@@ -504,7 +504,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             FinishedAt = doc.FinishedAt,
             Error = doc.Error,
             RetentionNotice = doc.RetentionNotice,
-            Duration = Link.UI.Services.AutomationRules.ResolveDuration(
+            Duration = Link.UI.Services.RunDuration.Resolve(
                 doc.Duration,
                 doc.Status,
                 doc.StartedAt,

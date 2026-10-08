@@ -1,0 +1,184 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+    var origin = ReturnUrlRules.Here(Context.Request);
+    var topic = Model.SelectedTopic;
+    var topicName = topic?.Topic ?? Model.DraftTopic;
+    var openAdvanced = query.Advanced || Model.Plan is not null || Model.DraftReason.Length > 0;
+}
+
+<div class="au-card card mt-3">
+    <div class="card-header">Choose a topic</div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+            @foreach (var row in Model.TopicRows)
+            {
+                var current = topic is not null && row.Topic == topic.Topic;
+                <a class="btn btn-sm @(current ? "btn-success" : "btn-au-neutral")" href="@query.Href(topic: row.Topic, page: 1)">@row.Topic</a>
+            }
+        </div>
+        @if (Model.TopicRows.Count == 0)
+        {
+            <p class="text-muted mb-0">No topics match this search.</p>
+        }
+    </div>
+</div>
+
+@if (topic is null)
+{
+    <p class="text-muted mt-3">Select a topic to see leaders, replicas, in-sync replicas, and lag.</p>
+}
+else
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">@topic.Topic</div>
+        <div class="card-body">
+            <p>
+                <partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = topic.Topic, CopyLabel = "Copy topic", ReturnUrl = origin })" />
+            </p>
+            <p>Key @topic.KeyClass <span class="text-muted">@topic.KeyShape</span>. Partitions @topic.Partitions. Retry @topic.RetryPartitions. Error @topic.ErrorPartitions. RF @topic.ReplicationFactor. Replica ceiling @topic.MaxReplicas.</p>
+            @if (topic.HardBlocked)
+            {
+                <div class="alert alert-secondary" role="status">Partition changes for this topic are blocked. .NET producers hash the facility key with CRC32 and MeasureEval hashes it with murmur2, so one facility can land on different partitions.</div>
+            }
+            else if (topic.OrderSensitive && topic.KeyClass == "Facility")
+            {
+                <p>This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero. One facility can never use more than one partition.</p>
+            }
+            else if (topic.OrderSensitive)
+            {
+                <p>This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero.</p>
+            }
+            <p class="mb-2">Config</p>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var config in topic.Configs.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+                    {
+                        <tr>
+                            <td>@config.Key</td>
+                            <td>@config.Value</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Partition</th>
+                            <th>Leader</th>
+                            <th>Replicas</th>
+                            <th>ISR</th>
+                            <th>High watermark</th>
+                            <th>Lag by group</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Partitions)
+                    {
+                        <tr>
+                            <td>@row.Partition</td>
+                            <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
+                            <td>@row.Replicas</td>
+                            <td>@row.InSync</td>
+                            <td>@(row.HighWatermark < 0 ? "—" : row.HighWatermark.ToString())</td>
+                            <td>
+                                @if (row.Lag.Count == 0)
+                                {
+                                    <span class="text-muted">No group lag</span>
+                                }
+                                else
+                                {
+                                    @string.Join("; ", row.Lag.Select(item => item.GroupId + " " + item.Lag))
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            @if (Model.Partitions.Count == 0)
+            {
+                <p class="text-muted mb-0 mt-2">Placement for this topic is not in the cluster metadata.</p>
+            }
+        </div>
+    </div>
+    <h2 class="h5 mt-4">Partition lag</h2>
+    <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
+
+    <details class="mt-4" @(openAdvanced ? "open" : null)>
+        <summary>Advanced: add partitions</summary>
+        <div class="alert alert-secondary mt-3" role="status">
+            Adding partitions is permanent and cannot be reversed. Existing keys are remapped. The main topic, its retry topic, and its error topic increase together. None of them can shrink.
+            @if (topic.KeyClass == "Facility")
+            {
+                <span>One facility can never use more than one partition.</span>
+            }
+        </div>
+        <form method="post" action="/Operations/Kafka/plan">
+            @Html.AntiForgeryToken()
+            <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
+            <div class="row g-2">
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="plan-partitions">Target partitions</label>
+                    <input class="form-control" id="plan-partitions" name="partitions" type="number" min="1" max="@Model.Topics.Cap" value="@(Model.DraftPartitions > 0 ? Model.DraftPartitions : topic.Partitions + 1)" />
+                </div>
+                <div class="col-12 col-md-5">
+                    <label class="form-label" for="plan-reason">Reason</label>
+                    <input class="form-control" id="plan-reason" name="reason" value="@Model.DraftReason" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="plan-confirm">Type the topic name</label>
+                    <input class="form-control" id="plan-confirm" name="confirmation" value="@Model.DraftConfirmation" data-topic="@topicName" autocomplete="off" />
+                </div>
+                <div class="col-12">
+                    <label class="form-check-label" for="plan-override">
+                        <input class="form-check-input" id="plan-override" type="checkbox" name="overrideQuietWindow" value="true" @(Model.DraftOverride ? "checked" : null) />
+                        Override the quiet window. A second approver and a reason are required.
+                    </label>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="plan-override-reason">Override reason</label>
+                    <input class="form-control" id="plan-override-reason" name="overrideReason" value="@Model.DraftOverrideReason" />
+                </div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                @if (!Model.Topics.ReadOnly)
+                {
+                    <button class="btn btn-sm btn-success" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                }
+            </div>
+        </form>
+        @if (Model.Plan is not null)
+        {
+            var plan = Model.Plan;
+            <div class="au-card card mt-3">
+                <div class="card-header">Dry run</div>
+                <div class="card-body">
+                    <p><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
+                    <p>@plan.CurrentPartitions to @plan.RequestedPartitions. Family @plan.Family. Key @plan.KeyClass @plan.KeyShape. Replica ceiling @plan.MaxReplicas.</p>
+                    <p>Retry @plan.RetryTopic and error @plan.ErrorTopic increase with the main topic.</p>
+                    <p>Quiet window @(plan.QuietWindowRequired ? (plan.QuietWindowMet ? "met" : "not met") : "not required"). @(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</p>
+                    @foreach (var note in plan.Notes)
+                    {
+                        <p class="mb-1">@note</p>
+                    }
+                    @foreach (var planError in plan.Errors)
+                    {
+                        <p class="mb-1">@planError</p>
+                    }
+                    <p class="mb-0">Groups: @(plan.AffectedGroups.Count == 0 ? "none" : string.Join(", ", plan.AffectedGroups))</p>
+                </div>
+            </div>
+        }
+    </details>
+}

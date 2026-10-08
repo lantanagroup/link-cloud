@@ -13,6 +13,7 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -23,6 +24,9 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Shared.Application.Factories;
+using Link.Authorization.Policies;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
@@ -101,6 +105,25 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
     builder.Services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { AllowAutoCreateTopics = false });
+
+    builder.Services.Configure<KafkaOpsOptions>(builder.Configuration.GetSection(KafkaOpsOptions.SectionName));
+    builder.Services.AddSingleton<KafkaBrokerGateway>();
+    builder.Services.AddSingleton<IKafkaBrokerGateway>(provider => provider.GetRequiredService<KafkaBrokerGateway>());
+    builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
+    builder.Services.AddSingleton<IKubernetesResourceClient, UnconfiguredKubernetesClient>();
+    builder.Services.AddSingleton<IKafkaInfraProvider>(provider =>
+    {
+        var options = provider.GetRequiredService<IOptions<KafkaOpsOptions>>().Value;
+        var environment = provider.GetRequiredService<IHostEnvironment>();
+        return KafkaInfraProviderFactory.Create(
+            options,
+            environment.IsProduction(),
+            provider.GetRequiredService<IProcessRunner>(),
+            provider.GetRequiredService<IKubernetesResourceClient>());
+    });
+    builder.Services.AddSingleton<IKafkaOpsService, KafkaOpsService>();
+    builder.Services.AddHostedService<KafkaOpsWorker>();
 
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
@@ -194,7 +217,11 @@ static void RegisterServices(WebApplicationBuilder builder)
             .AddPolicy("AuthenticatedUser", pb =>
             {
                 pb.RequireAssertion(_ => true);
-            });
+            })
+            .AddPolicy(PolicyNames.CanViewInfrastructure, pb => pb.RequireAssertion(_ => true))
+            .AddPolicy(PolicyNames.CanManageKafkaTopics, pb => pb.RequireAssertion(_ => true))
+            .AddPolicy(PolicyNames.CanManageScaling, pb => pb.RequireAssertion(_ => true))
+            .AddPolicy(PolicyNames.CanOperateKafka, pb => pb.RequireAssertion(_ => true));
     }
 
     // Configure CORS regardless of anonymous access
@@ -240,6 +267,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
     }
+
+    builder.Services.AddTransient<IApi, KafkaOpsEndpoints>();
 
     // Add health checks
     var monitorBackend = builder.Configuration.GetValue<bool>("MonitorBackendHealthChecks");
