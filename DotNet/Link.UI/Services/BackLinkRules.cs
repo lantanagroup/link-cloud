@@ -37,7 +37,7 @@ public static class BackLinkRules
         if (raw.StartsWith("Back to ", StringComparison.OrdinalIgnoreCase))
             return "Back to " + raw["Back to ".Length..].Trim();
         if (raw.Length == 0)
-            return "Back";
+            return "Back to the previous page";
         return "Back to " + raw.ToLowerInvariant();
     }
 

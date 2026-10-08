@@ -92,7 +92,7 @@
                         <div class="fw-semibold">@run.RunName</div>
                         <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
                         <div class="d-flex justify-content-between align-items-center mt-2">
-                            <span class="badge au-badge-active">@run.StatusLabel</span>
+                            <span class="badge @StatusPills.ForRun(run.Status)">@run.StatusLabel</span>
                             <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")"></span>
                         </div>
                         <a class="btn btn-sm btn-au-neutral mt-2 w-100" asp-action="Run" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">

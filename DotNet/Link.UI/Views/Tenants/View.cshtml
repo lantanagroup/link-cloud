@@ -1,6 +1,7 @@
 @model FacilityViewModel
 @{
-    var heading = Model.FacilityName ?? Model.FacilityId ?? "Facility";
+    var titleName = LabeledIdRules.DisplayName(Model.FacilityName, Model.FacilityId);
+    var heading = titleName ?? "Facility";
     ViewData["Title"] = heading;
 }
 
@@ -36,10 +37,11 @@ else if (Model.NotFound)
 }
 else
 {
+    <h1 class="h3 mb-3">@heading</h1>
     <div class="au-card card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span>Facility <partial name="_AutomationBadge" model="Model.AutomationRunId" /></span>
-            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Name = Model.FacilityName, Value = Model.FacilityId, CopyLabel = "Copy facility id" })" />
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, CopyLabel = "Copy facility id" })" />
         </div>
         <div class="card-body">
             <h2 class="h6">Enrolled reporting</h2>

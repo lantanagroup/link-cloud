@@ -284,7 +284,7 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
                     <tr>
                         <td>@validator.Name</td>
                         <td>
-                            <span class="badge rounded-pill @(string.Equals(validator.Outcome, "Passed", StringComparison.OrdinalIgnoreCase) ? "au-badge-success" : string.Equals(validator.Outcome, "Failed", StringComparison.OrdinalIgnoreCase) ? "au-badge-danger" : "au-badge-muted")">
+                            <span class="badge rounded-pill @StatusPills.ForOutcome(validator.Outcome)">
                                 @validator.Outcome
                             </span>
                         </td>

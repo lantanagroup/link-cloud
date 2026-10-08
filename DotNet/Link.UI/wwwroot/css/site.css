@@ -8,14 +8,19 @@
   --au-dark-soft:   #1a1a1a;
   --au-accent:      #343a40;
   --au-accent-fill: #111;
-  --au-accent-soft: #f3f5f8;
+  --au-accent-soft: #f4f4f4;
   --au-success:     #28a745;
+  --au-success-soft: #e9f7ee;
   --au-danger:      #dc3545;
   --au-warning:     #ffc107;
   --au-muted:       #545c64;
-  --au-bg:          #f3f5f8;
-  --au-text:        #1c2430;
-  --au-border:      #e2e6ec;
+  --au-bg:          #f4f4f4;
+  --au-text:        #222222;
+  --au-border:      #e6e6e6;
+  --lu-chart-compact-height: 140px;
+  --lu-chart-donut-size: 150px;
+  --lu-chart-dashboard-height: 168px;
+  --lu-chart-dashboard-donut: 168px;
   --au-card-shadow: 0 2px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
   --au-radius:      .5rem;
   --au-focus:       0 0 0 .2rem rgba(17, 17, 17, .16);
@@ -109,7 +114,7 @@ pre code, a > code { color: inherit; }
   background-color: var(--au-success) !important;
 }
 .bg-success-subtle {
-  background-color: #e9f7ee !important;
+  background-color: var(--au-success-soft) !important;
 }
 .text-success-emphasis {
   color: var(--au-success) !important;
@@ -343,14 +348,14 @@ details.au-facility-actions > summary::-webkit-details-marker {
 .btn-au-close:focus,
 .btn-au-close:active,
 .btn-au-close:disabled {
-  background-color: #f8f9fa;
-  border-color: #f8f9fa;
+  background-color: #f8f8f8;
+  border-color: #f8f8f8;
   color: #111;
 }
 .btn-au-close:hover,
 .btn-au-close:focus {
-  background-color: #e2e6ea;
-  border-color: #e2e6ea;
+  background-color: #e6e6e6;
+  border-color: #e6e6e6;
   color: #111;
 }
 
@@ -440,7 +445,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
   height: 2rem;
   margin: -1rem 0 0 -1rem;
   border: 3px solid #ccc;
-  border-top-color: var(--au-dark, #1f2937);
+  border-top-color: var(--au-dark, #222222);
   border-radius: 50%;
   animation: au-card-spin .8s linear infinite;
   z-index: 6;
@@ -453,9 +458,9 @@ details.au-facility-actions > summary::-webkit-details-marker {
    Cohort builder
    =================================================================== */
 .au-cohort-card {
-  border: 1px solid #dee2e6;
+  border: 1px solid #e0e0e0;
   border-radius: var(--au-radius);
-  background: #fafbfc;
+  background: #fafafa;
 }
 .au-cohort-card .card-body { padding: .75rem 1rem; }
 
@@ -586,7 +591,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
    Stat tiles (data-acq / norm / measure / validation)
    =================================================================== */
 .au-stat-tile {
-  border: 1px solid #e3e6ea;
+  border: 1px solid #e6e6e6;
   border-radius: var(--au-radius);
   padding: .6rem .8rem;
   background: #fff;
@@ -668,8 +673,8 @@ details.au-facility-actions > summary::-webkit-details-marker {
 .au-help-text {
   font-size: .78rem;
   line-height: 1.4;
-  color: #3d4753;
-  background: #f3f7fc;
+  color: #404040;
+  background: #f5f5f5;
   border-left: 3px solid var(--au-accent);
   padding: .45rem .7rem;
   margin: .35rem 0 .1rem;
@@ -684,8 +689,8 @@ details.au-facility-actions > summary::-webkit-details-marker {
 }
 .au-help-text li { margin-bottom: .15rem; }
 .au-help-panel {
-  background: #f7f9fc;
-  border: 1px solid #e3e8ef;
+  background: #f7f7f7;
+  border: 1px solid #e6e6e6;
   border-radius: var(--au-radius);
   padding: .6rem .85rem;
   margin-bottom: 1rem;
@@ -693,7 +698,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
 .au-help-panel > summary {
   cursor: pointer;
   font-weight: 600;
-  color: #2f3a46;
+  color: #333333;
   list-style: none;
   display: flex;
   align-items: center;
@@ -704,7 +709,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
 .au-help-panel[open] > summary { margin-bottom: .5rem; }
 .au-help-panel .au-help-body {
   font-size: .82rem;
-  color: #3d4753;
+  color: #404040;
   line-height: 1.45;
 }
 .au-help-panel .au-help-body p { margin: 0 0 .5rem; }
@@ -723,7 +728,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
 .au-cleanup-phase {
   padding-bottom: 1.15rem;
   margin-bottom: 1.15rem;
-  border-bottom: 1px solid #eceff3;
+  border-bottom: 1px solid #eeeeee;
 }
 .au-cleanup-section:last-of-type,
 .au-cleanup-phase-last {
@@ -790,7 +795,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
   gap: .35rem;
   padding: .75rem 1rem 0;
   background: #fff;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid #efefef;
 }
 .au-cfggen-step {
   flex: 1;
@@ -812,7 +817,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #e9ecef;
+  background: #e9e9e9;
   color: #555;
   font-size: .72rem;
   flex: 0 0 auto;
@@ -845,7 +850,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
   .au-cfggen-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .au-cfggen-choice {
-  border: 1px solid #e3e6ea;
+  border: 1px solid #e6e6e6;
   border-radius: var(--au-radius);
   padding: .85rem .95rem;
   background: #fff;
@@ -867,7 +872,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
   align-items: flex-start;
   gap: .6rem;
   padding: .55rem 0;
-  border-bottom: 1px solid #f0f2f4;
+  border-bottom: 1px solid #f1f1f1;
 }
 .au-cfggen-op:last-child { border-bottom: 0; }
 .au-cfggen-op-type {
@@ -885,8 +890,8 @@ details.au-facility-actions > summary::-webkit-details-marker {
   align-items: center;
   gap: .75rem;
   padding: .75rem 1.15rem;
-  border-top: 1px solid #eef0f3;
-  background: #fafbfc;
+  border-top: 1px solid #efefef;
+  background: #fafafa;
   flex-shrink: 0;
 }
 .au-cfggen-loading {
@@ -911,8 +916,8 @@ details.au-facility-actions > summary::-webkit-details-marker {
   overflow: auto;
   margin: .4rem 0 0;
   padding: .55rem .7rem;
-  background: #f7f8fa;
-  border: 1px solid #e9ecef;
+  background: #f8f8f8;
+  border: 1px solid #e9e9e9;
   border-radius: .35rem;
   font-size: .75rem;
 }
@@ -976,7 +981,7 @@ a.au-kpi-link:hover {
   color: inherit;
   text-decoration: none;
 }
-.home-row:hover { color: inherit; background: #f7f8fa; }
+.home-row:hover { color: inherit; background: #f8f8f8; }
 .home-row-main { min-width: 0; }
 .home-row-time { white-space: nowrap; justify-self: end; }
 .home-name { overflow-wrap: anywhere; }
@@ -1004,7 +1009,7 @@ a.au-kpi-link:hover {
 .home-trend-link:hover,
 .home-trend-link:focus {
   color: inherit;
-  background: #f7f8fa;
+  background: #f8f8f8;
 }
 .home-trend-plot {
   display: flex;
@@ -1028,7 +1033,7 @@ a.au-kpi-link:hover {
   text-decoration: none;
 }
 .home-issue:hover,
-.home-issue:focus { background: #f7f8fa; color: inherit; }
+.home-issue:focus { background: #f8f8f8; color: inherit; }
 .home-issue-title { display: block; font-weight: 600; }
 .home-issue-detail { display: block; color: var(--au-muted); font-size: .8rem; }
 a.au-service-chip { display: block; color: inherit; text-decoration: none; }
@@ -1037,7 +1042,7 @@ a.au-service-chip:focus { color: inherit; }
 .home-chip-slow { box-shadow: inset 0 0 0 2px var(--au-danger); }
 
 .au-service-chip {
-  background: #f7f8fa;
+  background: #f8f8f8;
   border-radius: var(--au-radius);
   padding: .75rem .8rem;
   height: 100%;
@@ -1061,7 +1066,7 @@ a.au-service-chip:focus { color: inherit; }
 }
 
 .au-live-gauge-card {
-  background: #f7f8fa;
+  background: #f8f8f8;
   border-radius: var(--au-radius);
   padding: .85rem .7rem .7rem;
   height: 100%;
@@ -1099,7 +1104,7 @@ a.au-service-chip:focus { color: inherit; }
   margin: 0 auto -0.35rem;
 }
 .au-gauge-track {
-  stroke: #e6e8ee;
+  stroke: #e8e8e8;
   stroke-width: 9;
   stroke-linecap: round;
 }
@@ -1163,12 +1168,14 @@ a.au-scenario-card:hover {
 .lu-chart-donut {
   position: relative;
   width: 100%;
-  height: 200px;
-  max-height: 220px;
+  height: var(--lu-chart-compact-height);
+  max-height: var(--lu-chart-compact-height);
 }
 .lu-chart-donut {
-  height: 210px;
-  max-width: 260px;
+  width: var(--lu-chart-donut-size);
+  height: var(--lu-chart-donut-size);
+  max-width: var(--lu-chart-donut-size);
+  max-height: var(--lu-chart-donut-size);
   margin-inline: auto;
 }
 .lu-chart > canvas,
@@ -1219,7 +1226,7 @@ a.au-scenario-card:hover {
   cursor: pointer;
 }
 .pc-picker-item:hover {
-  background: #f4f6f8;
+  background: #f5f5f5;
 }
 .pc-picker-add {
   font-size: .82rem;
@@ -1326,7 +1333,7 @@ a.au-scenario-card:hover {
   gap: .5rem .65rem;
   align-items: center;
   padding: .7rem .9rem;
-  background: #fafbfc;
+  background: #fafafa;
   border-bottom: 1px solid var(--au-border);
 }
 .au-table-toolbar .form-control,
@@ -1371,8 +1378,8 @@ a.au-scenario-card:hover {
    Live service pulse (Performance dashboard)
    =================================================================== */
 .au-pulse {
-  background: linear-gradient(180deg, #171a20 0%, #111 100%);
-  color: #e8edf4;
+  background: linear-gradient(180deg, #181818 0%, #111 100%);
+  color: #eaeaea;
   border-radius: var(--au-radius);
   box-shadow: var(--au-card-shadow);
   overflow: hidden;
@@ -1558,7 +1565,7 @@ a.au-scenario-card:hover {
 }
 .au-pulse-h-meter .au-pulse-h-track {
   height: 8px;
-  background: #e8eaef;
+  background: #e9e9e9;
   border-radius: 99px;
   overflow: hidden;
 }
@@ -1579,7 +1586,7 @@ a.au-scenario-card:hover {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: .55rem;
   padding: .75rem;
-  background: #f7f8fa;
+  background: #f8f8f8;
 }
 .au-pulse-mini {
   background: #fff;
@@ -1947,13 +1954,16 @@ a.lu-clip {
 .au-dash .card-header { padding: .3rem .7rem; }
 .au-dash .card-body { padding: .45rem .7rem; }
 .au-dash .mb-3 { margin-bottom: .45rem !important; }
-.au-dash .lu-chart,
-.au-dash .lu-chart-donut {
-  height: 88px;
-  max-height: 88px;
+.au-dash .lu-chart {
+  height: var(--lu-chart-dashboard-height);
+  max-height: var(--lu-chart-dashboard-height);
 }
-.au-dash .lu-chart-donut { max-width: 120px; }
-.au-dash #recentRunsCard .table-responsive { max-height: 8.5rem; }
+.au-dash .lu-chart-donut {
+  width: var(--lu-chart-dashboard-donut);
+  height: var(--lu-chart-dashboard-donut);
+  max-width: var(--lu-chart-dashboard-donut);
+  max-height: var(--lu-chart-dashboard-donut);
+}
 .au-dash #activeCard .border { padding: .4rem .6rem !important; }
 .au-dash #activeCard .btn { margin-top: .25rem !important; padding-top: .1rem; padding-bottom: .1rem; }
 
@@ -2184,13 +2194,13 @@ a.lu-clip {
   gap: .75rem;
   align-items: center;
   padding: .4rem 0;
-  border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+  border-bottom: 1px solid var(--bs-border-color, #e0e0e0);
 }
 
 .lu-location-row.is-selected { background: var(--au-bg); }
 
 .lu-hsloc-detail {
-  border: 1px solid var(--bs-border-color, #dee2e6);
+  border: 1px solid var(--bs-border-color, #e0e0e0);
   border-radius: .375rem;
   padding: .75rem;
 }
@@ -2234,9 +2244,9 @@ a.lu-clip {
   border-color: #b02a37;
 }
 .badge.text-bg-light {
-  background-color: #f8f9fa !important;
+  background-color: #f8f8f8 !important;
   color: #111 !important;
-  border: 1px solid #ced4da;
+  border: 1px solid #d0d0d0;
 }
 .badge.text-bg-secondary { background-color: #6c757d !important; color: #fff !important; }
 .badge.text-bg-success { background-color: var(--au-success) !important; color: #fff !important; }

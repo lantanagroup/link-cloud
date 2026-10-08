@@ -227,8 +227,6 @@
                             <div class="border rounded p-3 h-100">
                                 <div class="small text-muted mb-2">Report Schedule</div>
                                 <div class="row g-2">
-                                    <div class="col-md-12"><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility ID", Value = Model.FacilityId, CopyLabel = "Copy facility id", ValueElementId = "scheduleFacilityId" })" /></div>
-                                    <div class="col-md-6"><partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = Model.ReportId, CopyLabel = "Copy report id", ValueElementId = "scheduleReportName" })" /></div>
                                     <div class="col-md-6"><strong>Frequency:</strong> <span id="scheduleFrequency">-</span></div>
                                     <div class="col-md-6"><strong>Start:</strong> <span id="scheduleStart">-</span></div>
                                     <div class="col-md-6"><strong>End:</strong> <span id="scheduleEnd">-</span></div>
@@ -476,7 +474,7 @@
                 <div class="sticky-top bg-white border-bottom px-3 py-2" style="z-index:2;">
                     <div class="row g-2 align-items-center">
                         <div class="col">
-                            <input type="text" class="form-control form-control-sm" id="exModalSearch" placeholder="Search exceptions…">
+                            <input type="text" class="form-control form-control-sm" id="exModalSearch" data-lu-query="exceptions" placeholder="Search exceptions…">
                         </div>
                         <div class="col-auto">
                             <span class="badge au-badge-muted" id="exModalVisibleCount">0</span>
