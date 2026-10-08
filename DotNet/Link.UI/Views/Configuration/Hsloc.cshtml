@@ -97,7 +97,7 @@ else
                         @foreach (var row in Model.Rows)
                         {
                             <tr>
-                                <td class="text-nowrap"><code>@row.Code</code></td>
+                                <td class="text-nowrap"><partial name="_LabeledId" model="@(new LabeledId { Label = "Code", Value = row.Code, Compact = true, CopyLabel = "Copy code" })" /></td>
                                 <td>@row.CdcCode</td>
                                 <td>@row.ShortDescription</td>
                                 <td>@row.LongDescription</td>
@@ -108,7 +108,7 @@ else
                                         <input type="hidden" name="text" value="@query.Text" />
                                         <input type="hidden" name="version" value="@query.Version" />
                                         <input type="hidden" name="page" value="@bar.Page" />
-                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Code"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     </form>
                                 </td>
                             </tr>

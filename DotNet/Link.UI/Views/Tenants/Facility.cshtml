@@ -58,7 +58,7 @@ else
             @if (!Model.IsCreate)
             {
                 <span class="d-flex align-items-center gap-2">
-                    <a class="btn btn-sm btn-light" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">View</a>
+                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)" title="View" aria-label="View"><i class="bi bi-eye" aria-hidden="true"></i></a>
                 </span>
             }
         </div>
@@ -183,7 +183,7 @@ else
                                             </div>
                                             <div class="col-12 col-md-2">
                                                 <input class="d-none" type="checkbox" id="remove-@i" name="Schedules[@i].Remove" value="true" />
-                                                <button type="button" class="btn btn-sm btn-danger" data-row-remove>Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-row-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             </div>
                                         </div>
                                     </div>
@@ -252,7 +252,7 @@ else
                                                 <input class="form-control" data-email-input value="@address" aria-label="Email address" maxlength="254" />
                                             </div>
                                             <div class="col-auto">
-                                                <button type="button" class="btn btn-sm btn-danger" data-email-remove>Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-email-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             </div>
                                         </div>
                                     }

@@ -422,7 +422,7 @@
                     <li><strong>Use FHIR Server Data</strong>: discard this upload and import by Patient ID using server data.</li>
                 </ol>
                 <div class="alert alert-warning py-2 small mb-3">This is a destructive server operation. Only proceed if you intentionally want uploaded content to become authoritative on the FHIR server.</div>
-                <div id="replaceFhirLargeHint" class="alert alert-info py-2 small mb-3" style="display:none;">
+                <div id="replaceFhirLargeHint" class="alert au-note py-2 small mb-3" style="display:none;">
                     This bundle is considered large. For now, use <strong>Purge + Replace</strong> because pulling full patient data from the server can be incomplete for large patients.
                 </div>
                 <div class="small text-muted mb-1">Patient</div>
@@ -1274,7 +1274,7 @@
                 '<td><input type="number" class="form-control form-control-sm cohort-count" min="1" value="' + (count || 1) + '" /></td>' +
                 '<td>' + buildPatientConfigSelect(patientConfigurationId || '') + '</td>' +
                 '<td class="cohort-predicted-cell align-middle"></td>' +
-                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger btn-remove-cohort">&times;</button></td>';
+                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-remove-cohort" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button></td>';
             if (intent) tr.dataset.intentJson = JSON.stringify(intent);
             if (patientConfigurationId) tr.dataset.patientConfigurationId = patientConfigurationId;
             var cfg = findPatientConfig(patientConfigurationId);
@@ -1835,7 +1835,7 @@
 
             var sourceLabel = row.source === 'Bundle'
                 ? '<span class="badge au-badge-muted"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
-                : '<span class="badge bg-secondary"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
+                : '<span class="badge au-badge-muted"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
             var fileLabel = row.source === 'Bundle' && row.fileName ? '<div class="small text-muted">' + esc(row.fileName) + '</div>' : '';
             var detectBtn = '<button type="button" class="btn btn-sm btn-au-neutral btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';
             var tr = document.createElement('tr');
@@ -1858,7 +1858,7 @@
                 '<td><div class="imp-elig-editor">' + importedRowEligEditor(elig) + '</div></td>' +
                 '<td class="imp-encounter-cell align-middle small"></td>' +
                 '<td class="align-middle text-center">' + detectBtn + '</td>' +
-                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger btn-remove-imported">&times;</button></td>';
+                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-remove-imported" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button></td>';
             importedRows.appendChild(tr);
             renderImportedEncounterCell(tr);
             reindexImported();
@@ -2337,7 +2337,7 @@
                     populate(data);
                     var isSystem = data.isSystemScenario === true;
                     var isView = mode === 'view' || isSystem;
-                    modalTitle.innerHTML = '<i class="bi bi-' + (isView ? 'eye' : 'pencil-square') + ' me-2"></i>' + (isView ? 'View' : 'Edit') + ': ' + esc(data.name || 'Scenario') + (isSystem ? ' <span class="badge bg-secondary ms-2">System</span>' : '');
+                    modalTitle.innerHTML = '<i class="bi bi-' + (isView ? 'eye' : 'pencil-square') + ' me-2"></i>' + (isView ? 'View' : 'Edit') + ': ' + esc(data.name || 'Scenario') + (isSystem ? ' <span class="badge au-badge-muted ms-2">System</span>' : '');
                     setEditable(!isView);
                     openModal();
                 } catch (err) {

@@ -50,7 +50,7 @@
                             <strong>@t.Name</strong>
                             @if (t.IsDefault)
                             {
-                                <span class="badge bg-success ms-1">Default</span>
+                                <span class="badge au-badge-success ms-1">Default</span>
                             }
                             @if (!string.IsNullOrWhiteSpace(t.Description))
                             {
@@ -70,16 +70,18 @@
                         </td>
                         <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                         <td class="text-nowrap">
-                            <button class="btn btn-sm btn-au-neutral btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
-                            <button class="btn btn-sm btn-au-neutral btn-map-clone" data-id="@t.Id">Clone</button>
-                            @if (!t.IsDefault)
-                            {
-                                <button class="btn btn-sm btn-success btn-map-default" data-id="@t.Id">Default</button>
-                            }
-                            @if (!t.IsSystem)
-                            {
-                                <button class="btn btn-sm btn-danger btn-map-delete" data-id="@t.Id">Delete</button>
-                            }
+                            <div class="lu-row-actions">
+                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-map-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                @if (!t.IsDefault)
+                                {
+                                    <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-map-default" data-id="@t.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i></button>
+                                }
+                                @if (!t.IsSystem)
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-map-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                }
+                            </div>
                         </td>
                     </tr>
                 }
@@ -187,8 +189,10 @@
     function makeRemoveButton(onClick){
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'btn btn-sm btn-danger';
-        btn.innerHTML = '<i class="bi bi-x-lg"></i>';
+        btn.className = 'btn btn-sm btn-danger lu-icon-btn';
+        btn.title = 'Remove';
+        btn.setAttribute('aria-label', 'Remove');
+        btn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
         btn.addEventListener('click', onClick);
         return btn;
     }
@@ -287,7 +291,7 @@
         row.className = 'card mb-2 p-2 location-type-match-row map-match-card';
         row.dataset.matchType = 'LocationType';
         row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
-            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge bg-warning text-dark ms-1">Location Type</span></div>'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge au-badge-warning ms-1">Location Type</span></div>'
             + '<div class="d-flex gap-1 map-match-actions"></div>'
             + '</div>'
             + '<div class="row g-2">'
@@ -331,7 +335,7 @@
         row.className = 'card mb-2 p-2 custom-match-row map-match-card';
         row.dataset.matchType = 'Custom';
         row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
-            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge bg-secondary ms-1">Custom FHIRPath</span></div>'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge au-badge-muted ms-1">Custom FHIRPath</span></div>'
             + '<div class="d-flex gap-1 map-match-actions"></div>'
             + '</div>'
             + '<label class="form-label mb-1 small">FHIRPath</label>'

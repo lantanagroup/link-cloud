@@ -2,7 +2,8 @@
 @if (LinkUiFeatures.Value.AutomationEnabled)
 {
     var scope = AutomationMarkRules.NormalizeScope(Model);
-    <label class="form-label" for="automationScope">Facility type</label>
+    <div class="d-flex align-items-center gap-2">
+    <label class="col-form-label py-0 text-nowrap" for="automationScope">Facility type</label>
     <select id="automationScope" name="scope" class="form-select">
         @if (scope == AutomationMarkRules.Automation)
         {
@@ -23,4 +24,5 @@
             <option value="automation">Automation</option>
         }
     </select>
+    </div>
 }

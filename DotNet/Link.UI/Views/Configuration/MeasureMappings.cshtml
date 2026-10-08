@@ -109,8 +109,7 @@ else
                                     <th scope="col">Measure</th>
                                     <th scope="col">dQM</th>
                                     <th scope="col">Frequency</th>
-                                    <th scope="col"><span class="visually-hidden">Save</span></th>
-                                    <th scope="col"><span class="visually-hidden">Delete</span></th>
+                                    <th scope="col"><span class="visually-hidden">Actions</span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -140,17 +139,17 @@ else
                                         </select>
                                     </td>
                                     <td>
-                                        <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveMapping">
-                                            <input type="hidden" name="Id" value="@row.Id" />
-                                            <button type="submit" class="btn btn-sm btn-success">Save</button>
-                                            <button type="button" class="btn btn-sm btn-au-neutral" data-lu-cancel>Cancel</button>
-                                        </form>
-                                    </td>
-                                    <td>
-                                        <form method="post" data-au-save asp-action="DeleteMapping" onsubmit="return confirm('Delete this measure mapping?');">
-                                            <input type="hidden" name="id" value="@row.Id" />
-                                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                                        </form>
+                                        <div class="lu-row-actions">
+                                            <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveMapping">
+                                                <input type="hidden" name="Id" value="@row.Id" />
+                                                <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save mapping @row.Id"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing mapping @row.Id"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                            </form>
+                                            <form method="post" data-au-save asp-action="DeleteMapping" onsubmit="return confirm('Delete this measure mapping?');">
+                                                <input type="hidden" name="id" value="@row.Id" />
+                                                <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete mapping @row.Id"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             }

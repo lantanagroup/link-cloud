@@ -13,7 +13,8 @@ public class SectionChromeTests
         nav.Should().BeGreaterThan(-1);
         var bar = css.Substring(nav, 280);
         bar.Should().Contain("background: var(--au-dark);");
-        bar.Should().Contain("overflow-x: auto");
+        bar.Should().Contain("overflow-x: hidden");
+        bar.Should().Contain("flex-wrap: wrap");
 
         var current = css.IndexOf(".lu-section-nav a.lu-nav-current", StringComparison.Ordinal);
         current.Should().BeGreaterThan(-1);

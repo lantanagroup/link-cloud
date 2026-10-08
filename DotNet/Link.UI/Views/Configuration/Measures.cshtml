@@ -35,10 +35,10 @@
                     @foreach (var row in Model.Measures)
                     {
                         <tr>
-                            <td><code>@row.Id</code></td>
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = row.Id, Compact = true, CopyLabel = "Copy id" })" /></td>
                             <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
                             <td class="text-nowrap">@(string.IsNullOrWhiteSpace(row.Modified) ? "—" : row.Modified)</td>
-                            <td><a asp-action="Measure" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a></td>
+                            <td><a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Measure" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a></td>
                         </tr>
                     }
                     </tbody>

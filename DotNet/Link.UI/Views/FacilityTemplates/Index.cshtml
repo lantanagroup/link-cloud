@@ -43,7 +43,7 @@
                             <strong>@t.Name</strong>
                             @if (t.IsDefault)
                             {
-                                <span class="badge bg-success ms-1">System config</span>
+                                <span class="badge au-badge-success ms-1">System config</span>
                             }
                             @if (!string.IsNullOrWhiteSpace(t.Description))
                             {
@@ -68,12 +68,14 @@
                             }
                         </td>
                         <td class="text-nowrap">
-                            <button type="button" class="btn btn-sm btn-au-neutral btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">@(t.IsSystem ? "View" : "Edit")</button>
-                            <button type="button" class="btn btn-sm btn-au-neutral btn-facility-clone" data-id="@t.Id">Clone</button>
-                            @if (!t.IsSystem)
-                            {
-                                <button type="button" class="btn btn-sm btn-danger btn-facility-delete" data-id="@t.Id">Delete</button>
-                            }
+                            <div class="lu-row-actions">
+                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-facility-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                @if (!t.IsSystem)
+                                {
+                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-facility-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                }
+                            </div>
                         </td>
                     </tr>
                 }

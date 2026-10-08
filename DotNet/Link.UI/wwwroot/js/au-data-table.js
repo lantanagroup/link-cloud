@@ -127,6 +127,67 @@
         select.hidden = false;
     }
 
+    function pageParams() {
+        return new URLSearchParams(window.location.search);
+    }
+
+    function readQuery() {
+        var params = pageParams();
+        return {
+            q: params.get('q') || '',
+            type: params.get('type') || '',
+            sort: params.get('sort') || '',
+            dir: params.get('dir') === 'asc' ? 'asc' : (params.get('dir') === 'desc' ? 'desc' : '')
+        };
+    }
+
+    function writeQuery(shell) {
+        var params = pageParams();
+        function put(key, value) {
+            if (value) params.set(key, value);
+            else params.delete(key);
+        }
+        put('q', (shell._auSearch || '').trim());
+        put('type', shell._auType || '');
+        put('sort', shell._auSortKey || '');
+        put('dir', shell._auSortKey ? (shell._auSortDir || '') : '');
+        var next = params.toString();
+        var url = window.location.pathname + (next ? '?' + next : '') + window.location.hash;
+        var current = window.location.pathname + window.location.search + window.location.hash;
+        if (url !== current) history.replaceState(history.state, '', url);
+    }
+
+    function markSort(shell, key, dir) {
+        var table = shell._auTable;
+        if (!table) return;
+        Array.prototype.forEach.call(table.querySelectorAll('thead th[data-sort]'), function (other) {
+            other.removeAttribute('data-sort-dir');
+            if (key && other.getAttribute('data-sort') === key) {
+                other.setAttribute('data-sort-dir', dir);
+                shell._auSortIndex = other.cellIndex;
+                shell._auSortNumeric = other.getAttribute('data-sort-type') === 'number' || key === 'updated';
+            }
+        });
+    }
+
+    function restoreQuery(shell) {
+        var saved = readQuery();
+        shell._auSearch = saved.q;
+        shell._auType = saved.type;
+        var search = shell.querySelector('.au-table-search');
+        if (search) search.value = saved.q;
+        var typeSel = shell.querySelector('.au-table-type');
+        if (typeSel && saved.type) {
+            typeSel.value = saved.type;
+            shell._auType = typeSel.value;
+        }
+        if (saved.sort) {
+            shell._auSortKey = saved.sort;
+            shell._auSortDir = saved.dir || 'asc';
+            markSort(shell, shell._auSortKey, shell._auSortDir);
+        }
+    }
+
     function enhance(shell) {
         if (shell.dataset.auTableReady === 'true') return;
         var table = shell.matches('table') ? shell : shell.querySelector('table');
@@ -149,6 +210,7 @@
             search.addEventListener('input', function () {
                 shell._auSearch = search.value;
                 apply(shell);
+                writeQuery(shell);
             });
         }
         var typeSel = toolbar.querySelector('.au-table-type');
@@ -156,6 +218,7 @@
             typeSel.addEventListener('change', function () {
                 shell._auType = typeSel.value;
                 apply(shell);
+                writeQuery(shell);
             });
         }
 
@@ -186,10 +249,12 @@
                 });
                 th.setAttribute('data-sort-dir', shell._auSortDir);
                 apply(shell);
+                writeQuery(shell);
             });
             void i;
         });
 
+        restoreQuery(shell);
         apply(shell);
     }
 
@@ -213,6 +278,14 @@
             });
         }).observe(document.body, { childList: true, subtree: true });
     }
+
+    window.addEventListener('popstate', function () {
+        document.querySelectorAll('[data-au-table]').forEach(function (shell) {
+            if (shell.dataset.auTableReady !== 'true') return;
+            restoreQuery(shell);
+            apply(shell);
+        });
+    });
 
     window.AuDataTable = { scan: scan, apply: apply };
 })();

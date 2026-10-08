@@ -285,7 +285,7 @@
 
         function findingsHtml() {
             return `
-                ${combined ? '<div class="alert alert-info py-2 small">Includes every patient analyzed in this session, not just the last upload.</div>' : ''}
+                ${combined ? '<div class="alert au-note py-2 small">Includes every patient analyzed in this session, not just the last upload.</div>' : ''}
                 <p class="au-cfggen-intro">We looked at the uploaded patients and found the pieces needed to recognize hospital locations and clean the FHIR data.</p>
                 <div class="au-cfggen-stats">
                     <div class="au-stat-tile"><div class="au-stat-value">${esc(patientCount)}</div><div class="au-stat-label">Patients</div></div>

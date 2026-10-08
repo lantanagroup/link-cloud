@@ -82,12 +82,12 @@
                                 <td>
                                     @foreach (var m in s.SelectedMeasures)
                                     {
-                                        <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
+                                        <span class="badge au-badge-muted">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
                                     }
                                 </td>
                                 <td>@patientCount</td>
                                 <td>@resourceRange</td>
-                                <td><code>@s.Seed</code></td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Seed", Value = s.Seed.ToString(), Compact = true, CopyLabel = "Copy seed" })" /></td>
                                 <td>
                                     @if (s.IsSystemScenario)
                                     {
@@ -100,14 +100,12 @@
                                 </td>
                                 <td class="small text-muted">@LinkUiTime.Display(s.UpdatedAt)</td>
                                 <td class="text-nowrap">
-                                    <div class="d-inline-flex gap-1">
-                                        <button type="button" class="btn btn-sm btn-au-neutral btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
-                                            @(s.IsSystemScenario ? "View" : "Edit")
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-au-neutral btn-scenario-clone" data-id="@s.Id">Clone</button>
+                                    <div class="lu-row-actions">
+                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")" title="@(s.IsSystemScenario ? "View" : "Edit")" aria-label="@(s.IsSystemScenario ? "View" : "Edit")"><i class="bi @(s.IsSystemScenario ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-scenario-clone" data-id="@s.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
                                         @if (!s.IsSystemScenario)
                                         {
-                                            <button type="button" class="btn btn-sm btn-danger btn-scenario-delete" data-id="@s.Id">Delete</button>
+                                            <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-scenario-delete" data-id="@s.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                         }
                                     </div>
                                 </td>
