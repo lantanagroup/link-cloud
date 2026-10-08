@@ -262,10 +262,13 @@ public sealed class FacilityAcquisitionService
     public async Task<string?> TestSavedSftpAsync(FacilityHubViewModel page, CancellationToken cancellationToken)
     {
         var response = await _client.TestSavedSftpConnectionAsync(page.FacilityId!, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessStatusCode || response.Body is not { Success: true })
         {
             LogFailure("SFTP saved connection test", page.FacilityId, response);
-            return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
+            var detail = response.Body?.Message;
+            return string.IsNullOrWhiteSpace(detail)
+                ? FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody)
+                : detail;
         }
 
         return null;

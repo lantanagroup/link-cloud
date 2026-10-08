@@ -217,6 +217,22 @@ public class SaveInPlaceTests
     }
 
     [Fact]
+    public void Saved_sftp_test_reads_the_result_body()
+    {
+        var service = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/FacilityAcquisitionService.cs"));
+        var start = service.IndexOf("Task<string?> TestSavedSftpAsync(", StringComparison.Ordinal);
+        var end = service.IndexOf("Task<string?> TestSftpAsync(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = service.Substring(start, end - start);
+        body.Should().Contain("response.Body is not { Success: true }");
+        body.Should().Contain("response.Body?.Message");
+
+        var client = File.ReadAllText(RepoFile("DotNet/LinkSdk/Clients/DataAcquisitionServiceClient.cs"));
+        client.Should().Contain("SendAsync<SftpTestConnectionResultApiModel>(() => Request($\"data/{organizationId}/sftp-configurations/test-connection\")");
+    }
+
+    [Fact]
     public void Report_counts_survive_a_page_refresh()
     {
         var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
