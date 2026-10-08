@@ -257,12 +257,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
     private static string? Correlation(HttpContext http) =>
         http.Request.Headers["X-Correlation-Id"].FirstOrDefault();
 
-    private IResult StatusFor(KafkaOpsRejectedException ex)
-    {
-        var forbidden = ex.Message.Contains("read-only", StringComparison.OrdinalIgnoreCase)
-            || ex.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase);
-        return Problem(ex.Message, forbidden ? StatusCodes.Status403Forbidden : StatusCodes.Status400BadRequest);
-    }
+    private IResult StatusFor(KafkaOpsRejectedException ex) =>
+        Problem(ex.Message, ex is KafkaOpsForbiddenException
+            ? StatusCodes.Status403Forbidden
+            : StatusCodes.Status400BadRequest);
 
     private static bool TryToken(string? value, out string name)
     {
