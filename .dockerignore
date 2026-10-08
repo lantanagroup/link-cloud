@@ -44,8 +44,8 @@ smoke-test*.log
 **/.env
 .azure-artifacts.env
 **/.azure-artifacts.env
-.azure-artifacts.*.tmp
-**/.azure-artifacts.*.tmp
+.azure-artifacts.*
+**/.azure-artifacts.*
 **/.git
 **/.gitattributes
 **/.gitignore

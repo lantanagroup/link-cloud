@@ -233,12 +233,35 @@ exit 1
 EOF
 chmod +x "$mv_home/bin/uname" "$mv_home/bin/az"
 old_path=$PATH
+trace_root="$repo/trace-root"
+mkdir -p "$trace_root"
 set +e
-PATH="$mv_home/bin:$PATH" TMPDIR="$mv_home/tmp" bash "$root/docker-compose.feed-token-fetch.sh" "$mv_home/missing" >"$mv_home/out.txt" 2>"$mv_home/err.txt"
+PATH="$mv_home/bin:$old_path" env SHELLOPTS=xtrace bash "$root/docker-compose.feed-token-fetch.sh" "$trace_root" >"$repo/fetch-xtrace-out.txt" 2>"$repo/fetch-xtrace-err.txt"
+trace_code=$?
+set -e
+trace_files=$(find "$trace_root" -name '.azure-artifacts.*' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+if [ "$trace_code" -eq 0 ] && [ "$trace_files" -eq 1 ]; then
+  pass 'inherited xtrace still writes the token file'
+else
+  fail 'inherited xtrace still writes the token file'
+fi
+if grep -F "$sentinel" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" >/dev/null 2>&1; then
+  fail 'inherited xtrace does not print the token'
+else
+  pass 'inherited xtrace does not print the token'
+fi
+mkdir -p "$mv_home/root"
+cat > "$mv_home/bin/mv" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+chmod +x "$mv_home/bin/mv"
+set +e
+PATH="$mv_home/bin:$old_path" TMPDIR="$mv_home/tmp" bash "$root/docker-compose.feed-token-fetch.sh" "$mv_home/root" >"$mv_home/out.txt" 2>"$mv_home/err.txt"
 mv_code=$?
 set -e
 PATH=$old_path
-left=$(find "$mv_home/tmp" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+left=$(find "$mv_home/root" -name '.azure-artifacts.*' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
 if [ "$mv_code" -ne 0 ] && [ "$left" -eq 0 ]; then
   pass 'failed token move removes the temporary file'
 else
@@ -249,9 +272,33 @@ if grep -F "$sentinel" "$mv_home/out.txt" "$mv_home/err.txt" >/dev/null 2>&1; th
 else
   pass 'failed token move does not print the token'
 fi
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1893456000' > "$repo/.azure-artifacts.env"
+export LINK_CLOUD_REPO_ROOT_OVERRIDE="$repo"
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+reset_log
+set +e
+set -x
+docker compose ps >"$repo/xtrace-out.txt" 2>"$repo/xtrace-err.txt"
+xcode=$?
+case $- in
+  *x*) tracing=1 ;;
+  *) tracing=0 ;;
+esac
+set +x
+set -e
+if [ "$xcode" -eq 0 ] && [ "$tracing" -eq 1 ]; then
+  pass 'bash xtrace stays enabled after compose'
+else
+  fail 'bash xtrace stays enabled after compose'
+fi
+if grep -F "$sentinel" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" >/dev/null 2>&1; then
+  fail 'bash xtrace does not print the token'
+else
+  pass 'bash xtrace does not print the token'
+fi
 
 # Output files must not contain the sentinel.
-if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" >/dev/null 2>&1; then
+if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" >/dev/null 2>&1; then
   fail 'bash test output does not contain the token'
 else
   pass 'bash test output does not contain the token'

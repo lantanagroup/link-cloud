@@ -53,6 +53,9 @@ function Set-DockerHook {
         } else {
             $hooks['DockerSaw'] = 'absent'
         }
+        $stdinText = ''
+        foreach ($item in $input) { $stdinText += [string]$item }
+        $hooks['Stdin'] = $stdinText
         return $ExitCode
     }.GetNewClosure()
 }
@@ -208,6 +211,31 @@ try {
     docker --context desktop-linux version
     $contextVersion = @($global:LinkCloudFeedTokenHooks['DockerCalls'][1])
     Write-Result ($contextVersion.Count -eq 3 -and $contextVersion[2] -eq 'version') 'docker global option on a non-compose command is passed through'
+
+    # Pipeline input reaches docker. A command without a pipeline does not get an empty pipe.
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = ''
+    Set-DockerHook -ExitCode 0
+    'hello' | docker exec -i db
+    Write-Result ($global:LinkCloudFeedTokenHooks['Stdin'] -eq 'hello') 'docker wrapper forwards pipeline input outside the repo'
+    docker version
+    Write-Result ([string]$global:LinkCloudFeedTokenHooks['Stdin'] -eq '') 'docker wrapper does not invent pipeline input'
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = $repo
+    Set-DockerHook -ExitCode 0
+    'hello' | docker exec -i db
+    Write-Result ($global:LinkCloudFeedTokenHooks['Stdin'] -eq 'hello') 'docker wrapper forwards pipeline input inside the repo'
+    $copyRoot = Join-Path $repo 'reload-copy'
+    $copyScripts = Join-Path $copyRoot 'Scripts'
+    New-Item -ItemType Directory -Path $copyScripts | Out-Null
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docker-compose.feed-token-profile.ps1') -Destination (Join-Path $copyScripts 'docker-compose.feed-token-profile.ps1')
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['SkipReload'] = $false
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = $copyRoot
+    Set-DockerHook -ExitCode 0
+    'hello' | docker exec -i db
+    Write-Result ($global:LinkCloudFeedTokenHooks['Stdin'] -eq 'hello') 'docker wrapper forwards pipeline input through reload'
+    $global:LinkCloudFeedTokenHooks['SkipReload'] = $true
 
     # Message text matches the image restore helper.
     $restore = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'docker-compose.restore-feed.sh'))

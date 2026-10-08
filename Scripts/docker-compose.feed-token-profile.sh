@@ -129,42 +129,45 @@ link_cloud_is_compose() {
 }
 
 link_cloud_launch() {
-  local root envfile now token expires
-  root=$(find_link_cloud_root) || {
-    printf '%s\n' "compose is only available inside the link-cloud repo." >&2
-    return 1
-  }
-  envfile="$root/.azure-artifacts.env"
-  now=$(link_cloud_now)
-  token=""
-  expires=""
-  if [ -f "$envfile" ]; then
-    link_cloud_load_token "$envfile"
-  fi
-  if ! link_cloud_token_fresh "$token" "$expires" "$now"; then
-    if ! link_cloud_fetch "$root"; then
-      link_cloud_missing_message >&2
-      return 1
-    fi
-    if [ ! -f "$envfile" ]; then
-      link_cloud_missing_message >&2
-      return 1
-    fi
+  # The subshell keeps the caller's set -x from printing the token, and from being turned off.
+  (
+    set +x
+    root=$(find_link_cloud_root) || {
+      printf '%s\n' "compose is only available inside the link-cloud repo." >&2
+      exit 1
+    }
+    envfile="$root/.azure-artifacts.env"
+    now=$(link_cloud_now)
     token=""
     expires=""
-    link_cloud_load_token "$envfile"
-    now=$(link_cloud_now)
-    if ! link_cloud_token_unexpired "$token" "$expires" "$now"; then
-      link_cloud_missing_message >&2
-      return 1
+    if [ -f "$envfile" ]; then
+      link_cloud_load_token "$envfile"
     fi
-  fi
-  if [ -z "${LINK_CLOUD_DOCKER_EXE:-}" ]; then
-    printf '%s\n' "docker was not found on PATH." >&2
-    return 1
-  fi
-  AZURE_ARTIFACTS_PAT="$token" "$LINK_CLOUD_DOCKER_EXE" "$@"
-  return $?
+    if ! link_cloud_token_fresh "$token" "$expires" "$now"; then
+      if ! link_cloud_fetch "$root"; then
+        link_cloud_missing_message >&2
+        exit 1
+      fi
+      if [ ! -f "$envfile" ]; then
+        link_cloud_missing_message >&2
+        exit 1
+      fi
+      token=""
+      expires=""
+      link_cloud_load_token "$envfile"
+      now=$(link_cloud_now)
+      if ! link_cloud_token_unexpired "$token" "$expires" "$now"; then
+        link_cloud_missing_message >&2
+        exit 1
+      fi
+    fi
+    if [ -z "${LINK_CLOUD_DOCKER_EXE:-}" ]; then
+      printf '%s\n' "docker was not found on PATH." >&2
+      exit 1
+    fi
+    AZURE_ARTIFACTS_PAT="$token" "$LINK_CLOUD_DOCKER_EXE" "$@"
+    exit $?
+  )
 }
 
 compose() {
