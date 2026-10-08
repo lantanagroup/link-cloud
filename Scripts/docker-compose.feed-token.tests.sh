@@ -148,6 +148,26 @@ if [ "$code" -eq 4 ]; then pass 'bash non-compose exit code is propagated'; else
 grep -F 'ARG:version' "$log" >/dev/null && pass 'bash non-compose command is passed through' || fail 'bash non-compose command is passed through'
 grep -F 'TOKEN:absent' "$log" >/dev/null && pass 'bash non-compose command does not set the token' || fail 'bash non-compose command does not set the token'
 
+# Global docker options still reach the compose token path.
+reset_log
+export LINK_CLOUD_MOCK_EXIT=0
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+export LINK_CLOUD_NOW_EPOCH=1700000000
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1893456000' > "$repo/.azure-artifacts.env"
+set +e
+docker --context desktop-linux compose build automation-ui >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+if [ "$code" -eq 0 ]; then pass 'bash docker global option runs compose'; else fail 'bash docker global option runs compose'; fi
+grep -F 'TOKEN:match' "$log" >/dev/null && pass 'bash docker global option sets the token' || fail 'bash docker global option sets the token'
+grep -F 'ARG:--context' "$log" >/dev/null && grep -F 'ARG:desktop-linux' "$log" >/dev/null && grep -F 'ARG:compose' "$log" >/dev/null && grep -F 'ARG:build' "$log" >/dev/null && grep -F 'ARG:automation-ui' "$log" >/dev/null && pass 'bash docker global option keeps the original arguments' || fail 'bash docker global option keeps the original arguments'
+reset_log
+set +e
+docker --context desktop-linux version >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+grep -F 'ARG:version' "$log" >/dev/null && grep -F 'TOKEN:absent' "$log" >/dev/null && pass 'bash docker global option on a non-compose command is passed through' || fail 'bash docker global option on a non-compose command is passed through'
+
 # Installer idempotence.
 install_dir="$repo/home-link"
 profile_path="$repo/bashrc"
