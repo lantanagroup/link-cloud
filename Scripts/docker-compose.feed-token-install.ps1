@@ -33,6 +33,22 @@ function Get-ProfileText {
     return $text
 }
 
+function Write-ProfilePolicyWarning {
+    # Ignore Process. The installer is often started with -ExecutionPolicy Bypass.
+    $effective = 'Undefined'
+    foreach ($entry in (Get-ExecutionPolicy -List)) {
+        $scope = $entry.Scope.ToString()
+        if ($scope -eq 'Process') { continue }
+        $value = $entry.ExecutionPolicy.ToString()
+        if ($value -eq 'Undefined') { continue }
+        $effective = $value
+        break
+    }
+    if ($effective -eq 'Restricted' -or $effective -eq 'AllSigned') {
+        Write-Host "PowerShell execution policy is $effective, so a new shell will not load this profile. Run Get-ExecutionPolicy -List. If group policy has not locked it, run Set-ExecutionPolicy -Scope CurrentUser RemoteSigned."
+    }
+}
+
 if (-not $ProfilePath) {
     $ProfilePath = $PROFILE
 }
@@ -55,6 +71,7 @@ if (-not (Test-Path -LiteralPath $source)) {
     Write-Host "Missing $source."
     exit 1
 }
+Write-ProfilePolicyWarning
 
 if (-not (Test-Path -LiteralPath $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null

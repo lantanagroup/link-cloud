@@ -320,7 +320,9 @@ try {
     Write-Result ($hostUnchanged -and (Test-Path -LiteralPath $profilePath) -and $profileText.Contains('link-cloud-feed-token')) 'ProfilePath writes the given file and leaves the host profile unchanged'
     $documented = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\DEVELOPMENT.md'))
     Write-Result ($documented.Contains('powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"')) 'documented setup passes the calling shell profile'
+    Write-Result ($documented.Contains('Get-ExecutionPolicy -List') -and $documented.Contains('Set-ExecutionPolicy -Scope CurrentUser RemoteSigned')) 'documented setup names the execution policy check'
     $installerText = [System.IO.File]::ReadAllText($installer)
+    Write-Result ($installerText.Contains('Set-ExecutionPolicy -Scope CurrentUser RemoteSigned') -and $installerText.Contains("if (`$scope -eq 'Process')")) 'installer warns from the saved execution policy'
     Write-Result ($installerText.Contains('if (-not $ProfilePath)') -and $installerText.Contains('$ProfilePath = $PROFILE')) 'installer defaults to the running host profile'
     Write-Result ($profileText.Contains($installDir) -and $profileText.Contains('docker-compose.feed-token-profile.ps1')) 'installer profile line uses the install directory'
     Write-Result ($installerText.Contains('. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token')) 'default install line stays the documented snippet'
