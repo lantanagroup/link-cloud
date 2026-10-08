@@ -120,6 +120,7 @@ public sealed class HomeOverviewService : IHomeOverview
                 pulse,
                 loadedAt),
             AutomationVisible = automationOn,
+            RealScope = HomeOverviewRules.RealFacilityScope(automationOn, facilities.Regular),
             LoadedAt = loadedAt
         };
         cancellationToken.ThrowIfCancellationRequested();
