@@ -8,6 +8,8 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Permissions;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -135,6 +137,44 @@ public class KafkaOpsServiceGuardTests
         var again = await service.PlanAsync("ReadyToAcquire", 4, false, null, CancellationToken.None);
         Assert.True(again.Accepted);
         Assert.DoesNotContain(again.Errors, item => item.Contains("minutes", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Execute_StartsTheRateLimitWhenTheMainTopicChangedAndASiblingFailed()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: true);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the log topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageTopics), created.Id, CancellationToken.None);
+        broker.FailIncreaseTopic = "ReadyToAcquire-Retry";
+
+        var error = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ExecuteAsync(User("carol", ManageTopics), created.Id, CancellationToken.None));
+
+        var stored = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Failed, stored!.Status);
+        Assert.NotNull(stored.PartitionsChangedUtc);
+        Assert.Contains("failed", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(("ReadyToAcquire", 4), broker.Increases);
+        Assert.DoesNotContain(broker.Increases, item => item.Topic == "ReadyToAcquire-Retry");
+
+        broker.FailIncreaseTopic = null;
+        var again = await service.PlanAsync("ReadyToAcquire", 5, false, null, CancellationToken.None);
+        Assert.False(again.Accepted);
+        Assert.Contains(again.Errors, item => item.Contains("minutes", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ApproveRejectAndCancel_WithTheWrongPermission_Return403()
+    {
+        var (service, _, _) = NewService(requireSecondApprover: true);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the log topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        var endpoints = new KafkaOpsEndpoints(service, NullLogger<KafkaOpsEndpoints>.Instance);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, await StatusAsync(endpoints, "Approve", User("sam", ManageScaling), created.Id, null));
+        Assert.Equal(StatusCodes.Status403Forbidden, await StatusAsync(endpoints, "Reject", User("sam", ManageScaling), created.Id, new RejectBody { Reason = "no" }));
+        Assert.Equal(StatusCodes.Status403Forbidden, await StatusAsync(endpoints, "Cancel", User("sam", ManageScaling), created.Id, null));
+        Assert.Equal(KafkaChangeStatus.Pending, (await service.GetAsync(created.Id, CancellationToken.None))!.Status);
+        Assert.Equal(StatusCodes.Status400BadRequest, await StatusAsync(endpoints, "Approve", User("alice", ManageTopics), created.Id, null));
     }
 
     [Fact]
@@ -316,6 +356,19 @@ public class KafkaOpsServiceGuardTests
         return (service, broker, infra);
     }
 
+    private static async Task<int> StatusAsync(KafkaOpsEndpoints endpoints, string method, ClaimsPrincipal user, Guid id, object? body)
+    {
+        var found = typeof(KafkaOpsEndpoints).GetMethod(method, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(found);
+        var args = found!.GetParameters().Length == 4
+            ? new object?[] { user, id, body, CancellationToken.None }
+            : new object?[] { user, id, CancellationToken.None };
+        var task = (Task<IResult>)found.Invoke(endpoints, args)!;
+        var result = await task;
+        var status = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
+        return status.StatusCode ?? 0;
+    }
+
     private static ClaimsPrincipal User(string name, string permission)
     {
         var identity = new ClaimsIdentity(
@@ -409,6 +462,7 @@ public class KafkaOpsServiceGuardTests
         public int CapabilityProbes { get; private set; }
         public List<GroupView> Groups { get; } = [];
         public List<(string Topic, int Count)> Increases { get; } = [];
+        public string? FailIncreaseTopic { get; set; }
         public List<PartitionPlacement> Placements { get; } = [];
         public int ControllerId { get; set; } = 1;
         public bool RolesKnown { get; set; } = true;
@@ -440,6 +494,8 @@ public class KafkaOpsServiceGuardTests
 
         public Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken)
         {
+            if (string.Equals(topic, FailIncreaseTopic, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The sibling increase failed.");
             Increases.Add((topic, newCount));
             _counts[topic] = newCount;
             return Task.CompletedTask;
