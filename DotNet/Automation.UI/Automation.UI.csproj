@@ -24,5 +24,8 @@
        old web project builds until it is removed. Link.UI does not reference this project. -->
   <ItemGroup>
     <Compile Include="..\Link.UI\Engine\**\*.cs" Link="Engine\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Engine calls AutomationRules, which lives outside Engine with its models. -->
+    <Compile Include="..\Link.UI\Services\AutomationRules.cs" Link="LinkServices\AutomationRules.cs" />
+    <Compile Include="..\Link.UI\Models\AutomationModels.cs" Link="LinkModels\AutomationModels.cs" />
   </ItemGroup>
 </Project>
