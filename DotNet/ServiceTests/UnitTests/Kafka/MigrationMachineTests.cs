@@ -163,7 +163,7 @@ public class MigrationMachineTests
             Assert.All(world.Watermarks(record.Topic), mark => Assert.Equal(0, mark));
         }
 
-        record = MigrationDriver.Command(record, world, MigrationCommand.RecoverOriginal, record.Executor, record.Topic);
+        record = MigrationDriver.Command(record, world, MigrationCommand.RecoverOriginal, "dana", record.Topic);
         Assert.Equal(MigrationStep.Done, record.Step);
         Assert.Equal("original", record.RecoveryChoice);
         Assert.Equal(MigrationWorld.OriginalPartitions, world.Topic(record.Topic).Partitions);
@@ -183,6 +183,135 @@ public class MigrationMachineTests
         var refused = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.RecoverOriginal, record.Executor, record.Topic, world.Now, world.Limits);
         Assert.NotNull(refused.Error);
         Assert.DoesNotContain(record.Topic, world.Deleted);
+    }
+
+    [Fact]
+    public void RecoverOriginal_RefusesTheExecutorWhenTheNewTopicIsEmpty()
+    {
+        var world = MigrationWorld.Create();
+        var record = MigrationDriver.Until(world.Record(), world, MigrationStep.C4);
+        var refused = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.RecoverOriginal, record.Executor, record.Topic, world.Now, world.Limits);
+        Assert.Equal("A second person must delete the empty topic before it is recreated.", refused.Error);
+        Assert.Empty(refused.Effects);
+    }
+
+    [Fact]
+    public void DeleteForeign_RemovesAnEmptyTopic_AndDoesNotFinish()
+    {
+        var world = MigrationWorld.Create();
+        var record = MigrationDriver.Until(world.Record(), world, MigrationStep.C3);
+        world.Topics[record.Topic] = new MigrationWorld.TopicState { Id = "foreign", Partitions = record.TargetPartitions, Rf = 3 };
+        record.Step = MigrationStep.NeedsAttention;
+        record = MigrationDriver.Command(record, world, MigrationCommand.DeleteForeign, "dana", record.Topic);
+        Assert.Equal(MigrationStep.NeedsAttention, record.Step);
+        Assert.Contains(record.Topic, world.Deleted);
+    }
+
+    [Fact]
+    public void Forward_RejectsAForeignTopicThatHasRecords()
+    {
+        var world = MigrationWorld.Create();
+        var record = MigrationDriver.Until(world.Record(), world, MigrationStep.C2);
+        world.Topics[record.Topic] = new MigrationWorld.TopicState
+        {
+            Id = "stray",
+            Partitions = 3,
+            Rf = 3,
+            Records = [new CopiedRecord { Partition = 0, Offset = 0, Value = [1], TimestampMs = 1 }]
+        };
+        record.Step = MigrationStep.NeedsAttention;
+        var refused = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.RecoverForward, "dana", record.Topic, world.Now, world.Limits);
+        Assert.Contains("kafka-topics.sh", refused.Error, StringComparison.Ordinal);
+        Assert.Empty(refused.Effects);
+    }
+
+    [Fact]
+    public void Abort_OnAFinishedMigration_IsRejected()
+    {
+        var record = MigrationWorld.Create().Record();
+        record.Step = MigrationStep.Done;
+        var refused = MigrationMachine.Describe(record, new MigrationObservation(), MigrationCommand.Abort, "dana", null, DateTimeOffset.UtcNow, new MigrationLimits());
+        Assert.Contains("already", refused.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HoldPoint_WaitsWithoutANote_AndTimesOutIntoRollback()
+    {
+        var world = MigrationWorld.Create();
+        var record = MigrationDriver.Until(world.Record(), world, MigrationStep.H1);
+        var notes = record.Timeline.Count;
+        var waiting = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
+        Assert.True(waiting.Wait);
+        Assert.Equal(notes, (waiting.Persist ?? record).Timeline.Count);
+        record.StepStartedUtc = world.Now.AddMinutes(-16);
+        var timed = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
+        Assert.Equal(MigrationStep.RollingBack, timed.Completed!.Step);
+        var aborted = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.Abort, record.Executor, null, world.Now.AddMinutes(-20), world.Limits);
+        Assert.Equal(MigrationStep.RollingBack, aborted.Completed!.Step);
+    }
+
+    [Fact]
+    public void GroupWithNoCommit_HasNoLag_AndDeadIsNotRequiredStable()
+    {
+        Assert.Equal(0, MigrationGroups.Lag([10, 10], [-1, -1]));
+        Assert.Equal(0, MigrationGroups.Lag([10], []));
+        Assert.Equal(4, MigrationGroups.Lag([10], [6]));
+        Assert.True(MigrationGroups.Ready("Empty", 0, [-1]));
+        Assert.True(MigrationGroups.Ready("Stable", 1, [6]));
+        Assert.False(MigrationGroups.Ready("Empty", 0, [6]));
+        Assert.False(MigrationGroups.Ready("Dead", 0, [6]));
+    }
+
+    [Fact]
+    public void Holds_AreReadFromTheStore()
+    {
+        var store = new InMemoryMigrationStore();
+        var registry = new MigrationHoldRegistry(store);
+        var record = MigrationWorld.Create().Record();
+        record.Step = MigrationStep.H1;
+        store.SaveAsync(record, 1, CancellationToken.None).GetAwaiter().GetResult();
+        Assert.False(registry.IsHeld(record.Topic));
+        Assert.True(registry.IsHeldAsync(record.Topic, CancellationToken.None).GetAwaiter().GetResult());
+        Assert.Contains(record.Topic, registry.HeldTopicsAsync(CancellationToken.None).GetAwaiter().GetResult());
+    }
+
+    [Fact]
+    public void PlanHash_MustMatchTheDryRun()
+    {
+        Assert.Equal("The plan hash from the dry run is required.", MigrationApprovals.ValidatePlanHash("", "abc"));
+        Assert.Equal("The plan changed. Request it again.", MigrationApprovals.ValidatePlanHash("nope", "abc"));
+        Assert.Null(MigrationApprovals.ValidatePlanHash("abc", "abc"));
+    }
+
+    [Fact]
+    public void BackupMatch_RequiresCountAndOrder()
+    {
+        var source = new List<CopiedRecord>
+        {
+            new() { Partition = 0, Offset = 0, Key = [1], Value = [9], TimestampMs = 1 },
+            new() { Partition = 0, Offset = 1, Key = [1], Value = [8], TimestampMs = 2 }
+        };
+        var copied = source.Select(record => new CopiedRecord
+        {
+            Partition = 1,
+            Offset = record.Offset,
+            Key = record.Key,
+            Value = record.Value,
+            TimestampMs = record.TimestampMs,
+            Headers = [new CopiedHeader { Name = KafkaTopicCatalog.MigrationHeader, Value = System.Text.Encoding.UTF8.GetBytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;" + "ResourcesNormalized" + ";" + record.Partition + ";" + record.Offset) }]
+        }).ToList();
+        Assert.True(LogCopier.Matches(source, copied));
+        var changed = copied[0];
+        copied[0] = new CopiedRecord
+        {
+            Partition = changed.Partition,
+            Offset = changed.Offset,
+            Key = changed.Key,
+            Value = [7],
+            TimestampMs = changed.TimestampMs,
+            Headers = changed.Headers
+        };
+        Assert.False(LogCopier.Matches(source, copied));
     }
 
     [Fact]
@@ -211,7 +340,7 @@ public class MigrationMachineTests
 
         var lease = new InMemoryKafkaOpsLease();
         var first = lease.AcquireAsync(CancellationToken.None).GetAwaiter().GetResult();
-        Assert.Throws<KafkaOpsRejectedException>(() => lease.AcquireAsync(CancellationToken.None).GetAwaiter().GetResult());
+        Assert.Throws<LeaseHeldException>(() => lease.AcquireAsync(CancellationToken.None).GetAwaiter().GetResult());
         first.DisposeAsync().AsTask().GetAwaiter().GetResult();
         var second = lease.AcquireAsync(CancellationToken.None).GetAwaiter().GetResult();
         Assert.True(second.Fence > first.Fence);

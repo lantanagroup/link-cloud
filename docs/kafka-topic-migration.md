@@ -109,7 +109,7 @@ The console shows the same order. Workloads stay stopped from B1 until D2. The t
 7. **B3 Drain.** Every discovered group's committed offset equals the high watermark on every partition. Two reads, at least 10 seconds apart. Every message is consumed before the later delete.
 8. **B4 Stop consumers.** Every discovered group is Empty.
 9. **B5 Freeze.** Record the topic id, offsets, configs, and replication factor.
-10. **B6 Backup copy.** This is the only copy. Raise `retention.ms` on the temp topic before the first write. The floor is max(frozen `retention.ms`, age of the oldest CreateTime + `MigrationBackupRetentionHours`). Do not lower it afterward. Copy T into the temp topic with `toPositive(murmur2(key)) % M`. A null key uses `sourcePartition % M`. Keep key, value, headers, and CreateTime. Stamp `x-link-migration: {migrationId};{sourceTopic};{sourcePartition};{sourceOffset}`. The producer is idempotent and uses `acks=all`. Resume reads the temp topic, skips identities already present for this migration, and does not delete the temp topic. It does not write the new T. A record with no migration header, or with another migration id, stops in NeedsAttention.
+10. **B6 Backup copy.** This is the only copy. Raise `retention.ms` on the temp topic before the first write. The floor is max(frozen `retention.ms`, age of the oldest CreateTime + `MigrationBackupRetentionHours`). Do not lower it afterward. Set `min.insync.replicas` to min(2, replication factor). The copy is verified only when every source partition was read through its frozen end and the per-partition counts and order-sensitive digests match the backup. A short read is retried. A mismatch stops before the delete. Copy T into the temp topic with `toPositive(murmur2(key)) % M`. A null key uses `sourcePartition % M`. Keep key, value, headers, and CreateTime. Stamp `x-link-migration: {migrationId};{sourceTopic};{sourcePartition};{sourceOffset}`. The producer is idempotent and uses `acks=all`. Resume reads the temp topic, skips identities already present for this migration, and does not delete the temp topic. It does not write the new T. A record with no migration header, or with another migration id, stops in NeedsAttention.
 11. **B7 Verify the backup.** Counts and the per-partition order-sensitive digest match a fresh read of the temp topic.
 12. **H1 Hold.** The executor types the topic name. The default hold is 15 minutes. If it expires, the migration rolls back and keeps the temp topic.
 13. **C1 Delete T.** This is the point of no return. Re-check the frozen id and the verified backup first. A different topic id is a foreign topic and stops the run. Nothing else is deleted.
@@ -145,7 +145,7 @@ Two recoveries are on the page. Both require the typed topic name. The requester
 
 **Recover original.** Recreate the original partition count empty. Write offset 0 only when every high watermark is 0 and the groups are Empty. Delete the new T only when all three are true: its topic id is the recorded id, every high watermark is 0, and the action was typed. If any high watermark is above 0, do not write offsets and do not delete the topic. The run stays in NeedsAttention.
 
-A foreign topic (auto-create, or a sync run during C2) is shown with its partitions, configs, and high watermarks. Delete it only when it is empty, by typing its name, and only by a second person who is not the executor. Then recover forward or original. Nothing is deleted without that typed action.
+A foreign topic (auto-create, or a sync run during C2) is shown with its partitions, configs, and high watermarks. Delete it only when it is empty, by typing its name, and only by a second person who is not the executor. That delete does not finish the migration. Choose forward or original afterwards. A foreign topic that already has records is not deleted by the console. Remove it with `kafka-topics.sh --delete --topic <name>`, then choose forward. Forward returns 400 and names that command while the records are still there. Nothing is deleted without a typed action. Recover original deletes an empty new topic only for a person who is not the requester and not the executor.
 
 Going from M back to N after D1 is a new migration. Slice 1 will refuse the decrease.
 
@@ -197,7 +197,7 @@ During B1 and B4 the page lists each workload and the recorded replica count:
 
 During C2:
 
-8. Do not create T. Do not run topic sync. If something creates T, leave it. The page reports a foreign topic. Delete it only through the typed, second-person action, and only when every high watermark is 0.
+8. Do not create T. Do not run topic sync. If something creates T, leave it. The page reports a foreign topic. Delete an empty one through the typed, second-person action. If it already has records, delete it with `kafka-topics.sh --delete --topic <name>` and then choose forward.
 
 After C5 the page lists the recorded replica counts. C5 has written 0 on every partition of the empty topic.
 
@@ -210,4 +210,4 @@ After C1, a workload that comes back on its own stops the run in NeedsAttention.
 
 The timeline shows the frozen offsets, the backup counts and digest, the stop set with live replica counts, and the H1 countdown. Every transition is also written to `AuditableEventOccurred` and to `_linkmig-journal`.
 
-Stop when the page says NeedsAttention. Do not delete topics from the Kafka CLI to hurry a step. The safe deletes are the ones the page offers: an empty foreign topic (typed, second person), an empty new T on a typed recover-original, and the temp topic after cleanup is confirmed.
+Stop when the page says NeedsAttention. Do not delete topics from the Kafka CLI to hurry a step. The CLI delete is only for a foreign topic that already has records: `kafka-topics.sh --delete --topic <name>`, then choose forward. The other safe deletes are the ones the page offers: an empty foreign topic (typed, second person, and that delete does not finish the migration), an empty new T on a typed recover-original by a person who is not the executor, and the temp topic after cleanup is confirmed.

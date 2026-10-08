@@ -38,6 +38,9 @@ public sealed class CopyOutcome
     public Dictionary<int, int> Counts { get; init; } = [];
     public Dictionary<int, string> Digests { get; init; } = [];
     public int Total { get; init; }
+    public bool ReachedEnd { get; init; }
+    public bool CountsMatch { get; init; }
+    public bool DigestsMatch { get; init; }
 }
 
 /// <summary>
@@ -127,6 +130,29 @@ public static class LogCopier
         if (record.Key is null || record.Key.Length == 0)
             return KafkaMurmur.NullKeyPartition(record.Partition, targetPartitions);
         return KafkaMurmur.Partition(record.Key, targetPartitions);
+    }
+
+    /// <summary>
+    /// Compares the source log with the backup. Counts and the order-sensitive digest
+    /// use the source partition and offset, including the identity stamped on the backup.
+    /// </summary>
+    public static bool Matches(IReadOnlyList<CopiedRecord> source, IReadOnlyList<CopiedRecord> destination)
+    {
+        if (source.Count != destination.Count)
+            return false;
+        foreach (var group in source.GroupBy(record => record.Partition))
+        {
+            var copied = destination
+                .Where(record => SourceIdentity(record).Partition == group.Key)
+                .OrderBy(record => SourceIdentity(record).Offset)
+                .ToList();
+            if (copied.Count != group.Count())
+                return false;
+            if (!string.Equals(Digest(group.OrderBy(record => record.Offset)), Digest(copied), StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
     }
 
     public static string Digest(IEnumerable<CopiedRecord> records)

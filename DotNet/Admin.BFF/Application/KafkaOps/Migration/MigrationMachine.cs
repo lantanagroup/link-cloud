@@ -22,7 +22,11 @@ public static class MigrationMachine
     {
         limits ??= new MigrationLimits();
         if (record.Step is MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected)
+        {
+            if (command is MigrationCommand.Abort or MigrationCommand.Go or MigrationCommand.RecoverForward or MigrationCommand.RecoverOriginal or MigrationCommand.DeleteForeign)
+                return MigrationTick.Reject("The migration is already " + record.Step + ".");
             return MigrationTick.Done(record);
+        }
 
         if (record.Step == MigrationStep.NeedsAttention)
             return Recover(record, seen, command, actor, typedName, now);
@@ -174,7 +178,7 @@ public static class MigrationMachine
             case MigrationStep.B7:
                 return Fail(record, "The backup digest did not match.", now);
             case MigrationStep.H1:
-                return MigrationTick.Waiting(Note(persist, now, "Holding for a typed go."));
+                return MigrationTick.Waiting(record);
             case MigrationStep.C1:
                 if (seen.TopicPresent && record.OriginalTopicId.Length > 0 && !string.Equals(seen.TopicId, record.OriginalTopicId, StringComparison.Ordinal))
                     return Attention(record, "T has a foreign topic id. It was not deleted.", now);
@@ -343,11 +347,10 @@ public static class MigrationMachine
                 return MigrationTick.Reject("A second person must delete a foreign topic.");
             if (!seen.TopicPresent || seen.HighWatermarks.Any(mark => mark > 0))
                 return MigrationTick.Reject("A foreign topic is deleted only when it is empty.");
+            // The delete stops here. Forward is a separate command and is what finishes the migration.
             var next = record.Copy();
-            next.Step = MigrationStep.C3;
             next.NewTopicId = "";
             next.Failure = "";
-            next.StepStartedUtc = now;
             return MigrationTick.Acting(Note(next, now, "Deleting the empty foreign topic."), [new MigrationEffect.DeleteTopic(record.Topic, seen.TopicId, true)]);
         }
 
@@ -361,6 +364,8 @@ public static class MigrationMachine
                     return MigrationTick.Reject("The new topic has records, so it was not deleted.");
                 if (record.NewTopicId.Length > 0 && !string.Equals(seen.TopicId, record.NewTopicId, StringComparison.Ordinal))
                     return MigrationTick.Reject("The topic id does not match the recorded id, so it was not deleted.");
+                if (string.Equals(actor, record.Executor, StringComparison.OrdinalIgnoreCase))
+                    return MigrationTick.Reject("A second person must delete the empty topic before it is recreated.");
                 var deleting = record.Copy();
                 deleting.RecoveryChoice = "original";
                 deleting.Step = MigrationStep.C2;
@@ -379,6 +384,13 @@ public static class MigrationMachine
 
         if (command == MigrationCommand.RecoverForward)
         {
+            if (seen.TopicPresent && !Adopted(record, seen))
+            {
+                if (seen.HighWatermarks.Any(mark => mark > 0))
+                    return MigrationTick.Reject("The topic has records. Delete it with kafka-topics.sh --delete --topic " + record.Topic + ", then continue. The migration will not delete it.");
+                return MigrationTick.Reject("The topic id does not match this migration. A second person can delete it when it is empty, or delete it with kafka-topics.sh --delete --topic " + record.Topic + ".");
+            }
+
             var next = record.Copy();
             next.RecoveryChoice = "";
             next.Step = seen.TopicPresent && Adopted(next, seen) ? MigrationStep.C4 : MigrationStep.C3;
@@ -543,6 +555,7 @@ public static class MigrationMachine
     {
         var configs = new Dictionary<string, string>(record.FrozenConfigs, StringComparer.OrdinalIgnoreCase);
         configs["retention.ms"] = Floor(record, seen, now, limits).ToString();
+        configs["min.insync.replicas"] = Math.Min(2, Math.Max(1, BackupRf(record, seen))).ToString();
         return configs;
     }
 
@@ -577,6 +590,15 @@ public static class MigrationMachine
 
 public static class MigrationApprovals
 {
+    public static string? ValidatePlanHash(string? clientHash, string liveHash)
+    {
+        if (string.IsNullOrWhiteSpace(clientHash))
+            return "The plan hash from the dry run is required.";
+        if (!string.Equals(clientHash.Trim(), liveHash, StringComparison.Ordinal))
+            return "The plan changed. Request it again.";
+        return null;
+    }
+
     public static string? ValidateRequest(string? requester, string? typedName, string topic, string? reason)
     {
         if (string.IsNullOrWhiteSpace(requester))
@@ -609,4 +631,28 @@ public static class MigrationApprovals
             return "The approval is not bound to the current plan.";
         return null;
     }
+}
+
+public static class MigrationGroups
+{
+    public static bool HasCommit(IReadOnlyList<long>? committed) =>
+        committed is { Count: > 0 } && committed.Any(offset => offset >= 0);
+
+    public static long Lag(IReadOnlyList<long> watermarks, IReadOnlyList<long>? committed)
+    {
+        if (!HasCommit(committed))
+            return 0;
+        long lag = 0;
+        for (var i = 0; i < watermarks.Count; i++)
+        {
+            var commit = i < committed!.Count ? committed[i] : -1L;
+            lag += Math.Max(0, watermarks[i] - (commit >= 0 ? commit : 0));
+        }
+
+        return lag;
+    }
+
+    public static bool Ready(string? state, int members, IReadOnlyList<long>? committed) =>
+        string.Equals(state, "Stable", StringComparison.OrdinalIgnoreCase)
+        || (string.Equals(state, "Empty", StringComparison.OrdinalIgnoreCase) && members == 0 && !HasCommit(committed));
 }

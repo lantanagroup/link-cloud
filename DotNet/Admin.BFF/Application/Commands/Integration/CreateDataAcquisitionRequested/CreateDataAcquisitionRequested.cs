@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers
                 };
 
-                MigrationHoldGuard.RefuseIfHeld(_holds, nameof(KafkaTopic.DataAcquisitionRequested));
+                await MigrationHoldGuard.RefuseIfHeldAsync(_holds, nameof(KafkaTopic.DataAcquisitionRequested), CancellationToken.None);
                 await _producer.ProduceAsync(nameof(KafkaTopic.DataAcquisitionRequested), message);
                 _logger.LogKafkaProducerDataAcquisitionRequested(correlationId);
 
