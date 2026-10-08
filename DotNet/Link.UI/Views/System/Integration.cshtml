@@ -84,8 +84,8 @@
                                 {
                                     <tr>
                                         <td>@topic.Topic</td>
-                                        <td class="text-break">@(string.IsNullOrWhiteSpace(item.CorrelationId) ? "—" : item.CorrelationId)</td>
-                                        <td class="text-break">@(string.IsNullOrWhiteSpace(item.PatientId) ? "—" : item.PatientId)</td>
+                                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = item.CorrelationId, Compact = true, CopyLabel = "Copy correlation id" })" /></td>
+                                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = item.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
                                         <td class="text-break">@(string.IsNullOrWhiteSpace(item.Error) ? "—" : item.Error)</td>
                                     </tr>
                                 }

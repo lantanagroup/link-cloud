@@ -45,7 +45,7 @@
     }
     function heatColor(pct) {
         if (pct >= 0.8) return 'var(--au-danger)';
-        if (pct >= 0.5) return '#e38b00';
+        if (pct >= 0.5) return window.luChartPalette.orange;
         return 'var(--au-success)';
     }
     function cpuPct(svc) {

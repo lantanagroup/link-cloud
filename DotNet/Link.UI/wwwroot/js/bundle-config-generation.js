@@ -156,7 +156,7 @@
                             <div class="fw-semibold">${esc(pick(item, 'name', 'Name', ''))}</div>
                             <div class="small text-muted mt-1">${esc(pick(item, 'reason', 'Reason', ''))}</div>
                         </div>
-                        <span class="badge ${isReuse ? 'au-badge-success' : 'au-badge-warning'}">${esc(isReuse ? 'Ready to use' : 'Needs a few additions')}</span>
+                        <span class="badge ${window.luStatusPills.forReadiness(isReuse)}">${esc(isReuse ? 'Ready to use' : 'Needs a few additions')}</span>
                     </div>
                     <div class="au-cfggen-choice-actions d-flex align-items-center gap-2 flex-wrap">
                         <button type="button" class="btn btn-sm ${recommended && isReuse ? 'btn-success' : 'btn-au-neutral'} cfggen-reuse"
