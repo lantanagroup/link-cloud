@@ -26,6 +26,8 @@ public class UiPatternGuardTests
         css.Should().Contain("--lu-chart-donut-size: 150px;");
         css.Should().Contain("--lu-chart-dashboard-height: 168px;");
         css.Should().Contain("--lu-chart-dashboard-donut: 168px;");
+        css.Should().Contain("--lu-chart-dashboard-donut-box: 200px;");
+        css.Should().Contain(".bg-light");
         css.Should().NotContain("max-height: 8.5rem");
         css.Should().NotContain("max-width: 120px");
         css.Should().Contain("#recentRunsCard .table-responsive");
