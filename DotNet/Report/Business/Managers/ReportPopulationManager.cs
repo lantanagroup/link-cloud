@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using System.Text.Json;
@@ -410,11 +411,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         private static bool IsUniqueViolation(Exception exception)
         {
+            // 2601 is a unique index and 2627 is a unique constraint (or a primary key). The number
+            // does not change with the SQL Server language. SQLite has no language pack; its message
+            // is "UNIQUE constraint failed". Result code 19 is every SQLite constraint, so a null or
+            // foreign-key failure would be treated as a duplicate and the total would not move.
             for (var current = exception; current != null; current = current.InnerException)
             {
-                if (current.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase)
-                    || current.Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase)
-                    || current.Message.Contains("UNIQUE KEY constraint", StringComparison.OrdinalIgnoreCase))
+                if (current is SqlException { Number: 2601 or 2627 })
+                    return true;
+
+                if (current.Message.Contains("2601", StringComparison.Ordinal)
+                    || current.Message.Contains("2627", StringComparison.Ordinal)
+                    || current.Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }
