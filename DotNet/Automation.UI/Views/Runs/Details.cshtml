@@ -2281,6 +2281,14 @@
                 }
 
                 const data = await res.json();
+                if (data.unavailable === true || data.Unavailable === true) {
+                    document.getElementById('dataAcqLogPaginationInfo').textContent = 'Source no longer available.';
+                    document.getElementById('dataAcqLogPrev').disabled = true;
+                    document.getElementById('dataAcqLogNext').disabled = true;
+                    renderDaLogRows([], 'Source no longer available.');
+                    return;
+                }
+
                 const records = data.records || data.Records || [];
                 const totalCount = data.metadata?.totalCount || data.Metadata?.TotalCount || 0;
                 const totalPages = Math.max(1, Math.ceil(totalCount / daLogPageSize));
@@ -2361,6 +2369,11 @@
                 }
 
                 const d = await res.json();
+                if (d.unavailable === true || d.Unavailable === true) {
+                    subtitle.textContent = '';
+                    body.innerHTML = '<div class="text-muted">Source no longer available.</div>';
+                    return;
+                }
                 const notes = d.notes || d.Notes || [];
                 const resources = d.resourceAcquiredIds || d.ResourceAcquiredIds || [];
                 const referenceResources = d.referenceResourceIds || d.ReferenceResourceIds || [];
