@@ -44,6 +44,39 @@ public class KafkaTopicAndAssignmentTests
     }
 
     [Fact]
+    public void DeadLetterCommitIsWhatRevokeCommits()
+    {
+        var tracker = new KafkaAssignmentTracker();
+        var partition = new TopicPartition("PatientEvent", new Partition(0));
+        tracker.MarkProcessed(new ConsumeResult<string, string>
+        {
+            Topic = partition.Topic,
+            Partition = partition.Partition,
+            Offset = 0
+        });
+
+        var consumer = new object();
+        KafkaAssignmentRegistry.Register(consumer, tracker);
+        KafkaAssignmentRegistry.Remember(consumer, new[]
+        {
+            new TopicPartitionOffset(partition, new Offset(2))
+        });
+
+        var revoked = new[] { new TopicPartitionOffset(partition, Offset.Unset) };
+        var batch = tracker.OffsetsCommittedFor(revoked);
+        Assert.Single(batch);
+        Assert.Equal(partition, batch[0].TopicPartition);
+        Assert.Equal(2, batch[0].Offset.Value);
+
+        KafkaAssignmentRegistry.Remember(consumer, new[]
+        {
+            new TopicPartitionOffset(partition, new Offset(1))
+        });
+        batch = tracker.OffsetsCommittedFor(revoked);
+        Assert.Equal(2, batch[0].Offset.Value);
+    }
+
+    [Fact]
     public void ProducerConfigUsesMurmur2AndConsumerUsesCooperativeSticky()
     {
         var connection = new KafkaConnection { ClientId = "Report", GroupId = "Report" };
