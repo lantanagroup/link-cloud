@@ -40,7 +40,7 @@ The installer adds one line to the shell profile:
 . "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token
 ```
 
-Open a new shell in the repo and run `docker compose` as usual. The wrapper fetches a token into the gitignored file `.azure-artifacts.env` when that file is missing or the token has less than 10 minutes left, then passes `AZURE_ARTIFACTS_PAT` only to the docker process. The parent shell does not keep the variable. On Windows the file's ACL is limited to the current user. The token is not printed.
+Open a new shell in the repo and run `docker compose` as usual. The wrapper fetches a token into the gitignored file `.azure-artifacts.env` when that file is missing or the token has less than 10 minutes left, then passes `AZURE_ARTIFACTS_PAT` only to the docker process. The parent shell does not keep the variable. On Windows, including Git Bash, the PowerShell script writes the file and limits its ACL to the current user before the token is stored. If that restriction fails, the file is removed and the command exits. The token is not printed.
 
 If Azure CLI is missing, `Scripts/docker-compose.feed-token.ps1` (and the Git Bash script `Scripts/docker-compose.feed-token-fetch.sh`) installs it for the current user with `winget install --id Microsoft.AzureCLI --scope user`. If winget is missing, policy blocks the install, the install fails, or sign-in is cancelled, the command prints that reason and stops. A `docker compose` command in this repo then stops before Docker starts and tells you to run the installer lines above. Install Azure CLI yourself (no admin) from https://aka.ms/installazurecliwindows and run the fetch script again, or finish `az login`.
 

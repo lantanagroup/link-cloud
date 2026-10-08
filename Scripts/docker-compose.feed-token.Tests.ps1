@@ -204,6 +204,11 @@ try {
         if ($trimmed -eq '!Scripts/docker-compose.restore-feed.sh') { $includeAt = $i }
     }
     Write-Result ($includeAt -gt $excludeAt) 'dockerignore keeps the restore helper after the docker-compose exclusion'
+    $tokenIgnored = $false
+    foreach ($ignoreLine in $ignoreLines) {
+        if ($ignoreLine.Trim() -eq '.azure-artifacts.env') { $tokenIgnored = $true }
+    }
+    Write-Result $tokenIgnored 'dockerignore excludes the local token file'
 
     # Installer is idempotent and does not touch the real profile.
     $profilePath = Join-Path $repo 'profile.ps1'
@@ -233,15 +238,17 @@ if /I "%~1"=="account" (
 exit /b 1
 "@
     [System.IO.File]::WriteAllText($mock, $mockBody)
-    $envFile = Join-Path $repo '.azure-artifacts.env'
+    $spaceRoot = Join-Path $repo 'space dir'
+    New-Item -ItemType Directory -Path $spaceRoot | Out-Null
+    $envFile = Join-Path $spaceRoot '.azure-artifacts.env'
     if (Test-Path $envFile) { Remove-Item $envFile }
     $stdoutLog = Join-Path $repo 'fetch-stdout.txt'
     $stderrLog = Join-Path $repo 'fetch-stderr.txt'
     $fetch = Join-Path $PSScriptRoot 'docker-compose.feed-token.ps1'
-    $proc = Start-Process -FilePath powershell.exe -ArgumentList @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $fetch,
-        '-RepoRoot', $repo, '-EnvFile', $envFile, '-AzExecutable', $mock
-    ) -Wait -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -WindowStyle Hidden
+    $mockInSpace = Join-Path $spaceRoot 'az.cmd'
+    Copy-Item -LiteralPath $mock -Destination $mockInSpace
+    $argLine = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -RepoRoot "{1}" -EnvFile "{2}" -AzExecutable "{3}"' -f $fetch, $spaceRoot, $envFile, $mockInSpace
+    $proc = Start-Process -FilePath powershell.exe -ArgumentList $argLine -Wait -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -WindowStyle Hidden
     $stdoutText = [System.IO.File]::ReadAllText($stdoutLog)
     $stderrText = [System.IO.File]::ReadAllText($stderrLog)
     $combined = $stdoutText + $stderrText
@@ -254,6 +261,33 @@ exit /b 1
     $rules = @($acl.Access)
     $onlyCurrentUser = ($rules.Count -eq 1)
     Write-Result $onlyCurrentUser 'fetch script limits the token file ACL to one entry'
+    Write-Result ($spaceRoot.Contains(' ')) 'fetch script accepts a repo path that contains a space'
+
+    # A fetch script that prints on the success stream must still return only its exit code.
+    $stubRoot = Join-Path $repo 'stub-root'
+    $stubScripts = Join-Path $stubRoot 'Scripts'
+    New-Item -ItemType Directory -Path $stubScripts | Out-Null
+    $stub = Join-Path $stubScripts 'docker-compose.feed-token.ps1'
+    $stubBody = @"
+param([string]`$RepoRoot)
+Write-Output '{"subscription":"not-a-token"}'
+`$dest = Join-Path `$RepoRoot '.azure-artifacts.env'
+`$utf8 = New-Object System.Text.UTF8Encoding `$false
+[System.IO.File]::WriteAllText(`$dest, "AZURE_ARTIFACTS_PAT=$sentinel``nAZURE_ARTIFACTS_PAT_EXPIRES_ON=1893456000``n", `$utf8)
+exit 0
+"@
+    [System.IO.File]::WriteAllText($stub, $stubBody)
+    $global:LinkCloudFeedTokenHooks.Remove('Fetch')
+    $noisyCode = Invoke-LinkCloudFeedTokenFetch -Root $stubRoot
+    Write-Result (($noisyCode -is [int]) -and ($noisyCode -eq 0)) 'fetch extra output does not replace the exit code'
+    Remove-Item -LiteralPath (Join-Path $stubRoot '.azure-artifacts.env') -Force
+    Set-DockerHook -ExitCode 3
+    $global:LinkCloudFeedTokenHooks['DockerCalls'].Clear()
+    $global:LinkCloudFeedTokenHooks['NowEpoch'] = [int64]1700000000
+    $global:LinkCloudFeedTokenHooks.Remove('Fetch')
+    Invoke-LinkCloudCompose -RepoRoot $stubRoot -ComposeArguments @('up')
+    $noisyDockerCalls = $global:LinkCloudFeedTokenHooks['DockerCalls'].Count
+    Write-Result (($global:LASTEXITCODE -eq 3) -and ($noisyDockerCalls -eq 1)) 'compose starts docker after a fetch script prints extra output'
 
     # Messages collected above must not contain the sentinel either.
     $hookText = ($global:LinkCloudFeedTokenHooks['Messages'] -join "`n")

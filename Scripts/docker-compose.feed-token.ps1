@@ -143,13 +143,29 @@ if ($dir -and -not (Test-Path -LiteralPath $dir)) {
 
 $utf8 = New-Object System.Text.UTF8Encoding $false
 $body = "AZURE_ARTIFACTS_PAT=$token`nAZURE_ARTIFACTS_PAT_EXPIRES_ON=$expires`n"
-[System.IO.File]::WriteAllText($EnvFile, $body, $utf8)
-
 try {
+    if (-not (Test-Path -LiteralPath $EnvFile)) {
+        [System.IO.File]::WriteAllText($EnvFile, '', $utf8)
+    }
     Set-FeedTokenAcl -Path $EnvFile
+    [System.IO.File]::WriteAllText($EnvFile, $body, $utf8)
 } catch {
-    Write-Host "The token file was written, but its permissions could not be limited to the current user."
+    $kept = $false
+    if (Test-Path -LiteralPath $EnvFile) {
+        try {
+            Remove-Item -LiteralPath $EnvFile -Force -ErrorAction Stop
+        } catch {
+            $kept = $true
+        }
+    }
+    if ($kept) {
+        Write-Host "The token file could not be limited to the current user, and it could not be removed. Delete $EnvFile and run Scripts/docker-compose.feed-token.ps1 again."
+    } else {
+        Write-Host "The token file could not be limited to the current user, so it was not kept."
+    }
+    exit 1
+} finally {
+    Remove-Variable token, parsed, raw, body, expiresRaw -ErrorAction SilentlyContinue
 }
 
-Remove-Variable token, parsed, raw, body, expiresRaw -ErrorAction SilentlyContinue
 exit 0

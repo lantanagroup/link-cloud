@@ -146,6 +146,10 @@ if [ "$count" -eq 1 ]; then pass 'bash installer adds the profile line once'; el
 grep -F '. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token' "$profile_path" >/dev/null && pass 'bash installer writes the profile snippet' || fail 'bash installer writes the profile snippet'
 if [ -f "$install_dir/docker-compose.feed-token.sh" ]; then pass 'bash installer copies the profile script'; else fail 'bash installer copies the profile script'; fi
 
+grep -F '.azure-artifacts.env' "$root/../.dockerignore" >/dev/null && pass 'dockerignore excludes the local token file' || fail 'dockerignore excludes the local token file'
+grep -F 'MINGW*' "$root/docker-compose.feed-token-fetch.sh" >/dev/null && pass 'git bash fetch delegates before writing a token' || fail 'git bash fetch delegates before writing a token'
+grep -F 'file_mode_is_600' "$root/docker-compose.feed-token-fetch.sh" >/dev/null && pass 'fetch script rejects a token file that is not mode 600' || fail 'fetch script rejects a token file that is not mode 600'
+
 # Output files must not contain the sentinel.
 if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" >/dev/null 2>&1; then
   fail 'bash test output does not contain the token'
