@@ -13,7 +13,7 @@
 
 @if (Model.Missing)
 {
-    <div class="alert alert-info">This category is not saved yet. Saving creates it.</div>
+    <div class="alert au-note">This category is not saved yet. Saving creates it.</div>
 }
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
@@ -23,7 +23,7 @@
 @if (Model.ShowForm)
 {
     <div class="au-card card">
-        <div class="card-header"><code>@form.Id</code></div>
+        <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = form.Id, CopyLabel = "Copy id" })" /></div>
         <div class="card-body">
             <form method="post" data-au-save asp-action="SaveCategory" class="row g-3">
                 <input type="hidden" name="Id" value="@form.Id" />
@@ -115,7 +115,7 @@
                                     <td>
                                         <form method="post" data-au-save asp-action="DeleteRule" asp-route-ruleId="@rule.Id" onsubmit="return confirm('Delete this rule? This cannot be undone.');">
                                             <input type="hidden" name="id" value="@form.Id" />
-                                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete rule @rule.Id"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                         </form>
                                     </td>
                                 </tr>

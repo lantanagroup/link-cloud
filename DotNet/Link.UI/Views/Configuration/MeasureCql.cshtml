@@ -13,7 +13,7 @@
 }
 
 <div class="au-card card">
-    <div class="card-header"><code>@Model.Id</code></div>
+    <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = Model.Id, CopyLabel = "Copy id" })" /></div>
     <div class="card-body">
         @if (Model.Libraries.Count > 0)
         {

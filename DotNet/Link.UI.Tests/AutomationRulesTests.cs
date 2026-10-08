@@ -144,10 +144,56 @@ public class AutomationRulesTests
             false,
             null,
             null);
-        stored.Duration.Should().Be("2m 5s");
+        stored.Duration.Should().Be("2:05");
 
         AutomationRules.ResolveDuration(null, "Cancelled", started, started, started).Should().Be("0:00");
     }
+
+    [Fact]
+    public void Average_uses_the_span_the_row_shows_and_skips_a_running_run()
+    {
+        var created = Now.AddHours(-1);
+        var started = created.AddMinutes(30);
+        var finished = started.AddMinutes(1);
+
+        var queuedDelay = SpanRow("Succeeded", created, started, finished, null);
+        var stored = SpanRow("Succeeded", created, started, finished, "54s");
+        var running = SpanRow("Running", created, started, null, null);
+        var blank = SpanRow("Failed", created, started, finished, "  ");
+
+        queuedDelay.Duration.Should().Be("1:00");
+        stored.Duration.Should().Be("0:54");
+        running.Duration.Should().BeNull();
+        blank.Duration.Should().Be("1:00");
+
+        var stats = AutomationRules.BuildStats(new[] { queuedDelay, stored, running, blank }, Now);
+        stats.Running.Should().Be(1);
+        stats.AvgDurationSeconds.Should().Be(58);
+    }
+
+    private static Link.UI.Models.AutomationRunRow SpanRow(
+        string status,
+        DateTimeOffset created,
+        DateTimeOffset started,
+        DateTimeOffset? finished,
+        string? duration) =>
+        AutomationRules.ToRow(
+            Guid.NewGuid(),
+            "Sample",
+            "Custom",
+            status,
+            2,
+            7,
+            false,
+            created,
+            started,
+            finished,
+            null,
+            duration,
+            null,
+            false,
+            null,
+            null);
 
     private static Link.UI.Models.AutomationRunRow Row(string status, DateTimeOffset created, DateTimeOffset? finished) =>
         AutomationRules.ToRow(

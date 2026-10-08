@@ -787,7 +787,7 @@
             }
 
             listBox.innerHTML = filtered
-                .map(id => `<div class="py-1 border-bottom"><code>${escapeHtml(id)}</code></div>`)
+                .map(id => `<div class="py-1 border-bottom">${window.luLabeledId('Patient', id)}</div>`)
                 .join('');
         }
 
@@ -798,7 +798,8 @@
 
         function formatUtc(value) {
             if (!value) return '-';
-            try { return new Date(value).toISOString(); } catch { return String(value); }
+            if (window.luLocalInstant) return window.luLocalInstant(value).text;
+            return String(value);
         }
 
         function censusStateName(value) {
@@ -833,13 +834,11 @@
 
         function formatLogTime(value) {
             if (!value) return '-';
-            try {
-                const d = new Date(value);
-                if (Number.isNaN(d.getTime())) return String(value);
-                return d.toISOString().replace(/\.000Z$/, 'Z');
-            } catch {
-                return String(value);
-            }
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return String(value);
+            const part = (n) => String(n).padStart(2, '0');
+            return d.getUTCFullYear() + '-' + part(d.getUTCMonth() + 1) + '-' + part(d.getUTCDate())
+                + ' ' + part(d.getUTCHours()) + ':' + part(d.getUTCMinutes()) + ':' + part(d.getUTCSeconds()) + 'Z';
         }
 
         function originName(value) {
@@ -911,14 +910,14 @@
                 const stateBadge = censusStateBadge(census);
                 let action = '';
                 if (accepting && census === 'NotAdmitted')
-                    action = `<button type="button" class="btn btn-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Admit</button>`;
+                    action = `<button type="button" class="btn btn-success btn-sm lu-icon-btn live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}" title="Admit" aria-label="Admit"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>`;
                 else if (accepting && census === 'Admitted')
-                    action = `<button type="button" class="btn btn-danger btn-sm live-pool-discharge" data-patient-id="${escapeHtml(id)}">Discharge</button>`;
+                    action = `<button type="button" class="btn btn-danger btn-sm lu-icon-btn live-pool-discharge" data-patient-id="${escapeHtml(id)}" title="Discharge" aria-label="Discharge"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></button>`;
                 else if (accepting && census === 'DischargedDuringWindow')
-                    action = `<button type="button" class="btn btn-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Re-admit</button>`;
+                    action = `<button type="button" class="btn btn-success btn-sm lu-icon-btn live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}" title="Re-admit" aria-label="Re-admit"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>`;
                 return `<tr>
                     <td>
-                        <code>${escapeHtml(id)}</code>
+                        ${window.luLabeledId('Patient', id)}
                         ${expected ? '' : '<div class="small text-muted">Not expected in report</div>'}
                     </td>
                     <td class="text-muted">${escapeHtml(origin)}</td>
@@ -991,7 +990,7 @@
                 return `<div class="d-flex flex-wrap align-items-baseline gap-2 py-1 border-bottom">
                     <span class="au-live-log-time">${escapeHtml(ts)}</span>
                     <span class="${eventTypeBadgeClass(type)}">${escapeHtml(type)}</span>
-                    <code>${escapeHtml(patient)}</code>
+                    ${window.luLabeledId('Patient', patient)}
                     <span class="text-muted">${escapeHtml(String(source))}</span>
                     ${notes ? `<span class="text-muted">— ${escapeHtml(notes)}</span>` : ''}
                 </div>`;
@@ -1147,6 +1146,7 @@
             if (window.luPaintTimes) window.luPaintTimes(document.getElementById('finished'));
             document.getElementById('pipelineDuration').textContent = run.duration || '-';
             currentFinishedAt = run.finishedAt || currentFinishedAt;
+            if (isRunComplete(currentRunStatus)) stopLiveConnection();
 
             if (isRunComplete(currentRunStatus) && !runCompletedAtMs) {
                 runCompletedAtMs = Date.now();
@@ -1239,10 +1239,10 @@
                 const isPass = outcome.toLowerCase() === 'passed';
                 const isAdvisory = !isPass && (item.name || '').toUpperCase() === 'VALIDATION RESULTS (API)';
                 const badge = isPass
-                    ? 'bg-success-subtle text-success-emphasis'
+                    ? 'au-badge-success'
                     : isAdvisory
-                        ? 'bg-warning-subtle text-warning-emphasis'
-                        : 'bg-danger-subtle text-danger-emphasis';
+                        ? 'au-badge-warning'
+                        : 'au-badge-danger';
                 const badgeText = isPass ? 'Passed' : isAdvisory ? 'Advisory' : outcome;
                 const issueText = isPass ? 'No issues' : `${item.issueCount || 0} issue(s)`;
 
@@ -1351,7 +1351,7 @@
                 const div = document.createElement('span');
                 const failed = m.failed === true;
                 const completed = m.completed === true;
-                div.className = `rounded-pill d-inline-flex align-items-center justify-content-center ${failed ? 'bg-danger text-white' : completed ? 'bg-success text-white' : 'bg-light border text-dark'}`;
+                div.className = `rounded-pill d-inline-flex align-items-center justify-content-center ${failed ? 'au-badge-danger text-white' : completed ? 'au-badge-success text-white' : 'au-badge-muted'}`;
                 div.style.width = '136px';
                 div.style.height = '30px';
                 div.style.fontSize = '0.8rem';
@@ -1571,6 +1571,10 @@
                 document.getElementById('scheduleCreated').textContent = schedule?.reportCreated || '-';
                 document.getElementById('scheduleSubmitted').textContent = schedule?.submittedAt || '-';
                 document.getElementById('scheduleDuration').textContent = schedule?.duration || '-';
+                ['scheduleStart', 'scheduleEnd', 'scheduleCreated', 'scheduleSubmitted', 'started', 'finished'].forEach(function (id) {
+                    const node = document.getElementById(id);
+                    if (node && window.luPaintTimes) window.luPaintTimes(node);
+                });
 
                 const statusPill = document.getElementById('scheduleStatusPill');
                 statusPill.className = `badge ${getScheduleStatusClass(schedule?.scheduleStatus)}`;
@@ -1740,9 +1744,20 @@
             document.getElementById('errorFlyout').style.right = '-480px';
         });
 
-        connection.start()
-            .then(() => connection.invoke('SubscribeRun', runId))
-            .catch(err => appendLog('[signalr] ' + err));
+        function stopLiveConnection() {
+            const badge = document.getElementById('liveStatus');
+            if (badge) badge.remove();
+            if (connection.state && connection.state !== 'Disconnected')
+                connection.stop();
+        }
+
+        if (isRunComplete(currentRunStatus)) {
+            stopLiveConnection();
+        } else {
+            connection.start()
+                .then(() => connection.invoke('SubscribeRun', runId))
+                .catch(err => appendLog('[signalr] ' + err));
+        }
 
         renderConfigProperties(runConfigurationJson);
         refreshSnapshot();

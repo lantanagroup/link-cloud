@@ -489,7 +489,7 @@
 
     var live = document.getElementById("liveStatus");
     if (!live || live.getAttribute("data-live") !== "yes" || typeof signalR === "undefined") {
-        if (live && live.getAttribute("data-live") === "yes") setLive("Live updates unavailable", "bg-secondary");
+        if (live && live.getAttribute("data-live") === "yes") setLive("Live updates unavailable", "au-badge-muted");
         return;
     }
 
@@ -500,7 +500,7 @@
 
     function catchUp() {
         return connection.invoke("SubscribeDashboard").then(function () {
-            setLive("Live", "bg-success");
+            setLive("Live", "au-badge-active");
             refresh();
         });
     }
@@ -508,11 +508,11 @@
     connection.on("dashboardUpdate", refresh);
     connection.onreconnecting(function () { setLive("Reconnecting", "bg-warning text-dark"); });
     connection.onreconnected(function () {
-        catchUp().catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
+        catchUp().catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
     });
-    connection.onclose(function () { setLive("Live updates unavailable", "bg-secondary"); });
+    connection.onclose(function () { setLive("Live updates unavailable", "au-badge-muted"); });
     refresh();
     connection.start()
         .then(catchUp)
-        .catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
+        .catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
 })();

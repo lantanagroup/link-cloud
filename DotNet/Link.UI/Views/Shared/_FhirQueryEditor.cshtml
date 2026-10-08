@@ -57,7 +57,7 @@ else
                 }
                 else if (!query.Exists)
                 {
-                    <div class="alert alert-info">No FHIR query configuration for this facility.</div>
+                    <div class="alert au-note">No FHIR query configuration for this facility.</div>
                 }
                 @if (!query.ReadFailed)
                 {
@@ -208,7 +208,7 @@ else
                 }
                 else if (!list.Exists)
                 {
-                    <div class="alert alert-info">No FHIR list configuration for this facility.</div>
+                    <div class="alert au-note">No FHIR list configuration for this facility.</div>
                 }
                 @if (!list.ReadFailed)
                 {
@@ -287,10 +287,10 @@ else
                             }
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <a class="btn btn-au-neutral btn-sm" data-facility-swap="queryPlanItem" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@summary.Type" asp-route-planEdit="edit">Edit</a>
+                            <a class="btn btn-au-neutral btn-sm lu-icon-btn" data-facility-swap="queryPlanItem" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@summary.Type" asp-route-planEdit="edit" title="Edit" aria-label="Edit @summary.Type"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                             <form method="post" data-au-save asp-action="DeleteQueryPlan" asp-route-id="@Model.FacilityId">
                                 <input type="hidden" name="type" value="@summary.Type" />
-                                <button type="submit" class="btn btn-sm btn-danger">Delete @summary.Type</button>
+                                <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @summary.Type"><i class="bi bi-trash" aria-hidden="true"></i></button>
                             </form>
                         </div>
                     </div>
@@ -449,7 +449,7 @@ else
                 }
                 else if (!org.Exists)
                 {
-                    <div class="alert alert-info">No reporting organization configuration for this facility.</div>
+                    <div class="alert au-note">No reporting organization configuration for this facility.</div>
                 }
                 @if (org.Choices.Count > 1)
                 {
@@ -593,7 +593,7 @@ else
                 }
                 else if (!sftp.Exists)
                 {
-                    <div class="alert alert-info">No SFTP configuration for this facility.</div>
+                    <div class="alert au-note">No SFTP configuration for this facility.</div>
                 }
                 @if (!sftp.ReadFailed)
                 {

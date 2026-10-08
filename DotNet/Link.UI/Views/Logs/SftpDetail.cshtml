@@ -68,7 +68,7 @@ else
                 <ul class="mb-0">
                     @foreach (var file in Model.Files)
                     {
-                        <li><code>@file</code></li>
+                        <li><partial name="_LabeledId" model="@(new LabeledId { Label = "File", Value = file, Compact = true, CopyLabel = "Copy file" })" /></li>
                     }
                 </ul>
             }

@@ -29,17 +29,17 @@
     <ul class="lu-section-nav" id="normTabs" role="tablist">
         <li role="presentation">
             <button class="active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
-                <i class="bi bi-gear me-1"></i>Operations <span class="badge bg-secondary">@operations.Count</span>
+                <i class="bi bi-gear me-1"></i>Operations <span class="badge au-badge-muted">@operations.Count</span>
             </button>
         </li>
         <li role="presentation">
             <button id="tab-sequences" data-bs-toggle="tab" data-bs-target="#pane-sequences" type="button" role="tab">
-                <i class="bi bi-list-ol me-1"></i>Sequences <span class="badge bg-secondary">@sequences.Count</span>
+                <i class="bi bi-list-ol me-1"></i>Sequences <span class="badge au-badge-muted">@sequences.Count</span>
             </button>
         </li>
         <li role="presentation">
             <button id="tab-suites" data-bs-toggle="tab" data-bs-target="#pane-suites" type="button" role="tab">
-                <i class="bi bi-box me-1"></i>Suites <span class="badge bg-secondary">@suites.Count</span>
+                <i class="bi bi-box me-1"></i>Suites <span class="badge au-badge-muted">@suites.Count</span>
             </button>
         </li>
     </ul>
@@ -88,14 +88,12 @@
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(op.UpdatedAt)</td>
                                     <td class="text-nowrap">
-                                        <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-au-neutral btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")">
-                                                @(op.IsSystem ? "View" : "Edit")
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-au-neutral btn-op-clone" data-id="@op.Id">Clone</button>
+                                        <div class="lu-row-actions">
+                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")" title="@(op.IsSystem ? "View" : "Edit")" aria-label="@(op.IsSystem ? "View" : "Edit")"><i class="bi @(op.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-op-clone" data-id="@op.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
                                             @if (!op.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-danger btn-op-delete" data-id="@op.Id">Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-op-delete" data-id="@op.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             }
                                         </div>
                                     </td>
@@ -144,21 +142,19 @@
                                             <br /><small class="text-muted">@seq.Description</small>
                                         }
                                     </td>
-                                    <td><span class="badge bg-secondary">@seq.Entries.Count op(s)</span></td>
+                                    <td><span class="badge au-badge-muted">@seq.Entries.Count op(s)</span></td>
                                     <td>
                                         @if (seq.IsSystem) { <span class="badge bg-dark">System</span> }
                                         else { <span class="badge bg-light text-dark border">Custom</span> }
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(seq.UpdatedAt)</td>
                                     <td class="text-nowrap">
-                                        <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-au-neutral btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")">
-                                                @(seq.IsSystem ? "View" : "Edit")
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-au-neutral btn-seq-clone" data-id="@seq.Id">Clone</button>
+                                        <div class="lu-row-actions">
+                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")" title="@(seq.IsSystem ? "View" : "Edit")" aria-label="@(seq.IsSystem ? "View" : "Edit")"><i class="bi @(seq.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-seq-clone" data-id="@seq.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
                                             @if (!seq.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-danger btn-seq-delete" data-id="@seq.Id">Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-seq-delete" data-id="@seq.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             }
                                         </div>
                                     </td>
@@ -204,7 +200,7 @@
                                         <strong>@suite.Name</strong>
                                         @if (suite.IsDefault)
                                         {
-                                            <span class="badge bg-success ms-1">Default</span>
+                                            <span class="badge au-badge-success ms-1">Default</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(suite.Description))
                                         {
@@ -220,20 +216,16 @@
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(suite.UpdatedAt)</td>
                                     <td class="text-nowrap">
-                                        <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-au-neutral btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")">
-                                                @(suite.IsSystem ? "View" : "Edit")
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-au-neutral btn-suite-clone" data-id="@suite.Id">Clone</button>
+                                        <div class="lu-row-actions">
+                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")" title="@(suite.IsSystem ? "View" : "Edit")" aria-label="@(suite.IsSystem ? "View" : "Edit")"><i class="bi @(suite.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-suite-clone" data-id="@suite.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
                                             @if (!suite.IsDefault)
                                             {
-                                                <button type="button" class="btn btn-sm btn-success btn-suite-default" data-id="@suite.Id" title="Set as default">
-                                                    <i class="bi bi-star"></i>
-                                                </button>
+                                                <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-suite-default" data-id="@suite.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i></button>
                                             }
                                             @if (!suite.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-danger btn-suite-delete" data-id="@suite.Id">Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-suite-delete" data-id="@suite.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             }
                                         </div>
                                     </td>
@@ -619,7 +611,7 @@
             '<div class="col-md-4"><input class="form-control form-control-sm code-map-source-key" placeholder="Source Code" /></div>'
             + '<div class="col-md-3"><input class="form-control form-control-sm code-map-target-code" placeholder="Target Code" /></div>'
             + '<div class="col-md-4"><input class="form-control form-control-sm code-map-target-display" placeholder="Display" /></div>'
-            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i></button></div>';
+            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>';
 
         row.querySelector('.code-map-source-key').value = key || '';
         row.querySelector('.code-map-target-code').value = value?.code || value?.Code || '';
@@ -635,7 +627,7 @@
         card.innerHTML =
             '<div class="d-flex justify-content-between align-items-center mb-2">'
             + '<span class="fw-semibold">Code System Map</span>'
-            + '<button type="button" class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i></button>'
+            + '<button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button>'
             + '</div>'
             + '<div class="row g-2 mb-2">'
             + '<div class="col-md-6"><label class="form-label mb-1 small">Source System</label><input class="form-control form-control-sm csm-source-system" /></div>'
@@ -789,8 +781,10 @@
         col4.className = 'col-2';
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'btn btn-sm btn-danger';
-        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.className = 'btn btn-sm btn-danger lu-icon-btn';
+        removeButton.title = 'Remove';
+        removeButton.setAttribute('aria-label', 'Remove');
+        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
         removeButton.addEventListener('click', () => row.remove());
         col4.appendChild(removeButton);
 
@@ -989,8 +983,8 @@
         row.innerHTML = `
             <span class="badge bg-dark" style="width:28px;">${seq}</span>
             <select class="form-select form-select-sm seq-op-select"></select>
-            <button type="button" class="btn btn-sm btn-danger">
-                <i class="bi bi-x-lg"></i>
+            <button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
             </button>`;
 
         const select = row.querySelector('.seq-op-select');
@@ -1374,8 +1368,10 @@
 
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'btn btn-sm btn-danger';
-        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.className = 'btn btn-sm btn-danger lu-icon-btn';
+        removeButton.title = 'Remove';
+        removeButton.setAttribute('aria-label', 'Remove');
+        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
 
         removeButton.addEventListener('click', () => {
             row.remove();
@@ -1421,8 +1417,10 @@
 
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'btn btn-sm btn-danger';
-        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.className = 'btn btn-sm btn-danger lu-icon-btn';
+        removeButton.title = 'Remove';
+        removeButton.setAttribute('aria-label', 'Remove');
+        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
 
         removeButton.addEventListener('click', () => {
             row.remove();

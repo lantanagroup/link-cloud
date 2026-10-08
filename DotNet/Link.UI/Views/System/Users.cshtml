@@ -158,13 +158,15 @@
                                 }
                             </td>
                             <td class="text-nowrap">
-                                <a asp-action="Account" asp-route-id="@user.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a>
-                                @if (user.IsDeleted)
-                                {
-                                    <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline" onsubmit="return confirm('Restore this account?');">
-                                        <button type="submit" class="btn btn-sm btn-au-neutral ms-2">Restore</button>
-                                    </form>
-                                }
+                                <div class="lu-row-actions">
+                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Account" asp-route-id="@user.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                    @if (user.IsDeleted)
+                                    {
+                                        <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline" onsubmit="return confirm('Restore this account?');">
+                                            <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                                        </form>
+                                    }
+                                </div>
                             </td>
                         </tr>
                     }

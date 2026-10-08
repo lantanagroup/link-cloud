@@ -93,7 +93,7 @@
                             <td>
                                 @if (string.Equals(row.Type, "PACKAGE", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <a asp-action="Package" asp-route-name="@row.Name" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a>
+                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Package" asp-route-name="@row.Name" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
                                 }
                             </td>
                         </tr>
@@ -150,7 +150,7 @@
                     @foreach (var row in Model.Categories)
                     {
                         <tr>
-                            <td><code>@row.Id</code></td>
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = row.Id, Compact = true, CopyLabel = "Copy id" })" /></td>
                             <td>@row.Title</td>
                             <td>@row.Severity</td>
                             <td>@(row.Acceptable ? "Yes" : "No")</td>
@@ -161,7 +161,7 @@
                                 }
                                 else
                                 {
-                                    <a asp-action="Category" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Edit</a>
+                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Category" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                                 }
                             </td>
                         </tr>
