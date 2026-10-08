@@ -3,7 +3,7 @@
 # token is missing or has less than 10 minutes left, then runs the real
 # docker executable with AZURE_ARTIFACTS_PAT set only for that process.
 
-function Get-LinkCloudFeedTokenMissingMessage {
+function global:Get-LinkCloudFeedTokenMissingMessage {
     $lines = @(
         'Azure token missing. Run this one-time setup: powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"'
         'PowerShell profile line: . "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token'
@@ -13,7 +13,7 @@ function Get-LinkCloudFeedTokenMissingMessage {
     return ($lines -join [Environment]::NewLine)
 }
 
-function Write-LinkCloudMessage {
+function global:Write-LinkCloudMessage {
     param([string]$Message)
     $hooks = $global:LinkCloudFeedTokenHooks
     if ($hooks -and $hooks.ContainsKey('Messages') -and $null -ne $hooks['Messages']) {
@@ -22,7 +22,7 @@ function Write-LinkCloudMessage {
     Write-Host $Message
 }
 
-function Get-LinkCloudNowEpoch {
+function global:Get-LinkCloudNowEpoch {
     $hooks = $global:LinkCloudFeedTokenHooks
     if ($hooks -and $hooks.ContainsKey('NowEpoch')) {
         return [int64]$hooks['NowEpoch']
@@ -30,7 +30,7 @@ function Get-LinkCloudNowEpoch {
     return [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 }
 
-function Find-LinkCloudRepoRoot {
+function global:Find-LinkCloudRepoRoot {
     $hooks = $global:LinkCloudFeedTokenHooks
     if ($hooks -and $hooks.ContainsKey('RepoRoot')) {
         $value = [string]$hooks['RepoRoot']
@@ -56,7 +56,7 @@ function Find-LinkCloudRepoRoot {
     return $null
 }
 
-function Read-LinkCloudFeedTokenFile {
+function global:Read-LinkCloudFeedTokenFile {
     param([Parameter(Mandatory = $true)][string]$Path)
     $token = ''
     $expires = [int64]0
@@ -77,7 +77,7 @@ function Read-LinkCloudFeedTokenFile {
     }
 }
 
-function Resolve-LinkCloudDockerExecutable {
+function global:Resolve-LinkCloudDockerExecutable {
     $hooks = $global:LinkCloudFeedTokenHooks
     if ($hooks -and $hooks.ContainsKey('DockerExecutable') -and $hooks['DockerExecutable']) {
         return [string]$hooks['DockerExecutable']
@@ -92,7 +92,7 @@ function Resolve-LinkCloudDockerExecutable {
     return [string]$cmd.Source
 }
 
-function Invoke-LinkCloudDockerProcess {
+function global:Invoke-LinkCloudDockerProcess {
     param([string[]]$ArgumentList)
     if (-not $ArgumentList) {
         $ArgumentList = @()
@@ -122,7 +122,7 @@ function Invoke-LinkCloudDockerProcess {
     $global:LASTEXITCODE = $LASTEXITCODE
 }
 
-function Invoke-LinkCloudFeedTokenFetch {
+function global:Invoke-LinkCloudFeedTokenFetch {
     param([Parameter(Mandatory = $true)][string]$Root)
     $hooks = $global:LinkCloudFeedTokenHooks
     if ($hooks -and $hooks.ContainsKey('Fetch')) {
@@ -147,7 +147,7 @@ function Invoke-LinkCloudFeedTokenFetch {
     return [int]$code
 }
 
-function Test-LinkCloudFeedTokenFresh {
+function global:Test-LinkCloudFeedTokenFresh {
     param(
         $Read,
         [int64]$Now
@@ -158,7 +158,7 @@ function Test-LinkCloudFeedTokenFresh {
     return (([int64]$Read.Expires - $Now) -ge 600)
 }
 
-function Test-LinkCloudFeedTokenUnexpired {
+function global:Test-LinkCloudFeedTokenUnexpired {
     param(
         $Read,
         [int64]$Now
@@ -171,7 +171,7 @@ function Test-LinkCloudFeedTokenUnexpired {
     return (([int64]$Read.Expires - $Now) -gt 0)
 }
 
-function Invoke-LinkCloudCompose {
+function global:Invoke-LinkCloudCompose {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [string[]]$ComposeArguments,
@@ -244,7 +244,7 @@ function global:compose {
     }
 }
 
-function Test-LinkCloudComposeCommand {
+function global:Test-LinkCloudComposeCommand {
     param([string[]]$Arguments)
     $needsValue = @{
         '--context' = $true
@@ -283,16 +283,15 @@ function global:docker {
     $hooks = $global:LinkCloudFeedTokenHooks
     $skipReload = $hooks -and $hooks.ContainsKey('SkipReload') -and $hooks['SkipReload']
     $composeCommand = Test-LinkCloudComposeCommand -Arguments @($args)
-    # Only compose reloads the checkout script. Other docker commands must not run it.
-    if (-not $skipReload -and $composeCommand) {
+    # Only compose reloads the checkout script, and it re-reads that script on every call.
+    # Other docker commands must not run it. The flag stops the reload from calling itself.
+    if (-not $skipReload -and $composeCommand -and -not $global:LinkCloudFeedTokenSourcing) {
         $reloadRoot = Find-LinkCloudRepoRoot
         if ($reloadRoot) {
             $repoProfile = Join-Path $reloadRoot 'Scripts\docker-compose.feed-token-profile.ps1'
-            $current = $PSCommandPath
-            if ($current -and (Test-Path -LiteralPath $repoProfile)) {
-                $repoFull = (Resolve-Path -LiteralPath $repoProfile).Path
-                $currentFull = (Resolve-Path -LiteralPath $current).Path
-                if ($repoFull -ne $currentFull) {
+            if (Test-Path -LiteralPath $repoProfile) {
+                $global:LinkCloudFeedTokenSourcing = $true
+                try {
                     . $repoProfile
                     $reloaded = Get-Command -Name docker -CommandType Function
                     if ($MyInvocation.ExpectingInput) {
@@ -300,8 +299,10 @@ function global:docker {
                     } else {
                         & $reloaded @args
                     }
-                    return
+                } finally {
+                    $global:LinkCloudFeedTokenSourcing = $false
                 }
+                return
             }
         }
     }

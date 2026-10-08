@@ -247,6 +247,10 @@ try {
     Set-DockerHook -ExitCode 0
     docker compose version
     Write-Result ($global:LinkCloudFeedTokenHooks['Reloaded'] -eq $true) 'compose loads the checkout script'
+    $secondBody = "`$global:LinkCloudFeedTokenHooks['Reloaded'] = 'second'`r`n" + [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'docker-compose.feed-token-profile.ps1'))
+    [System.IO.File]::WriteAllText($copyProfile, $secondBody)
+    docker compose version
+    Write-Result ($global:LinkCloudFeedTokenHooks['Reloaded'] -eq 'second') 'compose reloads a changed checkout script'
     $global:LinkCloudFeedTokenHooks['SkipReload'] = $true
 
     # Message text matches the image restore helper.
