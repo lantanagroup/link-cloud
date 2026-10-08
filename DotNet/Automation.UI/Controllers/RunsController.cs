@@ -571,9 +571,10 @@ public class RunsController(
                 normalizedSearchTerm,
                 cancellationToken);
 
-            if ((result?.Body?.Records?.Count ?? 0) == 0)
+            if ((result?.Body?.Records?.Count ?? 0) == 0
+                && (result?.Body != null || result?.IsSuccessStatusCode == true))
             {
-                result = await dataAcqClient.SearchAcquisitionLogsAsync(
+                var fallback = await dataAcqClient.SearchAcquisitionLogsAsync(
                     string.Empty,
                     reportId,
                     pageSize,
@@ -582,7 +583,18 @@ public class RunsController(
                     sortOrder,
                     normalizedSearchTerm,
                     cancellationToken);
+                if (AcquisitionLogAvailability.PreferFallback(
+                        result?.Body != null,
+                        fallback?.Body?.Records?.Count ?? 0,
+                        fallback?.Body != null))
+                    result = fallback;
             }
+
+            var read = AcquisitionLogAvailability.Classify(result?.StatusCode, result?.Body != null);
+            if (read.Unavailable)
+                return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 }, unavailable = true });
+            if (read.ErrorStatus is int status)
+                return StatusCode(status);
 
             var records = (result?.Body?.Records ?? [])
                 .Select(r => new
@@ -613,6 +625,10 @@ public class RunsController(
 
             return Json(new { records, metadata });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
@@ -621,7 +637,7 @@ public class RunsController(
                 facilityId,
                 reportId);
 
-            return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 } });
+            return StatusCode(StatusCodes.Status502BadGateway);
         }
     }
 
@@ -641,8 +657,12 @@ public class RunsController(
         try
         {
             var detailed = await dataAcqClient.GetAcquisitionLogByIdAsync(logId, cancellationToken);
-            if (detailed == null)
-                return NotFound();
+            var detailRead = AcquisitionLogAvailability.Classify(
+                detailed?.StatusCode, detailed?.Body != null, notFoundIsMissing: true);
+            if (detailRead.Unavailable)
+                return Json(new { unavailable = true });
+            if (detailRead.ErrorStatus is int detailStatus)
+                return StatusCode(detailStatus);
 
             // Fetch reference resources linked to this log.
             var referenceResourceIds = new List<string>();
@@ -729,10 +749,14 @@ public class RunsController(
                 Notes = detailed.Body?.Notes?.ToList() ?? new List<string>()
             });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load DA log detail for run {RunId}, log {LogId}", id, logId);
-            return NotFound();
+            return StatusCode(StatusCodes.Status502BadGateway);
         }
     }
 
