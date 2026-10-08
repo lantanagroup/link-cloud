@@ -79,6 +79,7 @@ public class AutomationAreaPagesTests
         view.Should().Contain("Named production facilities and other GUID tenants that were not created by Automation.UI are never selected.");
         view.Should().Contain("/hubs/cleanup");
         view.Should().Contain("SubscribeCleanup");
+        view.Should().Contain("window.luPaintTimes(body)");
     }
 
     [Fact]

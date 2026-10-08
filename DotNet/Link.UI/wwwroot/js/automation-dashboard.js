@@ -189,6 +189,7 @@
             .then(function (html) {
                 if (ticket !== recentTicket || html == null) return;
                 host.innerHTML = html;
+                if (window.luPaintTimes) window.luPaintTimes(host);
                 tick();
             })
             .catch(function () { });
