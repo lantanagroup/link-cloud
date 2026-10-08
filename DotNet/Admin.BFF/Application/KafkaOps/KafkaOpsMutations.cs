@@ -69,17 +69,25 @@ public sealed partial class KafkaOpsService
 
     public async Task<BrokerMovePlan> PlanDecommissionAsync(int brokerId, CancellationToken cancellationToken)
     {
-        var cluster = await GetClusterAsync(cancellationToken);
+        ClusterSnapshot cluster;
+        try
+        {
+            cluster = await _broker.DescribeClusterAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            throw new KafkaOpsRejectedException("Kafka could not be read. " + ex.Message);
+        }
+
         if (cluster.Error is not null)
             throw new KafkaOpsRejectedException(cluster.Error);
-        var eligible = cluster.ControllerEligibleIds.ToList();
-        if (cluster.ControllerId is int controller && !eligible.Contains(controller))
-            eligible.Add(controller);
+        if (!cluster.ControllerRolesKnown)
+            throw new KafkaOpsRejectedException("Broker roles could not be read, so decommission is refused.");
         return BrokerMovePlanner.Decommission(
             brokerId,
             cluster.Brokers.Select(broker => broker.Id).ToList(),
             await FactsAsync(cancellationToken),
-            eligible);
+            cluster.ControllerEligibleIds);
     }
 
     public async Task<ChangeRequestRecord> CreateDecommissionAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken)
