@@ -101,21 +101,45 @@
         {
             <nav aria-label="Recent runs pagination">
                 <ul class="pagination pagination-sm mb-0">
-                    <li class="page-item @(Model.PageNumber == 1 ? "disabled" : "")">
-                        <a class="page-link" data-page="1" href="@(Model.PageNumber == 1 ? "#" : PageHref(1))" aria-label="First">«</a>
-                    </li>
-                    <li class="page-item @(Model.PageNumber == 1 ? "disabled" : "")">
-                        <a class="page-link" data-page="@(Model.PageNumber - 1)" href="@(Model.PageNumber == 1 ? "#" : PageHref(Model.PageNumber - 1))" aria-label="Previous">‹</a>
-                    </li>
+                    @if (Model.PageNumber == 1)
+                    {
+                        <li class="page-item disabled">
+                            <a class="page-link" data-page="1" href="#" aria-label="First" tabindex="-1" aria-disabled="true">«</a>
+                        </li>
+                        <li class="page-item disabled">
+                            <a class="page-link" data-page="@(Model.PageNumber - 1)" href="#" aria-label="Previous" tabindex="-1" aria-disabled="true">‹</a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="page-item">
+                            <a class="page-link" data-page="1" href="@PageHref(1)" aria-label="First">«</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" data-page="@(Model.PageNumber - 1)" href="@PageHref(Model.PageNumber - 1)" aria-label="Previous">‹</a>
+                        </li>
+                    }
                     <li class="page-item disabled">
                         <span class="page-link">@Model.PageNumber / @Model.TotalPages</span>
                     </li>
-                    <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
-                        <a class="page-link" data-page="@(Model.PageNumber + 1)" href="@(Model.PageNumber >= Model.TotalPages ? "#" : PageHref(Model.PageNumber + 1))" aria-label="Next">›</a>
-                    </li>
-                    <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
-                        <a class="page-link" data-page="@Model.TotalPages" href="@(Model.PageNumber >= Model.TotalPages ? "#" : PageHref(Model.TotalPages))" aria-label="Last">»</a>
-                    </li>
+                    @if (Model.PageNumber >= Model.TotalPages)
+                    {
+                        <li class="page-item disabled">
+                            <a class="page-link" data-page="@(Model.PageNumber + 1)" href="#" aria-label="Next" tabindex="-1" aria-disabled="true">›</a>
+                        </li>
+                        <li class="page-item disabled">
+                            <a class="page-link" data-page="@Model.TotalPages" href="#" aria-label="Last" tabindex="-1" aria-disabled="true">»</a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="page-item">
+                            <a class="page-link" data-page="@(Model.PageNumber + 1)" href="@PageHref(Model.PageNumber + 1)" aria-label="Next">›</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" data-page="@Model.TotalPages" href="@PageHref(Model.TotalPages)" aria-label="Last">»</a>
+                        </li>
+                    }
                 </ul>
             </nav>
         }
