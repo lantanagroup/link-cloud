@@ -139,6 +139,9 @@ public sealed class OperationsController : Controller
     public async Task<IActionResult> Kafka(Guid? requestId, CancellationToken cancellationToken)
     {
         var page = await LoadAsync(requestId, null, null, null, null, null, cancellationToken);
+        if (page.Query.View == ThroughputKafkaPageQuery.Messages
+            && string.Equals(Request.Query["batch"], "1", StringComparison.Ordinal))
+            return Json(KafkaBrowseText.Batch(page));
         return View(page);
     }
 
@@ -149,25 +152,24 @@ public sealed class OperationsController : Controller
         if (string.IsNullOrWhiteSpace(query.TopicName))
             return Problem(detail: "A topic name is required.", statusCode: StatusCodes.Status400BadRequest);
 
-        var size = KafkaWindows.Size(query.PageSize);
+        var plan = KafkaBrowsePlan.For(query, KafkaBrowseAllowList.MembersOf(query.TopicName));
         var call = await _kafka.ExportMessagesAsync(
-            query.TopicName,
-            query.BrowseMode,
+            plan.Topic,
+            plan.Mode,
             query.BrowsePartitions,
             query.BrowseOffset,
-            query.MessageFrom ?? query.BrowseTimestamp,
-            size,
-            query.BrowseKey,
-            query.BrowseHeaderName,
-            query.HeaderContains.Length > 0 ? query.HeaderContains : query.BrowseHeaderValue,
+            plan.Timestamp,
+            KafkaWindows.Size(query.PageSize),
+            plan.Key,
+            "",
+            "",
             cancellationToken,
-            query.MsgPage,
-            query.MessageText,
-            query.HeaderContains,
-            query.ValueContains,
-            query.MessageKind,
-            query.MessageFrom,
-            query.MessageTo);
+            plan.Page,
+            from: query.MessageFrom,
+            to: query.MessageTo,
+            resume: plan.Resume,
+            until: plan.Until,
+            correlation: plan.Correlation);
         if (call.Value is null)
             return Problem(detail: call.Error ?? "The export was refused.", statusCode: call.Status == 0 ? StatusCodes.Status502BadGateway : call.Status);
         return File(call.Value, "application/json", query.TopicName + "-messages.json");
@@ -519,25 +521,28 @@ public sealed class OperationsController : Controller
         {
             var familyCall = await _kafka.GetFamilyAsync(query.TopicName, cancellationToken);
             family = familyCall.Value;
-            var size = KafkaWindows.Size(query.PageSize);
+            var members = family is { Members.Count: > 0 }
+                ? (IReadOnlyList<KafkaNamedTopic>)family.Members
+                : KafkaBrowseAllowList.MembersOf(query.TopicName);
+            var browsePlan = KafkaBrowsePlan.For(query, members);
             var messageCall = await _kafka.GetMessagesAsync(
-                query.TopicName,
-                query.BrowseMode,
+                browsePlan.Topic,
+                browsePlan.Mode,
                 query.BrowsePartitions,
                 query.BrowseOffset,
-                query.MessageFrom ?? query.BrowseTimestamp,
-                size,
-                query.BrowseKey,
-                query.BrowseHeaderName,
-                query.HeaderContains.Length > 0 ? query.HeaderContains : query.BrowseHeaderValue,
+                browsePlan.Timestamp,
+                KafkaWindows.Size(query.PageSize),
+                browsePlan.Key,
+                "",
+                "",
                 cancellationToken,
-                query.MsgPage,
-                query.MessageText,
-                query.HeaderContains,
-                query.ValueContains,
-                query.MessageKind,
-                query.MessageFrom,
-                query.MessageTo);
+                browsePlan.Page,
+                from: query.MessageFrom,
+                to: query.MessageTo,
+                resume: browsePlan.Resume,
+                until: browsePlan.Until,
+                correlation: browsePlan.Correlation,
+                fixtureKey: query.BrowseKey);
             messages = messageCall.Value;
             if (messages is null)
                 browseError = messageCall.Error ?? familyCall.Error;

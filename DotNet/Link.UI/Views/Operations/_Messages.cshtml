@@ -34,13 +34,24 @@
                 : browse.Records.Count + " on this page";
     string TimeValue(long? unix) => unix is long ms ? DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime.ToString("yyyy-MM-ddTHH:mm") : "";
     var advancedOpen = query.More || query.BrowseKey.Length > 0 || query.HeaderContains.Length > 0 || query.ValueContains.Length > 0;
+    var exactKey = LinkMessageKey.TryDeserialize(query.BrowseKey, out _);
+    var correlationSearch = Guid.TryParse(query.MessageText, out _);
+    var clientBatch = browse is not null && (
+        browse.Metadata.More
+        || browse.Records.Count > pageSize
+        || query.Resume.Length > 0
+        || query.MessageFrom is not null
+        || query.MessageTo is not null
+        || exactKey
+        || correlationSearch);
+    var clock = DateTimeOffset.UtcNow;
 }
 
 <h2 class="h5 mt-3">Read messages</h2>
-<p>This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Search narrows the messages. The pager reads one page at a time. Export reads that same page again and writes an audit of the rows it returns.</p>
+<p>This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Time, message type, and an exact facility and patient key narrow what is read. A keyword filters the messages already loaded and does not read again. Search further reads the next batch. An unfiltered topic is paged one page at a time. Export reads that same page again and writes an audit of the rows it returns.</p>
 <ol class="lu-kafka-steps">
     <li>Choose the topic. The family tabs move between the main topic and its error, retry, and redrive topics.</li>
-    <li>Search. Every filter you fill in has to match. The page below is the only read.</li>
+    <li>Search. Time, type, and an exact facility and patient key narrow the read. A keyword filters the loaded messages on this page.</li>
     <li>Open a row for the payload and the facility or report it belongs to.</li>
     <li>Export JSON when you need a copy of this page. That second read is audited.</li>
 </ol>
@@ -126,13 +137,16 @@
         <input type="hidden" name="broker" value="@query.Broker" />
         <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
         <input type="hidden" name="page" value="1" />
+        <input type="hidden" name="mq" id="browse-mq" value="@query.MessageText" />
+        <input type="hidden" name="hq" id="browse-hq" value="@query.HeaderContains" />
+        <input type="hidden" name="vq" id="browse-vq" value="@query.ValueContains" />
 
         <fieldset class="border rounded p-3 mb-0 lu-search">
             <legend class="float-none w-auto px-2 h6">Search</legend>
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-lg-5">
                     <label class="form-label" for="browse-q">Search</label>
-                    <input class="form-control" id="browse-q" name="mq" value="@query.MessageText" />
+                    <input class="form-control" id="browse-q" value="@query.MessageText" autocomplete="off" />
                 </div>
                 <div class="col-6 col-md-3 col-lg-2">
                     <label class="form-label" for="browse-kind">Message type</label>
@@ -163,20 +177,25 @@
                     <button class="btn btn-au-execute" type="submit">Search</button>
                 </div>
             </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <a class="btn btn-sm btn-au-link" href="@query.AtFrom(clock.AddMinutes(-15).ToUnixTimeMilliseconds()).Href()">Last 15 minutes</a>
+                <a class="btn btn-sm btn-au-link" href="@query.AtFrom(clock.AddHours(-1).ToUnixTimeMilliseconds()).Href()">Last hour</a>
+                <a class="btn btn-sm btn-au-link" href="@query.AtFrom(clock.AddHours(-24).ToUnixTimeMilliseconds()).Href()">Last 24 hours</a>
+            </div>
             <details class="lu-advanced mt-3" @(advancedOpen ? "open" : null)>
                 <summary>Advanced</summary>
                 <div class="row g-2 mt-1">
                     <div class="col-12 col-md-4">
                         <label class="form-label" for="browse-header">Header contains</label>
-                        <input class="form-control" id="browse-header" name="hq" value="@query.HeaderContains" />
+                        <input class="form-control" id="browse-header" data-lu-keyword-part value="@query.HeaderContains" autocomplete="off" />
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label" for="browse-key">Key contains</label>
-                        <input class="form-control" id="browse-key" name="key" value="@query.BrowseKey" />
+                        <input class="form-control" id="browse-key" name="key" value="@query.BrowseKey" autocomplete="off" />
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label" for="browse-value">Value contains</label>
-                        <input class="form-control" id="browse-value" name="vq" value="@query.ValueContains" />
+                        <input class="form-control" id="browse-value" data-lu-keyword-part value="@query.ValueContains" autocomplete="off" />
                     </div>
                 </div>
             </details>
@@ -242,7 +261,7 @@
         <h3 class="h6 mt-4">Records</h3>
         <div class="au-card card">
         <div class="table-responsive">
-            <table class="table table-sm align-middle">
+            <table class="table table-sm align-middle" data-lu-messages data-lu-page-size="@pageSize" data-lu-page="1" data-lu-client="@(clientBatch ? "1" : "0")">
                 <thead>
                     <tr>
                         <th>Partition</th>
@@ -260,7 +279,7 @@
                     var recordId = KafkaBrowseText.RecordId(record.Partition, record.Offset);
                     var open = string.Equals(query.OpenRecord, recordId, StringComparison.Ordinal);
                     var hasException = !string.IsNullOrWhiteSpace(record.Link.ExceptionMessage) || record.Link.ExceptionHeaders.Count > 0;
-                    <tr>
+                    <tr data-lu-id="@recordId" data-lu-text="@KafkaBrowseText.FilterText(record)">
                         <td>@record.Partition</td>
                         <td>@record.Offset</td>
                         <td>@KafkaBrowseText.When(record.TimestampUnixMs)</td>
@@ -311,6 +330,21 @@
     }
 
     <nav class="lu-pager" aria-label="Message pages">
+        @if (browse is not null)
+        {
+            var scanNote = KafkaBrowseText.ScanNote(browse);
+            if (scanNote.Length > 0)
+            {
+                <span class="small text-muted" data-lu-scan>@scanNote</span>
+            }
+            <span class="small text-muted" data-lu-loaded>@KafkaBrowseText.LoadedNote(browse.Records.Count)</span>
+            @if (browse.Metadata.More && browse.Metadata.Resume.Length > 0)
+            {
+                <a class="btn btn-sm btn-au-execute" data-lu-further href="@query.Href(resume: browse.Metadata.Resume, msgPage: 1)">Search further</a>
+            }
+        }
+        <div data-lu-client-pager></div>
+        <div data-lu-server-pager @(clientBatch ? "hidden" : null)>
         @if (matchLabel.Length > 0)
         {
             <span class="small text-muted">@matchLabel</span>
@@ -386,6 +420,7 @@
                 <a class="btn btn-sm btn-au-link" href="@query.Href(pageSize: size, msgPage: 1)">@size</a>
             }
         }
+        </div>
     </nav>
 
     <partial name="_ProduceMessage" model="Model" />

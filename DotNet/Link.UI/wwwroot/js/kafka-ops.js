@@ -81,6 +81,7 @@
         bindBusy(root);
         wireResults(root);
         wireProduce();
+        wireMessageKeyword();
         focusResult(root);
         watchRequest();
     }
@@ -355,6 +356,215 @@
         if (status === "Cancelled" || status === "Empty") return "au-badge-warning";
         if (status === "Pending" || status === "Executing" || status === "Converging" || status === "Verifying") return "au-badge-active";
         return "au-badge-muted";
+    }
+
+    function wireMessageKeyword() {
+        if (document.documentElement.getAttribute("data-lu-keyword-wired") !== "1") {
+            document.documentElement.setAttribute("data-lu-keyword-wired", "1");
+            document.addEventListener("input", function (event) {
+                var target = event.target;
+                if (!target) return;
+                if (target.id === "browse-q" || target.hasAttribute("data-lu-keyword-part"))
+                    applyMessageKeyword();
+            });
+            document.addEventListener("submit", function (event) {
+                var form = event.target;
+                if (!form || !form.querySelector || !form.querySelector("#browse-q")) return;
+                var box = document.getElementById("browse-q");
+                var mq = form.querySelector("#browse-mq");
+                if (box && mq) mq.value = box.value;
+                var header = document.getElementById("browse-header");
+                var hq = form.querySelector("#browse-hq");
+                if (header && hq) hq.value = header.value;
+                var value = document.getElementById("browse-value");
+                var vq = form.querySelector("#browse-vq");
+                if (value && vq) vq.value = value.value;
+            });
+            document.addEventListener("click", function (event) {
+                var further = event.target && event.target.closest ? event.target.closest("[data-lu-further]") : null;
+                if (!further) return;
+                event.preventDefault();
+                loadFurther(further);
+            });
+        }
+        applyMessageKeyword();
+    }
+
+    function keywordParts() {
+        var parts = [];
+        var box = document.getElementById("browse-q");
+        if (box && box.value.trim()) parts.push(box.value.trim().toLowerCase());
+        document.querySelectorAll("[data-lu-keyword-part]").forEach(function (el) {
+            var value = (el.value || "").trim().toLowerCase();
+            if (value) parts.push(value);
+        });
+        return parts;
+    }
+
+    function applyMessageKeyword() {
+        var table = document.querySelector("[data-lu-messages]");
+        if (!table) return;
+        var parts = keywordParts();
+        var needle = parts.join("\n");
+        var page = parseInt(table.getAttribute("data-lu-page") || "1", 10);
+        if (table.getAttribute("data-lu-needle") !== needle) {
+            table.setAttribute("data-lu-needle", needle);
+            table.setAttribute("data-lu-page", "1");
+            page = 1;
+        }
+        var rows = Array.prototype.slice.call(table.querySelectorAll("tr[data-lu-text]"));
+        var matched = [];
+        rows.forEach(function (row) {
+            var hay = (row.getAttribute("data-lu-text") || "").toLowerCase();
+            var ok = parts.every(function (part) { return hay.indexOf(part) >= 0; });
+            var detail = row.nextElementSibling;
+            var detailRow = detail && detail.classList.contains("lu-msg-row") ? detail : null;
+            if (!ok) {
+                row.hidden = true;
+                if (detailRow) detailRow.hidden = true;
+                return;
+            }
+            matched.push({ row: row, detail: detailRow });
+        });
+        var client = table.getAttribute("data-lu-client") === "1";
+        var size = parseInt(table.getAttribute("data-lu-page-size") || "25", 10);
+        if (!size || size < 1) size = 25;
+        if (!client) {
+            matched.forEach(function (item) {
+                item.row.hidden = false;
+                if (item.detail) item.detail.hidden = false;
+            });
+            paintClientPager(table, 1, 1);
+            return;
+        }
+        var pages = Math.max(1, Math.ceil(matched.length / size));
+        if (page > pages) page = pages;
+        if (page < 1) page = 1;
+        table.setAttribute("data-lu-page", String(page));
+        matched.forEach(function (item, index) {
+            var show = index >= (page - 1) * size && index < page * size;
+            item.row.hidden = !show;
+            if (item.detail) item.detail.hidden = !show;
+        });
+        paintClientPager(table, page, pages);
+    }
+
+    function paintClientPager(table, page, pages) {
+        var host = document.querySelector("[data-lu-client-pager]");
+        if (!host) return;
+        host.replaceChildren();
+        if (!table || table.getAttribute("data-lu-client") !== "1") return;
+        var note = document.createElement("span");
+        note.className = "small text-muted";
+        note.textContent = "Page " + page + " of " + pages;
+        host.appendChild(note);
+        function go(label, target, enabled) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-sm btn-au-link";
+            button.textContent = label;
+            button.disabled = !enabled;
+            button.addEventListener("click", function () {
+                table.setAttribute("data-lu-page", String(target));
+                table.setAttribute("data-lu-needle", keywordParts().join("\n"));
+                applyMessageKeyword();
+            });
+            host.appendChild(button);
+        }
+        go("First", 1, page > 1);
+        go("Previous", page - 1, page > 1);
+        go("Next", page + 1, page < pages);
+        go("Last", pages, page < pages);
+    }
+
+    function loadFurther(link) {
+        if (link.getAttribute("data-lu-busy") === "1") return;
+        var href = link.getAttribute("href") || "";
+        if (!href) return;
+        if (!document.querySelector("[data-lu-messages]")) {
+            window.location.href = href;
+            return;
+        }
+        link.setAttribute("data-lu-busy", "1");
+        var url = href + (href.indexOf("?") >= 0 ? "&" : "?") + "batch=1";
+        fetch(url, { headers: { "Accept": "application/json" }, credentials: "same-origin" })
+            .then(function (response) {
+                if (!response.ok) throw new Error("read failed");
+                return response.json();
+            })
+            .then(function (body) {
+                appendMessages(body);
+                if (body && body.more && body.resume) link.href = replaceQuery(href, "resume", body.resume);
+                else link.hidden = true;
+                var scan = document.querySelector("[data-lu-scan]");
+                if (scan && body && body.scanned) scan.textContent = "Searched the latest " + body.scanned + " messages.";
+                applyMessageKeyword();
+            })
+            .catch(function () {
+                window.location.href = href;
+            })
+            .finally(function () {
+                link.removeAttribute("data-lu-busy");
+            });
+    }
+
+    function appendMessages(body) {
+        var table = document.querySelector("[data-lu-messages]");
+        var bodyEl = table ? table.querySelector("tbody") : null;
+        if (!table || !bodyEl || !body || !Array.isArray(body.records)) return;
+        var seen = {};
+        table.querySelectorAll("tr[data-lu-id]").forEach(function (row) {
+            seen[row.getAttribute("data-lu-id")] = true;
+        });
+        body.records.forEach(function (record) {
+            var id = String(record.partition) + ":" + String(record.offset);
+            if (seen[id]) return;
+            seen[id] = true;
+            var tr = document.createElement("tr");
+            tr.setAttribute("data-lu-text", record.text || "");
+            tr.setAttribute("data-lu-id", id);
+            function cell(text) {
+                var td = document.createElement("td");
+                td.textContent = text == null ? "" : String(text);
+                return td;
+            }
+            tr.appendChild(cell(record.partition));
+            tr.appendChild(cell(record.offset));
+            tr.appendChild(cell(record.time));
+            var key = document.createElement("td");
+            var code = document.createElement("code");
+            code.className = "small";
+            code.textContent = record.key || "";
+            key.appendChild(code);
+            tr.appendChild(key);
+            tr.appendChild(cell(record.summary));
+            tr.appendChild(cell("—"));
+            var open = document.createElement("td");
+            var anchor = document.createElement("a");
+            anchor.className = "btn btn-sm btn-au-link";
+            anchor.href = record.openHref || "#";
+            anchor.textContent = "Open";
+            open.appendChild(anchor);
+            tr.appendChild(open);
+            bodyEl.appendChild(tr);
+        });
+        var note = document.querySelector("[data-lu-loaded]");
+        if (note) {
+            var count = table.querySelectorAll("tr[data-lu-text]").length;
+            note.textContent = count === 1 ? "1 message loaded" : count + " messages loaded";
+        }
+    }
+
+    function replaceQuery(href, key, value) {
+        var hashAt = href.indexOf("#");
+        var hash = hashAt >= 0 ? href.slice(hashAt) : "";
+        var base = hashAt >= 0 ? href.slice(0, hashAt) : href;
+        var q = base.indexOf("?");
+        var path = q >= 0 ? base.slice(0, q) : base;
+        var params = new URLSearchParams(q >= 0 ? base.slice(q + 1) : "");
+        params.set(key, value);
+        params.delete("batch");
+        return path + "?" + params.toString() + hash;
     }
 
     document.addEventListener("au-refreshed", function (event) {

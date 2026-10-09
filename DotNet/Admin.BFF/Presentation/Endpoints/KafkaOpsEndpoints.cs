@@ -587,9 +587,12 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         string? key,
         string? headerName,
         string? headerValue,
+        string? resume,
+        long? until,
+        string? correlation,
         [FromQuery] int[]? partition,
         CancellationToken cancellationToken) =>
-        Browse(user, topic, request => browser!.ReadAsync(request, cancellationToken), mode, offset, timestamp, limit, key, headerName, headerValue, partition, cancellationToken);
+        Browse(user, topic, request => browser!.ReadAsync(request, cancellationToken), mode, offset, timestamp, limit, key, headerName, headerValue, partition, cancellationToken, resume, until, correlation);
 
     private async Task<IResult> ExportMessages(
         ClaimsPrincipal user,
@@ -601,6 +604,9 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         string? key,
         string? headerName,
         string? headerValue,
+        string? resume,
+        long? until,
+        string? correlation,
         [FromQuery] int[]? partition,
         CancellationToken cancellationToken)
     {
@@ -613,7 +619,7 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             return Problem(invalid, StatusCodes.Status400BadRequest);
         try
         {
-            var page = await browser.ExportAsync(user, BrowseRequest(name, mode, offset, timestamp, limit, key, headerName, headerValue, partition), cancellationToken);
+            var page = await browser.ExportAsync(user, BrowseRequest(name, mode, offset, timestamp, limit, key, headerName, headerValue, partition, resume, until, correlation), cancellationToken);
             var json = JsonSerializer.Serialize(page.Records, ExportJson);
             return Results.File(Encoding.UTF8.GetBytes(json), "application/json", name + "-messages.json");
         }
@@ -667,7 +673,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         string? headerName,
         string? headerValue,
         int[]? partition,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? resume = null,
+        long? until = null,
+        string? correlation = null)
     {
         var denied = ViewDenied(user);
         if (denied is not null)
@@ -678,7 +687,7 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             return Problem(invalid, StatusCodes.Status400BadRequest);
         try
         {
-            var page = await read(BrowseRequest(name, mode, offset, timestamp, limit, key, headerName, headerValue, partition));
+            var page = await read(BrowseRequest(name, mode, offset, timestamp, limit, key, headerName, headerValue, partition, resume, until, correlation));
             return Results.Ok(page);
         }
         catch (KafkaBrowseBrokerException ex)
@@ -700,7 +709,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         string? key,
         string? headerName,
         string? headerValue,
-        int[]? partition)
+        int[]? partition,
+        string? resume = null,
+        long? until = null,
+        string? correlation = null)
     {
         var cleanMode = (mode ?? "").SanitizeAndRemove().Trim().ToLowerInvariant();
         return new KafkaBrowseRequest
@@ -710,11 +722,28 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             Partitions = partition ?? [],
             Offset = offset,
             TimestampUnixMs = timestamp,
+            UntilUnixMs = until,
             Limit = limit ?? KafkaBrowseLimits.DefaultLimit,
-            Key = (key ?? "").SanitizeAndRemove(),
+            Key = CleanKey(key),
             HeaderName = (headerName ?? "").SanitizeAndRemove(),
-            HeaderValue = (headerValue ?? "").SanitizeAndRemove()
+            HeaderValue = (headerValue ?? "").SanitizeAndRemove(),
+            Resume = KafkaBrowseResume.Format(KafkaBrowseResume.Parse(resume)),
+            CorrelationId = (correlation ?? "").SanitizeAndRemove()
         };
+    }
+
+    private static string CleanKey(string? key)
+    {
+        var raw = key ?? "";
+        if (!LinkMessageKey.TryDeserialize(raw, out var parsed) || parsed is null)
+            return raw.SanitizeAndRemove();
+        var facility = parsed.FacilityId.SanitizeAndRemove();
+        if (facility.Length == 0)
+            return "";
+        var patient = string.IsNullOrEmpty(parsed.PatientId) ? null : parsed.PatientId.SanitizeAndRemove();
+        if (patient is { Length: 0 })
+            patient = null;
+        return new LinkMessageKey(facility, patient).Serialize();
     }
 
     private IResult? ViewDenied(ClaimsPrincipal user)

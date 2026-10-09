@@ -47,6 +47,7 @@ public sealed record ThroughputKafkaPageQuery
     public long? MessageFrom { get; init; }
     public long? MessageTo { get; init; }
     public int MsgPage { get; init; } = 1;
+    public string Resume { get; init; } = "";
     public bool More { get; init; }
     public int Rf { get; init; }
     public int RfPage { get; init; } = 1;
@@ -142,6 +143,7 @@ public sealed record ThroughputKafkaPageQuery
             MessageFrom = When(One(query, "mfrom")),
             MessageTo = When(One(query, "mto")),
             MsgPage = msgPage,
+            Resume = KafkaBrowseResume.Format(KafkaBrowseResume.Parse(Clip(One(query, "resume"), 2000))),
             More = One(query, "more") is "1" or "true",
             Rf = rf,
             RfPage = rfPage,
@@ -159,7 +161,10 @@ public sealed record ThroughputKafkaPageQuery
             RfQ = search ?? RfQ
         };
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null)
+    public ThroughputKafkaPageQuery AtFrom(long from) =>
+        this with { MessageFrom = from, MessageTo = null, Resume = "", MsgPage = 1, OpenRecord = "", StageRecord = "" };
+
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false)
     {
         var chosenView = view ?? View;
         var partPage = part ?? PartPage;
@@ -222,6 +227,9 @@ public sealed record ThroughputKafkaPageQuery
                 values["mto"] = to.ToString();
             if (More)
                 values["more"] = "1";
+            var resumeValue = changed || clearResume ? "" : resume ?? Resume;
+            if (resumeValue.Length > 0)
+                values["resume"] = resumeValue;
             var open = closeRecord ? "" : record ?? OpenRecord;
             if (open.Length > 0)
                 values["record"] = open;
@@ -292,7 +300,10 @@ public sealed record ThroughputKafkaPageQuery
         long.TryParse(value, out var parsed) ? parsed : null;
 
     private static string Clip(string value) =>
-        value.Length <= 200 ? value : value[..200];
+        Clip(value, 200);
+
+    private static string Clip(string value, int max) =>
+        value.Length <= max ? value : value[..max];
 
     private static string Record(string value)
     {
