@@ -134,10 +134,13 @@ public class MorningFixesGuardTests
 
         var copyPartials = ProductFiles("*.cshtml", "Views")
             .Where(file => File.ReadAllText(file).Contains("name=\"_CopyButton\"", StringComparison.Ordinal)
-                && !file.EndsWith("_LabeledId.cshtml", StringComparison.OrdinalIgnoreCase))
+                && !file.EndsWith("_LabeledId.cshtml", StringComparison.OrdinalIgnoreCase)
+                && !file.EndsWith("_MessageDetail.cshtml", StringComparison.OrdinalIgnoreCase))
             .Select(Rel)
             .ToList();
         copyPartials.Should().BeEmpty();
+        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_MessageDetail.cshtml"))
+            .Should().Contain("Copy payload");
 
         var inline = ProductFiles("*.cshtml", "Views")
             .Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js")))

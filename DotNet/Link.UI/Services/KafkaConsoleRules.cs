@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.UI.Models;
 
@@ -271,6 +273,149 @@ public static class KafkaBrowseText
 
     public static string RecordId(int partition, long offset) =>
         partition.ToString() + ":" + offset.ToString();
+
+    public static string MessageType(string? topic)
+    {
+        var admission = KafkaBrowseAllowList.Admit(topic, null);
+        if (!admission.Allowed || admission.Main.Length == 0)
+            return string.IsNullOrWhiteSpace(topic) ? "Unknown" : topic.Trim();
+
+        var role = admission.Kind switch
+        {
+            KafkaBrowseAllowList.KindError => "Error",
+            KafkaBrowseAllowList.KindRetry => "Retry",
+            KafkaBrowseAllowList.KindRedrive => "Redrive",
+            KafkaBrowseAllowList.KindBackup => "Backup",
+            _ => "Main"
+        };
+        return admission.Main + " " + role;
+    }
+
+    public static string KeyBadge(string? key)
+    {
+        var text = (key ?? "").Trim();
+        if (text.Length == 0)
+            return "No key";
+        if (text.Length <= 36)
+            return text;
+        return text[..32] + "…";
+    }
+
+    public static string PayloadHtml(string? pretty, string? raw)
+    {
+        if (!string.IsNullOrEmpty(pretty))
+            return Highlight(pretty);
+        return WebUtility.HtmlEncode(raw ?? "");
+    }
+
+    public static string Highlight(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return "";
+
+        var html = new StringBuilder(text.Length + 32);
+        var index = 0;
+        while (index < text.Length)
+        {
+            var character = text[index];
+            if (char.IsWhiteSpace(character))
+            {
+                html.Append(WebUtility.HtmlEncode(character.ToString()));
+                index++;
+                continue;
+            }
+
+            if (character is '{' or '}' or '[' or ']' or ':' or ',')
+            {
+                html.Append("<span class=\"lu-json-punct\">").Append(WebUtility.HtmlEncode(character.ToString())).Append("</span>");
+                index++;
+                continue;
+            }
+
+            if (character == '"')
+            {
+                var end = ReadJsonString(text, index);
+                var token = text[index..end];
+                var kind = IsJsonKey(text, end) ? "lu-json-key" : "lu-json-string";
+                html.Append("<span class=\"").Append(kind).Append("\">").Append(WebUtility.HtmlEncode(token)).Append("</span>");
+                index = end;
+                continue;
+            }
+
+            if ((character == '-' && index + 1 < text.Length && char.IsDigit(text[index + 1])) || char.IsDigit(character))
+            {
+                var end = index + 1;
+                while (end < text.Length && (char.IsDigit(text[end]) || text[end] is '.' or 'e' or 'E' or '+' or '-'))
+                    end++;
+                html.Append("<span class=\"lu-json-number\">").Append(WebUtility.HtmlEncode(text[index..end])).Append("</span>");
+                index = end;
+                continue;
+            }
+
+            if (MatchJsonWord(text, index, "true") || MatchJsonWord(text, index, "false"))
+            {
+                var word = character == 't' ? "true" : "false";
+                html.Append("<span class=\"lu-json-bool\">").Append(word).Append("</span>");
+                index += word.Length;
+                continue;
+            }
+
+            if (MatchJsonWord(text, index, "null"))
+            {
+                html.Append("<span class=\"lu-json-null\">null</span>");
+                index += 4;
+                continue;
+            }
+
+            html.Append(WebUtility.HtmlEncode(character.ToString()));
+            index++;
+        }
+
+        return html.ToString();
+    }
+
+    private static int ReadJsonString(string text, int start)
+    {
+        var index = start + 1;
+        while (index < text.Length)
+        {
+            if (text[index] == '\\')
+            {
+                index += index + 1 < text.Length ? 2 : 1;
+                continue;
+            }
+
+            if (text[index] == '"')
+                return index + 1;
+            index++;
+        }
+
+        return text.Length;
+    }
+
+    private static bool IsJsonKey(string text, int after)
+    {
+        var index = after;
+        while (index < text.Length && char.IsWhiteSpace(text[index]))
+            index++;
+        return index < text.Length && text[index] == ':';
+    }
+
+    private static bool MatchJsonWord(string text, int start, string word)
+    {
+        if (start + word.Length > text.Length)
+            return false;
+        if (!text.AsSpan(start, word.Length).Equals(word, StringComparison.Ordinal))
+            return false;
+        if (start + word.Length < text.Length)
+        {
+            var next = text[start + word.Length];
+            if (char.IsLetterOrDigit(next) || next == '_')
+                return false;
+        }
+
+        return true;
+    }
 
     public static string Verdict(KafkaBrowsePage? page, string? error)
     {

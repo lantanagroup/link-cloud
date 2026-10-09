@@ -1,0 +1,126 @@
+@model KafkaMessageOpen
+@using LantanaGroup.Link.Shared.Application.Models.Kafka
+@{
+    var record = Model.Record;
+    var facilityHref = KafkaBrowseText.FacilityHref(record.Link.FacilityId);
+    var reportHref = KafkaBrowseText.ReportHref(record.Link.FacilityId, record.Link.ReportId);
+    var payload = record.ValuePretty ?? record.Value ?? "";
+    var hasException = !string.IsNullOrWhiteSpace(record.Link.ExceptionMessage) || record.Link.ExceptionHeaders.Count > 0;
+}
+<article class="lu-msg">
+    <header class="lu-msg-head">
+        <div>
+            <h3 class="lu-msg-topic">@Model.Topic</h3>
+            <ul class="lu-msg-meta">
+                <li><span>Partition</span><strong>@record.Partition</strong></li>
+                <li><span>Offset</span><strong>@record.Offset</strong></li>
+                <li><span>Time</span><strong>@KafkaBrowseText.When(record.TimestampUnixMs)</strong></li>
+                <li><span>Size</span><strong>@record.ByteSize bytes</strong></li>
+            </ul>
+        </div>
+        <div class="lu-msg-badges">
+            <span class="lu-msg-pill">
+                <span class="lu-msg-pill-label">Key</span>
+                <span class="badge au-badge-active lu-msg-key" title="@record.Key">@KafkaBrowseText.KeyBadge(record.Key)</span>
+            </span>
+            <span class="lu-msg-pill">
+                <span class="lu-msg-pill-label">Message type</span>
+                <span class="badge au-badge-muted">@KafkaBrowseText.MessageType(Model.Topic)</span>
+            </span>
+            @if (record.Truncated)
+            {
+                <span class="badge au-badge-warning">Truncated</span>
+            }
+            @if (hasException)
+            {
+                <span class="badge au-badge-danger">Exception</span>
+            }
+        </div>
+    </header>
+    @if (record.Truncated)
+    {
+        <p class="lu-msg-note">The value was cut to stay inside the byte cap.</p>
+    }
+    @if (!string.IsNullOrWhiteSpace(record.Link.ExceptionMessage))
+    {
+        <p class="lu-msg-note lu-msg-note-danger">@record.Link.ExceptionMessage</p>
+    }
+    <div class="lu-msg-ids">
+        <div>
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = record.Link.FacilityId, CopyLabel = "Copy facility id", LinkHref = facilityHref, ReturnUrl = Model.ReturnHref })" />
+        </div>
+        <div>
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = record.Link.PatientId, CopyLabel = "Copy patient id" })" />
+        </div>
+        <div>
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = record.Link.ReportId, CopyLabel = "Copy report id", LinkHref = reportHref, ReturnUrl = Model.ReturnHref })" />
+        </div>
+        <div>
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = record.Link.CorrelationId, CopyLabel = "Copy correlation id" })" />
+        </div>
+        @if (!string.IsNullOrWhiteSpace(record.Link.RetryCount))
+        {
+            <div>
+                <span class="lu-id-label">Retry count</span>
+                <span>@record.Link.RetryCount</span>
+            </div>
+        }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(record.KeyNote))
+    {
+        <p class="lu-msg-note">@record.KeyNote</p>
+    }
+    <section class="lu-msg-section">
+        <h4 class="h6">Headers</h4>
+        @if (record.Headers.Count == 0)
+        {
+            <p class="text-muted mb-0">No headers on this record.</p>
+        }
+        else
+        {
+            <p class="text-muted">@record.Headers.Count on this record.</p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Header</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var header in record.Headers)
+                    {
+                        <tr>
+                            <td>@header.Name</td>
+                            <td>
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = header.Name, Value = header.Value, Compact = true, CopyLabel = "Copy " + header.Name })" />
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+    <section class="lu-msg-section">
+        <div class="lu-msg-payload-wrap">
+            <details class="lu-msg-payload" open>
+                <summary>Payload</summary>
+                @if (payload.Length == 0)
+                {
+                    <p class="text-muted mb-0">This record has no payload.</p>
+                }
+                else
+                {
+                    <pre class="lu-json">@Html.Raw(KafkaBrowseText.PayloadHtml(record.ValuePretty, record.Value))</pre>
+                }
+            </details>
+            @if (payload.Length > 0)
+            {
+                <div class="lu-msg-payload-tools">
+                    <partial name="_CopyButton" model="@(new CopyTarget { Value = payload, Label = "Copy payload" })" />
+                </div>
+            }
+        </div>
+    </section>
+</article>

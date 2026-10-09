@@ -344,3 +344,10 @@ public sealed class KafkaPartitionDetail
     public long HighWatermark { get; init; } = -1;
     public List<KafkaPartitionLagRow> Lag { get; init; } = [];
 }
+
+public sealed class KafkaMessageOpen
+{
+    public string Topic { get; init; } = "";
+    public KafkaBrowseRecord Record { get; init; } = new();
+    public string ReturnHref { get; init; } = "";
+}
