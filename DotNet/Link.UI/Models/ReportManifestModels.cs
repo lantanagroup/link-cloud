@@ -18,6 +18,10 @@ public sealed class ReportManifestQuery
     public int ComparePage { get; init; } = 1;
     public int CompareSize { get; init; } = DefaultPageSize;
     public int CompareTypePage { get; init; } = 1;
+    public string? Stage { get; init; }
+    public string? StageMeasure { get; init; }
+    public int PopulationPage { get; init; } = 1;
+    public string? Tab { get; init; }
 }
 
 public sealed class ManifestCountRow
@@ -47,6 +51,21 @@ public sealed class ManifestPatientRow
     public IReadOnlyList<ManifestTimelineEvent> Events { get; init; } = [];
     public IReadOnlyList<ManifestLink> Links { get; init; } = [];
     public IReadOnlyList<ManifestResourceRef> ResourceRefs { get; init; } = [];
+    public IReadOnlyList<ManifestMembership> Membership { get; init; } = [];
+}
+
+/// <summary>One population a patient belongs to. The measure name is the one the report stored.</summary>
+public sealed class ManifestMembership
+{
+    public string Measure { get; init; } = string.Empty;
+    public string Key { get; init; } = string.Empty;
+}
+
+/// <summary>Plain-English (i) for a domain term. The text is the tooltip.</summary>
+public sealed class TermInfo
+{
+    public string Label { get; init; } = "About this term";
+    public string Text { get; init; } = string.Empty;
 }
 
 /// <summary>One measure on a patient row. Qualifies is null when the report does not say.</summary>
@@ -94,6 +113,44 @@ public sealed class ManifestPopulationHighlight
     public int? NumeratorExclusion { get; init; }
     public string? Rate { get; init; }
     public IReadOnlyList<ManifestCountRow> Other { get; init; } = [];
+}
+
+/// <summary>One stage of a measure funnel. A side stage is an exclusion or exception, not the main path.</summary>
+public sealed class ManifestFunnelStage
+{
+    public string Key { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string? Help { get; init; }
+    public int Count { get; init; }
+    public string? Percent { get; init; }
+    public int Width { get; init; }
+    public bool Side { get; init; }
+}
+
+public sealed class ManifestPopulationFunnel
+{
+    public string Measure { get; init; } = string.Empty;
+    public string? Rate { get; init; }
+    public IReadOnlyList<ManifestFunnelStage> Stages { get; init; } = [];
+}
+
+public sealed class ManifestPopulationCompareRow
+{
+    public string Measure { get; init; } = string.Empty;
+    public int? InitialPopulation { get; init; }
+    public int? Denominator { get; init; }
+    public int? Numerator { get; init; }
+    public string? Rate { get; init; }
+}
+
+/// <summary>Automation only. Counts are predictions of the Initial Population, not a scored Numerator.</summary>
+public sealed class ManifestPrediction
+{
+    public string Measure { get; init; } = string.Empty;
+    public int Predicted { get; init; }
+    public int NotPredicted { get; init; }
+    public int? InActual { get; init; }
+    public int? MissingFromActual { get; init; }
 }
 
 /// <summary>One population on a report, and the measure-report ids that belong to it.</summary>
@@ -167,6 +224,9 @@ public sealed class ReportManifestFacts
     public int? PendingValidation { get; init; }
     public IReadOnlyList<ManifestCountRow> ResourceTypes { get; init; } = [];
     public IReadOnlyList<ManifestPopulationHighlight> Populations { get; init; } = [];
+    public IReadOnlyList<ManifestPatientRow> PopulationPatients { get; init; } = [];
+    public PageBar PopulationPaging { get; init; } = new();
+    public string? PopulationNote { get; init; }
 }
 
 public sealed class ReportManifestModel
@@ -211,6 +271,14 @@ public sealed class ReportManifestModel
     public IReadOnlyList<ManifestCountRow> StatusChart { get; init; } = [];
     public bool ContentsAreStatus { get; init; }
     public IReadOnlyList<ManifestPopulationHighlight> Populations { get; init; } = [];
+    public int PopulationMeasureCount { get; init; }
+    public IReadOnlyList<ManifestPopulationFunnel> Funnels { get; init; } = [];
+    public IReadOnlyList<ManifestPopulationCompareRow> PopulationComparison { get; init; } = [];
+    public IReadOnlyList<ManifestPatientRow> PopulationPatients { get; init; } = [];
+    public PageBar PopulationPaging { get; init; } = new();
+    public string? PopulationNote { get; init; }
+    public ManifestPrediction? Prediction { get; init; }
+    public bool PopulationsOpen { get; init; }
     public int? PassedValidation { get; init; }
     public int? FailedValidation { get; init; }
     public int? PendingValidation { get; init; }
@@ -240,7 +308,12 @@ public sealed class ReportManifestModel
         bool? descending = null,
         int? pageSize = null,
         int? typeSize = null,
-        int? compareSize = null)
+        int? compareSize = null,
+        string? stage = null,
+        bool clearStage = false,
+        string? stageMeasure = null,
+        int? populationPage = null,
+        string? tab = null)
     {
         var current = Query;
         var nextPatient = clearPatient ? null : patientQuery ?? current.PatientQuery;
@@ -255,6 +328,10 @@ public sealed class ReportManifestModel
         var nextSize = pageSize ?? current.PageSize;
         var nextTypeSize = typeSize ?? current.TypeSize;
         var nextCompareSize = compareSize ?? current.CompareSize;
+        var nextStage = clearStage ? null : stage ?? current.Stage;
+        var nextStageMeasure = clearStage ? null : stageMeasure ?? current.StageMeasure;
+        var nextPopulationPage = populationPage ?? (stage is not null || clearStage || pageSize is not null ? 1 : current.PopulationPage);
+        var nextTab = tab ?? current.Tab;
 
         var parts = new List<string>();
         foreach (var pair in Route)
@@ -285,6 +362,13 @@ public sealed class ReportManifestModel
             parts.Add("sort=" + Uri.EscapeDataString(nextSort));
             parts.Add("dir=" + (nextDescending ? "desc" : "asc"));
         }
+
+        Add(parts, "stage", nextStage);
+        Add(parts, "stageMeasure", nextStageMeasure);
+        if (nextPopulationPage > 1)
+            parts.Add("popPage=" + nextPopulationPage);
+        if (nextTab is "patients" or "populations" or "comparison")
+            parts.Add("tab=" + nextTab);
 
         return parts.Count == 0 ? Path : Path + "?" + string.Join("&", parts);
     }

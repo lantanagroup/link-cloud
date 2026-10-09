@@ -95,7 +95,7 @@
                         <div class="lu-kafka-summary" aria-label="Replication plan summary">
                             <div>
                                 <div class="lu-kafka-summary-value">@plan.CurrentFactor to @plan.TargetFactor</div>
-                                <div class="lu-kafka-summary-label">Replication factor@(plan.Uneven ? ", uneven today" : "")</div>
+                                <div class="lu-kafka-summary-label">Replication factor@(plan.Uneven ? ", uneven today" : "") <partial name="_TermInfo" model="@(new TermInfo { Label = "About replication factor", Text = "How many copies of each partition the topic keeps. The leader stays. A higher number adds a replica. A lower number removes one." })" /></div>
                             </div>
                             <div>
                                 <div class="lu-kafka-summary-value">@plan.ChangedCount<span class="lu-kafka-summary-of"> of @plan.PartitionCount</span></div>
@@ -110,7 +110,7 @@
                                 <div class="lu-kafka-summary-label">Skew</div>
                             </div>
                         </div>
-                        <p class="text-muted mt-2 mb-2">min.insync.replicas @plan.MinInSyncReplicas. @plan.OnlineBrokers brokers online. @racks</p>
+                        <p class="text-muted mt-2 mb-2">min.insync.replicas <partial name="_TermInfo" model="@(new TermInfo { Label = "About min.insync.replicas", Text = "The fewest copies that must be in sync before a write is accepted. A replication factor cannot sit below this." })" /> @plan.MinInSyncReplicas. @plan.OnlineBrokers brokers online. @racks</p>
                         @if (plan.Errors.Count > 0)
                         {
                             <p class="mb-1">Blocking reasons</p>

@@ -7,7 +7,13 @@
     var chartTypes = JsonSerializer.Serialize(Model.ChartTypes.Select(row => new { row.Name, row.Total }), jsonOptions);
     var chartPatients = JsonSerializer.Serialize(Model.ChartPatients.Select(row => new { row.PatientId, row.Total }), jsonOptions);
     var statusChart = JsonSerializer.Serialize(Model.StatusChart.Select(row => new { row.Name, row.Total }), jsonOptions);
-    var patientDetails = JsonSerializer.Serialize(Model.Patients.Select(row => new
+    var detailRows = Model.Patients.ToList();
+    foreach (var extra in Model.PopulationPatients)
+    {
+        if (detailRows.All(row => !string.Equals(row.PatientId, extra.PatientId, StringComparison.Ordinal)))
+            detailRows.Add(extra);
+    }
+    var patientDetails = JsonSerializer.Serialize(detailRows.Select(row => new
     {
         id = row.PatientId,
         status = row.Status,
@@ -26,6 +32,19 @@
     var countHeader = Model.ContentsAreStatus || Model.TypeHeading == "Populations" ? "Patients" : "Total";
     var nameHeader = Model.TypeHeading == "Populations" ? "Population" : "Name";
     var populationCards = Model.Populations.Take(ReportManifestModel.ChartCap).ToList();
+    var populationsOpen = Model.PopulationsOpen;
+    var patientsOpen = !populationsOpen && string.Equals(Model.Query.Tab, "patients", StringComparison.OrdinalIgnoreCase);
+    var comparisonOpen = !populationsOpen && !patientsOpen && Model.ShowComparison && string.Equals(Model.Query.Tab, "comparison", StringComparison.OrdinalIgnoreCase);
+    var overviewOpen = !populationsOpen && !patientsOpen && !comparisonOpen;
+    var stageTitle = Model.Query.Stage switch
+    {
+        "predicted" => "Predicted to qualify",
+        "not-predicted" => "Not predicted to qualify",
+        "missing" => "Predicted, missing from ABS",
+        "in-actual" => "In the ABS upload",
+        null or "" => "",
+        _ => ReportManifestRules.PopulationLabel(Model.Query.Stage)
+    };
     string Count(int value) => value.ToString("N0");
 }
 
@@ -49,7 +68,7 @@
 <div class="row g-3 mb-3">
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PatientCount)</div><div class="au-stat-label">Patients</div></div></div>
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.TotalResourceCount)</div><div class="au-stat-label">@Model.TotalLabel</div></div></div>
-    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PatientResourceCount)</div><div class="au-stat-label">@Model.PatientResourceLabel</div></div></div>
+    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PatientResourceCount)</div><div class="au-stat-label">@Model.PatientResourceLabel @if (ReportManifestRules.PopulationHelp(Model.PatientResourceLabel) is string populationHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + Model.PatientResourceLabel, Text = populationHelp })" /> }</div></div></div>
     @if (Model.ShowShared)
     {
         <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.SharedResourceCount)</div><div class="au-stat-label">Shared</div></div></div>
@@ -70,7 +89,7 @@
         {
             <div class="col-lg-6">
                 <section class="card au-card mb-0 h-100">
-                    <h3 class="card-header h6 mb-0">@highlight.Measure</h3>
+                    <h3 class="card-header h6 mb-0"><a class="text-white" href="@Model.Href(tab: "populations", clearStage: true)">@highlight.Measure</a></h3>
                     <div class="card-body">
                         <div class="row g-2">
                             @if (highlight.InitialPopulation is int initialPopulation)
@@ -118,16 +137,17 @@
 }
 
 <ul class="lu-section-nav" role="tablist">
-    <li><button class="active" data-manifest-tab="#manifest-overview" type="button">Overview</button></li>
-    <li><button data-manifest-tab="#manifest-patients" type="button">Patients <span class="text-muted ms-1">@Count(Model.PatientCount)</span></button></li>
+    <li><button class="@(overviewOpen ? "active" : null)" data-manifest-tab="#manifest-overview" type="button">Overview</button></li>
+    <li><button class="@(patientsOpen ? "active" : null)" data-manifest-tab="#manifest-patients" type="button">Patients <span class="text-muted ms-1">@Count(Model.PatientCount)</span></button></li>
+    <li><button class="@(populationsOpen ? "active" : null)" data-manifest-tab="#manifest-populations" type="button">Populations</button></li>
     @if (Model.ShowComparison)
     {
-        <li><button data-manifest-tab="#manifest-comparison" type="button">Generated vs ABS</button></li>
+        <li><button class="@(comparisonOpen ? "active" : null)" data-manifest-tab="#manifest-comparison" type="button">Generated vs ABS</button></li>
     }
 </ul>
 
 <div class="tab-content">
-    <div class="tab-pane fade show active" id="manifest-overview">
+    <div class="tab-pane fade @(overviewOpen ? "show active" : null)" id="manifest-overview">
         <div class="row g-3">
             <div class="col-lg-5">
                 <div class="au-card">
@@ -258,7 +278,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="manifest-patients">
+    <div class="tab-pane fade @(patientsOpen ? "show active" : null)" id="manifest-patients">
         @if (!string.IsNullOrWhiteSpace(Model.PatientNote))
         {
             <div class="alert alert-warning">@Model.PatientNote</div>
@@ -420,10 +440,159 @@
         </div>
     </div>
 
+    <div class="tab-pane fade @(populationsOpen ? "show active" : null)" id="manifest-populations">
+        @if (Model.Funnels.Count == 0 && Model.Prediction is null)
+        {
+            <div class="au-card"><div class="card-body"><p class="mb-0">No populations were stored for this report.</p></div></div>
+        }
+        @if (Model.Prediction is ManifestPrediction prediction)
+        {
+            <section class="card au-card mb-3">
+                <h3 class="card-header h6 mb-0">@prediction.Measure</h3>
+                <div class="card-body">
+                    <p class="small text-muted">Expected and actual for this run. These figures are a predicted Initial Population, not a scored Numerator.</p>
+                    @{
+                        var predictionRows = new (string Key, string Name, int? Count)[]
+                        {
+                            ("predicted", "Predicted to qualify", prediction.Predicted),
+                            ("not-predicted", "Not predicted to qualify", prediction.NotPredicted),
+                            ("in-actual", "In the ABS upload", prediction.InActual),
+                            ("missing", "Predicted, missing from ABS", prediction.MissingFromActual)
+                        };
+                    }
+                    @foreach (var item in predictionRows)
+                    {
+                        if (item.Count is not int count)
+                            continue;
+                        var selected = string.Equals(Model.Query.Stage, item.Key, StringComparison.Ordinal);
+                        var width = prediction.Predicted + prediction.NotPredicted == 0 ? 0 : (int)Math.Round(count * 100d / (prediction.Predicted + prediction.NotPredicted));
+                        <a class="lu-funnel-stage @(selected ? "is-selected" : null)" href="@Model.Href(stage: item.Key, stageMeasure: prediction.Measure, tab: "populations", populationPage: 1)">
+                            <span class="lu-funnel-name">@item.Name @if (ReportManifestRules.PredictionHelp(item.Name) is string predictionHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + item.Name, Text = predictionHelp })" /> }</span>
+                            <span class="lu-funnel-track"><span class="lu-funnel-bar" style="width:@(Math.Clamp(width, 0, 100))%"></span></span>
+                            <span class="lu-funnel-count">@Count(count)</span>
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+        @if (Model.PopulationComparison.Count > 1)
+        {
+            <section class="card au-card mb-3">
+                <h3 class="card-header h6 mb-0">Measures compared</h3>
+                <div class="card-body">
+                    <p class="small text-muted">Largest Initial Population first. At most @ReportManifestModel.ChartCap measures.</p>
+                    <table class="au-table table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Measure</th>
+                                <th class="text-end">Initial Population @if (ReportManifestRules.PopulationHelp("Initial Population") is string ipHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Initial Population", Text = ipHelp })" /> }</th>
+                                <th class="text-end">Denominator @if (ReportManifestRules.PopulationHelp("Denominator") is string denHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Denominator", Text = denHelp })" /> }</th>
+                                <th class="text-end">Numerator @if (ReportManifestRules.PopulationHelp("Numerator") is string numHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Numerator", Text = numHelp })" /> }</th>
+                                <th class="text-end">Rate @if (ReportManifestRules.PopulationHelp("Rate") is string rateHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Rate", Text = rateHelp })" /> }</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.PopulationComparison)
+                        {
+                            <tr>
+                                <td>@row.Measure</td>
+                                <td class="text-end">@(row.InitialPopulation is int ip ? Count(ip) : "—")</td>
+                                <td class="text-end">@(row.Denominator is int den ? Count(den) : "—")</td>
+                                <td class="text-end">@(row.Numerator is int num ? Count(num) : "—")</td>
+                                <td class="text-end">@(string.IsNullOrWhiteSpace(row.Rate) ? "—" : row.Rate)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                    @if (Model.PopulationMeasureCount > Model.PopulationComparison.Count)
+                    {
+                        <p class="small text-muted mb-0 mt-2">@Model.PopulationComparison.Count of @Model.PopulationMeasureCount measures shown.</p>
+                    }
+                </div>
+            </section>
+        }
+        @foreach (var funnel in Model.Funnels)
+        {
+            <section class="card au-card mb-3">
+                <h3 class="card-header h6 mb-0">@funnel.Measure</h3>
+                <div class="card-body">
+                    <p class="small text-muted">Percentages are of the Initial Population. An exclusion or exception sits beside the stage it leaves.</p>
+                    @foreach (var stage in funnel.Stages)
+                    {
+                        var selected = string.Equals(Model.Query.Stage, stage.Key, StringComparison.Ordinal)
+                            && (string.IsNullOrWhiteSpace(Model.Query.StageMeasure) || string.Equals(Model.Query.StageMeasure, funnel.Measure, StringComparison.OrdinalIgnoreCase));
+                        <a class="lu-funnel-stage @(stage.Side ? "is-side" : null) @(selected ? "is-selected" : null)" href="@Model.Href(stage: stage.Key, stageMeasure: funnel.Measure, tab: "populations", populationPage: 1)">
+                            <span class="lu-funnel-name">@stage.Name @if (!string.IsNullOrWhiteSpace(stage.Help)) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + stage.Name, Text = stage.Help })" /> }</span>
+                            <span class="lu-funnel-track"><span class="lu-funnel-bar" style="width:@(stage.Width)%"></span></span>
+                            <span class="lu-funnel-count">@Count(stage.Count)@(string.IsNullOrWhiteSpace(stage.Percent) ? "" : " · " + stage.Percent)</span>
+                        </a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(funnel.Rate))
+                    {
+                        <p class="mb-0 mt-2">Rate @if (ReportManifestRules.PopulationHelp("Rate") is string funnelRateHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Rate", Text = funnelRateHelp })" /> } <strong>@funnel.Rate</strong></p>
+                    }
+                </div>
+            </section>
+        }
+        @if (Model.PopulationMeasureCount > Model.Funnels.Count)
+        {
+            <p class="small text-muted">@Model.Funnels.Count of @Model.PopulationMeasureCount measures shown.</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Query.Stage))
+        {
+            <section class="card au-card mb-3" id="manifest-population-patients">
+                <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                    <span>@stageTitle@(string.IsNullOrWhiteSpace(Model.Query.StageMeasure) ? "" : " · " + Model.Query.StageMeasure)</span>
+                    <a class="btn btn-sm btn-au-link" href="@Model.Href(clearStage: true, tab: "populations")">All stages</a>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrWhiteSpace(Model.PopulationNote))
+                    {
+                        <p class="small text-muted">@Model.PopulationNote</p>
+                    }
+                    @if (Model.PopulationPatients.Count == 0)
+                    {
+                        <p class="mb-0">No patients in this population on the list.</p>
+                    }
+                    else
+                    {
+                        <table class="au-table table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Patient</th>
+                                    <th>Status</th>
+                                    <th class="text-end"><span class="visually-hidden">Details</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in Model.PopulationPatients)
+                            {
+                                var detailIndex = detailRows.FindIndex(item => string.Equals(item.PatientId, row.PatientId, StringComparison.Ordinal));
+                                <tr>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = row.Href })" /></td>
+                                    <td><span class="badge @row.BadgeClass">@row.Status</span></td>
+                                    <td class="text-end"><button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@detailIndex" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+                <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(populationPage: 1, tab: "populations"), Enabled = Model.PopulationPaging.Page > 1 })" />
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(populationPage: Model.PopulationPaging.Page - 1, tab: "populations"), Enabled = Model.PopulationPaging.HasPrevious })" />
+                    <span class="small text-muted">Page @Model.PopulationPaging.Page of @(Model.PopulationPaging.TotalPages == 0 ? 1 : Model.PopulationPaging.TotalPages) (@Model.PopulationPaging.TotalCount)</span>
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(populationPage: Model.PopulationPaging.Page + 1, tab: "populations"), Enabled = Model.PopulationPaging.HasNext })" />
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(populationPage: (int)Model.PopulationPaging.TotalPages, tab: "populations"), Enabled = Model.PopulationPaging.HasNext })" />
+                </div>
+            </section>
+        }
+    </div>
+
     @if (Model.ShowComparison)
     {
         var comparison = Model.Comparison;
-        <div class="tab-pane fade" id="manifest-comparison">
+        <div class="tab-pane fade @(comparisonOpen ? "show active" : null)" id="manifest-comparison">
             <div class="au-card">
                 <div class="card-header">Generated vs ABS</div>
                 <div class="card-body">
@@ -617,7 +786,7 @@
                     item.classList.toggle("active", item === button);
                 });
             }
-            ["manifest-overview", "manifest-patients", "manifest-comparison"].forEach(function (id) {
+            ["manifest-overview", "manifest-patients", "manifest-populations", "manifest-comparison"].forEach(function (id) {
                 var pane = document.getElementById(id);
                 if (!pane) return;
                 var on = "#" + id === target;

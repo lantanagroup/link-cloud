@@ -216,10 +216,15 @@ public sealed class ReportsController : Controller
         int cmpPage,
         int cmpSize,
         int cmpType,
+        string? stage,
+        string? stageMeasure,
+        int popPage,
+        string? tab,
         CancellationToken cancellationToken)
     {
         var query = ReportManifestRules.Normalize(
-            q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "status");
+            q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "status",
+            stage, stageMeasure, popPage, tab);
         var returnUrl = ReturnUrlRules.FromQuery(Request);
         ReportManifestPage model;
         if (_fixture.Active && ReportManifestRules.IsSample(facilityId, reportId))
