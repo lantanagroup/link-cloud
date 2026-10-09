@@ -148,7 +148,7 @@ public static class LogCopier
                 .ToList();
             if (copied.Count != group.Count())
                 return false;
-            if (!string.Equals(Digest(group.OrderBy(record => record.Offset)), Digest(copied), StringComparison.Ordinal))
+            if (!string.Equals(Digest(group), Digest(copied), StringComparison.Ordinal))
                 return false;
         }
 
@@ -157,7 +157,12 @@ public static class LogCopier
 
     public static string Digest(IEnumerable<CopiedRecord> records)
     {
-        var ordered = records.OrderBy(record => record.Offset).ToList();
+        // Backup offsets are not source offsets. Order by the source identity so a
+        // re-partitioned copy hashes in the same order as the source log.
+        var ordered = records
+            .OrderBy(record => SourceIdentity(record).Partition)
+            .ThenBy(record => SourceIdentity(record).Offset)
+            .ToList();
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var record in ordered)
         {

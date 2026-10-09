@@ -208,7 +208,13 @@ public static class MigrationMachine
                     return Attention(record, "The new topic is not empty, so offsets were not written.", now);
                 var zeros = ZeroOffsets(record, seen);
                 foreach (var group in record.Groups)
+                {
+                    // A catalog group that never committed stays that way. Writing 0 makes it
+                    // look committed, and an empty group cannot become Stable, so D1 would wait forever.
+                    if (!seen.Groups.TryGetValue(group, out var observed) || !MigrationGroups.HasCommit(observed.Committed))
+                        continue;
                     effects.Add(new MigrationEffect.WriteOffsets(group, zeros));
+                }
                 break;
             case MigrationStep.D1:
                 ScaleTo(effects, record.StopConsumers, record.ConsumerReplicas);
@@ -223,7 +229,10 @@ public static class MigrationMachine
                 return MigrationTick.Reject("This step cannot run.");
         }
 
-        return MigrationTick.Acting(Note(persist, now, "Started " + record.Step), effects);
+        var started = "Started " + record.Step;
+        if (record.Step == MigrationStep.B6 && record.Timeline.Any(entry => entry.Step == record.Step && entry.Text == started))
+            return MigrationTick.Acting(persist, effects);
+        return MigrationTick.Acting(Note(persist, now, started), effects);
     }
 
     private static MigrationRecord Advance(MigrationRecord record, MigrationObservation seen, DateTimeOffset now, MigrationStep? forced = null)
@@ -279,7 +288,7 @@ public static class MigrationMachine
         next.Failure = reason;
         next.StepStartedUtc = now;
         next.StepSequence++;
-        if (record.BackupTopic.Length > 0)
+        if (record.BackupTopic.Length > 0 && !record.BackupSkipped)
             next.BackupCleanupRequired = true;
         next.Timeline.Add(new MigrationTimelineEntry { Sequence = next.StepSequence, Step = MigrationStep.NeedsAttention, Text = reason, At = now });
         return MigrationTick.Done(next);
@@ -324,7 +333,10 @@ public static class MigrationMachine
                     next.BackupCleanupRequired = true;
                 next.Step = MigrationStep.RolledBack;
                 next.StepSequence++;
-                next.Timeline.Add(new MigrationTimelineEntry { Sequence = next.StepSequence, Step = MigrationStep.RolledBack, Text = "Rolled back. The temp topic was kept.", At = now });
+                var rollbackText = seen.BackupPresent
+                    ? "Rolled back. The temp topic was kept."
+                    : "Rolled back. No temp topic was created.";
+                next.Timeline.Add(new MigrationTimelineEntry { Sequence = next.StepSequence, Step = MigrationStep.RolledBack, Text = rollbackText, At = now });
                 return MigrationTick.Done(next);
         }
 
@@ -469,6 +481,8 @@ public static class MigrationMachine
                 return false;
             if (!string.Equals(group.State, "Empty", StringComparison.OrdinalIgnoreCase) || group.Members != 0)
                 return false;
+            if (!MigrationGroups.HasCommit(group.Committed))
+                continue;
             if (!Same(group.Committed, expected))
                 return false;
         }

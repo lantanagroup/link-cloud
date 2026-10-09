@@ -102,7 +102,9 @@ public static class MigrationPreflight
             result.Errors.Add("The topic or a sibling is under-replicated.");
         if (facts.BrokerCount < facts.ReplicationFactor)
             result.Errors.Add("The broker count is below the topic replication factor.");
-        if (facts.MinInSyncReplicas > facts.ReplicationFactor)
+        if (facts.MinInSyncReplicas < 1)
+            result.Errors.Add("min.insync.replicas could not be read.");
+        else if (facts.MinInSyncReplicas > facts.ReplicationFactor)
             result.Errors.Add("min.insync.replicas cannot be met.");
         if (facts.AutoCreate)
             result.Warnings.Add("auto.create.topics.enable is true. Recreate checks the topic id before adopting T.");
@@ -116,7 +118,7 @@ public static class MigrationPreflight
             result.Errors.Add("The new partition count must be higher than the current count.");
         if (facts.Cap > 0 && facts.RequestedPartitions > facts.Cap)
             result.Errors.Add($"The new partition count must be at most {facts.Cap}.");
-        if (!string.Equals(facts.CleanupPolicy, "delete", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(facts.CleanupPolicy) && !string.Equals(facts.CleanupPolicy, "delete", StringComparison.OrdinalIgnoreCase))
             result.Errors.Add("Compacted topics are refused in slice 1.");
         if (!facts.WorkloadsMapped)
             result.Errors.Add("A stop-set workload has no provider target.");
