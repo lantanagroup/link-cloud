@@ -64,8 +64,11 @@ public class PayloadSubmittedListener(
                         var accounted = false;
                         try
                         {
-                            await ProcessMessageAsync(result, consumeCancellationToken);
-                            accounted = true;
+                            accounted = await ProcessMessageAsync(result, consumeCancellationToken);
+                            if (!accounted)
+                            {
+                                await DeadLetterCommit.RewindAsync(consumer, result, logger, consumeCancellationToken);
+                            }
                         }
                         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                         {
@@ -112,7 +115,7 @@ public class PayloadSubmittedListener(
         }
     }
 
-    public async Task ProcessMessageAsync(ConsumeResult<string, PayloadSubmittedValue> result, CancellationToken cancellationToken)
+    public async Task<bool> ProcessMessageAsync(ConsumeResult<string, PayloadSubmittedValue> result, CancellationToken cancellationToken)
     {
         using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
         var facilityId = KafkaIdentity.Facility(result.Message.Value?.FacilityId, result.Message.Key) ?? string.Empty;
@@ -140,7 +143,7 @@ public class PayloadSubmittedListener(
             var patientId = KafkaIdentity.Patient(result.Message.Value?.PatientId, result.Message.Key);
             if (await PipelineAbortSkip.ShouldSkipAsync(
                     scope.ServiceProvider, logger, Name, facilityId, reportTrackingId.ToString(), cancellationToken))
-                return;
+                return true;
 
             var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, cancellationToken)).Single();
 
@@ -176,20 +179,24 @@ public class PayloadSubmittedListener(
                 reportSchedule.ModifyDate = DateTime.UtcNow;
                 await reportScheduledManager.UpdateAsync(reportSchedule, cancellationToken);
             }
+
+            return true;
         }
         catch (DeadLetterException ex)
         {
-            deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+            return deadLetterExceptionHandler.HandleException(result, ex, facilityId);
         }
         catch (TransientException ex)
         {
             transientExceptionHandler.HandleException(result, ex, facilityId);
+            return true;
         }
         catch (TimeoutException ex)
         {
             var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [PayloadSubmitted] at offset: {result.TopicPartitionOffset}";
             var transientException = new TransientException(exceptionMessage, ex);
             transientExceptionHandler.HandleException(result, transientException, facilityId);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -198,6 +205,7 @@ public class PayloadSubmittedListener(
         catch (Exception ex)
         {
             transientExceptionHandler.HandleException(result, ex, facilityId);
+            return true;
         }
     }
 }

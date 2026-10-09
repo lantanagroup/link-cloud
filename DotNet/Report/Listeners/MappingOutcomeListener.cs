@@ -102,8 +102,12 @@ public class MappingOutcomeListener : BackgroundService
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                        accounted = true;
+                        accounted = await DeadLetterCommit.AccountAsync(
+                            _deadLetterExceptionHandler.HandleException(result, ex, facilityId),
+                            kafkaConsumer,
+                            result,
+                            _logger,
+                            consumeCancellationToken);
                     }
                     catch (TransientException ex)
                     {

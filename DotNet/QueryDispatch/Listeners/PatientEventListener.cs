@@ -5,6 +5,7 @@ using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -162,8 +163,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 {
                                     if (consumeResult != null)
                                     {
-                                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId ?? string.Empty);
-                                        accounted = true;
+                                        accounted = await DeadLetterCommit.AccountAsync(
+                                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId ?? string.Empty),
+                                            _patientEventConsumer,
+                                            consumeResult,
+                                            _logger,
+                                            consumeCancellationToken);
                                     }
                                 }
                                 catch (TransientException ex)
@@ -196,8 +201,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     if (consumeResult != null)
                                     {
-                                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), facilityId ?? string.Empty);
-                                        accounted = true;
+                                        accounted = await DeadLetterCommit.AccountAsync(
+                                            _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), facilityId ?? string.Empty),
+                                            _patientEventConsumer,
+                                            consumeResult,
+                                            _logger,
+                                            consumeCancellationToken);
                                     }
                                 }
                                 finally

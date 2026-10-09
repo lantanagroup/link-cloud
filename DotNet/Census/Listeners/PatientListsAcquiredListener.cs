@@ -5,6 +5,7 @@ using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -168,8 +169,16 @@ public class PatientListsAcquiredListener : BackgroundService
                                 _nonTransientExceptionHandler.Topic = KafkaTopicNames.Error(KafkaTopicNames.Main(rawmessage.Topic));
                             }
 
-                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, FacilityIdOf(rawmessage?.Message));
-                            accounted = true;
+                            accounted = false;
+                            if (rawmessage != null)
+                            {
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _nonTransientExceptionHandler.HandleException(rawmessage, ex, FacilityIdOf(rawmessage.Message)),
+                                    kafkaConsumer,
+                                    rawmessage,
+                                    _logger,
+                                    consumeCancellationToken);
+                            }
                         }
                         catch (TransientException ex)
                         {

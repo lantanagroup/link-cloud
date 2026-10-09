@@ -79,8 +79,12 @@ namespace LantanaGroup.Link.Census.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, ex, FacilityIdOf(result?.Message));
-                                accounted = true;
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, ex, FacilityIdOf(result?.Message)),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (TransientException ex)
                             {
@@ -98,8 +102,12 @@ namespace LantanaGroup.Link.Census.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), FacilityIdOf(result?.Message));
-                                accounted = true;
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), FacilityIdOf(result?.Message)),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             finally
                             {

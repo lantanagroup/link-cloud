@@ -55,10 +55,15 @@ while IFS=: read -r TOPIC PARTITIONS REPLICAS PARAMETERS || [[ -n "$TOPIC" ]]; d
         | grep -oE '"partitions_count":[0-9]+' | head -n 1 | cut -d: -f2)
       if [[ "$LIVE_PARTITIONS" =~ ^[0-9]+$ && "$PARTITIONS" =~ ^[0-9]+$ && "$LIVE_PARTITIONS" -lt "$PARTITIONS" ]]; then
         echo "Growing '$TOPIC' from $LIVE_PARTITIONS to $PARTITIONS partitions."
-        curl -s -u "$USERNAME:$PASSWORD" \
+        GROW_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+          -u "$USERNAME:$PASSWORD" \
           -X PATCH "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$TOPIC" \
           -H "Content-Type: application/json" \
-          -d "{\"partitions_count\":$PARTITIONS}"
+          -d "{\"partitions_count\":$PARTITIONS}")
+        if [[ "$GROW_CODE" != "200" && "$GROW_CODE" != "204" ]]; then
+          echo "ERROR: Failed to grow '$TOPIC' (HTTP $GROW_CODE)."
+          exit 1
+        fi
       fi
     fi
   else

@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -135,8 +136,12 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     ? parsed
                                     : consumeResult.Topic;
                                 _deadLetterExceptionHandler.Topic = KafkaTopicNames.Error(mainTopic);
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                                accounted = true;
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId),
+                                    consumer,
+                                    consumeResult,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {

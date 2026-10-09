@@ -87,8 +87,11 @@ namespace LantanaGroup.Link.Report.Listeners
                             var accounted = false;
                             try
                             {
-                                await ProcessMessageAsync(result, consumeCancellationToken);
-                                accounted = true;
+                                accounted = await ProcessMessageAsync(result, consumeCancellationToken);
+                                if (!accounted && result != null)
+                                {
+                                    await DeadLetterCommit.RewindAsync(consumer, result, _logger, consumeCancellationToken);
+                                }
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -134,12 +137,12 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, PatientEventValue>? result, CancellationToken cancellationToken)
+        public async Task<bool> ProcessMessageAsync(ConsumeResult<string, PatientEventValue>? result, CancellationToken cancellationToken)
         {
             if (result == null)
             {
                 _logger.LogWarning("Null PatientEvent consumer result found");
-                return;
+                return true;
             }
 
             using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
@@ -149,7 +152,7 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 if (result == null)
                 {
-                    return;
+                    return true;
                 }
 
                 using var scope = _serviceScopeFactory.CreateScope();
@@ -171,12 +174,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(
                         scope.ServiceProvider, _logger, Name, facilityId, reportId: null, cancellationToken))
-                    return;
+                    return true;
 
                 if (value.EventType != PatientEvents.Admit.ToString() && value.EventType != PatientEvents.Discharge.ToString())
                 {
                     _logger.LogDebug("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
-                    return;
+                    return true;
                 }
 
                 _logger.LogDebug("Consuming {EventType} PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(value.EventType), HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
@@ -239,14 +242,17 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     await reportEntryManager.UpdateAsync(entryToUpdate, cancellationToken);
                 }
+
+                return true;
             }
             catch (DeadLetterException ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                return result != null && _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
             }
             catch (TransientException ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -254,7 +260,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (Exception ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);
+                return result != null && _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);
             }
         }
 

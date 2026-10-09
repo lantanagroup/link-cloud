@@ -3,6 +3,7 @@ using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -79,8 +80,12 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 Activity.Current?.AddException(ex);
 
                                 var facilityId = KafkaIdentity.Facility(result?.Message?.Value?.FacilityId, result?.Message?.Key);
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                                accounted = true;
+                                accounted = result != null && await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty),
+                                    _consumer,
+                                    result,
+                                    _logger,
+                                    cancellationToken);
                             }
                             catch (TransientException ex)
                             {

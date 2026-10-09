@@ -4,6 +4,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -247,8 +248,12 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (DeadLetterException ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                accounted = true;
+                accounted = await DeadLetterCommit.AccountAsync(
+                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty),
+                    _consumer,
+                    result,
+                    _logger,
+                    cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -256,8 +261,12 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (Exception ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                accounted = true;
+                accounted = await DeadLetterCommit.AccountAsync(
+                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty),
+                    _consumer,
+                    result,
+                    _logger,
+                    cancellationToken);
             }
             finally
             {

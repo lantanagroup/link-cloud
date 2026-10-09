@@ -23,12 +23,13 @@ namespace LantanaGroup.Link.Shared.Application.Models.Mapping;
 /// </remarks>
 public class MappingOutcomeEvaluatedValue
 {
+    public string? FacilityId { get; set; }
+    public string? PatientId { get; set; }
+
     /// <summary>
     /// Which service produced this message. Determines which of the properties below carry meaning; see
     /// <see cref="MappingOutcomeSource"/>.
     /// </summary>
-    public string? FacilityId { get; set; }
-    public string? PatientId { get; set; }
     public MappingOutcomeSource Source { get; set; }
 
     /// <summary>

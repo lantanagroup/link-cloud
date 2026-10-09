@@ -90,8 +90,11 @@ namespace LantanaGroup.Link.Report.Listeners
                             var accounted = false;
                             try
                             {
-                                await ProcessMessageAsync(result, consumeCancellationToken);
-                                accounted = true;
+                                accounted = await ProcessMessageAsync(result, consumeCancellationToken);
+                                if (!accounted)
+                                {
+                                    await DeadLetterCommit.RewindAsync(consumer, result, _logger, consumeCancellationToken);
+                                }
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -137,7 +140,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, ReportScheduledValue> result, CancellationToken cancellationToken)
+        public async Task<bool> ProcessMessageAsync(ConsumeResult<string, ReportScheduledValue> result, CancellationToken cancellationToken)
         {
             string facilityId = string.Empty;
             try
@@ -168,7 +171,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(
                         scope.ServiceProvider, _logger, nameof(ReportScheduledListener), facilityId, reportId?.ToString(), cancellationToken))
-                    return;
+                    return true;
 
                 var reportTypes = value.ReportTypes;
 
@@ -210,20 +213,24 @@ namespace LantanaGroup.Link.Report.Listeners
                     { "ReportScheduleId", reportSchedule.Id },
                     { "FacilityId", reportSchedule.FacilityId }
                 }, reportSchedule.ReportEndDate, reportSchedule.Id.ToString(), ReportConstants.MeasureReportSubmissionScheduler.Group, $"{reportSchedule.Id}-{reportSchedule.ReportEndDate}");
+
+                return true;
             }
             catch (DeadLetterException ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                return _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
             }
             catch (TransientException ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
             catch (TimeoutException ex)
             {
                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [ReportScheduled] at offset: {result.TopicPartitionOffset}";
                 var transientException = new TransientException(exceptionMessage, ex);
                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
+                return true;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -232,6 +239,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (Exception ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
         }
 
