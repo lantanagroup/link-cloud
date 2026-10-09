@@ -3752,3 +3752,140 @@ tr.lu-kafka-problem > td:first-child {
   line-height: 1.35rem;
   text-align: center;
 }
+.lu-kafka tr.lu-msg-row > td {
+  background: var(--au-bg);
+  padding: .75rem;
+}
+.lu-msg {
+  background: #fff;
+  border: 1px solid var(--au-border);
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  overflow: hidden;
+}
+.lu-msg-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .75rem 1.25rem;
+  align-items: flex-start;
+  padding: .9rem 1rem .85rem 1.05rem;
+  background: linear-gradient(180deg, #fff, var(--au-bg));
+  border-bottom: 1px solid var(--au-border);
+  border-left: 3px solid var(--au-dark);
+}
+.lu-msg-topic {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -.015em;
+}
+.lu-msg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem 1rem;
+  list-style: none;
+  padding: 0;
+  margin: .4rem 0 0;
+}
+.lu-msg-meta span {
+  display: block;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+}
+.lu-msg-meta strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+.lu-msg-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem .7rem;
+  align-items: center;
+}
+.lu-msg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+}
+.lu-msg-pill-label {
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+}
+.lu-msg-key {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-weight: 600;
+}
+.lu-msg-note {
+  margin: 0;
+  padding: .55rem 1rem;
+  border-bottom: 1px solid var(--au-border);
+  background: #fff6db;
+  color: #7a5b00;
+}
+.lu-msg-note-danger {
+  background: #fdecee;
+  color: var(--au-danger);
+}
+.lu-msg-ids {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: .6rem;
+  padding: .85rem 1rem;
+}
+.lu-msg-ids > div {
+  background: var(--au-bg);
+  border-radius: calc(var(--au-radius) - .1rem);
+  padding: .45rem .65rem;
+}
+.lu-msg-section {
+  padding: 0 1rem .9rem;
+}
+.lu-msg-payload {
+  border: 1px solid var(--au-border);
+  border-radius: var(--au-radius);
+  overflow: hidden;
+}
+.lu-msg-payload-wrap {
+  position: relative;
+}
+.lu-msg-payload > summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding: .55rem 6.5rem .55rem .75rem;
+  background: var(--au-bg);
+}
+.lu-msg-payload-tools {
+  position: absolute;
+  top: .28rem;
+  right: .45rem;
+}
+.lu-kafka pre.lu-json {
+  margin: 0;
+  max-height: 22rem;
+  overflow: auto;
+  background: var(--au-dark);
+  color: #f4f4f4;
+  border: none;
+  border-radius: 0;
+  padding: .75rem 1rem .9rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .8125rem;
+  line-height: 1.5;
+}
+.lu-json-key { color: #9ec5ff; }
+.lu-json-string { color: #9be7b4; }
+.lu-json-number { color: #ffd56a; }
+.lu-json-bool,
+.lu-json-null { color: #ffb4bc; }
+.lu-json-punct { color: #c5c9ce; }
