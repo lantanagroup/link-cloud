@@ -8,7 +8,7 @@
 <p class="text-muted">Cluster health, consumer replicas, and brokers. Adding partitions is a separate, permanent action.</p>
 <partial name="_Nav" />
 
-<div id="kafkaResults" data-au-refresh="8000">
+<div id="kafkaResults" data-au-refresh="8000" data-au-page-url="@query.Href()">
     <nav class="lu-section-nav mt-3" aria-label="Kafka">
         <a class="@(query.View == ThroughputKafkaPageQuery.Overview ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Overview, page: 1)">Overview</a>
         <a class="@(query.View == ThroughputKafkaPageQuery.Topic ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, page: 1)">Topic</a>

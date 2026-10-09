@@ -108,8 +108,46 @@
         return !!(form && form.contains(active));
     }
 
+    function declaredPageUrl(node) {
+        var page = node && node.getAttribute ? node.getAttribute("data-au-page-url") : "";
+        if (!page) {
+            var marked = document.querySelector("[data-au-page-url]");
+            page = marked ? marked.getAttribute("data-au-page-url") : "";
+        }
+        if (!page) return "";
+        try {
+            var absolute = new URL(page, window.location.href);
+            if (absolute.origin !== window.location.origin) return "";
+            return absolute.pathname + absolute.search + absolute.hash;
+        } catch (e) {
+            return "";
+        }
+    }
+
+    // A dry run posts to an action that has no GET. The address bar then names
+    // that action, and a later refresh would receive 405. Use the page URL.
     function regionUrl(node) {
-        return node.getAttribute("data-au-refresh-url") || window.location.href;
+        var explicit = node.getAttribute("data-au-refresh-url");
+        if (explicit) return explicit;
+        var page = declaredPageUrl(node);
+        if (!page) return window.location.href;
+        try {
+            var here = new URL(window.location.href);
+            var target = new URL(page, window.location.href);
+            if (here.pathname !== target.pathname) return page;
+        } catch (e) { /* keep the address bar */ }
+        return window.location.href;
+    }
+
+    function alignPostedPage(node) {
+        var page = declaredPageUrl(node);
+        if (!page || !window.history || !history.replaceState) return;
+        try {
+            var here = new URL(window.location.href);
+            var target = new URL(page, window.location.href);
+            if (here.pathname === target.pathname) return;
+            history.replaceState(null, "", page);
+        } catch (e) { /* leave the address bar */ }
     }
 
     function replaceRegion(node, url, push) {
@@ -384,6 +422,7 @@
     function watch(node) {
         if (node._auWatch) return;
         node._auWatch = true;
+        alignPostedPage(node);
         var ms = Number(node.getAttribute("data-au-refresh")) || 12000;
         if (node.hasAttribute("data-au-refresh-url")) {
             setTimeout(function () { refresh(node); }, 0);
