@@ -67,8 +67,8 @@ public class KafkaConsoleUxTests
         overview.Should().Contain("Full topic table");
 
         topic.Should().Contain("Preview it first.");
-        topic.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">What to change</legend>");
-        topic.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">Request only</legend>");
+        topic.Should().Contain("<h3 class=\"card-header h6 mb-0\">What to change</h3>");
+        topic.Should().Contain("<h3 class=\"card-header h6 mb-0\">Request only</h3>");
         topic.Should().Contain("A preview does not read these. Submit does.");
         IndexOf(topic, "id=\"kafka-partition-result\"").Should().BeLessThan(IndexOf(topic, ">Preview increase</span>"));
         topic.Should().Contain("data-lu-result=\"kafka-partition\"");
@@ -81,7 +81,7 @@ public class KafkaConsoleUxTests
         IndexOf(consumers, "id=\"kafka-replica-result\"").Should().BeLessThan(IndexOf(consumers, ">Preview add</span>"));
 
         brokers.Should().Contain("A preview plans the partitions and changes nothing.");
-        brokers.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">Request only</legend>");
+        brokers.Should().Contain("<h3 class=\"card-header h6 mb-0\">Request only</h3>");
         IndexOf(brokers, "id=\"kafka-broker-result\"").Should().BeLessThan(IndexOf(brokers, ">Preview decommission</span>"));
 
         home.Should().Contain("changes that start as a preview");
@@ -172,8 +172,16 @@ public class KafkaConsoleUxTests
         overview.Should().NotContain("foreach (var row in Model.Groups.Groups");
         overview.Should().Contain("Full topic table");
         messages.Should().Contain("aria-label=\"Message pages\"");
-        messages.Should().Contain(">First</");
-        messages.Should().Contain(">Last</");
+        messages.Should().Contain("Direction = \"first\"");
+        messages.Should().Contain("Direction = \"last\"");
+        messages.Should().NotContain(">First</");
+        messages.Should().NotContain(">Last</");
+        var step = File.ReadAllText(Path.Combine(root, "Views", "Shared", "_PagerStep.cshtml"));
+        step.Should().Contain("aria-label=\"@label\"");
+        step.Should().Contain("bi-chevron-double-left");
+        step.Should().Contain("bi-chevron-double-right");
+        step.Should().Contain("lu-page-step");
+        step.Should().NotContain("btn-au-link");
         messages.Should().NotContain(">Earlier</a>");
         messages.Should().NotContain(">Later</a>");
         messages.Should().NotContain("name=\"limit\"");

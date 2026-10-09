@@ -152,20 +152,11 @@
                         }
                     </div>
                     <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
-                        @if (Model.TypePaging.Page > 1)
-                        {
-                            <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: 1)">First</a>
-                        }
-                        @if (Model.TypePaging.HasPrevious)
-                        {
-                            <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: Model.TypePaging.Page - 1)">Previous</a>
-                        }
+                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(typePage: 1), Enabled = Model.TypePaging.Page > 1 })" />
+                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(typePage: Model.TypePaging.Page - 1), Enabled = Model.TypePaging.HasPrevious })" />
                         <span class="small text-muted">Page @Model.TypePaging.Page of @(Model.TypePaging.TotalPages == 0 ? 1 : Model.TypePaging.TotalPages) (@Model.TypePaging.TotalCount)</span>
-                        @if (Model.TypePaging.HasNext)
-                        {
-                            <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: Model.TypePaging.Page + 1)">Next</a>
-                            <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: (int)Model.TypePaging.TotalPages)">Last</a>
-                        }
+                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(typePage: Model.TypePaging.Page + 1), Enabled = Model.TypePaging.HasNext })" />
+                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(typePage: (int)Model.TypePaging.TotalPages), Enabled = Model.TypePaging.HasNext })" />
                         @foreach (var size in ReportManifestQuery.PageSizes)
                         {
                             <a class="btn btn-sm @(size == Model.Query.TypeSize ? "lu-nav-current" : "btn-au-link")" href="@Model.Href(typeSize: size)">@size</a>
@@ -275,20 +266,11 @@
                 }
             </div>
             <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
-                @if (Model.PatientPaging.Page > 1)
-                {
-                    <a class="btn btn-sm btn-au-link" href="@Model.Href(page: 1)">First</a>
-                }
-                @if (Model.PatientPaging.HasPrevious)
-                {
-                    <a class="btn btn-sm btn-au-link" href="@Model.Href(page: Model.PatientPaging.Page - 1)">Previous</a>
-                }
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(page: 1), Enabled = Model.PatientPaging.Page > 1 })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(page: Model.PatientPaging.Page - 1), Enabled = Model.PatientPaging.HasPrevious })" />
                 <span class="small text-muted">Page @Model.PatientPaging.Page of @(Model.PatientPaging.TotalPages == 0 ? 1 : Model.PatientPaging.TotalPages) (@Model.PatientPaging.TotalCount)</span>
-                @if (Model.PatientPaging.HasNext)
-                {
-                    <a class="btn btn-sm btn-au-link" href="@Model.Href(page: Model.PatientPaging.Page + 1)">Next</a>
-                    <a class="btn btn-sm btn-au-link" href="@Model.Href(page: (int)Model.PatientPaging.TotalPages)">Last</a>
-                }
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(page: Model.PatientPaging.Page + 1), Enabled = Model.PatientPaging.HasNext })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(page: (int)Model.PatientPaging.TotalPages), Enabled = Model.PatientPaging.HasNext })" />
                 @foreach (var size in ReportManifestQuery.PageSizes)
                 {
                     <a class="btn btn-sm @(size == Model.Query.PageSize ? "lu-nav-current" : "btn-au-link")" href="@Model.Href(pageSize: size)">@size</a>
