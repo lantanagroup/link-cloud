@@ -217,6 +217,66 @@ global:
     required: false
     defaultValue: "broker-0"
     consumers: ["AdminBFF"]
+  - key: "KafkaOps:AllowTopicMigration"
+    description: "Allows the Kafka console to plan and run an increase-only topic migration. Off until an environment opts in."
+    required: false
+    defaultValue: "false"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:MigrationBackupRetentionHours"
+    description: "Hours a finished migration keeps its _linkmig backup before the console may delete it. Failure, abort, and rollback never delete the backup."
+    required: false
+    defaultValue: "168"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:MigrationMaxBackupMinutes"
+    description: "Minutes allowed for the backup copy and its verify before the migration rolls back."
+    required: false
+    defaultValue: "15"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:MigrationHoldMinutes"
+    description: "Minutes the migration waits at the hold point for a typed go before it rolls back."
+    required: false
+    defaultValue: "15"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:MigrationUnknownDiskMaxBytes"
+    description: "Largest estimated backup, in bytes, accepted when broker disk free space is unknown."
+    required: false
+    defaultValue: "1073741824"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:TopicOperatorManagesLinkTopics"
+    description: "When true, a Strimzi topic operator is expected to own Link topics and migration refuses to create or delete them."
+    required: false
+    defaultValue: "false"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:Workloads"
+    description: "Comma-separated workload=deployment pairs the migration stops and starts. Distinct from KafkaOps:ConsumerDeployments."
+    required: false
+    defaultValue: ""
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:WorkloadNamespace"
+    description: "Namespace of the Deployments named by KafkaOps:Workloads. Used when KafkaOps:InfraProvider is Strimzi."
+    required: false
+    defaultValue: ""
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ManualChecklist"
+    description: "When true on Strimzi, workload stop and start are recorded for an operator instead of patched."
+    required: false
+    defaultValue: "false"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:Connection:BootstrapServers"
+    description: "Comma-separated bootstrap servers for the KafkaOps admin principal. Required outside LocalCompose. Empty uses the shared connection only on LocalCompose."
+    required: false
+    defaultValue: ""
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:Connection:SaslUsername"
+    description: "SASL username for the KafkaOps admin principal."
+    required: false
+    sensitive: true
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:Connection:SaslPassword"
+    description: "SASL password for the KafkaOps admin principal."
+    required: false
+    sensitive: true
+    consumers: ["AdminBFF"]
   - key: "DatabaseProvider"
     description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
     required: false

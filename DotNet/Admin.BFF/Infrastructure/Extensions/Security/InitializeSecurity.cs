@@ -57,6 +57,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.AddPolicy(PolicyNames.CanManageKafkaTopics, pb => { pb.RequireAssertion(context => true); });
                     options.AddPolicy(PolicyNames.CanManageScaling, pb => { pb.RequireAssertion(context => true); });
                     options.AddPolicy(PolicyNames.CanOperateKafka, pb => { pb.RequireAssertion(context => true); });
+                    options.AddPolicy(PolicyNames.CanMigrateKafkaTopics, pb => { pb.RequireAssertion(context => true); });
                 });
 
                 return services;
@@ -232,6 +233,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 builder.AddPolicy(PolicyNames.CanManageKafkaTopics, AuthorizationPolicies.CanManageKafkaTopics());
                 builder.AddPolicy(PolicyNames.CanManageScaling, AuthorizationPolicies.CanManageScaling());
                 builder.AddPolicy(PolicyNames.CanOperateKafka, AuthorizationPolicies.CanOperateKafka());
+                builder.AddPolicy(PolicyNames.CanMigrateKafkaTopics, AuthorizationPolicies.CanMigrateKafkaTopics());
             });
 
             return services;

@@ -12,7 +12,8 @@ public class PartitionChangePlannerTests
         var quiet = PartitionChangePlanner.Evaluate(Valid("ResourcesAcquired"));
         Assert.True(quiet.Accepted);
         Assert.True(quiet.QuietWindowRequired);
-        Assert.Equal("{facilityId}:{patientId}", quiet.KeyShape);
+        Assert.Equal(KafkaTopicCatalog.PatientJsonShape, quiet.KeyShape);
+        Assert.Contains("moves about", quiet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(6, quiet.MaxReplicas);
         Assert.Contains("cannot be reversed", quiet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("raised together", quiet.Summary, StringComparison.OrdinalIgnoreCase);
@@ -29,17 +30,20 @@ public class PartitionChangePlannerTests
 
         Assert.True(plan.Accepted);
         Assert.False(plan.QuietWindowRequired);
-        Assert.Equal(KafkaTopicKeyClass.Log, plan.KeyClass);
+        Assert.Equal(KafkaTopicKeyClass.Patient, plan.KeyClass);
+        Assert.Equal(KafkaTopicCatalog.PatientOrFacilityJsonShape, plan.KeyShape);
     }
 
     [Fact]
-    public void MixedHashTopic_StaysBlocked()
+    public void DataAcquisitionRequested_IsEligible_AndOrderSensitive()
     {
         var plan = PartitionChangePlanner.Evaluate(Valid("DataAcquisitionRequested") with { QuietWindowMet = true });
 
-        Assert.False(plan.Accepted);
-        Assert.True(plan.HardBlocked);
-        Assert.Contains(plan.Errors, error => error.Contains("murmur2", StringComparison.OrdinalIgnoreCase));
+        Assert.True(plan.Accepted);
+        Assert.False(plan.HardBlocked);
+        Assert.True(plan.QuietWindowRequired);
+        Assert.Equal(KafkaTopicKeyClass.Patient, plan.KeyClass);
+        Assert.DoesNotContain(plan.Errors, error => error.Contains("murmur2", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -134,6 +138,70 @@ public class PartitionChangePlannerTests
             LastFamilyChangeUtc = now.AddMinutes(-10)
         });
         Assert.Contains(recent.Errors, error => error.Contains("must wait", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CompleteFamily_RaisesOnlySiblings_AndSkipsTheRateLimit()
+    {
+        var uneven = PartitionChangePlanner.CompleteFamily(Valid("ReadyToAcquire") with
+        {
+            CurrentPartitions = 4,
+            RetryPartitions = 3,
+            ErrorPartitions = 3,
+            QuietWindowMet = false,
+            LastFamilyChangeUtc = DateTimeOffset.Parse("2026-10-07T11:50:00Z")
+        });
+
+        Assert.True(uneven.Accepted);
+        Assert.False(uneven.SecondApproverRequired);
+        Assert.Equal(4, uneven.RequestedPartitions);
+        Assert.Equal(["ReadyToAcquire-Retry", "ReadyToAcquire-Error"], uneven.TopicsToRaise);
+        Assert.DoesNotContain("ReadyToAcquire", uneven.TopicsToRaise);
+        Assert.Contains(uneven.Notes, note => note.Contains("retry topic will be raised from 3 to 4", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(uneven.Errors, error => error.Contains("must wait", StringComparison.Ordinal));
+
+        var even = PartitionChangePlanner.CompleteFamily(Valid("ReadyToAcquire") with
+        {
+            CurrentPartitions = 4,
+            RetryPartitions = 4,
+            ErrorPartitions = 4,
+            QuietWindowMet = false
+        });
+        Assert.False(even.Accepted);
+        Assert.Contains(even.Errors, error => error.Contains("No sibling is behind", StringComparison.Ordinal));
+
+        var ahead = PartitionChangePlanner.CompleteFamily(Valid("ReadyToAcquire") with
+        {
+            CurrentPartitions = 4,
+            RetryPartitions = 5,
+            ErrorPartitions = 3,
+            QuietWindowMet = false
+        });
+        Assert.True(ahead.Accepted);
+        Assert.Equal(["ReadyToAcquire-Error"], ahead.TopicsToRaise);
+        Assert.Contains(ahead.Notes, note => note.Contains("not be shrunk", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LogTopicIncrease_RequiresASecondApprover()
+    {
+        var plan = PartitionChangePlanner.Evaluate(Valid("ReadyToAcquire") with { RequireSecondApprover = false });
+        Assert.True(plan.Accepted, string.Join(" ", plan.Errors));
+        Assert.False(plan.QuietWindowRequired);
+        Assert.True(plan.SecondApproverRequired);
+    }
+
+    [Fact]
+    public void ReassignmentInFlight_RefusesThePartitionPlan()
+    {
+        var plan = PartitionChangePlanner.Evaluate(Valid("ReadyToAcquire") with
+        {
+            QuietWindowMet = false,
+            InFlightReassignmentTopics = ["ops-proof-log"]
+        });
+
+        Assert.False(plan.Accepted);
+        Assert.Contains(plan.Errors, error => error.Contains("ops-proof-log", StringComparison.Ordinal));
     }
 
     private static PartitionPlanRequest Valid(string topic)
