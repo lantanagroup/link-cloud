@@ -16,6 +16,7 @@ public sealed class KafkaOpsFixture
 
     private readonly FixtureDocument _document;
     private readonly Dictionary<Guid, ChangeRequestRecord> _requests = new();
+    private readonly Dictionary<string, List<KafkaBrowseRecord>> _produced = new(StringComparer.Ordinal);
     private readonly object _gate = new();
 
     public KafkaOpsFixture(IConfiguration configuration, IWebHostEnvironment environment)
@@ -584,9 +585,71 @@ public sealed class KafkaOpsFixture
 
         if (partitions.Count > 0)
             page.Records = page.Records.Where(record => partitions.Contains(record.Partition)).ToList();
+        var produced = ProducedFor(admission.Topic, partitions, key, headerName, headerValue);
+        if (produced.Count > 0)
+            page.Records.InsertRange(0, produced);
         page.Records = page.Records.Take(limit).ToList();
         page.Metadata.Returned = page.Records.Count;
         return Ok(page);
+    }
+
+    public KafkaOpsCall<ChangeRequestRecord> ProduceMessage(string topic, string? headers, string? key, string? value, string? reason, string? confirmation, string correlationId)
+    {
+        var typed = (topic ?? "").Trim();
+        if (!string.Equals((confirmation ?? "").Trim(), typed, StringComparison.Ordinal))
+            return Fail<ChangeRequestRecord>(KafkaProduceRules.ConfirmSentence);
+        if (string.IsNullOrWhiteSpace(reason))
+            return Fail<ChangeRequestRecord>(KafkaProduceRules.ReasonSentence);
+        if (reason.Trim().Length > KafkaProduceRules.MaxReason)
+            return Fail<ChangeRequestRecord>(KafkaProduceRules.ReasonLengthSentence);
+
+        var review = KafkaProduceRules.Evaluate(typed, headers, key, value);
+        if (!review.Accepted)
+            return Fail<ChangeRequestRecord>(review.Error);
+
+        lock (_gate)
+        {
+            if (_document.Topics.ReadOnly)
+                return Fail<ChangeRequestRecord>("Kafka changes are read-only in this environment.");
+
+            if (!_produced.TryGetValue(review.Topic, out var list))
+            {
+                list = [];
+                _produced[review.Topic] = list;
+            }
+
+            if (list.Count >= 50)
+                list.RemoveAt(0);
+            var offset = list.Count == 0 ? 1_000 : list.Max(item => item.Offset) + 1;
+            list.Add(Record(
+                review.Topic,
+                0,
+                offset,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                review.Key,
+                review.Value,
+                review.Headers,
+                false));
+
+            var now = DateTimeOffset.UtcNow;
+            return Store(new ChangeRequestRecord
+            {
+                Id = Guid.NewGuid(),
+                Kind = "Produce",
+                Topic = review.Topic,
+                Family = review.Topic,
+                Reason = reason.Trim(),
+                Requester = "anonymous",
+                Status = "Done",
+                DryRunSummary = review.Summary,
+                Progress = "One message was produced.",
+                CorrelationId = correlationId,
+                CreatedUtc = now,
+                ExecutedUtc = now,
+                ConvergedUtc = now,
+                ClosedUtc = now
+            });
+        }
     }
 
     public KafkaOpsCall<KafkaFamilyView> Family(string topic)
@@ -750,6 +813,32 @@ public sealed class KafkaOpsFixture
                 CreatedUtc = DateTimeOffset.UtcNow
             });
         }
+    }
+
+    private List<KafkaBrowseRecord> ProducedFor(string topic, IReadOnlyList<int> partitions, string key, string headerName, string headerValue)
+    {
+        lock (_gate)
+        {
+            if (!_produced.TryGetValue(topic, out var list))
+                return [];
+            return list.Where(record => KeepProduced(record, partitions, key, headerName, headerValue)).ToList();
+        }
+    }
+
+    private static bool KeepProduced(KafkaBrowseRecord record, IReadOnlyList<int> partitions, string key, string headerName, string headerValue)
+    {
+        if (!string.Equals(key, "cap", StringComparison.Ordinal) && !string.IsNullOrEmpty(key) && !(record.Key ?? "").Contains(key, StringComparison.Ordinal))
+            return false;
+        if (!string.IsNullOrEmpty(headerName) && !string.IsNullOrEmpty(headerValue))
+        {
+            var hit = record.Headers.Any(header =>
+                string.Equals(header.Name, headerName, StringComparison.OrdinalIgnoreCase)
+                && header.Value.Contains(headerValue, StringComparison.Ordinal));
+            if (!hit)
+                return false;
+        }
+
+        return partitions.Count == 0 || partitions.Contains(record.Partition);
     }
 
     private KafkaTopicRow? FindTopic(string topic) =>

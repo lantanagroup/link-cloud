@@ -1,4 +1,12 @@
 @model CopyTarget
 <button type="button" class="btn btn-sm btn-au-link lu-copy" data-lu-copy="@Model.Value" title="@Model.Label" aria-label="@Model.Label">
-    <i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Copy</span>
+    <i class="bi bi-copy" aria-hidden="true"></i>
+    @if (string.IsNullOrWhiteSpace(Model.Text))
+    {
+        <span class="ms-1">Copy</span>
+    }
+    else
+    {
+        <span class="ms-1">@Model.Text</span>
+    }
 </button>

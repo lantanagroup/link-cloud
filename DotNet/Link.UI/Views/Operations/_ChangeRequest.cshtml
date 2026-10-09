@@ -57,6 +57,10 @@
                 }
                 </ol>
             }
+            else if (request.Kind == "Produce")
+            {
+                <p>One message was produced on @request.Topic.</p>
+            }
             else if (request.BrokerId >= 0)
             {
                 <p>Broker @request.BrokerId.</p>
