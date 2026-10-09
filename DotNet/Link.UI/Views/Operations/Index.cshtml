@@ -10,9 +10,10 @@
 <div class="au-card card mt-3">
     <div class="card-header">Kafka</div>
     <div class="card-body">
-        <p>The console is four reads and one migration. Start with Overview when something looks wrong. Use Topic, Consumers, or Brokers when you already know what you want to change.</p>
+        <p>Start with Overview when something looks wrong. Messages reads one allow-listed topic and does not commit offsets. Use Topic, Consumers, or Brokers when you already know what you want to change.</p>
         <ol>
             <li>Overview lists topics and groups that need attention. Healthy tables stay folded.</li>
+            <li>Messages shows a page of records. Export writes an audit of that read.</li>
             <li>Topic previews an in-place partition increase. Migrate is the other path, and it recreates the topic empty.</li>
             <li>Consumers previews adding or removing replicas. Brokers previews a decommission or a rebalance.</li>
         </ol>
