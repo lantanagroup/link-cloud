@@ -39,6 +39,69 @@ public sealed class ManifestPatientRow
     public string? Configuration { get; init; }
     public bool HasBundle { get; init; }
     public string? Href { get; init; }
+    public string Submission { get; init; } = string.Empty;
+    public string Updated { get; init; } = string.Empty;
+    public string ResourceTypes { get; init; } = string.Empty;
+    public IReadOnlyList<ManifestMeasureBadge> Measures { get; init; } = [];
+    public IReadOnlyList<ManifestResourceCount> Resources { get; init; } = [];
+    public IReadOnlyList<ManifestTimelineEvent> Events { get; init; } = [];
+    public IReadOnlyList<ManifestLink> Links { get; init; } = [];
+    public IReadOnlyList<ManifestResourceRef> ResourceRefs { get; init; } = [];
+}
+
+/// <summary>One measure on a patient row. Qualifies is null when the report does not say.</summary>
+public sealed class ManifestMeasureBadge
+{
+    public string Name { get; init; } = string.Empty;
+    public string Outcome { get; init; } = string.Empty;
+    public bool? Qualifies { get; init; }
+    public string BadgeClass { get; init; } = "au-badge-muted";
+}
+
+public sealed class ManifestResourceCount
+{
+    public string Name { get; init; } = string.Empty;
+    public int Count { get; init; }
+}
+
+public sealed class ManifestTimelineEvent
+{
+    public string Label { get; init; } = string.Empty;
+    public string When { get; init; } = string.Empty;
+}
+
+public sealed class ManifestLink
+{
+    public string Label { get; init; } = string.Empty;
+    public string Href { get; init; } = string.Empty;
+}
+
+public sealed class ManifestResourceRef
+{
+    public string Type { get; init; } = string.Empty;
+    public string Id { get; init; } = string.Empty;
+}
+
+/// <summary>Report-level population figures for one measure. A null count was not in the data.</summary>
+public sealed class ManifestPopulationHighlight
+{
+    public string Measure { get; init; } = string.Empty;
+    public int? InitialPopulation { get; init; }
+    public int? Denominator { get; init; }
+    public int? DenominatorExclusion { get; init; }
+    public int? DenominatorException { get; init; }
+    public int? Numerator { get; init; }
+    public int? NumeratorExclusion { get; init; }
+    public string? Rate { get; init; }
+    public IReadOnlyList<ManifestCountRow> Other { get; init; } = [];
+}
+
+/// <summary>One population on a report, and the measure-report ids that belong to it.</summary>
+public sealed class PopulationSlot
+{
+    public string Measure { get; init; } = string.Empty;
+    public string PopulationId { get; init; } = string.Empty;
+    public IReadOnlyList<string> MeasureReportIds { get; init; } = [];
 }
 
 public sealed class ManifestCompareTypeRow
@@ -99,6 +162,11 @@ public sealed class ReportManifestFacts
     public PageBar PatientPaging { get; init; } = new();
     public string? Notice { get; init; }
     public string? PatientNote { get; init; }
+    public int? PassedValidation { get; init; }
+    public int? FailedValidation { get; init; }
+    public int? PendingValidation { get; init; }
+    public IReadOnlyList<ManifestCountRow> ResourceTypes { get; init; } = [];
+    public IReadOnlyList<ManifestPopulationHighlight> Populations { get; init; } = [];
 }
 
 public sealed class ReportManifestModel
@@ -140,6 +208,13 @@ public sealed class ReportManifestModel
     public IReadOnlyList<ManifestCountRow> Types { get; init; } = [];
     public PageBar TypePaging { get; init; } = new();
     public IReadOnlyList<ManifestCountRow> ChartTypes { get; init; } = [];
+    public IReadOnlyList<ManifestCountRow> StatusChart { get; init; } = [];
+    public bool ContentsAreStatus { get; init; }
+    public IReadOnlyList<ManifestPopulationHighlight> Populations { get; init; } = [];
+    public int? PassedValidation { get; init; }
+    public int? FailedValidation { get; init; }
+    public int? PendingValidation { get; init; }
+    public bool ShowValidation => PassedValidation is not null || FailedValidation is not null || PendingValidation is not null;
     public IReadOnlyList<ManifestPatientRow> ChartPatients { get; init; } = [];
     public IReadOnlyList<ManifestPatientRow> Patients { get; init; } = [];
     public PageBar PatientPaging { get; init; } = new();

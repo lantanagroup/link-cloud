@@ -6,6 +6,26 @@
     var jsonOptions = new JsonSerializerOptions { Encoder = JavaScriptEncoder.Default };
     var chartTypes = JsonSerializer.Serialize(Model.ChartTypes.Select(row => new { row.Name, row.Total }), jsonOptions);
     var chartPatients = JsonSerializer.Serialize(Model.ChartPatients.Select(row => new { row.PatientId, row.Total }), jsonOptions);
+    var statusChart = JsonSerializer.Serialize(Model.StatusChart.Select(row => new { row.Name, row.Total }), jsonOptions);
+    var patientDetails = JsonSerializer.Serialize(Model.Patients.Select(row => new
+    {
+        id = row.PatientId,
+        status = row.Status,
+        submission = row.Submission,
+        updated = row.Updated,
+        measures = row.Measures.Select(item => new { name = item.Name, outcome = item.Outcome, qualifies = item.Qualifies, tone = item.BadgeClass }),
+        resources = row.Resources.Select(item => new { name = item.Name, count = item.Count }),
+        events = row.Events.Select(item => new { label = item.Label, when = item.When }),
+        links = row.Links.Select(item => new { label = item.Label, href = item.Href }),
+        refs = row.ResourceRefs.Select(item => new { type = item.Type, id = item.Id })
+    }), jsonOptions);
+    var showMeasures = Model.Patients.Any(row => row.Measures.Count > 0);
+    var showSubmission = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Submission));
+    var showResourceTypes = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.ResourceTypes));
+    var showUpdated = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Updated));
+    var countHeader = Model.ContentsAreStatus || Model.TypeHeading == "Populations" ? "Patients" : "Total";
+    var nameHeader = Model.TypeHeading == "Populations" ? "Population" : "Name";
+    var populationCards = Model.Populations.Take(ReportManifestModel.ChartCap).ToList();
     string Count(int value) => value.ToString("N0");
 }
 
@@ -35,8 +55,67 @@
         <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.SharedResourceCount)</div><div class="au-stat-label">Shared</div></div></div>
     }
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.TypeCount)</div><div class="au-stat-label">@Model.TypeHeading</div></div></div>
+    @if (Model.ShowValidation)
+    {
+        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PassedValidation ?? 0)</div><div class="au-stat-label">Passed validation</div></div></div>
+        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.FailedValidation ?? 0)</div><div class="au-stat-label">Failed validation</div></div></div>
+        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PendingValidation ?? 0)</div><div class="au-stat-label">Pending validation</div></div></div>
+    }
 </div>
 <p class="small text-muted">@Model.EligibilityText @(string.IsNullOrWhiteSpace(Model.HottestName) ? "" : "Largest is " + Model.HottestName + ", " + Count(Model.HottestCount) + ".")</p>
+@if (populationCards.Count > 0)
+{
+    <div class="row g-3 mb-3">
+        @foreach (var highlight in populationCards)
+        {
+            <div class="col-lg-6">
+                <section class="card au-card mb-0 h-100">
+                    <h3 class="card-header h6 mb-0">@highlight.Measure</h3>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            @if (highlight.InitialPopulation is int initialPopulation)
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(initialPopulation)</div><div class="au-stat-label">Initial Population <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Initial Population")" aria-label="About Initial Population"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                            }
+                            @if (highlight.Denominator is int denominator)
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominator)</div><div class="au-stat-label">Denominator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator")" aria-label="About Denominator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                            }
+                            @if (highlight.DenominatorExclusion is int denominatorExclusion)
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorExclusion)</div><div class="au-stat-label">Denominator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exclusion")" aria-label="About Denominator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                            }
+                            @if (highlight.DenominatorException is int denominatorException)
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorException)</div><div class="au-stat-label">Denominator Exception <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exception")" aria-label="About Denominator Exception"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                            }
+                            @if (highlight.Numerator is int numerator)
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numerator)</div><div class="au-stat-label">Numerator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator")" aria-label="About Numerator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                            }
+                            @if (highlight.NumeratorExclusion is int numeratorExclusion)
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numeratorExclusion)</div><div class="au-stat-label">Numerator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator Exclusion")" aria-label="About Numerator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(highlight.Rate))
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@highlight.Rate</div><div class="au-stat-label">Rate <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Rate")" aria-label="About Rate"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                            }
+                            @foreach (var other in highlight.Other)
+                            {
+                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(other.Total)</div><div class="au-stat-label">@other.Name</div></div></div>
+                            }
+                        </div>
+                    </div>
+                </section>
+            </div>
+        }
+    </div>
+    @if (Model.Populations.Count > populationCards.Count)
+    {
+        <p class="small text-muted">@populationCards.Count of @Model.Populations.Count measures shown.</p>
+    }
+}
 
 <ul class="lu-section-nav" role="tablist">
     <li><button class="active" data-manifest-tab="#manifest-overview" type="button">Overview</button></li>
@@ -85,16 +164,28 @@
                 }
             </div>
             <div class="col-lg-7">
-                <div class="au-card">
-                    <div class="card-header">Largest @Model.TypeHeading.ToLowerInvariant()</div>
-                    <div class="card-body">
-                        <div class="lu-chart-donut"><canvas id="resourceDistChart"></canvas></div>
-                        @if (Model.TypeCount > ReportManifestModel.ChartCap)
-                        {
-                            <p class="small text-muted mb-0 mt-2">The chart shows the @ReportManifestModel.ChartCap largest. The table pages every row, largest first.</p>
-                        }
+                @if (Model.ChartTypes.Count > 0)
+                {
+                    <div class="au-card">
+                        <div class="card-header">Largest @Model.TypeHeading.ToLowerInvariant()</div>
+                        <div class="card-body">
+                            <div class="lu-chart-donut"><canvas id="resourceDistChart"></canvas></div>
+                            @if (Model.TypeCount > ReportManifestModel.ChartCap)
+                            {
+                                <p class="small text-muted mb-0 mt-2">The chart shows the @ReportManifestModel.ChartCap largest. The table pages every row, largest first.</p>
+                            }
+                        </div>
                     </div>
-                </div>
+                }
+                @if (Model.StatusChart.Count > 0 && !Model.ContentsAreStatus)
+                {
+                    <div class="au-card">
+                        <div class="card-header">Patients by validation</div>
+                        <div class="card-body">
+                            <div class="lu-chart-donut"><canvas id="patientStatusChart"></canvas></div>
+                        </div>
+                    </div>
+                }
                 <div class="au-card">
                     <div class="card-header d-flex justify-content-between align-items-center gap-2">
                         <span>@Model.TypeHeading</span>
@@ -125,13 +216,13 @@
                             <table class="au-table table table-sm mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
+                                        <th>@nameHeader</th>
                                         @if (Model.ShowSplit)
                                         {
                                             <th class="text-end">Patient</th>
                                             <th class="text-end">Shared</th>
                                         }
-                                        <th class="text-end">Total</th>
+                                        <th class="text-end">@countHeader</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -215,38 +306,87 @@
                                         <a class="text-white" href="@Model.Href(sort: "status", descending: Model.Query.Sort == "status" ? !Model.Query.Descending : true)">Status</a>
                                     }
                                 </th>
-                                <th>Detail</th>
+                                @if (showSubmission)
+                                {
+                                    <th>Submission</th>
+                                }
+                                @if (showMeasures)
+                                {
+                                    <th>Measures <span class="au-info-icon" data-bs-toggle="tooltip" title="Green means the patient is in the Numerator when this report has one. Red means they are not. A cohort measure with only an Initial Population uses that instead. A run shows a prediction, not a scored Numerator. A badge is left off when the data does not say." aria-label="About measure badges"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
+                                }
+                                @if (showResourceTypes)
+                                {
+                                    <th>Resource types</th>
+                                }
                                 @if (Model.ShowTotals)
                                 {
                                     <th class="text-end">
                                         @if (Model.ShowGeneration)
                                         {
-                                            <a class="text-white" href="@Model.Href(sort: "total", descending: Model.Query.Sort == "total" ? !Model.Query.Descending : true)">Total</a>
+                                            <a class="text-white" href="@Model.Href(sort: "total", descending: Model.Query.Sort == "total" ? !Model.Query.Descending : true)">Resources</a>
                                         }
                                         else
                                         {
-                                            <text>Total</text>
+                                            <text>Resources</text>
                                         }
                                     </th>
+                                }
+                                @if (showUpdated)
+                                {
+                                    <th>Updated</th>
                                 }
                                 @if (Model.ShowGeneration)
                                 {
                                     <th>Pattern</th>
                                     <th>Configuration</th>
-                                    <th></th>
+                                    <th><span class="visually-hidden">Download</span></th>
                                 }
+                                <th class="text-end"><span class="visually-hidden">Details</span></th>
                             </tr>
                         </thead>
                         <tbody>
+                        @{
+                            var patientIndex = 0;
+                        }
                         @foreach (var row in Model.Patients)
                         {
+                            var index = patientIndex;
+                            patientIndex++;
                             <tr>
                                 <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = row.Href })" /></td>
                                 <td><span class="badge @row.BadgeClass">@row.Status</span></td>
-                                <td>@row.Detail</td>
+                                @if (showSubmission)
+                                {
+                                    <td>@(string.IsNullOrWhiteSpace(row.Submission) ? "—" : row.Submission)</td>
+                                }
+                                @if (showMeasures)
+                                {
+                                    <td>
+                                        @if (row.Measures.Count == 0)
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            foreach (var badge in row.Measures)
+                                            {
+                                                <span class="badge @badge.BadgeClass lu-measure-badge text-truncate" title="@badge.Name">@badge.Name</span>
+                                                <span class="au-info-icon" data-bs-toggle="tooltip" title="@badge.Name. @badge.Outcome" aria-label="@badge.Name. @badge.Outcome"><i class="bi bi-info-circle" aria-hidden="true"></i></span>
+                                            }
+                                        }
+                                    </td>
+                                }
+                                @if (showResourceTypes)
+                                {
+                                    <td>@(string.IsNullOrWhiteSpace(row.ResourceTypes) ? "—" : row.ResourceTypes)</td>
+                                }
                                 @if (Model.ShowTotals)
                                 {
                                     <td class="text-end">@Count(row.Total)</td>
+                                }
+                                @if (showUpdated)
+                                {
+                                    <td>@(string.IsNullOrWhiteSpace(row.Updated) ? "—" : row.Updated)</td>
                                 }
                                 @if (Model.ShowGeneration)
                                 {
@@ -259,6 +399,7 @@
                                         }
                                     </td>
                                 }
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@index" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
                             </tr>
                         }
                         </tbody>
@@ -427,6 +568,43 @@
     }
 </div>
 
+<div class="modal fade" id="manifestPatientModal" tabindex="-1" aria-labelledby="manifestPatientTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0" id="manifestPatientTitle">Patient details</h2>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Identity</h3>
+                    <div class="card-body" id="manifest-patient-identity"></div>
+                </section>
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Measures</h3>
+                    <div class="card-body" id="manifest-patient-measures"></div>
+                </section>
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Resources by type</h3>
+                    <div class="card-body" id="manifest-patient-resources"></div>
+                </section>
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Linked resources</h3>
+                    <div class="card-body" id="manifest-patient-refs"></div>
+                </section>
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Timeline</h3>
+                    <div class="card-body" id="manifest-patient-events"></div>
+                </section>
+                <section class="card au-card mb-0">
+                    <h3 class="card-header h6 mb-0">Related</h3>
+                    <div class="card-body" id="manifest-patient-links"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 (function () {
@@ -450,6 +628,8 @@
     });
     var types = @Html.Raw(chartTypes);
     var patients = @Html.Raw(chartPatients);
+    var statuses = @Html.Raw(statusChart);
+    var details = @Html.Raw(patientDetails);
     var palette = (window.luChartPalette && window.luChartPalette.manifest) || [];
     function draw(id, labels, data, kind) {
         var canvas = document.getElementById(id);
@@ -466,6 +646,185 @@
         });
     }
     draw("resourceDistChart", types.map(function (row) { return row.Name; }), types.map(function (row) { return row.Total; }), "doughnut");
+    draw("patientStatusChart", statuses.map(function (row) { return row.Name; }), statuses.map(function (row) { return row.Total; }), "doughnut");
     draw("patientBarChart", patients.map(function (row) { return row.PatientId; }), patients.map(function (row) { return row.Total; }), "bar");
+
+    var openRow = null;
+    var refPage = 0;
+    var refSize = 10;
+
+    function line(parent, label, value) {
+        if (!value) return;
+        var paragraph = document.createElement("p");
+        paragraph.className = "mb-1";
+        var name = document.createElement("span");
+        name.className = "text-muted";
+        name.textContent = label + " ";
+        paragraph.appendChild(name);
+        paragraph.appendChild(document.createTextNode(value));
+        parent.appendChild(paragraph);
+    }
+
+    function note(parent, value) {
+        var paragraph = document.createElement("p");
+        paragraph.className = "mb-0 text-muted";
+        paragraph.textContent = value;
+        parent.appendChild(paragraph);
+    }
+
+    function fillRefs() {
+        var host = document.getElementById("manifest-patient-refs");
+        host.replaceChildren();
+        var refs = (openRow && openRow.refs) || [];
+        if (!refs.length) {
+            note(host, "Resource identifiers are not on this list. Counts by type are above.");
+            return;
+        }
+        var pages = Math.max(1, Math.ceil(refs.length / refSize));
+        if (refPage >= pages) refPage = pages - 1;
+        var slice = refs.slice(refPage * refSize, refPage * refSize + refSize);
+        var table = document.createElement("table");
+        table.className = "au-table table table-sm mb-2";
+        var head = document.createElement("thead");
+        var headRow = document.createElement("tr");
+        ["Type", "Resource"].forEach(function (label) {
+            var cell = document.createElement("th");
+            cell.textContent = label;
+            headRow.appendChild(cell);
+        });
+        head.appendChild(headRow);
+        table.appendChild(head);
+        var body = document.createElement("tbody");
+        slice.forEach(function (item) {
+            var row = document.createElement("tr");
+            var type = document.createElement("td");
+            type.textContent = item.type || "—";
+            var id = document.createElement("td");
+            if (window.luLabeledId) id.innerHTML = window.luLabeledId("Resource", item.id || "");
+            else id.textContent = item.id || "—";
+            row.appendChild(type);
+            row.appendChild(id);
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        host.appendChild(table);
+        var bar = document.createElement("div");
+        bar.className = "d-flex flex-wrap gap-2 align-items-center";
+        function step(label, icon, enabled, next) {
+            var control = document.createElement(enabled ? "a" : "button");
+            control.className = "lu-page-step";
+            control.setAttribute("aria-label", label);
+            control.setAttribute("title", label);
+            if (!enabled) control.disabled = true;
+            else control.href = "#manifest-patient-refs";
+            var mark = document.createElement("i");
+            mark.className = "bi " + icon;
+            mark.setAttribute("aria-hidden", "true");
+            control.appendChild(mark);
+            control.addEventListener("click", function (event) {
+                if (!enabled) return;
+                event.preventDefault();
+                refPage = next;
+                fillRefs();
+            });
+            bar.appendChild(control);
+        }
+        step("First", "bi-chevron-double-left", refPage > 0, 0);
+        step("Previous", "bi-chevron-left", refPage > 0, refPage - 1);
+        var place = document.createElement("span");
+        place.className = "small text-muted";
+        place.textContent = "Page " + (refPage + 1) + " of " + pages + " (" + refs.length + ")";
+        bar.appendChild(place);
+        step("Next", "bi-chevron-right", refPage + 1 < pages, refPage + 1);
+        step("Last", "bi-chevron-double-right", refPage + 1 < pages, pages - 1);
+        host.appendChild(bar);
+    }
+
+    function fill(index) {
+        openRow = details[index];
+        if (!openRow) return;
+        refPage = 0;
+        var identity = document.getElementById("manifest-patient-identity");
+        identity.replaceChildren();
+        var idLine = document.createElement("div");
+        idLine.className = "mb-2";
+        if (window.luLabeledId) idLine.innerHTML = window.luLabeledId("Patient", openRow.id || "");
+        else idLine.textContent = openRow.id || "—";
+        identity.appendChild(idLine);
+        line(identity, "Status", openRow.status);
+        line(identity, "Submission", openRow.submission);
+        line(identity, "Updated", openRow.updated);
+
+        var measures = document.getElementById("manifest-patient-measures");
+        measures.replaceChildren();
+        if (!openRow.measures || !openRow.measures.length) note(measures, "No population membership was recorded for this patient.");
+        else openRow.measures.forEach(function (item) {
+            var row = document.createElement("p");
+            row.className = "mb-1";
+            var badge = document.createElement("span");
+            badge.className = "badge " + (item.tone || "au-badge-muted");
+            badge.textContent = item.name || "Measure";
+            row.appendChild(badge);
+            row.appendChild(document.createTextNode(" " + (item.outcome || "")));
+            measures.appendChild(row);
+        });
+
+        var resources = document.getElementById("manifest-patient-resources");
+        resources.replaceChildren();
+        if (!openRow.resources || !openRow.resources.length) note(resources, "No resource counts were recorded.");
+        else {
+            var table = document.createElement("table");
+            table.className = "au-table table table-sm mb-0";
+            var body = document.createElement("tbody");
+            openRow.resources.forEach(function (item) {
+                var row = document.createElement("tr");
+                var name = document.createElement("td");
+                name.textContent = item.name || "—";
+                var count = document.createElement("td");
+                count.className = "text-end";
+                count.textContent = Number(item.count || 0).toLocaleString();
+                row.appendChild(name);
+                row.appendChild(count);
+                body.appendChild(row);
+            });
+            table.appendChild(body);
+            resources.appendChild(table);
+        }
+
+        fillRefs();
+
+        var events = document.getElementById("manifest-patient-events");
+        events.replaceChildren();
+        if (!openRow.events || !openRow.events.length) note(events, "No acquisition or normalization time was recorded.");
+        else openRow.events.forEach(function (item) { line(events, item.label, item.when); });
+
+        var links = document.getElementById("manifest-patient-links");
+        links.replaceChildren();
+        var usable = (openRow.links || []).filter(function (item) { return item.href && item.href.charAt(0) === "/"; });
+        if (!usable.length) note(links, "No measure page or log link is available for this patient.");
+        else usable.forEach(function (item) {
+            var anchor = document.createElement("a");
+            anchor.className = "btn btn-sm btn-au-link me-2 mb-2";
+            anchor.href = item.href;
+            anchor.textContent = item.label || "Open";
+            links.appendChild(anchor);
+        });
+
+        var modal = document.getElementById("manifestPatientModal");
+        if (window.bootstrap && bootstrap.Modal) bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+
+    document.addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("[data-manifest-patient]") : null;
+        if (!button) return;
+        fill(Number(button.getAttribute("data-manifest-patient")));
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        if (!window.bootstrap || !bootstrap.Tooltip) return;
+        document.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
+    });
 })();
 </script>
