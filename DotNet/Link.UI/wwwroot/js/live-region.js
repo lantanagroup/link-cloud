@@ -653,14 +653,24 @@
         });
     }
 
+    function wireTips(root) {
+        if (!window.bootstrap || !bootstrap.Tooltip) return;
+        var scope = root && root.querySelectorAll ? root : document;
+        scope.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
+    }
+
     document.addEventListener("au-refreshed", function (event) {
         var id = event.detail && event.detail.id;
         var node = id ? document.getElementById(id) : null;
         paintTimes(node);
         wireConditional(node || document);
         wireDismiss(node || document);
+        wireTips(node || document);
     });
     paintTimes();
     wireConditional(document);
     wireDismiss(document);
+    wireTips(document);
 })();

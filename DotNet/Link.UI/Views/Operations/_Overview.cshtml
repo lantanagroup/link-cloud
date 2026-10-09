@@ -42,7 +42,7 @@
                         <tr>
                             <th>Topic</th>
                             <th>Why</th>
-                            <th>Lag</th>
+                            <th>Lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag", Text = "How far a consumer is behind the latest message on that topic. A larger number is further behind." })" /></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -195,7 +195,7 @@ else if (groupWindow.Total > 0)
                     <th>Group</th>
                     <th>State</th>
                     <th>Members</th>
-                    <th>Lag</th>
+                    <th>Lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag", Text = "How far a consumer is behind the latest message on that topic. A larger number is further behind." })" /></th>
                     <th></th>
                 </tr>
             </thead>

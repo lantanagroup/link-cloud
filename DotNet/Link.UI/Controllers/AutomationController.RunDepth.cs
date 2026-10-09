@@ -43,10 +43,15 @@ public sealed partial class AutomationController
         int cmpPage,
         int cmpSize,
         int cmpType,
+        string? stage,
+        string? stageMeasure,
+        int popPage,
+        string? tab,
         CancellationToken cancellationToken)
     {
         var query = ReportManifestRules.Normalize(
-            q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "total");
+            q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "total",
+            stage, stageMeasure, popPage, tab);
         const string path = "/Automation/manifest";
         var fixture = _services.GetService<KafkaOpsFixture>();
         if (id == ReportManifestRules.SampleId && (!_engine.Ready || _manager is null) && fixture?.Active == true)

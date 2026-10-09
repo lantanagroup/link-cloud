@@ -4257,3 +4257,47 @@ button.btn-au-action.disabled,
   max-width: 11rem;
   vertical-align: middle;
 }
+
+.lu-funnel-stage {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(8rem, 1fr) auto;
+  gap: .75rem;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+  padding: .4rem .25rem;
+  border-radius: var(--au-radius);
+}
+
+.lu-funnel-stage:hover,
+.lu-funnel-stage.is-selected {
+  background: var(--au-accent-soft);
+}
+
+.lu-funnel-stage.is-side {
+  margin-left: 1.25rem;
+}
+
+.lu-funnel-name {
+  min-width: 0;
+}
+
+.lu-funnel-track {
+  display: block;
+  height: .55rem;
+  background: var(--au-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.lu-funnel-bar {
+  display: block;
+  height: 100%;
+  background: var(--au-dark);
+  border-radius: 999px;
+}
+
+.lu-funnel-count {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -34,11 +34,19 @@ public static partial class ReportManifestRules
         int comparePage,
         int compareSize,
         int compareTypePage,
-        string defaultSort)
+        string defaultSort,
+        string? stage = null,
+        string? stageMeasure = null,
+        int populationPage = 1,
+        string? tab = null)
     {
         var allowed = sort.Sanitize().Trim().ToLowerInvariant();
         if (allowed is not ("total" or "id" or "status"))
             allowed = defaultSort;
+
+        var opened = tab.Sanitize().Trim().ToLowerInvariant();
+        if (opened is not ("patients" or "populations" or "comparison"))
+            opened = string.Empty;
 
         return new ReportManifestQuery
         {
@@ -53,7 +61,11 @@ public static partial class ReportManifestRules
             TypeSize = ClampSize(typeSize),
             ComparePage = comparePage < 1 ? 1 : comparePage,
             CompareSize = ClampSize(compareSize),
-            CompareTypePage = compareTypePage < 1 ? 1 : compareTypePage
+            CompareTypePage = compareTypePage < 1 ? 1 : compareTypePage,
+            Stage = StageKey(stage),
+            StageMeasure = Cap(Blank(stageMeasure), 120),
+            PopulationPage = populationPage < 1 ? 1 : populationPage,
+            Tab = opened.Length == 0 ? null : opened
         };
     }
 
@@ -92,7 +104,8 @@ public static partial class ReportManifestRules
         IReadOnlyList<ManifestResourceCount>? resources = null,
         IReadOnlyList<ManifestTimelineEvent>? events = null,
         IReadOnlyList<ManifestLink>? links = null,
-        IReadOnlyList<ManifestResourceRef>? resourceRefs = null)
+        IReadOnlyList<ManifestResourceRef>? resourceRefs = null,
+        IReadOnlyList<ManifestMembership>? membership = null)
     {
         var status = Words(reportingStatus);
         if (status.Length == 0)
@@ -119,7 +132,8 @@ public static partial class ReportManifestRules
             Resources = resources ?? [],
             Events = events ?? [],
             Links = links ?? [],
-            ResourceRefs = resourceRefs ?? []
+            ResourceRefs = resourceRefs ?? [],
+            Membership = membership ?? []
         };
     }
 
@@ -212,6 +226,103 @@ public static partial class ReportManifestRules
             .ThenBy(row => row.Measure, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    public static string? PopulationKey(string? populationId) => Classify(populationId) switch
+    {
+        PopulationKind.InitialPopulation => "initial-population",
+        PopulationKind.Denominator => "denominator",
+        PopulationKind.DenominatorExclusion => "denominator-exclusion",
+        PopulationKind.DenominatorException => "denominator-exception",
+        PopulationKind.Numerator => "numerator",
+        PopulationKind.NumeratorExclusion => "numerator-exclusion",
+        _ => null
+    };
+
+    public static IReadOnlyList<ManifestMembership> MembershipFor(
+        IReadOnlyCollection<string?> patientMeasureReportIds,
+        IReadOnlyList<PopulationSlot> slots)
+    {
+        var owned = new HashSet<string>(
+            patientMeasureReportIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+        if (owned.Count == 0 || slots.Count == 0)
+            return [];
+
+        var membership = new List<ManifestMembership>();
+        foreach (var slot in slots)
+        {
+            var key = PopulationKey(slot.PopulationId);
+            if (key is null || string.IsNullOrWhiteSpace(slot.Measure))
+                continue;
+            if (!slot.MeasureReportIds.Any(id => owned.Contains(id)))
+                continue;
+            membership.Add(new ManifestMembership { Measure = slot.Measure.Trim(), Key = key });
+        }
+
+        return membership;
+    }
+
+    public static int? StageTotal(IReadOnlyList<ManifestPopulationHighlight> highlights, string? measure, string? stage)
+    {
+        if (string.IsNullOrWhiteSpace(stage))
+            return null;
+
+        var match = highlights.FirstOrDefault(row =>
+            string.IsNullOrWhiteSpace(measure)
+            || string.Equals(row.Measure, measure, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return null;
+
+        return stage switch
+        {
+            "initial-population" => match.InitialPopulation,
+            "denominator" => match.Denominator,
+            "denominator-exclusion" => match.DenominatorExclusion,
+            "denominator-exception" => match.DenominatorException,
+            "numerator" => match.Numerator,
+            "numerator-exclusion" => match.NumeratorExclusion,
+            _ => null
+        };
+    }
+
+    public static (IReadOnlyList<ManifestPatientRow> Page, PageBar Bar, string? Note) PopulationPage(
+        IReadOnlyList<ManifestPatientRow> rows,
+        string? stage,
+        string? measure,
+        int page,
+        int size,
+        int? populationCount)
+    {
+        if (string.IsNullOrWhiteSpace(stage))
+            return ([], new PageBar { Page = 1, PageSize = size }, null);
+
+        var matched = rows.Where(row => row.Membership.Any(item =>
+            string.Equals(item.Key, stage, StringComparison.OrdinalIgnoreCase)
+            && (string.IsNullOrWhiteSpace(measure)
+                || string.Equals(item.Measure, measure, StringComparison.OrdinalIgnoreCase)))).ToList();
+        var sliced = Slice(matched, page, size);
+        string? note = null;
+        if (populationCount is int expected && expected != matched.Count)
+        {
+            var label = PopulationLabel(stage);
+            note = "Showing "
+                + matched.Count.ToString("N0", CultureInfo.InvariantCulture)
+                + " patients from this page who are in the "
+                + label
+                + ". The funnel count is the whole population. The report service does not search by population, so this is not every patient in it.";
+        }
+
+        return (sliced.Page, sliced.Bar, note);
+    }
+
+    public static string? PredictionHelp(string? term) => (term ?? string.Empty).Trim() switch
+    {
+        "Predicted to qualify" => "Patients the run expected to be in the Initial Population. This is a prediction, not a scored Numerator.",
+        "Not predicted to qualify" => "Patients the run did not expect to be in the Initial Population.",
+        "In the ABS upload" => "Predicted patients who were also in the ABS upload.",
+        "Predicted, missing from ABS" => "Predicted patients who were not in the ABS upload.",
+        _ => null
+    };
 
     /// <summary>
     /// Badges for a real report. A patient is marked only when their measure report id is in a population
@@ -341,7 +452,7 @@ public static partial class ReportManifestRules
             status.Add(new ManifestCountRow { Name = "Pending validation", Primary = pending, Total = pending });
         return new ReportManifestModel
         {
-            Lead = "Report overview. Counts, the largest resource types, and population highlights are here. Open Patients for one row per patient.",
+            Lead = "Report overview. Counts, the largest resource types, and population highlights are here. Open Patients for one row per patient, or Populations for the measure funnel.",
             Notice = facts.Notice,
             PatientNote = facts.PatientNote,
             ShowComparison = false,
@@ -371,6 +482,16 @@ public static partial class ReportManifestRules
                 : [],
             StatusChart = status,
             Populations = facts.Populations,
+            PopulationMeasureCount = facts.Populations.Count,
+            Funnels = facts.Populations.Take(ReportManifestModel.ChartCap).Select(ToFunnel).ToList(),
+            PopulationComparison = facts.Populations.Count > 1
+                ? facts.Populations.Take(ReportManifestModel.ChartCap).Select(ToCompareRow).ToList()
+                : [],
+            PopulationPatients = facts.PopulationPatients,
+            PopulationPaging = facts.PopulationPaging,
+            PopulationNote = facts.PopulationNote,
+            PopulationsOpen = string.Equals(query.Tab, "populations", StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(query.Stage),
             PassedValidation = facts.PassedValidation,
             FailedValidation = facts.FailedValidation,
             PendingValidation = facts.PendingValidation,
@@ -452,32 +573,92 @@ public static partial class ReportManifestRules
         var eligibilityKnown = eligibility.Count > 0;
         var measureDisplays = (snapshot.MeasureIds ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).ToList();
         var measureAliases = (snapshot.SelectedMeasures ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).ToList();
-        var shown = patientPage.Page.Select(row =>
+        var measureName = measureDisplays.FirstOrDefault() ?? measureAliases.FirstOrDefault() ?? "This run";
+        var actualIds = actual?.PatientIds is { } present
+            ? new HashSet<string>(present.Where(id => !string.IsNullOrWhiteSpace(id)), StringComparer.Ordinal)
+            : null;
+        bool Predicted(string id) =>
+            eligibility.TryGetValue(id, out var list) && list is { Count: > 0 };
+
+        ManifestPatientRow Build(string id, int total)
         {
-            byPatient.TryGetValue(row.Id, out var counts);
-            eligibility.TryGetValue(row.Id, out var measures);
-            patterns.TryGetValue(row.Id, out var pattern);
-            cohort.Patterns.TryGetValue(row.Id, out var fallbackPattern);
-            cohort.Names.TryGetValue(row.Id, out var configuration);
+            byPatient.TryGetValue(id, out var counts);
+            eligibility.TryGetValue(id, out var measures);
+            patterns.TryGetValue(id, out var pattern);
+            cohort.Patterns.TryGetValue(id, out var fallbackPattern);
+            cohort.Names.TryGetValue(id, out var configuration);
             var qualifying = measures?.Where(measure => !string.IsNullOrWhiteSpace(measure)).ToList() ?? [];
-            var recorded = eligibility.ContainsKey(row.Id);
+            var recorded = eligibility.ContainsKey(id);
+            var membership = new List<ManifestMembership>();
+            if (recorded && qualifying.Count > 0)
+            {
+                membership.Add(new ManifestMembership { Measure = measureName, Key = "predicted" });
+                if (actualIds is not null)
+                {
+                    membership.Add(new ManifestMembership
+                    {
+                        Measure = measureName,
+                        Key = actualIds.Contains(id) ? "in-actual" : "missing"
+                    });
+                }
+            }
+
             return new ManifestPatientRow
             {
-                PatientId = row.Id,
+                PatientId = id,
                 Status = qualifying.Count == 0 ? "None" : qualifying.Count + " measure" + (qualifying.Count == 1 ? string.Empty : "s"),
                 BadgeClass = qualifying.Count == 0 ? "au-badge-muted" : "au-badge-success",
                 Detail = TopTypes(counts, 4),
                 ResourceTypes = TopTypes(counts, 4),
-                Total = row.Total,
+                Total = total,
                 Resources = ResourceCounts(counts),
                 Measures = eligibilityKnown && recorded
                     ? PredictedBadges(measureDisplays, measureAliases, qualifying)
                     : [],
+                Membership = membership,
                 Pattern = ShortPattern(string.IsNullOrWhiteSpace(pattern) ? fallbackPattern : pattern),
                 Configuration = string.IsNullOrWhiteSpace(configuration) ? "No configuration" : configuration,
-                HasBundle = templates.ContainsKey(row.Id)
+                HasBundle = templates.ContainsKey(id)
             };
-        }).ToList();
+        }
+
+        var shown = patientPage.Page.Select(row => Build(row.Id, row.Total)).ToList();
+        var predicted = ids.Count(Predicted);
+        ManifestPrediction? prediction = eligibilityKnown
+            ? new ManifestPrediction
+            {
+                Measure = measureName,
+                Predicted = predicted,
+                NotPredicted = Math.Max(0, ids.Count - predicted),
+                InActual = actualIds is null ? null : ids.Count(id => Predicted(id) && actualIds.Contains(id)),
+                MissingFromActual = actualIds is null ? null : predicted - ids.Count(id => Predicted(id) && actualIds.Contains(id))
+            }
+            : null;
+        IReadOnlyList<ManifestPatientRow> populationPatients = [];
+        var populationPaging = new PageBar { Page = 1, PageSize = query.PageSize };
+        string? populationNote = null;
+        if (query.Stage is "predicted" or "not-predicted" or "missing" or "in-actual")
+        {
+            var stageIds = ids.Where(id => query.Stage switch
+            {
+                "predicted" => Predicted(id),
+                "not-predicted" => !Predicted(id),
+                "missing" => actualIds is not null && Predicted(id) && !actualIds.Contains(id),
+                "in-actual" => actualIds is not null && Predicted(id) && actualIds.Contains(id),
+                _ => false
+            }).ToList();
+            var sliced = Slice(stageIds, query.PopulationPage, query.PageSize);
+            populationPatients = sliced.Page.Select(id =>
+            {
+                var total = Sum(byPatient.TryGetValue(id, out var counts) ? counts : null);
+                return Build(id, total);
+            }).ToList();
+            populationPaging = sliced.Bar;
+        }
+        else if (!string.IsNullOrWhiteSpace(query.Stage))
+        {
+            populationNote = "This run did not store a scored " + PopulationLabel(query.Stage) + ".";
+        }
 
         var qualifyingCount = eligibility.Count(pair => pair.Value is { Count: > 0 });
         var hottest = types.Sorted.FirstOrDefault();
@@ -526,6 +707,12 @@ public static partial class ReportManifestRules
             ChartPatients = shown.OrderByDescending(row => row.Total).Take(ReportManifestModel.ChartCap).ToList(),
             Patients = shown,
             PatientPaging = patientPage.Bar,
+            PopulationPatients = populationPatients,
+            PopulationPaging = populationPaging,
+            PopulationNote = populationNote,
+            Prediction = prediction,
+            PopulationsOpen = string.Equals(query.Tab, "populations", StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(query.Stage),
             Comparison = comparison,
             DefaultSort = "total",
             Query = query,
@@ -537,6 +724,33 @@ public static partial class ReportManifestRules
     public static ReportManifestPage SampleReport(ReportManifestQuery query, string? returnUrl = null)
     {
         const string measure = "NHSN Acute Care Hospital";
+        static List<string> SampleKeys(int index)
+        {
+            var keys = new List<string>();
+            var inInitial = index == 1 || (index >= 4 && index <= 38);
+            if (!inInitial)
+                return keys;
+            keys.Add("initial-population");
+            if (index is >= 5 and <= 8)
+                keys.Add("denominator-exclusion");
+            if (index == 1 || index == 4 || (index >= 9 && index <= 36))
+                keys.Add("denominator");
+            if (index == 4 || (index >= 9 && index <= 28) || index == 36)
+                keys.Add("numerator");
+            return keys;
+        }
+
+        var slots = new[] { "initial-population", "denominator-exclusion", "denominator", "numerator" }
+            .Select(key => new PopulationSlot
+            {
+                Measure = measure,
+                PopulationId = key,
+                MeasureReportIds = Enumerable.Range(1, 40)
+                    .Where(index => SampleKeys(index).Contains(key))
+                    .Select(index => "mr-" + index.ToString("00", CultureInfo.InvariantCulture))
+                    .ToList()
+            })
+            .ToList();
         var patients = Enumerable.Range(1, 40).Select(index =>
         {
             var failed = index <= 3;
@@ -561,16 +775,10 @@ public static partial class ReportManifestRules
                 types: "Observation " + (41 - index) + ", Encounter 1",
                 href: "/Reports/Measure?facilityId=" + SampleFacilityId + "&reportId=" + SampleId + "&patientId=" + Uri.EscapeDataString(id),
                 updated: "2026-03-11 15:42 UTC",
-                measures:
-                [
-                    new ManifestMeasureBadge
-                    {
-                        Name = measure,
-                        Outcome = failed ? "Not in Numerator" : "In Numerator",
-                        Qualifies = !failed,
-                        BadgeClass = failed ? "au-badge-danger" : "au-badge-success"
-                    }
-                ],
+                measures: ReportBadges(["mr-" + index.ToString("00", CultureInfo.InvariantCulture)], slots),
+                membership: SampleKeys(index)
+                    .Select(key => new ManifestMembership { Measure = measure, Key = key })
+                    .ToList(),
                 resources: resources,
                 events:
                 [
@@ -613,6 +821,20 @@ public static partial class ReportManifestRules
             ("Patient", 40)
         }.Select(row => new ManifestCountRow { Name = row.Name, Primary = row.Total, Total = row.Total }).ToList();
         var page = Slice(patients, query.Page, query.PageSize);
+        var populations = Highlights(
+        [
+            (measure, "initial-population", 36),
+            (measure, "denominator", 30),
+            (measure, "denominator-exclusion", 4),
+            (measure, "numerator", 22)
+        ]);
+        var members = PopulationPage(
+            patients,
+            query.Stage,
+            query.StageMeasure,
+            query.PopulationPage,
+            query.PageSize,
+            StageTotal(populations, query.StageMeasure, query.Stage));
         var route = new Dictionary<string, string>
         {
             ["facilityId"] = SampleFacilityId,
@@ -632,18 +854,15 @@ public static partial class ReportManifestRules
                 ContentsHeading = "Resource types",
                 TotalLabel = "Resources",
                 PatientResourceLabel = "Initial Population",
-                Populations = Highlights(
-                [
-                    (measure, "initial-population", 36),
-                    (measure, "denominator", 30),
-                    (measure, "denominator-exclusion", 4),
-                    (measure, "numerator", 22)
-                ]),
+                Populations = populations,
                 PassedValidation = 37,
                 FailedValidation = 3,
                 PendingValidation = 0,
                 Patients = page.Page,
                 PatientPaging = page.Bar,
+                PopulationPatients = members.Page,
+                PopulationPaging = members.Bar,
+                PopulationNote = members.Note,
                 Notice = "Fixture data. Nothing here was read from a report service."
             },
             query,
@@ -1108,6 +1327,95 @@ public static partial class ReportManifestRules
 
     private static int ClampSize(int size) =>
         ReportManifestQuery.PageSizes.Contains(size) ? size : ReportManifestQuery.DefaultPageSize;
+
+    private static string? Cap(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        var text = value.Trim();
+        return text.Length <= max ? text : text[..max];
+    }
+
+    private static string? StageKey(string? stage)
+    {
+        var key = stage.Sanitize().Trim().ToLowerInvariant().Replace(' ', '-');
+        return key is "initial-population"
+            or "denominator"
+            or "denominator-exclusion"
+            or "denominator-exception"
+            or "numerator"
+            or "numerator-exclusion"
+            or "predicted"
+            or "not-predicted"
+            or "missing"
+            or "in-actual"
+            ? key
+            : null;
+    }
+
+    private static ManifestPopulationFunnel ToFunnel(ManifestPopulationHighlight highlight)
+    {
+        var baseline = highlight.InitialPopulation;
+        ManifestFunnelStage Stage(string key, string name, int? count, bool side)
+        {
+            var value = count ?? 0;
+            return new ManifestFunnelStage
+            {
+                Key = key,
+                Name = name,
+                Help = PopulationHelp(name),
+                Count = value,
+                Percent = Percent(value, baseline),
+                Width = Width(value, baseline),
+                Side = side
+            };
+        }
+
+        var stages = new List<ManifestFunnelStage>();
+        if (highlight.InitialPopulation is int)
+            stages.Add(Stage("initial-population", "Initial Population", highlight.InitialPopulation, false));
+        if (highlight.DenominatorExclusion is int)
+            stages.Add(Stage("denominator-exclusion", "Denominator Exclusion", highlight.DenominatorExclusion, true));
+        if (highlight.DenominatorException is int)
+            stages.Add(Stage("denominator-exception", "Denominator Exception", highlight.DenominatorException, true));
+        if (highlight.Denominator is int)
+            stages.Add(Stage("denominator", "Denominator", highlight.Denominator, false));
+        if (highlight.NumeratorExclusion is int)
+            stages.Add(Stage("numerator-exclusion", "Numerator Exclusion", highlight.NumeratorExclusion, true));
+        if (highlight.Numerator is int)
+            stages.Add(Stage("numerator", "Numerator", highlight.Numerator, false));
+
+        return new ManifestPopulationFunnel
+        {
+            Measure = highlight.Measure,
+            Rate = highlight.Rate,
+            Stages = stages
+        };
+    }
+
+    private static ManifestPopulationCompareRow ToCompareRow(ManifestPopulationHighlight highlight) => new()
+    {
+        Measure = highlight.Measure,
+        InitialPopulation = highlight.InitialPopulation,
+        Denominator = highlight.Denominator,
+        Numerator = highlight.Numerator,
+        Rate = highlight.Rate
+    };
+
+    private static string? Percent(int count, int? baseline)
+    {
+        if (baseline is not > 0)
+            return null;
+        return (count * 100d / baseline.Value).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    }
+
+    private static int Width(int count, int? baseline)
+    {
+        if (baseline is not > 0)
+            return count > 0 ? 100 : 0;
+        var width = (int)Math.Round(count * 100d / baseline.Value, MidpointRounding.AwayFromZero);
+        return Math.Clamp(width, 0, 100);
+    }
 
     private static string? Blank(string? value)
     {
