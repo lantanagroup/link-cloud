@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 var message = new Message<string, object>
                 {
-                    Key = KafkaKeys.ForFacility(model.FacilityId),
+                    Key = model.FacilityId,
                     Value = new PatientAcquiredMessage
                     {
                         FacilityId = model.FacilityId,

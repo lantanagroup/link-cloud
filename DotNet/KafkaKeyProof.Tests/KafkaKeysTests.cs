@@ -53,6 +53,19 @@ public class KafkaKeysTests
     }
 
     [Fact]
+    public void ForReport_EmitsFacilityAndScheduleWithoutPatient()
+    {
+        var scheduleId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        Assert.Equal(
+            "{\"facilityId\":\"facility-1\",\"reportScheduleId\":\"11111111-2222-3333-4444-555555555555\"}",
+            KafkaKeys.ForReport("facility-1", scheduleId));
+        Assert.True(KafkaKeyLegacy.TryReadReportScheduleId(KafkaKeys.ForReport("facility-1", scheduleId), out var parsed));
+        Assert.Equal(scheduleId, parsed);
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForReport("facility-1", Guid.Empty));
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForReport(null, scheduleId));
+    }
+
+    [Fact]
     public void ForAudit_UsesPatientThenFacilityThenService()
     {
         Assert.Equal("{\"facilityId\":\"fac\",\"patientId\":\"pat\"}", KafkaKeys.ForAudit("fac", "pat", "QueryDispatch"));

@@ -392,7 +392,7 @@ public class PatientCensusServiceTests
         kafkaProducerMock.Verify(p => p.ProduceAsync(
             It.Is<string>(topic => topic == "PatientListsAcquired"),
             It.Is<Message<string, PatientListMessage>>(m =>
-                m.Key == KafkaKeys.ForFacility(facilityId) &&
+                m.Key == facilityId &&
                 m.Value.FacilityId == facilityId &&
                 m.Value.PatientLists.Count == 6),
             It.IsAny<CancellationToken>()), Times.Once);

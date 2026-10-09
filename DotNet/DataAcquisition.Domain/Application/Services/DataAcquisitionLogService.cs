@@ -27,12 +27,12 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
     private readonly ILogger<DataAcquisitionLogService> _logger;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
-    IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
+    IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly ICacheService? _cache;
 
     public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IProducer<string, ReadyToAcquire> readyToAcquireProducer,
+        IProducer<long, ReadyToAcquire> readyToAcquireProducer,
         ICacheService? cache = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -75,9 +75,9 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
             await _readyToAcquireProducer.ProduceAsync(
                 nameof(KafkaTopic.ReadyToAcquire),
-                new Message<string, ReadyToAcquire>
+                new Message<long, ReadyToAcquire>
                 {
-                    Key = ReadyToAcquireKey(log.FacilityId, log.PatientId),
+                    Key = log.Id,
                     Value = new ReadyToAcquire
                     {
                         LogId = log.Id,
@@ -92,7 +92,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
         }
         catch (Exception ex)
         {
-            if (transaction != null && ex is ProduceException<string, ReadyToAcquire>)
+            if (transaction != null && ex is ProduceException<long, ReadyToAcquire>)
             {
                 //ensure that db update is rolled back
                 request.Status = RequestStatus.Failed;
@@ -146,13 +146,4 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
         }
     }
 
-    private static string ReadyToAcquireKey(string? facilityId, string? patientId)
-    {
-        if (string.IsNullOrWhiteSpace(patientId))
-        {
-            return KafkaKeys.ForFacility(facilityId);
-        }
-
-        return KafkaKeys.ForPatient(facilityId, patientId);
-    }
 }

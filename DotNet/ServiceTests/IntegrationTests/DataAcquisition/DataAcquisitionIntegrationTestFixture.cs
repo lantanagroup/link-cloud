@@ -55,14 +55,14 @@ namespace IntegrationTests.DataAcquisition
         private string? _testDatabaseName;
         private string? _serverConnectionString;
 
-        public Mock<IProducer<string, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
+        public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<string, ResourcesAcquired>> ResourcesAcquiredProducerMock { get; private set; }
         public Mock<IResourceCache> ResourceCacheMock { get; } = new Mock<IResourceCache>();
         public Mock<IPatientDataService> PatientDataServiceMock { get; } = new Mock<IPatientDataService>();
 
         public DataAcquisitionIntegrationTestFixture()
         {
-            ReadyToAcquireProducerMock = new Mock<IProducer<string, ReadyToAcquire>>();
+            ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
             ResourcesAcquiredProducerMock = new Mock<IProducer<string, ResourcesAcquired>>();
 
             if (string.IsNullOrWhiteSpace(ExternalConnectionString))
@@ -201,7 +201,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
 
             // Mock Kafka producers for integration tests
-            builder.Services.AddSingleton<IProducer<string, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
+            builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
             builder.Services.AddSingleton<IProducer<string, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
             ResourceCacheMock
                 .Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>()))
@@ -223,7 +223,7 @@ namespace IntegrationTests.DataAcquisition
             // ReadyToAcquire producer factory only needs to resolve.
             builder.Services.AddScoped<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
             builder.Services.AddScoped<IPatientDataService>(_ => PatientDataServiceMock.Object);
-            builder.Services.AddSingleton<IKafkaProducerFactory<string, ReadyToAcquire>>(_ => new Mock<IKafkaProducerFactory<string, ReadyToAcquire>>().Object);
+            builder.Services.AddSingleton<IKafkaProducerFactory<long, ReadyToAcquire>>(_ => new Mock<IKafkaProducerFactory<long, ReadyToAcquire>>().Object);
 
             builder.Services.Configure<ServiceRegistry>(options =>
             {

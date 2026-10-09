@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 var message = new Message<string, PatientListMessage>
                 {
-                    Key = KafkaKeys.ForFacility(model.FacilityId),
+                    Key = model.FacilityId,
                     Value = new PatientListMessage
                     {
                         FacilityId = model.FacilityId,

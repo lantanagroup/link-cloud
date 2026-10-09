@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Headers = headers,
-                    Key = KafkaKeys.ForAudit(model.FacilityId, model.PatientId, serviceName),
+                    Key = model.FacilityId ?? "",
                     Value = model
                 }, cancellationToken);
             }

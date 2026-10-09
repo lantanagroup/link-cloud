@@ -63,14 +63,14 @@ public class ValidationCompleteListenerTests
             Times.Once);
 
         harness.Producer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 nameof(KafkaTopic.SubmitPayload),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForPatient(FacilityId, PatientId) &&
                     m.Value.FacilityId == FacilityId &&
                     m.Value.PatientId == PatientId &&
                     m.Value.ReportScheduleId == harness.ReportId),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -171,6 +171,13 @@ public class ValidationCompleteListenerTests
 
             var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
+            Producer
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue>());
+
             var submitPayloadProducer = new SubmitPayloadProducer(
                 scopeFactory,
                 Producer.Object,
@@ -182,6 +189,7 @@ public class ValidationCompleteListenerTests
                 Mock.Of<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(),
                 Mock.Of<IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(),
                 submitPayloadProducer,
+                new PayloadSubmittedSignalProducer(Mock.Of<IProducer<string, PayloadSubmittedValue>>()),
                 scopeFactory,
                 new ServiceInformation { ServiceConfigName = "Report" },
                 new BlobStorageService(blobSettings),

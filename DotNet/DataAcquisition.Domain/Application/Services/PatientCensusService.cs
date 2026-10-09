@@ -364,7 +364,7 @@ public class PatientCensusService : IPatientCensusService
 
             var produceMessage = new Message<string, PatientListMessage>
             {
-                Key = KafkaKeys.ForFacility(log.FacilityId),
+                Key = log.FacilityId,
                 Value = new PatientListMessage
                 {
                     FacilityId = log.FacilityId,

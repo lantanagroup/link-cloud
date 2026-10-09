@@ -384,7 +384,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
         services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
         services.AddTransient<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
-        services.AddTransient<IKafkaConsumerFactory<string, ReadyToAcquire>, KafkaConsumerFactory<string, ReadyToAcquire>>();
+        services.AddTransient<IKafkaConsumerFactory<long, ReadyToAcquire>, KafkaConsumerFactory<long, ReadyToAcquire>>();
 
         //Validation
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
@@ -403,7 +403,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, MappingOutcomeEvaluatedValue>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
-        services.RegisterKafkaProducer<string, ReadyToAcquire>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, CernerPatientsAcquired>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
@@ -413,7 +413,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<string, ResourcesAcquired>, KafkaProducerFactory<string, ResourcesAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
-        services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
+        services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
         services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();
 
         //Factories - Application

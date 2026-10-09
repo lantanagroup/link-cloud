@@ -148,13 +148,19 @@ public class PayloadSubmittedListener(
 
             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
             {
-                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == patientId && e.ReportScheduleId == reportTrackingId, cancellationToken);
+                // Submission off: ValidationComplete already stored NotSubmitted and sent this
+                // event only so the manifest check stays on the report key. Do not mark the
+                // entry submitted. Nothing was copied to the external container.
+                if (reportSchedule.EnableSubmission)
+                {
+                    var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == patientId && e.ReportScheduleId == reportTrackingId, cancellationToken);
 
-                reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
-                reportEntry.SubmitReportDateTime = DateTime.UtcNow;
-                reportEntry.ModifyDate = DateTime.UtcNow;
-                database.ReportEntryRepository.Update(reportEntry);
-                await database.SaveChangesAsync(cancellationToken);
+                    reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
+                    reportEntry.SubmitReportDateTime = DateTime.UtcNow;
+                    reportEntry.ModifyDate = DateTime.UtcNow;
+                    database.ReportEntryRepository.Update(reportEntry);
+                    await database.SaveChangesAsync(cancellationToken);
+                }
 
                 await reportManifestProducer.Produce(reportSchedule, correlationId, cancellationToken);
             }

@@ -123,7 +123,7 @@ public class CernerCclExtractProcessorTests
         _kafkaProducerMock.Verify(p => p.ProduceAsync(
             nameof(KafkaTopic.CernerPatientsAcquired),
             It.Is<Message<string, CernerPatientsAcquired>>(m =>
-                m.Key == KafkaKeys.ForFacility("TestFacility") &&
+                m.Key == "TestFacility" &&
                 m.Value.FacilityId == "TestFacility" &&
                 m.Value.PatientEncounters.Count == 1 &&
                 m.Value.PatientEncounters[0].PatientId == "12345"),

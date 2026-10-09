@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
 
                     await _producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
                     {
-                        Key = KafkaKeys.ForAudit(auditEvent.FacilityId, null, NotificationConstants.ServiceName),
+                        Key = facilityId ?? string.Empty,
                         Value = auditEvent,
                         Headers = headers
                     });

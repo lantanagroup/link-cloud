@@ -32,6 +32,20 @@ public static class KafkaKeys
     }
 
     /// <summary>
+    /// One key for every completion of a report. PayloadSubmitted and the manifest
+    /// SubmitPayload use this so the last-patient check runs on one consumer.
+    /// </summary>
+    public static string ForReport(string? facilityId, Guid reportScheduleId)
+    {
+        if (string.IsNullOrEmpty(facilityId))
+        {
+            throw new ArgumentException("Facility id is required.", nameof(facilityId));
+        }
+
+        return LinkMessageKey.SerializeReport(facilityId, reportScheduleId);
+    }
+
+    /// <summary>
     /// Key for a message that has neither a facility nor a patient, such as a service health check.
     /// </summary>
     public static string ForService(string? serviceName)

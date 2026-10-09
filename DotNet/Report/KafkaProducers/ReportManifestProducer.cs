@@ -130,109 +130,54 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            // One winner across pods. A live claim is retried. An emitted row is done.
-            var claimToken = Guid.NewGuid();
-            var claim = await _reportScheduleManager.TryClaimManifestAsync(schedule.Id, claimToken, cancellationToken);
-            if (claim == ManifestClaimResult.AlreadyEmitted)
-            {
-                return false;
-            }
+            // PayloadSubmitted is keyed by facility and report schedule, so one consumer
+            // sees this report's completions in order. The last one finds a zero count.
+            List<Resource> manifestResources = await Generate(schedule, cancellationToken);
 
-            if (claim == ManifestClaimResult.Held)
-            {
-                throw new TransientException($"Report manifest is already claimed (ReportId = {schedule.Id}).");
-            }
-
-            var committed = false;
+            Uri? payloadUri;
             try
             {
-                List<Resource> manifestResources = await Generate(schedule, cancellationToken);
-                if (!await _reportScheduleManager.RenewManifestClaimAsync(schedule.Id, claimToken, cancellationToken))
-                {
-                    throw new TransientException($"Report manifest claim was lost before upload (ReportId = {schedule.Id}).");
-                }
-
-                Uri? payloadUri;
-                try
-                {
-                    payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
-                }
-                catch (Exception ex)
-                {
-                    await ReleaseManifestClaimQuietly(schedule.Id, claimToken, cancellationToken);
-                    _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id.SanitizeForLog(), schedule.FacilityId.SanitizeForLog());
-                    AuditEventMessage auditEvent = new()
-                    {
-                        FacilityId = schedule.FacilityId,
-                        CorrelationId = correlationId,
-                        EventDate = DateTime.UtcNow,
-                        Notes = $"Failed to upload to blob storage: {ex}"
-                    };
-                    await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
-                    throw new TransientException($"Failed to upload report manifest (ReportId = {schedule.Id}).", ex);
-                }
-
-                _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
-
-                if (schedule.EnableSubmission)
-                {
-                    if (!await _reportScheduleManager.RenewManifestClaimAsync(schedule.Id, claimToken, cancellationToken))
-                    {
-                        throw new TransientException($"Report manifest claim was lost before submission (ReportId = {schedule.Id}).");
-                    }
-
-                    _logger.LogDebug("Producing report manifest to Kafka (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
-                    try
-                    {
-                        await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
-                            payloadUri: payloadUri?.ToString(), cancellationToken: CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        await ReleaseManifestClaimQuietly(schedule.Id, claimToken, cancellationToken);
-                        throw new TransientException($"Failed to produce the report manifest submission (ReportId = {schedule.Id}).", ex);
-                    }
-                }
-                else
-                {
-                    schedule.Status = ScheduleStatus.CompletedNotSubmitted;
-                    await _reportScheduleManager.UpdateAsync(schedule, cancellationToken);
-                    _logger.LogDebug("Report manifest submission is disabled (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
-                }
-
-                if (!await _reportScheduleManager.MarkManifestEmittedAsync(schedule.Id, claimToken, CancellationToken.None))
-                {
-                    throw new TransientException($"Report manifest claim was lost before it was marked emitted (ReportId = {schedule.Id}).");
-                }
-
-                committed = true;
-                return true;
-            }
-            catch (TransientException)
-            {
-                throw;
-            }
-            catch (Exception)
-            {
-                if (!committed)
-                {
-                    await ReleaseManifestClaimQuietly(schedule.Id, claimToken, cancellationToken);
-                }
-
-                throw;
-            }
-        }
-
-        private async Task ReleaseManifestClaimQuietly(Guid reportScheduleId, Guid claimToken, CancellationToken cancellationToken)
-        {
-            try
-            {
-                await _reportScheduleManager.ReleaseManifestClaimAsync(reportScheduleId, claimToken, cancellationToken);
+                payloadUri = await _blobStorageService.UploadManifestAsync(schedule, manifestResources);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to release the report manifest claim (ReportId = {ReportId}).", reportScheduleId.SanitizeForLog());
+                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id.SanitizeForLog(), schedule.FacilityId.SanitizeForLog());
+                AuditEventMessage auditEvent = new()
+                {
+                    FacilityId = schedule.FacilityId,
+                    CorrelationId = correlationId,
+                    EventDate = DateTime.UtcNow,
+                    Notes = $"Failed to upload to blob storage: {ex}"
+                };
+                await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
+                throw new TransientException($"Failed to upload report manifest (ReportId = {schedule.Id}).", ex);
             }
+
+            _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
+
+            if (schedule.EnableSubmission)
+            {
+                _logger.LogDebug("Producing report manifest to Kafka (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
+                try
+                {
+                    // Do not cancel the delivery wait. A cancelled caller can still leave the
+                    // record on the broker, and a retry would upload the manifest again.
+                    await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
+                        payloadUri: payloadUri?.ToString(), cancellationToken: CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    throw new TransientException($"Failed to produce the report manifest submission (ReportId = {schedule.Id}).", ex);
+                }
+            }
+            else
+            {
+                schedule.Status = ScheduleStatus.CompletedNotSubmitted;
+                await _reportScheduleManager.UpdateAsync(schedule, cancellationToken);
+                _logger.LogDebug("Report manifest submission is disabled (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
+            }
+
+            return true;
         }
 
         private Device CreateDevice()

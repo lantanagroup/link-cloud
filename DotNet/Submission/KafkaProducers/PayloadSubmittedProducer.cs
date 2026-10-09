@@ -13,9 +13,7 @@ public class PayloadSubmittedProducer(IProducer<string, PayloadSubmittedValue> p
         if (correlationId == null)
             correlationId = Guid.NewGuid().ToString();
 
-        var key = string.IsNullOrWhiteSpace(patientId)
-            ? KafkaKeys.ForFacility(facilityId)
-            : KafkaKeys.ForPatient(facilityId, patientId);
+        var key = KafkaKeys.ForReport(facilityId, reportScheduleId);
 
         try
         {

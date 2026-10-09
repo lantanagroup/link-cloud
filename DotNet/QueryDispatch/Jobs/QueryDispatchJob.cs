@@ -131,7 +131,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
             _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
-                Key = KafkaKeys.ForAudit(auditMessage.FacilityId, auditMessage.PatientId, QueryDispatchConstants.ServiceName),
                 Value = auditMessage,
                 Headers = headers
             });

@@ -259,7 +259,7 @@ public class DmrpNightlyJobEndToEndTests : IAsyncLifetime
         values.Single(v => v.Frequency == "Monthly").ReportTypes.Should().BeEquivalentTo(["NHSNdQMHTCDI"]);
         values.Single(v => v.Frequency == "Daily").ReportTypes.Should().BeEquivalentTo(["NHSNdQMHOB"]);
         values.Should().OnlyContain(v => v.StartDate == new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc));
-        _produced.Should().OnlyContain(m => m.Key == KafkaKeys.ForFacility(FacilityId));
+        _produced.Should().OnlyContain(m => m.Key == FacilityId);
     }
 
     [Fact]
