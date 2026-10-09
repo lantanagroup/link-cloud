@@ -74,8 +74,10 @@ public class MorningFixesGuardTests
         css.Should().Contain("--au-success-rgb: 40, 167, 69;");
         File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "chart-palette.js"))
             .Should().Contain("getPropertyValue(\"--au-success\")");
-        File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "kafka-ops.js"))
-            .Should().Contain("getPropertyValue(\"--au-success\")");
+        // Kafka charts use one neutral grey, so they carry no success green at all.
+        var kafkaScript = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "kafka-ops.js"));
+        kafkaScript.Should().Contain("#6c757d");
+        kafkaScript.Should().NotContain("--au-success");
     }
 
     [Fact]
