@@ -547,7 +547,7 @@ public sealed class KafkaOpsFixture
         });
     }
 
-    public KafkaOpsCall<KafkaBrowsePage> Messages(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null)
+    public KafkaOpsCall<KafkaBrowsePage> Messages(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null, string? resume = null, long? until = null, string? correlation = null)
     {
         var cleanMode = (mode ?? "").Trim().ToLowerInvariant();
         if (cleanMode.Length == 0)
@@ -556,7 +556,7 @@ public sealed class KafkaOpsFixture
             return Fail<KafkaBrowsePage>("Mode must be newest, oldest, from-offset, or since.");
         if (limit < 1 || limit > KafkaBrowseLimits.MaxLimit)
             return Fail<KafkaBrowsePage>("Limit must be from 1 to 50.");
-        if (cleanMode == "from-offset" && offset is null)
+        if (cleanMode == "from-offset" && offset is null && string.IsNullOrWhiteSpace(resume))
             return Fail<KafkaBrowsePage>("From offset needs an offset.");
         if (cleanMode == "since" && timestamp is null)
             return Fail<KafkaBrowsePage>("Since time needs a timestamp.");
@@ -566,40 +566,69 @@ public sealed class KafkaOpsFixture
             return Fail<KafkaBrowsePage>(admission.Reason);
 
         var result = SamplePage(admission.Topic, cleanMode);
-        if (string.Equals(key, "cap", StringComparison.Ordinal))
+        var capped = string.Equals(key, "cap", StringComparison.Ordinal);
+        int? targeted = null;
+        if (!capped && KafkaBrowseTarget.TryPartition(key, 3, out var onlyPartition))
+            targeted = onlyPartition;
+        if (capped)
         {
-            result.Metadata.CapHit = true;
-            result.Metadata.Truncated = true;
             if (result.Records.Count > 0)
                 result.Records[0].Truncated = true;
+        }
+        else if (targeted is int only)
+        {
+            result.Records = result.Records.Where(record => record.Partition == only).ToList();
         }
         else if (!string.IsNullOrEmpty(key))
         {
             result.Records = result.Records.Where(record => (record.Key ?? "").Contains(key, StringComparison.Ordinal)).ToList();
         }
 
+        if (!string.IsNullOrEmpty(correlation))
+        {
+            result.Records = result.Records.Where(record =>
+                string.Equals(record.Link.CorrelationId, correlation, StringComparison.OrdinalIgnoreCase)
+                || record.Headers.Any(item => item.Value.Contains(correlation, StringComparison.OrdinalIgnoreCase))).ToList();
+        }
+
         if (!string.IsNullOrEmpty(headerName) && !string.IsNullOrEmpty(headerValue))
         {
-            result.Records = result.Records.Where(record => record.Headers.Any(header =>
-                string.Equals(header.Name, headerName, StringComparison.OrdinalIgnoreCase)
-                && header.Value.Contains(headerValue, StringComparison.Ordinal))).ToList();
+            result.Records = result.Records.Where(record => record.Headers.Any(item =>
+                string.Equals(item.Name, headerName, StringComparison.OrdinalIgnoreCase)
+                && item.Value.Contains(headerValue, StringComparison.Ordinal))).ToList();
         }
 
         if (partitions.Count > 0)
             result.Records = result.Records.Where(record => partitions.Contains(record.Partition)).ToList();
-        var produced = ProducedFor(admission.Topic, partitions, key, headerName, headerValue);
+        var produced = ProducedFor(admission.Topic, partitions, targeted is int ? "" : key, headerName, headerValue);
+        if (targeted is int producedPartition)
+            produced = produced.Where(record => record.Partition == producedPartition).ToList();
         if (produced.Count > 0)
             result.Records.InsertRange(0, produced);
-        result.Records = result.Records.Where(record => KafkaMessageWindow.Matches(record, text, key, header, valueContains, messageType, from, to)).ToList();
+        result.Records = result.Records.Where(record => KafkaMessageWindow.Matches(record, text, targeted is int || capped ? null : key, header, valueContains, messageType, from, to)).ToList();
+        if (until is long end)
+            result.Records = result.Records.Where(record => record.TimestampUnixMs <= end).ToList();
         if (cleanMode == "oldest")
             result.Records = result.Records.OrderBy(record => record.TimestampUnixMs).ThenBy(record => record.Offset).ToList();
         else
             result.Records = result.Records.OrderByDescending(record => record.TimestampUnixMs).ThenByDescending(record => record.Offset).ToList();
         result.Metadata.Total = result.Records.Count;
+        result.Metadata.Scanned = result.Records.Count;
         var size = KafkaMessageWindow.Size(limit);
         var number = page < 1 ? 1 : page;
+        if (!string.IsNullOrWhiteSpace(resume) || !string.IsNullOrWhiteSpace(correlation) || targeted is int || from is not null || until is not null)
+            number = 1;
         result.Records = result.Records.Skip((number - 1) * size).Take(size).ToList();
         result.Metadata.Returned = result.Records.Count;
+        if (capped)
+        {
+            result.Metadata.CapHit = true;
+            result.Metadata.Truncated = true;
+            result.Metadata.Scanned = 200;
+            result.Metadata.More = true;
+            result.Metadata.Resume = "0:121";
+        }
+
         return Ok(result);
     }
 
@@ -707,12 +736,13 @@ public sealed class KafkaOpsFixture
             new() { Name = "X-Exception-Service", Value = "Normalization" }
         };
         var second = Record(topic, 1, 88, 1_709_999_000_000, key, failedValue, failedHeaders, false);
+        var third = Record(topic, 2, 10, 1_709_998_000_000, key, value, headers, false);
         return new KafkaBrowsePage
         {
             Topic = topic,
             Mode = mode,
-            Records = [first, second],
-            Metadata = new KafkaBrowseMetadata { Returned = 2, ElapsedMs = 42 }
+            Records = [first, second, third],
+            Metadata = new KafkaBrowseMetadata { Returned = 3, ElapsedMs = 42 }
         };
     }
 

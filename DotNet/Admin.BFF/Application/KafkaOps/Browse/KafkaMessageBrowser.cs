@@ -20,6 +20,15 @@ public sealed class KafkaBrowseRequest
     public string HeaderName { get; init; } = "";
     public string HeaderValue { get; init; } = "";
     public int? ByteBudget { get; init; }
+    public long? UntilUnixMs { get; init; }
+    public string Resume { get; init; } = "";
+    public string CorrelationId { get; init; } = "";
+    public int? ScanBatch { get; init; }
+}
+
+public interface IKafkaCorrelationLog
+{
+    IReadOnlyList<string> Lines(string correlationId);
 }
 
 public sealed class KafkaBrowseBusyException : KafkaOpsRejectedException
@@ -49,6 +58,7 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
     private readonly IMigrationStore? _store;
     private readonly IProducer<string, AuditEventMessage>? _audit;
     private readonly ILogger<KafkaMessageBrowser> _logger;
+    private readonly IKafkaCorrelationLog? _logs;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public KafkaMessageBrowser(
@@ -56,13 +66,15 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
         IKafkaBrokerGateway gateway,
         ILogger<KafkaMessageBrowser> logger,
         IEnumerable<IProducer<string, AuditEventMessage>> audit,
-        IMigrationStore? store = null)
+        IMigrationStore? store = null,
+        IEnumerable<IKafkaCorrelationLog>? logs = null)
     {
         _sessions = sessions;
         _gateway = gateway;
         _logger = logger;
         _store = store;
         _audit = audit.FirstOrDefault();
+        _logs = logs?.FirstOrDefault();
     }
 
     public Task<KafkaBrowsePage> ReadAsync(KafkaBrowseRequest request, CancellationToken cancellationToken) =>
@@ -187,10 +199,19 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
         if (described.Count > KafkaBrowseLimits.MaxPartitions && prepared.Partitions.Count == 0)
             throw new KafkaOpsRejectedException("This topic has too many partitions to browse at once. Choose at most " + KafkaBrowseLimits.MaxPartitions + ".");
 
-        var selected = prepared.Partitions.Count == 0
+        var located = LocateCorrelation(prepared);
+        var chosen = prepared.Partitions.ToList();
+        if (located is KafkaCorrelationHit found)
+            chosen = [found.Partition];
+        else if (chosen.Count == 0 && prepared.Resume.Count > 0)
+            chosen = prepared.Resume.Keys.ToList();
+        else if (chosen.Count == 0 && KafkaBrowseTarget.TryPartition(prepared.Key, described.Count, out var targeted))
+            chosen = [targeted];
+
+        var selected = chosen.Count == 0
             ? described
-            : described.Where(partition => prepared.Partitions.Contains(partition.Id)).ToList();
-        var missing = prepared.Partitions.Where(id => described.All(partition => partition.Id != id)).ToList();
+            : described.Where(partition => chosen.Contains(partition.Id)).ToList();
+        var missing = chosen.Where(id => described.All(partition => partition.Id != id)).ToList();
         if (missing.Count > 0)
             throw new KafkaOpsRejectedException("Partition " + missing[0] + " is not on that topic.");
 
@@ -198,16 +219,28 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
         foreach (var partition in selected)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var start = StartOffset(session, prepared, partition);
+            var start = located is KafkaCorrelationHit hit && hit.Partition == partition.Id
+                ? hit.Offset
+                : StartOffset(session, prepared, partition);
             if (start is null || start.Value >= partition.High)
                 continue;
+            if (start.Value < partition.Low)
+                start = partition.Low;
             seeks.Add(new KafkaBrowseSeek { Topic = prepared.Topic, Partition = partition.Id, Offset = start.Value });
         }
 
         var collected = new List<KafkaBrowseRecord>();
-        var capHit = false;
+        var hitBytes = false;
+        var hitScan = false;
+        var timedOut = false;
         var scanned = 0;
         var bytes = 0;
+        var sawEnd = new HashSet<int>();
+        var next = seeks.ToDictionary(seek => seek.Partition, seek => seek.Offset);
+        var highs = described.ToDictionary(partition => partition.Id, partition => partition.High);
+        var filtered = prepared.Filtered;
+        var matchGoal = filtered ? prepared.ScanBatch : prepared.Limit;
+        var readWindow = prepared.Mode == "newest" && !filtered && located is null;
         if (seeks.Count > 0)
         {
             try
@@ -221,14 +254,13 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
             }
 
             var open = seeks.Select(seek => seek.Partition).ToHashSet();
-            var newest = prepared.Mode == "newest";
-            while (open.Count > 0 && (newest || collected.Count < prepared.Limit))
+            while (open.Count > 0 && (readWindow || collected.Count < matchGoal))
             {
                 if (cancellationToken.IsCancellationRequested)
                     throw new OperationCanceledException(cancellationToken);
                 if (timeout.IsCancellationRequested)
                 {
-                    capHit = true;
+                    timedOut = true;
                     break;
                 }
 
@@ -248,30 +280,54 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
                     if (cancellationToken.IsCancellationRequested)
                         throw new OperationCanceledException(cancellationToken);
                     if (timeout.IsCancellationRequested)
-                        capHit = true;
+                        timedOut = true;
                     break;
                 }
 
                 if (polled.EndOfPartition || !open.Contains(polled.Partition))
                 {
+                    sawEnd.Add(polled.Partition);
+                    if (highs.TryGetValue(polled.Partition, out var endAt))
+                        next[polled.Partition] = endAt;
+                    open.Remove(polled.Partition);
+                    continue;
+                }
+
+                if (prepared.UntilUnixMs is long until && polled.TimestampUnixMs > until)
+                {
+                    sawEnd.Add(polled.Partition);
+                    next[polled.Partition] = highs.TryGetValue(polled.Partition, out var endAt) ? endAt : polled.Offset;
+                    open.Remove(polled.Partition);
+                    continue;
+                }
+
+                if (prepared.Resume.TryGetValue(polled.Partition, out var cursor) && cursor.Stop is long stopAt && polled.Offset >= stopAt)
+                {
+                    sawEnd.Add(polled.Partition);
+                    next[polled.Partition] = stopAt;
                     open.Remove(polled.Partition);
                     continue;
                 }
 
                 scanned++;
-                var size = polled.Value?.Length ?? 0;
-                if (scanned > KafkaBrowseLimits.MaxScanned || bytes >= prepared.ByteBudget)
+                var overBatch = filtered && scanned > prepared.ScanBatch;
+                var overHard = scanned > KafkaBrowseLimits.MaxScanned;
+                if (overBatch || overHard || bytes >= prepared.ByteBudget)
                 {
-                    capHit = true;
+                    hitScan = overBatch || (overHard && filtered);
+                    hitBytes = bytes >= prepared.ByteBudget;
+                    next[polled.Partition] = polled.Offset;
                     break;
                 }
 
+                var size = polled.Value?.Length ?? 0;
                 bytes += size;
+                next[polled.Partition] = polled.Offset + 1;
                 if (!Matches(polled, prepared))
                 {
                     if (bytes > prepared.ByteBudget)
                     {
-                        capHit = true;
+                        hitBytes = true;
                         break;
                     }
 
@@ -286,16 +342,16 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
                     var keep = Math.Max(0, shown.Length - over);
                     shown = Prefix(shown, keep);
                     truncated = true;
-                    capHit = true;
+                    hitBytes = true;
                 }
 
                 collected.Add(ToRecord(prepared.Topic, polled, shown, size, truncated));
-                if (capHit)
+                if (hitBytes || located is not null)
                     break;
             }
         }
 
-        if (prepared.Mode == "newest")
+        if (readWindow)
         {
             collected = collected
                 .OrderByDescending(record => record.TimestampUnixMs)
@@ -304,6 +360,24 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
                 .ToList();
         }
 
+        var capHit = false;
+        var resume = new Dictionary<int, KafkaBrowseCursor>();
+        foreach (var seek in seeks)
+        {
+            var high = highs.TryGetValue(seek.Partition, out var mark) ? mark : seek.Offset;
+            var nextOffset = next.TryGetValue(seek.Partition, out var at) ? at : seek.Offset;
+            var reachedEnd = sawEnd.Contains(seek.Partition) || nextOffset >= high;
+            if (KafkaBrowseStop.IsCap(hitBytes, hitScan, reachedEnd, timedOut, nextOffset, high))
+                capHit = true;
+            if (!filtered)
+                continue;
+            if (!reachedEnd)
+                resume[seek.Partition] = new KafkaBrowseCursor(nextOffset, null);
+            else if (prepared.Mode == "newest" && seek.Offset > 0)
+                resume[seek.Partition] = new KafkaBrowseCursor(Math.Max(0, seek.Offset - prepared.ScanBatch), seek.Offset);
+        }
+
+        var more = filtered && resume.Count > 0;
         return new KafkaBrowsePage
         {
             Topic = prepared.Topic,
@@ -314,15 +388,34 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
                 Returned = collected.Count,
                 Truncated = capHit || collected.Any(record => record.Truncated),
                 CapHit = capHit,
+                Scanned = scanned,
+                More = more,
+                Resume = more ? KafkaBrowseResume.Format(resume) : "",
                 ElapsedMs = started.ElapsedMilliseconds
             }
         };
+    }
+
+    private KafkaCorrelationHit? LocateCorrelation(PreparedBrowse prepared)
+    {
+        if (prepared.CorrelationId.Length == 0 || _logs is null)
+            return null;
+        foreach (var line in _logs.Lines(prepared.CorrelationId))
+        {
+            if (KafkaCorrelationLog.TryHit(line, prepared.CorrelationId, out var hit)
+                && string.Equals(hit.Topic, prepared.Topic, StringComparison.OrdinalIgnoreCase))
+                return hit;
+        }
+
+        return null;
     }
 
     private static long? StartOffset(IKafkaBrowseSession session, PreparedBrowse prepared, KafkaBrowsePartition partition)
     {
         if (partition.High <= partition.Low)
             return null;
+        if (prepared.Resume.TryGetValue(partition.Id, out var resumeAt))
+            return resumeAt.Start < partition.Low ? partition.Low : resumeAt.Start;
         if (prepared.Mode == "oldest")
             return partition.Low;
         if (prepared.Mode == "from-offset")
@@ -341,7 +434,16 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
             return Math.Max(partition.Low, at.Value);
         }
 
-        var window = Math.Max(prepared.Limit, 1);
+        if (prepared.UntilUnixMs is long untilMs)
+        {
+            var at = session.OffsetForTime(prepared.Topic, partition.Id, untilMs);
+            var end = at ?? partition.High;
+            if (end <= partition.Low)
+                return null;
+            return Math.Max(partition.Low, end - prepared.ScanBatch);
+        }
+
+        var window = prepared.Filtered ? prepared.ScanBatch : Math.Max(prepared.Limit, 1);
         return Math.Max(partition.Low, partition.High - window);
     }
 
@@ -420,10 +522,27 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
             throw new KafkaOpsRejectedException("Choose at most " + KafkaBrowseLimits.MaxPartitions + " partitions.");
         if (request.Partitions.Any(partition => partition < 0))
             throw new KafkaOpsRejectedException("A partition id cannot be negative.");
-        if (mode == "from-offset" && request.Offset is null)
+        var resume = KafkaBrowseResume.Parse(request.Resume);
+        if (mode == "from-offset" && request.Offset is null && resume.Count == 0)
             throw new KafkaOpsRejectedException("From offset needs an offset.");
         if (mode == "since" && request.TimestampUnixMs is null)
             throw new KafkaOpsRejectedException("Since time needs a timestamp.");
+
+        var correlation = (request.CorrelationId ?? "").Trim();
+        var headerName = request.HeaderName ?? "";
+        var headerValue = request.HeaderValue ?? "";
+        if (correlation.Length > 0 && headerName.Length == 0)
+        {
+            headerName = "X-Correlation-Id";
+            headerValue = correlation;
+        }
+
+        var batch = request.ScanBatch ?? KafkaBrowseLimits.ScanBatch;
+        if (batch < 1 || batch > KafkaBrowseLimits.MaxScanBatch)
+            batch = KafkaBrowseLimits.ScanBatch;
+        var key = request.Key ?? "";
+        var filtered = key.Length > 0 || headerName.Length > 0 || headerValue.Length > 0 || correlation.Length > 0 || resume.Count > 0
+            || mode == "since" || request.UntilUnixMs is not null;
 
         var backups = await BackupNamesAsync(cancellationToken);
         var admission = KafkaBrowseAllowList.Admit(request.Topic, backups);
@@ -437,11 +556,16 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
             Partitions = request.Partitions.Distinct().ToList(),
             Offset = request.Offset,
             TimestampUnixMs = request.TimestampUnixMs,
+            UntilUnixMs = request.UntilUnixMs,
             Limit = request.Limit,
-            Key = request.Key ?? "",
-            HeaderName = request.HeaderName ?? "",
-            HeaderValue = request.HeaderValue ?? "",
-            ByteBudget = budget
+            Key = key,
+            HeaderName = headerName,
+            HeaderValue = headerValue,
+            ByteBudget = budget,
+            Resume = resume,
+            CorrelationId = correlation,
+            ScanBatch = batch,
+            Filtered = filtered
         };
     }
 
@@ -520,5 +644,10 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
         public string HeaderName { get; init; } = "";
         public string HeaderValue { get; init; } = "";
         public int ByteBudget { get; init; }
+        public long? UntilUnixMs { get; init; }
+        public Dictionary<int, KafkaBrowseCursor> Resume { get; init; } = [];
+        public string CorrelationId { get; init; } = "";
+        public int ScanBatch { get; init; } = KafkaBrowseLimits.ScanBatch;
+        public bool Filtered { get; init; }
     }
 }

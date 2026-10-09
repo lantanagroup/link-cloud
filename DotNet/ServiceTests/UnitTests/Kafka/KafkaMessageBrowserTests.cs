@@ -132,6 +132,81 @@ public class KafkaMessageBrowserTests
     }
 
     [Fact]
+    public async Task Read_DoesNotCallTheEndOfASmallTopicACap()
+    {
+        var sessions = new FakeSessions();
+        sessions.Session.Partitions.Add(Partition(0, 0, 2));
+        sessions.Session.Queue.Add(Polled(0, 0, 10, "a"));
+        sessions.Session.Queue.Add(Polled(0, 1, 11, "b"));
+        sessions.Session.Queue.Add(End(0));
+        var browser = Browser(sessions);
+
+        var page = await browser.ReadAsync(Request("newest", limit: 25), CancellationToken.None);
+
+        Assert.Equal(2, page.Metadata.Returned);
+        Assert.False(page.Metadata.CapHit);
+        Assert.False(page.Metadata.More);
+        Assert.Equal("", page.Metadata.Resume);
+    }
+
+    [Fact]
+    public async Task Read_TargetsThePartitionOfAPatientKey()
+    {
+        var key = KafkaKeys.ForPatient("facility-proof", "patient-proof");
+        var sessions = new FakeSessions();
+        sessions.Session.Partitions.Add(Partition(0, 0, 8));
+        sessions.Session.Partitions.Add(Partition(1, 0, 8));
+        sessions.Session.Partitions.Add(Partition(2, 0, 8));
+        sessions.Session.Partitions.Add(Partition(3, 0, 8));
+        var browser = Browser(sessions);
+
+        await browser.ReadAsync(Request("newest", limit: 10, key: key), CancellationToken.None);
+
+        Assert.Single(sessions.Session.Seeks);
+        Assert.Equal(KafkaMurmur.Partition(key, 4), sessions.Session.Seeks[0].Partition);
+    }
+
+    [Fact]
+    public async Task Read_UsesACorrelationLogHitBeforeScanning()
+    {
+        var sessions = new FakeSessions();
+        sessions.Session.Partitions.Add(Partition(0, 0, 40));
+        sessions.Session.Partitions.Add(Partition(1, 0, 40));
+        sessions.Session.Queue.Add(Polled(1, 12, 50, "k", headers:
+        [
+            new KafkaBrowseHeaderBytes { Name = "X-Correlation-Id", Value = Encoding.UTF8.GetBytes("33333333-3333-3333-3333-333333333333") }
+        ]));
+        sessions.Session.Queue.Add(End(1));
+        var logs = new FakeCorrelationLog("{\"correlationId\":\"33333333-3333-3333-3333-333333333333\",\"topic\":\"ResourcesAcquired\",\"partition\":1,\"offset\":12}");
+        var browser = new KafkaMessageBrowser(sessions, new Mock<IKafkaBrokerGateway>().Object, NullLogger<KafkaMessageBrowser>.Instance, Array.Empty<IProducer<string, AuditEventMessage>>(), null, [logs]);
+
+        var page = await browser.ReadAsync(Request("newest", limit: 10, correlation: "33333333-3333-3333-3333-333333333333"), CancellationToken.None);
+
+        Assert.Single(sessions.Session.Seeks);
+        Assert.Equal(1, sessions.Session.Seeks[0].Partition);
+        Assert.Equal(12, sessions.Session.Seeks[0].Offset);
+        Assert.Equal(12, page.Records[0].Offset);
+        Assert.False(page.Metadata.CapHit);
+    }
+
+    [Fact]
+    public void Stop_IgnoresEndOfPartitionAndATimeoutAfterTheHighWatermark()
+    {
+        Assert.False(KafkaBrowseStop.IsCap(false, false, true, true, 0, 5));
+        Assert.False(KafkaBrowseStop.IsCap(false, false, false, true, 2, 2));
+        Assert.True(KafkaBrowseStop.IsCap(false, false, false, true, 0, 5));
+        Assert.True(KafkaBrowseStop.IsCap(true, false, true, false, 2, 2));
+        Assert.Equal(10, KafkaBrowseResume.Parse("0:10:30,1:4")[0].Start);
+        Assert.Equal(30, KafkaBrowseResume.Parse("0:10:30")[0].Stop);
+        Assert.True(KafkaCorrelationLog.TryHit(
+            "correlation 33333333-3333-3333-3333-333333333333 topic ResourcesAcquired partition 2 offset 88",
+            "33333333-3333-3333-3333-333333333333",
+            out var hit));
+        Assert.Equal(2, hit.Partition);
+        Assert.Equal(88, hit.Offset);
+    }
+
+    [Fact]
     public async Task Read_StopsWhenCancelledAndDoesNotOpenASession()
     {
         var sessions = new FakeSessions();
@@ -315,7 +390,7 @@ public class KafkaMessageBrowserTests
             ? new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "pat")], "test"))
             : new ClaimsPrincipal(new ClaimsIdentity());
 
-        var result = await Call(endpoints, "GetMessages", user, "ResourcesAcquired", null, null, null, null, null, null, null, null, CancellationToken.None);
+        var result = await Call(endpoints, "GetMessages", user, "ResourcesAcquired", null, null, null, null, null, null, null, null, null, null, null, CancellationToken.None);
 
         Assert.Equal(status, await Status(result));
         browser.Verify(item => item.ReadAsync(It.IsAny<KafkaBrowseRequest>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -330,14 +405,32 @@ public class KafkaMessageBrowserTests
         sessions.Session.Queue.Add(End(0));
         var endpoints = new KafkaOpsEndpoints(Ops(true).Object, NullLogger<KafkaOpsEndpoints>.Instance, null, Browser(sessions));
 
-        var ok = await Call(endpoints, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, "fac<script>", null, null, new[] { 0 }, CancellationToken.None);
+        var ok = await Call(endpoints, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, "fac<script>", null, null, null, null, null, new[] { 0 }, CancellationToken.None);
         Assert.Equal(StatusCodes.Status200OK, await Status(ok));
 
-        var limit = await Call(endpoints, "GetMessages", Viewer(), "ResourcesAcquired", "oldest", null, null, (int?)0, null, null, null, null, CancellationToken.None);
+        var limit = await Call(endpoints, "GetMessages", Viewer(), "ResourcesAcquired", "oldest", null, null, (int?)0, null, null, null, null, null, null, null, CancellationToken.None);
         Assert.Equal(StatusCodes.Status400BadRequest, await Status(limit));
 
-        var unknown = await Call(endpoints, "GetMessages", Viewer(), "NotAPipelineTopic", "newest", null, null, null, null, null, null, null, CancellationToken.None);
+        var unknown = await Call(endpoints, "GetMessages", Viewer(), "NotAPipelineTopic", "newest", null, null, null, null, null, null, null, null, null, null, CancellationToken.None);
         Assert.Equal(StatusCodes.Status400BadRequest, await Status(unknown));
+
+        var key = KafkaKeys.ForPatient("facility-proof", "patient-proof");
+        sessions.Session.Partitions.Clear();
+        sessions.Session.Seeks.Clear();
+        sessions.Session.Queue.Clear();
+        sessions.Session.Partitions.Add(Partition(0, 0, 8));
+        sessions.Session.Partitions.Add(Partition(1, 0, 8));
+        sessions.Session.Partitions.Add(Partition(2, 0, 8));
+        sessions.Session.Partitions.Add(Partition(3, 0, 8));
+        var targeted = await Call(endpoints, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, (int?)10, key, null, null, null, null, null, null, CancellationToken.None);
+        Assert.Equal(StatusCodes.Status200OK, await Status(targeted));
+        Assert.Single(sessions.Session.Seeks);
+        Assert.Equal(KafkaMurmur.Partition(key, 4), sessions.Session.Seeks[0].Partition);
+
+        sessions.Session.Seeks.Clear();
+        var resumed = await Call(endpoints, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, (int?)10, null, null, null, "1:4", null, null, null, CancellationToken.None);
+        Assert.Equal(StatusCodes.Status200OK, await Status(resumed));
+        Assert.Contains(sessions.Session.Seeks, seek => seek.Partition == 1 && seek.Offset == 4);
     }
 
     [Fact]
@@ -347,16 +440,16 @@ public class KafkaMessageBrowserTests
         busyBrowser.Setup(item => item.ReadAsync(It.IsAny<KafkaBrowseRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KafkaBrowseBusyException());
         var busy = new KafkaOpsEndpoints(Ops(true).Object, NullLogger<KafkaOpsEndpoints>.Instance, null, busyBrowser.Object);
-        Assert.Equal(StatusCodes.Status409Conflict, await Status(await Call(busy, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, null, null, null, null, CancellationToken.None)));
+        Assert.Equal(StatusCodes.Status409Conflict, await Status(await Call(busy, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, null, null, null, null, null, null, null, CancellationToken.None)));
 
         var brokerBrowser = new Mock<IKafkaMessageBrowser>();
         brokerBrowser.Setup(item => item.ReadAsync(It.IsAny<KafkaBrowseRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KafkaBrowseBrokerException("The broker refused the read."));
         var broker = new KafkaOpsEndpoints(Ops(true).Object, NullLogger<KafkaOpsEndpoints>.Instance, null, brokerBrowser.Object);
-        Assert.Equal(StatusCodes.Status502BadGateway, await Status(await Call(broker, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, null, null, null, null, CancellationToken.None)));
+        Assert.Equal(StatusCodes.Status502BadGateway, await Status(await Call(broker, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, null, null, null, null, null, null, null, CancellationToken.None)));
 
         var missing = new KafkaOpsEndpoints(Ops(true).Object, NullLogger<KafkaOpsEndpoints>.Instance);
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, await Status(await Call(missing, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, null, null, null, null, CancellationToken.None)));
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, await Status(await Call(missing, "GetMessages", Viewer(), "ResourcesAcquired", "newest", null, null, null, null, null, null, null, null, null, null, CancellationToken.None)));
     }
 
     [Fact]
@@ -371,7 +464,7 @@ public class KafkaMessageBrowserTests
             .ReturnsAsync(new DeliveryResult<string, AuditEventMessage>());
         var endpoints = new KafkaOpsEndpoints(Ops(true).Object, NullLogger<KafkaOpsEndpoints>.Instance, null, Browser(sessions, [producer.Object]));
 
-        var exported = await Call(endpoints, "ExportMessages", Viewer(), "ResourcesAcquired", "oldest", null, null, (int?)25, null, null, null, null, CancellationToken.None);
+        var exported = await Call(endpoints, "ExportMessages", Viewer(), "ResourcesAcquired", "oldest", null, null, (int?)25, null, null, null, null, null, null, null, CancellationToken.None);
         var file = Assert.IsAssignableFrom<FileContentHttpResult>(exported);
         Assert.Contains("application/json", file.ContentType ?? "", StringComparison.Ordinal);
         Assert.Equal("ResourcesAcquired-messages.json", file.FileDownloadName);
@@ -427,7 +520,7 @@ public class KafkaMessageBrowserTests
     private static ClaimsPrincipal Viewer() =>
         new(new ClaimsIdentity([new Claim(ClaimTypes.Name, "pat")], "test"));
 
-    private static KafkaBrowseRequest Request(string mode, int limit, long? offset = null, long? timestamp = null, int[]? partitions = null, string key = "", int? byteBudget = null) =>
+    private static KafkaBrowseRequest Request(string mode, int limit, long? offset = null, long? timestamp = null, int[]? partitions = null, string key = "", int? byteBudget = null, string correlation = "") =>
         new()
         {
             Topic = "ResourcesAcquired",
@@ -437,21 +530,28 @@ public class KafkaMessageBrowserTests
             TimestampUnixMs = timestamp,
             Partitions = partitions ?? [],
             Key = key,
-            ByteBudget = byteBudget
+            ByteBudget = byteBudget,
+            CorrelationId = correlation
         };
 
     private static KafkaBrowsePartition Partition(int id, long low, long high) =>
         new() { Id = id, Low = low, High = high };
 
-    private static KafkaBrowsePolled Polled(int partition, long offset, long timestamp, string key, byte[]? value = null) =>
+    private static KafkaBrowsePolled Polled(int partition, long offset, long timestamp, string key, byte[]? value = null, List<KafkaBrowseHeaderBytes>? headers = null) =>
         new()
         {
             Partition = partition,
             Offset = offset,
             TimestampUnixMs = timestamp,
             Key = Encoding.UTF8.GetBytes(key),
-            Value = value ?? Encoding.UTF8.GetBytes("{\"ok\":true}")
+            Value = value ?? Encoding.UTF8.GetBytes("{\"ok\":true}"),
+            Headers = headers ?? []
         };
+
+    private sealed class FakeCorrelationLog(string line) : IKafkaCorrelationLog
+    {
+        public IReadOnlyList<string> Lines(string correlationId) => [line];
+    }
 
     private static KafkaBrowsePolled End(int partition) =>
         new() { Partition = partition, EndOfPartition = true };
