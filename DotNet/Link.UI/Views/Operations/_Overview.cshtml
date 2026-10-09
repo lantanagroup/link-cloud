@@ -55,7 +55,7 @@
                         <td>@(row.FullIsr ? "full" : "short")@(row.LeadersSkewed ? ", skewed" : "")</td>
                         <td>@row.SizeClass</td>
                         <td>@(row.LagKnown ? row.TotalLag.ToString() : "unknown")</td>
-                        <td>@row.ProduceRatePerSecond.ToString("0.###")</td>
+                        <td>@KafkaProduceRate.Text(row.ProduceRateKnown, row.ProduceRatePerSecond)</td>
                         <td>@row.MaxReplicas</td>
                         <td>
                             <a class="btn btn-sm btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i></a>
@@ -105,7 +105,7 @@
                 @foreach (var row in Model.Groups.Groups.OrderBy(item => item.GroupId, StringComparer.OrdinalIgnoreCase))
                 {
                     <tr>
-                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" /></td>
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
                         <td>@row.Members.Count</td>
                         <td>@row.TotalLag</td>

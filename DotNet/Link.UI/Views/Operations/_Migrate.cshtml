@@ -42,7 +42,7 @@
         <div class="card-body">
             <p>Id <partial name="_LabeledId" model="@(new LabeledId { Label = "Topic id", Value = detail.TopicId, Compact = true, CopyLabel = "Copy topic id" })" /></p>
             <p>@detail.Partitions partitions, RF @detail.ReplicationFactor, @(detail.FullIsr ? "full ISR" : "ISR short")@(detail.LeadersSkewed ? ", leaders skewed" : ""). Key @detail.KeyClass @detail.KeyShape.</p>
-            <p>@(detail.Slice1Eligible ? detail.Eligibility : detail.Eligibility)</p>
+            <p>@KafkaIncreaseEligibility.MigrationLine(detail.Eligibility, plan)</p>
             <p>Estimated records @detail.EstimatedRecords. @(detail.PartitionDrift ? "Live count differs from topics.txt (3)." : "Live count matches topics.txt.")</p>
             @if (detail.Held)
             {
@@ -117,7 +117,11 @@
 {
     <div class="alert alert-secondary mt-3" role="status">
         <p>@(plan.Accepted ? "Dry run accepted." : "Dry run refused.") @plan.Summary</p>
-        <p>Window @plan.WindowMinutes minutes. Alert at @plan.AlertMinutes minutes. Plan hash @plan.PlanHash.</p>
+        @if (MigrationDryRunText.ShowWindowLine(plan.Summary))
+        {
+            <p>Window @plan.WindowMinutes minutes. Alert at @plan.AlertMinutes minutes.</p>
+        }
+        <p>Plan hash @plan.PlanHash.</p>
         <p>Stop set: @string.Join(", ", plan.StopSet)</p>
         <p>Siblings grown before the stop: @string.Join(", ", plan.Siblings)</p>
         @foreach (var warning in plan.Warnings)
@@ -134,34 +138,45 @@
 
 @if (!string.IsNullOrWhiteSpace(topicName))
 {
-    <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations">
+    <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations" data-kafka-busy="Dry run is running.">
         @Html.AntiForgeryToken()
         <input type="hidden" name="topic" value="@topicName" />
         <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
-        <input type="hidden" name="planHash" value="@(plan?.PlanHash ?? "")" />
+        <input type="hidden" name="planHash" value="@(Model.HasDryRunSnapshot ? (string.IsNullOrEmpty(plan?.PlanHash) ? Model.DraftPlanHash : plan.PlanHash) : "")" />
+        <input type="hidden" name="hasDryRunSnapshot" value="@(Model.HasDryRunSnapshot ? "true" : "false")" />
+        <input type="hidden" name="dryRunPartitions" value="@Model.DryRunPartitions" />
+        <input type="hidden" name="dryRunBackupSkip" value="@(Model.DryRunBackupSkip ? "true" : "false")" />
+        <input type="hidden" name="dryRunBackupSkipAcknowledged" value="@(Model.DryRunBackupSkipAcknowledged ? "true" : "false")" />
+        <input type="hidden" name="dryRunAcknowledgedGroups" value="@string.Join(",", MigrationGroupList.Parse(Model.DryRunAcknowledgedGroups))" />
         <div class="col-6 col-md-3">
             <label class="form-label" for="migrate-partitions">Target partitions</label>
-            <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@((topic?.Partitions ?? 3) + 1)" />
+            <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@(Model.DraftPartitions > 0 ? Model.DraftPartitions : (topic?.Partitions ?? 3) + 1)" />
         </div>
         <div class="col-auto form-check mt-4">
-            <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" />
+            <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" @(Model.DraftBackupSkip ? "checked" : null) />
             <label class="form-check-label" for="migrate-skip">Skip backup</label>
         </div>
         <div class="col-auto form-check mt-4">
-            <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" />
+            <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" @(Model.DraftBackupSkipAcknowledged ? "checked" : null) />
             <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged</label>
+        </div>
+        <div class="col-12">
+            <label class="form-label" for="migrate-groups">Groups to drop offsets for</label>
+            <textarea class="form-control" id="migrate-groups" name="acknowledgedGroups" rows="2">@Model.DraftAcknowledgedGroups</textarea>
+            <p class="form-text mb-0">When a dry run says a group is inactive and has lag, type that group name here and dry run again. Separate names with commas or new lines.</p>
         </div>
         <div class="col-12 col-md-4">
             <label class="form-label" for="migrate-reason">Reason</label>
-            <input class="form-control" id="migrate-reason" name="reason" />
+            <input class="form-control" id="migrate-reason" name="reason" value="@Model.DraftReason" />
         </div>
         <div class="col-12 col-md-4">
             <label class="form-label" for="migrate-confirm">Type the topic name</label>
-            <input class="form-control" id="migrate-confirm" name="confirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
+            <input class="form-control" id="migrate-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
         </div>
         <div class="col-auto mt-4">
             <button class="btn btn-au-neutral" type="submit" formaction="/Operations/Kafka/migrations/plan">Dry run</button>
             <button class="btn btn-success" type="submit">Request</button>
+            <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
         </div>
     </form>
 }
