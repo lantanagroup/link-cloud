@@ -334,7 +334,7 @@ else
             <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
             @if (!Model.Topics.ReadOnly)
             {
-                <button class="btn btn-sm btn-success lu-icon-btn" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
+                <button class="btn btn-sm btn-au-execute lu-icon-btn" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
             }
         </div>
     </form>
@@ -365,7 +365,7 @@ else
                 <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                 @if (!Model.Topics.ReadOnly)
                 {
-                    <button class="btn btn-sm btn-success" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
+                    <button class="btn btn-sm btn-au-execute" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
                 }
             </div>
         </form>

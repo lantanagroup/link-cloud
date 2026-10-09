@@ -145,7 +145,7 @@ public class DataAcquisitionLogsTests
         foreach (var searchPage in new[] { "Acquisition", "Audit", "Sftp" })
         {
             Read($"DotNet/Link.UI/Views/Logs/{searchPage}.cshtml")
-                .Should().Contain("btn btn-success\"><i class=\"bi bi-search me-1\"></i>Search");
+                .Should().Contain("btn btn-au-execute\"><i class=\"bi bi-search me-1\"></i>Search");
         }
 
         var live = Read("DotNet/Link.UI/wwwroot/js/live-region.js");
