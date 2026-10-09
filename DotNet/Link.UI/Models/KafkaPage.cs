@@ -128,7 +128,17 @@ public sealed record ThroughputKafkaPage
     public string DraftTopic { get; init; } = "";
     public int DraftPartitions { get; init; }
     public string DraftReason { get; init; } = "";
+    public string DraftAddBrokerReason { get; init; } = "";
     public string DraftConfirmation { get; init; } = "";
+    public bool DraftBackupSkip { get; init; }
+    public bool DraftBackupSkipAcknowledged { get; init; }
+    public string DraftAcknowledgedGroups { get; init; } = "";
+    public string DraftPlanHash { get; init; } = "";
+    public bool HasDryRunSnapshot { get; init; }
+    public int DryRunPartitions { get; init; }
+    public bool DryRunBackupSkip { get; init; }
+    public bool DryRunBackupSkipAcknowledged { get; init; }
+    public string DryRunAcknowledgedGroups { get; init; } = "";
     public bool DraftOverride { get; init; }
     public string DraftOverrideReason { get; init; } = "";
     public int DraftReplicas { get; init; }
@@ -149,7 +159,10 @@ public sealed record ThroughputKafkaPage
     {
         get
         {
-            var rates = ChartTopics.Select(row => new { label = row.Topic, value = row.ProduceRatePerSecond }).ToList();
+            var rates = ChartTopics
+                .Where(row => row.ProduceRateKnown)
+                .Select(row => new { label = row.Topic, value = row.ProduceRatePerSecond })
+                .ToList();
             var lags = ChartTopics.Select(row => new { label = row.Topic, value = (double)row.TotalLag }).ToList();
             if (Query.View == ThroughputKafkaPageQuery.Topic && Partitions.Count > 0)
             {
@@ -182,7 +195,13 @@ public sealed class KafkaMigrationForm
     public string? Confirmation { get; set; }
     public bool BackupSkip { get; set; }
     public bool BackupSkipAcknowledged { get; set; }
+    public string? AcknowledgedGroups { get; set; }
     public string? PlanHash { get; set; }
+    public bool HasDryRunSnapshot { get; set; }
+    public int DryRunPartitions { get; set; }
+    public bool DryRunBackupSkip { get; set; }
+    public bool DryRunBackupSkipAcknowledged { get; set; }
+    public string? DryRunAcknowledgedGroups { get; set; }
     public string? Action { get; set; }
     public Guid MigrationId { get; set; }
     public string? Workload { get; set; }

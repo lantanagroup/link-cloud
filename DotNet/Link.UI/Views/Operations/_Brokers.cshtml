@@ -3,6 +3,7 @@
     var query = Model.Query;
     var origin = ReturnUrlRules.Here(Context.Request);
     var selected = Model.SelectedBroker;
+    var showLogDirs = KafkaLogDirs.Show(Model.Cluster);
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
     string Size(long bytes) => bytes < 0 ? "Not available" : bytes.ToString("N0");
 }
@@ -29,7 +30,10 @@
                         <th>State</th>
                         <th><a href="@query.Href(sort: "partitions", dir: SortDir("partitions"), page: 1)">Partitions</a></th>
                         <th><a href="@query.Href(sort: "leaders", dir: SortDir("leaders"), page: 1)">Leaders</a></th>
-                        <th>Log dir</th>
+                        @if (showLogDirs)
+                        {
+                            <th>Log dir</th>
+                        }
                         <th></th>
                     </tr>
                 </thead>
@@ -43,7 +47,10 @@
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
                         <td>@row.PartitionCount</td>
                         <td>@row.LeaderCount</td>
-                        <td>@Size(row.LogDirBytes)</td>
+                        @if (showLogDirs)
+                        {
+                            <td>@Size(row.LogDirBytes)</td>
+                        }
                         <td>
                             <a class="btn btn-sm btn-au-link" href="@query.Href(broker: row.Id.ToString(), page: 1)" title="Open broker @row.Id" aria-label="Open broker @row.Id"><i class="bi bi-hdd" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                         </td>
@@ -69,7 +76,7 @@
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-md-6">
                     <label class="form-label" for="add-broker-reason">Reason</label>
-                    <input class="form-control" id="add-broker-reason" name="reason" value="@Model.DraftReason" />
+                    <input class="form-control" id="add-broker-reason" name="addBrokerReason" value="@Model.DraftAddBrokerReason" />
                 </div>
                 <div class="col-auto">
                     <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
@@ -91,8 +98,8 @@ else
             <p>
                 <partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = selected.Id.ToString(), CopyLabel = "Copy broker id" })" />
             </p>
-            <p>@selected.Host:@selected.Port. Rack @(string.IsNullOrWhiteSpace(selected.Rack) ? "—" : selected.Rack). <span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Partitions @selected.PartitionCount. Leaders @selected.LeaderCount. Log dir @Size(selected.LogDirBytes).</p>
-            <form method="post" action="/Operations/Kafka/brokers/decommission/plan">
+            <p>@selected.Host:@selected.Port. Rack @(string.IsNullOrWhiteSpace(selected.Rack) ? "—" : selected.Rack). <span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Partitions @selected.PartitionCount. Leaders @selected.LeaderCount.@if (showLogDirs) { <text> Log dir @Size(selected.LogDirBytes).</text> }</p>
+            <form method="post" action="/Operations/Kafka/brokers/decommission/plan" data-kafka-busy="Dry run is running.">
                 @Html.AntiForgeryToken()
                 <partial name="_QueryFields" model="@(query with { Broker = selected.Id.ToString() })" />
                 <input type="hidden" name="brokerId" value="@selected.Id" />
@@ -103,52 +110,87 @@ else
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview decommission</span></button>
                     <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission" title="Decommission broker" aria-label="Decommission broker"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="ms-1">Decommission</span></button>
-                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview rebalance</span></button>
+                    <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                     <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance" title="Rebalance onto this broker" aria-label="Rebalance onto this broker"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span class="ms-1">Rebalance</span></button>
                 </div>
             </form>
             @if (Model.MovePlan is not null)
             {
                 var plan = Model.MovePlan;
-                <div class="mt-3">
-                    <p><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span> Broker @plan.BrokerId. @(plan.AlreadyEmpty ? "Already empty." : plan.Moves.Count + " moves.") @(plan.SecondApproverRequired ? "A second approver is required." : "")</p>
-                    @foreach (var note in plan.Notes)
+                var moveLines = BrokerMovePreview.Lines(plan.Moves);
+                var shownMoves = moveLines.Take(BrokerMovePreview.FoldAfter).ToList();
+                var restMoves = moveLines.Skip(BrokerMovePreview.FoldAfter).ToList();
+                var shownErrors = plan.Errors.Take(BrokerMovePreview.FoldAfter).ToList();
+                var restErrors = plan.Errors.Skip(BrokerMovePreview.FoldAfter).ToList();
+                var moveTone = plan.Accepted ? "alert-success" : "alert-danger";
+                <div id="kafka-broker-result" class="alert @moveTone mt-3" role="status" tabindex="-1" data-kafka-result data-result-key="@(plan.Accepted)-@plan.BrokerId-@plan.Moves.Count-@plan.Errors.Count">
+                    <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
+                    <p>@(plan.Accepted ? "Dry run accepted. Nothing has moved yet." : "This broker change cannot run yet.")</p>
+                    <dl class="row mb-2">
+                        <dt class="col-sm-4">Broker</dt>
+                        <dd class="col-sm-8">@plan.BrokerId</dd>
+                        <dt class="col-sm-4">Partitions</dt>
+                        <dd class="col-sm-8">@(plan.AlreadyEmpty ? "Already empty." : plan.Moves.Count + " move off or onto this broker.")</dd>
+                        <dt class="col-sm-4">Approval</dt>
+                        <dd class="col-sm-8">@(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
+                    </dl>
+                    @if (shownErrors.Count > 0)
                     {
-                        <p class="mb-1">@note</p>
-                    }
-                    @foreach (var planError in plan.Errors)
-                    {
-                        <p class="mb-1">@planError</p>
-                    }
-                    @if (plan.Moves.Count > 0)
-                    {
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Topic</th>
-                                        <th>Partition</th>
-                                        <th>From</th>
-                                        <th>To</th>
-                                        <th>Replicas</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                @foreach (var move in plan.Moves)
+                        <p class="mb-1">Blocking reasons</p>
+                        <ul class="mb-2">
+                        @foreach (var planError in shownErrors)
+                        {
+                            <li>@planError</li>
+                        }
+                        </ul>
+                        @if (restErrors.Count > 0)
+                        {
+                            <details>
+                                <summary>Show the rest</summary>
+                                <ul class="mb-2">
+                                @foreach (var planError in restErrors)
                                 {
-                                    <tr>
-                                        <td>@move.Topic</td>
-                                        <td>@move.Partition</td>
-                                        <td>@move.FromBroker</td>
-                                        <td>@move.ToBroker</td>
-                                        <td>@string.Join(", ", move.Replicas)</td>
-                                    </tr>
+                                    <li>@planError</li>
                                 }
-                                </tbody>
-                            </table>
-                        </div>
+                                </ul>
+                            </details>
+                        }
+                    }
+                    @if (shownMoves.Count > 0)
+                    {
+                        <p class="mb-1">Topics</p>
+                        <ul class="mb-2">
+                        @foreach (var line in shownMoves)
+                        {
+                            <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
+                        }
+                        </ul>
+                        @if (restMoves.Count > 0)
+                        {
+                            <details>
+                                <summary>Show the rest</summary>
+                                <ul class="mb-2">
+                                @foreach (var line in restMoves)
+                                {
+                                    <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
+                                }
+                                </ul>
+                            </details>
+                        }
+                    }
+                    <p class="mb-2">@(plan.Accepted ? "Ready. Submit the decommission or the rebalance when the reason is filled in." : "Fix the items above, then preview again.")</p>
+                    @if (plan.Notes.Count > 0)
+                    {
+                        <details>
+                            <summary>Details</summary>
+                            @foreach (var note in plan.Notes)
+                            {
+                                <p class="mb-1">@note</p>
+                            }
+                        </details>
                     }
                 </div>
             }

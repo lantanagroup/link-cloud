@@ -209,7 +209,7 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
     public Task<KafkaOpsCall<KafkaTopicDetail>> GetDetailAsync(string topic, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
-            return Task.FromResult(new KafkaOpsCall<KafkaTopicDetail> { Status = 200, Value = new KafkaTopicDetail { Topic = topic } });
+            return Task.FromResult(_fixture.Detail(topic));
         return SendAsync<KafkaTopicDetail>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/detail", null, cancellationToken);
     }
 
@@ -217,22 +217,22 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
     {
         var query = string.IsNullOrWhiteSpace(diff) ? "" : "?diff=" + Uri.EscapeDataString(diff);
         if (_fixture.Active)
-            return Task.FromResult(new KafkaOpsCall<KafkaTopicConfigs> { Status = 200, Value = new KafkaTopicConfigs { Topic = topic, Diff = diff ?? "" } });
+            return Task.FromResult(_fixture.Configs(topic, diff));
         return SendAsync<KafkaTopicConfigs>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/configs" + query, null, cancellationToken);
     }
 
-    public Task<KafkaOpsCall<KafkaMigrationPlan>> PlanMigrationAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, CancellationToken cancellationToken)
+    public Task<KafkaOpsCall<KafkaMigrationPlan>> PlanMigrationAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
             return Task.FromResult(new KafkaOpsCall<KafkaMigrationPlan> { Status = 200, Value = new KafkaMigrationPlan { Accepted = false, Summary = "Fixture mode does not run a migration." } });
-        return SendAsync<KafkaMigrationPlan>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/migrations/plan", new { partitions, backupSkip, backupSkipAcknowledged }, cancellationToken, keepBodyOnFailure: true);
+        return SendAsync<KafkaMigrationPlan>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/migrations/plan", new { partitions, backupSkip, backupSkipAcknowledged, acknowledgedGroups }, cancellationToken, keepBodyOnFailure: true);
     }
 
-    public Task<KafkaOpsCall<KafkaMigrationRecord>> RequestMigrationAsync(string topic, int partitions, string reason, string confirmation, bool backupSkip, bool backupSkipAcknowledged, string planHash, CancellationToken cancellationToken)
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> RequestMigrationAsync(string topic, int partitions, string reason, string confirmation, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, string planHash, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
             return Task.FromResult(new KafkaOpsCall<KafkaMigrationRecord> { Status = 403, Error = "Fixture mode does not run a migration." });
-        return SendAsync<KafkaMigrationRecord>(HttpMethod.Post, "api/ops/kafka/migrations", new { topic, partitions, reason, confirmation, backupSkip, backupSkipAcknowledged, planHash }, cancellationToken);
+        return SendAsync<KafkaMigrationRecord>(HttpMethod.Post, "api/ops/kafka/migrations", new { topic, partitions, reason, confirmation, backupSkip, backupSkipAcknowledged, acknowledgedGroups, planHash }, cancellationToken);
     }
 
     public Task<KafkaOpsCall<KafkaMigrationRecord>> GetMigrationAsync(Guid id, CancellationToken cancellationToken)
@@ -393,6 +393,7 @@ public sealed class KafkaTopicRow
     public int ReplicationFactor { get; set; }
     public Dictionary<string, string> Configs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public double ProduceRatePerSecond { get; set; }
+    public bool ProduceRateKnown { get; set; } = true;
     public long TotalLag { get; set; }
     public bool LagKnown { get; set; } = true;
     public int MaxReplicas { get; set; }
@@ -441,6 +442,7 @@ public sealed class KafkaGroupRow
     public long TotalLag { get; set; }
     public List<string> UnownedPartitions { get; set; } = [];
     public int MembersOnExpectedConfig { get; set; }
+    public bool Catalogued { get; set; } = true;
 }
 
 public sealed class KafkaMemberRow
@@ -534,6 +536,7 @@ public sealed class ClusterSnapshot
 {
     public int BrokerCount { get; set; }
     public int? ControllerId { get; set; }
+    public string ControllerUnavailableReason { get; set; } = "";
     public int UnderReplicatedPartitions { get; set; }
     public int OfflinePartitions { get; set; }
     public int IsrShrunkPartitions { get; set; }

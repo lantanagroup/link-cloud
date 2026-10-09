@@ -47,6 +47,8 @@ public static class BrokerMovePlanner
 
         var others = brokerIds.Where(id => id != brokerId).ToList();
         var load = others.ToDictionary(id => id, _ => 0);
+        var leadersMoving = 0;
+        var failures = new List<(string Topic, string Reason)>();
         foreach (var partition in partitions)
         {
             if (!partition.Replicas.Contains(brokerId))
@@ -63,7 +65,7 @@ public static class BrokerMovePlanner
             var candidates = others.Where(id => !kept.Contains(id)).OrderBy(id => load.GetValueOrDefault(id)).ThenBy(id => id).ToList();
             if (candidates.Count == 0 || kept.Count + 1 < Math.Max(partition.Replicas.Count, 1))
             {
-                plan.Errors.Add($"Topic {partition.Topic} partition {partition.Partition} would have fewer brokers than its replication factor if broker {brokerId} left.");
+                failures.Add((partition.Topic, $"would have fewer brokers than the replication factor if broker {brokerId} left."));
                 continue;
             }
 
@@ -72,7 +74,7 @@ public static class BrokerMovePlanner
             var minIsr = Math.Max(1, partition.MinInSyncReplicas);
             if (next.Count < minIsr)
             {
-                plan.Errors.Add($"Topic {partition.Topic} partition {partition.Partition} would fall below min.insync.replicas ({minIsr}).");
+                failures.Add((partition.Topic, $"would fall below min.insync.replicas ({minIsr})."));
                 continue;
             }
 
@@ -86,14 +88,17 @@ public static class BrokerMovePlanner
                 Replicas = next
             });
             if (partition.Leader == brokerId)
-                plan.Notes.Add($"Leader of {partition.Topic}-{partition.Partition} moves off broker {brokerId}.");
+                leadersMoving++;
         }
 
+        AddGroupedFailures(plan, failures);
         plan.AlreadyEmpty = plan.Moves.Count == 0 && plan.Errors.Count == 0;
         if (plan.AlreadyEmpty)
             plan.Notes.Add($"Broker {brokerId} has no replicas. It can be stopped once the cluster is green.");
         else
             plan.Notes.Add($"{plan.Moves.Count} partition(s) move off broker {brokerId}.");
+        if (leadersMoving > 0)
+            plan.Notes.Add($"{leadersMoving} leader(s) move off broker {brokerId}.");
 
         plan.Accepted = plan.Errors.Count == 0;
         plan.Summary = plan.Accepted ? string.Join(" ", plan.Notes) : string.Join(" ", plan.Errors);
@@ -109,6 +114,7 @@ public static class BrokerMovePlanner
         var load = brokerIds.ToDictionary(id => id, id => partitions.Count(partition => partition.Replicas.Contains(id)));
         var replicaCount = partitions.Sum(partition => partition.Replicas.Count);
         var average = brokerIds.Count == 0 ? 0 : (replicaCount + brokerIds.Count - 1) / brokerIds.Count;
+        var failures = new List<(string Topic, string Reason)>();
         foreach (var partition in partitions.OrderBy(item => item.Topic, StringComparer.Ordinal).ThenBy(item => item.Partition))
         {
             if (load.GetValueOrDefault(brokerId) >= average)
@@ -128,7 +134,7 @@ public static class BrokerMovePlanner
             var next = partition.Replicas.Where(id => id != source).Append(brokerId).ToList();
             if (next.Count < Math.Max(1, partition.MinInSyncReplicas))
             {
-                plan.Errors.Add($"Moving {partition.Topic}-{partition.Partition} onto broker {brokerId} would fall below min.insync.replicas.");
+                failures.Add((partition.Topic, $"would fall below min.insync.replicas if moved onto broker {brokerId}."));
                 continue;
             }
 
@@ -144,11 +150,28 @@ public static class BrokerMovePlanner
             });
         }
 
+        AddGroupedFailures(plan, failures);
         plan.Notes.Add(plan.Moves.Count == 0
             ? $"Broker {brokerId} already holds its share of replicas."
             : $"{plan.Moves.Count} partition(s) move onto broker {brokerId}.");
         plan.Accepted = plan.Errors.Count == 0;
         plan.Summary = plan.Accepted ? string.Join(" ", plan.Notes) : string.Join(" ", plan.Errors);
         return plan;
+    }
+
+    private static void AddGroupedFailures(BrokerMovePlan plan, List<(string Topic, string Reason)> failures)
+    {
+        foreach (var group in failures
+            .GroupBy(item => (Topic: item.Topic ?? "", Reason: item.Reason))
+            .OrderBy(item => item.Key.Topic.StartsWith('_'))
+            .ThenBy(item => item.Key.Topic, StringComparer.Ordinal)
+            .ThenBy(item => item.Key.Reason, StringComparer.Ordinal))
+        {
+            var topic = group.Key.Topic;
+            var count = group.Count();
+            var prefix = topic.StartsWith('_') ? "(internal) " : "";
+            var noun = count == 1 ? "partition" : "partitions";
+            plan.Errors.Add($"{prefix}{topic}: {count} {noun} {group.Key.Reason}");
+        }
     }
 }

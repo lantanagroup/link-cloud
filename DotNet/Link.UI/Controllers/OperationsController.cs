@@ -26,9 +26,28 @@ public sealed class OperationsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PlanMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
     {
-        var plan = await _kafka.PlanMigrationAsync(form.Topic ?? "", form.Partitions, form.BackupSkip, form.BackupSkipAcknowledged, cancellationToken);
+        var groups = MigrationGroupList.Parse(form.AcknowledgedGroups);
+        var plan = await _kafka.PlanMigrationAsync(form.Topic ?? "", form.Partitions, form.BackupSkip, form.BackupSkipAcknowledged, groups, cancellationToken);
         var page = await LoadAsync(null, null, null, null, plan.Error, MigrateQuery(form.Topic), cancellationToken);
-        return View("Kafka", page with { MigrationPlan = plan.Value ?? page.MigrationPlan, Error = plan.Ok ? page.Error : plan.Error ?? page.Error });
+        var drafted = WithMigrationDraft(page with
+        {
+            MigrationPlan = plan.Value ?? page.MigrationPlan,
+            Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null)
+        }, form);
+        if (plan.Value is not null)
+        {
+            drafted = drafted with
+            {
+                HasDryRunSnapshot = true,
+                DryRunPartitions = form.Partitions,
+                DryRunBackupSkip = form.BackupSkip,
+                DryRunBackupSkipAcknowledged = form.BackupSkipAcknowledged,
+                DryRunAcknowledgedGroups = MigrationGroupList.Canonical(form.AcknowledgedGroups),
+                DraftPlanHash = plan.Value.PlanHash ?? ""
+            };
+        }
+
+        return View("Kafka", drafted);
     }
 
     [HttpPost("Kafka/migrations")]
@@ -36,11 +55,26 @@ public sealed class OperationsController : Controller
     public async Task<IActionResult> RequestMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
     {
         if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
-            return await MigrateError(form, "Type the topic name to confirm the migration.", cancellationToken);
+            return await MigrateError(form, "Type the topic name to confirm the migration.", cancellationToken, keepDraft: true);
 
-        var created = await _kafka.RequestMigrationAsync(form.Topic ?? "", form.Partitions, form.Reason ?? "", form.Confirmation ?? "", form.BackupSkip, form.BackupSkipAcknowledged, form.PlanHash ?? "", cancellationToken);
+        var refusal = MigrationRequestGuard.Refusal(
+            form.Partitions,
+            form.BackupSkip,
+            form.BackupSkipAcknowledged,
+            form.AcknowledgedGroups,
+            form.PlanHash,
+            form.HasDryRunSnapshot,
+            form.DryRunPartitions,
+            form.DryRunBackupSkip,
+            form.DryRunBackupSkipAcknowledged,
+            form.DryRunAcknowledgedGroups);
+        if (refusal is not null)
+            return await MigrateError(form, refusal, cancellationToken, keepDraft: true, clearDryRun: true);
+
+        var groups = MigrationGroupList.Parse(form.AcknowledgedGroups);
+        var created = await _kafka.RequestMigrationAsync(form.Topic ?? "", form.Partitions, form.Reason ?? "", form.Confirmation ?? "", form.BackupSkip, form.BackupSkipAcknowledged, groups, form.PlanHash ?? "", cancellationToken);
         if (created.Value is null)
-            return await MigrateError(form, created.Error ?? "The migration was not requested.", cancellationToken);
+            return await MigrateError(form, created.Error ?? "The migration was not requested.", cancellationToken, keepDraft: true);
 
         return Redirect(MigrateHref(form.Topic, created.Value.Id));
     }
@@ -119,7 +153,7 @@ public sealed class OperationsController : Controller
     {
         var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
         var plan = await _kafka.PlanAsync(form.Topic ?? "", form.Partitions, form.OverrideQuietWindow, form.OverrideReason, cancellationToken);
-        return View("Kafka", page with { Plan = plan.Value, Error = plan.Error ?? page.Error, Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
+        return View("Kafka", page with { Plan = plan.Value, Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null), Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
     }
 
     [HttpPost("Kafka/family/plan")]
@@ -128,7 +162,7 @@ public sealed class OperationsController : Controller
     {
         var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
         var plan = await _kafka.PlanFamilyAsync(form.Topic ?? "", form.OverrideQuietWindow, form.OverrideReason, cancellationToken);
-        return View("Kafka", page with { Plan = plan.Value, Error = plan.Error ?? page.Error, Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
+        return View("Kafka", page with { Plan = plan.Value, Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null), Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
     }
 
     [HttpPost("Kafka/family")]
@@ -190,7 +224,7 @@ public sealed class OperationsController : Controller
         return View("Kafka", page with
         {
             ScalePlan = plan.Value,
-            Error = plan.Error ?? page.Error,
+            Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null),
             DraftReplicas = desired,
             Query = page.Query with { View = ThroughputKafkaPageQuery.Consumers }
         });
@@ -237,9 +271,9 @@ public sealed class OperationsController : Controller
     {
         var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
         page = page with { Query = page.Query with { View = ThroughputKafkaPageQuery.Brokers } };
-        if (string.IsNullOrWhiteSpace(form.Reason))
+        if (string.IsNullOrWhiteSpace(form.AddBrokerReason))
             return View("Kafka", page with { Error = "A reason is required." });
-        var created = await _kafka.CreateAddBrokerAsync(form.Reason, Guid.NewGuid().ToString("N"), cancellationToken);
+        var created = await _kafka.CreateAddBrokerAsync(form.AddBrokerReason, Guid.NewGuid().ToString("N"), cancellationToken);
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error });
         return Redirect(page.Query.Href() + "&requestId=" + created.Value.Id.ToString("D"));
@@ -283,7 +317,7 @@ public sealed class OperationsController : Controller
         return View("Kafka", page with
         {
             MovePlan = plan.Value,
-            Error = plan.Error ?? page.Error,
+            Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null),
             DraftBrokerId = brokerId,
             Query = page.Query with { View = ThroughputKafkaPageQuery.Brokers, Broker = brokerId.ToString() }
         });
@@ -577,13 +611,18 @@ public sealed class OperationsController : Controller
         return ordered.ToList();
     }
 
-    private async Task<IActionResult> MigrateError(KafkaMigrationForm form, string error, CancellationToken cancellationToken)
+    private async Task<IActionResult> MigrateError(KafkaMigrationForm form, string error, CancellationToken cancellationToken, bool keepDraft = false, bool clearDryRun = false)
     {
         var page = await LoadAsync(null, null, null, null, error, MigrateQuery(form.Topic), cancellationToken);
         var migration = page.Migration;
         if (migration is null && form.MigrationId != Guid.Empty)
             migration = (await _kafka.GetMigrationAsync(form.MigrationId, cancellationToken)).Value;
-        return View("Kafka", page with { Migration = migration, Error = error });
+        var drafted = page with { Migration = migration, Error = error };
+        if (keepDraft)
+            drafted = WithMigrationDraft(drafted, form);
+        if (clearDryRun)
+            drafted = drafted with { HasDryRunSnapshot = false, DraftPlanHash = "" };
+        return View("Kafka", drafted);
     }
 
     private async Task<IActionResult> MigrationPost(KafkaMigrationForm form, Func<Task<KafkaOpsCall<KafkaMigrationRecord>>> call, CancellationToken cancellationToken)
@@ -605,12 +644,33 @@ public sealed class OperationsController : Controller
     private static string MigrateHref(string? topic, Guid id) =>
         "/Operations/Kafka?view=migrate&topic=" + Uri.EscapeDataString(topic ?? "") + "&migration=" + id.ToString("D");
 
+    private static ThroughputKafkaPage WithMigrationDraft(ThroughputKafkaPage page, KafkaMigrationForm form)
+    {
+        var snapshot = form.HasDryRunSnapshot;
+        return page with
+        {
+            DraftPartitions = form.Partitions,
+            DraftReason = form.Reason ?? "",
+            DraftConfirmation = form.Confirmation ?? "",
+            DraftBackupSkip = form.BackupSkip,
+            DraftBackupSkipAcknowledged = form.BackupSkipAcknowledged,
+            DraftAcknowledgedGroups = form.AcknowledgedGroups ?? "",
+            DraftPlanHash = snapshot ? form.PlanHash ?? "" : page.DraftPlanHash,
+            HasDryRunSnapshot = snapshot,
+            DryRunPartitions = form.DryRunPartitions,
+            DryRunBackupSkip = form.DryRunBackupSkip,
+            DryRunBackupSkipAcknowledged = form.DryRunBackupSkipAcknowledged,
+            DryRunAcknowledgedGroups = form.DryRunAcknowledgedGroups ?? ""
+        };
+    }
+
     private static ThroughputKafkaPage WithDraft(ThroughputKafkaPage page, KafkaChangeForm form) =>
         page with
         {
             DraftTopic = form.Topic ?? page.Query.TopicName,
             DraftPartitions = form.Partitions,
-            DraftReason = form.Reason ?? "",
+            DraftReason = form.Reason ?? page.DraftReason,
+            DraftAddBrokerReason = form.AddBrokerReason ?? page.DraftAddBrokerReason,
             DraftConfirmation = form.Confirmation ?? "",
             DraftOverride = form.OverrideQuietWindow,
             DraftOverrideReason = form.OverrideReason ?? "",
@@ -664,6 +724,7 @@ public sealed class KafkaChangeForm
     public string? Topic { get; set; }
     public int Partitions { get; set; }
     public string? Reason { get; set; }
+    public string? AddBrokerReason { get; set; }
     public string? Confirmation { get; set; }
     public bool OverrideQuietWindow { get; set; }
     public string? OverrideReason { get; set; }

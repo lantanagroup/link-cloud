@@ -34,7 +34,7 @@
                 {
                     var member = row.Members.FirstOrDefault();
                     <tr>
-                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" /></td>
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
                         <td>@row.Members.Count</td>
                         <td>@(member is null ? "—" : member.ClientId)</td>
@@ -64,62 +64,76 @@
 else
 {
     <div class="au-card card mt-3">
-        <div class="card-header">@selected.GroupId</div>
+        <div class="card-header">@selected.GroupId @if (!selected.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</div>
         <div class="card-body">
             <p>
                 <partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = selected.GroupId, CopyLabel = "Copy group id" })" />
             </p>
             <p><span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Members @selected.Members.Count. Lag @selected.TotalLag. Replica ceiling @Model.ReplicaCeiling. Members on the expected config @selected.MembersOnExpectedConfig.</p>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Client</th>
-                            <th>Host</th>
-                            <th>Assignment</th>
-                            <th>Config</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var member in selected.Members)
-                    {
-                        <tr>
-                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Client", Value = member.ClientId, Compact = true, CopyLabel = "Copy client id" })" /></td>
-                            <td>@member.Host</td>
-                            <td>@(member.Assignment.Count == 0 ? "—" : string.Join(", ", member.Assignment))</td>
-                            <td>@(member.AdvertisesExpectedConfig ? "Expected" : "Not advertised")</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Topic</th>
-                            <th>Partition</th>
-                            <th>High watermark</th>
-                            <th>Committed</th>
-                            <th>Lag</th>
-                            <th>Owned</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var row in selected.Partitions.OrderBy(item => item.Topic, StringComparer.Ordinal).ThenBy(item => item.Partition))
-                    {
-                        <tr>
-                            <td>@row.Topic</td>
-                            <td>@row.Partition</td>
-                            <td>@row.HighWatermark</td>
-                            <td>@row.Committed</td>
-                            <td>@row.Lag</td>
-                            <td>@(row.Owned ? "Yes" : "No")</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
+            @if (selected.Members.Count == 0)
+            {
+                <p class="text-muted mb-3">This group has no members.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Host</th>
+                                <th>Assignment</th>
+                                <th>Config</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var member in selected.Members)
+                        {
+                            <tr>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Client", Value = member.ClientId, Compact = true, CopyLabel = "Copy client id" })" /></td>
+                                <td>@member.Host</td>
+                                <td>@(member.Assignment.Count == 0 ? "—" : string.Join(", ", member.Assignment))</td>
+                                <td>@(member.AdvertisesExpectedConfig ? "Expected" : "Not advertised")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            @if (selected.Partitions.Count == 0)
+            {
+                <p class="text-muted mb-3">This group has no committed partitions.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Topic</th>
+                                <th>Partition</th>
+                                <th>High watermark</th>
+                                <th>Committed</th>
+                                <th>Lag</th>
+                                <th>Owned</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in selected.Partitions.OrderBy(item => item.Topic, StringComparer.Ordinal).ThenBy(item => item.Partition))
+                        {
+                            <tr>
+                                <td>@row.Topic</td>
+                                <td>@row.Partition</td>
+                                <td>@row.HighWatermark</td>
+                                <td>@row.Committed</td>
+                                <td>@row.Lag</td>
+                                <td>@(row.Owned ? "Yes" : "No")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
             @if (selected.UnownedPartitions.Count > 0)
             {
                 <p class="mt-2 mb-0">Unowned: @string.Join(", ", selected.UnownedPartitions)</p>
@@ -129,11 +143,17 @@ else
     <h2 class="h5 mt-4">Partition lag</h2>
     <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
 
+    @if (!selected.Catalogued)
+    {
+        <p class="text-muted mt-3">Replica changes are hidden for an unknown group.</p>
+    }
+    else
+    {
     <div class="au-card card mt-3">
         <div class="card-header">Replicas</div>
         <div class="card-body">
             <p>Add or remove replicas. The preview shows the new member count against the partition ceiling @Model.ReplicaCeiling. Counts above that ceiling are refused.</p>
-            <form method="post" action="/Operations/Kafka/groups/replicas/plan">
+            <form method="post" action="/Operations/Kafka/groups/replicas/plan" data-kafka-busy="Dry run is running.">
                 @Html.AntiForgeryToken()
                 <partial name="_QueryFields" model="@(query with { Group = selected.GroupId })" />
                 <div class="row g-2 align-items-end">
@@ -147,9 +167,10 @@ else
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview adding replicas" aria-label="Preview adding replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview adding replicas" aria-label="Preview adding replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview add</span></button>
                     <button class="btn btn-sm btn-success lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas" title="Add replicas" aria-label="Add replicas"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
-                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview removing replicas" aria-label="Preview removing replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview removing replicas" aria-label="Preview removing replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview remove</span></button>
+                    <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                     <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas" title="Remove replicas" aria-label="Remove replicas"><i class="bi bi-dash-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
                 </div>
             </form>
@@ -170,4 +191,5 @@ else
             }
         </div>
     </div>
+    }
 }
