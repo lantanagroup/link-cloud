@@ -1,7 +1,7 @@
 @model Link.UI.Models.FacilityHubViewModel
 <div class="accordion-item">
     <h2 class="accordion-header" id="censusHeading">
-        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#censusPanel" aria-expanded="true" aria-controls="censusPanel">
+        <button class="accordion-button@(string.IsNullOrWhiteSpace(Model.CensusError) ? "" : " lu-section-invalid")" type="button" data-bs-toggle="collapse" data-bs-target="#censusPanel" aria-expanded="true" aria-controls="censusPanel" aria-invalid="@(string.IsNullOrWhiteSpace(Model.CensusError) ? "false" : "true")">
             Census configuration
         </button>
     </h2>
@@ -15,7 +15,7 @@
             {
                 @if (!string.IsNullOrWhiteSpace(Model.CensusError))
                 {
-                    <div class="alert alert-warning">@Model.CensusError</div>
+                    <div class="alert alert-warning lu-section-error">@Model.CensusError</div>
                 }
                 else if (!Model.CensusExists)
                 {

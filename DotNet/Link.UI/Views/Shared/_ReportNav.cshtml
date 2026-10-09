@@ -3,7 +3,7 @@
     var reportId = ViewData["ReportId"] as string ?? "";
     var active = ViewData["ReportSection"] as string ?? "report";
     var origin = ReturnUrlRules.FromQuery(Context.Request);
-    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-neutral";
+    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-link";
 }
 <nav class="lu-section-nav" aria-label="Report">
     <a class="@Btn("report")" asp-controller="Tenants" asp-action="Report" asp-route-id="@facilityId" asp-route-reportId="@reportId" asp-route-returnUrl="@origin"><i class="bi bi-file-earmark-text me-1"></i>Report details</a>

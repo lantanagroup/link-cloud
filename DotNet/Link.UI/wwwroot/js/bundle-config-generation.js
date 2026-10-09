@@ -74,7 +74,7 @@
                             <div class="au-cfggen-title" id="cfgGenTitle">Suggest configuration</div>
                             <div class="au-cfggen-sub">Two choices: how locations are recognized, then how the data is cleaned.</div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-au-close" data-cfggen-close>Close</button>
+                        <button type="button" class="btn btn-sm btn-warning" data-cfggen-close>Close</button>
                     </div>
                     <div class="au-cfggen-steps" id="cfgGenSteps" hidden>
                         <button type="button" class="au-cfggen-step" data-goto="1"><span class="au-cfggen-step-num">1</span><span>What we found</span></button>
@@ -159,7 +159,7 @@
                         <span class="badge ${window.luStatusPills.forReadiness(isReuse)}">${esc(isReuse ? 'Ready to use' : 'Needs a few additions')}</span>
                     </div>
                     <div class="au-cfggen-choice-actions d-flex align-items-center gap-2 flex-wrap">
-                        <button type="button" class="btn btn-sm ${recommended && isReuse ? 'btn-success' : 'btn-au-neutral'} cfggen-reuse"
+                        <button type="button" class="btn btn-sm ${recommended && isReuse ? 'btn-success' : 'btn-au-link'} cfggen-reuse"
                             data-kind="${esc(kindHint)}"
                             data-id="${esc(pick(item, 'id', 'Id', ''))}"
                             data-name="${esc(pick(item, 'name', 'Name', ''))}"
@@ -317,7 +317,7 @@
                         <button type="button" class="btn btn-sm btn-success" id="cfgGenSaveOrm" ${ormConds.length ? '' : 'disabled'}>
                             ${refinedOrmId ? 'Update this map' : 'Save and use this map'}
                         </button>
-                        ${refinedOrmId ? '<button type="button" class="btn btn-sm btn-au-neutral" id="cfgGenSaveOrmNew">Save as a new map</button>' : ''}
+                        ${refinedOrmId ? '<button type="button" class="btn btn-sm btn-success" id="cfgGenSaveOrmNew">Save as a new map</button>' : ''}
                     </div>
                 </div>`;
         }
@@ -355,19 +355,19 @@
                         <button type="button" class="btn btn-sm btn-success" id="cfgGenSaveNorm" ${ops.length || refinedSuiteId ? '' : 'disabled'}>
                             ${refinedSuiteId ? 'Update this suite' : 'Save and use this suite'}
                         </button>
-                        ${refinedSuiteId ? '<button type="button" class="btn btn-sm btn-au-neutral" id="cfgGenSaveNormNew">Save as a new suite</button>' : ''}
+                        ${refinedSuiteId ? '<button type="button" class="btn btn-sm btn-success" id="cfgGenSaveNormNew">Save as a new suite</button>' : ''}
                     </div>
                 </div>`;
         }
 
         function footerHtml() {
             if (step === 1)
-                return `<span></span><button type="button" class="btn btn-success" data-cfggen-next>Continue</button>`;
+                return `<span></span><button type="button" class="btn btn-au-link" data-cfggen-next>Continue</button>`;
             if (step === 2)
-                return `<button type="button" class="btn btn-au-neutral" data-cfggen-back>Back</button>
-                    <button type="button" class="btn btn-au-neutral" data-cfggen-skip>Skip for now</button>`;
-            return `<button type="button" class="btn btn-au-neutral" data-cfggen-back>Back</button>
-                <button type="button" class="btn btn-au-neutral" data-cfggen-done>I'm done</button>`;
+                return `<button type="button" class="btn btn-au-link" data-cfggen-back>Back</button>
+                    <button type="button" class="btn btn-warning" data-cfggen-skip>Skip for now</button>`;
+            return `<button type="button" class="btn btn-au-link" data-cfggen-back>Back</button>
+                <button type="button" class="btn btn-success" data-cfggen-done>I'm done</button>`;
         }
 
         function paint() {

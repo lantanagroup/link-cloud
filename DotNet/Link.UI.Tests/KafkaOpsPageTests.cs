@@ -80,7 +80,8 @@ public class KafkaOpsPageTests
 
         var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
         script.Should().NotContain("#0d6efd");
-        script.Should().Contain("#28a745");
+        script.Should().Contain("getPropertyValue(\"--au-success\")");
+        script.Should().NotContain("#28a745");
         script.Should().Contain("luPaintTimes");
         script.Should().Contain("TimedOut");
     }

@@ -17,7 +17,7 @@
                 @Html.AntiForgeryToken()
                 <input type="file" id="ormGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
                 <button type="button" class="btn btn-sm btn-success" id="btnOrmGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
-                <button type="button" class="btn btn-sm btn-au-neutral" id="btnOrmGenerateReset">Start over</button>
+                <button type="button" class="btn btn-sm btn-warning" id="btnOrmGenerateReset">Start over</button>
                 <span id="ormGenSessionHint" class="small text-muted"></span>
             </div>
         </div>
@@ -26,7 +26,7 @@
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>All Templates</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewMap">New</button>
+            <button type="button" class="btn btn-sm btn-au-link" id="btnNewMap">New</button>
         </div>
         <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0">
@@ -61,25 +61,25 @@
                         <td>
                             @if (t.IsSystem)
                             {
-                                <span class="badge bg-dark">System</span>
+                                <text>System</text>
                             }
                             else
                             {
-                                <span class="badge bg-light text-dark border">Custom</span>
+                                <text>Custom</text>
                             }
                         </td>
                         <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                         <td class="text-nowrap">
                             <div class="lu-row-actions">
-                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-map-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(t.IsSystem ? "View" : "Edit")</span></button>
+                                <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-map-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                 @if (!t.IsDefault)
                                 {
-                                    <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-map-default" data-id="@t.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-map-default" data-id="@t.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i><span class="ms-1">Default</span></button>
                                 }
                                 @if (!t.IsSystem)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-map-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-map-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                 }
                             </div>
                         </td>
@@ -98,7 +98,7 @@
                 <h5 class="mb-0" id="mapModalTitle">Organization Resource Map</h5>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-success" id="btnMapSave">Save</button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnMapClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnMapClose">Close</button>
                 </div>
             </div>
             <div id="mapFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -118,7 +118,7 @@
                         <label class="form-label">Matches <i class="bi bi-info-circle text-muted" title="Add one or more match rows. Identifier and Location Type rows generate FHIRPath automatically; Custom rows let you enter raw FHIRPath."></i></label>
                         <div class="d-flex gap-2 align-items-center mb-2">
                             <div class="position-relative" id="addMatchMenuWrap" style="display:inline-block;">
-                                <button type="button" class="btn btn-sm btn-dark d-flex align-items-center justify-content-between" id="btnAddMapMatchMenu" style="min-width:210px;">
+                                <button type="button" class="btn btn-sm btn-success d-flex align-items-center justify-content-between" id="btnAddMapMatchMenu" style="min-width:210px;">
                                     <span>Add Match</span>
                                     <span class="ms-3">&gt;</span>
                                 </button>
@@ -192,7 +192,7 @@
         btn.className = 'btn btn-sm btn-danger lu-icon-btn';
         btn.title = 'Remove';
         btn.setAttribute('aria-label', 'Remove');
-        btn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+        btn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span>';
         btn.addEventListener('click', onClick);
         return btn;
     }
@@ -253,7 +253,7 @@
         row.className = 'card mb-2 p-2 identifier-match-row map-match-card';
         row.dataset.matchType = 'Identifier';
         row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
-            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge au-badge-muted ms-1">Identifier</span></div>'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="ms-1">Identifier</span></div>'
             + '<div class="d-flex gap-1 map-match-actions"></div>'
             + '</div>'
             + '<div class="row g-2">'
@@ -335,7 +335,7 @@
         row.className = 'card mb-2 p-2 custom-match-row map-match-card';
         row.dataset.matchType = 'Custom';
         row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
-            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge au-badge-muted ms-1">Custom FHIRPath</span></div>'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="ms-1">Custom FHIRPath</span></div>'
             + '<div class="d-flex gap-1 map-match-actions"></div>'
             + '</div>'
             + '<label class="form-label mb-1 small">FHIRPath</label>'

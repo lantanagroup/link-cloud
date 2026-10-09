@@ -3,6 +3,7 @@
     var value = Model.Value?.Trim() ?? "";
     var displayName = LabeledIdRules.DisplayName(Model.Name, value);
     var empty = string.IsNullOrWhiteSpace(value) || value == "—" || value == "-";
+    var allowCopy = Model.Copy && LabeledIdRules.ShowsCopy(Model.Label, value);
     var copyLabel = string.IsNullOrWhiteSpace(Model.CopyLabel) ? "Copy " + Model.Label.ToLowerInvariant() : Model.CopyLabel;
     var href = ReturnUrlRules.WithReturn(Model.LinkHref, Model.ReturnUrl);
     var safeLink = !string.IsNullOrWhiteSpace(href)
@@ -44,7 +45,7 @@
         {
             <code class="lu-facility-id" title="@value">@value</code>
         }
-        @if ((!empty || !string.IsNullOrWhiteSpace(Model.ValueElementId)) && Model.Copy)
+        @if ((!empty || !string.IsNullOrWhiteSpace(Model.ValueElementId)) && allowCopy)
         {
             <partial name="_CopyButton" model="@(new CopyTarget { Value = value, Label = copyLabel })" />
         }

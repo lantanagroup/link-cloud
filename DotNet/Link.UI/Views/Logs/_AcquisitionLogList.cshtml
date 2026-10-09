@@ -54,7 +54,7 @@
         {
             <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = search.ReportId, CopyLabel = "Copy report id" })" />
         }
-        <a class="btn btn-sm btn-au-neutral" href="@OpenLogs()">Open in Logs</a>
+        <a class="btn btn-sm btn-au-link" href="@OpenLogs()">Open in Logs</a>
     </div>
 }
 @if (!string.IsNullOrWhiteSpace(search.FacilityId) && string.IsNullOrWhiteSpace(search.Error))
@@ -77,7 +77,7 @@
                 </form>
                 <form method="post" data-au-save asp-action="RestoreFacility" onsubmit="return confirm('Restore every acquisition log for this facility?');">
                     <partial name="_AcquisitionFields" model="query" />
-                    <button type="submit" class="btn btn-sm btn-au-neutral">Restore logs</button>
+                    <button type="submit" class="btn btn-sm btn-success">Restore logs</button>
                 </form>
             </div>
         </div>
@@ -123,11 +123,11 @@ else
             {
                 <form method="post" data-au-save asp-action="ProcessMatching" class="d-inline" onsubmit="return confirm('Process every acquisition log that matches these filters?');">
                     <partial name="_AcquisitionFields" model="query" />
-                    <button type="submit" class="btn btn-sm btn-success">Process matching</button>
+                    <button type="submit" class="btn btn-sm btn-au-execute">Process matching</button>
                 </form>
                 <form method="post" data-au-save asp-action="CancelMatching" class="d-inline" onsubmit="return confirm('Cancel every matching log that is old enough? This cannot be undone.');">
                     <partial name="_AcquisitionFields" model="query" />
-                    <button type="submit" class="btn btn-sm btn-danger">Cancel matching</button>
+                    <button type="submit" class="btn btn-sm btn-warning">Cancel matching</button>
                 </form>
             }
         </div>
@@ -216,7 +216,7 @@ else
                                     <td class="lu-col-action">
                                         @if (!row.Deleted && row.CanProcess)
                                         {
-                                            <button type="submit" class="btn btn-sm btn-success lu-icon-btn" formaction="@Url.Action("ProcessOne", new { id = row.Id })" formmethod="post" onclick="return confirm('Process this acquisition log?');" title="Execute" aria-label="Execute"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+                                            <button type="submit" class="btn btn-sm btn-au-execute lu-icon-btn" formaction="@Url.Action("ProcessOne", new { id = row.Id })" formmethod="post" onclick="return confirm('Process this acquisition log?');" title="Execute" aria-label="Execute"><i class="bi bi-play-fill" aria-hidden="true"></i><span class="ms-1">Execute</span></button>
                                         }
                                     </td>
                                 </tr>
@@ -225,28 +225,28 @@ else
                         </table>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <button type="submit" class="btn btn-sm btn-success" data-au-bulk="process" disabled>Process selected</button>
-                        <button type="submit" class="btn btn-sm btn-danger" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save data-au-bulk="cancel" disabled>Cancel selected</button>
+                        <button type="submit" class="btn btn-sm btn-au-execute" data-au-bulk="process" disabled>Process selected</button>
+                        <button type="submit" class="btn btn-sm btn-warning" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save data-au-bulk="cancel" disabled>Cancel selected</button>
                     </div>
                     <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @search.MinAgeHours hours, and logs in a terminal status.</p>
                 </form>
                 <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Log pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-au-neutral" href="@Href(Route(bar.Page - 1))" @(Model.Embedded ? "data-da-panel" : null)>Previous</a>
+                        <a class="btn btn-sm btn-au-link" href="@Href(Route(bar.Page - 1))" @(Model.Embedded ? "data-da-panel" : null)>Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-au-neutral" href="@Href(Route(bar.Page + 1))" @(Model.Embedded ? "data-da-panel" : null)>Next</a>
+                        <a class="btn btn-sm btn-au-link" href="@Href(Route(bar.Page + 1))" @(Model.Embedded ? "data-da-panel" : null)>Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
                     }
                 </nav>
             }

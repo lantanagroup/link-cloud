@@ -49,6 +49,7 @@ public sealed class FacilityAcquisitionService
 
     public async Task<string?> SaveFhirQueryAsync(FacilityHubViewModel page, FhirQueryPanel input, CancellationToken cancellationToken)
     {
+        FacilityAcquisitionRules.KeepBlankSecrets(page.FhirQuery, input);
         page.FhirQuery.Apply(input);
         page.FhirQuery.CustomHeaders = FacilityAcquisitionRules.WithBlankHeader(page.FhirQuery.CustomHeaders);
         if (!FacilityAcquisitionRules.TryBuildFhirQuery(input, page.FacilityId!, page.TimeZone, out var body, out var error))

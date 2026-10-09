@@ -26,9 +26,8 @@
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-list-ul me-2"></i>All Patient Configurations</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewPc" title="New configuration" aria-label="New configuration">
-                <i class="bi bi-plus-lg"></i>
-            </button>
+            <button type="button" class="btn btn-sm btn-au-link" id="btnNewPc" title="New configuration" aria-label="New configuration">
+                <i class="bi bi-plus-lg"></i><span class="ms-1">New</span></button>
         </div>
         <div class="card-body p-0 au-help-scope" data-au-table>
             <div id="pcColStory" class="au-help-text mx-3 mt-2" hidden>
@@ -113,21 +112,21 @@
                             <td>
                                 @if (t.IsSystem)
                                 {
-                                    <span class="badge bg-dark">System</span>
+                                    <text>System</text>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-light text-dark border">Custom</span>
+                                    <text>Custom</text>
                                 }
                             </td>
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
                                 <div class="lu-row-actions">
-                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-pc-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-pc-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-pc-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(t.IsSystem ? "View" : "Edit")</span></button>
+                                    <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-pc-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                     @if (!t.IsSystem)
                                     {
-                                        <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-pc-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-pc-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     }
                                 </div>
                             </td>
@@ -150,7 +149,7 @@
                 <h5 class="mb-0" id="pcModalTitle"><i class="bi bi-person-gear me-2"></i>Patient Configuration</h5>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-success" id="btnPcSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnPcClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnPcClose">Close</button>
                 </div>
             </div>
             <div id="pcFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>

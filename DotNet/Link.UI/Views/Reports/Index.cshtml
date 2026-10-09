@@ -15,7 +15,7 @@
 
 <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
     <h1 class="h3 mb-0 me-auto">Reports</h1>
-    <a class="btn btn-success" asp-action="Generate">Generate report</a>
+    <a class="btn btn-au-link" asp-action="Generate">Generate report</a>
 </div>
 
 @if (TempData["Message"] is string message)
@@ -109,8 +109,8 @@
                 <partial name="_AutomationScope" model="Model.Query.Scope" />
             </div>
             <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-au-neutral" asp-action="Index">Clear</a>
+                <button type="submit" class="btn btn-success"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Index">Clear</a>
             </div>
         </form>
 
@@ -169,13 +169,10 @@
                             <td>
                                 <span class="lu-measures">
                                     <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
-                                    @if (!string.IsNullOrWhiteSpace(report.Measures))
-                                    {
-                                        <partial name="_CopyButton" model="@(new CopyTarget { Value = report.Measures, Label = "Copy measures" })" />
-                                    }
+
                                 </span>
                             </td>
-                            <td><span class="badge text-bg-light border">@report.Frequency</span></td>
+                            <td>@report.Frequency</td>
                             <td class="text-end" data-census="@report.Id">—</td>
                             <td class="text-end" data-population="@report.Id">—</td>
                             <td>
@@ -195,7 +192,7 @@
                                             <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                             <input type="hidden" name="targetId" value="@report.Id" />
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@report.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Resubmit" aria-label="Resubmit"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@report.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Resubmit" aria-label="Resubmit"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span class="ms-1">Resubmit</span></button>
                                     </div>
                                 }
                                 @if (report.CanAbort)
@@ -204,7 +201,7 @@
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Abort" aria-label="Abort"><i class="bi bi-stop-fill" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-warning lu-icon-btn" title="Abort" aria-label="Abort"><i class="bi bi-stop-fill" aria-hidden="true"></i><span class="ms-1">Abort</span></button>
                                     </form>
                                 }
                                 @if (report.CanCleanUp)
@@ -213,7 +210,7 @@
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Clean up" aria-label="Clean up"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Clean up" aria-label="Clean up"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Clean up</span></button>
                                     </form>
                                 }
                                 @if (report.CanRestore)
@@ -222,7 +219,7 @@
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
                                     </form>
                                 }
                                 </div>
@@ -235,20 +232,20 @@
             <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Report pages">
                 @if (bar.HasPrevious)
                 {
-                    <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page - 1)">Previous</a>
+                    <a class="btn btn-sm btn-au-link" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page - 1)">Previous</a>
                 }
                 else
                 {
-                    <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+                    <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
                 }
                 <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                 @if (bar.HasNext)
                 {
-                    <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page + 1)">Next</a>
+                    <a class="btn btn-sm btn-au-link" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page + 1)">Next</a>
                 }
                 else
                 {
-                    <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+                    <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
                 }
             </nav>
         }
@@ -266,8 +263,8 @@
                 <p id="resubmitSummary" class="mb-0"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-au-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-au-neutral" name="bypassSubmission" value="true">Regenerate without submitting</button>
+                <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning" name="bypassSubmission" value="true">Regenerate without submitting</button>
                 <button type="submit" class="btn btn-sm btn-warning">Resubmit</button>
             </div>
         </form>

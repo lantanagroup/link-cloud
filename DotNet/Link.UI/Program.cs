@@ -39,6 +39,7 @@ builder.Services.Configure<LinkUiFeatureOptions>(options =>
     options.DmrpEnabled = builder.Configuration.GetValue<bool>("DMRP:Enabled");
     options.NumericOnlyFacilityId = builder.Configuration.GetValue<bool>("FacilityIdSettings:NumericOnlyFacilityId");
     options.AutomationEnabled = builder.Configuration.GetValue("LinkUi:AutomationEnabled", false);
+    options.SignInRequired = builder.Configuration.GetValue<bool>("Authentication:RequireBffSession");
 });
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped(FacilityHubService.Create);
@@ -116,11 +117,12 @@ builder.Services.AddReverseProxy()
         // Admin.BFF login builds its post-auth RedirectUri from Referer by stripping the
         // last path segment and appending "/dashboard". A page such as /Placeholder/Reports
         // would otherwise land on /Placeholder/dashboard. Force the origin root so the
-        // redirect is always {origin}/dashboard, which this host maps to the dashboard.
+        // redirect is always {origin}/dashboard. The page the person left is stored in the
+        // return cookie and read once when that landing is served.
         transformBuilder.AddRequestTransform(transformContext =>
         {
             var request = transformContext.HttpContext.Request;
-            if (!request.Path.StartsWithSegments("/api/login"))
+            if (!SignInRules.IsProxiedLogin(request.Path))
                 return default;
 
             if (!request.Host.HasValue)
@@ -191,7 +193,8 @@ app.UseForwardedHeaders();
 if (requireBffSession)
 {
     app.Logger.LogInformation(
-        "Authentication:RequireBffSession is true. Pages without an Admin.BFF session redirect to /api/login.");
+        "Authentication:RequireBffSession is true. Pages without an Admin.BFF session redirect to {LoginPath}.",
+        SignInRules.LoginPath);
 }
 else if (!allowAnonymousAccess && apiBearerEnabled)
 {
@@ -213,7 +216,9 @@ app.Use(async (context, next) =>
 {
     // Pages read this options object. The gate uses the same value so a late
     // configuration source cannot leave a route up after the nav has hidden it.
-    var automationOn = context.RequestServices.GetRequiredService<IOptions<LinkUiFeatureOptions>>().Value.AutomationEnabled;
+    var features = context.RequestServices.GetRequiredService<IOptions<LinkUiFeatureOptions>>().Value;
+    var automationOn = features.AutomationEnabled;
+    var sessionRequired = features.SignInRequired;
     if (!automationOn && AutomationSurface.IsAutomationPath(context.Request.Path))
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -229,7 +234,7 @@ app.Use(async (context, next) =>
     }
 
     AdminBffUser? user = null;
-    if (requireBffSession && !ShellAccessGate.IsSessionPublic(context.Request.Path))
+    if (sessionRequired && !ShellAccessGate.IsSessionPublic(context.Request.Path))
     {
         var userService = context.RequestServices.GetRequiredService<IAdminBffUserService>();
         user = await userService.GetCurrentUserAsync(context.RequestAborted);
@@ -237,7 +242,7 @@ app.Use(async (context, next) =>
 
     var decision = ShellAccessGate.Evaluate(
         allowAnonymousAccess,
-        requireBffSession,
+        sessionRequired,
         context.Request.Path,
         user,
         out var message);
@@ -250,7 +255,8 @@ app.Use(async (context, next) =>
             await next();
             return;
         case ShellAccessGate.Decision.RedirectToLogin:
-            context.Response.Redirect("/api/login");
+            SignInRules.RememberReturn(context, includeCurrent: true);
+            context.Response.Redirect(SignInRules.LoginPath);
             return;
         default:
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;

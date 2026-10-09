@@ -58,10 +58,10 @@
                         <td>@row.ProduceRatePerSecond.ToString("0.###")</td>
                         <td>@row.MaxReplicas</td>
                         <td>
-                            <a class="btn btn-sm btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i></a>
+                            <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                             @if (row.Slice1Eligible)
                             {
-                                <a class="btn btn-sm btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: row.Topic, page: 1)" aria-label="Migrate @row.Topic">Migrate</a>
+                                <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: row.Topic, page: 1)" aria-label="Migrate @row.Topic">Migrate</a>
                             }
                         </td>
                     </tr>
@@ -77,11 +77,11 @@
         <div class="d-flex gap-2 mt-2">
             @if (query.Page > 1)
             {
-                <a class="btn btn-sm btn-au-neutral" href="@query.Href(page: query.Page - 1)">Previous</a>
+                <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
             }
             @if (query.Page < Model.TopicPages)
             {
-                <a class="btn btn-sm btn-au-neutral" href="@query.Href(page: query.Page + 1)">Next</a>
+                <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
             }
         </div>
     </div>
@@ -110,7 +110,7 @@
                         <td>@row.Members.Count</td>
                         <td>@row.TotalLag</td>
                         <td>
-                            <a class="btn btn-sm btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i></a>
+                            <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                         </td>
                     </tr>
                 }
