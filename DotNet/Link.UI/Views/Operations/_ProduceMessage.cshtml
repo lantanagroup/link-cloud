@@ -1,0 +1,81 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+    var draft = Model.ProduceDraft;
+    var topicName = draft is { Topic.Length: > 0 } ? draft.Topic : (Model.SelectedTopic?.Topic ?? query.TopicName);
+    var headers = draft?.Headers ?? "";
+    var key = draft?.Key ?? "";
+    var value = draft?.Value ?? "";
+    var summary = draft is { Summary.Length: > 0 }
+        ? draft.Summary
+        : "Review the topic, headers, key, and value. Produce sends one new record. Nothing is sent until you type the topic name.";
+    var hold = draft is { FromStage: false };
+}
+<form id="kafka-produce" class="mt-4@(hold ? " lu-produce-hold" : null)" method="post" action="/Operations/Kafka/messages">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
+    <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+    <input type="hidden" name="q" value="@query.Q" />
+    <input type="hidden" name="sort" value="@query.Sort" />
+    <input type="hidden" name="dir" value="@query.Dir" />
+    <input type="hidden" name="pageSize" value="@query.PageSize" />
+    <input type="hidden" name="family" value="@query.Family" />
+    <input type="hidden" name="keyClass" value="@query.KeyClass" />
+    <input type="hidden" name="group" value="@query.Group" />
+    <input type="hidden" name="broker" value="@query.Broker" />
+    <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
+    <input type="hidden" name="page" value="1" />
+    <input type="hidden" name="mode" value="@query.BrowseMode" />
+    <input type="hidden" name="limit" value="@query.BrowseLimit" />
+    <input type="hidden" name="offset" value="@query.BrowseOffset" />
+    <input type="hidden" name="timestamp" value="@query.BrowseTimestamp" />
+    <input type="hidden" name="key" value="@query.BrowseKey" />
+    <input type="hidden" name="headerName" value="@query.BrowseHeaderName" />
+    <input type="hidden" name="headerValue" value="@query.BrowseHeaderValue" />
+    <input type="hidden" name="record" value="@query.OpenRecord" />
+    <input type="hidden" name="stage" value="@query.StageRecord" />
+    <input type="hidden" name="browsePartition" value="@string.Join(",", query.BrowsePartitions)" />
+    <h2 class="h5">Produce a message</h2>
+    <fieldset class="border rounded p-3 mb-3">
+        <legend class="float-none w-auto px-2 h6">Message</legend>
+        <div class="row g-2">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="produce-topic">Topic</label>
+                <input class="form-control" id="produce-topic" name="topic" value="@topicName" autocomplete="off" />
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="produce-headers">Headers</label>
+                <textarea class="form-control" id="produce-headers" name="messageHeaders" rows="4" autocomplete="off">@headers</textarea>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="produce-key">Key</label>
+                <textarea class="form-control" id="produce-key" name="messageKey" rows="2" autocomplete="off">@key</textarea>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="produce-value">Value</label>
+                <textarea class="form-control" id="produce-value" name="messageValue" rows="6" autocomplete="off">@value</textarea>
+            </div>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-au-link" id="kafka-paste-message" type="button">Paste message</button>
+        </div>
+    </fieldset>
+    <fieldset class="border rounded p-3 mb-3">
+        <legend class="float-none w-auto px-2 h6">Review</legend>
+        <p class="lu-produce-summary" id="kafka-produce-summary">@summary</p>
+        <div class="row g-2">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="produce-reason">Reason</label>
+                <input class="form-control" id="produce-reason" name="reason" value="@Model.DraftReason" autocomplete="off" />
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="produce-confirm">Type the topic name</label>
+                <input class="form-control" id="produce-confirm" name="confirmation" value="@Model.DraftConfirmation" data-topic="@topicName" autocomplete="off" />
+            </div>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-au-execute" id="produce-submit" type="submit">Produce</button>
+            <a class="btn btn-warning" href="@query.Href(closeStage: true)">Cancel</a>
+        </div>
+    </fieldset>
+</form>

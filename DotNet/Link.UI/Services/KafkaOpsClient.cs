@@ -327,6 +327,20 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendBytesAsync(MessagesPath(topic, "messages/export", mode, partitions, offset, timestamp, limit, key, headerName, headerValue), cancellationToken);
     }
 
+    public Task<KafkaOpsCall<ChangeRequestRecord>> ProduceMessageAsync(string topic, string headers, string? key, string? value, string reason, string? confirmation, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.ProduceMessage(topic, headers, key, value, reason, confirmation, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/messages", new
+        {
+            headers,
+            key,
+            value,
+            reason,
+            confirmation
+        }, cancellationToken, correlationId);
+    }
+
     public Task<KafkaOpsCall<string>> DeleteBackupAsync(string name, string confirmation, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
