@@ -47,6 +47,7 @@ public static class BrokerMovePlanner
 
         var others = brokerIds.Where(id => id != brokerId).ToList();
         var load = others.ToDictionary(id => id, _ => 0);
+        var leadersMoving = 0;
         foreach (var partition in partitions)
         {
             if (!partition.Replicas.Contains(brokerId))
@@ -86,7 +87,7 @@ public static class BrokerMovePlanner
                 Replicas = next
             });
             if (partition.Leader == brokerId)
-                plan.Notes.Add($"Leader of {partition.Topic}-{partition.Partition} moves off broker {brokerId}.");
+                leadersMoving++;
         }
 
         plan.AlreadyEmpty = plan.Moves.Count == 0 && plan.Errors.Count == 0;
@@ -94,6 +95,8 @@ public static class BrokerMovePlanner
             plan.Notes.Add($"Broker {brokerId} has no replicas. It can be stopped once the cluster is green.");
         else
             plan.Notes.Add($"{plan.Moves.Count} partition(s) move off broker {brokerId}.");
+        if (leadersMoving > 0)
+            plan.Notes.Add($"{leadersMoving} leader(s) move off broker {brokerId}.");
 
         plan.Accepted = plan.Errors.Count == 0;
         plan.Summary = plan.Accepted ? string.Join(" ", plan.Notes) : string.Join(" ", plan.Errors);

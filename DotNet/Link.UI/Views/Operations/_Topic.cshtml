@@ -5,6 +5,7 @@
     var topic = Model.SelectedTopic;
     var topicName = topic?.Topic ?? Model.DraftTopic;
     var openAdvanced = query.Advanced || Model.Plan is not null || Model.DraftReason.Length > 0;
+    var increaseLine = topic is null ? null : KafkaIncreaseEligibility.Line(topic.PartitionAddReason, Model.Plan, topic.Topic);
 }
 
 <div class="au-card card mt-3">
@@ -122,9 +123,9 @@ else
     {
         <p class="text-muted mt-3">@topic.MigrationEligibility</p>
     }
-    @if (!string.IsNullOrWhiteSpace(topic.PartitionAddReason))
+    @if (!string.IsNullOrWhiteSpace(increaseLine))
     {
-        <p class="text-muted">@topic.PartitionAddReason</p>
+        <p class="text-muted">@increaseLine</p>
     }
 
     <details class="mt-4" @(openAdvanced ? "open" : null)>
@@ -136,7 +137,7 @@ else
                 <span>One facility can never use more than one partition.</span>
             }
         </div>
-        <form method="post" action="/Operations/Kafka/plan">
+        <form method="post" action="/Operations/Kafka/plan" data-kafka-busy="Dry run is running.">
             @Html.AntiForgeryToken()
             <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
             <div class="row g-2">
@@ -164,7 +165,8 @@ else
                 </div>
             </div>
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i> Preview increase</button>
+                <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                 @if (!Model.Topics.ReadOnly)
                 {
                     <button class="btn btn-sm btn-success" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
@@ -202,7 +204,7 @@ else
         }
         @if (topic is not null && (topic.RetryPartitions > 0 && topic.RetryPartitions < topic.Partitions || topic.ErrorPartitions > 0 && topic.ErrorPartitions < topic.Partitions))
         {
-            <form class="mt-3" method="post" action="/Operations/Kafka/family/plan">
+            <form class="mt-3" method="post" action="/Operations/Kafka/family/plan" data-kafka-busy="Dry run is running.">
                 @Html.AntiForgeryToken()
                 <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
                 <input type="hidden" name="topic" value="@topicName" />
@@ -218,7 +220,8 @@ else
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i> Preview family</button>
+                    <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                     @if (!Model.Topics.ReadOnly)
                     {
                         <button class="btn btn-sm btn-success" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>

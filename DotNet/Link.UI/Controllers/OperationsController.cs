@@ -26,9 +26,28 @@ public sealed class OperationsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PlanMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
     {
-        var plan = await _kafka.PlanMigrationAsync(form.Topic ?? "", form.Partitions, form.BackupSkip, form.BackupSkipAcknowledged, cancellationToken);
+        var groups = MigrationGroupList.Parse(form.AcknowledgedGroups);
+        var plan = await _kafka.PlanMigrationAsync(form.Topic ?? "", form.Partitions, form.BackupSkip, form.BackupSkipAcknowledged, groups, cancellationToken);
         var page = await LoadAsync(null, null, null, null, plan.Error, MigrateQuery(form.Topic), cancellationToken);
-        return View("Kafka", page with { MigrationPlan = plan.Value ?? page.MigrationPlan, Error = plan.Ok ? page.Error : plan.Error ?? page.Error });
+        var drafted = WithMigrationDraft(page with
+        {
+            MigrationPlan = plan.Value ?? page.MigrationPlan,
+            Error = plan.Ok ? page.Error : plan.Error ?? page.Error
+        }, form);
+        if (plan.Value is not null)
+        {
+            drafted = drafted with
+            {
+                HasDryRunSnapshot = true,
+                DryRunPartitions = form.Partitions,
+                DryRunBackupSkip = form.BackupSkip,
+                DryRunBackupSkipAcknowledged = form.BackupSkipAcknowledged,
+                DryRunAcknowledgedGroups = MigrationGroupList.Canonical(form.AcknowledgedGroups),
+                DraftPlanHash = plan.Value.PlanHash ?? ""
+            };
+        }
+
+        return View("Kafka", drafted);
     }
 
     [HttpPost("Kafka/migrations")]
@@ -36,11 +55,26 @@ public sealed class OperationsController : Controller
     public async Task<IActionResult> RequestMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
     {
         if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
-            return await MigrateError(form, "Type the topic name to confirm the migration.", cancellationToken);
+            return await MigrateError(form, "Type the topic name to confirm the migration.", cancellationToken, keepDraft: true);
 
-        var created = await _kafka.RequestMigrationAsync(form.Topic ?? "", form.Partitions, form.Reason ?? "", form.Confirmation ?? "", form.BackupSkip, form.BackupSkipAcknowledged, form.PlanHash ?? "", cancellationToken);
+        var refusal = MigrationRequestGuard.Refusal(
+            form.Partitions,
+            form.BackupSkip,
+            form.BackupSkipAcknowledged,
+            form.AcknowledgedGroups,
+            form.PlanHash,
+            form.HasDryRunSnapshot,
+            form.DryRunPartitions,
+            form.DryRunBackupSkip,
+            form.DryRunBackupSkipAcknowledged,
+            form.DryRunAcknowledgedGroups);
+        if (refusal is not null)
+            return await MigrateError(form, refusal, cancellationToken, keepDraft: true, clearDryRun: true);
+
+        var groups = MigrationGroupList.Parse(form.AcknowledgedGroups);
+        var created = await _kafka.RequestMigrationAsync(form.Topic ?? "", form.Partitions, form.Reason ?? "", form.Confirmation ?? "", form.BackupSkip, form.BackupSkipAcknowledged, groups, form.PlanHash ?? "", cancellationToken);
         if (created.Value is null)
-            return await MigrateError(form, created.Error ?? "The migration was not requested.", cancellationToken);
+            return await MigrateError(form, created.Error ?? "The migration was not requested.", cancellationToken, keepDraft: true);
 
         return Redirect(MigrateHref(form.Topic, created.Value.Id));
     }
@@ -577,13 +611,18 @@ public sealed class OperationsController : Controller
         return ordered.ToList();
     }
 
-    private async Task<IActionResult> MigrateError(KafkaMigrationForm form, string error, CancellationToken cancellationToken)
+    private async Task<IActionResult> MigrateError(KafkaMigrationForm form, string error, CancellationToken cancellationToken, bool keepDraft = false, bool clearDryRun = false)
     {
         var page = await LoadAsync(null, null, null, null, error, MigrateQuery(form.Topic), cancellationToken);
         var migration = page.Migration;
         if (migration is null && form.MigrationId != Guid.Empty)
             migration = (await _kafka.GetMigrationAsync(form.MigrationId, cancellationToken)).Value;
-        return View("Kafka", page with { Migration = migration, Error = error });
+        var drafted = page with { Migration = migration, Error = error };
+        if (keepDraft)
+            drafted = WithMigrationDraft(drafted, form);
+        if (clearDryRun)
+            drafted = drafted with { HasDryRunSnapshot = false, DraftPlanHash = "" };
+        return View("Kafka", drafted);
     }
 
     private async Task<IActionResult> MigrationPost(KafkaMigrationForm form, Func<Task<KafkaOpsCall<KafkaMigrationRecord>>> call, CancellationToken cancellationToken)
@@ -604,6 +643,26 @@ public sealed class OperationsController : Controller
 
     private static string MigrateHref(string? topic, Guid id) =>
         "/Operations/Kafka?view=migrate&topic=" + Uri.EscapeDataString(topic ?? "") + "&migration=" + id.ToString("D");
+
+    private static ThroughputKafkaPage WithMigrationDraft(ThroughputKafkaPage page, KafkaMigrationForm form)
+    {
+        var snapshot = form.HasDryRunSnapshot;
+        return page with
+        {
+            DraftPartitions = form.Partitions,
+            DraftReason = form.Reason ?? "",
+            DraftConfirmation = form.Confirmation ?? "",
+            DraftBackupSkip = form.BackupSkip,
+            DraftBackupSkipAcknowledged = form.BackupSkipAcknowledged,
+            DraftAcknowledgedGroups = form.AcknowledgedGroups ?? "",
+            DraftPlanHash = snapshot ? form.PlanHash ?? "" : page.DraftPlanHash,
+            HasDryRunSnapshot = snapshot,
+            DryRunPartitions = form.DryRunPartitions,
+            DryRunBackupSkip = form.DryRunBackupSkip,
+            DryRunBackupSkipAcknowledged = form.DryRunBackupSkipAcknowledged,
+            DryRunAcknowledgedGroups = form.DryRunAcknowledgedGroups ?? ""
+        };
+    }
 
     private static ThroughputKafkaPage WithDraft(ThroughputKafkaPage page, KafkaChangeForm form) =>
         page with
