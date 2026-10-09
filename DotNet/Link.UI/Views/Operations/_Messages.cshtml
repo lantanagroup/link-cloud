@@ -209,9 +209,14 @@
 
         @if (fetched)
         {
-            <div id="kafka-browse-result" class="alert @KafkaBrowseText.Tone(browse, error)" role="status" tabindex="-1" data-kafka-result data-result-key="@(browse?.Metadata.Returned)-@(browse?.Metadata.CapHit)-@error">
-                <p class="mb-2"><span class="badge @KafkaBrowseText.BadgeClass(browse, error)">@KafkaBrowseText.Badge(browse, error)</span></p>
-                <p>@KafkaBrowseText.Verdict(browse, error)</p>
+            <div id="kafka-browse-result" class="alert @KafkaBrowseText.Tone(browse, error) lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-browse" data-result-key="@(browse?.Metadata.Returned)-@(browse?.Metadata.CapHit)-@error">
+                <details class="lu-result-details">
+                    <summary>
+                        <span class="badge @KafkaBrowseText.BadgeClass(browse, error)">@KafkaBrowseText.Badge(browse, error)</span>
+                        <span class="lu-result-text">@KafkaBrowseText.Verdict(browse, error)</span>
+                        <button type="button" class="btn btn-sm btn-warning lu-result-dismiss" aria-label="Dismiss result">Dismiss</button>
+                    </summary>
+                    <div class="lu-result-body">
                 @if (browse is not null)
                 {
                     <dl class="row mb-2">
@@ -240,6 +245,8 @@
                 <details>
                     <summary>Details</summary>
                     <p class="mb-0">The read uses group @KafkaBrowseLimits.GroupId. Auto-commit is off, so this page does not move a consumer group. A page stops at @KafkaBrowseLimits.MaxLimit records, @KafkaBrowseLimits.MaxScanned scanned records, or @KafkaBrowseLimits.MaxPageBytes bytes.</p>
+                </details>
+                    </div>
                 </details>
             </div>
         }

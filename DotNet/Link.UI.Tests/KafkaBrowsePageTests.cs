@@ -74,7 +74,13 @@ public class KafkaBrowsePageTests
         page.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">Where to read</legend>");
         page.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">What to keep</legend>");
         page.Should().Contain("id=\"kafka-browse-result\"");
+        page.Should().Contain("data-lu-result=\"kafka-browse\"");
+        page.Should().Contain("lu-result-dismiss");
+        page.Should().Contain("Dismiss result");
         page.Should().Contain("Blocking reasons");
+        var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
+        script.Should().Contain("lu-result-open:");
+        script.Should().Contain("lu-result-dismiss:");
         var detail = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_MessageDetail.cshtml"));
         detail.Should().Contain("KafkaBrowseText.FacilityHref");
         detail.Should().Contain("KafkaBrowseText.ReportHref");

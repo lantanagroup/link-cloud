@@ -313,9 +313,14 @@ else
             @if (Model.ScalePlan is not null)
             {
                 var plan = Model.ScalePlan;
-                <div id="kafka-replica-result" class="alert @scaleTone" role="status" tabindex="-1" data-kafka-result data-result-key="@(plan.Accepted)-@plan.GroupId-@plan.DesiredMembers-@plan.Errors.Count">
-                    <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
-                    <p>@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This replica change cannot run yet.")</p>
+                <div id="kafka-replica-result" class="alert @scaleTone lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-replica" data-result-key="@(plan.Accepted)-@plan.GroupId-@plan.DesiredMembers-@plan.Errors.Count">
+                    <details class="lu-result-details">
+                        <summary>
+                            <span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span>
+                            <span class="lu-result-text">@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This replica change cannot run yet.")</span>
+                            <button type="button" class="btn btn-sm btn-warning lu-result-dismiss" aria-label="Dismiss result">Dismiss</button>
+                        </summary>
+                        <div class="lu-result-body">
                     <dl class="row mb-2">
                         <dt class="col-sm-4">Members</dt>
                         <dd class="col-sm-8">@plan.CurrentMembers to @plan.DesiredMembers</dd>
@@ -345,6 +350,8 @@ else
                             }
                         </details>
                     }
+                        </div>
+                    </details>
                 </div>
             }
             <div class="d-flex flex-wrap gap-2 mt-3">

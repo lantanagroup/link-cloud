@@ -202,9 +202,14 @@ else
                     var shownErrors = plan.Errors.Take(BrokerMovePreview.FoldAfter).ToList();
                     var restErrors = plan.Errors.Skip(BrokerMovePreview.FoldAfter).ToList();
                     var moveTone = plan.Accepted ? "alert-success" : "alert-danger";
-                    <div id="kafka-broker-result" class="alert @moveTone mt-3" role="status" tabindex="-1" data-kafka-result data-result-key="@(plan.Accepted)-@plan.BrokerId-@plan.Moves.Count-@plan.Errors.Count">
-                        <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
-                        <p>@(plan.Accepted ? "Dry run accepted. Nothing has moved yet." : "This broker change cannot run yet.")</p>
+                    <div id="kafka-broker-result" class="alert @moveTone mt-3 lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-broker" data-result-key="@(plan.Accepted)-@plan.BrokerId-@plan.Moves.Count-@plan.Errors.Count">
+                        <details class="lu-result-details">
+                            <summary>
+                                <span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span>
+                                <span class="lu-result-text">@(plan.Accepted ? "Dry run accepted. Nothing has moved yet." : "This broker change cannot run yet.")</span>
+                                <button type="button" class="btn btn-sm btn-warning lu-result-dismiss" aria-label="Dismiss result">Dismiss</button>
+                            </summary>
+                            <div class="lu-result-body">
                         <dl class="row mb-2">
                             <dt class="col-sm-4">Broker</dt>
                             <dd class="col-sm-8">@plan.BrokerId</dd>
@@ -268,6 +273,8 @@ else
                                 }
                             </details>
                         }
+                            </div>
+                        </details>
                     </div>
                 }
                 <div class="d-flex flex-wrap gap-2 mt-3">

@@ -71,6 +71,9 @@ public class KafkaConsoleUxTests
         topic.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">Request only</legend>");
         topic.Should().Contain("A preview does not read these. Submit does.");
         IndexOf(topic, "id=\"kafka-partition-result\"").Should().BeLessThan(IndexOf(topic, ">Preview increase</span>"));
+        topic.Should().Contain("data-lu-result=\"kafka-partition\"");
+        consumers.Should().Contain("data-lu-result=\"kafka-replica\"");
+        brokers.Should().Contain("data-lu-result=\"kafka-broker\"");
 
         consumers.Should().Contain("Add or remove members only after a preview.");
         consumers.Should().Contain("id=\"kafka-replica-result\"");
