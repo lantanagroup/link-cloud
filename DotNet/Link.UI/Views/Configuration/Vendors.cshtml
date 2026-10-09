@@ -22,14 +22,14 @@
             </div>
             <div class="col-12 col-md-5">
                 <label class="form-label" for="secret">Signing key secret name</label>
-                <input id="secret" name="secret" class="form-control" maxlength="127" autocomplete="off" />
+                <input id="secret" name="secret" type="password" value="" class="form-control" maxlength="127" autocomplete="new-password" />
             </div>
             <div class="col-12 col-md-3">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
             </div>
         </form>
-        <p class="text-muted small mb-0 mt-2">The secret name is a Key Vault secret name. Leave it blank when the vendor has no signing key.</p>
+        <p class="text-muted small mb-0 mt-2">The secret name is a Key Vault secret name. Leave it blank when the vendor has no signing key. On an existing vendor, leave it blank to keep the saved name, or check Clear signing key to remove it.</p>
     </div>
 </div>
 
@@ -64,18 +64,22 @@
                                 <input form="@formId" name="name" value="@row.Name" class="form-control form-control-sm" maxlength="255" required aria-label="Name for @row.Name" />
                             </td>
                             <td>
-                                <input form="@formId" name="secret" value="@row.SecretId" class="form-control form-control-sm" maxlength="127" autocomplete="off" aria-label="Signing key secret name for @row.Name" />
+                                <input form="@formId" name="secret" type="password" value="" class="form-control form-control-sm" maxlength="127" autocomplete="new-password" aria-label="Signing key secret name for @row.Name" />
+                                <div class="form-check mt-1">
+                                    <input form="@formId" class="form-check-input" type="checkbox" id="clear-secret-@row.Id" name="clearSecret" value="true" />
+                                    <label class="form-check-label" for="clear-secret-@row.Id">Clear signing key</label>
+                                </div>
                             </td>
                             <td><a asp-action="Versions" asp-route-vendorId="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Versions</a></td>
                             <td>
                                 <div class="lu-row-actions">
                                     <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVendor">
                                         <input type="hidden" name="id" value="@row.Id" />
-                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Name"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Name"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Name"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
+                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Name"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
                                     </form>
                                     <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Name"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Name"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </div>
                             </td>

@@ -55,9 +55,9 @@ public sealed class ConfigurationController : Controller
 
     [HttpPost("Vendors")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveVendor(Guid? id, string? name, string? secret, CancellationToken cancellationToken)
+    public async Task<IActionResult> SaveVendor(Guid? id, string? name, string? secret, bool clearSecret, CancellationToken cancellationToken)
     {
-        Temp(await _configuration.SaveVendorAsync(id, name, secret, cancellationToken));
+        Temp(await _configuration.SaveVendorAsync(id, name, secret, clearSecret, cancellationToken));
         return RedirectToAction(nameof(Vendors));
     }
 

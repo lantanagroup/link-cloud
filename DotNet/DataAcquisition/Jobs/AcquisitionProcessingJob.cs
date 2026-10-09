@@ -358,25 +358,8 @@ public class AcquisitionProcessingJob : IJob
         }
     }
 
-    private static bool IsWithinAcquisitionWindow(TimeSpan? minAcquisitionPullTime, TimeSpan? maxAcquisitionPullTime)
-    {
-        // No time restrictions
-        if (minAcquisitionPullTime == default && maxAcquisitionPullTime == default)
-        {
-            return true;
-        }
-
-        var currentTime = DateTime.UtcNow.TimeOfDay;
-
-        // Same-day window (e.g., 9 AM to 5 PM)
-        if (minAcquisitionPullTime <= maxAcquisitionPullTime)
-        {
-            return currentTime >= minAcquisitionPullTime && currentTime <= maxAcquisitionPullTime;
-        }
-
-        // Midnight-spanning window (e.g., 8 PM to 4 AM)
-        return currentTime >= minAcquisitionPullTime || currentTime <= maxAcquisitionPullTime;
-    }
+    private static bool IsWithinAcquisitionWindow(TimeSpan? minAcquisitionPullTime, TimeSpan? maxAcquisitionPullTime) =>
+        AcquisitionWindow.Contains(minAcquisitionPullTime, maxAcquisitionPullTime, DateTime.UtcNow.TimeOfDay);
 
     private static string ReadyToAcquireKey(string? facilityId, string? patientId)
     {

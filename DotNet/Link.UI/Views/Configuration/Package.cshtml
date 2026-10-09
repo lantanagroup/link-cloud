@@ -9,7 +9,7 @@
 <partial name="_Alerts" />
 
 <div class="au-card card mb-3">
-    <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Package", Value = Model.Name, CopyLabel = "Copy package" })" /></div>
+    <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Package", Value = Model.Name, Copy = false })" /></div>
     <div class="card-body">
         @if (!string.IsNullOrWhiteSpace(Model.LoadError))
         {

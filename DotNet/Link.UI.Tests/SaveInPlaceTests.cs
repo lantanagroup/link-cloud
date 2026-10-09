@@ -71,7 +71,10 @@ public class SaveInPlaceTests
     {
         var page = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Tenants/Facility.cshtml"));
         page.Should().Contain("id=\"facilitySaveBar\"");
-        page.Should().Contain("btn-au-neutral");
+        page.Should().Contain("id=\"facilitySaveButton\"");
+        page.Should().Contain("btn btn-success\" id=\"facilitySaveButton\"");
+        page.Should().Contain("btn btn-warning\" id=\"facilityCancelButton\"");
+        page.Should().NotContain("btn-au-neutral");
         page.Should().NotContain("LinkSDK");
 
         var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/facility-save.js"));

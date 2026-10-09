@@ -16,4 +16,10 @@ public sealed class LinkUiFeatureOptions
     /// Off in production. On for local Development. Test and QA set this true in their own settings.
     /// </summary>
     public bool AutomationEnabled { get; set; }
+
+    /// <summary>
+    /// Copied from Authentication:RequireBffSession. When false, Login stays on this host
+    /// and does not call the Admin.BFF challenge. When true, Login uses that challenge.
+    /// </summary>
+    public bool SignInRequired { get; set; }
 }

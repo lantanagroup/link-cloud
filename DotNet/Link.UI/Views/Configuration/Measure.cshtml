@@ -27,8 +27,8 @@
             <dd class="col-sm-9">@(Model.EntryCount?.ToString() ?? "—")</dd>
         </dl>
         <div class="d-flex flex-wrap gap-2 mt-3">
-            <a class="btn btn-au-neutral" asp-action="MeasureCql" asp-route-id="@Model.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">View CQL</a>
-            <a class="btn btn-au-neutral" asp-action="MeasureEvaluate" asp-route-id="@Model.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Evaluate</a>
+            <a class="btn btn-au-link" asp-action="MeasureCql" asp-route-id="@Model.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">View CQL</a>
+            <a class="btn btn-au-link" asp-action="MeasureEvaluate" asp-route-id="@Model.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Evaluate</a>
         </div>
         @if (Model.Libraries.Count > 0)
         {

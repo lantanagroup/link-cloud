@@ -31,7 +31,7 @@
         </select>
     </div>
     <div class="col-auto">
-        <button class="btn btn-au-neutral" type="submit">Open</button>
+        <button class="btn btn-au-link" type="submit">Open</button>
     </div>
 </form>
 
@@ -160,7 +160,7 @@
             <input class="form-control" id="migrate-confirm" name="confirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
         </div>
         <div class="col-auto mt-4">
-            <button class="btn btn-au-neutral" type="submit" formaction="/Operations/Kafka/migrations/plan">Dry run</button>
+            <button class="btn btn-au-execute" type="submit" formaction="/Operations/Kafka/migrations/plan">Dry run</button>
             <button class="btn btn-success" type="submit">Request</button>
         </div>
     </form>
@@ -196,19 +196,19 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="migrationId" value="@migration.Id" />
                     <input type="hidden" name="topic" value="@migration.Topic" />
-                    <button class="btn btn-au-neutral" type="submit" aria-label="Approve migration">Approve</button>
+                    <button class="btn btn-success" type="submit" aria-label="Approve migration">Approve</button>
                 </form>
                 <form method="post" action="/Operations/Kafka/migrations/execute">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="migrationId" value="@migration.Id" />
                     <input type="hidden" name="topic" value="@migration.Topic" />
-                    <button class="btn btn-success" type="submit" aria-label="Execute migration">Execute</button>
+                    <button class="btn btn-au-execute" type="submit" aria-label="Execute migration">Execute</button>
                 </form>
                 <form method="post" action="/Operations/Kafka/migrations/abort">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="migrationId" value="@migration.Id" />
                     <input type="hidden" name="topic" value="@migration.Topic" />
-                    <button class="btn btn-au-neutral" type="submit" aria-label="Abort migration">Abort</button>
+                    <button class="btn btn-warning" type="submit" aria-label="Abort migration">Abort</button>
                 </form>
             </div>
             <form class="row g-2 mt-3" method="post" action="/Operations/Kafka/migrations/go">
@@ -220,7 +220,7 @@
                     <input class="form-control" id="migrate-go" name="confirmation" autocomplete="off" aria-label="Type the topic name before go" />
                 </div>
                 <div class="col-auto mt-4">
-                    <button class="btn btn-success" type="submit">Go</button>
+                    <button class="btn btn-au-execute" type="submit">Go</button>
                 </div>
             </form>
             <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations/recover">
@@ -232,9 +232,9 @@
                     <input class="form-control" id="migrate-recover" name="confirmation" autocomplete="off" aria-label="Type the topic name to recover the original count" />
                 </div>
                 <div class="col-auto mt-4 d-flex flex-wrap gap-2">
-                    <button class="btn btn-au-neutral" type="submit" name="action" value="original">Recover original</button>
-                    <button class="btn btn-au-neutral" type="submit" name="action" value="forward">Continue forward</button>
-                    <button class="btn btn-au-neutral" type="submit" name="action" value="deleteForeign">Delete empty foreign topic</button>
+                    <button class="btn btn-warning" type="submit" name="action" value="original">Recover original</button>
+                    <button class="btn btn-au-execute" type="submit" name="action" value="forward">Continue forward</button>
+                    <button class="btn btn-danger" type="submit" name="action" value="deleteForeign">Delete empty foreign topic</button>
                 </div>
             </form>
             @if (migration.ManualChecklist)
@@ -248,7 +248,7 @@
                         <input class="form-control" id="migrate-workload" name="workload" />
                     </div>
                     <div class="col-auto mt-4">
-                        <button class="btn btn-au-neutral" type="submit">Confirm step</button>
+                        <button class="btn btn-success" type="submit">Confirm step</button>
                     </div>
                 </form>
             }
@@ -274,7 +274,7 @@
                 <input class="form-control" id="migrate-backup" name="confirmation" autocomplete="off" aria-label="Type the backup topic name to delete it" />
             </div>
             <div class="col-auto mt-4">
-                <button class="btn btn-au-neutral" type="submit">Delete backup</button>
+                <button class="btn btn-danger" type="submit">Delete backup</button>
             </div>
         </form>
     }

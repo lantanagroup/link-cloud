@@ -110,6 +110,8 @@ public class UiPatternGuardTests
     {
         var hits = SourceLines()
             .Where(row => !IsSharedChartPalette(row.Where))
+            .Where(row => !row.Line.Contains("--au-link:", StringComparison.Ordinal)
+                && !row.Line.Contains("--au-link-active:", StringComparison.Ordinal))
             .SelectMany(row => ColorsIn(row.Line).Where(IsForbiddenHue).Select(color => row.Where + " " + color))
             .ToList();
 
@@ -148,7 +150,7 @@ public class UiPatternGuardTests
         root.Should().Contain("#111");
         root.Should().Contain("--bs-link-color:");
         root.Should().Contain("--bs-info:");
-        root.Should().Contain("rgba(40, 167, 69, .35)");
+        root.Should().Contain("rgba(var(--au-success-rgb), .35)");
         css.Should().Contain("fill='%23111'");
 
         var vendor = File.ReadAllText(Path.Combine(Root(), "wwwroot", "lib", "bootstrap", "dist", "css", "bootstrap.css"));

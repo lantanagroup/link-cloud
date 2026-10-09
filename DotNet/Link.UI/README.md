@@ -33,10 +33,12 @@ Both the proxy and the server-side user chip use **`ServiceRegistry:AdminBffServ
 | `/api/logout`           | `{AdminBff}/api/logout` |
 | `/api/{**catch-all}`    | `{AdminBff}/api/...` |
 
-- MVC `AuthController` Login/Logout redirect to `/api/login` and `/api/logout`.
-- Admin.BFF registers those auth routes only when its own `Authentication:EnableAnonymousAccess` is false. A local compose BFF left in anonymous mode answers `/api/login` and `/api/user` with 404.
+- Sign-in is required exactly when `Authentication:RequireBffSession` is true. That is this host's equivalent of the retired Admin.UI `authRequired` flag. `Authentication:EnableAnonymousAccess` only decides whether the shell is browsable when a session is not required. Link.UI does not probe Admin.BFF to discover whether `/api/login` is mapped.
+- When sign-in is not required, `AuthController` Login redirects to the validated `returnUrl` or the dashboard, and Logout redirects to the dashboard. Neither action calls Admin.BFF, and the sidebar does not show a Login link.
+- When sign-in is required, Login and the shell gate redirect to `/api/login`. The local page is stored in an HttpOnly, SameSite=Lax cookie (`link.ui.return`, ten minutes) and consumed once on `GET /dashboard`. `ReturnUrlRules` accepts only a same-site path.
+- Admin.BFF registers those auth routes only when its own `Authentication:EnableAnonymousAccess` is false. A local compose BFF left in anonymous mode answers `/api/login` and `/api/user` with 404, which is why Login must not call that path unless sign-in is required.
 - Admin.BFF sends the browser to `/dashboard` after login and `/logout` after logout. This host maps those to Home.
-- The login proxy sets `Referer` to the Link.UI origin root so Admin.BFF's post-login redirect is `{origin}/dashboard` from every page.
+- The login proxy sets `Referer` to the Link.UI origin root so Admin.BFF's post-login redirect is `{origin}/dashboard` from every page. The return cookie, not Referer, restores the page the person left.
 - Server-side user display uses `AdminBffUserService` (`HttpClient` to Admin.BFF `/api/user` with the browser `Cookie` header forwarded). An empty 200 body (Development Admin.BFF anonymous mode) stays signed out.
 - `Authentication:RequireBffSession=true` redirects unauthenticated MVC requests to `/api/login`, whether or not anonymous access is enabled. If Admin.BFF cannot be reached, those pages return 503.
 - `Authentication:EnableAnonymousAccess=false` with `RequireBffSession=false` returns 503 for everything except `/health` and `/api` (Automation.UI posture).

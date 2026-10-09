@@ -29,12 +29,12 @@
         <div class="d-flex gap-2 align-items-center" id="runHeaderActions">
             @if (Model.Status.IsCancellable())
             {
-                <button type="button" class="btn btn-danger btn-sm" id="btnCancelRun"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+                <button type="button" class="btn btn-warning btn-sm" id="btnCancelRun"><i class="bi bi-x-circle me-1"></i>Cancel</button>
             }
             @if (Model.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
             {
                 <button type="button" class="btn btn-danger btn-sm" id="btnDeleteRun"><i class="bi bi-trash me-1"></i>Delete</button>
-                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-neutral">
+                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-link">
                     <i class="bi bi-download me-1"></i>Export Diagnostics
                 </a>
             }
@@ -147,9 +147,9 @@
             <div class="mb-3" id="liveInjectControls">
                 <h6 class="text-uppercase text-muted small mb-2">Add to pool</h6>
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnLiveGenerate">Generate</button>
-                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnLiveUpload">Upload</button>
-                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnLiveReference">FHIR ID</button>
+                    <button type="button" class="btn btn-au-execute btn-sm" id="btnLiveGenerate">Generate</button>
+                    <button type="button" class="btn btn-success btn-sm" id="btnLiveUpload">Upload</button>
+                    <button type="button" class="btn btn-au-link btn-sm" id="btnLiveReference">FHIR ID</button>
                 </div>
                 <input type="file" id="liveUploadFile" accept=".json,application/json" class="d-none" />
             </div>
@@ -190,7 +190,7 @@
     <div class="au-card" id="testConfigCard" style="display:none;">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-gear me-2"></i>Test Configuration</span>
-            <a href="#" class="btn btn-sm btn-au-neutral" id="btnViewManifest" style="display:none;">
+            <a href="#" class="btn btn-sm btn-au-link" id="btnViewManifest" style="display:none;">
                 <i class="bi bi-card-checklist me-1"></i>Generation Manifest
             </a>
         </div>
@@ -318,7 +318,7 @@
             <div class="au-card">
                 <div class="card-header" role="button" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal" style="cursor:pointer;">
                     <i class="bi bi-download me-2"></i>Data acquisition logs
-                    <span class="badge bg-light text-dark ms-2" id="dataAcqTotalLogs">0</span>
+                    <span class="text-muted ms-2" id="dataAcqTotalLogs">0</span>
                 </div>
                 <div class="card-body">
                     <div class="row g-3 mb-3">
@@ -441,8 +441,8 @@
                     <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
                         <span class="small text-muted" id="logPageInfo">Loading stored log…</span>
                         <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-au-neutral" id="logOlder">Older</button>
-                            <button type="button" class="btn btn-au-neutral" id="logNewer" disabled>Newer</button>
+                            <button type="button" class="btn btn-au-link" id="logOlder">Older</button>
+                            <button type="button" class="btn btn-au-link" id="logNewer" disabled>Newer</button>
                         </div>
                     </div>
                     <pre id="logBox" class="au-log-console mb-0"></pre>
@@ -455,7 +455,7 @@
 <div id="errorFlyout" style="position:fixed; top:0; right:-480px; width:460px; height:100%; background:#fff; box-shadow:-4px 0 20px rgba(0,0,0,.2); z-index:1055; transition:right .2s ease;">
     <div class="d-flex justify-content-between align-items-center border-bottom p-3">
         <h6 class="mb-0" id="errorFlyoutTitle">Errors</h6>
-        <button class="btn btn-sm btn-au-neutral" id="closeFlyout">Close</button>
+        <button class="btn btn-sm btn-warning" id="closeFlyout">Close</button>
     </div>
     <div class="p-3" id="errorFlyoutBody" style="overflow:auto; height: calc(100% - 60px);"></div>
 </div>
@@ -477,7 +477,7 @@
                             <input type="text" class="form-control form-control-sm" id="exModalSearch" data-lu-query="exceptions" placeholder="Search exceptions…">
                         </div>
                         <div class="col-auto">
-                            <span class="badge au-badge-muted" id="exModalVisibleCount">0</span>
+                            <span class="text-muted" id="exModalVisibleCount">0</span>
                             <span class="small text-muted">shown</span>
                         </div>
                     </div>

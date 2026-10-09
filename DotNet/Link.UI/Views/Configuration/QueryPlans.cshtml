@@ -17,7 +17,7 @@
                 <input id="facilityId" name="facilityId" value="@Model.FacilityId" class="form-control" required />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-au-neutral">Look up</button>
+                <button type="submit" class="btn btn-success">Look up</button>
             </div>
         </form>
     </div>
@@ -62,7 +62,7 @@
                                 }
                             </td>
                             <td>
-                                <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-controller="Tenants" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@plan.Type" title="Open editor" aria-label="Open editor"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                <a class="btn btn-sm btn-au-link lu-icon-btn" asp-controller="Tenants" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@plan.Type" title="Open editor" aria-label="Open editor"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                             </td>
                         </tr>
                     }

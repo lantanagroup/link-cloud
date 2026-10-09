@@ -241,13 +241,27 @@ public sealed partial class ConfigurationService
         return page;
     }
 
-    public async Task<ConfigurationAction> SaveVendorAsync(Guid? id, string? name, string? secret, CancellationToken cancellationToken)
+    public async Task<ConfigurationAction> SaveVendorAsync(Guid? id, string? name, string? secret, bool clearSecret, CancellationToken cancellationToken)
     {
         if (_tenant is null)
             return ConfigurationAction.Fail(TenantNotConfigured);
         var nameError = ConfigurationRules.CheckName(name, out var cleanName);
         if (nameError is not null)
             return ConfigurationAction.Fail(nameError);
+
+        if (id is not null && string.IsNullOrWhiteSpace(secret) && !clearSecret)
+        {
+            var existing = await _tenant.GetVendorAsync(id.Value, cancellationToken);
+            if (!Ok(existing) || existing.Body is null)
+            {
+                return ConfigurationAction.Fail(Ok(existing)
+                    ? "The saved signing key could not be read."
+                    : Fail("Tenant", existing.StatusCode, existing.RawBody));
+            }
+
+            secret = existing.Body.Authentication?.SigningKeySecretId;
+        }
+
         var secretError = ConfigurationRules.CheckSecret(secret, out var cleanSecret);
         if (secretError is not null)
             return ConfigurationAction.Fail(secretError);

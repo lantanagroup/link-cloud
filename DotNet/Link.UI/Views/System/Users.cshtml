@@ -58,7 +58,7 @@
                 <input id="pageSize" name="pageSize" value="@query.PageSize" class="form-control" inputmode="numeric" />
             </div>
             <div class="col-12 col-md-1">
-                <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-search me-1"></i>Search</button>
             </div>
             <div class="col-12">
                 <div class="form-check form-check-inline">
@@ -100,7 +100,7 @@
             </div>
             <div class="col-12 col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Roles are assigned from the account page after the account exists.</p>
@@ -148,11 +148,11 @@
                             </td>
                             <td class="text-nowrap">
                                 <div class="lu-row-actions">
-                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Account" asp-route-id="@user.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Account" asp-route-id="@user.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                                     @if (user.IsDeleted)
                                     {
                                         <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline" onsubmit="return confirm('Restore this account?');">
-                                            <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                                            <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
                                         </form>
                                     }
                                 </div>
@@ -165,11 +165,11 @@
             <nav aria-label="Accounts pages">
                 @if (bar.HasPrevious)
                 {
-                    <a class="btn btn-sm btn-au-neutral" asp-action="Users" asp-all-route-data="Route(bar.Page - 1)">Previous</a>
+                    <a class="btn btn-sm btn-au-link" asp-action="Users" asp-all-route-data="Route(bar.Page - 1)">Previous</a>
                 }
                 @if (bar.HasNext)
                 {
-                    <a class="btn btn-sm btn-au-neutral" asp-action="Users" asp-all-route-data="Route(bar.Page + 1)">Next</a>
+                    <a class="btn btn-sm btn-au-link" asp-action="Users" asp-all-route-data="Route(bar.Page + 1)">Next</a>
                 }
                 <span class="text-muted small ms-2">@bar.TotalCount accounts</span>
             </nav>
