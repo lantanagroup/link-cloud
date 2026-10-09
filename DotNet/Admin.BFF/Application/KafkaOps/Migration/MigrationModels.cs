@@ -110,6 +110,7 @@ public sealed class MigrationRecord
     public Dictionary<string, int> ProducerReplicas { get; set; } = new(StringComparer.Ordinal);
     public Dictionary<string, int> ConsumerReplicas { get; set; } = new(StringComparer.Ordinal);
     public List<string> Groups { get; set; } = [];
+    public List<string> GroupsWithCommits { get; set; } = [];
     public List<string> SiblingsToGrow { get; set; } = [];
     public List<long> SampleHighWatermarks { get; set; } = [];
     public List<long> FrozenHighWatermarks { get; set; } = [];
@@ -143,6 +144,7 @@ public sealed class MigrationRecord
         clone.ProducerReplicas = new Dictionary<string, int>(ProducerReplicas, StringComparer.Ordinal);
         clone.ConsumerReplicas = new Dictionary<string, int>(ConsumerReplicas, StringComparer.Ordinal);
         clone.Groups = [.. Groups];
+        clone.GroupsWithCommits = [.. GroupsWithCommits];
         clone.SiblingsToGrow = [.. SiblingsToGrow];
         clone.SampleHighWatermarks = [.. SampleHighWatermarks];
         clone.FrozenHighWatermarks = [.. FrozenHighWatermarks];

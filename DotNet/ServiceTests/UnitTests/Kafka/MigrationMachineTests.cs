@@ -338,29 +338,40 @@ public class MigrationMachineTests
     public void CatalogGroupWithNoCommit_IsNotAssignedOffsets()
     {
         var world = MigrationWorld.Create();
+        world.Offsets.Remove("measureeval-events");
         var record = MigrationDriver.Until(world.Record(), world, MigrationStep.C5);
+        Assert.Equal(["measureeval"], record.GroupsWithCommits);
         var seen = world.Observe(record);
         var width = seen.HighWatermarks.Count;
-        seen.Groups["measureeval-events"] = new GroupObservation
+        foreach (var name in record.Groups)
         {
-            State = "Empty",
-            Members = 0,
-            Lag = 0,
-            Committed = Enumerable.Repeat(-1L, width).ToList()
-        };
+            seen.Groups[name] = new GroupObservation
+            {
+                State = "Empty",
+                Members = 0,
+                Lag = 0,
+                Committed = Enumerable.Repeat(-1L, width).ToList()
+            };
+        }
+
         var tick = MigrationMachine.Describe(record, seen, MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
-        var writes = tick.Effects.OfType<MigrationEffect.WriteOffsets>().Select(item => item.Group).ToList();
-        Assert.Contains("measureeval", writes);
-        Assert.DoesNotContain("measureeval-events", writes);
-        world.Apply(tick.Effects, tick.Persist ?? record);
-        var after = world.Observe(tick.Persist ?? record);
+        Assert.Null(tick.Completed);
+        var noted = tick.Persist!;
+        Assert.Contains(noted.Timeline, entry => entry.Text == "Started C5");
+        var writes = tick.Effects.OfType<MigrationEffect.WriteOffsets>().ToList();
+        Assert.Equal(["measureeval"], writes.Select(item => item.Group).ToList());
+        Assert.All(writes[0].Offsets, offset => Assert.Equal(0, offset));
+        Assert.Equal(width, writes[0].Offsets.Count);
+
+        world.Apply(tick.Effects, noted);
+        var after = world.Observe(noted);
         after.Groups["measureeval-events"] = new GroupObservation
         {
             State = "Empty",
             Members = 0,
             Committed = Enumerable.Repeat(-1L, after.HighWatermarks.Count).ToList()
         };
-        var advanced = MigrationMachine.Describe(tick.Persist ?? record, after, MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
+        var advanced = MigrationMachine.Describe(noted, after, MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
         Assert.Equal(MigrationStep.D1, advanced.Completed!.Step);
         Assert.True(MigrationGroups.Ready("Empty", 0, [-1, -1]));
     }
@@ -782,19 +793,11 @@ internal sealed class MigrationWorld
         foreach (var group in record.Groups)
         {
             var committed = Offsets.TryGetValue(group, out var offsets) ? offsets : [];
-            var lag = 0L;
-            if (topic is not null)
-            {
-                var marks = seen.HighWatermarks;
-                for (var i = 0; i < marks.Count; i++)
-                    lag += Math.Max(0, marks[i] - (i < committed.Count ? committed[i] : 0));
-            }
-
             seen.Groups[group] = new GroupObservation
             {
                 State = GroupState.GetValueOrDefault(group, "Empty"),
                 Members = GroupMembers.GetValueOrDefault(group),
-                Lag = lag,
+                Lag = MigrationGroups.Lag(topic is null ? [] : seen.HighWatermarks, committed),
                 Committed = [.. committed]
             };
         }
