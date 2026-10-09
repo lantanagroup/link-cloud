@@ -4247,3 +4247,13 @@ button.btn-au-action.disabled,
 .lu-json-bool,
 .lu-json-null { color: #ffb4bc; }
 .lu-json-punct { color: #c5c9ce; }
+
+.card-header .au-info-icon,
+.card-header .au-info-icon:hover {
+  color: inherit;
+  opacity: .85;
+}
+.lu-measure-badge {
+  max-width: 11rem;
+  vertical-align: middle;
+}
