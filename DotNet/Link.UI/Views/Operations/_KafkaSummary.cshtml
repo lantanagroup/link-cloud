@@ -1,0 +1,19 @@
+@model KafkaSummaryStrip
+<div class="lu-kafka-summary" aria-label="@Model.TotalLabel summary">
+    <div>
+        <div class="lu-kafka-summary-value">@Model.Total</div>
+        <div class="lu-kafka-summary-label">@Model.TotalLabel</div>
+    </div>
+    <div>
+        <div class="lu-kafka-summary-value">@Model.Attention</div>
+        <div class="lu-kafka-summary-label">Need attention</div>
+    </div>
+    <div>
+        <div class="lu-kafka-summary-value">@Model.Hottest</div>
+        <div class="lu-kafka-summary-label">@Model.HottestLabel</div>
+    </div>
+    <div class="lu-kafka-summary-wide">
+        <div class="lu-kafka-summary-value lu-kafka-summary-text">@Model.Skew</div>
+        <div class="lu-kafka-summary-label">Skew</div>
+    </div>
+</div>

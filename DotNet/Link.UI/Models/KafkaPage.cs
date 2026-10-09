@@ -19,6 +19,7 @@ public sealed record ThroughputKafkaPageQuery
     public string Sort { get; init; } = "topic";
     public string Dir { get; init; } = "asc";
     public int Page { get; init; } = 1;
+    public int PartPage { get; init; } = 1;
     public int PageSize { get; init; } = 25;
     public string Family { get; init; } = "";
     public string KeyClass { get; init; } = "";
@@ -46,10 +47,13 @@ public sealed record ThroughputKafkaPageQuery
         var view = One(query, "view");
         var pageSize = int.TryParse(One(query, "pageSize"), out var size) ? size : 25;
         var page = int.TryParse(One(query, "page"), out var number) ? number : 1;
+        var part = int.TryParse(One(query, "part"), out var partNumber) ? partNumber : 1;
         if (pageSize is not (10 or 25 or 50))
             pageSize = 25;
         if (page < 1)
             page = 1;
+        if (part < 1)
+            part = 1;
         if (sort is not ("topic" or "partitions" or "lag" or "rate" or "group" or "state" or "key" or "brokers" or "leaders"))
             sort = "topic";
         if (dir is not ("asc" or "desc"))
@@ -75,6 +79,7 @@ public sealed record ThroughputKafkaPageQuery
             Sort = sort,
             Dir = dir,
             Page = page,
+            PartPage = part,
             PageSize = pageSize,
             Family = One(query, "family"),
             KeyClass = One(query, "keyClass"),
@@ -97,9 +102,16 @@ public sealed record ThroughputKafkaPageQuery
         };
     }
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false)
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null)
     {
         var chosenView = view ?? View;
+        var partPage = part ?? PartPage;
+        var changed = (view is not null && !string.Equals(view, View, StringComparison.Ordinal))
+            || (group is not null && !string.Equals(group, Group, StringComparison.Ordinal))
+            || (topic is not null && !string.Equals(topic, TopicName, StringComparison.Ordinal))
+            || (broker is not null && !string.Equals(broker, Broker, StringComparison.Ordinal));
+        if (part is null && changed)
+            partPage = 1;
         var values = new Dictionary<string, string?>
         {
             ["q"] = q ?? Q,
@@ -117,6 +129,8 @@ public sealed record ThroughputKafkaPageQuery
             ["advanced"] = (advanced ?? Advanced) ? "1" : "",
             ["returnUrl"] = ReturnUrl
         };
+        if (partPage > 1)
+            values["part"] = partPage.ToString();
         if (chosenView == Messages)
         {
             values["mode"] = BrowseMode;
@@ -148,6 +162,15 @@ public sealed record ThroughputKafkaPageQuery
 
         return href;
     }
+
+    public ThroughputKafkaPageQuery WithSeek(string mode, long? offset) =>
+        this with
+        {
+            View = Messages,
+            BrowseMode = string.IsNullOrWhiteSpace(mode) ? "newest" : mode.Trim().ToLowerInvariant(),
+            BrowseOffset = offset,
+            OpenRecord = ""
+        };
 
     public string ExportHref()
     {

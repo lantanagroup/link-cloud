@@ -11,8 +11,9 @@
         ? (IReadOnlyList<KafkaNamedTopic>)Model.Family.Members
         : KafkaBrowseAllowList.MembersOf(topicName);
     var familyChecked = Model.Family is not null;
-    var topics = Model.Topics.Topics;
-    var topicKnown = topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal));
+    var topics = Model.TopicRows;
+    var topicKnown = topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal))
+        || Model.Topics.Topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal));
     var families = topics
         .GroupBy(row => string.IsNullOrWhiteSpace(row.Family) ? "Other" : row.Family, StringComparer.Ordinal)
         .OrderBy(group => group.Key, StringComparer.Ordinal);
@@ -20,7 +21,7 @@
 
 <h2 class="h5 mt-3">Read messages</h2>
 <p>This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Fetch shows one page. Export reads that same seek again and writes an audit of the rows it returns.</p>
-<ol>
+<ol class="lu-kafka-steps">
     <li>Choose the topic. The family tabs move between the main topic and its error, retry, and redrive topics.</li>
     <li>Set the seek. Fetch reads that window and changes nothing on the broker.</li>
     <li>Open a row for the payload and the facility or report it belongs to.</li>
@@ -72,7 +73,7 @@
                 </optgroup>
             }
         </select>
-        <p class="form-text">Topics are grouped by family. Open keeps the current seek.</p>
+        <p class="form-text">Topics are grouped by family. This is one page of the search. Open keeps the current seek.</p>
     </div>
     <div class="col-auto">
         <button class="btn btn-au-link" type="submit">Open</button>
@@ -255,8 +256,23 @@
 
     @if (browse is { Records.Count: > 0 })
     {
+        var seek = KafkaBrowseText.SeekLinks(query, browse);
         <h3 class="h6 mt-4">Records</h3>
-        <p class="text-muted">@browse.Records.Count shown. Open a row for the payload. Headers and the raw key stay inside that row.</p>
+        <p class="text-muted">@browse.Records.Count shown. Open a row for the payload. Headers and the raw key stay inside that row. Offsets on this page run from @seek.Earliest to @seek.Latest. This is one page of offsets, not a cursor across partitions.</p>
+        <div class="lu-kafka-pager">
+            <span>At most @KafkaBrowseLimits.MaxLimit records. The read does not commit offsets.</span>
+            <span class="d-flex gap-2">
+                @if (seek.Earlier)
+                {
+                    <a class="btn btn-sm btn-au-link" href="@seek.EarlierHref">Earlier</a>
+                }
+                @if (seek.Later)
+                {
+                    <a class="btn btn-sm btn-au-link" href="@seek.LaterHref">Later</a>
+                }
+            </span>
+        </div>
+        <div class="au-card card">
         <div class="table-responsive">
             <table class="table table-sm align-middle">
                 <thead>
@@ -396,6 +412,7 @@
                 }
                 </tbody>
             </table>
+        </div>
         </div>
     }
     else if (browse is not null)

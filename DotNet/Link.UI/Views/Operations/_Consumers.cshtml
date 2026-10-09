@@ -3,7 +3,8 @@
     var query = Model.Query;
     var origin = ReturnUrlRules.Here(Context.Request);
     var selected = Model.SelectedGroup;
-    var groupProblems = Model.GroupRows.Where(KafkaAttention.Group).ToList();
+    var groupHot = Model.GroupRows.Where(KafkaAttention.Group).OrderByDescending(row => row.TotalLag).ThenBy(row => row.GroupId, StringComparer.OrdinalIgnoreCase).ToList();
+    var groupProblems = groupHot.Take(KafkaWindows.HottestCap).ToList();
     var consumerStep = 1;
     if (Model.ScalePlan is not null && Model.ScalePlan.Accepted)
         consumerStep = 5;
@@ -16,9 +17,9 @@
 
 <h2 class="h5 mt-3">Consumer replicas</h2>
 <p>A replica is a member of a consumer group. Add or remove members only after a preview. A count above the partition ceiling is refused, because the extra member would sit idle.</p>
-<ol>
+<ol class="lu-kafka-steps">
     <li>Choose the group. Groups that are behind or unowned are listed first.</li>
-    <li>Read lag and members. Healthy rows stay folded.</li>
+    <li>Read lag and members. Committed partitions are one page, worst first.</li>
     <li>Preview an add or a remove. Nothing changes.</li>
     <li>Review the result. A refusal lists each reason.</li>
     <li>Submit the add or the remove. The reason is required.</li>
@@ -39,7 +40,7 @@
 @if (groupProblems.Count > 0)
 {
     <div class="au-card card mt-3">
-        <div class="card-header">Groups that need attention (@groupProblems.Count)</div>
+        <div class="card-header">Groups that need attention (@groupHot.Count)</div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
@@ -66,6 +67,10 @@
                     </tbody>
                 </table>
             </div>
+            @if (groupHot.Count > groupProblems.Count)
+            {
+                <p class="text-muted mt-2 mb-0">@groupProblems.Count of @groupHot.Count shown. The rest are in the group table, worst lag first.</p>
+            }
         </div>
     </div>
 }
@@ -116,7 +121,19 @@ else if (Model.GroupRows.Count > 0)
         <p class="text-muted mb-0 mt-2">No groups match this search.</p>
     }
 </details>
-<p class="text-muted mt-2 mb-0">@Model.GroupCount groups. Page @query.Page of @Model.GroupPages.</p>
+<div class="lu-kafka-pager">
+    <span>@Model.GroupCount groups. Page @query.Page of @Model.GroupPages.</span>
+    <span class="d-flex gap-2">
+        @if (query.Page > 1)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
+        }
+        @if (query.Page < Model.GroupPages)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
+        }
+    </span>
+</div>
 
 @if (selected is null)
 {
@@ -124,7 +141,8 @@ else if (Model.GroupRows.Count > 0)
 }
 else
 {
-    var hotRows = selected.Partitions.Where(row => KafkaAttention.CommittedPartition(row.Lag, row.Owned)).ToList();
+    var committed = KafkaWindows.Committed(selected.Partitions, query.PartPage, query.PageSize);
+    var shownMembers = selected.Members.Take(query.PageSize).ToList();
     <div class="au-card card mt-3">
         <div class="card-header">@selected.GroupId @if (!selected.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</div>
         <div class="card-body">
@@ -135,28 +153,78 @@ else
         </div>
     </div>
 
-    @if (hotRows.Count > 0)
+    @if (selected.Partitions.Count == 0)
     {
+        <p class="text-muted mb-0 mt-3">This group has no committed partitions.</p>
+    }
+    else
+    {
+        <partial name="_KafkaSummary" model="@(new KafkaSummaryStrip(committed.Total, "Committed", committed.Hot, "Hottest lag", committed.Hottest.ToString("N0"), committed.Skew))" />
+        @if (committed.Hot > 0)
+        {
+            <div class="au-card card mt-3">
+                <div class="card-header">Partitions that need attention (@committed.Hot)</div>
+                <div class="card-body">
+                    <p>Lag or an unowned partition is listed here. Caught-up partitions follow in the paged list.</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Topic</th>
+                                    <th>Partition</th>
+                                    <th>Lag</th>
+                                    <th>Owned</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in committed.HottestRows)
+                            {
+                                <tr class="lu-kafka-problem">
+                                    <td>@row.Topic</td>
+                                    <td>@row.Partition</td>
+                                    <td>@row.Lag</td>
+                                    <td>@(row.Owned ? "Yes" : "No")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (committed.CapNote.Length > 0)
+                    {
+                        <p class="text-muted mt-2 mb-0">@committed.CapNote</p>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="mt-3 mb-0">Every committed partition is owned and caught up.</p>
+        }
+
         <div class="au-card card mt-3">
-            <div class="card-header">Partitions that need attention (@hotRows.Count)</div>
+            <div class="card-header">Committed partitions</div>
             <div class="card-body">
-                <p>Lag or an unowned partition is listed here. Caught-up partitions stay in the folded table.</p>
+                <p class="text-muted">One page, worst first.</p>
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead>
                             <tr>
                                 <th>Topic</th>
                                 <th>Partition</th>
+                                <th>High watermark</th>
+                                <th>Committed</th>
                                 <th>Lag</th>
                                 <th>Owned</th>
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var row in hotRows)
+                        @foreach (var row in committed.Rows)
                         {
-                            <tr class="lu-kafka-problem">
+                            <tr class="@(KafkaAttention.CommittedPartition(row.Lag, row.Owned) ? "lu-kafka-problem" : null)">
                                 <td>@row.Topic</td>
                                 <td>@row.Partition</td>
+                                <td>@row.HighWatermark</td>
+                                <td>@row.Committed</td>
                                 <td>@row.Lag</td>
                                 <td>@(row.Owned ? "Yes" : "No")</td>
                             </tr>
@@ -164,22 +232,27 @@ else
                         </tbody>
                     </table>
                 </div>
+                <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(committed.Page, committed.Pages, "Worst first.", committed.Page > 1 ? query.Href(part: committed.Page - 1) : "", committed.Page < committed.Pages ? query.Href(part: committed.Page + 1) : ""))" />
             </div>
         </div>
     }
-    else if (selected.Partitions.Count > 0)
+    @if (selected.UnownedPartitions.Count > 0)
     {
-        <p class="mt-3 mb-0">Every committed partition is owned and caught up.</p>
+        <p class="mt-2 mb-0">@KafkaWindows.UnownedText(selected.UnownedPartitions)</p>
     }
 
     <details class="lu-kafka-fold">
-        <summary>Members (@selected.Members.Count)</summary>
+        <summary>Members (@shownMembers.Count of @selected.Members.Count)</summary>
         @if (selected.Members.Count == 0)
         {
             <p class="text-muted mb-0 mt-2">This group has no members.</p>
         }
         else
         {
+            @if (shownMembers.Count < selected.Members.Count)
+            {
+                <p class="text-muted mt-3 mb-0">Showing @shownMembers.Count of @selected.Members.Count members.</p>
+            }
             <div class="table-responsive mt-3">
                 <table class="table table-sm mb-0">
                     <thead>
@@ -191,12 +264,12 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach (var member in selected.Members)
+                    @foreach (var member in shownMembers)
                     {
                         <tr class="@(!member.AdvertisesExpectedConfig ? "lu-kafka-problem" : null)">
                             <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Client", Value = member.ClientId, Compact = true, CopyLabel = "Copy client id" })" /></td>
                             <td>@member.Host</td>
-                            <td>@(member.Assignment.Count == 0 ? "—" : string.Join(", ", member.Assignment))</td>
+                            <td>@KafkaWindows.AssignmentText(member.Assignment)</td>
                             <td>@(member.AdvertisesExpectedConfig ? "Expected" : "Not advertised")</td>
                         </tr>
                     }
@@ -205,48 +278,6 @@ else
             </div>
         }
     </details>
-
-    <details class="lu-kafka-fold">
-        <summary>Committed partitions (@selected.Partitions.Count)</summary>
-        @if (selected.Partitions.Count == 0)
-        {
-            <p class="text-muted mb-0 mt-2">This group has no committed partitions.</p>
-        }
-        else
-        {
-            <div class="table-responsive mt-3">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Topic</th>
-                            <th>Partition</th>
-                            <th>High watermark</th>
-                            <th>Committed</th>
-                            <th>Lag</th>
-                            <th>Owned</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var row in selected.Partitions.OrderBy(item => item.Topic, StringComparer.Ordinal).ThenBy(item => item.Partition))
-                    {
-                        <tr class="@(KafkaAttention.CommittedPartition(row.Lag, row.Owned) ? "lu-kafka-problem" : null)">
-                            <td>@row.Topic</td>
-                            <td>@row.Partition</td>
-                            <td>@row.HighWatermark</td>
-                            <td>@row.Committed</td>
-                            <td>@row.Lag</td>
-                            <td>@(row.Owned ? "Yes" : "No")</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </details>
-    @if (selected.UnownedPartitions.Count > 0)
-    {
-        <p class="mt-2 mb-0">Unowned: @string.Join(", ", selected.UnownedPartitions)</p>
-    }
 
     <h2 class="h5 mt-4">Partition lag</h2>
     <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
