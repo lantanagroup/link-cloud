@@ -71,14 +71,22 @@ public static class KafkaIncreaseEligibility
         return string.IsNullOrWhiteSpace(catalogReason) ? null : catalogReason;
     }
 
+    public const string MigrationNotChecked = "Not checked yet. Dry run a migration to confirm it is eligible.";
+    public const string MigrationEligible = "Eligible for an increase migration.";
+    public const string MigrationRefused = "Not eligible for a migration.";
+
     public static string? MigrationLine(string? catalogReason, KafkaMigrationPlan? plan)
     {
-        if (plan is null)
-            return string.IsNullOrWhiteSpace(catalogReason) ? null : catalogReason;
-        if (plan.Accepted)
-            return string.IsNullOrWhiteSpace(catalogReason) ? "Eligible for an increase migration." : catalogReason;
+        if (plan is not null)
+            return plan.Accepted ? MigrationEligible : MigrationRefused;
 
-        return "Not eligible for a migration.";
+        if (string.IsNullOrWhiteSpace(catalogReason))
+            return null;
+
+        if (catalogReason.Contains("Eligible for an increase migration", StringComparison.Ordinal))
+            return MigrationNotChecked;
+
+        return catalogReason;
     }
 }
 

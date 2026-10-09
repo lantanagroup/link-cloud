@@ -126,6 +126,17 @@ public class KafkaOpsConsoleFixTests
     }
 
     [Fact]
+    public void Migration_IsNotCalledEligibleBeforeADryRun()
+    {
+        Assert.Equal(
+            "Not checked yet. Dry run a migration to confirm it is eligible.",
+            KafkaTopicEligibility.MigrationCatalogLine(true, "unused"));
+        Assert.Equal("This topic has no consumer.", KafkaTopicEligibility.MigrationCatalogLine(false, "This topic has no consumer."));
+        Assert.Equal("", KafkaTopicEligibility.MigrationCatalogLine(false, null));
+        Assert.DoesNotContain("Eligible for an increase migration.", KafkaTopicEligibility.MigrationNotChecked, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PlanHash_IncludesAcknowledgedGroupNames_AndIgnoresOrder()
     {
         var facts = MigrationWorld.Facts();

@@ -103,9 +103,18 @@ public class KafkaOpsConsoleFixTests
         KafkaIncreaseEligibility.MigrationLine(
                 "Eligible for an increase migration.",
                 new KafkaMigrationPlan { Accepted = false, Errors = ["Group X is inactive and has lag."] })
-            .Should().Be("Not eligible for a migration.");
+            .Should().Be(KafkaIncreaseEligibility.MigrationRefused);
         KafkaIncreaseEligibility.MigrationLine("Eligible for an increase migration.", null)
-            .Should().Be("Eligible for an increase migration.");
+            .Should().Be(KafkaIncreaseEligibility.MigrationNotChecked);
+        KafkaIncreaseEligibility.MigrationLine(KafkaIncreaseEligibility.MigrationNotChecked, null)
+            .Should().Be(KafkaIncreaseEligibility.MigrationNotChecked);
+        KafkaIncreaseEligibility.MigrationLine("This topic has no consumer.", null)
+            .Should().Be("This topic has no consumer.");
+        KafkaIncreaseEligibility.MigrationLine(
+                KafkaIncreaseEligibility.MigrationNotChecked,
+                new KafkaMigrationPlan { Accepted = true })
+            .Should().Be(KafkaIncreaseEligibility.MigrationEligible);
+        KafkaIncreaseEligibility.MigrationLine(null, null).Should().BeNull();
     }
 
     [Fact]
@@ -197,6 +206,7 @@ public class KafkaOpsConsoleFixTests
         migrate.Should().Contain("plan.Errors");
 
         topic.Should().Contain("KafkaIncreaseEligibility.Line");
+        topic.Should().Contain("KafkaIncreaseEligibility.MigrationLine(topic.MigrationEligibility, null)");
         topic.Should().Contain("id=\"kafka-partition-result\"");
         topic.Should().Contain("Preview increase");
         topic.Should().Contain("Preview family");
