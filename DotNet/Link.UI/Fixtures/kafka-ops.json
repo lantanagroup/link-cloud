@@ -10,7 +10,7 @@
         "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
         "hardBlocked": false,
         "slice1Eligible": true,
-        "migrationEligibility": "Eligible for an increase migration.",
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
         "orderSensitive": true,
         "partitions": 3,
         "retryPartitions": 3,
