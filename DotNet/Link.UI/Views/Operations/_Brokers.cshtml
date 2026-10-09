@@ -133,7 +133,7 @@ else
                         <dt class="col-sm-4">Broker</dt>
                         <dd class="col-sm-8">@plan.BrokerId</dd>
                         <dt class="col-sm-4">Partitions</dt>
-                        <dd class="col-sm-8">@(plan.AlreadyEmpty ? "Already empty." : plan.Moves.Count + " move off or onto this broker.")</dd>
+                        <dd class="col-sm-8">@BrokerMovePreview.MoveSummary(plan.Accepted, plan.AlreadyEmpty, plan.Moves.Count)</dd>
                         <dt class="col-sm-4">Approval</dt>
                         <dd class="col-sm-8">@(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
                     </dl>
