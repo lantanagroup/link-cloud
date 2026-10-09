@@ -1,0 +1,26 @@
+@model ReportManifestPage
+@{
+    ViewData["Title"] = "Report manifest";
+    ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["FacilityName"] = Model.FacilityName;
+    ViewData["ReportId"] = Model.ReportId;
+    ViewData["ReportSection"] = "manifest";
+}
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = Model.ReportId })!, "Back to report"))" />
+</div>
+<partial name="_ReportNav" />
+<h1 class="h3">Report manifest</h1>
+<partial name="_ReportIdentity" />
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound || Model.Manifest is null)
+{
+    <div class="au-card card"><div class="card-body"><p class="mb-0">That report was not found.</p></div></div>
+}
+else
+{
+    @await Html.PartialAsync("_ReportManifest", Model.Manifest)
+}

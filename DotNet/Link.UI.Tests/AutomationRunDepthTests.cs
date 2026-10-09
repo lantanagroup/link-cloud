@@ -91,9 +91,15 @@ public class AutomationRunDepthTests
         pulse.Should().Contain("if (!card || !card.getAttribute('data-url') || timer) return;");
 
         var manifest = Read("DotNet/Link.UI/Views/Automation/Manifest.cshtml");
-        manifest.Should().Contain("Generated vs ABS");
+        manifest.Should().Contain("_ReportManifest");
         manifest.Should().Contain("\"Automation\"");
         manifest.Should().Contain("asp-action=\"Run\"");
+        var shared = Read("DotNet/Link.UI/Views/Shared/_ReportManifest.cshtml");
+        shared.Should().Contain("Generated vs ABS");
+        shared.Should().Contain("ShowComparison");
+        var reports = Read("DotNet/Link.UI/Views/Reports/Manifest.cshtml");
+        reports.Should().Contain("_ReportManifest");
+        reports.Should().NotContain("Generated vs ABS");
 
         var runJs = Read("DotNet/Link.UI/wwwroot/js/automation-run.js");
         runJs.Should().Contain("getElementById(\"runStatus\") || document.getElementById(\"status\")");
