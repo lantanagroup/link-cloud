@@ -16,6 +16,8 @@ public sealed class MigrationTopicFacts
     public List<long> HighWatermarks { get; set; } = [];
     public List<long> LogStarts { get; set; } = [];
     public Dictionary<string, string> Configs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public string EffectiveCleanupPolicy { get; set; } = "";
+    public int? EffectiveMinInSyncReplicas { get; set; }
     public List<MigrationPartitionFacts> PartitionRows { get; set; } = [];
     public List<string> AuthorizedOperations { get; set; } = [];
     public long OldestCreateTimeMs { get; set; }
@@ -182,15 +184,28 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
         }
 
         var configs = await DescribeConfigsAsync(topic, cancellationToken);
-        foreach (var row in configs)
+        ApplyDescribedConfigs(facts, configs);
+        await WatermarksAsync(facts, topic, cancellationToken);
+        return facts;
+    }
+
+    /// <summary>
+    /// Create overrides stay limited to DynamicTopicConfig. cleanup.policy and
+    /// min.insync.replicas are read from the effective row, including broker defaults.
+    /// </summary>
+    internal static void ApplyDescribedConfigs(MigrationTopicFacts facts, IEnumerable<TopicConfigRow> rows)
+    {
+        foreach (var row in rows)
         {
-            // CreateTopics rejects static defaults. Keep the overrides the topic actually sets.
+            if (string.Equals(row.Name, "cleanup.policy", StringComparison.OrdinalIgnoreCase))
+                facts.EffectiveCleanupPolicy = row.Value ?? "";
+            if (string.Equals(row.Name, "min.insync.replicas", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(row.Value, out var minInSync))
+                facts.EffectiveMinInSyncReplicas = minInSync;
             if (!string.Equals(row.Source, "DynamicTopicConfig", StringComparison.Ordinal))
                 continue;
             facts.Configs[row.Name] = row.Value;
         }
-        await WatermarksAsync(facts, topic, cancellationToken);
-        return facts;
     }
 
     public async Task<IReadOnlyList<TopicConfigRow>> DescribeConfigsAsync(string topic, CancellationToken cancellationToken)

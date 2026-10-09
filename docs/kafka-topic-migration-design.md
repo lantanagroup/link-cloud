@@ -695,3 +695,6 @@ These replace the earlier wording where they differ.
 - The request is stored only when the client sends the dry-run plan hash and it matches.
 - Abort, go, and recover on a finished migration are rejected.
 - The catalog guard treats the shared retry, redrive, and error producers in `DeadLetterExceptionHandler.cs`, `RetryJob.cs`, and `TransientExceptionHandler.cs` as covered sibling helpers. Any other unbound produce still fails the guard.
+- `cleanup.policy` and `min.insync.replicas` are read from the effective config row. A broker default of `delete` is allowed. A missing `min.insync.replicas` refuses the plan. Those rows are not copied onto the new topic unless the topic set them dynamically.
+- The backup digest orders records by source partition and source offset. Backup offsets are not the sort key.
+- C5 does not write offsets for a group that has no commits. That group stays ready while it is empty. A repeated B6 tick does not append another "Started B6" line. A skipped backup does not say a temp topic was kept.

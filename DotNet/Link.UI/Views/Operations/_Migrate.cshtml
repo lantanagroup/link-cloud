@@ -174,10 +174,13 @@
             <p>@migration.Topic from @migration.OriginalPartitions to @migration.TargetPartitions. Step @migration.StepName.</p>
             <p>Requester @migration.Requester. Approver @migration.Approver. Executor @migration.Executor.</p>
             <p>Plan hash @migration.PlanHash.</p>
-            <p>Backup @(string.IsNullOrWhiteSpace(migration.BackupTopic) ? "not created" : migration.BackupTopic)@(migration.BackupCleanupRequired ? " is kept and flagged for cleanup." : ".")</p>
             @if (migration.BackupSkipped)
             {
-                <p>The backup was skipped. The recreated topic starts empty.</p>
+                <p>The backup was skipped. No temp topic was created. The recreated topic starts empty.</p>
+            }
+            else
+            {
+                <p>Backup @(string.IsNullOrWhiteSpace(migration.BackupTopic) ? "not created" : migration.BackupTopic)@(migration.BackupCleanupRequired ? " is kept and flagged for cleanup." : ".")</p>
             }
             @if (!string.IsNullOrWhiteSpace(migration.Failure))
             {
@@ -187,7 +190,7 @@
             {
                 <p>@migration.Evidence</p>
             }
-            <p>The new topic stays empty. Groups are committed at offset 0. History stays on the backup for replay. Nothing is reprocessed.</p>
+            <p>The new topic stays empty. Groups that already had commits are set to offset 0. @(migration.BackupSkipped ? "Nothing is reprocessed." : "History stays on the backup for replay. Nothing is reprocessed.")</p>
             <div class="d-flex flex-wrap gap-2">
                 <form method="post" action="/Operations/Kafka/migrations/approve">
                     @Html.AntiForgeryToken()

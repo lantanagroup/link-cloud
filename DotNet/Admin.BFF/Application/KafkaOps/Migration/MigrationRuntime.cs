@@ -249,7 +249,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
             "Topic " + record.Topic + " from " + record.OriginalPartitions + " to " + record.ActiveTarget + " partitions.",
             "Step " + record.Step + ".",
             "The recreated topic starts empty. Consumer groups are committed at offset 0. Nothing is reprocessed.",
-            "Backup " + (record.BackupTopic.Length == 0 ? "(none)" : record.BackupTopic) + (record.BackupCleanupRequired ? " is kept and flagged for cleanup." : " is the verified backup and is kept until a person deletes it or the retention expires.")
+            BackupLine(record)
         };
         if (record.Failure.Length > 0)
             lines.Add(record.Failure);
@@ -260,10 +260,23 @@ public sealed class MigrationRuntime : IMigrationRuntime
             lines.Add("An empty foreign topic is deleted by a second person who types the topic name. That delete does not finish the migration.");
         }
         if (record.Step == MigrationStep.H1)
-            lines.Add("The executor types the topic name to delete it and continue. Abort rolls back and keeps the backup.");
+            lines.Add(record.BackupSkipped
+                ? "The executor types the topic name to delete it and continue. Abort rolls back. No temp topic was created."
+                : "The executor types the topic name to delete it and continue. Abort rolls back and keeps the backup.");
         foreach (var entry in record.Timeline.TakeLast(12))
             lines.Add(entry.At.ToString("u") + " " + entry.Step + " " + entry.Text);
         return string.Join("\n", lines);
+    }
+
+    private static string BackupLine(MigrationRecord record)
+    {
+        if (record.BackupSkipped)
+            return "The backup was skipped. No temp topic was created.";
+        if (record.BackupTopic.Length == 0)
+            return "Backup (none).";
+        if (record.BackupCleanupRequired)
+            return "Backup " + record.BackupTopic + " is kept and flagged for cleanup.";
+        return "Backup " + record.BackupTopic + " is the verified backup and is kept until a person deletes it or the retention expires.";
     }
 
     public async Task DeleteBackupAsync(ClaimsPrincipal user, string name, string typedName, CancellationToken cancellationToken)
@@ -766,8 +779,8 @@ public sealed class MigrationRuntime : IMigrationRuntime
             ClusterHealthy = described is not null && await _admin.ClusterHealthyAsync(cancellationToken),
             FullIsr = described?.FullIsr ?? false,
             ReplicationFactor = described?.ReplicationFactor ?? 0,
-            MinInSyncReplicas = described?.Configs.TryGetValue("min.insync.replicas", out var insync) == true && int.TryParse(insync, out var parsed) ? parsed : 1,
-            CleanupPolicy = described?.Configs.GetValueOrDefault("cleanup.policy") ?? "",
+            MinInSyncReplicas = described?.EffectiveMinInSyncReplicas ?? 0,
+            CleanupPolicy = string.IsNullOrWhiteSpace(described?.EffectiveCleanupPolicy) ? "delete" : described!.EffectiveCleanupPolicy,
             EstimatedBytes = bytes,
             EstimatedBackupMinutes = (int)Math.Max(1, bytes / (2 * 1024 * 1024)),
             MaxBackupMinutes = _options.MigrationMaxBackupMinutes,
