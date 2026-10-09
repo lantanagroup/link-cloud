@@ -18,7 +18,7 @@
                 <input id="startCorrelation" name="correlationId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-success">Start consumers</button>
+                <button type="submit" class="btn btn-au-execute">Start consumers</button>
             </div>
         </form>
         <p class="text-muted small">Leave the id blank to generate one. The success message shows the id to use for read and stop.</p>
@@ -28,7 +28,7 @@
                 <input id="readCorrelation" name="correlationId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-success">Read consumers</button>
+                <button type="submit" class="btn btn-au-execute">Read consumers</button>
             </div>
         </form>
         <form method="post" data-au-save asp-action="StopConsumers" class="row g-2 align-items-end mt-2" onsubmit="return confirm('Stop consumers for this correlation id?');">
@@ -37,7 +37,7 @@
                 <input id="stopCorrelation" name="correlationId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-danger">Stop consumers</button>
+                <button type="submit" class="btn btn-warning">Stop consumers</button>
             </div>
         </form>
     </div>
@@ -139,7 +139,7 @@
                 <input id="reportTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success">Post report scheduled</button>
+                <button type="submit" class="btn btn-au-execute">Post report scheduled</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The start date has to be in the past. Report types are separated by commas.</p>
@@ -183,7 +183,7 @@
                 <input id="listTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success">Post patient list</button>
+                <button type="submit" class="btn btn-au-execute">Post patient list</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Patient ids are separated by commas or spaces.</p>
@@ -213,7 +213,7 @@
                 </select>
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success">Post patient event</button>
+                <button type="submit" class="btn btn-au-execute">Post patient event</button>
             </div>
         </form>
     </div>
@@ -254,7 +254,7 @@
                 <input id="acquisitionEnd" name="endDate" type="date" class="form-control" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success">Post data acquisition</button>
+                <button type="submit" class="btn btn-au-execute">Post data acquisition</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The start date has to be in the past and before the end date. Report types are separated by commas.</p>
@@ -278,7 +278,7 @@
                 <input id="acquiredTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-success">Post patient acquired</button>
+                <button type="submit" class="btn btn-au-execute">Post patient acquired</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Patient ids are separated by commas or spaces. A blank tracking id is filled in.</p>

@@ -316,6 +316,25 @@ public class MorningFixesGuardTests
     }
 
     [Fact]
+    public void Integration_posts_and_the_health_check_execute_and_stop_warns()
+    {
+        var integration = File.ReadAllText(Path.Combine(Root(), "Views", "System", "Integration.cshtml"));
+        integration.Should().Contain("btn btn-au-execute\">Start consumers");
+        integration.Should().Contain("btn btn-au-execute\">Read consumers");
+        integration.Should().Contain("btn btn-warning\">Stop consumers");
+        integration.Should().Contain("btn btn-au-execute\">Post report scheduled");
+        integration.Should().Contain("btn btn-au-execute\">Post patient list");
+        integration.Should().Contain("btn btn-au-execute\">Post patient event");
+        integration.Should().Contain("btn btn-au-execute\">Post data acquisition");
+        integration.Should().Contain("btn btn-au-execute\">Post patient acquired");
+        integration.Should().NotContain("btn btn-success\">Post");
+        integration.Should().NotContain("btn btn-danger\">Stop");
+
+        var health = File.ReadAllText(Path.Combine(Root(), "Views", "System", "Health.cshtml"));
+        health.Should().Contain("btn btn-au-execute\">Check");
+    }
+
+    [Fact]
     public void Secret_inputs_are_masked_and_do_not_echo()
     {
         var sensitive = new Regex(@"password|secret|token|apikey|credential", RegexOptions.IgnoreCase);
