@@ -111,6 +111,33 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         }, cancellationToken, correlationId);
     }
 
+    public Task<KafkaOpsCall<ReplicationFactorPlan>> PlanReplicationFactorAsync(string topic, int replicationFactor, long throttleBytesPerSecond, string? search, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.PlanReplicationFactor(topic, replicationFactor, throttleBytesPerSecond, search, page, pageSize));
+        return SendAsync<ReplicationFactorPlan>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/replication-factor/plan", new
+        {
+            replicationFactor,
+            throttleBytesPerSecond,
+            search,
+            page,
+            pageSize
+        }, cancellationToken, keepBodyOnFailure: true);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CreateReplicationFactorAsync(string topic, int replicationFactor, long throttleBytesPerSecond, string reason, string? confirmation, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.CreateReplicationFactor(topic, replicationFactor, throttleBytesPerSecond, reason, confirmation, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/replication-factor", new
+        {
+            replicationFactor,
+            throttleBytesPerSecond,
+            reason,
+            confirmation
+        }, cancellationToken, correlationId);
+    }
+
     public Task<KafkaOpsCall<ReplicaScalePlan>> PlanScaleAsync(string groupId, int replicas, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
@@ -602,6 +629,11 @@ public sealed class ChangeRequestRecord
     public string Warning { get; set; } = "";
     public bool AlertRaised { get; set; }
     public List<GroupProgressRow> Groups { get; set; } = [];
+    public int BeforeReplicationFactor { get; set; }
+    public int TargetReplicationFactor { get; set; }
+    public long ThrottleBytesPerSecond { get; set; }
+    public bool ThrottleCleared { get; set; }
+    public List<string> Steps { get; set; } = [];
 }
 
 public sealed class GroupProgressRow
