@@ -3963,6 +3963,51 @@ tr.lu-kafka-problem > td:first-child {
   margin-left: auto;
   flex: 0 0 auto;
 }
+.lu-dismiss {
+  appearance: none;
+  background: transparent;
+  background-image: none;
+  border: 0;
+  box-shadow: none;
+  color: currentColor;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  font-size: 1.15rem;
+  opacity: .72;
+  cursor: pointer;
+}
+.lu-dismiss:hover,
+.lu-dismiss:focus-visible {
+  opacity: 1;
+  color: currentColor;
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+.alert.lu-alert {
+  position: relative;
+  padding-right: 2.1rem;
+}
+.alert.lu-alert > .lu-dismiss {
+  position: absolute;
+  top: .35rem;
+  right: .4rem;
+}
+.alert > .btn-close {
+  color: currentColor;
+  background: transparent;
+  background-image: none;
+  opacity: .72;
+  box-shadow: none;
+}
+.alert > .btn-close:empty::before {
+  content: "\00d7";
+  color: currentColor;
+  font-size: 1.15rem;
+  line-height: 1;
+}
 .lu-result-body {
   margin-top: .65rem;
   padding-top: .6rem;
