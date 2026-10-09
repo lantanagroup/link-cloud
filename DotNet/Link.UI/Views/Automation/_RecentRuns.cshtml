@@ -62,15 +62,15 @@
                         <td>@(run.FinishedAt is null ? "—" : LinkUiTime.Display(run.FinishedAt.Value))</td>
                         <td class="text-nowrap">
                             <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
-                                <a asp-action="Run" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral lu-icon-btn" title="View details" aria-label="View details"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                <a asp-action="Run" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-link lu-icon-btn" title="View details" aria-label="View details"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">View</span></a>
                                 @if (AutomationRules.IsCancellable(run.Status))
                                 {
-                                    <button type="button" class="btn btn-sm btn-au-neutral btn-cancel-run lu-icon-btn" data-run-id="@run.RunId" title="Cancel" aria-label="Cancel"><i class="bi bi-x-circle" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-warning btn-cancel-run lu-icon-btn" data-run-id="@run.RunId" title="Cancel" aria-label="Cancel"><i class="bi bi-x-circle" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
                                 }
                                 @if (AutomationRules.IsTerminal(run.Status))
                                 {
-                                    <a asp-action="Export" asp-route-id="@run.RunId" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Export diagnostics ZIP" aria-label="Export diagnostics ZIP"><i class="bi bi-download" aria-hidden="true"></i></a>
-                                    <button type="button" class="btn btn-sm btn-danger btn-delete-run lu-icon-btn" data-run-id="@run.RunId" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                    <a asp-action="Export" asp-route-id="@run.RunId" class="btn btn-sm btn-au-link lu-icon-btn" title="Export diagnostics ZIP" aria-label="Export diagnostics ZIP"><i class="bi bi-download" aria-hidden="true"></i><span class="ms-1">Export</span></a>
+                                    <button type="button" class="btn btn-sm btn-danger btn-delete-run lu-icon-btn" data-run-id="@run.RunId" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                 }
                             </div>
                         </td>

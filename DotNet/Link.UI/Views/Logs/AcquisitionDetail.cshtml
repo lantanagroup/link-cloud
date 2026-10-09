@@ -27,7 +27,7 @@ else
             {
                 <form method="post" data-au-save asp-action="ProcessOne" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Process this acquisition log?');">
                     <partial name="_ReturnField" />
-                    <button type="submit" class="btn btn-sm btn-success">Process</button>
+                    <button type="submit" class="btn btn-sm btn-au-execute">Process</button>
                 </form>
             }
             @if (Model.CanCancel)
@@ -36,7 +36,7 @@ else
                     <partial name="_ReturnField" />
                     <label class="small text-muted mb-0" for="minAgeHours">Min age (hours)</label>
                     <input id="minAgeHours" name="minAgeHours" type="number" min="0" max="@LogsRules.MaxMinAgeHours" value="@Model.MinAgeHours" class="form-control form-control-sm" style="width: 6rem" />
-                    <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-warning">Cancel</button>
                 </form>
             }
         </div>
@@ -195,20 +195,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Reference pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-au-neutral" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page - 1)" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Previous</a>
+                        <a class="btn btn-sm btn-au-link" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page - 1)" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-au-neutral" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page + 1)" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Next</a>
+                        <a class="btn btn-sm btn-au-link" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page + 1)" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
                     }
                 </nav>
             }

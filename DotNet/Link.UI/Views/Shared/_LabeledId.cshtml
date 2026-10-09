@@ -3,7 +3,7 @@
     var value = Model.Value?.Trim() ?? "";
     var displayName = LabeledIdRules.DisplayName(Model.Name, value);
     var empty = string.IsNullOrWhiteSpace(value) || value == "—" || value == "-";
-    var allowCopy = Model.Copy && LabeledIdRules.AllowsCopy(Model.Label);
+    var allowCopy = Model.Copy && LabeledIdRules.ShowsCopy(Model.Label, value);
     var copyLabel = string.IsNullOrWhiteSpace(Model.CopyLabel) ? "Copy " + Model.Label.ToLowerInvariant() : Model.CopyLabel;
     var href = ReturnUrlRules.WithReturn(Model.LinkHref, Model.ReturnUrl);
     var safeLink = !string.IsNullOrWhiteSpace(href)

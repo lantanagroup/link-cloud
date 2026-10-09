@@ -126,23 +126,26 @@ public class DataAcquisitionLogsTests
         }
 
         var list = Read("DotNet/Link.UI/Views/Logs/_AcquisitionLogList.cshtml");
-        list.Should().Contain("btn btn-sm btn-success\">Process matching");
+        list.Should().Contain("btn btn-sm btn-au-execute\">Process matching");
+        list.Should().Contain("btn btn-sm btn-au-execute\" data-au-bulk=\"process\"");
         list.Should().Contain("data-au-bulk=\"process\"");
         list.Should().Contain("data-au-select-page");
         list.Should().Contain("cannot be selected.");
         list.Should().Contain("btn btn-sm btn-danger\">Disable logs");
-        list.Should().Contain("btn btn-sm btn-danger\">Cancel matching");
-        list.Should().Contain("btn btn-sm btn-danger\" formaction");
-        list.Should().Contain("btn-au-neutral\">Restore logs");
+        list.Should().Contain("btn btn-sm btn-warning\">Cancel matching");
+        list.Should().Contain("btn btn-sm btn-au-execute lu-icon-btn\" formaction");
+        list.Should().Contain("btn btn-sm btn-warning\" formaction");
+        list.Should().Contain("btn-success\">Restore logs");
+        list.Should().Contain("btn-au-link\" href");
 
         var detail = Read("DotNet/Link.UI/Views/Logs/AcquisitionDetail.cshtml");
-        detail.Should().Contain("btn btn-sm btn-success\">Process");
-        detail.Should().Contain("btn btn-sm btn-danger\">Cancel");
+        detail.Should().Contain("btn btn-sm btn-au-execute\">Process");
+        detail.Should().Contain("btn btn-sm btn-warning\">Cancel");
 
         foreach (var searchPage in new[] { "Acquisition", "Audit", "Sftp" })
         {
             Read($"DotNet/Link.UI/Views/Logs/{searchPage}.cshtml")
-                .Should().Contain("btn btn-au-neutral\"><i class=\"bi bi-search me-1\"></i>Search");
+                .Should().Contain("btn btn-success\"><i class=\"bi bi-search me-1\"></i>Search");
         }
 
         var live = Read("DotNet/Link.UI/wwwroot/js/live-region.js");

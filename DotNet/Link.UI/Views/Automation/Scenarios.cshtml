@@ -20,10 +20,8 @@
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-list-ul me-2"></i>All Scenarios</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewScenario" title="New scenario" @(string.IsNullOrWhiteSpace(engineMessage) ? null : "disabled")>
-                <i class="bi bi-plus-lg"></i>
-                <span class="visually-hidden">New scenario</span>
-            </button>
+            <button type="button" class="btn btn-sm btn-au-link" id="btnNewScenario" title="New scenario" @(string.IsNullOrWhiteSpace(engineMessage) ? null : "disabled")>
+                <i class="bi bi-plus-lg"></i><span class="ms-1">New</span></button>
         </div>
         <div class="card-body p-0" data-au-table>
 
@@ -101,11 +99,11 @@
                                 <td class="small text-muted">@LinkUiTime.Display(s.UpdatedAt)</td>
                                 <td class="text-nowrap">
                                     <div class="lu-row-actions">
-                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")" title="@(s.IsSystemScenario ? "View" : "Edit")" aria-label="@(s.IsSystemScenario ? "View" : "Edit")"><i class="bi @(s.IsSystemScenario ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-scenario-clone" data-id="@s.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")" title="@(s.IsSystemScenario ? "View" : "Edit")" aria-label="@(s.IsSystemScenario ? "View" : "Edit")"><i class="bi @(s.IsSystemScenario ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(s.IsSystemScenario ? "View" : "Edit")</span></button>
+                                        <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-scenario-clone" data-id="@s.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                         @if (!s.IsSystemScenario)
                                         {
-                                            <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-scenario-delete" data-id="@s.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-scenario-delete" data-id="@s.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                         }
                                     </div>
                                 </td>

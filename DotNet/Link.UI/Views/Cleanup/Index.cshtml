@@ -94,7 +94,7 @@
                                     <input class="form-control" type="number" min="1" max="500" id="MaxFacilitiesPerPass" name="MaxFacilitiesPerPass" value="@s.MaxFacilitiesPerPass" />
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-danger btn-sm cleanup-run-btn" name="runKind" value="quiesce">
+                            <button type="submit" class="btn btn-au-execute btn-sm cleanup-run-btn" name="runKind" value="quiesce">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run quiesce
                             </button>
                         </div>
@@ -124,8 +124,8 @@
                                     <input class="form-control" type="number" min="1" max="365" id="AbortTtlDays" name="AbortTtlDays" value="@((int)s.AbortTtl.TotalDays)" />
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-danger btn-sm cleanup-run-btn" name="runKind" value="teardown"
-                                    data-confirm="Teardown leftover Automation.UI facilities older than retention, including stale in-progress scenario jobs? Named production facilities are not touched.">
+                            <button type="submit" class="btn btn-au-execute btn-sm cleanup-run-btn" name="runKind" value="teardown"
+ data-confirm="Teardown leftover Automation.UI facilities older than retention, including stale in-progress scenario jobs? Named production facilities are not touched.">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run teardown
                             </button>
                         </div>
@@ -167,13 +167,13 @@
                                     <input class="form-control" type="number" min="1" max="12" id="CatchUpWindowHours" name="CatchUpWindowHours" value="@((int)s.CatchUpWindow.TotalHours)" />
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-danger btn-sm cleanup-run-btn" name="runKind" value="history-purge"
-                                    data-confirm="Delete Automation.UI run history older than retention and tear down each purged run's Automation.UI facility? Named production facilities are not touched. This cannot be undone.">
+                            <button type="submit" class="btn btn-au-execute btn-sm cleanup-run-btn" name="runKind" value="history-purge"
+ data-confirm="Delete Automation.UI run history older than retention and tear down each purged run's Automation.UI facility? Named production facilities are not touched. This cannot be undone.">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run weekly purge
                             </button>
                         </div>
 
-                        <button type="submit" class="btn btn-au-neutral" name="runKind" value="">Save settings</button>
+                        <button type="submit" class="btn btn-success" name="runKind" value="">Save settings</button>
                     </div>
                 </div>
             </form>
@@ -235,7 +235,7 @@
                                 <input class="form-check-input" type="checkbox" id="PurgeHistory" name="PurgeHistory" value="true" />
                                 <label class="form-check-label" for="PurgeHistory">Purge matching run history</label>
                             </div>
-                            <button type="submit" class="btn btn-danger w-100 cleanup-run-btn">Run custom range</button>
+                            <button type="submit" class="btn btn-au-execute w-100 cleanup-run-btn">Run custom range</button>
                         </form>
                     </div>
                 </div>
@@ -279,7 +279,7 @@
                                     purged @report.PurgedRunIds.Count/@report.HistoryPurgeCandidateCount
                                 </td>
                                 <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn cleanup-open-report" data-report-id="@report.Id" title="View" aria-label="@($"View {report.Label} finished {report.FinishedAt.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC")"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-au-link lu-icon-btn cleanup-open-report" data-report-id="@report.Id" title="View" aria-label="@($"View {report.Label} finished {report.FinishedAt.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC")"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">View</span></button>
                                 </td>
                             </tr>
                         }

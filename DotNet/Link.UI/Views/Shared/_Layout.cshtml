@@ -31,8 +31,9 @@
             var name = String(label || "Id").toLowerCase().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
             var shown = String(label || "Id").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
             var denied = { seed: 1, date: 1, time: 1, count: 1, name: 1, measures: 1, package: 1 };
-            var copy = denied[name] ? "" : '<button type="button" class="btn btn-sm btn-au-neutral lu-copy" data-lu-copy="' + safe
-                + '" title="Copy ' + name + '" aria-label="Copy ' + name + '"><i class="bi bi-copy" aria-hidden="true"></i></button>';
+            var guid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(trimmed.replace(/^\{|\}$/g, ""));
+            var copy = denied[name] || !guid ? "" : '<button type="button" class="btn btn-sm btn-au-link lu-copy" data-lu-copy="' + safe
+                + '" title="Copy ' + name + '" aria-label="Copy ' + name + '"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Copy</span></button>';
             return '<span class="lu-labeled-id lu-labeled-id-compact"><span class="lu-id-label visually-hidden">' + shown
                 + '</span><span class="lu-id-value"><code class="lu-facility-id" title="' + safe + '">' + safe
                 + '</code>' + copy + '</span></span>';

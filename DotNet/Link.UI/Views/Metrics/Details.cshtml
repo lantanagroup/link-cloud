@@ -33,7 +33,7 @@
         <div class="d-flex gap-2">
             @if (Model.RunAvailable)
             {
-                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral">
+                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-link">
                     <i class="bi bi-clipboard-data me-1"></i>Open full run
                 </a>
             }
@@ -43,13 +43,13 @@
             }
             @if (Model.PreviousRunId is Guid previous && Model.ScenarioId is Guid)
             {
-                <a asp-action="Compare" asp-route-a="@previous" asp-route-b="@Model.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral">
+                <a asp-action="Compare" asp-route-a="@previous" asp-route-b="@Model.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-link">
                     Compare with previous
                 </a>
             }
             @if (Model.ScenarioId is Guid scenarioId)
             {
-                <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-au-neutral">
+                <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-au-link">
                     History of this use case
                 </a>
             }

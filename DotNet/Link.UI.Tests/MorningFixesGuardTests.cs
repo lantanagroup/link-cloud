@@ -116,6 +116,19 @@ public class MorningFixesGuardTests
         LabeledIdRules.AllowsCopy("Report ID").Should().BeTrue();
         LabeledIdRules.AllowsCopy("Measure").Should().BeTrue();
         LabeledIdRules.AllowsCopy("File").Should().BeTrue();
+        LabeledIdRules.ShowsCopy("Facility", "11111111-1111-1111-1111-111111111111").Should().BeTrue();
+        LabeledIdRules.ShowsCopy("Facility", "{11111111-1111-1111-1111-111111111111}").Should().BeTrue();
+        LabeledIdRules.ShowsCopy("Facility", "not-a-guid").Should().BeFalse();
+        LabeledIdRules.ShowsCopy("Facility", "2026-10-09").Should().BeFalse();
+        LabeledIdRules.ShowsCopy("Name", "11111111-1111-1111-1111-111111111111").Should().BeFalse();
+        LabeledIdRules.ShowsCopy("Seed", "11111111-1111-1111-1111-111111111111").Should().BeFalse();
+        LabeledIdRules.ShowsCopy("Report ID", "  ").Should().BeFalse();
+        LabeledIdRules.IsGuid(null).Should().BeFalse();
+
+        File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_LabeledId.cshtml"))
+            .Should().Contain("LabeledIdRules.ShowsCopy");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_Layout.cshtml"))
+            .Should().Contain("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
         var copyPartials = ProductFiles("*.cshtml", "Views")
             .Where(file => File.ReadAllText(file).Contains("name=\"_CopyButton\"", StringComparison.Ordinal)
@@ -143,8 +156,6 @@ public class MorningFixesGuardTests
         var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
         css.Should().Contain(".btn.lu-icon-btn");
         css.Should().Contain(".btn.btn-danger.lu-icon-btn");
-        var ruleAt = css.IndexOf(".btn.lu-icon-btn", StringComparison.Ordinal);
-        css.Substring(ruleAt, 500).Should().Contain("background-color: #fff");
 
         var icon = new Regex(@"<i\s+class=""bi bi-(trash|pencil|eye|copy|download|x-lg|box-arrow-up-right)""", RegexOptions.IgnoreCase);
         var hits = new List<string>();
@@ -168,6 +179,135 @@ public class MorningFixesGuardTests
         }
 
         hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Row_icon_actions_are_solid_fills()
+    {
+        var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
+        var start = css.IndexOf(".btn.lu-icon-btn,", StringComparison.Ordinal);
+        var end = css.IndexOf("/* lu-row-action-fill-end */", StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var block = css[start..end];
+
+        block.Should().NotContain("background-color: #fff");
+        block.Should().NotContain("background: #fff");
+        block.Should().NotContain("background-color: transparent");
+        block.Should().NotContain("#6c757d");
+        block.Should().NotContain("#0d6efd");
+        block.Should().Contain("background-color: var(--au-link)");
+        block.Should().Contain("background-color: #000");
+        block.Should().Contain("background-color: var(--au-success)");
+        block.Should().Contain("background-color: var(--au-warning)");
+        block.Should().Contain("background-color: var(--au-danger)");
+        block.Should().Contain("color: #fff");
+
+        var danger = block.IndexOf(".btn.btn-danger.lu-icon-btn,", StringComparison.Ordinal);
+        danger.Should().BeGreaterThan(-1);
+        var dangerRule = block[danger..];
+        dangerRule.Should().Contain("background-color: var(--au-danger)");
+        dangerRule.Should().Contain("color: #fff");
+        dangerRule.Should().NotContain("background-color: #fff");
+    }
+
+    [Fact]
+    public void Action_buttons_are_not_outline_or_gray()
+    {
+        string[] forbidden = ["btn-outline-", "btn-au-neutral", "btn-au-close", "btn-secondary", "btn-light", "btn-dark"];
+        var hits = new List<string>();
+        foreach (var file in ProductFiles("*.cshtml", "Views").Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js"))))
+        {
+            var lines = File.ReadAllLines(file);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                foreach (var token in forbidden)
+                {
+                    if (lines[i].Contains(token, StringComparison.Ordinal))
+                        hits.Add(Rel(file) + ":" + (i + 1) + " " + token);
+                }
+            }
+        }
+
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Icon_only_buttons_have_a_visible_label()
+    {
+        var hits = new List<string>();
+        foreach (var file in ProductFiles("*.cshtml", "Views").Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js"))))
+            hits.AddRange(IconOnlyButtons(Rel(file), File.ReadAllText(file)));
+
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Copy_buttons_are_not_attached_to_non_guid_values()
+    {
+        var attr = new Regex(@"data-lu-copy\s*=\s*""([^""]*)""", RegexOptions.IgnoreCase);
+        var hits = new List<string>();
+        foreach (var file in ProductFiles("*.cshtml", "Views").Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js"))))
+        {
+            var lines = File.ReadAllLines(file);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                foreach (Match match in attr.Matches(lines[i]))
+                {
+                    var value = match.Groups[1].Value;
+                    if (value.Contains('@', StringComparison.Ordinal) || value.Contains('+', StringComparison.Ordinal))
+                        continue;
+                    if (!LabeledIdRules.IsGuid(value))
+                        hits.Add(Rel(file) + ":" + (i + 1) + " " + value);
+                }
+            }
+        }
+
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Kafka_operations_buttons_use_the_shared_colors()
+    {
+        var index = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Index.cshtml"));
+        index.Should().Contain("btn btn-au-link");
+        index.Should().Contain("Open Kafka");
+
+        var kafka = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Kafka.cshtml"));
+        kafka.Should().Contain("btn btn-success\" type=\"submit\">Search");
+
+        var overview = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml"));
+        overview.Should().Contain("bi-hdd-network");
+        overview.Should().Contain(">Open</span>");
+        overview.Should().Contain(">Migrate</a>");
+        overview.Should().NotContain("btn-au-neutral");
+
+        var topic = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Topic.cshtml"));
+        topic.Should().Contain("btn-au-link");
+        topic.Should().Contain("Migrate instead");
+        topic.Should().Contain(">Preview</span>");
+
+        var consumers = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Consumers.cshtml"));
+        consumers.Should().Contain(">Open</span>");
+        var brokers = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Brokers.cshtml"));
+        brokers.Should().Contain(">Open</span>");
+        brokers.Should().Contain(">Rebalance</span>");
+
+        var migrate = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Migrate.cshtml"));
+        migrate.Should().Contain("btn-au-execute\" type=\"submit\" formaction=\"/Operations/Kafka/migrations/plan\">Dry run");
+        migrate.Should().Contain("btn-au-execute\" type=\"submit\" aria-label=\"Execute migration\">Execute");
+        migrate.Should().Contain("btn-au-execute\" type=\"submit\">Go");
+        migrate.Should().Contain("btn-au-execute\" type=\"submit\" name=\"action\" value=\"forward\">Continue forward");
+        migrate.Should().Contain("btn-warning\" type=\"submit\" aria-label=\"Abort migration\">Abort");
+        migrate.Should().Contain("btn-warning\" type=\"submit\" name=\"action\" value=\"original\">Recover original");
+        migrate.Should().Contain("btn-danger\" type=\"submit\">Delete backup");
+        migrate.Should().Contain("btn-danger\" type=\"submit\" name=\"action\" value=\"deleteForeign\">Delete empty foreign topic");
+
+        var change = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_ChangeRequest.cshtml"));
+        change.Should().Contain(">Execute</span>");
+        change.Should().Contain("btn-au-execute");
+        change.Should().Contain(">Cancel</span>");
+        change.Should().Contain("btn-warning");
     }
 
     [Fact]
@@ -231,6 +371,171 @@ public class MorningFixesGuardTests
         editor.Should().Contain("form-text text-muted");
         File.ReadAllText(Path.Combine(Root(), "Services", "FacilityAcquisitionRules.cs"))
             .Should().Contain("Overnight window (crosses midnight)");
+    }
+
+    private static IEnumerable<string> IconOnlyButtons(string relative, string text)
+    {
+        var hits = new List<string>();
+        var i = 0;
+        while (i < text.Length)
+        {
+            var start = text.IndexOf('<', i);
+            if (start < 0)
+                break;
+            var name = TagName(text, start);
+            if (name is not ("button" or "a" or "label"))
+            {
+                i = start + 1;
+                continue;
+            }
+
+            if (!TryReadElement(text, start, name, out var openEnd, out var closeStart, out var closeEnd))
+            {
+                i = start + 1;
+                continue;
+            }
+
+            var opening = text[start..openEnd];
+            if (opening.Contains("btn", StringComparison.Ordinal)
+                && !SkippedControl(opening))
+            {
+                var body = text[openEnd..closeStart];
+                if ((body.Contains("<i", StringComparison.OrdinalIgnoreCase) || body.Contains("bi bi-", StringComparison.Ordinal))
+                    && !HasVisibleLabel(body))
+                {
+                    var line = text[..start].Count(ch => ch == '\n') + 1;
+                    hits.Add(relative + ":" + line);
+                }
+            }
+
+            i = closeEnd;
+        }
+
+        return hits;
+    }
+
+    private static bool SkippedControl(string opening) =>
+        opening.Contains("accordion-button", StringComparison.Ordinal)
+        || opening.Contains("btn-close", StringComparison.Ordinal)
+        || opening.Contains("dropdown-item", StringComparison.Ordinal)
+        || opening.Contains("list-group-item", StringComparison.Ordinal)
+        || opening.Contains("patient-sort-button", StringComparison.Ordinal)
+        || opening.Contains("lu-nav-toggle", StringComparison.Ordinal)
+        || opening.Contains("au-info-toggle", StringComparison.Ordinal)
+        || (opening.Contains("dropdown-toggle", StringComparison.Ordinal)
+            && !opening.Contains("pc-picker-toggle", StringComparison.Ordinal));
+
+    private static bool HasVisibleLabel(string body)
+    {
+        var shown = Regex.Replace(body, @"<span\b[^>]*\bvisually-hidden\b[^>]*>.*?</span>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        shown = Regex.Replace(shown, @"<i\b[^>]*>.*?</i>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        shown = Regex.Replace(shown, "<[^>]+>", " ");
+        return Regex.IsMatch(shown, @"[A-Za-z0-9]");
+    }
+
+    private static string? TagName(string text, int start)
+    {
+        if (start + 1 >= text.Length || text[start] != '<')
+            return null;
+        var i = start + 1;
+        if (i < text.Length && text[i] == '/')
+            return null;
+        var begin = i;
+        while (i < text.Length && char.IsLetter(text[i]))
+            i++;
+        if (i == begin)
+            return null;
+        return text[begin..i].ToLowerInvariant();
+    }
+
+    private static bool TryReadElement(string text, int start, string name, out int openEnd, out int closeStart, out int closeEnd)
+    {
+        openEnd = closeStart = closeEnd = 0;
+        var j = start + 1;
+        char? quote = null;
+        var depth = 0;
+        while (j < text.Length)
+        {
+            var ch = text[j];
+            if (quote is not null)
+            {
+                if (ch == quote && text[j - 1] != '\\')
+                    quote = null;
+                j++;
+                continue;
+            }
+
+            if (ch is '"' or '\'' or '`')
+            {
+                quote = ch;
+                j++;
+                continue;
+            }
+
+            if (ch == '(')
+                depth++;
+            else if (ch == ')' && depth > 0)
+                depth--;
+            else if (ch == '>' && depth == 0)
+                break;
+            j++;
+        }
+
+        if (j >= text.Length || text[j] != '>')
+            return false;
+        openEnd = j + 1;
+        if (text[j - 1] == '/')
+            return false;
+
+        var nest = 1;
+        var k = openEnd;
+        while (k < text.Length && nest > 0)
+        {
+            var next = IndexOfTag(text, name, k);
+            if (next < 0)
+                return false;
+            if (next + 1 < text.Length && text[next + 1] == '/')
+            {
+                nest--;
+                if (nest == 0)
+                {
+                    closeStart = next;
+                    var gt = text.IndexOf('>', next);
+                    if (gt < 0)
+                        return false;
+                    closeEnd = gt + 1;
+                    return true;
+                }
+            }
+            else
+            {
+                nest++;
+            }
+
+            k = next + name.Length + 1;
+        }
+
+        return false;
+    }
+
+    private static int IndexOfTag(string text, string name, int from)
+    {
+        var open = "<" + name;
+        var close = "</" + name;
+        while (from < text.Length)
+        {
+            var openAt = text.IndexOf(open, from, StringComparison.OrdinalIgnoreCase);
+            var closeAt = text.IndexOf(close, from, StringComparison.OrdinalIgnoreCase);
+            if (openAt < 0 && closeAt < 0)
+                return -1;
+            var at = openAt < 0 ? closeAt : closeAt < 0 ? openAt : Math.Min(openAt, closeAt);
+            var after = at + (at == closeAt ? close.Length : open.Length);
+            if (after >= text.Length || !char.IsLetterOrDigit(text[after]))
+                return at;
+            from = at + 1;
+        }
+
+        return -1;
     }
 
     private static IEnumerable<string> ProductFiles(string pattern, string relative)

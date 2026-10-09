@@ -285,15 +285,15 @@
                                 <td>@FormatWhen(run.FinishedAt)</td>
                                 <td class="text-nowrap">
                                     <div class="lu-row-actions">
-                                        <a asp-action="Details" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral lu-icon-btn" title="View" aria-label="View"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                        <a asp-action="Details" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-link lu-icon-btn" title="View" aria-label="View"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">View</span></a>
                                         @if (run.ScenarioId is Guid scenarioId)
                                         {
-                                            <a asp-action="Scenario" asp-route-id="@scenarioId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral lu-icon-btn" title="History" aria-label="History"><i class="bi bi-clock-history" aria-hidden="true"></i></a>
+                                            <a asp-action="Scenario" asp-route-id="@scenarioId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-link lu-icon-btn" title="History" aria-label="History"><i class="bi bi-clock-history" aria-hidden="true"></i><span class="ms-1">History</span></a>
                                         }
                                         <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline"
                                               onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
                                             @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
                                         </form>
                                     </div>
                                 </td>
@@ -307,15 +307,15 @@
         @if (Model.Metadata.TotalPages > 1)
         {
             <div class="card-body border-top d-flex justify-content-between align-items-center">
-                <a class="btn btn-sm btn-au-neutral @(Model.Metadata.PageNumber <= 1 ? "disabled" : "")"
-                   asp-action="Index"
-                   asp-route-pageNumber="@(Model.Metadata.PageNumber - 1)"
-                   asp-route-pageSize="@Model.Metadata.PageSize">Previous</a>
+                <a class="btn btn-sm btn-au-link @(Model.Metadata.PageNumber <= 1 ? "disabled" : "")"
+ asp-action="Index"
+ asp-route-pageNumber="@(Model.Metadata.PageNumber - 1)"
+ asp-route-pageSize="@Model.Metadata.PageSize">Previous</a>
                 <span class="small text-muted">Page @Model.Metadata.PageNumber of @Model.Metadata.TotalPages</span>
-                <a class="btn btn-sm btn-au-neutral @(Model.Metadata.PageNumber >= Model.Metadata.TotalPages ? "disabled" : "")"
-                   asp-action="Index"
-                   asp-route-pageNumber="@(Model.Metadata.PageNumber + 1)"
-                   asp-route-pageSize="@Model.Metadata.PageSize">Next</a>
+                <a class="btn btn-sm btn-au-link @(Model.Metadata.PageNumber>= Model.Metadata.TotalPages ? "disabled" : "")"
+ asp-action="Index"
+ asp-route-pageNumber="@(Model.Metadata.PageNumber + 1)"
+ asp-route-pageSize="@Model.Metadata.PageSize">Next</a>
             </div>
         }
     </div>
