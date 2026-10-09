@@ -3,59 +3,120 @@
     var query = Model.Query;
     var origin = ReturnUrlRules.Here(Context.Request);
     var selected = Model.SelectedGroup;
+    var groupProblems = Model.GroupRows.Where(KafkaAttention.Group).ToList();
+    var consumerStep = 1;
+    if (Model.ScalePlan is not null && Model.ScalePlan.Accepted)
+        consumerStep = 5;
+    else if (Model.ScalePlan is not null)
+        consumerStep = 4;
+    else if (selected is not null)
+        consumerStep = 2;
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
+
+<h2 class="h5 mt-3">Consumer replicas</h2>
+<p>A replica is a member of a consumer group. Add or remove members only after a preview. A count above the partition ceiling is refused, because the extra member would sit idle.</p>
+<ol>
+    <li>Choose the group. Groups that are behind or unowned are listed first.</li>
+    <li>Read lag and members. Healthy rows stay folded.</li>
+    <li>Preview an add or a remove. Nothing changes.</li>
+    <li>Review the result. A refusal lists each reason.</li>
+    <li>Submit the add or the remove. The reason is required.</li>
+</ol>
+<p class="mb-2">
+    <span class="badge @StatusPills.ForWizardStep(consumerStep, 1)">1 Choose a group</span>
+    <span class="badge @StatusPills.ForWizardStep(consumerStep, 2)">2 Read lag</span>
+    <span class="badge @StatusPills.ForWizardStep(consumerStep, 3)">3 Preview</span>
+    <span class="badge @StatusPills.ForWizardStep(consumerStep, 4)">4 Review</span>
+    <span class="badge @StatusPills.ForWizardStep(consumerStep, 5)">5 Submit</span>
+</p>
 
 @if (!Model.Infra.Enabled)
 {
     <div class="alert alert-secondary mt-3" role="status">@Model.Infra.Detail</div>
 }
 
-<div class="au-card card mt-3">
-    <div class="card-header">Consumer groups</div>
-    <div class="card-body">
-        <p class="text-muted">Time since the last rebalance is not reported by the client.</p>
-        <div class="table-responsive">
-            <table class="table table-sm mb-0">
-                <thead>
-                    <tr>
-                        <th><a href="@query.Href(sort: "group", dir: SortDir("group"), page: 1)">Group</a></th>
-                        <th><a href="@query.Href(sort: "state", dir: SortDir("state"), page: 1)">State</a></th>
-                        <th>Members</th>
-                        <th>Client</th>
-                        <th>Host</th>
-                        <th><a href="@query.Href(sort: "lag", dir: SortDir("lag"), page: 1)">Lag</a></th>
-                        <th>Unowned</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var row in Model.GroupRows)
-                {
-                    var member = row.Members.FirstOrDefault();
-                    <tr>
-                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
-                        <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
-                        <td>@row.Members.Count</td>
-                        <td>@(member is null ? "—" : member.ClientId)</td>
-                        <td>@(member is null ? "—" : member.Host)</td>
-                        <td>@row.TotalLag</td>
-                        <td>@row.UnownedPartitions.Count</td>
-                        <td>
-                            <a class="btn btn-sm btn-au-link" href="@query.Href(group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
+@if (groupProblems.Count > 0)
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Groups that need attention (@groupProblems.Count)</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Group</th>
+                            <th>State</th>
+                            <th>Why</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in groupProblems)
+                    {
+                        <tr class="lu-kafka-problem">
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
+                            <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
+                            <td>@KafkaAttention.Join(KafkaAttention.GroupReasons(row))</td>
+                            <td>
+                                <a class="btn btn-sm btn-au-link" href="@query.Href(group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
         </div>
-        @if (Model.GroupRows.Count == 0)
-        {
-            <p class="text-muted mb-0 mt-2">No groups match this search.</p>
-        }
-        <p class="text-muted mt-2 mb-0">@Model.GroupCount groups. Page @query.Page of @Model.GroupPages.</p>
     </div>
-</div>
+}
+else if (Model.GroupRows.Count > 0)
+{
+    <p class="mt-3 mb-0">No group on this page needs attention.</p>
+}
+
+<details class="lu-kafka-fold">
+    <summary>Full group table (@Model.GroupRows.Count on this page)</summary>
+    <p class="text-muted mt-3">Time since the last rebalance is not reported by the client.</p>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th><a href="@query.Href(sort: "group", dir: SortDir("group"), page: 1)">Group</a></th>
+                    <th><a href="@query.Href(sort: "state", dir: SortDir("state"), page: 1)">State</a></th>
+                    <th>Members</th>
+                    <th>Client</th>
+                    <th>Host</th>
+                    <th><a href="@query.Href(sort: "lag", dir: SortDir("lag"), page: 1)">Lag</a></th>
+                    <th>Unowned</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in Model.GroupRows)
+            {
+                var member = row.Members.FirstOrDefault();
+                <tr class="@(KafkaAttention.Group(row) ? "lu-kafka-problem" : null)">
+                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
+                    <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
+                    <td>@row.Members.Count</td>
+                    <td>@(member is null ? "—" : member.ClientId)</td>
+                    <td>@(member is null ? "—" : member.Host)</td>
+                    <td>@row.TotalLag</td>
+                    <td>@row.UnownedPartitions.Count</td>
+                    <td>
+                        <a class="btn btn-sm btn-au-link" href="@query.Href(group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.GroupRows.Count == 0)
+    {
+        <p class="text-muted mb-0 mt-2">No groups match this search.</p>
+    }
+</details>
+<p class="text-muted mt-2 mb-0">@Model.GroupCount groups. Page @query.Page of @Model.GroupPages.</p>
 
 @if (selected is null)
 {
@@ -63,69 +124,39 @@
 }
 else
 {
+    var hotRows = selected.Partitions.Where(row => KafkaAttention.CommittedPartition(row.Lag, row.Owned)).ToList();
     <div class="au-card card mt-3">
         <div class="card-header">@selected.GroupId @if (!selected.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</div>
         <div class="card-body">
             <p>
                 <partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = selected.GroupId, CopyLabel = "Copy group id" })" />
             </p>
-            <p><span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Members @selected.Members.Count. Lag @selected.TotalLag. Replica ceiling @Model.ReplicaCeiling. Members on the expected config @selected.MembersOnExpectedConfig.</p>
-            @if (selected.Members.Count == 0)
-            {
-                <p class="text-muted mb-3">This group has no members.</p>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-sm mb-0">
-                        <thead>
-                            <tr>
-                                <th>Client</th>
-                                <th>Host</th>
-                                <th>Assignment</th>
-                                <th>Config</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        @foreach (var member in selected.Members)
-                        {
-                            <tr>
-                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Client", Value = member.ClientId, Compact = true, CopyLabel = "Copy client id" })" /></td>
-                                <td>@member.Host</td>
-                                <td>@(member.Assignment.Count == 0 ? "—" : string.Join(", ", member.Assignment))</td>
-                                <td>@(member.AdvertisesExpectedConfig ? "Expected" : "Not advertised")</td>
-                            </tr>
-                        }
-                        </tbody>
-                    </table>
-                </div>
-            }
-            @if (selected.Partitions.Count == 0)
-            {
-                <p class="text-muted mb-3">This group has no committed partitions.</p>
-            }
-            else
-            {
+            <p class="mb-0"><span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Members @selected.Members.Count. Lag @selected.TotalLag. Replica ceiling @Model.ReplicaCeiling. Members on the expected config @selected.MembersOnExpectedConfig.</p>
+        </div>
+    </div>
+
+    @if (hotRows.Count > 0)
+    {
+        <div class="au-card card mt-3">
+            <div class="card-header">Partitions that need attention (@hotRows.Count)</div>
+            <div class="card-body">
+                <p>Lag or an unowned partition is listed here. Caught-up partitions stay in the folded table.</p>
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead>
                             <tr>
                                 <th>Topic</th>
                                 <th>Partition</th>
-                                <th>High watermark</th>
-                                <th>Committed</th>
                                 <th>Lag</th>
                                 <th>Owned</th>
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var row in selected.Partitions.OrderBy(item => item.Topic, StringComparer.Ordinal).ThenBy(item => item.Partition))
+                        @foreach (var row in hotRows)
                         {
-                            <tr>
+                            <tr class="lu-kafka-problem">
                                 <td>@row.Topic</td>
                                 <td>@row.Partition</td>
-                                <td>@row.HighWatermark</td>
-                                <td>@row.Committed</td>
                                 <td>@row.Lag</td>
                                 <td>@(row.Owned ? "Yes" : "No")</td>
                             </tr>
@@ -133,13 +164,90 @@ else
                         </tbody>
                     </table>
                 </div>
-            }
-            @if (selected.UnownedPartitions.Count > 0)
-            {
-                <p class="mt-2 mb-0">Unowned: @string.Join(", ", selected.UnownedPartitions)</p>
-            }
+            </div>
         </div>
-    </div>
+    }
+    else if (selected.Partitions.Count > 0)
+    {
+        <p class="mt-3 mb-0">Every committed partition is owned and caught up.</p>
+    }
+
+    <details class="lu-kafka-fold">
+        <summary>Members (@selected.Members.Count)</summary>
+        @if (selected.Members.Count == 0)
+        {
+            <p class="text-muted mb-0 mt-2">This group has no members.</p>
+        }
+        else
+        {
+            <div class="table-responsive mt-3">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Host</th>
+                            <th>Assignment</th>
+                            <th>Config</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var member in selected.Members)
+                    {
+                        <tr class="@(!member.AdvertisesExpectedConfig ? "lu-kafka-problem" : null)">
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Client", Value = member.ClientId, Compact = true, CopyLabel = "Copy client id" })" /></td>
+                            <td>@member.Host</td>
+                            <td>@(member.Assignment.Count == 0 ? "—" : string.Join(", ", member.Assignment))</td>
+                            <td>@(member.AdvertisesExpectedConfig ? "Expected" : "Not advertised")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </details>
+
+    <details class="lu-kafka-fold">
+        <summary>Committed partitions (@selected.Partitions.Count)</summary>
+        @if (selected.Partitions.Count == 0)
+        {
+            <p class="text-muted mb-0 mt-2">This group has no committed partitions.</p>
+        }
+        else
+        {
+            <div class="table-responsive mt-3">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Topic</th>
+                            <th>Partition</th>
+                            <th>High watermark</th>
+                            <th>Committed</th>
+                            <th>Lag</th>
+                            <th>Owned</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in selected.Partitions.OrderBy(item => item.Topic, StringComparer.Ordinal).ThenBy(item => item.Partition))
+                    {
+                        <tr class="@(KafkaAttention.CommittedPartition(row.Lag, row.Owned) ? "lu-kafka-problem" : null)">
+                            <td>@row.Topic</td>
+                            <td>@row.Partition</td>
+                            <td>@row.HighWatermark</td>
+                            <td>@row.Committed</td>
+                            <td>@row.Lag</td>
+                            <td>@(row.Owned ? "Yes" : "No")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </details>
+    @if (selected.UnownedPartitions.Count > 0)
+    {
+        <p class="mt-2 mb-0">Unowned: @string.Join(", ", selected.UnownedPartitions)</p>
+    }
+
     <h2 class="h5 mt-4">Partition lag</h2>
     <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
 
@@ -149,47 +257,72 @@ else
     }
     else
     {
-    <div class="au-card card mt-3">
-        <div class="card-header">Replicas</div>
-        <div class="card-body">
-            <p>Add or remove replicas. The preview shows the new member count against the partition ceiling @Model.ReplicaCeiling. Counts above that ceiling are refused.</p>
-            <form method="post" action="/Operations/Kafka/groups/replicas/plan" data-kafka-busy="Dry run is running.">
-                @Html.AntiForgeryToken()
-                <partial name="_QueryFields" model="@(query with { Group = selected.GroupId })" />
-                <div class="row g-2 align-items-end">
-                    <div class="col-6 col-md-2">
-                        <label class="form-label" for="replica-delta">Replicas</label>
-                        <input class="form-control" id="replica-delta" name="delta" type="number" min="1" max="100" value="@(Model.DraftDelta < 1 ? 1 : Model.DraftDelta)" />
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="replica-reason">Reason</label>
-                        <input class="form-control" id="replica-reason" name="reason" value="@Model.DraftReason" />
-                    </div>
+        var scaleTone = Model.ScalePlan is null ? "alert-secondary" : Model.ScalePlan.Accepted ? "alert-success" : "alert-danger";
+        <h2 class="h5 mt-4">Change replicas</h2>
+        <p>The preview shows the new member count against the partition ceiling @Model.ReplicaCeiling. Counts above that ceiling are refused.</p>
+        <form method="post" action="/Operations/Kafka/groups/replicas/plan" data-kafka-busy="Dry run is running.">
+            @Html.AntiForgeryToken()
+            <partial name="_QueryFields" model="@(query with { Group = selected.GroupId })" />
+            <fieldset class="border rounded p-3 mb-3">
+                <legend class="float-none w-auto px-2 h6">What to change</legend>
+                <p class="form-text">This is how many members to add or to remove, not the final count. Preview and Submit both use it. The button you press chooses the direction.</p>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="replica-delta">Replicas</label>
+                    <input class="form-control" id="replica-delta" name="delta" type="number" min="1" max="100" value="@(Model.DraftDelta < 1 ? 1 : Model.DraftDelta)" />
                 </div>
-                <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview adding replicas" aria-label="Preview adding replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview add</span></button>
-                    <button class="btn btn-sm btn-success lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas" title="Add replicas" aria-label="Add replicas"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
-                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview removing replicas" aria-label="Preview removing replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview remove</span></button>
-                    <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
-                    <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas" title="Remove replicas" aria-label="Remove replicas"><i class="bi bi-dash-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
+            </fieldset>
+            <fieldset class="border rounded p-3 mb-3">
+                <legend class="float-none w-auto px-2 h6">Request only</legend>
+                <p class="form-text">A preview does not read this. Add and Remove do.</p>
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="replica-reason">Reason</label>
+                    <input class="form-control" id="replica-reason" name="reason" value="@Model.DraftReason" />
                 </div>
-            </form>
+            </fieldset>
             @if (Model.ScalePlan is not null)
             {
                 var plan = Model.ScalePlan;
-                <div class="mt-3">
-                    <p><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span> @plan.CurrentMembers to @plan.DesiredMembers. Partition count @plan.PartitionCount. Ceiling @plan.Ceiling.</p>
-                    @foreach (var note in plan.Notes)
+                <div id="kafka-replica-result" class="alert @scaleTone" role="status" tabindex="-1" data-kafka-result data-result-key="@(plan.Accepted)-@plan.GroupId-@plan.DesiredMembers-@plan.Errors.Count">
+                    <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
+                    <p>@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This replica change cannot run yet.")</p>
+                    <dl class="row mb-2">
+                        <dt class="col-sm-4">Members</dt>
+                        <dd class="col-sm-8">@plan.CurrentMembers to @plan.DesiredMembers</dd>
+                        <dt class="col-sm-4">Ceiling</dt>
+                        <dd class="col-sm-8">Partition count @plan.PartitionCount. Ceiling @plan.Ceiling.</dd>
+                        <dt class="col-sm-4">Approval</dt>
+                        <dd class="col-sm-8">@(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
+                    </dl>
+                    @if (plan.Errors.Count > 0)
                     {
-                        <p class="mb-1">@note</p>
+                        <p class="mb-1">Blocking reasons</p>
+                        <ul>
+                        @foreach (var planError in plan.Errors)
+                        {
+                            <li>@planError</li>
+                        }
+                        </ul>
                     }
-                    @foreach (var planError in plan.Errors)
+                    <p class="mb-2">@(plan.Accepted ? "Ready. Fill in the reason, then add or remove." : "Fix the items above, then preview again.")</p>
+                    @if (plan.Notes.Count > 0)
                     {
-                        <p class="mb-1">@planError</p>
+                        <details>
+                            <summary>Details</summary>
+                            @foreach (var note in plan.Notes)
+                            {
+                                <p class="mb-1">@note</p>
+                            }
+                        </details>
                     }
                 </div>
             }
-        </div>
-    </div>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview adding replicas" aria-label="Preview adding replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview add</span></button>
+                <button class="btn btn-sm btn-success lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas" title="Add replicas" aria-label="Add replicas"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
+                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview removing replicas" aria-label="Preview removing replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview remove</span></button>
+                <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
+                <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas" title="Remove replicas" aria-label="Remove replicas"><i class="bi bi-dash-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
+            </div>
+        </form>
     }
 }
