@@ -25,18 +25,12 @@
 <div class="au-card card">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end" data-au-filter="400" data-au-target="auditResults">
+        <form method="get" class="lu-search" data-au-filter="400" data-au-target="auditResults">
+            <input type="hidden" name="pageSize" value="@search.PageSize" />
+            <div class="row g-2 align-items-end">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="searchText">Text</label>
                 <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="facilityId">Facility</label>
-                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="correlationId">Correlation id</label>
-                <input id="correlationId" name="correlationId" value="@query.CorrelationId" class="form-control" />
             </div>
             <div class="col-6 col-md-3">
                 <label class="form-label" for="service">Service</label>
@@ -72,33 +66,31 @@
                     }
                 </select>
             </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="user">User</label>
-                <input id="user" name="user" value="@query.User" class="form-control" />
-            </div>
-            <div class="col-6 col-md-3">
-                <label class="form-label" for="pageSize">Page size</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var size in LogsRules.AuditPageSizes)
-                    {
-                        if (search.PageSize == size)
-                        {
-                            <option value="@size" selected>@size</option>
-                        }
-                        else
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-6 col-md-3">
-                <partial name="_AutomationScope" model="query.Scope" />
-            </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
                 <a class="btn btn-warning" asp-action="Audit">Clear</a>
             </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.FacilityId) || !string.IsNullOrWhiteSpace(query.CorrelationId) || !string.IsNullOrWhiteSpace(query.User) || !string.IsNullOrWhiteSpace(query.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="facilityId">Facility</label>
+                        <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="correlationId">Correlation id</label>
+                        <input id="correlationId" name="correlationId" value="@query.CorrelationId" class="form-control" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="user">User</label>
+                        <input id="user" name="user" value="@query.User" class="form-control" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <partial name="_AutomationScope" model="query.Scope" />
+                    </div>
+                </div>
+            </details>
         </form>
     </div>
 </div>
@@ -167,25 +159,7 @@ else
                         </tbody>
                     </table>
                 </div>
-                <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Audit pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@query.ToRoute(bar.Page - 1)">Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@query.ToRoute(bar.Page + 1)">Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Audit pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = search.PageSize, Sizes = LogsRules.AuditPageSizes, Route = (page, size) => query.ToRoute(page, pageSize: size) })" />
             }
         </div>
     </div>

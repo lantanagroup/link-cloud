@@ -11,6 +11,19 @@
             AutomationMarkRules.Real => "No real facilities.",
             _ => "No tenants found."
         };
+    Dictionary<string, string> PageRoute(int page, int size)
+    {
+        var route = new Dictionary<string, string> { ["pageSize"] = size.ToString() };
+        if (!string.IsNullOrWhiteSpace(Model.Search))
+            route["search"] = Model.Search;
+        if (Model.IncludeDeleted)
+            route["includeDeleted"] = "true";
+        if (scopeQuery is not null)
+            route["scope"] = scopeQuery;
+        if (page > 1)
+            route["page"] = page.ToString();
+        return route;
+    }
 }
 
 <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
@@ -29,40 +42,32 @@
         {
             <div class="alert alert-warning">@error</div>
         }
-        <form method="get" class="row g-2 mb-3 align-items-center" data-au-filter="300" data-au-target="tenantResults">
+        <form method="get" class="mb-3 lu-search" data-au-filter="300" data-au-target="tenantResults">
             <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="pageSize" value="@Model.PageSize" />
+            <div class="row g-2 align-items-center">
             <div class="col-12 col-md-6">
                 <label class="visually-hidden" for="tenantSearch">Search facilities</label>
                 <input id="tenantSearch" type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search facilities..." />
             </div>
             <div class="col-auto">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(Model.IncludeDeleted ? "checked" : null) />
-                    <label class="form-check-label" for="includeDeleted">Include deleted</label>
-                </div>
-            </div>
-            <div class="col-auto">
-                <label class="visually-hidden" for="pageSize">Page size</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var size in TenantListRules.PageSizes)
-                    {
-                        if (Model.PageSize == size)
-                        {
-                            <option value="@size" selected>@size</option>
-                        }
-                        else
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-auto">
-                <partial name="_AutomationScope" model="Model.Scope" />
-            </div>
-            <div class="col-auto">
                 <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
             </div>
+            </div>
+            <details class="lu-advanced mt-2" @((Model.IncludeDeleted || !string.IsNullOrWhiteSpace(Model.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-center mt-1">
+                    <div class="col-auto">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(Model.IncludeDeleted ? "checked" : null) />
+                            <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <partial name="_AutomationScope" model="Model.Scope" />
+                    </div>
+                </div>
+            </details>
         </form>
         <div id="tenantResults" data-au-refresh="20000">
         @if (!string.IsNullOrWhiteSpace(Model.DeletedNote))
@@ -132,25 +137,7 @@
                     </tbody>
                 </table>
             </div>
-            <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Tenant pages">
-                @if (Model.Page > 1)
-                {
-                    <a class="btn btn-sm btn-au-link" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page - 1, pageSize = Model.PageSize, scope = scopeQuery })">Previous</a>
-                }
-                else
-                {
-                    <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                }
-                <span class="small text-muted">Page @Model.Page of @(Model.TotalPages == 0 ? 1 : Model.TotalPages) (@Model.TotalCount)</span>
-                @if (Model.Page < Model.TotalPages)
-                {
-                    <a class="btn btn-sm btn-au-link" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page + 1, pageSize = Model.PageSize, scope = scopeQuery })">Next</a>
-                }
-                else
-                {
-                    <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                }
-            </nav>
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Tenant pages", Page = Model.Page, Pages = Model.TotalPages == 0 ? 1 : Model.TotalPages, Total = Model.TotalCount, PageSize = Model.PageSize, Sizes = TenantListRules.PageSizes, Route = PageRoute })" />
             <p class="text-muted small mt-2 mb-0">@Model.TotalCount tenant(s). The name opens the facility. Configuration opens the editor.</p>
         }
         </div>

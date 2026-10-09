@@ -25,7 +25,9 @@
 <div class="au-card card">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end" data-au-filter="400" data-au-target="sftpResults">
+        <form method="get" class="lu-search" data-au-filter="400" data-au-target="sftpResults">
+            <input type="hidden" name="pageSize" value="@search.PageSize" />
+            <div class="row g-2 align-items-end">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="facilityId">Facility</label>
                 <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
@@ -64,46 +66,36 @@
                     }
                 </select>
             </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="subType">Subtype</label>
-                <select id="subType" name="subType" class="form-select">
-                    <option value="">Any</option>
-                    @foreach (var type in FacilityAcquisitionRules.AcquisitionSubTypes)
-                    {
-                        if (string.Equals(type, query.SubType, StringComparison.OrdinalIgnoreCase))
-                        {
-                            <option value="@type" selected>@type</option>
-                        }
-                        else
-                        {
-                            <option value="@type">@type</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="pageSize">Page size</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var size in LogsRules.PageSizes)
-                    {
-                        if (search.PageSize == size)
-                        {
-                            <option value="@size" selected>@size</option>
-                        }
-                        else
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-6 col-md-3">
-                <partial name="_AutomationScope" model="query.Scope" />
-            </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
                 <a class="btn btn-warning" asp-action="Sftp">Clear</a>
             </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.SubType) || !string.IsNullOrWhiteSpace(query.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="subType">Subtype</label>
+                        <select id="subType" name="subType" class="form-select">
+                            <option value="">Any</option>
+                            @foreach (var type in FacilityAcquisitionRules.AcquisitionSubTypes)
+                            {
+                                if (string.Equals(type, query.SubType, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <option value="@type" selected>@type</option>
+                                }
+                                else
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <partial name="_AutomationScope" model="query.Scope" />
+                    </div>
+                </div>
+            </details>
         </form>
     </div>
 </div>
@@ -179,25 +171,7 @@ else
                         </tbody>
                     </table>
                 </div>
-                <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="SFTP pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@query.ToRoute(bar.Page - 1)">Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@query.ToRoute(bar.Page + 1)">Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "SFTP pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = search.PageSize, Sizes = LogsRules.PageSizes, Route = (page, size) => query.ToRoute(page, pageSize: size) })" />
             }
         </div>
     </div>

@@ -5,14 +5,16 @@
     var form = Model.Form;
     var bar = Model.Paging;
     var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
-    Dictionary<string, string> Route(int page, string? edit = null)
+    Dictionary<string, string> Route(int page, string? edit = null, int pageSize = 0)
     {
-        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = size.ToString() };
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = chosen.ToString() };
         if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
         if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
         if (!string.IsNullOrWhiteSpace(edit)) route["edit"] = edit;
         return route;
     }
+    Dictionary<string, string> PageRoute(int page, int pageSize) => Route(page, query.Edit, pageSize);
 }
 
 <div class="mb-3">
@@ -42,35 +44,27 @@
 <div class="au-card card mb-3">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="searchText">Text</label>
-                <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+        <form method="get" class="lu-search">
+            <input type="hidden" name="pageSize" value="@size" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="searchText">Text</label>
+                    <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="Configurations">Clear</a>
+                </div>
             </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="facilityId">Facility</label>
-                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="pageSize">Page size</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var option in ConfigurationRules.NotificationPageSizes)
-                    {
-                        if (size == option)
-                        {
-                            <option value="@option" selected>@option</option>
-                        }
-                        else
-                        {
-                            <option value="@option">@option</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-warning" asp-action="Configurations">Clear</a>
-            </div>
+            <details class="lu-advanced mt-2" @(string.IsNullOrWhiteSpace(query.FacilityId) ? null : "open")>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="facilityId">Facility</label>
+                        <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+                    </div>
+                </div>
+            </details>
         </form>
     </div>
 </div>
@@ -121,26 +115,8 @@ else
                         </tbody>
                     </table>
                 </div>
-                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Configuration pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page - 1, query.Edit)">Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page + 1, query.Edit)">Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
             }
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Configuration pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = ConfigurationRules.NotificationPageSizes, Route = PageRoute })" />
         </div>
     </div>
 }

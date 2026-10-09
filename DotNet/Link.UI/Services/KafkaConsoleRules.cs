@@ -261,6 +261,22 @@ public static class KafkaBrowseText
         return member.Topic;
     }
 
+    public static string FamilyStat(IReadOnlyList<KafkaNamedTopic> members)
+    {
+        if (members.Count == 0)
+            return "";
+        var parts = members.Select(member =>
+        {
+            var name = MemberLabel(member);
+            if (!member.Exists)
+                return name + " is not on the broker";
+            if (!member.LagKnown)
+                return name + ", lag was not read";
+            return name + ", " + member.Partitions.ToString() + " partitions, lag " + member.Lag.ToString();
+        });
+        return string.Join(". ", parts) + ".";
+    }
+
     public static string FacilityHref(string? facilityId) =>
         string.IsNullOrWhiteSpace(facilityId) ? "" : "/Tenants/View/" + Uri.EscapeDataString(facilityId.Trim());
 

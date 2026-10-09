@@ -152,6 +152,10 @@
                         }
                     </div>
                     <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
+                        @if (Model.TypePaging.Page > 1)
+                        {
+                            <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: 1)">First</a>
+                        }
                         @if (Model.TypePaging.HasPrevious)
                         {
                             <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: Model.TypePaging.Page - 1)">Previous</a>
@@ -160,6 +164,7 @@
                         @if (Model.TypePaging.HasNext)
                         {
                             <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: Model.TypePaging.Page + 1)">Next</a>
+                            <a class="btn btn-sm btn-au-link" href="@Model.Href(typePage: (int)Model.TypePaging.TotalPages)">Last</a>
                         }
                         @foreach (var size in ReportManifestQuery.PageSizes)
                         {
@@ -270,6 +275,10 @@
                 }
             </div>
             <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
+                @if (Model.PatientPaging.Page > 1)
+                {
+                    <a class="btn btn-sm btn-au-link" href="@Model.Href(page: 1)">First</a>
+                }
                 @if (Model.PatientPaging.HasPrevious)
                 {
                     <a class="btn btn-sm btn-au-link" href="@Model.Href(page: Model.PatientPaging.Page - 1)">Previous</a>
@@ -278,6 +287,7 @@
                 @if (Model.PatientPaging.HasNext)
                 {
                     <a class="btn btn-sm btn-au-link" href="@Model.Href(page: Model.PatientPaging.Page + 1)">Next</a>
+                    <a class="btn btn-sm btn-au-link" href="@Model.Href(page: (int)Model.PatientPaging.TotalPages)">Last</a>
                 }
                 @foreach (var size in ReportManifestQuery.PageSizes)
                 {
@@ -357,6 +367,10 @@
                             </tbody>
                         </table>
                         <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                            @if (comparison.TypePaging.Page > 1)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: 1)">First types</a>
+                            }
                             @if (comparison.TypePaging.HasPrevious)
                             {
                                 <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: comparison.TypePaging.Page - 1)">Previous types</a>
@@ -365,6 +379,7 @@
                             @if (comparison.TypePaging.HasNext)
                             {
                                 <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: comparison.TypePaging.Page + 1)">Next types</a>
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: (int)comparison.TypePaging.TotalPages)">Last types</a>
                             }
                         </div>
                         <table class="au-table table table-sm mb-0">
@@ -408,6 +423,10 @@
                             </tbody>
                         </table>
                         <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                            @if (comparison.PatientPaging.Page > 1)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: 1)">First patients</a>
+                            }
                             @if (comparison.PatientPaging.HasPrevious)
                             {
                                 <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: comparison.PatientPaging.Page - 1)">Previous patients</a>
@@ -416,6 +435,7 @@
                             @if (comparison.PatientPaging.HasNext)
                             {
                                 <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: comparison.PatientPaging.Page + 1)">Next patients</a>
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: (int)comparison.PatientPaging.TotalPages)">Last patients</a>
                             }
                         </div>
                     }

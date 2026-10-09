@@ -20,18 +20,16 @@
         <p class="small text-muted">Every period DMRP recorded for this facility, including enrollments the facility later withdrew.</p>
         @if (Model.Periods.Count > 0)
         {
-            <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+            <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="mb-3 lu-search">
                 <input type="hidden" name="section" value="plans" />
+                <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
                 <partial name="_ReturnField" />
-                <div class="col-12 col-md-6 col-xl-3">
+                <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
                     <label class="form-label" for="measure">Measure</label>
                     <input id="measure" name="measure" value="@Model.Query.Measure" class="form-control" />
                 </div>
-                <div class="col-12 col-md-6 col-xl-2">
-                    <label class="form-label" for="dqm">dQM</label>
-                    <input id="dqm" name="dqm" value="@Model.Query.Dqm" class="form-control" />
-                </div>
-                <div class="col-12 col-md-4 col-xl-3">
+                <div class="col-12 col-md-4">
                     <label class="form-label" for="period">Reporting period</label>
                     <select id="period" name="period" class="form-select">
                         <option value="">All periods</option>
@@ -77,6 +75,16 @@
                     <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
                     <a class="btn btn-warning" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="plans" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Clear</a>
                 </div>
+                </div>
+                <details class="lu-advanced mt-2" @(string.IsNullOrWhiteSpace(Model.Query.Dqm) ? null : "open")>
+                    <summary>Advanced</summary>
+                    <div class="row g-2 align-items-end mt-1">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="dqm">dQM</label>
+                            <input id="dqm" name="dqm" value="@Model.Query.Dqm" class="form-control" />
+                        </div>
+                    </div>
+                </details>
             </form>
         }
 

@@ -547,9 +547,11 @@ public sealed class KafkaOpsFixture
         });
     }
 
-    public KafkaOpsCall<KafkaBrowsePage> Messages(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue)
+    public KafkaOpsCall<KafkaBrowsePage> Messages(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null)
     {
         var cleanMode = (mode ?? "").Trim().ToLowerInvariant();
+        if (cleanMode.Length == 0)
+            cleanMode = "newest";
         if (cleanMode is not ("newest" or "oldest" or "from-offset" or "since"))
             return Fail<KafkaBrowsePage>("Mode must be newest, oldest, from-offset, or since.");
         if (limit < 1 || limit > KafkaBrowseLimits.MaxLimit)
@@ -563,34 +565,42 @@ public sealed class KafkaOpsFixture
         if (!admission.Allowed)
             return Fail<KafkaBrowsePage>(admission.Reason);
 
-        var page = SamplePage(admission.Topic, cleanMode);
+        var result = SamplePage(admission.Topic, cleanMode);
         if (string.Equals(key, "cap", StringComparison.Ordinal))
         {
-            page.Metadata.CapHit = true;
-            page.Metadata.Truncated = true;
-            if (page.Records.Count > 0)
-                page.Records[0].Truncated = true;
+            result.Metadata.CapHit = true;
+            result.Metadata.Truncated = true;
+            if (result.Records.Count > 0)
+                result.Records[0].Truncated = true;
         }
         else if (!string.IsNullOrEmpty(key))
         {
-            page.Records = page.Records.Where(record => (record.Key ?? "").Contains(key, StringComparison.Ordinal)).ToList();
+            result.Records = result.Records.Where(record => (record.Key ?? "").Contains(key, StringComparison.Ordinal)).ToList();
         }
 
         if (!string.IsNullOrEmpty(headerName) && !string.IsNullOrEmpty(headerValue))
         {
-            page.Records = page.Records.Where(record => record.Headers.Any(header =>
+            result.Records = result.Records.Where(record => record.Headers.Any(header =>
                 string.Equals(header.Name, headerName, StringComparison.OrdinalIgnoreCase)
                 && header.Value.Contains(headerValue, StringComparison.Ordinal))).ToList();
         }
 
         if (partitions.Count > 0)
-            page.Records = page.Records.Where(record => partitions.Contains(record.Partition)).ToList();
+            result.Records = result.Records.Where(record => partitions.Contains(record.Partition)).ToList();
         var produced = ProducedFor(admission.Topic, partitions, key, headerName, headerValue);
         if (produced.Count > 0)
-            page.Records.InsertRange(0, produced);
-        page.Records = page.Records.Take(limit).ToList();
-        page.Metadata.Returned = page.Records.Count;
-        return Ok(page);
+            result.Records.InsertRange(0, produced);
+        result.Records = result.Records.Where(record => KafkaMessageWindow.Matches(record, text, key, header, valueContains, messageType, from, to)).ToList();
+        if (cleanMode == "oldest")
+            result.Records = result.Records.OrderBy(record => record.TimestampUnixMs).ThenBy(record => record.Offset).ToList();
+        else
+            result.Records = result.Records.OrderByDescending(record => record.TimestampUnixMs).ThenByDescending(record => record.Offset).ToList();
+        result.Metadata.Total = result.Records.Count;
+        var size = KafkaMessageWindow.Size(limit);
+        var number = page < 1 ? 1 : page;
+        result.Records = result.Records.Skip((number - 1) * size).Take(size).ToList();
+        result.Metadata.Returned = result.Records.Count;
+        return Ok(result);
     }
 
     public KafkaOpsCall<ChangeRequestRecord> ProduceMessage(string topic, string? headers, string? key, string? value, string? reason, string? confirmation, string correlationId)

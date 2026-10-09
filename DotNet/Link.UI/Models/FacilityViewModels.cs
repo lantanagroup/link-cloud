@@ -44,7 +44,7 @@ public sealed class FacilityViewQuery
     public Dictionary<string, string> SectionRoute(string section) =>
         new(StringComparer.Ordinal) { ["section"] = section };
 
-    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
+    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null, int? pageSize = null)
     {
         var route = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -82,7 +82,7 @@ public sealed class FacilityViewQuery
         Add(route, "planSort", PlanSort);
         Add(route, "planDir", PlanDir);
 
-        var size = pageSizeOrDefault();
+        var size = pageSizeOrDefault(pageSize);
         if (size != FacilityViewRules.DefaultPageSize)
             route["pageSize"] = size.ToString();
 
@@ -93,8 +93,11 @@ public sealed class FacilityViewQuery
         return route;
     }
 
-    private int pageSizeOrDefault() =>
-        FacilityViewRules.PageSizes.Contains(PageSize) ? PageSize : FacilityViewRules.DefaultPageSize;
+    private int pageSizeOrDefault(int? pageSize = null)
+    {
+        var chosen = pageSize ?? PageSize;
+        return FacilityViewRules.PageSizes.Contains(chosen) ? chosen : FacilityViewRules.DefaultPageSize;
+    }
 
     private static void Add(Dictionary<string, string> route, string key, string? value)
     {
@@ -110,7 +113,7 @@ public sealed class ReportPageQuery
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = FacilityViewRules.DefaultPageSize;
 
-    public Dictionary<string, string> ToRoute(string reportId, int? page = null, string? patient = null)
+    public Dictionary<string, string> ToRoute(string reportId, int? page = null, string? patient = null, int? pageSize = null)
     {
         var route = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -122,7 +125,8 @@ public sealed class ReportPageQuery
         if (!string.IsNullOrWhiteSpace(selected))
             route["patient"] = selected;
 
-        var size = FacilityViewRules.PageSizes.Contains(PageSize) ? PageSize : FacilityViewRules.DefaultPageSize;
+        var chosen = pageSize ?? PageSize;
+        var size = FacilityViewRules.PageSizes.Contains(chosen) ? chosen : FacilityViewRules.DefaultPageSize;
         if (size != FacilityViewRules.DefaultPageSize)
             route["pageSize"] = size.ToString();
 

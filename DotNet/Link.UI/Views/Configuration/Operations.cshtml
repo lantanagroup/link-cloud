@@ -6,12 +6,13 @@
     var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
     var sortBy = string.IsNullOrWhiteSpace(query.SortBy) ? "CreateDate" : query.SortBy;
     var sortDir = string.Equals(query.SortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
-    Dictionary<string, string> Route(int page, string? sort = null, string? dir = null)
+    Dictionary<string, string> Route(int page, string? sort = null, string? dir = null, int pageSize = 0)
     {
+        var chosen = pageSize > 0 ? pageSize : size;
         var route = new Dictionary<string, string>
         {
             ["page"] = page.ToString(),
-            ["pageSize"] = size.ToString(),
+            ["pageSize"] = chosen.ToString(),
             ["sortBy"] = sort ?? sortBy,
             ["sortDir"] = dir ?? sortDir
         };
@@ -23,6 +24,13 @@
         if (query.IncludeDisabled) route["includeDisabled"] = "true";
         return route;
     }
+    Dictionary<string, string> PageRoute(int page, int pageSize) => Route(page, pageSize: pageSize);
+    var advanced = !string.IsNullOrWhiteSpace(query.ResourceType)
+        || !string.IsNullOrWhiteSpace(query.OperationId)
+        || !string.IsNullOrWhiteSpace(query.VendorVersionId)
+        || query.IncludeDisabled
+        || !string.Equals(sortBy, "CreateDate", StringComparison.OrdinalIgnoreCase)
+        || !string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="mb-3">
@@ -36,103 +44,95 @@
 <div class="au-card card">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="facilityId">Facility</label>
-                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
-            </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="operationType">Type</label>
-                <select id="operationType" name="operationType" class="form-select">
-                    <option value="">Any</option>
-                    @foreach (var type in FacilityNormalizationRules.OperationTypes)
-                    {
-                        if (string.Equals(type, query.OperationType, StringComparison.OrdinalIgnoreCase))
+        <form method="get" class="lu-search">
+            <input type="hidden" name="pageSize" value="@size" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="facilityId">Facility</label>
+                    <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="operationType">Type</label>
+                    <select id="operationType" name="operationType" class="form-select">
+                        <option value="">Any</option>
+                        @foreach (var type in FacilityNormalizationRules.OperationTypes)
                         {
-                            <option value="@type" selected>@FacilityNormalizationRules.Label(type)</option>
+                            if (string.Equals(type, query.OperationType, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@type" selected>@FacilityNormalizationRules.Label(type)</option>
+                            }
+                            else
+                            {
+                                <option value="@type">@FacilityNormalizationRules.Label(type)</option>
+                            }
                         }
-                        else
-                        {
-                            <option value="@type">@FacilityNormalizationRules.Label(type)</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="resourceType">Resource</label>
-                <input id="resourceType" name="resourceType" value="@query.ResourceType" class="form-control" list="resourceTypes" />
-                <datalist id="resourceTypes">
-                    @foreach (var resource in Model.ResourceTypes)
-                    {
-                        <option value="@resource"></option>
-                    }
-                </datalist>
-            </div>
-            <div class="col-6 col-md-3">
-                <label class="form-label" for="pageSize">Page size</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var option in ConfigurationRules.PageSizes)
-                    {
-                        if (size == option)
-                        {
-                            <option value="@option" selected>@option</option>
-                        }
-                        else
-                        {
-                            <option value="@option">@option</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="operationId">Operation id</label>
-                <input id="operationId" name="operationId" value="@query.OperationId" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="vendorVersionId">Vendor version id</label>
-                <input id="vendorVersionId" name="vendorVersionId" value="@query.VendorVersionId" class="form-control" />
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="sortBy">Sort</label>
-                <select id="sortBy" name="sortBy" class="form-select">
-                    @foreach (var field in ConfigurationRules.OperationSorts)
-                    {
-                        if (string.Equals(field, sortBy, StringComparison.OrdinalIgnoreCase))
-                        {
-                            <option value="@field" selected>@field</option>
-                        }
-                        else
-                        {
-                            <option value="@field">@field</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="sortDir">Direction</label>
-                <select id="sortDir" name="sortDir" class="form-select">
-                    @if (sortDir == "asc")
-                    {
-                        <option value="asc" selected>Ascending</option>
-                        <option value="desc">Descending</option>
-                    }
-                    else
-                    {
-                        <option value="asc">Ascending</option>
-                        <option value="desc" selected>Descending</option>
-                    }
-                </select>
-            </div>
-            <div class="col-12">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="includeDisabled" name="includeDisabled" value="true" @(query.IncludeDisabled ? "checked" : null) />
-                    <label class="form-check-label" for="includeDisabled">Include disabled</label>
+                    </select>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="Operations">Clear</a>
                 </div>
             </div>
-            <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-warning" asp-action="Operations">Clear</a>
-            </div>
+            <details class="lu-advanced mt-2" @(advanced ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="resourceType">Resource</label>
+                        <input id="resourceType" name="resourceType" value="@query.ResourceType" class="form-control" list="resourceTypes" />
+                        <datalist id="resourceTypes">
+                            @foreach (var resource in Model.ResourceTypes)
+                            {
+                                <option value="@resource"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="operationId">Operation id</label>
+                        <input id="operationId" name="operationId" value="@query.OperationId" class="form-control" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="vendorVersionId">Vendor version id</label>
+                        <input id="vendorVersionId" name="vendorVersionId" value="@query.VendorVersionId" class="form-control" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="sortBy">Sort</label>
+                        <select id="sortBy" name="sortBy" class="form-select">
+                            @foreach (var field in ConfigurationRules.OperationSorts)
+                            {
+                                if (string.Equals(field, sortBy, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <option value="@field" selected>@field</option>
+                                }
+                                else
+                                {
+                                    <option value="@field">@field</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="sortDir">Direction</label>
+                        <select id="sortDir" name="sortDir" class="form-select">
+                            @if (sortDir == "asc")
+                            {
+                                <option value="asc" selected>Ascending</option>
+                                <option value="desc">Descending</option>
+                            }
+                            else
+                            {
+                                <option value="asc">Ascending</option>
+                                <option value="desc" selected>Descending</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeDisabled" name="includeDisabled" value="true" @(query.IncludeDisabled ? "checked" : null) />
+                            <label class="form-check-label" for="includeDisabled">Include disabled</label>
+                        </div>
+                    </div>
+                </div>
+            </details>
         </form>
     </div>
 </div>
@@ -214,26 +214,8 @@ else
                         </tbody>
                     </table>
                 </div>
-                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Operation pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
             }
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Operation pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = ConfigurationRules.PageSizes, Route = PageRoute })" />
         </div>
     </div>
 }

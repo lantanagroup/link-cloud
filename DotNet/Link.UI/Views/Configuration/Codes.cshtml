@@ -4,9 +4,10 @@
     var query = Model.Query;
     var bar = Model.Paging;
     var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
-    Dictionary<string, string> Route(int page)
+    Dictionary<string, string> Route(int page, int pageSize = 0)
     {
-        var route = new Dictionary<string, string> { ["submitted"] = "true", ["page"] = page.ToString(), ["pageSize"] = size.ToString() };
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string> { ["submitted"] = "true", ["page"] = page.ToString(), ["pageSize"] = chosen.ToString() };
         if (!string.IsNullOrWhiteSpace(query.Search)) route["search"] = query.Search;
         if (!string.IsNullOrWhiteSpace(query.CodeSystem)) route["codeSystem"] = query.CodeSystem;
         if (!string.IsNullOrWhiteSpace(query.ValueSet)) route["valueSet"] = query.ValueSet;
@@ -26,51 +27,43 @@
 <div class="au-card card">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
+        <form method="get" class="lu-search">
             <input type="hidden" name="submitted" value="true" />
+            <input type="hidden" name="pageSize" value="@size" />
             <partial name="_ReturnField" />
-            <div class="col-12 col-md-4">
+            <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
                 <label class="form-label" for="search">Search</label>
                 <input id="search" name="search" value="@query.Search" class="form-control" maxlength="255" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="codeSystem">Code system</label>
-                <input id="codeSystem" name="codeSystem" value="@query.CodeSystem" class="form-control" maxlength="2000" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="valueSet">Value set</label>
-                <input id="valueSet" name="valueSet" value="@query.ValueSet" class="form-control" maxlength="2000" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="version">Version</label>
-                <input id="version" name="version" value="@query.Version" class="form-control" maxlength="255" />
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="pageSize">Page size</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var option in new[] { 10, 20, 50, 100 })
-                    {
-                        if (size == option)
-                        {
-                            <option value="@option" selected>@option</option>
-                        }
-                        else
-                        {
-                            <option value="@option">@option</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="form-check mt-4">
-                    <input class="form-check-input" type="checkbox" id="excludeInactive" name="excludeInactive" value="true" @(query.ExcludeInactive ? "checked" : null) />
-                    <label class="form-check-label" for="excludeInactive">Exclude inactive</label>
-                </div>
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
                 <a class="btn btn-warning" asp-action="Codes" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Clear</a>
             </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.CodeSystem) || !string.IsNullOrWhiteSpace(query.ValueSet) || !string.IsNullOrWhiteSpace(query.Version) || query.ExcludeInactive) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="codeSystem">Code system</label>
+                        <input id="codeSystem" name="codeSystem" value="@query.CodeSystem" class="form-control" maxlength="2000" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="valueSet">Value set</label>
+                        <input id="valueSet" name="valueSet" value="@query.ValueSet" class="form-control" maxlength="2000" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="version">Version</label>
+                        <input id="version" name="version" value="@query.Version" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="excludeInactive" name="excludeInactive" value="true" @(query.ExcludeInactive ? "checked" : null) />
+                            <label class="form-check-label" for="excludeInactive">Exclude inactive</label>
+                        </div>
+                    </div>
+                </div>
+            </details>
         </form>
         <p class="text-muted small mb-0 mt-2">Enter a search of at least 3 characters, or one code system, or one value set. A version belongs with a system or a set.</p>
     </div>
@@ -114,25 +107,7 @@ else if (Model.Searched)
                         </tbody>
                     </table>
                 </div>
-                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Code pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Code pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = new[] { 10, 20, 50, 100 }, Route = Route })" />
             }
         </div>
     </div>
