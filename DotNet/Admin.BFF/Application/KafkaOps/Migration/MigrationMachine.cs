@@ -182,6 +182,7 @@ public static class MigrationMachine
             case MigrationStep.C1:
                 if (seen.TopicPresent && record.OriginalTopicId.Length > 0 && !string.Equals(seen.TopicId, record.OriginalTopicId, StringComparison.Ordinal))
                     return Attention(record, "T has a foreign topic id. It was not deleted.", now);
+                RememberCommittedGroups(persist, seen);
                 effects.Add(new MigrationEffect.DeleteTopic(record.Topic, record.OriginalTopicId, false));
                 break;
             case MigrationStep.C2:
@@ -207,14 +208,10 @@ public static class MigrationMachine
                 if (seen.HighWatermarks.Any(mark => mark > 0))
                     return Attention(record, "The new topic is not empty, so offsets were not written.", now);
                 var zeros = ZeroOffsets(record, seen);
-                foreach (var group in record.Groups)
-                {
-                    // A catalog group that never committed stays that way. Writing 0 makes it
-                    // look committed, and an empty group cannot become Stable, so D1 would wait forever.
-                    if (!seen.Groups.TryGetValue(group, out var observed) || !MigrationGroups.HasCommit(observed.Committed))
-                        continue;
+                // Deleting T drops every saved offset, so the live describe cannot tell who had commits.
+                // GroupsWithCommits was captured while the old topic still existed.
+                foreach (var group in record.GroupsWithCommits)
                     effects.Add(new MigrationEffect.WriteOffsets(group, zeros));
-                }
                 break;
             case MigrationStep.D1:
                 ScaleTo(effects, record.StopConsumers, record.ConsumerReplicas);
@@ -238,6 +235,8 @@ public static class MigrationMachine
     private static MigrationRecord Advance(MigrationRecord record, MigrationObservation seen, DateTimeOffset now, MigrationStep? forced = null)
     {
         var next = record.Copy();
+        if (record.BeforeDelete && seen.TopicPresent)
+            RememberCommittedGroups(next, seen);
         var step = forced ?? Next(record.Step);
         if (record.Step == MigrationStep.A2 && seen.BackupId.Length > 0)
             next.BackupTopicId = seen.BackupId;
@@ -481,13 +480,25 @@ public static class MigrationMachine
                 return false;
             if (!string.Equals(group.State, "Empty", StringComparison.OrdinalIgnoreCase) || group.Members != 0)
                 return false;
-            if (!MigrationGroups.HasCommit(group.Committed))
+            if (!record.GroupsWithCommits.Contains(name, StringComparer.Ordinal))
                 continue;
             if (!Same(group.Committed, expected))
                 return false;
         }
 
         return true;
+    }
+
+    private static void RememberCommittedGroups(MigrationRecord record, MigrationObservation seen)
+    {
+        foreach (var name in record.Groups)
+        {
+            if (record.GroupsWithCommits.Contains(name, StringComparer.Ordinal))
+                continue;
+            if (!seen.Groups.TryGetValue(name, out var group) || !MigrationGroups.HasCommit(group.Committed))
+                continue;
+            record.GroupsWithCommits.Add(name);
+        }
     }
 
     private static List<long> ZeroOffsets(MigrationRecord record, MigrationObservation seen)
