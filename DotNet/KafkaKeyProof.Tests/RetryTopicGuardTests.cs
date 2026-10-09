@@ -140,7 +140,9 @@ public class RetryTopicGuardTests
     {
         var root = FindRepoRoot();
         var yaml = ExtractRetryParse(File.ReadAllText(Path.Combine(root, "Azure_Pipelines", "kafka-topics-sync.yaml")));
-        var script = ExtractRetryParse(File.ReadAllText(Path.Combine(root, "Scripts", "create-topics-rest.sh")));
+        var scriptText = File.ReadAllText(Path.Combine(root, "Scripts", "create-topics-rest.sh")).Replace("\r", "");
+        Assert.Contains("[[ -z \"$TOPIC\" || \"$TOPIC\" =~ ^# ]] && continue", scriptText);
+        var script = ExtractRetryParse(scriptText);
         Assert.Equal(script, yaml);
         Assert.Contains("SERVICE=\"${SERVICE#\"~\"}\"", script);
 
