@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
 
             var key = string.IsNullOrWhiteSpace(patientId)
-                ? KafkaKeys.ForFacility(schedule.FacilityId)
+                ? KafkaKeys.ForReport(schedule.FacilityId, schedule.Id)
                 : KafkaKeys.ForPatient(schedule.FacilityId, patientId);
 
             await _submitPayloadProducer.ProduceAsync(nameof(KafkaTopic.SubmitPayload),

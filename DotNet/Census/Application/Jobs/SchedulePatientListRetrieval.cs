@@ -39,7 +39,7 @@ public class SchedulePatientListRetrieval : IJob
         {
             await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, PatientCensusScheduled>
             {
-                Key = KafkaKeys.ForFacility(facility.FacilityID),
+                Key = facility.FacilityID,
                 Value = new PatientCensusScheduled
                 {
                     FacilityId = facility.FacilityID

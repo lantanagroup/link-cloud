@@ -170,10 +170,10 @@ public class ReadyToAcquireListenerTests
         Mock<IDataAcquisitionLogManager> logManagerMock,
         TestAcquisitionProcessorBackgroundService processor)
     {
-        var deadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<ReadyToAcquire, string, ReadyToAcquire>>();
+        var deadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<ReadyToAcquire, long, ReadyToAcquire>>();
         var deadLetterErrorHandlerMock = new Mock<IDeadLetterExceptionHandler<ReadyToAcquire, string, string>>();
-        var transientHandlerMock = new Mock<ITransientExceptionHandler<ReadyToAcquire, string, ReadyToAcquire>>();
-        var consumerFactoryMock = new Mock<IKafkaConsumerFactory<string, ReadyToAcquire>>();
+        var transientHandlerMock = new Mock<ITransientExceptionHandler<ReadyToAcquire, long, ReadyToAcquire>>();
+        var consumerFactoryMock = new Mock<IKafkaConsumerFactory<long, ReadyToAcquire>>();
 
         var services = new ServiceCollection();
         services.AddScoped(_ => logManagerMock.Object);
@@ -190,13 +190,13 @@ public class ReadyToAcquireListenerTests
             provider.GetRequiredService<IServiceScopeFactory>());
     }
 
-    private static ConsumeResult<string, ReadyToAcquire> CreateConsumeResult(long logId, string facilityId)
+    private static ConsumeResult<long, ReadyToAcquire> CreateConsumeResult(long logId, string facilityId)
     {
-        return new ConsumeResult<string, ReadyToAcquire>
+        return new ConsumeResult<long, ReadyToAcquire>
         {
-            Message = new Message<string, ReadyToAcquire>
+            Message = new Message<long, ReadyToAcquire>
             {
-                Key = KafkaKeys.ForFacility(facilityId),
+                Key = logId,
                 Value = new ReadyToAcquire
                 {
                     LogId = logId,
@@ -211,17 +211,17 @@ public class ReadyToAcquireListenerTests
     {
         public TestReadyToAcquireListener(
             ILogger<ReadyToAcquireListener> logger,
-            IKafkaConsumerFactory<string, ReadyToAcquire> kafkaConsumerFactory,
-            IDeadLetterExceptionHandler<ReadyToAcquire, string, ReadyToAcquire> deadLetterConsumerHandler,
+            IKafkaConsumerFactory<long, ReadyToAcquire> kafkaConsumerFactory,
+            IDeadLetterExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> deadLetterConsumerHandler,
             IDeadLetterExceptionHandler<ReadyToAcquire, string, string> deadLetterConsumerErrorHandler,
-            ITransientExceptionHandler<ReadyToAcquire, string, ReadyToAcquire> transientExceptionHandler,
+            ITransientExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> transientExceptionHandler,
             ServiceInformation serviceInformation,
             IServiceScopeFactory serviceScopeFactory)
             : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation, serviceScopeFactory)
         {
         }
 
-        public Task InvokeExecuteListenerAsync(ConsumeResult<string, ReadyToAcquire> consumeResult, CancellationToken cancellationToken)
+        public Task InvokeExecuteListenerAsync(ConsumeResult<long, ReadyToAcquire> consumeResult, CancellationToken cancellationToken)
             => ExecuteListenerAsync(consumeResult, cancellationToken);
     }
 

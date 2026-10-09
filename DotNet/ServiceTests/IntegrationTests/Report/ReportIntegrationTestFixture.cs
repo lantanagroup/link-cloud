@@ -48,6 +48,7 @@ namespace IntegrationTests.Report
         public Mock<ISchedulerFactory> SchedulerFactoryMock { get; } = new();
 
         public Mock<IProducer<string, SubmitPayloadValue>> SubmitPayloadKafkaProducerMock { get; private set; } = new();
+        public Mock<IProducer<string, PayloadSubmittedValue>> PayloadSubmittedKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, ReadyForValidationValue>> ReadyForValidationKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedKafkaProducerMock { get; private set; } = new();
         public Mock<IProducer<string, AuditEventMessage>> AuditableEventKafkaProducerMock { get; private set; } = new();
@@ -83,6 +84,28 @@ namespace IntegrationTests.Report
         public Mock<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>> GenerateReportDeadLetterHandlerMock { get; } = new();
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
+
+        public void ResetSubmitPayloadProducer()
+        {
+            SubmitPayloadKafkaProducerMock.Reset();
+            SubmitPayloadKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue>());
+        }
+
+        public void ResetPayloadSubmittedProducer()
+        {
+            PayloadSubmittedKafkaProducerMock.Reset();
+            PayloadSubmittedKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, PayloadSubmittedValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, PayloadSubmittedValue>());
+        }
 
         public async Task InitializeAsync()
         {
@@ -142,8 +165,23 @@ namespace IntegrationTests.Report
 
             builder.Services.AddSingleton(serviceInformation);
 
+            SubmitPayloadKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue>());
+            PayloadSubmittedKafkaProducerMock
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, PayloadSubmittedValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, PayloadSubmittedValue>());
+
             builder.Services.AddTransient<SubmitPayloadProducer>(sp =>
                 new SubmitPayloadProducer(sp.GetRequiredService<IServiceScopeFactory>(), SubmitPayloadKafkaProducerMock.Object, new Mock<ILogger<SubmitPayloadProducer>>().Object));
+            builder.Services.AddSingleton<IProducer<string, PayloadSubmittedValue>>(PayloadSubmittedKafkaProducerMock.Object);
+            builder.Services.AddTransient<PayloadSubmittedSignalProducer>();
 
             builder.Services.AddTransient<ReadyForValidationProducer>(sp =>
                 new ReadyForValidationProducer(ReadyForValidationKafkaProducerMock.Object, sp.GetRequiredService<IServiceScopeFactory>(), new Mock<ILogger<ReadyForValidationProducer>>().Object));

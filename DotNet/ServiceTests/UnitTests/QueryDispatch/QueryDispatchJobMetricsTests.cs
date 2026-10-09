@@ -75,7 +75,7 @@ public class QueryDispatchJobMetricsTests
         metrics.Verify(m => m.RecordDispatchDuration("facility-1", It.Is<double>(d => d >= 0)), Times.Once);
 
         Assert.NotNull(producedAudit);
-        Assert.Equal(KafkaKeys.ForAudit("facility-1", "patient-1", QueryDispatchConstants.ServiceName), producedAudit!.Key);
+        Assert.Null(producedAudit!.Key);
         Assert.Equal("facility-1", producedAudit.Value.FacilityId);
         Assert.Equal("patient-1", producedAudit.Value.PatientId);
         Assert.NotNull(producedAcquisition);

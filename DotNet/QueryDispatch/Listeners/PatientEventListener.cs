@@ -244,10 +244,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
             _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
-                Key = KafkaKeys.ForAudit(
-                    auditValue.FacilityId,
-                    string.IsNullOrWhiteSpace(auditValue.FacilityId) ? null : auditValue.PatientId,
-                    QueryDispatchConstants.ServiceName),
                 Value = auditValue,
                 Headers = headers
             });

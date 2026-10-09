@@ -916,17 +916,6 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
-                    b.Property<Guid?>("ManifestClaimToken")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("ManifestClaimedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ManifestState")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 

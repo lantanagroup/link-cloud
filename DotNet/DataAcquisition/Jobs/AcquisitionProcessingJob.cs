@@ -25,7 +25,7 @@ public class AcquisitionProcessingJob : IJob
 {
     private readonly ILogger<AcquisitionProcessingJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
+    private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly AcquisitionWorkerProcessorSettings _settings;
     private readonly ICacheService? _cache;
     private const int BatchSize = 100;
@@ -33,7 +33,7 @@ public class AcquisitionProcessingJob : IJob
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
-        IProducer<string, ReadyToAcquire> readyToAcquireProducer,
+        IProducer<long, ReadyToAcquire> readyToAcquireProducer,
         IOptions<AcquisitionWorkerProcessorSettings> settings,
         ICacheService? cache = null)
     {
@@ -320,9 +320,9 @@ public class AcquisitionProcessingJob : IJob
 
                         await _readyToAcquireProducer.ProduceAsync(
                             KafkaTopic.ReadyToAcquire.ToString(),
-                            new Message<string, ReadyToAcquire>
+                            new Message<long, ReadyToAcquire>
                             {
-                                Key = ReadyToAcquireKey(facilityId, request.PatientId),
+                                Key = request.Id,
                                 Value = new ReadyToAcquire
                                 {
                                     LogId = request.Id,
@@ -378,13 +378,4 @@ public class AcquisitionProcessingJob : IJob
         return currentTime >= minAcquisitionPullTime || currentTime <= maxAcquisitionPullTime;
     }
 
-    private static string ReadyToAcquireKey(string? facilityId, string? patientId)
-    {
-        if (string.IsNullOrWhiteSpace(patientId))
-        {
-            return KafkaKeys.ForFacility(facilityId);
-        }
-
-        return KafkaKeys.ForPatient(facilityId, patientId);
-    }
 }

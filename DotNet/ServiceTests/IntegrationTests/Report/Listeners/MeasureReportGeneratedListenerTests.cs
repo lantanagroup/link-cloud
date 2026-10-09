@@ -93,7 +93,7 @@ public class MeasureReportGeneratedListenerTests
     [Fact]
     public async Task ProcessMessageAsync_AbortedFacility_SkipsWithoutUpdatingEntry()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var abort = scope.ServiceProvider.GetRequiredService<IPipelineAbortRegistry>();
@@ -130,10 +130,10 @@ public class MeasureReportGeneratedListenerTests
         Assert.NotNull(unchanged);
         Assert.Equal(MeasureReportStatus.EntryCreated, unchanged.MeasureReports.Single().Status);
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -182,7 +182,7 @@ public class MeasureReportGeneratedListenerTests
     public async Task ProcessMessageAsync_NoSchedule_SkipsWithoutDeadLetter()
     {
         _fixture.MeasureReportGeneratedDeadLetterHandlerMock.Reset();
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<MeasureReportGeneratedListener>();
@@ -208,17 +208,17 @@ public class MeasureReportGeneratedListenerTests
                 It.IsAny<string>()),
             Times.Never);
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
     public async Task ProcessMessageAsync_AllNonReportable_UpdatesAndProducesManifest()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
         _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
@@ -261,21 +261,21 @@ public class MeasureReportGeneratedListenerTests
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
-                    m.Key == KafkaKeys.ForFacility(facilityId) &&
+                    m.Key == KafkaKeys.ForReport(facilityId, reportId) &&
                     m.Value.FacilityId == facilityId &&
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
     public async Task ProcessMessageAsync_NotReadyForAggregation_ProducesManifest()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
         _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
@@ -358,14 +358,14 @@ public class MeasureReportGeneratedListenerTests
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
-                    m.Key == KafkaKeys.ForFacility(facilityId) &&
+                    m.Key == KafkaKeys.ForReport(facilityId, reportId) &&
                     m.Value.FacilityId == facilityId &&
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

@@ -122,7 +122,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
-        var producerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<string, ReadyToAcquire>>();
+        var producerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<long, ReadyToAcquire>>();
         var dependencyChecker = scope.ServiceProvider.GetRequiredService<IAcquisitionDependencyChecker>();
 
         DataAcquisitionLogModel? log = null;

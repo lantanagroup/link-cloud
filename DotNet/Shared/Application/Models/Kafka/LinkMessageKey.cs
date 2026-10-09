@@ -26,6 +26,25 @@ public sealed record LinkMessageKey(string FacilityId, string? PatientId)
         return "{\"facilityId\":\"" + facility + "\",\"patientId\":\"" + Escape(PatientId) + "\"}";
     }
 
+    /// <summary>
+    /// Report-scoped key. A patient id does not belong here: the completion stream for one
+    /// report has to stay on one partition, and a patient id would split it.
+    /// </summary>
+    public static string SerializeReport(string facilityId, Guid reportScheduleId)
+    {
+        if (string.IsNullOrEmpty(facilityId))
+        {
+            throw new ArgumentException("Facility id is required.", nameof(facilityId));
+        }
+
+        if (reportScheduleId == Guid.Empty)
+        {
+            throw new ArgumentException("Report schedule id is required.", nameof(reportScheduleId));
+        }
+
+        return "{\"facilityId\":\"" + Escape(facilityId) + "\",\"reportScheduleId\":\"" + reportScheduleId.ToString("D") + "\"}";
+    }
+
     public static bool TryDeserialize(string? key, out LinkMessageKey? messageKey)
     {
         messageKey = null;

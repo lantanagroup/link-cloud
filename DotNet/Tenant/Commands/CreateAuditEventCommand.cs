@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Tenant.Commands
 
                     await _producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
                     {
-                        Key = KafkaKeys.ForAudit(auditEvent.FacilityId, auditEvent.PatientId, TenantConstants.ServiceName),
+                        Key = facilityId,
                         Value = auditEvent,
                         Headers = headers
                     });

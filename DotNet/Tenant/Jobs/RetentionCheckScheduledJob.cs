@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 var message = new Message<string, object>
                 {
-                    Key = KafkaKeys.ForFacility(tenant),
+                    Key = tenant,
                     Headers = headers,
                     Value = new RetentionCheckScheduledMessage()
                     {

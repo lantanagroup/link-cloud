@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -44,6 +45,14 @@ public static class KafkaProducerRegistration
         };
         var submitPayloadProducer = new KafkaProducerFactory<string, SubmitPayloadValue>(kafkaConnection).CreateProducer(submitPayloadConfig);
         services.AddSingleton(submitPayloadProducer);
+
+        var payloadSubmittedConfig = new ProducerConfig()
+        {
+            ClientId = "Report_PayloadSubmitted"
+        };
+        var payloadSubmittedProducer = new KafkaProducerFactory<string, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
+        services.AddSingleton(payloadSubmittedProducer);
+        services.AddTransient<PayloadSubmittedSignalProducer>();
 
         var auditableEventOccurredConfig = new ProducerConfig()
         {

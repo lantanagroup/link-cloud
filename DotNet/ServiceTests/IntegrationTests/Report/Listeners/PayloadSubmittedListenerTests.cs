@@ -58,7 +58,7 @@ public class PayloadSubmittedListenerTests
         {
             Message = new Message<string, PayloadSubmittedValue>
             {
-                Key = KafkaKeys.ForFacility(facilityId),
+                Key = KafkaKeys.ForReport(facilityId, reportId),
                 Value = value,
                 Headers = new Headers()
             }
@@ -106,7 +106,7 @@ public class PayloadSubmittedListenerTests
         {
             Message = new Message<string, PayloadSubmittedValue>
             {
-                Key = KafkaKeys.ForFacility(facilityId),
+                Key = KafkaKeys.ForReport(facilityId, reportId),
                 Value = value,
                 Headers = headers
             }
@@ -125,7 +125,7 @@ public class PayloadSubmittedListenerTests
     [Fact]
     public async Task ProcessMessageAsync_MeasureReportSubmissionEntry_UpdatesEntryAndProducesManifest()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
         _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
@@ -177,7 +177,7 @@ public class PayloadSubmittedListenerTests
         {
             Message = new Message<string, PayloadSubmittedValue>
             {
-                Key = KafkaKeys.ForPatient(facilityId, patientId),
+                Key = KafkaKeys.ForReport(facilityId, reportId),
                 Value = value,
                 Headers = headers
             }
@@ -193,14 +193,14 @@ public class PayloadSubmittedListenerTests
         Assert.NotNull(updatedEntry.SubmitReportDateTime);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
-                    m.Key == KafkaKeys.ForFacility(facilityId) &&
+                    m.Key == KafkaKeys.ForReport(facilityId, reportId) &&
                     m.Value.FacilityId == facilityId &&
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

@@ -144,7 +144,7 @@ public class CernerCclExtractProcessor(
             // Produce Kafka event for patients found in this file
             var kafkaMessage = new Message<string, CernerPatientsAcquired>
             {
-                Key = KafkaKeys.ForFacility(log.FacilityId),
+                Key = log.FacilityId,
                 Headers = [new Header("X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))],
                 Value = new CernerPatientsAcquired
                 {

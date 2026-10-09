@@ -552,7 +552,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 var message = new Message<string, GenerateReportValue>
                 {
-                    Key = KafkaKeys.ForFacility(facilityId),
+                    Key = facilityId,
                     Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue
                     {
@@ -640,7 +640,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 var message = new Message<string, GenerateReportValue>
                 {
-                    Key = KafkaKeys.ForFacility(facilityId),
+                    Key = facilityId,
                     Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue()
                     {

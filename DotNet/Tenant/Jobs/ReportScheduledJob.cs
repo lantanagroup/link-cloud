@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 var message = new Message<string, object>
                 {
-                    Key = KafkaKeys.ForFacility(facility.FacilityId),
+                    Key = facility.FacilityId,
                     Headers = headers,
                     Value = new ReportScheduledMessage()
                     {
