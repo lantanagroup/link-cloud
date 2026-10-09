@@ -38,6 +38,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using StackExchange.Redis;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -108,6 +109,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { AllowAutoCreateTopics = false });
 
     builder.Services.Configure<KafkaOpsOptions>(builder.Configuration.GetSection(KafkaOpsOptions.SectionName));
+    builder.Services.Configure<KafkaOpsConnectionOptions>(builder.Configuration.GetSection(KafkaOpsConnectionOptions.SectionName));
     builder.Services.AddSingleton<KafkaBrokerGateway>();
     builder.Services.AddSingleton<IKafkaBrokerGateway>(provider => provider.GetRequiredService<KafkaBrokerGateway>());
     builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
@@ -184,6 +186,74 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
 
+    builder.Services.AddSingleton<IMigrationHoldRegistry, MigrationHoldRegistry>();
+    builder.Services.AddSingleton<IKafkaMigrationAdmin>(provider =>
+    {
+        var options = provider.GetRequiredService<IOptions<KafkaOpsOptions>>().Value;
+        var dedicated = provider.GetRequiredService<IOptions<KafkaOpsConnectionOptions>>().Value;
+        return new KafkaMigrationAdmin(
+            provider.GetRequiredService<KafkaConnection>(),
+            options,
+            dedicated);
+    });
+    builder.Services.AddSingleton<IKafkaWorkloadControl>(provider =>
+        new KafkaWorkloadControl(
+            provider.GetRequiredService<IOptions<KafkaOpsOptions>>().Value,
+            provider.GetRequiredService<IProcessRunner>(),
+            provider.GetRequiredService<IKubernetesResourceClient>()));
+
+    // A second multiplexer is used only for the migration lease. A failed connect
+    // falls back to memory so Admin.BFF still starts. Preflight refuses that store
+    // outside LocalCompose.
+    var migrationOnRedis = false;
+    if (string.Equals(cacheType, "Redis", StringComparison.Ordinal))
+    {
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrWhiteSpace(redisConnection))
+        {
+            try
+            {
+                var redisOptions = ConfigurationOptions.Parse(redisConnection);
+                redisOptions.AbortOnConnectFail = false;
+                redisOptions.ConnectTimeout = 2000;
+                var redisPassword = builder.Configuration.GetValue<string>("Redis:Password");
+                if (!string.IsNullOrWhiteSpace(redisPassword))
+                    redisOptions.Password = redisPassword;
+                var multiplexer = ConnectionMultiplexer.Connect(redisOptions);
+                if (multiplexer.IsConnected)
+                {
+                    builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+                    builder.Services.AddSingleton<IMigrationStore>(provider =>
+                        new RedisMigrationStore(
+                            provider.GetRequiredService<IConnectionMultiplexer>().GetDatabase(),
+                            builder.Environment.EnvironmentName));
+                    builder.Services.AddSingleton<IKafkaOpsLease>(provider =>
+                        new RedisKafkaOpsLease(
+                            provider.GetRequiredService<IConnectionMultiplexer>().GetDatabase(),
+                            builder.Environment.EnvironmentName));
+                    migrationOnRedis = true;
+                }
+                else
+                {
+                    multiplexer.Dispose();
+                    Log.Logger.Warning("Kafka migration store fell back to memory because Redis is not connected.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Warning(ex, "Kafka migration store fell back to memory because Redis did not connect.");
+            }
+        }
+    }
+
+    if (!migrationOnRedis)
+    {
+        builder.Services.AddSingleton<IMigrationStore, InMemoryMigrationStore>();
+        builder.Services.AddSingleton<IKafkaOpsLease, InMemoryKafkaOpsLease>();
+    }
+
+    builder.Services.AddSingleton<IMigrationRuntime, MigrationRuntime>();
+
     builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 
     // Add Secret Manager
@@ -221,7 +291,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             .AddPolicy(PolicyNames.CanViewInfrastructure, pb => pb.RequireAssertion(_ => true))
             .AddPolicy(PolicyNames.CanManageKafkaTopics, pb => pb.RequireAssertion(_ => true))
             .AddPolicy(PolicyNames.CanManageScaling, pb => pb.RequireAssertion(_ => true))
-            .AddPolicy(PolicyNames.CanOperateKafka, pb => pb.RequireAssertion(_ => true));
+            .AddPolicy(PolicyNames.CanOperateKafka, pb => pb.RequireAssertion(_ => true))
+            .AddPolicy(PolicyNames.CanMigrateKafkaTopics, pb => pb.RequireAssertion(_ => true));
     }
 
     // Configure CORS regardless of anonymous access

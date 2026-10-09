@@ -50,4 +50,35 @@ public sealed class KafkaOpsOptions
     public string ConsumerService { get; set; } = "consumer";
 
     public int ReassignmentThrottleBytesPerSecond { get; set; }
+
+    public bool AllowTopicMigration { get; set; }
+
+    public int MigrationBackupRetentionHours { get; set; } = 168;
+
+    public int MigrationMaxBackupMinutes { get; set; } = 15;
+
+    public int MigrationHoldMinutes { get; set; } = 15;
+
+    public long MigrationUnknownDiskMaxBytes { get; set; } = 1_073_741_824;
+
+    public bool TopicOperatorManagesLinkTopics { get; set; }
+
+    public string Workloads { get; set; } = "";
+
+    public string WorkloadNamespace { get; set; } = "";
+
+    public bool ManualChecklist { get; set; }
+}
+
+public sealed class KafkaOpsConnectionOptions
+{
+    public const string SectionName = "KafkaOps:Connection";
+
+    public string BootstrapServers { get; set; } = "";
+
+    public bool SaslProtocolEnabled { get; set; }
+
+    public string? SaslUsername { get; set; }
+
+    public string? SaslPassword { get; set; }
 }

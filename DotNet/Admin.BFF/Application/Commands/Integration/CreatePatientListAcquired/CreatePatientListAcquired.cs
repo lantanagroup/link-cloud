@@ -4,6 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Newtonsoft.Json;
 using OpenTelemetry.Trace;
@@ -16,11 +17,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     {
         private readonly ILogger<CreatePatientListAcquired> _logger;
         private readonly IProducer<string, PatientListMessage> _producer;
+        private readonly IMigrationHoldRegistry? _holds;
 
-        public CreatePatientListAcquired(ILogger<CreatePatientListAcquired> logger, IProducer<string, PatientListMessage> producer)
+        public CreatePatientListAcquired(ILogger<CreatePatientListAcquired> logger, IProducer<string, PatientListMessage> producer, IMigrationHoldRegistry? holds = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _producer = producer ?? throw new ArgumentNullException(nameof(producer));
+            _holds = holds;
         }
 
         public async Task<string> Execute(PatientListAcquired model, string? userId = null, CancellationToken cancellationToken = default)
@@ -71,6 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers
                 };
 
+                await MigrationHoldGuard.RefuseIfHeldAsync(_holds, nameof(KafkaTopic.PatientListsAcquired), cancellationToken);
                 await _producer.ProduceAsync(nameof(KafkaTopic.PatientListsAcquired), message);
 
                 return correlationId;

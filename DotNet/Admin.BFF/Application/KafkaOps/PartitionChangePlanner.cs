@@ -96,7 +96,7 @@ public static class PartitionChangePlanner
         if (keyClass == KafkaTopicKeyClass.Facility)
             plan.Notes.Add("A single facility can never use more than one partition of a facility-keyed topic. Extra partitions help only when many facilities are active at once.");
         if (keyClass == KafkaTopicKeyClass.Patient)
-            plan.Notes.Add("A patient key is {facilityId}:{patientId}. Raising the partition count remaps which partition that patient uses.");
+            plan.Notes.Add(OrderingWarning(family, plan.KeyShape, request.CurrentPartitions, request.RequestedPartitions));
         if (keyClass == KafkaTopicKeyClass.Report)
             plan.Notes.Add("A report key is {facilityId}:{reportScheduleId}. Raising the partition count remaps that report.");
 
@@ -303,4 +303,17 @@ public static class PartitionChangePlanner
 
     public static bool MemberIsSafe(string? clientId, int expectedVersion) =>
         KafkaConfigAdvertisement.ClientAdvertisesExpectedConfig(clientId, expectedVersion);
+
+    private static string OrderingWarning(string family, string keyShape, int current, int requested)
+    {
+        var share = current > 0 && requested > current
+            ? (1d - (double)current / requested).ToString("P0")
+            : "0%";
+        var producers = KafkaTopicCatalog.FamilyOf(family).Producers
+            .Where(site => !site.ControlPlane)
+            .Select(site => site.Workload + " (" + site.Path + ")")
+            .ToList();
+        var who = producers.Count == 0 ? "none listed" : string.Join(", ", producers);
+        return $"A patient key is {keyShape}. Raising partitions from {current} to {requested} moves about {share} of keys. Keyed producers: {who}.";
+    }
 }

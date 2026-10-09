@@ -22,6 +22,81 @@ public sealed class OperationsController : Controller
         return View();
     }
 
+    [HttpPost("Kafka/migrations/plan")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PlanMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
+    {
+        var plan = await _kafka.PlanMigrationAsync(form.Topic ?? "", form.Partitions, form.BackupSkip, form.BackupSkipAcknowledged, cancellationToken);
+        var page = await LoadAsync(null, null, null, null, plan.Error, MigrateQuery(form.Topic), cancellationToken);
+        return View("Kafka", page with { MigrationPlan = plan.Value ?? page.MigrationPlan, Error = plan.Ok ? page.Error : plan.Error ?? page.Error });
+    }
+
+    [HttpPost("Kafka/migrations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RequestMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
+    {
+        if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
+            return await MigrateError(form, "Type the topic name to confirm the migration.", cancellationToken);
+
+        var created = await _kafka.RequestMigrationAsync(form.Topic ?? "", form.Partitions, form.Reason ?? "", form.Confirmation ?? "", form.BackupSkip, form.BackupSkipAcknowledged, form.PlanHash ?? "", cancellationToken);
+        if (created.Value is null)
+            return await MigrateError(form, created.Error ?? "The migration was not requested.", cancellationToken);
+
+        return Redirect(MigrateHref(form.Topic, created.Value.Id));
+    }
+
+    [HttpPost("Kafka/migrations/approve")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> ApproveMigration(KafkaMigrationForm form, CancellationToken cancellationToken) =>
+        MigrationPost(form, () => _kafka.ApproveMigrationAsync(form.MigrationId, cancellationToken), cancellationToken);
+
+    [HttpPost("Kafka/migrations/execute")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> ExecuteMigration(KafkaMigrationForm form, CancellationToken cancellationToken) =>
+        MigrationPost(form, () => _kafka.ExecuteMigrationAsync(form.MigrationId, cancellationToken), cancellationToken);
+
+    [HttpPost("Kafka/migrations/abort")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> AbortMigration(KafkaMigrationForm form, CancellationToken cancellationToken) =>
+        MigrationPost(form, () => _kafka.AbortMigrationAsync(form.MigrationId, cancellationToken), cancellationToken);
+
+    [HttpPost("Kafka/migrations/go")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GoMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
+    {
+        if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
+            return await MigrateError(form, "Type the topic name before go.", cancellationToken);
+
+        return await MigrationPost(form, () => _kafka.GoMigrationAsync(form.MigrationId, form.Confirmation ?? "", cancellationToken), cancellationToken);
+    }
+
+    [HttpPost("Kafka/migrations/recover")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RecoverMigration(KafkaMigrationForm form, CancellationToken cancellationToken)
+    {
+        if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
+            return await MigrateError(form, "Type the topic name to recover the original partition count.", cancellationToken);
+
+        return await MigrationPost(form, () => _kafka.RecoverMigrationAsync(form.MigrationId, form.Confirmation ?? "", form.Action ?? "original", cancellationToken), cancellationToken);
+    }
+
+    [HttpPost("Kafka/migrations/manual")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> ManualMigration(KafkaMigrationForm form, CancellationToken cancellationToken) =>
+        MigrationPost(form, () => _kafka.ManualStepAsync(form.MigrationId, form.Workload ?? "", cancellationToken), cancellationToken);
+
+    [HttpPost("Kafka/migrations/backup-delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteMigrationBackup(KafkaMigrationForm form, CancellationToken cancellationToken)
+    {
+        if (!string.Equals((form.Confirmation ?? "").Trim(), (form.BackupName ?? "").Trim(), StringComparison.Ordinal))
+            return await MigrateError(form, "Type the backup topic name to delete it.", cancellationToken);
+
+        var deleted = await _kafka.DeleteBackupAsync(form.BackupName ?? "", form.Confirmation ?? "", cancellationToken);
+        var done = await LoadAsync(null, null, null, null, deleted.Error, MigrateQuery(form.Topic), cancellationToken);
+        return View("Kafka", done with { Message = deleted.Error is null ? "Backup delete was requested." : done.Message });
+    }
+
     [HttpGet("Kafka")]
     public async Task<IActionResult> Kafka(Guid? requestId, CancellationToken cancellationToken)
     {
@@ -290,6 +365,32 @@ public sealed class OperationsController : Controller
             : null;
         var partitions = BuildPartitions(selectedTopic, cluster, groups.Groups);
         var ceiling = ReplicaCeiling(selectedGroup, topics.Topics);
+        KafkaTopicDetail? detail = null;
+        KafkaTopicConfigs? configs = null;
+        KafkaMigrationRecord? migration = null;
+        string? runbook = null;
+        if (query.View == ThroughputKafkaPageQuery.Migrate && !string.IsNullOrWhiteSpace(query.TopicName))
+        {
+            var detailCall = await _kafka.GetDetailAsync(query.TopicName, cancellationToken);
+            detail = detailCall.Value;
+            error ??= detailCall.Error;
+            var diff = Request.Query["diff"].ToString();
+            var configCall = await _kafka.GetConfigsAsync(query.TopicName, diff, cancellationToken);
+            configs = configCall.Value;
+            error ??= configCall.Error;
+        }
+
+        if (Guid.TryParse(Request.Query["migration"], out var migrationId) && migrationId != Guid.Empty)
+        {
+            var loadedMigration = await _kafka.GetMigrationAsync(migrationId, cancellationToken);
+            migration = loadedMigration.Value;
+            error ??= loadedMigration.Error;
+            if (migration is not null)
+            {
+                var book = await _kafka.RunbookAsync(migration.Id, cancellationToken);
+                runbook = book.Value;
+            }
+        }
 
         ChangeRequestRecord? request = null;
         if (requestId is Guid id && id != Guid.Empty)
@@ -331,7 +432,11 @@ public sealed class OperationsController : Controller
             SelectedTopic = selectedTopic,
             SelectedBroker = selectedBroker,
             Partitions = partitions,
-            ReplicaCeiling = ceiling
+            ReplicaCeiling = ceiling,
+            Detail = detail,
+            Configs = configs,
+            Migration = migration,
+            Runbook = runbook
         };
     }
 
@@ -471,6 +576,34 @@ public sealed class OperationsController : Controller
             ordered = ordered.Reverse();
         return ordered.ToList();
     }
+
+    private async Task<IActionResult> MigrateError(KafkaMigrationForm form, string error, CancellationToken cancellationToken)
+    {
+        var page = await LoadAsync(null, null, null, null, error, MigrateQuery(form.Topic), cancellationToken);
+        var migration = page.Migration;
+        if (migration is null && form.MigrationId != Guid.Empty)
+            migration = (await _kafka.GetMigrationAsync(form.MigrationId, cancellationToken)).Value;
+        return View("Kafka", page with { Migration = migration, Error = error });
+    }
+
+    private async Task<IActionResult> MigrationPost(KafkaMigrationForm form, Func<Task<KafkaOpsCall<KafkaMigrationRecord>>> call, CancellationToken cancellationToken)
+    {
+        var result = await call();
+        if (result.Value is not null)
+            return Redirect(MigrateHref(result.Value.Topic, result.Value.Id));
+
+        var page = await LoadAsync(null, null, null, null, result.Error, MigrateQuery(form.Topic), cancellationToken);
+        var migration = page.Migration;
+        if (migration is null && form.MigrationId != Guid.Empty)
+            migration = (await _kafka.GetMigrationAsync(form.MigrationId, cancellationToken)).Value;
+        return View("Kafka", page with { Migration = migration, Error = result.Error ?? page.Error });
+    }
+
+    private static ThroughputKafkaPageQuery MigrateQuery(string? topic) =>
+        new() { View = ThroughputKafkaPageQuery.Migrate, TopicName = topic ?? "" };
+
+    private static string MigrateHref(string? topic, Guid id) =>
+        "/Operations/Kafka?view=migrate&topic=" + Uri.EscapeDataString(topic ?? "") + "&migration=" + id.ToString("D");
 
     private static ThroughputKafkaPage WithDraft(ThroughputKafkaPage page, KafkaChangeForm form) =>
         page with

@@ -21,6 +21,14 @@ The console has four panels. Search, filter, sort, and page stay in the query st
 | Execute a partition increase or a family completion | `CanManageKafkaTopics` |
 | Execute a replica, broker, rebalance, or cancel | `CanManageScaling` |
 
+## Topic migration
+
+Repartitioning by the temp-topic method is a separate operation from **Add partitions**. The operator runbook is [kafka-topic-migration.md](kafka-topic-migration.md). Slice 1 increases only. The recreated topic starts empty, consumer groups are written to offset 0, and the `_linkmig-` backup is kept until a person confirms cleanup or the backup retention expires. The backup is not copied onto the new topic. Use the in-place add when the topic can be quiet and the retained records can stay on their current partitions. Use the migration when the run needs that backup and rollback up to the delete.
+
+`DataAcquisitionRequested` is not hard-blocked. Its producers hash the patient key with murmur2, the same partitioner MeasureEval uses.
+
+An in-place add still remaps keys. The dry run names the keyed producers (workload and source file), the key shape, and the share of keys that move. That share is `1 - N/M`, where N is the current partition count and M is the requested count.
+
 ## What the service refuses
 
 The UI displays these rules. Admin.BFF enforces them.
@@ -28,7 +36,7 @@ The UI displays these rules. Admin.BFF enforces them.
 1. The new partition count must be higher than the current count and no higher than `KafkaOps:MaxPartitionsPerTopic` (default 24).
 2. The main topic, the retry topic, and the error topic are raised together. None of them can shrink. Retry and error topics are not increased on their own. The exception is a family completion: it raises only a sibling that exists and has fewer partitions than the main topic. A sibling that is already ahead is left as it is. The main topic is never in that list.
 3. Execute waits until every member of every subscribed group advertises the expected config version on `client.id` (`<service>-<host>-c<version>`, version 1). An empty group does not block. A member that does not advertise the version does. Consumer clients are unchanged by this console, so a group that still has members refuses an increase until those clients advertise the version.
-4. Key class comes from the topic catalog. Unknown topics are treated as facility-keyed. Facility keys are `{facilityId}`, patient keys are `{facilityId}:{patientId}`, and report keys are `{facilityId}:{reportScheduleId}`. Those topics keep per-key order, so an increase waits for a quiet window: zero lag in every subscribed group and no produce traffic for at least twice the metadata refresh, checked again immediately before execute. The dry run for a facility-keyed topic states that one facility can never use more than one partition. Skipping the quiet window needs a second approver and a reason. Log, correlation, and health topics may change while traffic is moving. `DataAcquisitionRequested` stays blocked: .NET producers hash the facility key with CRC32 and MeasureEval hashes it with murmur2, so one facility can land on different partitions.
+4. Key class comes from the topic catalog. Unknown topics are treated as facility-keyed. Facility keys are `{facilityId}`, patient keys are `{facilityId}:{patientId}`, and report keys are `{facilityId}:{reportScheduleId}`. Those topics keep per-key order, so an increase waits for a quiet window: zero lag in every subscribed group and no produce traffic for at least twice the metadata refresh, checked again immediately before execute. The dry run for a facility-keyed topic states that one facility can never use more than one partition. Skipping the quiet window needs a second approver and a reason. Log, correlation, and health topics may change while traffic is moving. `DataAcquisitionRequested` is not hard-blocked. Producers hash its key with murmur2, the same partitioner MeasureEval uses.
 5. The new partition count is the replica ceiling (`maxReplicas` stays at or below the partition count). The consumers panel shows that ceiling and refuses a scale past it.
 6. After the increase, the request stays open until every subscribed group with members has every partition assigned. If that takes longer than three metadata-refresh intervals, the request records a slow-convergence audit.
 7. A verification window (default 15 minutes, `KafkaOps:VerificationWindowSeconds`) then checks that lag did not rise above the baseline and that a partition whose high watermark moved also moved its committed offset. The request closes as done or needs attention.
@@ -70,7 +78,7 @@ The shell equivalent is `run-proof.sh`, `run-proof.sh --publish`, and `run-proof
 
 The runner:
 
-1. Runs the Kafka unit tests when `dotnet` is on PATH. Those tests are the partition-add guard: an order-sensitive topic with lag is refused, a drained order-sensitive topic is allowed, a log topic does not need the quiet window, and `DataAcquisitionRequested` stays blocked. They also cover the replica ceiling, the controller refusal, and the decommission planner. A missing `dotnet` skips this step and says so. It does not say the broker variable is missing.
+1. Runs the Kafka unit tests when `dotnet` is on PATH. Those tests are the partition-add guard: an order-sensitive topic with lag is refused, a drained order-sensitive topic is allowed, a log topic does not need the quiet window, and `DataAcquisitionRequested` is eligible. They also cover the replica ceiling, the controller refusal, and the decommission planner. A missing `dotnet` skips this step and says so. It does not say the broker variable is missing.
 2. Reads the cluster and requires brokers 0, 1, and 2. `-Publish` passes `--no-recreate` so an existing broker 0 is left in place.
 3. Scales the proof consumer to 3 and waits until the group is Stable with 3 members.
 4. Starts broker 3 and waits until it is registered.
