@@ -9,11 +9,13 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -128,6 +130,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
+            // PayloadSubmitted, including a redrive, is keyed by facility and report schedule,
+            // so one consumer sees this report's completions in order. The last one finds a zero count.
             List<Resource> manifestResources = await Generate(schedule, cancellationToken);
 
             Uri? payloadUri;
@@ -137,7 +141,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
             catch (Exception ex)
             {
-                payloadUri = null;
                 _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id.SanitizeForLog(), schedule.FacilityId.SanitizeForLog());
                 AuditEventMessage auditEvent = new()
                 {
@@ -147,9 +150,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     Notes = $"Failed to upload to blob storage: {ex}"
                 };
                 await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
-
-                // Return false to indicate failure
-                return false;
+                throw new TransientException($"Failed to upload report manifest (ReportId = {schedule.Id}).", ex);
             }
 
             _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
@@ -157,8 +158,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             if (schedule.EnableSubmission)
             {
                 _logger.LogDebug("Producing report manifest to Kafka (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
-                await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
-                    payloadUri: payloadUri?.ToString());
+                try
+                {
+                    // Do not cancel the delivery wait. A cancelled caller can still leave the
+                    // record on the broker, and a retry would upload the manifest again.
+                    await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
+                        patientId: null, correlationId: null, payloadUri: payloadUri?.ToString(), metricsMode: null, cancellationToken: CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    throw new TransientException($"Failed to produce the report manifest submission (ReportId = {schedule.Id}).", ex);
+                }
             }
             else
             {
@@ -166,7 +176,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 await _reportScheduleManager.UpdateAsync(schedule, cancellationToken);
                 _logger.LogDebug("Report manifest submission is disabled (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
             }
-
 
             return true;
         }

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "patient",
+    "facilityId": "facility-proof",
+    "patientId": "patient-proof",
+    "key": "{\"facilityId\":\"facility-proof\",\"patientId\":\"patient-proof\"}",
+    "partitions": { "3": 0, "6": 0, "12": 6, "24": 6 }
+  },
+  {
+    "name": "facility",
+    "facilityId": "ehr-test3",
+    "patientId": null,
+    "key": "{\"facilityId\":\"ehr-test3\"}",
+    "partitions": { "3": 2, "6": 2, "12": 8, "24": 8 }
+  },
+  {
+    "name": "escaped",
+    "facilityId": "a/b\"c\\d",
+    "patientId": "x\\y\"z",
+    "key": "{\"facilityId\":\"a/b\\\"c\\\\d\",\"patientId\":\"x\\\\y\\\"z\"}",
+    "partitions": { "3": 0, "6": 0, "12": 0, "24": 12 }
+  },
+  {
+    "name": "nonAscii",
+    "facilityId": "施設",
+    "patientId": "患者",
+    "key": "{\"facilityId\":\"施設\",\"patientId\":\"患者\"}",
+    "partitions": { "3": 0, "6": 3, "12": 3, "24": 3 }
+  },
+  {
+    "name": "supplementary",
+    "facilityId": "😀",
+    "patientId": "patient-proof",
+    "key": "{\"facilityId\":\"😀\",\"patientId\":\"patient-proof\"}",
+    "partitions": { "3": 2, "6": 2, "12": 2, "24": 2 }
+  }
+]

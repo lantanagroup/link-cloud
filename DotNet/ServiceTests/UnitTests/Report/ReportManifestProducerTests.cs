@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -121,10 +122,10 @@ public class ReportManifestProducerTests
 
         Assert.True(produced);
         harness.SubmitPayloadKafkaProducer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -201,11 +202,14 @@ public class ReportManifestProducerTests
 
         Assert.True(produced);
         harness.SubmitPayloadKafkaProducer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForReport(FacilityId, harness.Schedule.Id) &&
+                    m.Value.FacilityId == FacilityId &&
+                    m.Value.ReportScheduleId == harness.Schedule.Id &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
 
         Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
@@ -248,8 +252,8 @@ public class ReportManifestProducerTests
     }
 
     /// <summary>
-    /// A failed manifest upload returns false before either branch runs. A bypassed report
-    /// must not be marked complete when its manifest never reached internal/.
+    /// A failed manifest upload throws so the completion is retried. Returning false would
+    /// let the period job delete itself, and a blob outage would leave the manifest unproduced.
     /// </summary>
     [Fact]
     public async Task Produce_SubmissionBypassedAndUploadFails_DoesNotSetTerminalStatus()
@@ -262,13 +266,69 @@ public class ReportManifestProducerTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("blob storage unavailable"));
 
-        var produced = await harness.Producer.Produce(harness.Schedule);
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
 
-        Assert.False(produced);
         Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
         harness.ScheduleManager.Verify(
             m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        harness.SubmitPayloadKafkaProducer.Verify(
+            p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// A broker rejection of the submission produce must not look like success.
+    /// </summary>
+    [Fact]
+    public async Task Produce_SubmissionDeliveryFails_Throws()
+    {
+        var harness = new Harness();
+        harness.SubmitPayloadKafkaProducer
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ProduceException<string, SubmitPayloadValue>(
+                new Error(ErrorCode.Local_MsgTimedOut, "delivery failed"),
+                new DeliveryResult<string, SubmitPayloadValue>()));
+
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
+
+        harness.ScheduleManager.Verify(
+            m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// Cancelling the caller must not cancel the submission produce. A cancelled wait
+    /// can still leave the record on the broker.
+    /// </summary>
+    [Fact]
+    public async Task Produce_CancelledCaller_DoesNotCancelTheSubmissionWait()
+    {
+        var harness = new Harness();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        harness.SubmitPayloadKafkaProducer
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.Is<CancellationToken>(token => token.IsCancellationRequested)))
+            .ThrowsAsync(new OperationCanceledException(cancelled.Token));
+
+        Assert.True(await harness.Producer.Produce(harness.Schedule, cancellationToken: cancelled.Token));
+
+        harness.SubmitPayloadKafkaProducer.Verify(
+            p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForReport(FacilityId, harness.Schedule.Id)),
+                It.Is<CancellationToken>(token => !token.IsCancellationRequested)),
+            Times.Once);
     }
 
     #endregion
@@ -280,7 +340,7 @@ public class ReportManifestProducerTests
         public Mock<IReportScheduledManager> ScheduleManager { get; } = new();
         public Mock<IReportEntryManager> EntryManager { get; } = new();
         public Mock<BlobStorageService> BlobStorage { get; }
-        public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadKafkaProducer { get; } = new();
+        public Mock<IProducer<string, SubmitPayloadValue>> SubmitPayloadKafkaProducer { get; } = new();
 
         /// <param name="enableSubmission">
         /// False models a report requested with bypassSubmission: true.
@@ -390,6 +450,13 @@ public class ReportManifestProducerTests
                     It.IsAny<IEnumerable<Resource>>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Uri("https://blob.example.com/internal/manifest.ndjson"));
+
+            SubmitPayloadKafkaProducer
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue> { Status = PersistenceStatus.Persisted });
 
             var submitPayloadProducer = new SubmitPayloadProducer(
                 scopeFactory,

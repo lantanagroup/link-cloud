@@ -25,6 +25,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class PatientEventMessage
     {
+        public string? FacilityId { get; set; }
         public string PatientId { get; set; } = string.Empty;
         public string EventType { get; set; } = string.Empty;
     }

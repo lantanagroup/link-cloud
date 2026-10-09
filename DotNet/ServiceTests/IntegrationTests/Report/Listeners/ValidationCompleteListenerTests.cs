@@ -176,7 +176,7 @@ public class ValidationCompleteListenerTests
     [Fact]
     public async Task ProcessMessageAsync_ValidValidation_UpdatesEntryAndProducesSubmitPayload()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
@@ -242,19 +242,22 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
+                    m.Value.FacilityId == facilityId &&
+                    m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
     public async Task ProcessMessageAsync_InvalidValidation_UpdatesEntryAndProducesSubmitPayload()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
@@ -322,12 +325,15 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
+                    m.Value.FacilityId == facilityId &&
+                    m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -340,9 +346,10 @@ public class ValidationCompleteListenerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task ProcessMessageAsync_SubmissionDisabled_MarksNotSubmittedAndProducesNothing(bool isValid)
+    public async Task ProcessMessageAsync_SubmissionDisabled_MarksNotSubmittedAndSignalsCompletion(bool isValid)
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
+        _fixture.ResetPayloadSubmittedProducer();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
@@ -401,11 +408,21 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.NotSubmitted, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
+        _fixture.PayloadSubmittedKafkaProducerMock.Verify(
+            p => p.ProduceAsync(
+                nameof(KafkaTopic.PayloadSubmitted),
+                It.Is<Message<string, PayloadSubmittedValue>>(m =>
+                    m.Key == KafkaKeys.ForReport(facilityId, reportId) &&
+                    m.Value.PatientId == patientId &&
+                    m.Value.ReportScheduleId == reportId &&
+                    m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     /// <summary>
@@ -415,7 +432,7 @@ public class ValidationCompleteListenerTests
     [Fact]
     public async Task ProcessMessageAsync_SubmissionEnabledByDefault_ProducesSubmitPayload()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
@@ -467,12 +484,15 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
+                    m.Value.FacilityId == facilityId &&
+                    m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -490,7 +510,8 @@ public class ValidationCompleteListenerTests
     [Fact]
     public async Task ProcessMessageAsync_SubmissionDisabledAndLastPatient_DrivesReportToTerminal()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
+        _fixture.ResetPayloadSubmittedProducer();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<ValidationCompleteListener>();
@@ -540,21 +561,54 @@ public class ValidationCompleteListenerTests
         await listener.ProcessMessageAsync(
             BuildConsumeResult(facilityId, reportId, patientId, isValid: true), CancellationToken.None);
 
+        var completion = new ConsumeResult<string, PayloadSubmittedValue>
+        {
+            Message = new Message<string, PayloadSubmittedValue>
+            {
+                Key = KafkaKeys.ForReport(facilityId, reportId),
+                Value = new PayloadSubmittedValue
+                {
+                    PayloadType = PayloadType.MeasureReportSubmissionEntry,
+                    FacilityId = facilityId,
+                    ReportScheduleId = reportId,
+                    PatientId = patientId
+                },
+                Headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } }
+            }
+        };
+
+        using var completionScope = _fixture.ScopeFactory.CreateScope();
+        var completionListener = completionScope.ServiceProvider.GetRequiredService<PayloadSubmittedListener>();
+        await completionListener.ProcessMessageAsync(completion, CancellationToken.None);
+
         using var verifyScope = _fixture.ScopeFactory.CreateScope();
         var verifyScheduleManager = verifyScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var verifyEntryManager = verifyScope.ServiceProvider.GetRequiredService<IReportEntryManager>();
         var updated = await verifyScheduleManager.SingleOrDefaultAsync(s => s.Id == reportId);
+        var updatedEntry = await verifyEntryManager.SingleOrDefaultAsync(
+            e => e.PatientId == patientId && e.ReportScheduleId == reportId);
 
         Assert.NotNull(updated);
         Assert.Equal(ScheduleStatus.CompletedNotSubmitted, updated!.Status);
         Assert.True(updated.Status.IsTerminal());
         Assert.Null(updated.SubmitReportDateTime);
+        Assert.Equal(SubmissionStatus.NotSubmitted, updatedEntry.SubmissionStatus);
 
-        // Still no submission of any kind.
+        _fixture.PayloadSubmittedKafkaProducerMock.Verify(
+            p => p.ProduceAsync(
+                nameof(KafkaTopic.PayloadSubmitted),
+                It.Is<Message<string, PayloadSubmittedValue>>(m =>
+                    m.Key == KafkaKeys.ForReport(facilityId, reportId)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        // The manifest itself is not a patient submission.
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

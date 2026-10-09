@@ -32,7 +32,7 @@ public class PayloadSubmittedListenerTests
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<PayloadSubmittedListener>();
 
-        var consumeResult = (ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue>)null!;
+        var consumeResult = (ConsumeResult<string, PayloadSubmittedValue>)null!;
 
         await Assert.ThrowsAsync<NullReferenceException>(
             () => listener.ProcessMessageAsync(consumeResult, CancellationToken.None));
@@ -47,14 +47,18 @@ public class PayloadSubmittedListenerTests
         var facilityId = "test-facility-payload";
         var reportId = Guid.NewGuid();
 
-        var key = new PayloadSubmittedKey { FacilityId = facilityId, ReportScheduleId = reportId };
-        var value = new PayloadSubmittedValue { PayloadType = PayloadType.ReportSchedule };
-
-        var consumeResult = new ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue>
+        var value = new PayloadSubmittedValue
         {
-            Message = new Message<PayloadSubmittedKey, PayloadSubmittedValue>
+            PayloadType = PayloadType.ReportSchedule,
+            FacilityId = facilityId,
+            ReportScheduleId = reportId
+        };
+
+        var consumeResult = new ConsumeResult<string, PayloadSubmittedValue>
+        {
+            Message = new Message<string, PayloadSubmittedValue>
             {
-                Key = key,
+                Key = KafkaKeys.ForReport(facilityId, reportId),
                 Value = value,
                 Headers = new Headers()
             }
@@ -89,16 +93,20 @@ public class PayloadSubmittedListenerTests
         };
         await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
 
-        var key = new PayloadSubmittedKey { FacilityId = facilityId, ReportScheduleId = reportId };
-        var value = new PayloadSubmittedValue { PayloadType = PayloadType.ReportSchedule };
+        var value = new PayloadSubmittedValue
+        {
+            PayloadType = PayloadType.ReportSchedule,
+            FacilityId = facilityId,
+            ReportScheduleId = reportId
+        };
 
         var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-123") } };
 
-        var consumeResult = new ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue>
+        var consumeResult = new ConsumeResult<string, PayloadSubmittedValue>
         {
-            Message = new Message<PayloadSubmittedKey, PayloadSubmittedValue>
+            Message = new Message<string, PayloadSubmittedValue>
             {
-                Key = key,
+                Key = KafkaKeys.ForReport(facilityId, reportId),
                 Value = value,
                 Headers = headers
             }
@@ -117,7 +125,7 @@ public class PayloadSubmittedListenerTests
     [Fact]
     public async Task ProcessMessageAsync_MeasureReportSubmissionEntry_UpdatesEntryAndProducesManifest()
     {
-        _fixture.SubmitPayloadKafkaProducerMock.Reset();
+        _fixture.ResetSubmitPayloadProducer();
         _fixture.TenantApiServiceMock.Setup(x => x.GetFacilityConfig(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FacilityModel { FacilityName = "Test Facility" });
 
@@ -155,20 +163,21 @@ public class PayloadSubmittedListenerTests
         };
         await reportEntryManager.AddAsync(entry, CancellationToken.None);
 
-        var key = new PayloadSubmittedKey { FacilityId = facilityId, ReportScheduleId = reportId };
         var value = new PayloadSubmittedValue
         {
             PayloadType = PayloadType.MeasureReportSubmissionEntry,
+            FacilityId = facilityId,
+            ReportScheduleId = reportId,
             PatientId = patientId
         };
 
         var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes("corr-456") } };
 
-        var consumeResult = new ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue>
+        var consumeResult = new ConsumeResult<string, PayloadSubmittedValue>
         {
-            Message = new Message<PayloadSubmittedKey, PayloadSubmittedValue>
+            Message = new Message<string, PayloadSubmittedValue>
             {
-                Key = key,
+                Key = KafkaKeys.ForReport(facilityId, reportId),
                 Value = value,
                 Headers = headers
             }
@@ -184,10 +193,14 @@ public class PayloadSubmittedListenerTests
         Assert.NotNull(updatedEntry.SubmitReportDateTime);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m => m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForReport(facilityId, reportId) &&
+                    m.Value.FacilityId == facilityId &&
+                    m.Value.ReportScheduleId == reportId &&
+                    m.Value.PayloadType == PayloadType.ReportSchedule),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

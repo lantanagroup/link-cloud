@@ -90,7 +90,11 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
+            It.Is<Message<long, ReadyToAcquire>>(msg =>
+                msg.Key == log.Id &&
+                msg.Value.LogId == log.Id &&
+                msg.Value.FacilityId == facilityId &&
+                msg.Value.PatientId == "Patient/123"),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -412,14 +416,16 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log1.Id),
+            It.Is<Message<long, ReadyToAcquire>>(msg =>
+                msg.Key == log1.Id &&
+                msg.Value.LogId == log1.Id),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ReadyToAcquire.ToString(),
-                It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log2.Id),
+                It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.LogId == log2.Id),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -505,14 +511,16 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log1.Id),
+            It.Is<Message<long, ReadyToAcquire>>(msg =>
+                msg.Key == log1.Id &&
+                msg.Value.LogId == log1.Id),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ReadyToAcquire.ToString(),
-                It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log2.Id),
+                It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.LogId == log2.Id),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -817,7 +825,11 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
+            It.Is<Message<long, ReadyToAcquire>>(msg =>
+                msg.Key == log.Id &&
+                msg.Value.LogId == log.Id &&
+                msg.Value.FacilityId == facilityId &&
+                msg.Value.PatientId == "Patient/123"),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -973,7 +985,11 @@ public class AcquisitionProcessingJobTests
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
+            It.Is<Message<long, ReadyToAcquire>>(msg =>
+                msg.Key == log.Id &&
+                msg.Value.LogId == log.Id &&
+                msg.Value.FacilityId == facilityId &&
+                msg.Value.PatientId == "Patient/123"),
             It.IsAny<CancellationToken>()),
             Times.Once);
 

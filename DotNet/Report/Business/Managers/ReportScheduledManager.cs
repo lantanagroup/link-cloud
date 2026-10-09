@@ -48,6 +48,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             int pageSize, int pageNumber, CancellationToken cancellationToken = default);
 
         Task<ReportSummaryApiModel?> GetReportSummary(string reportScheduleId, CancellationToken cancellationToken = default);
+
     }
 
     public class ReportScheduledManager : IReportScheduledManager

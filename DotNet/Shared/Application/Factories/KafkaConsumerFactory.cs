@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 
@@ -16,7 +17,7 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
         _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
     }
 
-    public IConsumer<TConsumerKey, TConsumerValue> CreateConsumer(ConsumerConfig config, IDeserializer<TConsumerKey>? keyDeserializer = null, IDeserializer<TConsumerValue>? valueDeserializer = null)
+    public IConsumer<TConsumerKey, TConsumerValue> CreateConsumer(ConsumerConfig config, IDeserializer<TConsumerKey>? keyDeserializer = null, IDeserializer<TConsumerValue>? valueDeserializer = null, KafkaAssignmentTracker? assignmentTracker = null)
     {
         try
         {
@@ -28,6 +29,12 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
             config.BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers);
             config.ReceiveMessageMaxBytes = _kafkaConnection.ReceiveMessageMaxBytes;
             config.ClientId = _kafkaConnection.ClientId;
+            if (config.AutoOffsetReset is null)
+            {
+                config.AutoOffsetReset = AutoOffsetReset.Earliest;
+            }
+
+            config.PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky;
 
             if (_kafkaConnection.SaslProtocolEnabled)
             {
@@ -36,6 +43,8 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
                 config.SaslUsername = _kafkaConnection.SaslUsername;
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }
+
+            KafkaClientDefaults.ApplyConsumer(config, _kafkaConnection.ClientId, _kafkaConnection.StaticMembership, typeof(TConsumerValue).Name);
 
             var consumerBuilder = new ConsumerBuilder<TConsumerKey, TConsumerValue>(config);
 
@@ -49,7 +58,19 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
                 consumerBuilder.SetValueDeserializer(valueDeserializer ?? new JsonWithFhirMessageDeserializer<TConsumerValue>());
             }
 
-            return consumerBuilder.Build();
+            if (assignmentTracker != null)
+            {
+                consumerBuilder.SetPartitionsRevokedHandler((consumer, revoked) => assignmentTracker.OnRevoked(consumer, revoked, _logger));
+                consumerBuilder.SetPartitionsLostHandler((consumer, lost) => assignmentTracker.OnRevoked(consumer, lost, _logger));
+            }
+
+            var consumer = consumerBuilder.Build();
+            if (assignmentTracker != null)
+            {
+                KafkaAssignmentRegistry.Register(consumer, assignmentTracker);
+            }
+
+            return consumer;
         }
         catch (Exception ex)
         {

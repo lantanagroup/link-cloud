@@ -327,6 +327,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 Headers = headers,
                 Value = new ReportScheduledMessage
                 {
+                    FacilityId = facilityId,
                     ReportTypes = dqms,
                     Frequency = period.Frequency,
                     StartDate = startUtc,

@@ -1,10 +1,13 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,17 +61,25 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
         private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
+            var serviceName = string.IsNullOrWhiteSpace(_serviceInformation.ServiceConfigName)
+                ? _serviceInformation.ServiceName
+                : _serviceInformation.ServiceConfigName;
             var config = new ConsumerConfig()
             {
-                GroupId = _serviceInformation.ServiceConfigName,
+                GroupId = serviceName + "-retry",
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
 
             try
             {
-                consumer.Subscribe(_retryListenerSettings.Topics);
+                var topics = _retryListenerSettings.Topics
+                    .Select(topic => ToServiceRetryTopic(topic, serviceName))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+                consumer.Subscribe(topics);
 
                 _logger.LogInformation("Started {ServiceName} retry consumer for topics: [{Topics}] {Timestamp}", _serviceInformation.ServiceConfigName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
@@ -81,6 +92,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             consumeResult = result;
+                            var accounted = false;
 
                             try
                             {
@@ -90,6 +102,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     if (Encoding.UTF8.GetString(exceptionService) != _serviceInformation.ServiceConfigName)
                                     {
                                         _logger.LogWarning("Service that Retry instance is running in ({instanceServiceName}) is different from the service that produced the message ({messageServiceName}). Message will be disregarded.", _serviceInformation.ServiceConfigName, Encoding.UTF8.GetString(exceptionService));
+                                        accounted = true;
                                         return;
                                     }
                                 }
@@ -114,12 +127,21 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                 _logger.LogInformation("Scheduling retry for {Topic}-{Id} at {ScheduledTrigger}, Retry Count: {RetryCount}", retryModel.Topic, retryModel.Id, retryModel.ScheduledTrigger, retryModel.RetryCount);
 
                                 await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler, consumeCancellationToken);
+                                accounted = true;
                             }
                             catch (DeadLetterException ex)
                             {
                                 var facilityId = GetStringValueFromHeader(consumeResult.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
-                                _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                var mainTopic = KafkaTopicNames.TryMainFromRetry(consumeResult.Topic, out var parsed, out _)
+                                    ? parsed
+                                    : consumeResult.Topic;
+                                _deadLetterExceptionHandler.Topic = KafkaTopicNames.Error(mainTopic);
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId),
+                                    consumer,
+                                    consumeResult,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -128,11 +150,29 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             catch (Exception ex)
                             {
                                 _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _serviceInformation.ServiceConfigName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                                // A later commit on this partition would cover this offset. The main topic
+                                // is already committed, so rewind and try the schedule again.
+                                if (consumeResult != null)
+                                {
+                                    try
+                                    {
+                                        consumer.Seek(consumeResult.TopicPartitionOffset);
+                                    }
+                                    catch (KafkaException seekEx)
+                                    {
+                                        _logger.LogError(seekEx, "Failed to rewind retry message {TopicPartitionOffset}.", consumeResult.TopicPartitionOffset);
+                                    }
+                                }
+
+                                await Task.Delay(TimeSpan.FromSeconds(1), consumeCancellationToken);
                             }
                             finally
                             {
-                                if (!consumeCancellationToken.IsCancellationRequested)
-                                    consumer.Commit(consumeResult);
+                                if (accounted && consumeResult != null && !consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    assignmentTracker.MarkProcessed(consumeResult);
+                                    consumer.SafeCommit(consumeResult, _logger);
+                                }
                             }
 
                         }, cancellationToken);
@@ -141,7 +181,11 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                     {
                         var facilityId = GetStringValueFromHeader(ex.ConsumerRecord.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
 
-                        _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
+                        var failedTopic = ex.ConsumerRecord.Topic ?? string.Empty;
+                        var mainTopic = KafkaTopicNames.TryMainFromRetry(failedTopic, out var parsed, out _)
+                            ? parsed
+                            : failedTopic;
+                        _deadLetterExceptionHandler.Topic = KafkaTopicNames.Error(mainTopic);
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
                         _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                         continue;
@@ -155,6 +199,20 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                 consumer.Dispose();
             }
 
+        }
+
+        private static string ToServiceRetryTopic(string topic, string serviceName)
+        {
+            if (KafkaTopicNames.TryMainFromRetry(topic, out _, out _))
+            {
+                return topic;
+            }
+
+            const string sharedSuffix = "-Retry";
+            var main = topic.EndsWith(sharedSuffix, StringComparison.Ordinal)
+                ? topic[..^sharedSuffix.Length]
+                : topic;
+            return KafkaTopicNames.Retry(main, serviceName);
         }
 
         private static string GetStringValueFromHeader(Headers headers, string key)

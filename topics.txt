@@ -1,3 +1,5 @@
+CernerPatientsAcquired:3:1
+CernerPatientsAcquired-Error:3:1
 AuditableEventOccurred:3:1
 AuditableEventOccurred-Error:3:1
 AuditableEventOccurred-Retry:3:1
@@ -16,9 +18,12 @@ MappingOutcomeEvaluated-Retry:3:1
 MeasureReportGenerated:3:1
 MeasureReportGenerated-Error:3:1
 MeasureReportGenerated-Retry:3:1
+# Redrives for this topic are published back onto PayloadSubmitted. There is no PayloadSubmitted-Redrive-Report topic.
 PayloadSubmitted:3:1
 PayloadSubmitted-Error:3:1
 PayloadSubmitted-Retry:3:1
+NotificationRequested:3:1
+NotificationRequested-Error:3:1
 PatientCensusScheduled:3:1
 PatientCensusScheduled-Error:3:1
 PatientCensusScheduled-Retry:3:1
@@ -28,9 +33,6 @@ PatientEvent-Retry:3:1
 PatientListsAcquired:3:1
 PatientListsAcquired-Error:3:1
 PatientListsAcquired-Retry:3:1
-PayloadSubmitted:3:1
-PayloadSubmitted-Error:3:1
-PayloadSubmitted-Retry:3:1
 ReadyForValidation:3:1
 ReadyForValidation-Error:3:1
 ReadyForValidation-Retry:3:1

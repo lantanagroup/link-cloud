@@ -6,6 +6,7 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
     public class PatientEventValue
     {
         [DataMember]
+        public string? FacilityId { get; set; }
         public string PatientId { get; set; }
         [DataMember]
         public string EventType { get; set; }

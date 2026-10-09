@@ -30,6 +30,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class DataAcquisitionRequestedMessage
     {
+        public string? FacilityId { get; set; }
         public string PatientId { get; set; } = string.Empty;
         public string QueryType { get; set; } = string.Empty;
         public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();

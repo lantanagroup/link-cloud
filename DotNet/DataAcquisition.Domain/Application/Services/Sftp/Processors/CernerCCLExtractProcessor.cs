@@ -148,6 +148,7 @@ public class CernerCclExtractProcessor(
                 Headers = [new Header("X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))],
                 Value = new CernerPatientsAcquired
                 {
+                    FacilityId = log.FacilityId,
                     PatientEncounters = fileEncounters
                 }
             };

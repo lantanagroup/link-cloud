@@ -376,9 +376,10 @@ jobs:
       - name: Build
         run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
-      # Single invocation runs every test in the ServiceTests project (unit + integration).
+      # ServiceTests runs unit and integration tests in one invocation.
       # No Category filter; xUnit's collection wiring keeps integration tests serialized
-      # and unit tests parallel within the same run.
+      # and unit tests parallel within the same run. The key-proof and notification
+      # projects are separate suites and do not need the SQL or Azurite fixtures.
       - name: Run .NET tests
         run: |
           mkdir -p ./TestResults
@@ -390,6 +391,16 @@ jobs:
             --results-directory ./TestResults \
             --collect:"XPlat Code Coverage" \
             -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+          dotnet test DotNet/KafkaKeyProof.Tests/KafkaKeyProof.Tests.csproj \
+            --configuration Release \
+            --verbosity normal \
+            --logger "trx;LogFileName=kafka-key-proof-results.trx" \
+            --results-directory ./TestResults
+          dotnet test DotNet/Notification.Tests/Notification.Tests.csproj \
+            --configuration Release \
+            --verbosity normal \
+            --logger "trx;LogFileName=notification-tests-results.trx" \
+            --results-directory ./TestResults
         continue-on-error: true
         timeout-minutes: 25
 

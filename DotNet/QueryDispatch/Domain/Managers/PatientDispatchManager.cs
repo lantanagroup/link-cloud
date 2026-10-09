@@ -57,6 +57,7 @@ namespace QueryDispatch.Domain.Managers
                 var auditMessage = new AuditEventMessage
                 {
                     FacilityId = patientDispatch.FacilityId,
+                    PatientId = patientDispatch.PatientId,
                     ServiceName = QueryDispatchConstants.ServiceName,
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
@@ -105,6 +106,7 @@ namespace QueryDispatch.Domain.Managers
                 var auditMessage = new AuditEventMessage
                 {
                     FacilityId = facilityId,
+                    PatientId = patientId,
                     ServiceName = QueryDispatchConstants.ServiceName,
                     Action = AuditEventType.Delete,
                     EventDate = DateTime.UtcNow,
