@@ -29,6 +29,7 @@ public sealed class GroupView
     public long TotalLag { get; set; }
     public List<string> UnownedPartitions { get; set; } = [];
     public int MembersOnExpectedConfig { get; set; }
+    public bool Catalogued { get; set; } = true;
 }
 
 public sealed class GroupMemberView
@@ -188,11 +189,38 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     private async Task<IReadOnlyList<GroupView>> DescribeGroupsCoreAsync(IAdminClient admin, bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var ids = CatalogGroupIds(includeTestGroups);
+        var catalog = CatalogGroupIds(includeTestGroups);
+        var described = catalog.Count == 0
+            ? new List<ConsumerGroupDescription>()
+            : await DescribeCatalogGroupsAsync(admin, catalog, cancellationToken);
+
+        var foreign = new HashSet<string>(StringComparer.Ordinal);
+        var extra = new List<string>();
+        foreach (var id in await ListedGroupIdsAsync(admin, cancellationToken))
+        {
+            if (catalog.Contains(id, StringComparer.Ordinal) || !foreign.Add(id))
+                continue;
+            if (!includeTestGroups && IsHiddenTestGroup(id))
+                continue;
+            extra.Add(id);
+        }
+
+        if (extra.Count > 0)
+        {
+            try
+            {
+                described.AddRange(await DescribeCatalogGroupsAsync(admin, extra, cancellationToken));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The group name still appears. A describe failure must not hide a group that blocks a migration.
+            }
+        }
+
+        var ids = new List<string>(catalog);
+        ids.AddRange(extra);
         if (ids.Count == 0)
             return [];
-
-        var described = await DescribeCatalogGroupsAsync(admin, ids, cancellationToken);
         var present = described
             .Where(group => !string.IsNullOrWhiteSpace(group.GroupId) && !IsMissingGroup(group.Error))
             .Select(group => group.GroupId!)
@@ -236,7 +264,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             var group = described.FirstOrDefault(candidate => string.Equals(candidate.GroupId, groupId, StringComparison.Ordinal));
             if (group is null || IsMissingGroup(group.Error))
             {
-                views.Add(new GroupView { GroupId = groupId, State = "Empty" });
+                views.Add(new GroupView { GroupId = groupId, State = "Empty", Catalogued = !foreign.Contains(groupId) });
                 continue;
             }
 
@@ -244,7 +272,8 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             var view = new GroupView
             {
                 GroupId = group.GroupId ?? "",
-                State = group.State.ToString()
+                State = group.State.ToString(),
+                Catalogued = !foreign.Contains(group.GroupId ?? "")
             };
 
             var owned = new HashSet<string>(StringComparer.Ordinal);
@@ -413,10 +442,23 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         }
 
         var roles = await ControllerEligibleIdsAsync(admin, brokers, cancellationToken);
+        var logLeader = KafkaControllerId.Read(metadata);
+        if (!logLeader.Present)
+        {
+            try
+            {
+                logLeader = KafkaControllerId.Read(admin.GetMetadata(KafkaControllerId.MetadataLogTopic, TimeSpan.FromSeconds(10)));
+            }
+            catch (KafkaException)
+            {
+                // ZooKeeper clusters have no metadata log. DescribeCluster remains the controller id.
+            }
+        }
+
         return new ClusterSnapshot
         {
             BrokerCount = described.Nodes.Count,
-            ControllerId = described.Controller?.Id,
+            ControllerId = KafkaControllerId.Resolve(described.Controller?.Id, logLeader, roles.Known, roles.Ids),
             UnderReplicatedPartitions = underReplicated,
             OfflinePartitions = offline,
             IsrShrunkPartitions = isrShrunk,
@@ -605,6 +647,31 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         }
 
         return ids;
+    }
+
+    private static async Task<List<string>> ListedGroupIdsAsync(IAdminClient admin, CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var listed = await admin.ListConsumerGroupsAsync(new ListConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(15) });
+            if (listed?.Valid is null)
+                return [];
+
+            return listed.Valid
+                .Select(group => group.GroupId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList()!;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return [];
+        }
     }
 
     private static async Task<List<long>> HighWatermarksAsync(IAdminClient admin, string topic, int partitions, CancellationToken cancellationToken)

@@ -1,5 +1,5 @@
 (function () {
-    var colors = ["#28a745", "#dc3545", "#343a40", "#6c757d", "#212529"];
+    var barColor = "#6c757d";
     var charts = {};
     var poll;
 
@@ -33,7 +33,7 @@
                 datasets: [{
                     label: label,
                     data: rows.map(function (row) { return row.value; }),
-                    backgroundColor: rows.map(function (_, index) { return colors[index % colors.length]; })
+                    backgroundColor: barColor
                 }]
             },
             options: {
@@ -75,9 +75,25 @@
             bars("kafkaLagChart", data.lags, "Lag");
         }
         if (typeof window.luPaintTimes === "function") window.luPaintTimes(document.getElementById("kafkaResults") || document);
-        tips(document.getElementById("kafkaResults") || document);
+        var root = document.getElementById("kafkaResults") || document;
+        tips(root);
         wireConfirm();
+        bindBusy(root);
         watchRequest();
+    }
+
+    function bindBusy(root) {
+        (root || document).querySelectorAll("form[data-kafka-busy]").forEach(function (form) {
+            if (form.getAttribute("data-kafka-busy-bound") === "1") return;
+            form.setAttribute("data-kafka-busy-bound", "1");
+            form.addEventListener("submit", function (event) {
+                var submitter = event.submitter;
+                var action = (submitter && submitter.getAttribute("formaction")) || form.getAttribute("action") || "";
+                if (action.indexOf("/plan") < 0) return;
+                var note = form.querySelector("[data-kafka-busy-note]");
+                if (note) note.hidden = false;
+            });
+        });
     }
 
     function watchRequest() {
