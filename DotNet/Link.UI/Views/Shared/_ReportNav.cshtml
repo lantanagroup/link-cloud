@@ -7,6 +7,7 @@
 }
 <nav class="lu-section-nav" aria-label="Report">
     <a class="@Btn("report")" asp-controller="Tenants" asp-action="Report" asp-route-id="@facilityId" asp-route-reportId="@reportId" asp-route-returnUrl="@origin"><i class="bi bi-file-earmark-text me-1"></i>Report details</a>
+    <a class="@Btn("manifest")" asp-controller="Reports" asp-action="Manifest" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId" asp-route-returnUrl="@origin"><i class="bi bi-card-checklist me-1"></i>Manifest</a>
     <a class="@Btn("validation")" asp-controller="Reports" asp-action="Validation" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId" asp-route-returnUrl="@origin"><i class="bi bi-shield-check me-1"></i>Validation</a>
     <a class="@Btn("acquisition")" asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId" asp-route-returnUrl="@origin"><i class="bi bi-journal-text me-1"></i>Acquisition log</a>
 </nav>

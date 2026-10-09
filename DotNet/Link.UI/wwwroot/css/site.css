@@ -2202,6 +2202,14 @@ a.lu-clip {
   border-radius: 0;
   box-shadow: inset 0 -3px 0 var(--au-warning);
 }
+.card a.btn.lu-nav-current,
+.card a.btn.lu-nav-current:hover,
+.card a.btn.lu-nav-current:focus {
+  color: var(--au-text);
+  background: #fff;
+  border-color: var(--au-warning);
+  box-shadow: inset 0 -3px 0 var(--au-warning);
+}
 .lu-live-label {
   font-size: .75rem;
   color: var(--au-muted);

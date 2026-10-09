@@ -1,7 +1,9 @@
 using System.Text;
+using Automation.UI.Models;
 using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -27,8 +29,35 @@ public sealed partial class AutomationController
     }
 
     [HttpGet("manifest")]
-    public async Task<IActionResult> Manifest(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Manifest(
+        Guid id,
+        string? q,
+        string? sort,
+        string? dir,
+        string? typeQ,
+        string? cmpQ,
+        int page,
+        int pageSize,
+        int typePage,
+        int typeSize,
+        int cmpPage,
+        int cmpSize,
+        int cmpType,
+        CancellationToken cancellationToken)
     {
+        var query = ReportManifestRules.Normalize(
+            q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "total");
+        const string path = "/Automation/manifest";
+        var fixture = _services.GetService<KafkaOpsFixture>();
+        if (id == ReportManifestRules.SampleId && (!_engine.Ready || _manager is null) && fixture?.Active == true)
+        {
+            ViewData["Title"] = "Generation manifest";
+            ViewData["AutomationSection"] = "runs";
+            return View(
+                "~/Views/Automation/Manifest.cshtml",
+                ReportManifestRules.SampleAutomation(query, path, Url.Action(nameof(DownloadGeneratedBundle), new { id })));
+        }
+
         if (EngineOff() is { } off)
             return off;
 
@@ -40,15 +69,28 @@ public sealed partial class AutomationController
         if (manifest == null)
             return RedirectToAction(nameof(Run), new { id });
 
+        AbsUploadSnapshot? actual = null;
+        if (run.Status.IsTerminal())
+            actual = await _manager.GetAbsUploadSnapshotAsync(id, cancellationToken);
+
+        await FillRunDetailAsync(run, cancellationToken);
+        var latest = await LatestTemplateCacheVersionAsync(run.GeneratedTemplateCacheScenarioKey, cancellationToken);
+        var model = ReportManifestRules.FromGeneration(
+            manifest,
+            actual,
+            query,
+            showComparison: run.Status.IsTerminal(),
+            id,
+            path,
+            Url.Action(nameof(DownloadGeneratedBundle), new { id }),
+            run.RunConfigurationJson,
+            ConfigurationNames(),
+            run.GeneratedTemplateCacheVersionNumber,
+            latest);
+
         ViewData["Title"] = "Generation manifest";
         ViewData["AutomationSection"] = "runs";
-        ViewBag.Run = run;
-        ViewBag.RunId = id;
-        await FillRunDetailAsync(run, cancellationToken);
-        ViewBag.LatestTemplateCacheVersionNumber = await LatestTemplateCacheVersionAsync(
-            run.GeneratedTemplateCacheScenarioKey,
-            cancellationToken);
-        return View("~/Views/Automation/Manifest.cshtml", manifest);
+        return View("~/Views/Automation/Manifest.cshtml", model);
     }
 
     [HttpGet("manifest-data")]
@@ -672,6 +714,22 @@ public sealed partial class AutomationController
 
         var latest = await store.GetLatestAsync(scenarioKey, cancellationToken);
         return latest?.VersionNumber;
+    }
+
+    private IReadOnlyDictionary<string, string> ConfigurationNames()
+    {
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (ViewBag.PatientConfigurations is not IEnumerable<PatientConfiguration> rows)
+            return names;
+
+        foreach (var row in rows)
+        {
+            if (row.Id == Guid.Empty || string.IsNullOrWhiteSpace(row.Name))
+                continue;
+            names[row.Id.ToString()] = row.Name.Trim();
+        }
+
+        return names;
     }
 
     private IActionResult? EngineOff()

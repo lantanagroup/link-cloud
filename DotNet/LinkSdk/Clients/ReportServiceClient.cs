@@ -141,6 +141,7 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
         string? sortBy = null,
         int pageSize = 10,
         int pageNumber = 1,
+        SortOrder? sortOrder = null,
         CancellationToken cancellationToken = default) =>
         SendAsync<PagedConfigModel<ReportEntryApiModel>>(() => Request("/entries/search")
             .SetQueryParam("facilityId", facilityId)
@@ -148,6 +149,7 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
             .SetQueryParam("reportScheduleId", reportScheduleId)
             .SetQueryParam("reportType", reportType)
             .SetQueryParam("sortBy", sortBy)
+            .SetQueryParam("sortOrder", sortOrder?.ToString())
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));

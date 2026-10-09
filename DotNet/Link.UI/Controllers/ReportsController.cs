@@ -12,17 +12,20 @@ public sealed class ReportsController : Controller
     private readonly FacilityViewService _view;
     private readonly AutomationOwnershipLookup _ownership;
     private readonly IOptions<LinkUiFeatureOptions> _features;
+    private readonly KafkaOpsFixture _fixture;
 
     public ReportsController(
         ReportsService reports,
         FacilityViewService view,
         AutomationOwnershipLookup ownership,
-        IOptions<LinkUiFeatureOptions> features)
+        IOptions<LinkUiFeatureOptions> features,
+        KafkaOpsFixture fixture)
     {
         _reports = reports;
         _view = view;
         _ownership = ownership;
         _features = features;
+        _fixture = fixture;
     }
 
     [HttpGet]
@@ -195,6 +198,69 @@ public sealed class ReportsController : Controller
         ViewData["Title"] = "Acquisition log";
         ViewData["PatientId"] = FacilityViewRules.Clean(patientId);
         return View(model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Manifest(
+        string? facilityId,
+        string? reportId,
+        string? q,
+        string? sort,
+        string? dir,
+        string? typeQ,
+        string? cmpQ,
+        int page,
+        int pageSize,
+        int typePage,
+        int typeSize,
+        int cmpPage,
+        int cmpSize,
+        int cmpType,
+        CancellationToken cancellationToken)
+    {
+        var query = ReportManifestRules.Normalize(
+            q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "status");
+        var returnUrl = ReturnUrlRules.FromQuery(Request);
+        ReportManifestPage model;
+        if (_fixture.Active && ReportManifestRules.IsSample(facilityId, reportId))
+        {
+            model = ReportManifestRules.SampleReport(query, returnUrl);
+        }
+        else
+        {
+            var route = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(facilityId))
+                route["facilityId"] = facilityId.Trim();
+            if (!string.IsNullOrWhiteSpace(reportId))
+                route["reportId"] = reportId.Trim();
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+                route["returnUrl"] = returnUrl;
+
+            model = await _reports.LoadManifestAsync(
+                facilityId,
+                reportId,
+                query,
+                "/Reports/Manifest",
+                route,
+                patientId => PatientMeasureHref(facilityId, reportId, patientId, returnUrl),
+                cancellationToken);
+        }
+
+        ViewData["Title"] = "Report manifest";
+        return View(model);
+    }
+
+    private static string PatientMeasureHref(string? facilityId, string? reportId, string patientId, string? returnUrl)
+    {
+        var parts = new List<string>
+        {
+            "facilityId=" + Uri.EscapeDataString(facilityId?.Trim() ?? string.Empty),
+            "reportId=" + Uri.EscapeDataString(reportId?.Trim() ?? string.Empty),
+            "patientId=" + Uri.EscapeDataString(patientId ?? string.Empty)
+        };
+        if (!string.IsNullOrWhiteSpace(returnUrl))
+            parts.Add("returnUrl=" + Uri.EscapeDataString(returnUrl));
+        return "/Reports/Measure?" + string.Join("&", parts);
     }
 
     [HttpPost]
