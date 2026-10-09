@@ -8,6 +8,8 @@ public static class KafkaBrowseLimits
     public const int MaxPageBytes = 1_048_576;
     public const int MaxPartitions = 64;
     public const int MaxScanned = 2_000;
+    public const int ScanBatch = 200;
+    public const int MaxScanBatch = 500;
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
 }
 
@@ -25,6 +27,9 @@ public sealed class KafkaBrowseMetadata
     public int Total { get; set; }
     public bool Truncated { get; set; }
     public bool CapHit { get; set; }
+    public int Scanned { get; set; }
+    public bool More { get; set; }
+    public string Resume { get; set; } = "";
     public long ElapsedMs { get; set; }
 }
 

@@ -299,14 +299,19 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendAsync<string>(HttpMethod.Get, "api/ops/kafka/migrations/" + id.ToString("D") + "/runbook", null, cancellationToken);
     }
 
-    public Task<KafkaOpsCall<KafkaBrowsePage>> GetMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null)
+    public Task<KafkaOpsCall<KafkaBrowsePage>> GetMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null, string? resume = null, long? until = null, string? correlation = null, string? fixtureKey = null)
     {
         if (_fixture.Active)
-            return Task.FromResult(_fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue, page, text, header, valueContains, messageType, from, to));
-        var read = KafkaMessageWindow.Locate(page, limit, 0, long.MaxValue);
-        if (page > 1)
-            return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", "from-offset", partitions, read.Offset, null, read.Count, key, headerName, headerValue), null, cancellationToken);
-        return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", mode, partitions, offset, timestamp, read.Count, key, headerName, headerValue), null, cancellationToken);
+            return Task.FromResult(_fixture.Messages(topic, mode, partitions, offset, timestamp, limit, string.IsNullOrEmpty(key) ? fixtureKey ?? "" : key, headerName, headerValue, page, text, header, valueContains, messageType, from, to, resume, until, correlation));
+        var narrowed = !string.IsNullOrWhiteSpace(resume) || timestamp is not null || until is not null || !string.IsNullOrWhiteSpace(correlation) || !string.IsNullOrWhiteSpace(key);
+        if (!narrowed && page > 1)
+        {
+            var read = KafkaMessageWindow.Locate(page, limit, 0, long.MaxValue);
+            return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", "from-offset", partitions, read.Offset, null, read.Count, "", "", ""), null, cancellationToken);
+        }
+
+        var sentMode = timestamp is not null && string.IsNullOrWhiteSpace(resume) ? "since" : mode;
+        return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", sentMode, partitions, string.IsNullOrWhiteSpace(resume) ? offset : null, timestamp, limit, key, headerName, headerValue, resume, until, correlation), null, cancellationToken);
     }
 
     public Task<KafkaOpsCall<KafkaFamilyView>> GetFamilyAsync(string topic, CancellationToken cancellationToken)
@@ -316,22 +321,23 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendAsync<KafkaFamilyView>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/family", null, cancellationToken);
     }
 
-    public Task<KafkaOpsCall<byte[]>> ExportMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null)
+    public Task<KafkaOpsCall<byte[]>> ExportMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null, string? resume = null, long? until = null, string? correlation = null)
     {
+        var narrowed = !string.IsNullOrWhiteSpace(resume) || timestamp is not null || until is not null || !string.IsNullOrWhiteSpace(correlation) || !string.IsNullOrWhiteSpace(key);
         var read = KafkaMessageWindow.Locate(page, limit, 0, long.MaxValue);
-        var exportMode = page > 1 ? "from-offset" : mode;
-        var exportOffset = page > 1 ? read.Offset : offset;
-        var exportTimestamp = page > 1 ? null : timestamp;
+        var exportMode = !narrowed && page > 1 ? "from-offset" : timestamp is not null && string.IsNullOrWhiteSpace(resume) ? "since" : mode;
+        var exportOffset = !narrowed && page > 1 ? read.Offset : string.IsNullOrWhiteSpace(resume) ? offset : null;
+        var exportTimestamp = !narrowed && page > 1 ? null : timestamp;
         if (_fixture.Active)
         {
-            var browsed = _fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue, page, text, header, valueContains, messageType, from, to);
+            var browsed = _fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue, page, text, header, valueContains, messageType, from, to, resume, until, correlation);
             if (browsed.Value is null)
                 return Task.FromResult(new KafkaOpsCall<byte[]> { Status = browsed.Status, Error = browsed.Error });
             var json = JsonSerializer.Serialize(browsed.Value.Records, ExportJson);
             return Task.FromResult(new KafkaOpsCall<byte[]> { Status = 200, Value = Encoding.UTF8.GetBytes(json) });
         }
 
-        return SendBytesAsync(MessagesPath(topic, "messages/export", exportMode, partitions, exportOffset, exportTimestamp, read.Count, key, headerName, headerValue), cancellationToken);
+        return SendBytesAsync(MessagesPath(topic, "messages/export", exportMode, partitions, exportOffset, exportTimestamp, read.Count, key, headerName, headerValue, resume, until, correlation), cancellationToken);
     }
 
     public Task<KafkaOpsCall<ChangeRequestRecord>> ProduceMessageAsync(string topic, string headers, string? key, string? value, string reason, string? confirmation, string correlationId, CancellationToken cancellationToken)
@@ -368,7 +374,7 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         WriteIndented = true
     };
 
-    private static string MessagesPath(string topic, string action, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue)
+    private static string MessagesPath(string topic, string action, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, string? resume = null, long? until = null, string? correlation = null)
     {
         var pairs = new List<string>
         {
@@ -381,12 +387,18 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
             pairs.Add("offset=" + at.ToString());
         if (timestamp is long unixMs)
             pairs.Add("timestamp=" + unixMs.ToString());
+        if (until is long end)
+            pairs.Add("until=" + end.ToString());
         if (!string.IsNullOrEmpty(key))
             pairs.Add("key=" + Uri.EscapeDataString(key));
         if (!string.IsNullOrEmpty(headerName))
             pairs.Add("headerName=" + Uri.EscapeDataString(headerName));
         if (!string.IsNullOrEmpty(headerValue))
             pairs.Add("headerValue=" + Uri.EscapeDataString(headerValue));
+        if (!string.IsNullOrEmpty(resume))
+            pairs.Add("resume=" + Uri.EscapeDataString(resume));
+        if (!string.IsNullOrEmpty(correlation))
+            pairs.Add("correlation=" + Uri.EscapeDataString(correlation));
         return "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/" + action + "?" + string.Join("&", pairs);
     }
 

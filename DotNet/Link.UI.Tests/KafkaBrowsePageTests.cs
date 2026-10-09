@@ -29,6 +29,7 @@ public class KafkaBrowsePageTests
             ["mfrom"] = "1710000000000",
             ["mto"] = "1710000001000",
             ["msgPage"] = "3",
+            ["resume"] = "0:10:30,nope",
             ["more"] = "1",
             ["record"] = "0:120",
             ["stage"] = "0:88"
@@ -44,6 +45,7 @@ public class KafkaBrowsePageTests
         query.MessageFrom.Should().Be(1710000000000);
         query.MessageTo.Should().Be(1710000001000);
         query.MsgPage.Should().Be(3);
+        query.Resume.Should().Be("0:10:30");
         query.More.Should().BeTrue();
         query.OpenRecord.Should().Be("0:120");
         query.StageRecord.Should().Be("0:88");
@@ -56,6 +58,7 @@ public class KafkaBrowsePageTests
         href.Should().Contain("vq=Patient");
         href.Should().Contain("mtype=Error");
         href.Should().Contain("msgPage=3");
+        href.Should().Contain("resume=0%3A10%3A30");
         href.Should().Contain("more=1");
         href.Should().Contain("record=0%3A120");
         href.Should().Contain("stage=0%3A88");
@@ -90,6 +93,12 @@ public class KafkaBrowsePageTests
         page.Should().NotContain("id=\"browse-offset\"");
         page.Should().NotContain(">Fetch</button>");
         page.Should().Contain("name=\"mq\"");
+        page.Should().NotContain("id=\"browse-q\" name=\"mq\"");
+        page.Should().Contain("data-lu-keyword-part");
+        page.Should().Contain("data-lu-loaded");
+        page.Should().Contain("Search further");
+        page.Should().Contain("Last 15 minutes");
+        page.Should().Contain("name=\"key\"");
         page.Should().Contain("name=\"msgPage\"");
         page.Should().Contain("aria-label=\"Message pages\"");
         page.Should().Contain("id=\"kafka-browse-result\"");
@@ -102,6 +111,8 @@ public class KafkaBrowsePageTests
         var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
         script.Should().Contain("lu-result-open:");
         script.Should().Contain("lu-result-dismiss:");
+        script.Should().Contain("data-lu-further");
+        script.Should().Contain("browse-q");
         var detail = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_MessageDetail.cshtml"));
         detail.Should().Contain("KafkaBrowseText.FacilityHref");
         detail.Should().Contain("KafkaBrowseText.ReportHref");
@@ -144,9 +155,44 @@ public class KafkaBrowsePageTests
         KafkaBrowseText.PayloadHtml(null, "<script>alert(1)</script>").Should().Contain("&lt;script&gt;").And.NotContain("<script");
         KafkaBrowseText.Verdict(null, "That topic is not in the catalog.").Should().Be("This read was refused.");
         KafkaBrowseText.NextStep(null, "That topic is not in the catalog.").Should().Contain("fetch again");
-        var capped = new KafkaBrowsePage { Metadata = new KafkaBrowseMetadata { CapHit = true, Returned = 1 } };
+        var capped = new KafkaBrowsePage { Metadata = new KafkaBrowseMetadata { CapHit = true, Returned = 1, Scanned = 200, More = true } };
         KafkaBrowseText.Tone(capped, null).Should().Be("alert-warning");
         KafkaBrowseText.Badge(capped, null).Should().Be("Capped");
+        KafkaBrowseText.Verdict(capped, null).Should().Be("Showing 1 record.");
+        KafkaBrowseText.ScanNote(capped).Should().Be("Searched the latest 200 messages.");
+        KafkaBrowseText.ScanNote(new KafkaBrowsePage { Metadata = new KafkaBrowseMetadata { Scanned = 2, Returned = 2 } }).Should().BeEmpty();
+        KafkaBrowseText.NextStep(capped, null).Should().Contain("Search further");
+
+        var planned = KafkaBrowsePlan.For(new ThroughputKafkaPageQuery
+        {
+            View = ThroughputKafkaPageQuery.Messages,
+            TopicName = "ResourcesAcquired",
+            MessageText = "fac",
+            MessageKind = "Error",
+            MessageFrom = 1_710_000_000_000,
+            MessageTo = 1_710_000_001_000,
+            MsgPage = 3,
+            BrowseKey = "fac-1pat"
+        }, KafkaBrowseAllowList.MembersOf("ResourcesAcquired"));
+        planned.Topic.Should().Be("ResourcesAcquired-Error");
+        planned.Mode.Should().Be("since");
+        planned.Timestamp.Should().Be(1_710_000_000_000);
+        planned.Until.Should().Be(1_710_000_001_000);
+        planned.Page.Should().Be(1);
+        planned.Key.Should().BeEmpty();
+        planned.Correlation.Should().BeEmpty();
+
+        var correlation = KafkaBrowsePlan.For(new ThroughputKafkaPageQuery
+        {
+            TopicName = "ResourcesAcquired",
+            MessageText = "33333333-3333-3333-3333-333333333333",
+            BrowseKey = KafkaKeys.ForPatient("11111111-1111-1111-1111-111111111111", "pat-9"),
+            MsgPage = 4
+        }, KafkaBrowseAllowList.MembersOf("ResourcesAcquired"));
+        correlation.Topic.Should().Be("ResourcesAcquired");
+        correlation.Correlation.Should().Be("33333333-3333-3333-3333-333333333333");
+        correlation.Key.Should().Be(KafkaKeys.ForPatient("11111111-1111-1111-1111-111111111111", "pat-9"));
+        correlation.Page.Should().Be(1);
     }
 
     [Fact]
@@ -174,6 +220,18 @@ public class KafkaBrowsePageTests
         var capped = fixture.Messages("ResourcesAcquired", "newest", [], null, null, 25, "cap", "", "");
         capped.Value!.Metadata.CapHit.Should().BeTrue();
         capped.Value.Metadata.Truncated.Should().BeTrue();
+        capped.Value.Metadata.Scanned.Should().Be(200);
+        capped.Value.Metadata.More.Should().BeTrue();
+        capped.Value.Metadata.Resume.Should().Be("0:121");
+
+        var key = KafkaKeys.ForPatient("11111111-1111-1111-1111-111111111111", "pat-9");
+        var narrowed = fixture.Messages("ResourcesAcquired", "newest", [], null, null, 25, key, "", "");
+        narrowed.Value!.Records.Should().ContainSingle();
+        narrowed.Value.Records[0].Partition.Should().Be(KafkaMurmur.Partition(key, 3));
+
+        var hit = fixture.Messages("ResourcesAcquired", "newest", [], null, null, 25, "", "", "", correlation: "33333333-3333-3333-3333-333333333333");
+        hit.Value!.Records.Should().NotBeEmpty();
+        fixture.Messages("ResourcesAcquired", "newest", [], null, null, 25, "", "", "", correlation: "44444444-4444-4444-4444-444444444444").Value!.Records.Should().BeEmpty();
 
         fixture.Messages("NotAPipelineTopic", "newest", [], null, null, 25, "", "", "").Error.Should().NotBeNullOrWhiteSpace();
         fixture.Messages("ResourcesAcquired", "newest", [], null, null, 51, "", "", "").Error.Should().Contain("1 to 50");

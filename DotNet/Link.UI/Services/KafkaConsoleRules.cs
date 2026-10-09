@@ -439,11 +439,54 @@ public static class KafkaBrowseText
             return "This read was refused.";
         if (page is null)
             return "";
-        if (page.Metadata.CapHit)
-            return "The read stopped at the safety cap.";
         if (page.Metadata.Returned == 1)
             return "Showing 1 record.";
         return "Showing " + page.Metadata.Returned + " records.";
+    }
+
+    public static string ScanNote(KafkaBrowsePage? page)
+    {
+        if (page is null || page.Metadata.Scanned <= 0)
+            return "";
+        if (!page.Metadata.More && !page.Metadata.CapHit)
+            return "";
+        return "Searched the latest " + page.Metadata.Scanned + " messages.";
+    }
+
+    public static string LoadedNote(int count) =>
+        count == 1 ? "1 message loaded" : count + " messages loaded";
+
+    public static string FilterText(KafkaBrowseRecord record)
+    {
+        var text = new StringBuilder();
+        text.Append(record.Key).Append('\n').Append(record.Value).Append('\n').Append(record.ValueSummary);
+        foreach (var header in record.Headers)
+            text.Append('\n').Append(header.Name).Append(' ').Append(header.Value);
+        return text.ToString();
+    }
+
+    public static object Batch(ThroughputKafkaPage page)
+    {
+        var browse = page.Messages;
+        var records = browse?.Records ?? [];
+        var query = page.Query;
+        return new
+        {
+            records = records.Select(record => new
+            {
+                partition = record.Partition,
+                offset = record.Offset,
+                time = When(record.TimestampUnixMs),
+                key = record.Key ?? "",
+                summary = record.ValueSummary ?? "",
+                text = FilterText(record),
+                openHref = query.Href(record: RecordId(record.Partition, record.Offset))
+            }).ToList(),
+            scanned = browse?.Metadata.Scanned ?? 0,
+            more = browse?.Metadata.More == true,
+            resume = browse?.Metadata.Resume ?? "",
+            loadedNote = LoadedNote(records.Count)
+        };
     }
 
     public static string NextStep(KafkaBrowsePage? page, string? error)
@@ -452,6 +495,8 @@ public static class KafkaBrowseText
             return "Change the seek and fetch again.";
         if (page is null)
             return "";
+        if (page.Metadata.More)
+            return "Search further continues from where this read stopped.";
         if (page.Metadata.CapHit)
             return "Narrow the partitions, the key, or the time, then fetch again.";
         if (page.Metadata.Returned == 0)
@@ -519,6 +564,43 @@ public static class KafkaBrowseText
 }
 
 public sealed record KafkaBrowseSeekLinks(bool Earlier, string EarlierHref, bool Later, string LaterHref, long Earliest, long Latest);
+
+public sealed record KafkaBrowsePlan(string Topic, string Mode, int Page, long? Timestamp, long? Until, string Key, string Correlation, string Resume)
+{
+    public static KafkaBrowsePlan For(ThroughputKafkaPageQuery query, IReadOnlyList<KafkaNamedTopic>? members)
+    {
+        var topic = query.TopicName ?? "";
+        var kind = (query.MessageKind ?? "").Trim();
+        if (kind.Length > 0 && members is { Count: > 0 })
+        {
+            var wanted = kind.ToLowerInvariant();
+            var match = members.FirstOrDefault(member => string.Equals(member.Kind, wanted, StringComparison.Ordinal));
+            if (match is not null && !string.IsNullOrWhiteSpace(match.Topic))
+                topic = match.Topic;
+        }
+
+        var resume = query.Resume ?? "";
+        var mode = string.IsNullOrWhiteSpace(query.BrowseMode) ? "newest" : query.BrowseMode;
+        long? timestamp = query.BrowseTimestamp;
+        if (resume.Length == 0 && query.MessageFrom is long from)
+        {
+            mode = "since";
+            timestamp = from;
+        }
+
+        var key = "";
+        if (LinkMessageKey.TryDeserialize(query.BrowseKey, out var parsed) && parsed is not null)
+            key = parsed.Serialize();
+
+        var text = (query.MessageText ?? "").Trim();
+        var correlation = Guid.TryParse(text, out var id) ? id.ToString("D") : "";
+        var narrowed = resume.Length > 0 || mode == "since" || key.Length > 0 || correlation.Length > 0 || query.MessageTo is not null;
+        var page = narrowed ? 1 : query.MsgPage;
+        if (page < 1)
+            page = 1;
+        return new KafkaBrowsePlan(topic, mode, page, timestamp, query.MessageTo, key, correlation, resume);
+    }
+}
 
 public sealed record KafkaSummaryStrip(int Total, string TotalLabel, int Attention, string HottestLabel, string Hottest, string Skew);
 
