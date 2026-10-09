@@ -52,7 +52,9 @@ public class PayloadSubmittedListener(
         using var consumer = kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
         try
         {
-            consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.PayloadSubmitted), "Report"));
+            // Redrives are published back onto this topic with the report key. A separate
+            // redrive topic would be assigned on its own and could submit the manifest twice.
+            consumer.Subscribe(nameof(KafkaTopic.PayloadSubmitted));
             logger.LogInformation("{Name}: Started report submitted consumer for topic '{Topic}' at {StartTime}", Name, nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
 
             while (!cancellationToken.IsCancellationRequested)

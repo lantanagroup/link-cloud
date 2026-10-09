@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 
@@ -5,6 +6,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers;
 
 public static class DeadLetterCommit
 {
+    public const string MeterName = "Link.Kafka";
+    public const string RewindFailedCounterName = "link_kafka.consumer_rewind_failed.count";
+    public const string RewindFailedEventName = "kafka_consumer_rewind_failed";
+
+    private static readonly Counter<long> RewindFailed =
+        new Meter(MeterName).CreateCounter<long>(RewindFailedCounterName);
+
     public static async Task RewindAsync<TKey, TValue>(
         IConsumer<TKey, TValue> consumer,
         ConsumeResult<TKey, TValue> result,
@@ -19,7 +27,14 @@ public static class DeadLetterCommit
         }
         catch (KafkaException ex)
         {
-            logger.LogError(ex, "Failed to rewind {TopicPartitionOffset} after the error topic publish failed.", result.TopicPartitionOffset);
+            RewindFailed.Add(1, new KeyValuePair<string, object?>("topic", result.Topic));
+            logger.LogError(
+                ex,
+                "Failed to rewind after the error topic publish failed. EventName={EventName} Topic={Topic} Partition={Partition} Offset={Offset}",
+                RewindFailedEventName,
+                result.Topic,
+                result.Partition.Value,
+                result.Offset.Value);
         }
 
         await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);

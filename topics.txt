@@ -18,6 +18,7 @@ MappingOutcomeEvaluated-Retry:3:1
 MeasureReportGenerated:3:1
 MeasureReportGenerated-Error:3:1
 MeasureReportGenerated-Retry:3:1
+# Redrives for this topic are published back onto PayloadSubmitted. There is no PayloadSubmitted-Redrive-Report topic.
 PayloadSubmitted:3:1
 PayloadSubmitted-Error:3:1
 PayloadSubmitted-Retry:3:1

@@ -106,8 +106,11 @@ echo "Creating per-service retry and redrive topics from $RETRY_FILE"
       if [[ "$SERVICE" == "~"* ]]; then
         SERVICE="${SERVICE#"~"}"
         SUFFIXES=(Redrive)
+      elif [[ "$SERVICE" == "!"* ]]; then
+        SERVICE="${SERVICE#"!"}"
+        SUFFIXES=(Retry)
       fi
-      if [[ -z "$SERVICE" || "$SERVICE" == *"~"* ]]; then
+      if [[ -z "$SERVICE" || "$SERVICE" == *"~"* || "$SERVICE" == *"!"* ]]; then
         echo "ERROR: invalid service for topic '$MAIN_TOPIC'." >&2
         exit 1
       fi
