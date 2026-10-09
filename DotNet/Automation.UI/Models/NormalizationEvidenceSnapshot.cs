@@ -22,6 +22,11 @@ public sealed class NormalizationEvidenceSnapshot
     public bool StepsCollapsed { get; set; }
 
     /// <summary>
+    /// Parsed execution steps that were left out of this snapshot. Zero means none were parsed.
+    /// </summary>
+    public int OmittedStepCount { get; set; }
+
+    /// <summary>
     /// Additional snapshot documents named <c>normalizationEvidence-chunk-N</c> hold the raw lines
     /// and per-resource steps that did not fit in this document.
     /// </summary>

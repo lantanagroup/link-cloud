@@ -73,6 +73,7 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
 
             foreach (var result in group)
             {
+                var persisted = ApiHealthResultBudget.CopyWithinBudget(result);
                 var resultFilter = Builders<ApiHealthRunResultDocument>.Filter.And(
                     Builders<ApiHealthRunResultDocument>.Filter.Eq(d => d.RunId, runId),
                     Builders<ApiHealthRunResultDocument>.Filter.Eq(
@@ -88,7 +89,7 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
                     .Set(d => d.ServiceName, group.Key.ServiceName)
                     .Set(d => d.EndpointKey, result.EndpointKey)
                     .Set(d => d.StartedAt, startedAt)
-                    .Set(d => d.Result, result);
+                    .Set(d => d.Result, persisted);
 
                 await _resultCollection.UpdateOneAsync(
                     resultFilter,
