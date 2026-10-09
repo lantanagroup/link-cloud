@@ -133,6 +133,73 @@ public static class KafkaLogDirs
         cluster.LogDirsAvailable || cluster.Brokers.Any(broker => broker.LogDirBytes >= 0);
 }
 
+public static class KafkaAttention
+{
+    public static bool Topic(KafkaTopicRow row) => TopicReasons(row).Count > 0;
+
+    public static IReadOnlyList<string> TopicReasons(KafkaTopicRow row)
+    {
+        var reasons = new List<string>();
+        if (row.HardBlocked)
+            reasons.Add("Partition changes are blocked.");
+        if (!row.FullIsr)
+            reasons.Add("The ISR is short.");
+        if (row.LeadersSkewed)
+            reasons.Add("Leaders are skewed.");
+        if (row.PartitionDrift)
+            reasons.Add("The live partition count differs from topics.txt.");
+        if (row.RetryBehind || row.ErrorBehind || row.ServiceRetryBehind || row.ServiceRedriveBehind || row.PinnedSiblingBehind)
+            reasons.Add("A sibling topic is behind.");
+        if (!row.LagKnown)
+            reasons.Add("Lag is unknown.");
+        else if (row.TotalLag > 0)
+            reasons.Add("Lag is " + row.TotalLag + ".");
+        if (!string.IsNullOrWhiteSpace(row.Error))
+            reasons.Add(row.Error.Trim());
+        return reasons;
+    }
+
+    public static bool Group(KafkaGroupRow row) => GroupReasons(row).Count > 0;
+
+    public static IReadOnlyList<string> GroupReasons(KafkaGroupRow row)
+    {
+        var reasons = new List<string>();
+        if (!row.Catalogued)
+            reasons.Add("This group is not in the catalog.");
+        if (!string.Equals(row.State?.Trim(), "Stable", StringComparison.OrdinalIgnoreCase))
+            reasons.Add(string.IsNullOrWhiteSpace(row.State) ? "State is not reported." : "State is " + row.State.Trim() + ".");
+        if (row.TotalLag > 0)
+            reasons.Add("Lag is " + row.TotalLag + ".");
+        if (row.UnownedPartitions.Count > 0)
+            reasons.Add(row.UnownedPartitions.Count + " partitions are unowned.");
+        if (row.Members.Count > 0 && row.Members.Any(member => !member.AdvertisesExpectedConfig))
+            reasons.Add("A member does not advertise the expected config.");
+        return reasons;
+    }
+
+    public static bool Broker(BrokerSnapshot row) =>
+        !string.Equals(row.State?.Trim(), "up", StringComparison.OrdinalIgnoreCase);
+
+    public static bool Partition(int leader, string? replicas, string? inSync, IEnumerable<long> lags)
+    {
+        if (leader < 0)
+            return true;
+        if (lags.Any(lag => lag > 0))
+            return true;
+        var replicaCount = CountList(replicas);
+        return replicaCount > 0 && CountList(inSync) < replicaCount;
+    }
+
+    public static bool CommittedPartition(long lag, bool owned) => lag > 0 || !owned;
+
+    public static string Join(IReadOnlyList<string> reasons) => string.Join(" ", reasons);
+
+    private static int CountList(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? 0
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+}
+
 public sealed record BrokerMoveTopicLine(string Topic, int Partitions, bool Internal);
 
 public static class BrokerMovePreview

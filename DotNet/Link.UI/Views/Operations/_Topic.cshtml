@@ -4,27 +4,63 @@
     var origin = ReturnUrlRules.Here(Context.Request);
     var topic = Model.SelectedTopic;
     var topicName = topic?.Topic ?? Model.DraftTopic;
-    var openAdvanced = query.Advanced || Model.Plan is not null || Model.DraftReason.Length > 0;
     var increaseLine = topic is null ? null : KafkaIncreaseEligibility.Line(topic.PartitionAddReason, Model.Plan, topic.Topic);
     var partitionTone = Model.Plan is null ? "alert-secondary" : Model.Plan.Accepted ? "alert-success" : "alert-danger";
+    var hotPartitions = Model.Partitions.Where(row => KafkaAttention.Partition(row.Leader, row.Replicas, row.InSync, row.Lag.Select(item => item.Lag))).ToList();
+    var topicStep = 1;
+    if (Model.Plan is not null && Model.Plan.Accepted)
+        topicStep = 5;
+    else if (Model.Plan is not null)
+        topicStep = 4;
+    else if (topic is not null)
+        topicStep = 2;
 }
 
-<div class="au-card card mt-3">
-    <div class="card-header">Choose a topic</div>
-    <div class="card-body">
-        <div class="d-flex flex-wrap gap-2">
+<h2 class="h5 mt-3">One topic</h2>
+<p>Placement, lag, and partition changes for a single topic. An increase is permanent. Preview it first. Nothing changes until the request is approved and executed.</p>
+<ol>
+    <li>Choose the topic.</li>
+    <li>Read the partitions that are offline or behind. The full placement stays folded.</li>
+    <li>Preview an increase, or a family completion when only the siblings are behind.</li>
+    <li>Review the result. A refusal lists each reason.</li>
+    <li>Submit the request. Type the topic name first.</li>
+</ol>
+<p class="mb-2">
+    <span class="badge @StatusPills.ForWizardStep(topicStep, 1)">1 Choose a topic</span>
+    <span class="badge @StatusPills.ForWizardStep(topicStep, 2)">2 Read placement</span>
+    <span class="badge @StatusPills.ForWizardStep(topicStep, 3)">3 Preview</span>
+    <span class="badge @StatusPills.ForWizardStep(topicStep, 4)">4 Review</span>
+    <span class="badge @StatusPills.ForWizardStep(topicStep, 5)">5 Submit</span>
+</p>
+
+<form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
+    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Topic" />
+    <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="topic-pick">Topic</label>
+        <select class="form-select" id="topic-pick" name="topic">
             @foreach (var row in Model.TopicRows)
             {
-                var current = topic is not null && row.Topic == topic.Topic;
-                <a class="btn btn-sm btn-au-link@(current ? " active" : "")" href="@query.Href(topic: row.Topic, page: 1)">@row.Topic</a>
+                if (topic is not null && row.Topic == topic.Topic)
+                {
+                    <option value="@row.Topic" selected>@row.Topic (@row.Partitions)</option>
+                }
+                else
+                {
+                    <option value="@row.Topic">@row.Topic (@row.Partitions)</option>
+                }
             }
-        </div>
-        @if (Model.TopicRows.Count == 0)
-        {
-            <p class="text-muted mb-0">No topics match this search.</p>
-        }
+        </select>
+        <p class="form-text">The list follows the search above.</p>
     </div>
-</div>
+    <div class="col-auto">
+        <button class="btn btn-au-link" type="submit">Open</button>
+    </div>
+</form>
+@if (Model.TopicRows.Count == 0)
+{
+    <p class="text-muted mt-3">No topics match this search.</p>
+}
 
 @if (topic is null)
 {
@@ -38,40 +74,77 @@ else
             <p>
                 <partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = topic.Topic, CopyLabel = "Copy topic", ReturnUrl = origin })" />
             </p>
-            <p>Key @topic.KeyClass <span class="text-muted">@topic.KeyShape</span>. Partitions @topic.Partitions. Retry @topic.RetryPartitions. Error @topic.ErrorPartitions. RF @topic.ReplicationFactor. Replica ceiling @topic.MaxReplicas.</p>
-            @if (topic.HardBlocked)
-            {
-                <div class="alert alert-secondary" role="status">Partition changes for this topic are blocked.</div>
-            }
-            else if (topic.OrderSensitive && topic.KeyClass == "Facility")
-            {
-                <p>This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero. One facility can never use more than one partition.</p>
-            }
-            else if (topic.OrderSensitive)
-            {
-                <p>This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero.</p>
-            }
-            <p class="mb-2">Config</p>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var config in topic.Configs.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
-                    {
-                        <tr>
-                            <td>@config.Key</td>
-                            <td>@config.Value</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
+            <p class="mb-0">Key @topic.KeyClass <span class="text-muted">@topic.KeyShape</span>. Partitions @topic.Partitions. Retry @topic.RetryPartitions. Error @topic.ErrorPartitions. RF @topic.ReplicationFactor. Replica ceiling @topic.MaxReplicas.</p>
+        </div>
+    </div>
+    @if (topic.HardBlocked)
+    {
+        <div class="alert alert-secondary mt-3" role="status">Partition changes for this topic are blocked.</div>
+    }
+    else if (topic.OrderSensitive && topic.KeyClass == "Facility")
+    {
+        <p class="mt-3">This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero. One facility can never use more than one partition.</p>
+    }
+    else if (topic.OrderSensitive)
+    {
+        <p class="mt-3">This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero.</p>
+    }
+
+    @if (hotPartitions.Count > 0)
+    {
+        <div class="au-card card mt-3">
+            <div class="card-header">Partitions that need attention (@hotPartitions.Count)</div>
+            <div class="card-body">
+                <p>A partition is listed here when its leader is offline, its ISR is short, or a group still has lag on it.</p>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Partition</th>
+                                <th>Leader</th>
+                                <th>ISR</th>
+                                <th>Lag by group</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in hotPartitions)
+                        {
+                            <tr class="lu-kafka-problem">
+                                <td>@row.Partition</td>
+                                <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
+                                <td>@row.InSync</td>
+                                <td>
+                                    @if (row.Lag.Count == 0)
+                                    {
+                                        <span class="text-muted">No group lag</span>
+                                    }
+                                    else
+                                    {
+                                        @string.Join("; ", row.Lag.Select(item => item.GroupId + " " + item.Lag))
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="table-responsive">
+        </div>
+    }
+    else
+    {
+        <p class="mt-3 mb-0">No partition is offline or behind.</p>
+    }
+
+    <details class="lu-kafka-fold">
+        <summary>Partition placement (@Model.Partitions.Count)</summary>
+        @if (Model.Partitions.Count == 0)
+        {
+            <p class="text-muted mb-0 mt-2">Placement for this topic is not in the cluster metadata.</p>
+        }
+        else
+        {
+            <div class="table-responsive mt-3">
                 <table class="table table-sm mb-0">
                     <thead>
                         <tr>
@@ -86,7 +159,7 @@ else
                     <tbody>
                     @foreach (var row in Model.Partitions)
                     {
-                        <tr>
+                        <tr class="@(KafkaAttention.Partition(row.Leader, row.Replicas, row.InSync, row.Lag.Select(item => item.Lag)) ? "lu-kafka-problem" : null)">
                             <td>@row.Partition</td>
                             <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
                             <td>@row.Replicas</td>
@@ -107,12 +180,32 @@ else
                     </tbody>
                 </table>
             </div>
-            @if (Model.Partitions.Count == 0)
-            {
-                <p class="text-muted mb-0 mt-2">Placement for this topic is not in the cluster metadata.</p>
-            }
+        }
+    </details>
+
+    <details class="lu-kafka-fold">
+        <summary>Topic configuration (@topic.Configs.Count settings)</summary>
+        <div class="table-responsive mt-3">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var config in topic.Configs.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    <tr>
+                        <td>@config.Key</td>
+                        <td>@config.Value</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
         </div>
-    </div>
+    </details>
+
     <h2 class="h5 mt-4">Partition lag</h2>
     <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
 
@@ -129,23 +222,40 @@ else
         <p class="text-muted">@increaseLine</p>
     }
 
-    <details class="mt-4" @(openAdvanced ? "open" : null)>
-        <summary>Advanced: add partitions</summary>
-        <div class="alert alert-secondary mt-3" role="status">
-            Adding partitions is permanent and cannot be reversed. Existing keys are remapped. The main topic, its retry topic, and its error topic increase together. None of them can shrink. When the family is uneven, the action below raises only the siblings that are behind and leaves the main topic unchanged.
-            @if (topic.KeyClass == "Facility")
-            {
-                <span>One facility can never use more than one partition.</span>
-            }
-        </div>
-        <form method="post" action="/Operations/Kafka/plan" data-kafka-busy="Dry run is running.">
-            @Html.AntiForgeryToken()
-            <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
+    <h2 class="h5 mt-4">Add partitions</h2>
+    <p>Adding partitions is permanent and cannot be reversed. Existing keys are remapped. The main topic, its retry topic, and its error topic increase together. None of them can shrink. When the family is uneven, the family action raises only the siblings that are behind and leaves the main topic unchanged.</p>
+    @if (topic.KeyClass == "Facility")
+    {
+        <p>One facility can never use more than one partition.</p>
+    }
+    <form class="mt-3" method="post" action="/Operations/Kafka/plan" data-kafka-busy="Dry run is running.">
+        @Html.AntiForgeryToken()
+        <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">What to change</legend>
+            <p class="form-text">Preview and Submit both use this count. The quiet-window override is part of the preview.</p>
             <div class="row g-2">
                 <div class="col-12 col-md-3">
                     <label class="form-label" for="plan-partitions">Target partitions</label>
                     <input class="form-control" id="plan-partitions" name="partitions" type="number" min="1" max="@Model.Topics.Cap" value="@(Model.DraftPartitions > 0 ? Model.DraftPartitions : topic.Partitions + 1)" />
                 </div>
+                <div class="col-12">
+                    <label class="form-check-label" for="plan-override">
+                        <input class="form-check-input" id="plan-override" type="checkbox" name="overrideQuietWindow" value="true" @(Model.DraftOverride ? "checked" : null) />
+                        Override the quiet window. A second approver and a reason are required.
+                    </label>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="plan-override-reason">Override reason</label>
+                    <input class="form-control" id="plan-override-reason" name="overrideReason" value="@Model.DraftOverrideReason" />
+                    <p class="form-text">Required only when the quiet window is overridden.</p>
+                </div>
+            </div>
+        </fieldset>
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">Request only</legend>
+            <p class="form-text">A preview does not read these. Submit does.</p>
+            <div class="row g-2">
                 <div class="col-12 col-md-5">
                     <label class="form-label" for="plan-reason">Reason</label>
                     <input class="form-control" id="plan-reason" name="reason" value="@Model.DraftReason" />
@@ -154,26 +264,8 @@ else
                     <label class="form-label" for="plan-confirm">Type the topic name</label>
                     <input class="form-control" id="plan-confirm" name="confirmation" value="@Model.DraftConfirmation" data-topic="@topicName" autocomplete="off" />
                 </div>
-                <div class="col-12">
-                    <label class="form-check-label" for="plan-override">
-                        <input class="form-check-input" id="plan-override" type="checkbox" name="overrideQuietWindow" value="true" @(Model.DraftOverride ? "checked" : null) />
-                        Override the quiet window. A second approver and a reason are required.
-                    </label>
-                </div>
-                <div class="col-12">
-                    <label class="form-label" for="plan-override-reason">Override reason</label>
-                    <input class="form-control" id="plan-override-reason" name="overrideReason" value="@Model.DraftOverrideReason" />
-                </div>
             </div>
-            <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview increase</span></button>
-                <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
-                @if (!Model.Topics.ReadOnly)
-                {
-                    <button class="btn btn-sm btn-success lu-icon-btn" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
-                }
-            </div>
-        </form>
+        </fieldset>
         @if (Model.Plan is not null)
         {
             var plan = Model.Plan;
@@ -217,32 +309,44 @@ else
                 }
             </div>
         }
-        @if (topic is not null && (topic.RetryPartitions > 0 && topic.RetryPartitions < topic.Partitions || topic.ErrorPartitions > 0 && topic.ErrorPartitions < topic.Partitions))
-        {
-            <form class="mt-3" method="post" action="/Operations/Kafka/family/plan" data-kafka-busy="Dry run is running.">
-                @Html.AntiForgeryToken()
-                <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
-                <input type="hidden" name="topic" value="@topicName" />
-                <p>The family is uneven. Complete it by raising only the retry and error topics up to @topic.Partitions. The main topic stays as it is.</p>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview increase</span></button>
+            <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
+            @if (!Model.Topics.ReadOnly)
+            {
+                <button class="btn btn-sm btn-success lu-icon-btn" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
+            }
+        </div>
+    </form>
+    @if (topic is not null && (topic.RetryPartitions > 0 && topic.RetryPartitions < topic.Partitions || topic.ErrorPartitions > 0 && topic.ErrorPartitions < topic.Partitions))
+    {
+        <form class="mt-3" method="post" action="/Operations/Kafka/family/plan" data-kafka-busy="Dry run is running.">
+            @Html.AntiForgeryToken()
+            <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
+            <input type="hidden" name="topic" value="@topicName" />
+            <fieldset class="border rounded p-3 mb-3">
+                <legend class="float-none w-auto px-2 h6">Complete the family</legend>
+                <p class="form-text">The family is uneven. This raises only the retry and error topics up to @topic.Partitions. The main topic stays as it is. Preview and Submit both use that count.</p>
                 <div class="row g-2">
                     <div class="col-12 col-md-6">
                         <label class="form-label" for="family-reason">Reason</label>
                         <input class="form-control" id="family-reason" name="reason" value="@Model.DraftReason" />
+                        <p class="form-text">A preview does not read the reason. Submit does.</p>
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label" for="family-confirm">Type the topic name</label>
                         <input class="form-control" id="family-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" />
                     </div>
                 </div>
-                <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview family</span></button>
-                    <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
-                    @if (!Model.Topics.ReadOnly)
-                    {
-                        <button class="btn btn-sm btn-success" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
-                    }
-                </div>
-            </form>
-        }
-    </details>
+            </fieldset>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview family</span></button>
+                <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
+                @if (!Model.Topics.ReadOnly)
+                {
+                    <button class="btn btn-sm btn-success" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
+                }
+            </div>
+        </form>
+    }
 }
