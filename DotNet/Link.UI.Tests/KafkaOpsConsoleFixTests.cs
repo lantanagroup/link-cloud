@@ -242,6 +242,15 @@ public class KafkaOpsConsoleFixTests
         overview.Should().Contain("Unknown");
 
         script.Should().Contain("data-kafka-busy");
+        var live = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "live-region.js"));
+        live.Should().Contain("function declaredPageUrl(node)");
+        live.Should().Contain("data-au-page-url");
+        live.Should().Contain("here.pathname !== target.pathname");
+        live.Should().Contain("function alignPostedPage(node)");
+        live.Should().Contain("history.replaceState(null, \"\", page)");
+        var kafka = File.ReadAllText(Path.Combine(root, "Views", "Operations", "Kafka.cshtml"));
+        kafka.Should().Contain("id=\"kafkaResults\" data-au-refresh=\"8000\" data-au-page-url=\"@query.Href()\"");
+        kafka.Should().NotContain("/Operations/Kafka/migrations/plan\" data-au-refresh");
         script.Should().Contain("indexOf(\"/plan\")");
         script.Should().Contain("setTimeout");
         script.Should().Contain("button.disabled = true");
