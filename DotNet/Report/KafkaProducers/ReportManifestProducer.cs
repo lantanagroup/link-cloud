@@ -130,8 +130,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            // PayloadSubmitted is keyed by facility and report schedule, so one consumer
-            // sees this report's completions in order. The last one finds a zero count.
+            // PayloadSubmitted, including a redrive, is keyed by facility and report schedule,
+            // so one consumer sees this report's completions in order. The last one finds a zero count.
             List<Resource> manifestResources = await Generate(schedule, cancellationToken);
 
             Uri? payloadUri;

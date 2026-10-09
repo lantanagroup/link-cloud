@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,35 @@ public class DeadLetterCommitTests
         var accounted = await DeadLetterCommit.AccountAsync(false, consumer.Object, result, Mock.Of<ILogger>(), CancellationToken.None);
 
         Assert.False(accounted);
+        consumer.Verify(c => c.Seek(result.TopicPartitionOffset), Times.Once);
+    }
+
+    [Fact]
+    public async Task AccountAsync_SeekThrows_CountsTheFailureAndDoesNotCommit()
+    {
+        var consumer = new Mock<IConsumer<string, string>>();
+        consumer.Setup(c => c.Seek(It.IsAny<TopicPartitionOffset>()))
+            .Throws(new KafkaException(ErrorCode.Local_MsgTimedOut));
+        var result = Result();
+        long counted = 0;
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, meterListener) =>
+            {
+                if (instrument.Meter.Name == DeadLetterCommit.MeterName
+                    && instrument.Name == DeadLetterCommit.RewindFailedCounterName)
+                {
+                    meterListener.EnableMeasurementEvents(instrument);
+                }
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, value, _, _) => counted += value);
+        listener.Start();
+
+        var accounted = await DeadLetterCommit.AccountAsync(false, consumer.Object, result, Mock.Of<ILogger>(), CancellationToken.None);
+
+        Assert.False(accounted);
+        Assert.Equal(1, counted);
         consumer.Verify(c => c.Seek(result.TopicPartitionOffset), Times.Once);
     }
 

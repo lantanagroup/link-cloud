@@ -66,6 +66,8 @@ public class RetryTopicGuardTests
         Assert.Contains("CernerPatientsAcquired:Census", hosted);
         Assert.Contains("CernerPatientsAcquired:Census", producers);
         Assert.Contains("PayloadSubmitted:Report", list.Retry);
+        Assert.Contains("PayloadSubmitted:Report", list.RetryOnly);
+        Assert.DoesNotContain("PayloadSubmitted:Report", list.RedriveOnly);
         Assert.Contains("PayloadSubmitted", catalog);
         Assert.Contains("ReadyToAcquire:DataAcquisitionWorker", list.RedriveOnly);
         Assert.Contains("NotificationRequested:Notification", list.RedriveOnly);
@@ -126,6 +128,8 @@ public class RetryTopicGuardTests
 
         Assert.Contains("NotificationRequested-Redrive-Notification", subscribed);
         Assert.Contains("ReadyToAcquire-Redrive-DataAcquisitionWorker", subscribed);
+        Assert.Contains("PayloadSubmitted", subscribed);
+        Assert.DoesNotContain("PayloadSubmitted-Redrive-Report", subscribed);
         Assert.DoesNotContain("NotificationRequested-Retry-Notification", SubscribedRetryTopics(list));
         Assert.DoesNotContain("ReadyToAcquire-Retry-DataAcquisitionWorker", SubscribedRetryTopics(list));
         Assert.True(problems.Count == 0, string.Join("; ", problems));
@@ -155,14 +159,22 @@ public class RetryTopicGuardTests
         Assert.Contains("AuditableEventOccurred-Redrive-Audit", withHome.Topics);
         Assert.Contains("PatientEvent-Retry-Report", withHome.Topics);
         Assert.Contains("PatientEvent-Redrive-QueryDispatch", withHome.Topics);
-        Assert.Equal(34, withHome.Topics.Count);
+        Assert.Contains("PayloadSubmitted-Retry-Report", withHome.Topics);
+        Assert.DoesNotContain("PayloadSubmitted-Redrive-Report", withHome.Topics);
+        Assert.Equal(33, withHome.Topics.Count);
 
         var empty = RunRetryParse(bash, script, WriteList("X:~"), keepHome: true);
         var embedded = RunRetryParse(bash, script, WriteList("X:a~b"), keepHome: true);
+        var emptyRetry = RunRetryParse(bash, script, WriteList("X:!"), keepHome: true);
+        var embeddedRetry = RunRetryParse(bash, script, WriteList("X:a!b"), keepHome: true);
         Assert.NotEqual(0, empty.Exit);
         Assert.NotEqual(0, embedded.Exit);
+        Assert.NotEqual(0, emptyRetry.Exit);
+        Assert.NotEqual(0, embeddedRetry.Exit);
         Assert.Empty(empty.Topics);
         Assert.Empty(embedded.Topics);
+        Assert.Empty(emptyRetry.Topics);
+        Assert.Empty(embeddedRetry.Topics);
     }
 
     private static string ExtractRetryParse(string text)
@@ -335,6 +347,11 @@ public class RetryTopicGuardTests
         if (KafkaTopicNames.TryMainFromRedrive(topic, out main, out service))
         {
             var pair = main + ":" + service;
+            if (list.RetryOnly.Contains(pair))
+            {
+                return false;
+            }
+
             return list.Retry.Contains(pair) || list.RedriveOnly.Contains(pair);
         }
 
@@ -344,6 +361,7 @@ public class RetryTopicGuardTests
     private sealed class RetryList
     {
         public HashSet<string> Retry { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> RetryOnly { get; } = new(StringComparer.Ordinal);
         public HashSet<string> RedriveOnly { get; } = new(StringComparer.Ordinal);
     }
 
@@ -368,20 +386,26 @@ public class RetryTopicGuardTests
             {
                 var name = service;
                 var redriveOnly = name.StartsWith('~');
-                if (redriveOnly)
+                var retryOnly = name.StartsWith('!');
+                if (redriveOnly || retryOnly)
                 {
                     name = name[1..];
                 }
 
-                if (name.Length == 0 || name.Contains('~') || name.Contains(':'))
+                if (name.Length == 0 || name.Contains('~') || name.Contains('!') || name.Contains(':'))
                 {
                     throw new InvalidOperationException("Invalid service in retry-services row: " + line);
                 }
 
                 var pair = split[0] + ":" + name;
-                var target = redriveOnly ? list.RedriveOnly : list.Retry;
-                var other = redriveOnly ? list.Retry : list.RedriveOnly;
-                if (!target.Add(pair) || other.Contains(pair))
+                if (redriveOnly)
+                {
+                    if (!list.RedriveOnly.Add(pair) || list.Retry.Contains(pair))
+                    {
+                        throw new InvalidOperationException("Duplicate retry-services row: " + pair);
+                    }
+                }
+                else if (!list.Retry.Add(pair) || list.RedriveOnly.Contains(pair) || (retryOnly && !list.RetryOnly.Add(pair)))
                 {
                     throw new InvalidOperationException("Duplicate retry-services row: " + pair);
                 }
@@ -685,7 +709,16 @@ public class RetryTopicGuardTests
                 }
                 else
                 {
-                    throw new InvalidOperationException("Unresolved Subscribe in " + file + ": " + argument);
+                    var namedTopic = NameofTopicPattern.Match(argument);
+                    if (namedTopic.Success && argument == namedTopic.Value)
+                    {
+                        // A direct main-topic subscribe does not include the redrive topic.
+                        subscribed.Add(RequireTopicMember(topics, namedTopic.Groups[1].Value));
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Unresolved Subscribe in " + file + ": " + argument);
+                    }
                 }
 
                 index = open + inner.Length + 2;

@@ -54,8 +54,13 @@ public class RetryJob : IJob
             {
                 var darKey = retryModel.Key;
                 var darValue = retryModel.Value;
-
                 var destination = KafkaTopicNames.Redrive(retryModel.Topic, retryModel.ServiceName);
+                if (PayloadSubmittedRedrive.Applies(retryModel.Topic))
+                {
+                    destination = nameof(KafkaTopic.PayloadSubmitted);
+                    darKey = PayloadSubmittedRedrive.Key(retryModel.Key, retryModel.Value);
+                }
+
                 producer.Produce(destination,
                     new Message<string, string>
                     {
