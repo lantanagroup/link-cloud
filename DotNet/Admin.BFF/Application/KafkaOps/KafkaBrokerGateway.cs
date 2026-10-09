@@ -15,6 +15,9 @@ public sealed class TopicWatermark
     public string? Error { get; set; }
     public List<string> AuthorizedOperations { get; set; } = [];
     public bool? CanAlterPartitions { get; set; }
+    public bool FullIsr { get; set; }
+    public double LargestLeaderShare { get; set; }
+    public bool LeadersSkewed { get; set; }
 }
 
 public sealed class GroupView
@@ -47,12 +50,26 @@ public sealed class PartitionLagView
     public bool Owned { get; set; }
 }
 
+public sealed class ReassignmentListing
+{
+    public bool Known { get; set; }
+    public List<string> Topics { get; set; } = [];
+    public List<string> Partitions { get; set; } = [];
+}
+
+public static class KafkaLeaderElection
+{
+    public static readonly ElectionType Kind = ElectionType.Preferred;
+}
+
 public interface IKafkaBrokerGateway
 {
     Task<IReadOnlyList<TopicWatermark>> DescribeTopicsAsync(IReadOnlyList<string> topics, bool probeAlter, CancellationToken cancellationToken);
     Task<IReadOnlyList<GroupView>> DescribeGroupsAsync(bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken);
     Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken);
     Task<ClusterSnapshot> DescribeClusterAsync(CancellationToken cancellationToken);
+    Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken);
+    Task ElectPreferredLeadersAsync(IReadOnlyList<TopicPartition> partitions, CancellationToken cancellationToken);
 }
 
 public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
@@ -65,29 +82,41 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         "max.message.bytes"
     ];
 
+    private const int AdminClientFailureLimit = 3;
+
     private readonly KafkaConnection _connection;
-    private readonly object _gate = new();
+    private readonly IKafkaAdminClientFactory _clients;
+    private readonly SemaphoreSlim _adminGate = new(1, 1);
+    private readonly Dictionary<string, int> _failuresByOperation = new(StringComparer.Ordinal);
     private IAdminClient? _admin;
 
     public KafkaBrokerGateway(KafkaConnection connection)
+        : this(connection, new ConfluentAdminClientFactory())
     {
-        _connection = connection;
     }
 
-    public async Task<IReadOnlyList<TopicWatermark>> DescribeTopicsAsync(IReadOnlyList<string> topics, bool probeAlter, CancellationToken cancellationToken)
+    internal KafkaBrokerGateway(KafkaConnection connection, IKafkaAdminClientFactory clients)
+    {
+        _connection = connection;
+        _clients = clients;
+    }
+
+    public Task<IReadOnlyList<TopicWatermark>> DescribeTopicsAsync(IReadOnlyList<string> topics, bool probeAlter, CancellationToken cancellationToken) =>
+        UseClientAsync("topics", (admin, token) => DescribeTopicsCoreAsync(admin, topics, probeAlter, token), cancellationToken);
+
+    private async Task<IReadOnlyList<TopicWatermark>> DescribeTopicsCoreAsync(IAdminClient admin, IReadOnlyList<string> topics, bool probeAlter, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (topics.Count == 0)
             return [];
 
-        var admin = Client();
         var known = new HashSet<string>(
             admin.GetMetadata(TimeSpan.FromSeconds(20)).Topics.Select(topic => topic.Topic),
             StringComparer.Ordinal);
         var present = topics.Where(known.Contains).ToList();
         var result = topics
             .Where(name => !known.Contains(name))
-            .Select(name => new TopicWatermark { Topic = name, Error = "Unknown topic or partition" })
+            .Select(name => new TopicWatermark { Topic = name, Error = "Unknown topic or partition", FullIsr = false })
             .ToList();
         if (present.Count == 0)
             return result;
@@ -102,6 +131,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             var view = new TopicWatermark { Topic = topic.Name ?? "" };
             if (topic.Error.IsError)
             {
+                ThrowIfStale(topic.Error);
                 view.Error = topic.Error.Reason;
                 result.Add(view);
                 continue;
@@ -109,6 +139,26 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
 
             view.Partitions = topic.Partitions?.Count ?? 0;
             view.ReplicationFactor = topic.Partitions?.FirstOrDefault()?.Replicas?.Count ?? 0;
+            var leaders = new List<int>();
+            var fullIsr = view.Partitions > 0;
+            foreach (var partition in topic.Partitions ?? [])
+            {
+                var replicas = partition.Replicas?.Select(node => node.Id).ToList() ?? [];
+                var isr = partition.ISR?.Select(node => node.Id).ToList() ?? [];
+                var leader = partition.Leader?.Id ?? -1;
+                leaders.Add(leader);
+                if (isr.Count != replicas.Count || replicas.Count == 0)
+                    fullIsr = false;
+            }
+
+            view.FullIsr = fullIsr;
+            if (leaders.Count > 0)
+            {
+                var distinct = leaders.Where(id => id >= 0).Distinct().Count();
+                var ideal = distinct == 0 ? 1d : 1d / distinct;
+                view.LargestLeaderShare = leaders.GroupBy(id => id).Max(group => group.Count() / (double)leaders.Count);
+                view.LeadersSkewed = view.LargestLeaderShare - ideal > 0.34;
+            }
             if (topic.AuthorizedOperations is not null)
             {
                 view.AuthorizedOperations = topic.AuthorizedOperations
@@ -132,24 +182,24 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         return result;
     }
 
-    public async Task<IReadOnlyList<GroupView>> DescribeGroupsAsync(bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<GroupView>> DescribeGroupsAsync(bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken) =>
+        UseClientAsync("groups", (admin, token) => DescribeGroupsCoreAsync(admin, includeTestGroups, expectedConfigVersion, token), cancellationToken);
+
+    private async Task<IReadOnlyList<GroupView>> DescribeGroupsCoreAsync(IAdminClient admin, bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var admin = Client();
-        var listed = await admin.ListConsumerGroupsAsync(new ListConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(20) });
-        var ids = listed.Valid
-            .Select(group => group.GroupId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Where(id => includeTestGroups || !IsHiddenTestGroup(id))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
+        var ids = CatalogGroupIds(includeTestGroups);
         if (ids.Count == 0)
             return [];
 
-        var described = await admin.DescribeConsumerGroupsAsync(ids, new DescribeConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+        var described = await DescribeCatalogGroupsAsync(admin, ids, cancellationToken);
+        var present = described
+            .Where(group => !string.IsNullOrWhiteSpace(group.GroupId) && !IsMissingGroup(group.Error))
+            .Select(group => group.GroupId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         var offsetResults = await ConsumerGroupOffsetQueries.ListPerGroupAsync<ListConsumerGroupOffsetsResult>(
-            ids,
+            present,
             async (groupId, token) =>
             {
                 var listed = await admin.ListConsumerGroupOffsetsAsync(
@@ -168,6 +218,9 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             committed[groupOffsets.Group] = groupOffsets.Partitions?.ToList() ?? [];
         }
 
+        foreach (var row in committed.Values.SelectMany(rows => rows))
+            ThrowIfStale(row.Error);
+
         var watermarkTopics = committed.Values
             .SelectMany(rows => rows)
             .Select(row => row.Topic)
@@ -177,9 +230,17 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         var watermarks = await WatermarksForCommittedAsync(admin, watermarkTopics, committed, cancellationToken);
 
         var views = new List<GroupView>();
-        foreach (var group in described.ConsumerGroupDescriptions)
+        foreach (var groupId in ids)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var group = described.FirstOrDefault(candidate => string.Equals(candidate.GroupId, groupId, StringComparison.Ordinal));
+            if (group is null || IsMissingGroup(group.Error))
+            {
+                views.Add(new GroupView { GroupId = groupId, State = "Empty" });
+                continue;
+            }
+
+            ThrowIfGroupFailed(group.GroupId, group.Error);
             var view = new GroupView
             {
                 GroupId = group.GroupId ?? "",
@@ -211,6 +272,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             {
                 foreach (var row in rows)
                 {
+                    ThrowIfStale(row.Error);
                     var key = row.Topic + "-" + row.Partition.Value;
                     var high = watermarks.TryGetValue(key, out var watermark) ? watermark : 0;
                     var committedOffset = row.Offset.IsSpecial ? 0 : Math.Max(0, row.Offset.Value);
@@ -236,10 +298,39 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         return views;
     }
 
-    public async Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken)
+    public Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var admin = Client();
+        // Confluent.Kafka 2.16.0 still has no ListPartitionReassignments. The service asks the infrastructure provider.
+        return Task.FromResult(new ReassignmentListing());
+    }
+
+    public Task ElectPreferredLeadersAsync(IReadOnlyList<TopicPartition> partitions, CancellationToken cancellationToken)
+    {
+        if (partitions.Count == 0)
+            return Task.CompletedTask;
+        return UseClientAsync("election", async (admin, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            await admin.ElectLeadersAsync(
+                KafkaLeaderElection.Kind,
+                partitions,
+                new ElectLeadersOptions { RequestTimeout = TimeSpan.FromSeconds(15), OperationTimeout = TimeSpan.FromSeconds(15) });
+            return true;
+        }, cancellationToken);
+    }
+
+    public Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken) =>
+        UseClientAsync("partitions", async (admin, token) =>
+        {
+            await IncreasePartitionsCoreAsync(admin, topic, newCount, token);
+            return true;
+        }, cancellationToken);
+
+    private async Task IncreasePartitionsCoreAsync(IAdminClient admin, string topic, int newCount, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var metadata = admin.GetMetadata(topic, TimeSpan.FromSeconds(20));
         var current = metadata.Topics.FirstOrDefault(item => string.Equals(item.Topic, topic, StringComparison.Ordinal))?.Partitions.Count ?? 0;
         if (current >= newCount)
@@ -250,10 +341,13 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             new CreatePartitionsOptions { ValidateOnly = false, RequestTimeout = TimeSpan.FromSeconds(30) });
     }
 
-    public async Task<ClusterSnapshot> DescribeClusterAsync(CancellationToken cancellationToken)
+    public Task<ClusterSnapshot> DescribeClusterAsync(CancellationToken cancellationToken) =>
+        UseClientAsync("cluster", (admin, token) => DescribeClusterCoreAsync(admin, token), cancellationToken);
+
+    private async Task<ClusterSnapshot> DescribeClusterCoreAsync(IAdminClient admin, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var admin = Client();
+
         var described = await admin.DescribeClusterAsync(new DescribeClusterOptions
         {
             IncludeAuthorizedOperations = true,
@@ -279,6 +373,8 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         foreach (var topic in metadata.Topics)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (topic.Error.IsError)
+                ThrowIfStale(topic.Error);
             if (topic.Error.IsError || topic.Partitions is null)
                 continue;
             foreach (var partition in topic.Partitions)
@@ -335,10 +431,15 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
 
     public void Dispose()
     {
-        lock (_gate)
+        _adminGate.Wait();
+        try
         {
             _admin?.Dispose();
             _admin = null;
+        }
+        finally
+        {
+            _adminGate.Release();
         }
     }
 
@@ -346,29 +447,164 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         groupId.StartsWith("e2e-diag-", StringComparison.OrdinalIgnoreCase)
         || groupId.StartsWith("Dynamic:", StringComparison.Ordinal);
 
-    private IAdminClient Client()
+    private async Task<T> UseClientAsync<T>(string operation, Func<IAdminClient, CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
-        lock (_gate)
+        await _adminGate.WaitAsync(cancellationToken);
+        try
         {
-            if (_admin is not null)
-                return _admin;
-
-            var config = new AdminClientConfig
+            _admin ??= _clients.Create(AdminConfig());
+            try
             {
-                BootstrapServers = string.Join(",", _connection.BootstrapServers ?? []),
-                ClientId = "LinkAdminBFF-ops"
-            };
-            if (_connection.SaslProtocolEnabled)
-            {
-                config.SecurityProtocol = _connection.Protocol;
-                config.SaslMechanism = _connection.Mechanism;
-                config.SaslUsername = _connection.SaslUsername;
-                config.SaslPassword = _connection.SaslPassword;
+                var result = await action(_admin, cancellationToken);
+                _failuresByOperation[operation] = 0;
+                return result;
             }
-
-            _admin = new AdminClientBuilder(config).Build();
-            return _admin;
+            catch (Exception ex)
+            {
+                NoteFailure(operation, ex);
+                throw;
+            }
         }
+        finally
+        {
+            _adminGate.Release();
+        }
+    }
+
+    private void NoteFailure(string operation, Exception error)
+    {
+        if (error is OperationCanceledException)
+            return;
+
+        if (!IsStaleAdminError(error))
+        {
+            var count = _failuresByOperation.GetValueOrDefault(operation) + 1;
+            _failuresByOperation[operation] = count;
+            if (count < AdminClientFailureLimit)
+                return;
+        }
+
+        SwapAdmin();
+    }
+
+    private void SwapAdmin()
+    {
+        var fresh = _clients.Create(AdminConfig());
+        var old = _admin;
+        _admin = fresh;
+        _failuresByOperation.Clear();
+        old?.Dispose();
+    }
+
+    private AdminClientConfig AdminConfig()
+    {
+        var config = new AdminClientConfig
+        {
+            BootstrapServers = string.Join(",", _connection.BootstrapServers ?? []),
+            ClientId = "LinkAdminBFF-ops"
+        };
+        if (_connection.SaslProtocolEnabled)
+        {
+            config.SecurityProtocol = _connection.Protocol;
+            config.SaslMechanism = _connection.Mechanism;
+            config.SaslUsername = _connection.SaslUsername;
+            config.SaslPassword = _connection.SaslPassword;
+        }
+
+        return config;
+    }
+
+    private static bool IsStaleAdminError(Exception error)
+    {
+        if (error is not KafkaException kafka)
+            return false;
+        return IsStaleAdminCode(kafka.Error.Code);
+    }
+
+    private static bool IsStaleAdminCode(ErrorCode code) =>
+        code is ErrorCode.NotCoordinatorForGroup
+            or ErrorCode.GroupCoordinatorNotAvailable
+            or ErrorCode.LeaderNotAvailable
+            or ErrorCode.NotLeaderForPartition
+            or ErrorCode.Local_Transport
+            or ErrorCode.Local_AllBrokersDown
+            or ErrorCode.Local_TimedOut
+            or ErrorCode.RequestTimedOut
+            or ErrorCode.NetworkException;
+
+    private static bool IsMissingGroup(Error? error) =>
+        error is { Code: ErrorCode.GroupIdNotFound };
+
+    private static void ThrowIfGroupFailed(string? groupId, Error? error)
+    {
+        if (error is null || error.Code == ErrorCode.NoError || IsMissingGroup(error))
+            return;
+        throw new KafkaException(new Error(error.Code, GroupFailureText(groupId, error)));
+    }
+
+    private static string GroupFailureText(string? groupId, Error error)
+    {
+        var who = string.IsNullOrWhiteSpace(groupId) ? "unknown group" : groupId.Trim();
+        var reason = (error.Reason ?? "").Trim();
+        var code = error.Code.ToString();
+        if (string.IsNullOrWhiteSpace(reason) || reason.EndsWith(':'))
+            return who + " " + code + ": no error detail returned by broker";
+        return who + " " + code + ": " + reason;
+    }
+
+    private static void ThrowIfStale(Error? error)
+    {
+        if (error is not null && IsStaleAdminCode(error.Code))
+            throw new KafkaException(error);
+    }
+
+    private static void RejectUnsafeGroupErrors(IEnumerable<ConsumerGroupDescription> groups)
+    {
+        foreach (var group in groups)
+        {
+            if (IsMissingGroup(group.Error))
+                continue;
+            ThrowIfGroupFailed(group.GroupId, group.Error);
+        }
+    }
+
+    private async Task<List<ConsumerGroupDescription>> DescribeCatalogGroupsAsync(IAdminClient admin, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var described = await admin.DescribeConsumerGroupsAsync(
+                ids,
+                new DescribeConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+            var rows = described.ConsumerGroupDescriptions?.ToList() ?? [];
+            RejectUnsafeGroupErrors(rows);
+            return rows;
+        }
+        catch (DescribeConsumerGroupsException ex)
+        {
+            var rows = ex.Results?.ConsumerGroupDescriptions?.ToList() ?? [];
+            RejectUnsafeGroupErrors(rows);
+            return rows;
+        }
+    }
+
+    private static List<string> CatalogGroupIds(bool includeTestGroups)
+    {
+        var ids = new List<string>();
+        foreach (var topic in KafkaTopicCatalog.Topics)
+        {
+            foreach (var groupId in topic.Groups)
+            {
+                if (string.IsNullOrWhiteSpace(groupId))
+                    continue;
+                if (!includeTestGroups && IsHiddenTestGroup(groupId))
+                    continue;
+                if (!ids.Contains(groupId, StringComparer.Ordinal))
+                    ids.Add(groupId);
+            }
+        }
+
+        return ids;
     }
 
     private static async Task<List<long>> HighWatermarksAsync(IAdminClient admin, string topic, int partitions, CancellationToken cancellationToken)
@@ -386,7 +622,10 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         foreach (var info in listed.ResultInfos)
         {
             var error = info.TopicPartitionOffsetError;
-            if (error is null || error.Error.IsError)
+            if (error is null)
+                continue;
+            ThrowIfStale(error.Error);
+            if (error.Error.IsError)
                 continue;
             if (error.Partition.Value >= 0 && error.Partition.Value < values.Length)
                 values[error.Partition.Value] = error.Offset.Value;
@@ -427,7 +666,10 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         foreach (var info in listed.ResultInfos)
         {
             var error = info.TopicPartitionOffsetError;
-            if (error is null || error.Error.IsError)
+            if (error is null)
+                continue;
+            ThrowIfStale(error.Error);
+            if (error.Error.IsError)
                 continue;
             map[error.Topic + "-" + error.Partition.Value] = Math.Max(0, error.Offset.Value);
         }
@@ -435,7 +677,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         return map;
     }
 
-    private static async Task<(List<int> Ids, bool Known)> ControllerEligibleIdsAsync(
+    internal static async Task<(List<int> Ids, bool Known)> ControllerEligibleIdsAsync(
         IAdminClient admin,
         IReadOnlyList<BrokerSnapshot> brokers,
         CancellationToken cancellationToken)
@@ -470,9 +712,9 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
                     }
                 }
 
-                if (!sawBroker)
+                if (!sawBroker || string.IsNullOrWhiteSpace(roles))
                     return ([], false);
-                if (roles is not null && roles.Contains("controller", StringComparison.OrdinalIgnoreCase))
+                if (roles.Contains("controller", StringComparison.OrdinalIgnoreCase))
                     eligible.Add(broker.Id);
             }
             catch (KafkaException)
@@ -529,4 +771,14 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             return null;
         }
     }
+}
+
+internal interface IKafkaAdminClientFactory
+{
+    IAdminClient Create(AdminClientConfig config);
+}
+
+internal sealed class ConfluentAdminClientFactory : IKafkaAdminClientFactory
+{
+    public IAdminClient Create(AdminClientConfig config) => new AdminClientBuilder(config).Build();
 }

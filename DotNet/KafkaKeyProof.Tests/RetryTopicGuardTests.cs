@@ -683,6 +683,13 @@ public class RetryTopicGuardTests
                         throw new InvalidOperationException("KafkaErrorMonitor subscribes to a list that is not discovered from the broker.");
                     }
                 }
+                else if (argument == "memberTopic"
+                    && text.Contains("const string memberTopic = \"ops-proof-members\"", StringComparison.Ordinal)
+                    && file.Replace('/', '\\').EndsWith("\\KafkaOps.Proof\\KafkaOpsConsoleFlowTests.cs", StringComparison.Ordinal))
+                {
+                    // This proof subscribes throwaway readers to ops-proof-members, a topic the same test creates.
+                    // That name is not a pipeline subscription and does not belong in topics.txt.
+                }
                 else
                 {
                     throw new InvalidOperationException("Unresolved Subscribe in " + file + ": " + argument);
