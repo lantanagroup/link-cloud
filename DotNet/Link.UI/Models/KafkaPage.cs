@@ -128,6 +128,7 @@ public sealed record ThroughputKafkaPage
     public string DraftTopic { get; init; } = "";
     public int DraftPartitions { get; init; }
     public string DraftReason { get; init; } = "";
+    public string DraftAddBrokerReason { get; init; } = "";
     public string DraftConfirmation { get; init; } = "";
     public bool DraftBackupSkip { get; init; }
     public bool DraftBackupSkipAcknowledged { get; init; }

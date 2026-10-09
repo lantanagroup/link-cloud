@@ -16,7 +16,9 @@ public class KafkaOpsConsoleFixTests
 
         Assert.True(read.Present);
         Assert.Equal(100, read.Leader);
-        Assert.Equal(100, KafkaControllerId.Resolve(1, read, rolesKnown: true, controllerEligibleBrokerIds: []));
+        var resolved = KafkaControllerId.Resolve(1, read, rolesKnown: true, controllerEligibleBrokerIds: []);
+        Assert.Equal(100, resolved.Id);
+        Assert.Equal("", resolved.UnavailableReason);
     }
 
     [Fact]
@@ -35,9 +37,17 @@ public class KafkaOpsConsoleFixTests
             new Error(ErrorCode.UnknownTopicOrPart));
         Assert.False(KafkaControllerId.Read(new Metadata([], [missing], 1, "")).Present);
 
-        Assert.Null(KafkaControllerId.Resolve(2, new MetadataLogLeader(false, -1), rolesKnown: true, controllerEligibleBrokerIds: []));
-        Assert.Equal(2, KafkaControllerId.Resolve(2, new MetadataLogLeader(false, -1), rolesKnown: false, controllerEligibleBrokerIds: []));
-        Assert.Null(KafkaControllerId.Resolve(2, new MetadataLogLeader(true, -1), rolesKnown: false, controllerEligibleBrokerIds: [1]));
+        var hidden = KafkaControllerId.Resolve(2, new MetadataLogLeader(false, -1), rolesKnown: true, controllerEligibleBrokerIds: []);
+        Assert.Null(hidden.Id);
+        Assert.Equal(KafkaControllerId.QuorumNotExposedReason, hidden.UnavailableReason);
+
+        var zooKeeper = KafkaControllerId.Resolve(2, new MetadataLogLeader(false, -1), rolesKnown: false, controllerEligibleBrokerIds: []);
+        Assert.Equal(2, zooKeeper.Id);
+        Assert.Equal("", zooKeeper.UnavailableReason);
+
+        var unreadableLeader = KafkaControllerId.Resolve(2, new MetadataLogLeader(true, -1), rolesKnown: false, controllerEligibleBrokerIds: [1]);
+        Assert.Null(unreadableLeader.Id);
+        Assert.Equal("", unreadableLeader.UnavailableReason);
     }
 
     [Fact]
@@ -82,5 +92,52 @@ public class KafkaOpsConsoleFixTests
         Assert.Contains(plan.Moves, move => move.Topic == "_linkmig-journal");
         Assert.Contains(plan.Notes, note => note == "4 leader(s) move off broker 1.");
         Assert.DoesNotContain(plan.Notes, note => note.Contains("partition 0", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Decommission_GroupsRefusalsByTopic_AndLabelsInternalTopics()
+    {
+        var partitions = Enumerable.Range(0, 12).Select(index => new BrokerPartitionFact
+        {
+            Topic = index < 10 ? "__consumer_offsets" : "ReadyToAcquire",
+            Partition = index,
+            Leader = 1,
+            Replicas = [1],
+            MinInSyncReplicas = 1
+        }).ToList();
+
+        var plan = BrokerMovePlanner.Decommission(1, [1], partitions);
+
+        Assert.False(plan.Accepted);
+        Assert.Empty(plan.Moves);
+        Assert.Equal(2, plan.Errors.Count);
+        Assert.StartsWith("ReadyToAcquire: 2 partitions", plan.Errors[0], StringComparison.Ordinal);
+        Assert.Contains("(internal) __consumer_offsets: 10 partitions", plan.Errors[1], StringComparison.Ordinal);
+        Assert.DoesNotContain(plan.Errors, error => error.Contains("partition 0", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PartitionAdd_IsNotCalledEligibleBeforeADryRun()
+    {
+        Assert.Equal(
+            "Not checked yet. Dry run an in-place increase to confirm it is eligible.",
+            KafkaTopicEligibility.PartitionAddReason(false, "blocked"));
+        Assert.Equal("blocked", KafkaTopicEligibility.PartitionAddReason(true, "blocked"));
+    }
+
+    [Fact]
+    public void PlanHash_IncludesAcknowledgedGroupNames_AndIgnoresOrder()
+    {
+        var facts = MigrationWorld.Facts();
+        var baseline = MigrationPreflight.Evaluate(facts).PlanHash;
+        facts.Groups[0].Acknowledged = true;
+        Assert.NotEqual(baseline, MigrationPreflight.Evaluate(facts).PlanHash);
+
+        var typed = MigrationWorld.Facts();
+        typed.AcknowledgedGroupIds = ["zeta", "alpha"];
+        var reordered = MigrationWorld.Facts();
+        reordered.AcknowledgedGroupIds = ["alpha", "zeta", "alpha"];
+        Assert.Equal(MigrationPreflight.Evaluate(typed).PlanHash, MigrationPreflight.Evaluate(reordered).PlanHash);
+        Assert.NotEqual(baseline, MigrationPreflight.Evaluate(typed).PlanHash);
     }
 }

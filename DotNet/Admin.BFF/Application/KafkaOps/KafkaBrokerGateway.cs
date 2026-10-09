@@ -455,10 +455,12 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             }
         }
 
+        var controller = KafkaControllerId.Resolve(described.Controller?.Id, logLeader, roles.Known, roles.Ids);
         return new ClusterSnapshot
         {
             BrokerCount = described.Nodes.Count,
-            ControllerId = KafkaControllerId.Resolve(described.Controller?.Id, logLeader, roles.Known, roles.Ids),
+            ControllerId = controller.Id,
+            ControllerUnavailableReason = controller.UnavailableReason,
             UnderReplicatedPartitions = underReplicated,
             OfflinePartitions = offline,
             IsrShrunkPartitions = isrShrunk,

@@ -65,12 +65,7 @@ public static class KafkaIncreaseEligibility
             if (plan.Accepted)
                 return "Eligible for an in-place increase.";
 
-            var why = plan.Errors.FirstOrDefault(error => !string.IsNullOrWhiteSpace(error));
-            if (string.IsNullOrWhiteSpace(why))
-                why = plan.Summary;
-            return string.IsNullOrWhiteSpace(why)
-                ? "Not eligible for an in-place increase."
-                : "Not eligible for an in-place increase. " + why;
+            return "Not eligible for an in-place increase.";
         }
 
         return string.IsNullOrWhiteSpace(catalogReason) ? null : catalogReason;
@@ -83,12 +78,38 @@ public static class KafkaIncreaseEligibility
         if (plan.Accepted)
             return string.IsNullOrWhiteSpace(catalogReason) ? "Eligible for an increase migration." : catalogReason;
 
-        var why = plan.Errors.FirstOrDefault(error => !string.IsNullOrWhiteSpace(error));
-        if (string.IsNullOrWhiteSpace(why))
-            why = plan.Summary;
-        return string.IsNullOrWhiteSpace(why)
-            ? "Not eligible for a migration."
-            : "Not eligible for a migration. " + why;
+        return "Not eligible for a migration.";
+    }
+}
+
+public readonly record struct KafkaControllerDisplay(string Value, string Caption, string? Title);
+
+public static class KafkaControllerTile
+{
+    public const string NotReported = "Not reported";
+    public const string SeparateNodeCaption = "KRaft controller (separate node, not exposed to clients)";
+    public const string KnownCaption = "Controller";
+
+    public static KafkaControllerDisplay Display(int? controllerId, string? unavailableReason)
+    {
+        if (controllerId is int id)
+            return new KafkaControllerDisplay(id.ToString(), KnownCaption, null);
+
+        if (!string.IsNullOrWhiteSpace(unavailableReason))
+            return new KafkaControllerDisplay(NotReported, SeparateNodeCaption, unavailableReason.Trim());
+
+        return new KafkaControllerDisplay("—", KnownCaption, null);
+    }
+}
+
+public static class KafkaPlanBanner
+{
+    public static string? BesidePlan(string? pageError, string? planSummary, bool planReturned)
+    {
+        if (!planReturned || string.IsNullOrWhiteSpace(pageError) || string.IsNullOrWhiteSpace(planSummary))
+            return string.IsNullOrWhiteSpace(pageError) ? null : pageError;
+
+        return string.Equals(pageError.Trim(), planSummary.Trim(), StringComparison.Ordinal) ? null : pageError;
     }
 }
 

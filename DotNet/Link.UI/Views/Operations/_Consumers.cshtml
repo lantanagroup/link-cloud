@@ -143,6 +143,12 @@ else
     <h2 class="h5 mt-4">Partition lag</h2>
     <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
 
+    @if (!selected.Catalogued)
+    {
+        <p class="text-muted mt-3">Replica changes are hidden for an unknown group.</p>
+    }
+    else
+    {
     <div class="au-card card mt-3">
         <div class="card-header">Replicas</div>
         <div class="card-body">
@@ -185,4 +191,5 @@ else
             }
         </div>
     </div>
+    }
 }

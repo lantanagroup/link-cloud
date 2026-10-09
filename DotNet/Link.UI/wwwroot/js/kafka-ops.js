@@ -79,6 +79,7 @@
         tips(root);
         wireConfirm();
         bindBusy(root);
+        focusResult(root);
         watchRequest();
     }
 
@@ -90,10 +91,30 @@
                 var submitter = event.submitter;
                 var action = (submitter && submitter.getAttribute("formaction")) || form.getAttribute("action") || "";
                 if (action.indexOf("/plan") < 0) return;
-                var note = form.querySelector("[data-kafka-busy-note]");
-                if (note) note.hidden = false;
+                window.setTimeout(function () {
+                    form.setAttribute("aria-busy", "true");
+                    form.querySelectorAll("button[type='submit'], input[type='submit']").forEach(function (button) {
+                        button.disabled = true;
+                    });
+                    var note = form.querySelector("[data-kafka-busy-note]");
+                    if (note) note.hidden = false;
+                }, 0);
             });
         });
+    }
+
+    function focusResult(root) {
+        var panel = (root || document).querySelector("[data-kafka-result]");
+        if (!panel) return;
+        var key = panel.id + ":" + (panel.getAttribute("data-plan-hash") || panel.getAttribute("data-result-key") || "");
+        try {
+            if (window.sessionStorage.getItem("kafka-result-seen") === key) return;
+            window.sessionStorage.setItem("kafka-result-seen", key);
+        } catch (err) {
+            return;
+        }
+        panel.scrollIntoView({ block: "nearest" });
+        if (typeof panel.focus === "function") panel.focus();
     }
 
     function watchRequest() {

@@ -97,6 +97,7 @@ public sealed class MigrationRecord
     public string Executor { get; set; } = "";
     public string Reason { get; set; } = "";
     public bool BackupSkipped { get; set; }
+    public List<string> AcknowledgedGroups { get; set; } = [];
     public bool BackupCleanupRequired { get; set; }
     public string BackupTopic { get; set; } = "";
     public string BackupTopicId { get; set; } = "";
@@ -143,6 +144,7 @@ public sealed class MigrationRecord
         clone.StopConsumers = [.. StopConsumers];
         clone.ProducerReplicas = new Dictionary<string, int>(ProducerReplicas, StringComparer.Ordinal);
         clone.ConsumerReplicas = new Dictionary<string, int>(ConsumerReplicas, StringComparer.Ordinal);
+        clone.AcknowledgedGroups = [.. AcknowledgedGroups];
         clone.Groups = [.. Groups];
         clone.GroupsWithCommits = [.. GroupsWithCommits];
         clone.SiblingsToGrow = [.. SiblingsToGrow];

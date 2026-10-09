@@ -76,7 +76,7 @@
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-md-6">
                     <label class="form-label" for="add-broker-reason">Reason</label>
-                    <input class="form-control" id="add-broker-reason" name="reason" value="@Model.DraftReason" />
+                    <input class="form-control" id="add-broker-reason" name="addBrokerReason" value="@Model.DraftAddBrokerReason" />
                 </div>
                 <div class="col-auto">
                     <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
@@ -123,19 +123,46 @@ else
                 var moveLines = BrokerMovePreview.Lines(plan.Moves);
                 var shownMoves = moveLines.Take(BrokerMovePreview.FoldAfter).ToList();
                 var restMoves = moveLines.Skip(BrokerMovePreview.FoldAfter).ToList();
-                <div class="mt-3">
-                    <p><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span> Broker @plan.BrokerId. @(plan.AlreadyEmpty ? "Already empty." : plan.Moves.Count + " moves.") @(plan.SecondApproverRequired ? "A second approver is required." : "")</p>
-                    @foreach (var note in plan.Notes)
+                var shownErrors = plan.Errors.Take(BrokerMovePreview.FoldAfter).ToList();
+                var restErrors = plan.Errors.Skip(BrokerMovePreview.FoldAfter).ToList();
+                var moveTone = plan.Accepted ? "alert-success" : "alert-danger";
+                <div id="kafka-broker-result" class="alert @moveTone mt-3" role="status" tabindex="-1" data-kafka-result data-result-key="@(plan.Accepted)-@plan.BrokerId-@plan.Moves.Count-@plan.Errors.Count">
+                    <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
+                    <p>@(plan.Accepted ? "Dry run accepted. Nothing has moved yet." : "This broker change cannot run yet.")</p>
+                    <dl class="row mb-2">
+                        <dt class="col-sm-4">Broker</dt>
+                        <dd class="col-sm-8">@plan.BrokerId</dd>
+                        <dt class="col-sm-4">Partitions</dt>
+                        <dd class="col-sm-8">@(plan.AlreadyEmpty ? "Already empty." : plan.Moves.Count + " move off or onto this broker.")</dd>
+                        <dt class="col-sm-4">Approval</dt>
+                        <dd class="col-sm-8">@(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
+                    </dl>
+                    @if (shownErrors.Count > 0)
                     {
-                        <p class="mb-1">@note</p>
-                    }
-                    @foreach (var planError in plan.Errors)
-                    {
-                        <p class="mb-1">@planError</p>
+                        <p class="mb-1">Blocking reasons</p>
+                        <ul class="mb-2">
+                        @foreach (var planError in shownErrors)
+                        {
+                            <li>@planError</li>
+                        }
+                        </ul>
+                        @if (restErrors.Count > 0)
+                        {
+                            <details>
+                                <summary>Show the rest</summary>
+                                <ul class="mb-2">
+                                @foreach (var planError in restErrors)
+                                {
+                                    <li>@planError</li>
+                                }
+                                </ul>
+                            </details>
+                        }
                     }
                     @if (shownMoves.Count > 0)
                     {
-                        <ul class="mb-0">
+                        <p class="mb-1">Topics</p>
+                        <ul class="mb-2">
                         @foreach (var line in shownMoves)
                         {
                             <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
@@ -145,7 +172,7 @@ else
                         {
                             <details>
                                 <summary>Show the rest</summary>
-                                <ul class="mb-0">
+                                <ul class="mb-2">
                                 @foreach (var line in restMoves)
                                 {
                                     <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
@@ -153,6 +180,17 @@ else
                                 </ul>
                             </details>
                         }
+                    }
+                    <p class="mb-2">@(plan.Accepted ? "Ready. Submit the decommission or the rebalance when the reason is filled in." : "Fix the items above, then preview again.")</p>
+                    @if (plan.Notes.Count > 0)
+                    {
+                        <details>
+                            <summary>Details</summary>
+                            @foreach (var note in plan.Notes)
+                            {
+                                <p class="mb-1">@note</p>
+                            }
+                        </details>
                     }
                 </div>
             }
