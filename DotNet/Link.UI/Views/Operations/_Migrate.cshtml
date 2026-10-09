@@ -218,9 +218,14 @@
 
         @if (plan is not null)
         {
-            <div id="kafka-dry-run-result" class="alert @resultTone" role="status" tabindex="-1" data-kafka-result data-plan-hash="@plan.PlanHash">
-                <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
-                <p>@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This migration cannot run yet.")</p>
+            <div id="kafka-dry-run-result" class="alert @resultTone lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-migrate" data-plan-hash="@plan.PlanHash">
+                <details class="lu-result-details">
+                    <summary>
+                        <span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span>
+                        <span class="lu-result-text">@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This migration cannot run yet.")</span>
+                        <button type="button" class="btn btn-sm btn-warning lu-result-dismiss" aria-label="Dismiss result">Dismiss</button>
+                    </summary>
+                    <div class="lu-result-body">
                 <dl class="row mb-2">
                     <dt class="col-sm-4">Partitions</dt>
                     <dd class="col-sm-8">@currentPartitions to @targetPartitions</dd>
@@ -262,6 +267,8 @@
                     <summary>Details</summary>
                     <p>Plan hash @plan.PlanHash.</p>
                     <p class="mb-0">In-place add keeps the topic name and remaps keys. Migrate stops the workloads, copies the log to the backup, and recreates an empty topic. Use an in-place add when the quiet window can be met.</p>
+                </details>
+                    </div>
                 </details>
             </div>
         }

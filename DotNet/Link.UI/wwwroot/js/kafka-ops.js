@@ -79,8 +79,46 @@
         tips(root);
         wireConfirm();
         bindBusy(root);
+        wireResults(root);
         focusResult(root);
         watchRequest();
+    }
+
+    function wireResults(root) {
+        (root || document).querySelectorAll("[data-lu-result]").forEach(function (panel) {
+            if (panel.getAttribute("data-lu-result-bound") === "1") return;
+            panel.setAttribute("data-lu-result-bound", "1");
+            var id = panel.getAttribute("data-lu-result") || panel.id || "result";
+            var key = panel.getAttribute("data-result-key") || panel.getAttribute("data-plan-hash") || "";
+            var details = panel.querySelector("details");
+            var dismiss = panel.querySelector(".lu-result-dismiss");
+            try {
+                if (key && window.localStorage.getItem("lu-result-dismiss:" + id) === key) {
+                    panel.hidden = true;
+                } else if (details && window.localStorage.getItem("lu-result-open:" + id) === "1") {
+                    details.open = true;
+                }
+            } catch (err) {
+                /* Storage can be blocked. The line still collapses and dismisses for this page. */
+            }
+            if (details) {
+                details.addEventListener("toggle", function () {
+                    try {
+                        window.localStorage.setItem("lu-result-open:" + id, details.open ? "1" : "0");
+                    } catch (err) {}
+                });
+            }
+            if (dismiss) {
+                dismiss.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    panel.hidden = true;
+                    try {
+                        if (key) window.localStorage.setItem("lu-result-dismiss:" + id, key);
+                    } catch (err) {}
+                });
+            }
+        });
     }
 
     function bindBusy(root) {
@@ -105,7 +143,7 @@
 
     function focusResult(root) {
         var panel = (root || document).querySelector("[data-kafka-result]");
-        if (!panel) return;
+        if (!panel || panel.hidden) return;
         var key = panel.id + ":" + (panel.getAttribute("data-plan-hash") || panel.getAttribute("data-result-key") || "");
         try {
             if (window.sessionStorage.getItem("kafka-result-seen") === key) return;
