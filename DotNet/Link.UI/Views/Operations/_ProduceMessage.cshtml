@@ -25,16 +25,17 @@
     <input type="hidden" name="broker" value="@query.Broker" />
     <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
     <input type="hidden" name="page" value="1" />
-    <input type="hidden" name="mode" value="@query.BrowseMode" />
-    <input type="hidden" name="limit" value="@query.BrowseLimit" />
-    <input type="hidden" name="offset" value="@query.BrowseOffset" />
-    <input type="hidden" name="timestamp" value="@query.BrowseTimestamp" />
     <input type="hidden" name="key" value="@query.BrowseKey" />
-    <input type="hidden" name="headerName" value="@query.BrowseHeaderName" />
-    <input type="hidden" name="headerValue" value="@query.BrowseHeaderValue" />
+    <input type="hidden" name="messageText" value="@query.MessageText" />
+    <input type="hidden" name="headerContains" value="@query.HeaderContains" />
+    <input type="hidden" name="valueContains" value="@query.ValueContains" />
+    <input type="hidden" name="messageKind" value="@query.MessageKind" />
+    <input type="hidden" name="messageFrom" value="@(query.MessageFrom?.ToString() ?? "")" />
+    <input type="hidden" name="messageTo" value="@(query.MessageTo?.ToString() ?? "")" />
+    <input type="hidden" name="msgPage" value="@query.MsgPage" />
+    <input type="hidden" name="more" value="@(query.More ? "true" : "false")" />
     <input type="hidden" name="record" value="@query.OpenRecord" />
     <input type="hidden" name="stage" value="@query.StageRecord" />
-    <input type="hidden" name="browsePartition" value="@string.Join(",", query.BrowsePartitions)" />
     <h2 class="h5">Produce a message</h2>
     <fieldset class="border rounded p-3 mb-3">
         <legend class="float-none w-auto px-2 h6">Message</legend>

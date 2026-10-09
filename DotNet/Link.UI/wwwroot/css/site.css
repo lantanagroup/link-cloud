@@ -3650,6 +3650,47 @@ tr.lu-kafka-problem > td:first-child {
   background: #fff;
   border-color: var(--au-border) !important;
   box-shadow: var(--au-card-shadow);
+  min-width: 0;
+  max-width: 100%;
+}
+.lu-kafka fieldset,
+.lu-kafka .form-text,
+.lu-kafka legend,
+.lu-search,
+.lu-search .form-text,
+.lu-search legend {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.lu-kafka .row > [class*="col-"],
+.lu-search .row > [class*="col-"] {
+  min-width: 0;
+}
+.lu-kafka-stat {
+  color: var(--au-muted);
+  font-size: .875rem;
+}
+.lu-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin-top: 1rem;
+}
+.lu-pager-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+.lu-pager-jump .form-control {
+  width: 5rem;
+}
+.lu-advanced summary {
+  cursor: pointer;
+  color: var(--au-muted);
+  font-size: .875rem;
 }
 .lu-kafka .alert {
   border-radius: var(--au-radius);
@@ -4073,7 +4114,7 @@ tr.lu-kafka-problem > td:first-child {
   font-weight: 650;
   line-height: 1.35;
 }
-.lu-json-key { color: #9ec5ff; }
+.lu-json-key { color: #f3b27a; }
 .lu-json-string { color: #9be7b4; }
 .lu-json-number { color: #ffd56a; }
 .lu-json-bool,

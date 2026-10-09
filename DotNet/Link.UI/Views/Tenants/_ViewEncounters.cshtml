@@ -20,9 +20,11 @@
 <div class="au-card card">
     <div class="card-header">Encounters</div>
     <div class="card-body">
-        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="mb-3 lu-search">
             <input type="hidden" name="section" value="encounters" />
+            <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
             <partial name="_ReturnField" />
+            <div class="row g-2 align-items-end">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="encounterId">Encounter ID</label>
                 <input id="encounterId" name="encounterId" value="@Model.Query.EncounterId" class="form-control" />
@@ -42,6 +44,7 @@
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
                 <a class="btn btn-warning" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="encounters" asp-route-returnUrl="@origin">Clear</a>
+            </div>
             </div>
         </form>
 

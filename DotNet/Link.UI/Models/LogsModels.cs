@@ -74,7 +74,7 @@ public sealed class AcquisitionQuery
         SearchTerm
     });
 
-    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
+    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null, int? pageSize = null)
     {
         var route = new Dictionary<string, string>(StringComparer.Ordinal);
         Add(route, "facilityId", FacilityId);
@@ -98,7 +98,7 @@ public sealed class AcquisitionQuery
             route["minAgeHours"] = MinAgeHours.ToString();
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
-        var size = LogsRules.ClampPageSize(PageSize);
+        var size = LogsRules.ClampPageSize(pageSize ?? PageSize);
         if (size != LogsRules.DefaultPageSize)
             route["pageSize"] = size.ToString();
         var number = page ?? (Page < 1 ? 1 : Page);
@@ -269,7 +269,7 @@ public sealed class SftpQuery
         SortDir
     });
 
-    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
+    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null, int? pageSize = null)
     {
         var route = new Dictionary<string, string>(StringComparer.Ordinal);
         Add(route, "facilityId", FacilityId);
@@ -279,7 +279,7 @@ public sealed class SftpQuery
         AutomationMarkRules.AddScope(route, Scope);
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
-        var size = LogsRules.ClampPageSize(PageSize);
+        var size = LogsRules.ClampPageSize(pageSize ?? PageSize);
         if (size != LogsRules.DefaultPageSize)
             route["pageSize"] = size.ToString();
         var number = page ?? (Page < 1 ? 1 : Page);
@@ -405,7 +405,7 @@ public sealed class AuditQuery
         SortDir
     });
 
-    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
+    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null, int? pageSize = null)
     {
         var route = new Dictionary<string, string>(StringComparer.Ordinal);
         Add(route, "searchText", SearchText);
@@ -417,7 +417,7 @@ public sealed class AuditQuery
         AutomationMarkRules.AddScope(route, Scope);
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
-        var size = LogsRules.ClampAuditPageSize(PageSize);
+        var size = LogsRules.ClampAuditPageSize(pageSize ?? PageSize);
         if (size != LogsRules.DefaultPageSize)
             route["pageSize"] = size.ToString();
         var number = page ?? (Page < 1 ? 1 : Page);

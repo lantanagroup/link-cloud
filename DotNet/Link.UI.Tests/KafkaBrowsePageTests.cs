@@ -15,52 +15,64 @@ namespace Link.UI.Tests;
 public class KafkaBrowsePageTests
 {
     [Fact]
-    public void Query_keeps_a_message_seek_and_drops_it_on_the_other_tabs()
+    public void Query_keeps_a_message_search_and_drops_it_on_the_other_tabs()
     {
         var raw = new QueryCollection(new Dictionary<string, StringValues>
         {
             ["view"] = "messages",
             ["topic"] = "ResourcesAcquired",
-            ["mode"] = "from-offset",
-            ["partition"] = new StringValues(["0", "2, 4"]),
-            ["offset"] = "15",
-            ["timestamp"] = "1710000000000",
-            ["limit"] = "0",
+            ["mq"] = "fac",
             ["key"] = "fac-1|pat",
-            ["headerName"] = "X-Correlation-Id",
-            ["headerValue"] = "abc def",
-            ["record"] = "0:120"
+            ["hq"] = "corr",
+            ["vq"] = "Patient",
+            ["mtype"] = "Error",
+            ["mfrom"] = "1710000000000",
+            ["mto"] = "1710000001000",
+            ["msgPage"] = "3",
+            ["more"] = "1",
+            ["record"] = "0:120",
+            ["stage"] = "0:88"
         });
 
         var query = ThroughputKafkaPageQuery.From(raw, "/Operations");
         query.View.Should().Be(ThroughputKafkaPageQuery.Messages);
-        query.BrowseMode.Should().Be("from-offset");
-        query.BrowsePartitions.Should().Equal(0, 2, 4);
-        query.BrowseOffset.Should().Be(15);
-        query.BrowseTimestamp.Should().Be(1710000000000);
-        query.BrowseLimit.Should().Be(0);
+        query.MessageText.Should().Be("fac");
         query.BrowseKey.Should().Be("fac-1pat");
-        query.BrowseHeaderName.Should().Be("X-Correlation-Id");
-        query.BrowseHeaderValue.Should().Be("abc def");
+        query.HeaderContains.Should().Be("corr");
+        query.ValueContains.Should().Be("Patient");
+        query.MessageKind.Should().Be("Error");
+        query.MessageFrom.Should().Be(1710000000000);
+        query.MessageTo.Should().Be(1710000001000);
+        query.MsgPage.Should().Be(3);
+        query.More.Should().BeTrue();
         query.OpenRecord.Should().Be("0:120");
+        query.StageRecord.Should().Be("0:88");
 
         var href = query.Href();
         href.Should().Contain("view=messages");
-        href.Should().Contain("mode=from-offset");
-        href.Should().Contain("partition=0");
-        href.Should().Contain("partition=2");
-        href.Should().Contain("partition=4");
-        href.Should().Contain("offset=15");
-        href.Should().Contain("limit=0");
+        href.Should().Contain("mq=fac");
+        href.Should().Contain("key=fac-1pat");
+        href.Should().Contain("hq=corr");
+        href.Should().Contain("vq=Patient");
+        href.Should().Contain("mtype=Error");
+        href.Should().Contain("msgPage=3");
+        href.Should().Contain("more=1");
         href.Should().Contain("record=0%3A120");
+        href.Should().Contain("stage=0%3A88");
+        href.Should().NotContain("mode=");
+        href.Should().NotContain("limit=");
+        href.Should().NotContain("offset=");
+        href.Should().NotContain("partition=");
+        query.Href(pageSize: 10, msgPage: 1).Should().Contain("pageSize=10").And.NotContain("msgPage=");
         query.ExportHref().Should().StartWith("/Operations/Kafka/messages/export?");
         query.ExportHref().Should().NotContain("record=");
 
         var overview = query.Href(view: ThroughputKafkaPageQuery.Overview, page: 1);
         overview.Should().Contain("view=overview");
-        overview.Should().NotContain("mode=");
-        overview.Should().NotContain("partition=");
+        overview.Should().NotContain("mq=");
+        overview.Should().NotContain("msgPage=");
         overview.Should().NotContain("record=");
+        overview.Should().NotContain("stage=");
     }
 
     [Fact]
@@ -71,8 +83,15 @@ public class KafkaBrowsePageTests
         var shell = File.ReadAllText(Path.Combine(root, "Views", "Operations", "Kafka.cshtml"));
         page.Should().Contain("does not commit offsets");
         page.Should().Contain("Topic family");
-        page.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">Where to read</legend>");
-        page.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">What to keep</legend>");
+        page.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">Search</legend>");
+        page.Should().NotContain("Where to read");
+        page.Should().NotContain("What to keep");
+        page.Should().NotContain("name=\"limit\"");
+        page.Should().NotContain("id=\"browse-offset\"");
+        page.Should().NotContain(">Fetch</button>");
+        page.Should().Contain("name=\"mq\"");
+        page.Should().Contain("name=\"msgPage\"");
+        page.Should().Contain("aria-label=\"Message pages\"");
         page.Should().Contain("id=\"kafka-browse-result\"");
         page.Should().Contain("data-lu-result=\"kafka-browse\"");
         page.Should().Contain("lu-result-dismiss");
@@ -93,7 +112,9 @@ public class KafkaBrowsePageTests
         page.Should().Contain("btn btn-warning");
         page.Should().NotContain("btn-primary");
         page.Should().NotContain("btn-outline-");
-        IndexOf(page, "id=\"kafka-browse-result\"").Should().BeLessThan(IndexOf(page, ">Fetch</button>"));
+        IndexOf(page, ">Search</button>").Should().BeLessThan(IndexOf(page, "id=\"kafka-browse-result\""));
+        IndexOf(page, "id=\"kafka-browse-result\"").Should().BeLessThan(IndexOf(page, "<table"));
+        IndexOf(page, "<table").Should().BeLessThan(IndexOf(page, "aria-label=\"Message pages\""));
         shell.Should().Contain("ThroughputKafkaPageQuery.Messages");
         shell.Should().Contain(">Messages</a>");
     }

@@ -11,43 +11,51 @@
 <div class="au-card card">
     <div class="card-header">Organization locations</div>
     <div class="card-body">
-        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="mb-3 lu-search">
             <input type="hidden" name="section" value="locations" />
+            <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
             <partial name="_ReturnField" />
-            <div class="col-12 col-md-6 col-xl-3">
-                <label class="form-label" for="locationId">Location ID</label>
-                <input id="locationId" name="locationId" value="@Model.Query.LocationId" class="form-control" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="locationId">Location ID</label>
+                    <input id="locationId" name="locationId" value="@Model.Query.LocationId" class="form-control" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="locationName">Name</label>
+                    <input id="locationName" name="locationName" value="@Model.Query.LocationName" class="form-control" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="orgLocation">Org location</label>
+                    <select id="orgLocation" name="orgLocation" class="form-select">
+                        <option value="">Any</option>
+                        <option value="true" selected="@(Model.Query.OrgLocation == "true" ? "selected" : null)">Yes</option>
+                        <option value="false" selected="@(Model.Query.OrgLocation == "false" ? "selected" : null)">No</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="locations" asp-route-returnUrl="@origin">Clear</a>
+                </div>
             </div>
-            <div class="col-12 col-md-6 col-xl-3">
-                <label class="form-label" for="locationName">Name</label>
-                <input id="locationName" name="locationName" value="@Model.Query.LocationName" class="form-control" />
-            </div>
-            <div class="col-12 col-md-6 col-xl-2">
-                <label class="form-label" for="locationAlias">Alias</label>
-                <input id="locationAlias" name="locationAlias" value="@Model.Query.LocationAlias" class="form-control" />
-            </div>
-            <div class="col-12 col-md-6 col-xl-2">
-                <label class="form-label" for="partOf">Part of</label>
-                <input id="partOf" name="partOf" value="@Model.Query.PartOf" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4 col-xl-2">
-                <label class="form-label" for="orgLocation">Org location</label>
-                <select id="orgLocation" name="orgLocation" class="form-select">
-                    <option value="">Any</option>
-                    <option value="true" selected="@(Model.Query.OrgLocation == "true" ? "selected" : null)">Yes</option>
-                    <option value="false" selected="@(Model.Query.OrgLocation == "false" ? "selected" : null)">No</option>
-                </select>
-            </div>
-            <div class="col-12">
-                <label class="form-check-label">
-                    <input class="form-check-input me-1" type="checkbox" name="showInactive" value="true" @(Model.Query.ShowInactive ? "checked" : null) />
-                    Show inactive
-                </label>
-            </div>
-            <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-warning" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="locations" asp-route-returnUrl="@origin">Clear</a>
-            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(Model.Query.LocationAlias) || !string.IsNullOrWhiteSpace(Model.Query.PartOf) || Model.Query.ShowInactive) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="locationAlias">Alias</label>
+                        <input id="locationAlias" name="locationAlias" value="@Model.Query.LocationAlias" class="form-control" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="partOf">Part of</label>
+                        <input id="partOf" name="partOf" value="@Model.Query.PartOf" class="form-control" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-check-label">
+                            <input class="form-check-input me-1" type="checkbox" name="showInactive" value="true" @(Model.Query.ShowInactive ? "checked" : null) />
+                            Show inactive
+                        </label>
+                    </div>
+                </div>
+            </details>
         </form>
 
         @if (Model.Locations.Count == 0)

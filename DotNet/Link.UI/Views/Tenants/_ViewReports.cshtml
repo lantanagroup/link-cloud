@@ -19,79 +19,69 @@
 <div class="au-card card">
     <div class="card-header">Facility reports</div>
     <div class="card-body">
-        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3" data-au-filter="400" data-au-target="facilityReportResults">
+        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="mb-3 lu-search" data-au-filter="400" data-au-target="facilityReportResults">
             <input type="hidden" name="section" value="reports" />
+            <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
             <partial name="_ReturnField" />
-            <div class="col-12 col-md-4 col-xl-3">
-                <label class="form-label" for="reportId">Report ID</label>
-                <input id="reportId" name="reportId" value="@Model.Query.ReportId" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4 col-xl-2">
-                <label class="form-label" for="frequency">Frequency</label>
-                <select id="frequency" name="frequency" class="form-select">
-                    <option value="">Any</option>
-                    @foreach (var frequency in new[] { "Daily", "Weekly", "Monthly", "Adhoc", "Discharge" })
-                    {
-                        if (string.Equals(Model.Query.Frequency, frequency, StringComparison.OrdinalIgnoreCase))
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4 col-xl-3">
+                    <label class="form-label" for="reportId">Report ID</label>
+                    <input id="reportId" name="reportId" value="@Model.Query.ReportId" class="form-control" />
+                </div>
+                <div class="col-12 col-md-4 col-xl-2">
+                    <label class="form-label" for="frequency">Frequency</label>
+                    <select id="frequency" name="frequency" class="form-select">
+                        <option value="">Any</option>
+                        @foreach (var frequency in new[] { "Daily", "Weekly", "Monthly", "Adhoc", "Discharge" })
                         {
-                            <option value="@frequency" selected>@frequency</option>
+                            if (string.Equals(Model.Query.Frequency, frequency, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@frequency" selected>@frequency</option>
+                            }
+                            else
+                            {
+                                <option value="@frequency">@frequency</option>
+                            }
                         }
-                        else
-                        {
-                            <option value="@frequency">@frequency</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <label class="form-label" for="created">Created</label>
-                <input id="created" name="created" type="date" value="@Model.Query.Created" class="form-control" />
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <label class="form-label" for="periodFrom">Period from</label>
-                <input id="periodFrom" name="periodFrom" type="date" value="@Model.Query.PeriodFrom" class="form-control" />
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <label class="form-label" for="periodTo">Period to</label>
-                <input id="periodTo" name="periodTo" type="date" value="@Model.Query.PeriodTo" class="form-control" />
-            </div>
-            <div class="col-6 col-md-3 col-xl-1">
-                <label class="form-label" for="pageSize">Page</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var size in FacilityViewRules.PageSizes)
-                    {
-                        if (Model.Query.PageSize == size)
-                        {
-                            <option value="@size" selected>@size</option>
-                        }
-                        else
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-12">
-                <span class="form-label d-block">Status</span>
-                <div class="d-flex flex-wrap gap-3">
-                    @foreach (var status in Enum.GetValues<ScheduleStatus>())
-                    {
-                        var selected = statuses.Contains(status);
-                        <label class="form-check-label">
-                            <input class="form-check-input me-1" type="checkbox" name="status" value="@status" @(selected ? "checked" : null) />
-                            @FacilityViewRules.StatusLabel(status)
-                        </label>
-                    }
-                    <label class="form-check-label">
-                        <input class="form-check-input me-1" type="checkbox" name="showDeleted" value="true" @(Model.Query.ShowDeleted ? "checked" : null) />
-                        Show deleted
-                    </label>
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="created">Created</label>
+                    <input id="created" name="created" type="date" value="@Model.Query.Created" class="form-control" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="periodFrom">Period from</label>
+                    <input id="periodFrom" name="periodFrom" type="date" value="@Model.Query.PeriodFrom" class="form-control" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="periodTo">Period to</label>
+                    <input id="periodTo" name="periodTo" type="date" value="@Model.Query.PeriodTo" class="form-control" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports" asp-route-returnUrl="@origin">Clear</a>
                 </div>
             </div>
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-warning" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports" asp-route-returnUrl="@origin">Clear</a>
-            </div>
+            <details class="lu-advanced mt-2" @(statuses.Length > 0 || Model.Query.ShowDeleted ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="mt-1">
+                    <span class="form-label d-block">Status</span>
+                    <div class="d-flex flex-wrap gap-3">
+                        @foreach (var status in Enum.GetValues<ScheduleStatus>())
+                        {
+                            var selected = statuses.Contains(status);
+                            <label class="form-check-label">
+                                <input class="form-check-input me-1" type="checkbox" name="status" value="@status" @(selected ? "checked" : null) />
+                                @FacilityViewRules.StatusLabel(status)
+                            </label>
+                        }
+                        <label class="form-check-label">
+                            <input class="form-check-input me-1" type="checkbox" name="showDeleted" value="true" @(Model.Query.ShowDeleted ? "checked" : null) />
+                            Show deleted
+                        </label>
+                    </div>
+                </div>
+            </details>
         </form>
 
         <p class="lu-live-label mb-2">This list updates on its own.</p>

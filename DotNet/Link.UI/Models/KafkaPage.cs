@@ -40,6 +40,14 @@ public sealed record ThroughputKafkaPageQuery
     public string BrowseHeaderValue { get; init; } = "";
     public string OpenRecord { get; init; } = "";
     public string StageRecord { get; init; } = "";
+    public string MessageText { get; init; } = "";
+    public string HeaderContains { get; init; } = "";
+    public string ValueContains { get; init; } = "";
+    public string MessageKind { get; init; } = "";
+    public long? MessageFrom { get; init; }
+    public long? MessageTo { get; init; }
+    public int MsgPage { get; init; } = 1;
+    public bool More { get; init; }
     public int Rf { get; init; }
     public int RfPage { get; init; } = 1;
     public int RfSize { get; init; } = 25;
@@ -93,6 +101,12 @@ public sealed record ThroughputKafkaPageQuery
         var rfThrottle = long.TryParse(One(query, "rfThrottle"), out var throttleValue) ? throttleValue : 0;
         if (rfThrottle < 0 || rfThrottle > ReplicationFactorRules.MaxThrottle)
             rfThrottle = 0;
+        var msgPage = int.TryParse(One(query, "msgPage"), out var msgPageValue) ? msgPageValue : 1;
+        if (msgPage < 1)
+            msgPage = 1;
+        var kind = One(query, "mtype").SanitizeAndRemove();
+        if (kind.Length > 40)
+            kind = kind[..40];
 
         return new ThroughputKafkaPageQuery
         {
@@ -121,6 +135,14 @@ public sealed record ThroughputKafkaPageQuery
             BrowseHeaderValue = Clip(One(query, "headerValue").SanitizeAndRemove()),
             OpenRecord = Record(One(query, "record")),
             StageRecord = Record(One(query, "stage")),
+            MessageText = Clip(One(query, "mq").SanitizeAndRemove()),
+            HeaderContains = Clip(One(query, "hq").SanitizeAndRemove()),
+            ValueContains = Clip(One(query, "vq").SanitizeAndRemove()),
+            MessageKind = kind,
+            MessageFrom = When(One(query, "mfrom")),
+            MessageTo = When(One(query, "mto")),
+            MsgPage = msgPage,
+            More = One(query, "more") is "1" or "true",
             Rf = rf,
             RfPage = rfPage,
             RfSize = rfSize,
@@ -137,7 +159,7 @@ public sealed record ThroughputKafkaPageQuery
             RfQ = search ?? RfQ
         };
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false)
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null)
     {
         var chosenView = view ?? View;
         var partPage = part ?? PartPage;
@@ -153,7 +175,7 @@ public sealed record ThroughputKafkaPageQuery
             ["sort"] = sort ?? Sort,
             ["dir"] = dir ?? Dir,
             ["page"] = (page ?? Page).ToString(),
-            ["pageSize"] = PageSize.ToString(),
+            ["pageSize"] = (pageSize is 10 or 25 or 50 ? pageSize.Value : PageSize).ToString(),
             ["family"] = family ?? Family,
             ["keyClass"] = keyClass ?? KeyClass,
             ["view"] = chosenView,
@@ -181,18 +203,25 @@ public sealed record ThroughputKafkaPageQuery
         }
         if (chosenView == Messages)
         {
-            values["mode"] = BrowseMode;
-            values["limit"] = BrowseLimit.ToString();
-            if (BrowseOffset is long offset)
-                values["offset"] = offset.ToString();
-            if (BrowseTimestamp is long timestamp)
-                values["timestamp"] = timestamp.ToString();
+            var messagePage = changed ? 1 : msgPage ?? MsgPage;
+            if (messagePage > 1)
+                values["msgPage"] = messagePage.ToString();
+            if (MessageText.Length > 0)
+                values["mq"] = MessageText;
             if (BrowseKey.Length > 0)
                 values["key"] = BrowseKey;
-            if (BrowseHeaderName.Length > 0)
-                values["headerName"] = BrowseHeaderName;
-            if (BrowseHeaderValue.Length > 0)
-                values["headerValue"] = BrowseHeaderValue;
+            if (HeaderContains.Length > 0)
+                values["hq"] = HeaderContains;
+            if (ValueContains.Length > 0)
+                values["vq"] = ValueContains;
+            if (MessageKind.Length > 0)
+                values["mtype"] = MessageKind;
+            if (MessageFrom is long from)
+                values["mfrom"] = from.ToString();
+            if (MessageTo is long to)
+                values["mto"] = to.ToString();
+            if (More)
+                values["more"] = "1";
             var open = closeRecord ? "" : record ?? OpenRecord;
             if (open.Length > 0)
                 values["record"] = open;
@@ -205,13 +234,18 @@ public sealed record ThroughputKafkaPageQuery
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
             .Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value!));
         var href = "/Operations/Kafka?" + string.Join("&", pairs);
-        if (chosenView == Messages)
-        {
-            foreach (var partition in BrowsePartitions)
-                href += "&partition=" + partition.ToString();
-        }
-
         return href;
+    }
+
+    private static long? When(string raw)
+    {
+        if (raw.Length == 0)
+            return null;
+        if (long.TryParse(raw, out var unix))
+            return unix < 0 ? null : unix;
+        if (DateTimeOffset.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var parsed))
+            return parsed.ToUnixTimeMilliseconds();
+        return null;
     }
 
     public ThroughputKafkaPageQuery WithSeek(string mode, long? offset) =>

@@ -22,6 +22,7 @@ public sealed class KafkaBrowsePage
 public sealed class KafkaBrowseMetadata
 {
     public int Returned { get; set; }
+    public int Total { get; set; }
     public bool Truncated { get; set; }
     public bool CapHit { get; set; }
     public long ElapsedMs { get; set; }

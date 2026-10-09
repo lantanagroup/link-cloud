@@ -34,14 +34,12 @@
 <div class="au-card card">
     <div class="card-header">Report schedules</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end mb-3" data-au-filter="300" data-au-target="reportResults">
+        <form method="get" class="mb-3 lu-search" data-au-filter="300" data-au-target="reportResults">
+            <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
+            <div class="row g-2 align-items-end">
             <div class="col-12 col-md-4 col-xl-3">
                 <label class="form-label" for="facilityId">Facility ID</label>
                 <input id="facilityId" name="facilityId" value="@Model.Query.FacilityId" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4 col-xl-3">
-                <label class="form-label" for="reportId">Report ID</label>
-                <input id="reportId" name="reportId" value="@Model.Query.ReportId" class="form-control" />
             </div>
             <div class="col-6 col-md-4 col-xl-2">
                 <label class="form-label" for="frequency">Frequency</label>
@@ -72,21 +70,17 @@
                 <label class="form-label" for="periodTo">Period to</label>
                 <input id="periodTo" name="periodTo" type="date" value="@Model.Query.PeriodTo" class="form-control" />
             </div>
-            <div class="col-6 col-md-3 col-xl-1">
-                <label class="form-label" for="pageSize">Page</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var size in FacilityViewRules.PageSizes)
-                    {
-                        if (Model.Query.PageSize == size)
-                        {
-                            <option value="@size" selected>@size</option>
-                        }
-                        else
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    }
-                </select>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Index">Clear</a>
+            </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(Model.Query.ReportId) || statuses.Length > 0 || Model.Query.ShowDeleted || !string.IsNullOrWhiteSpace(Model.Query.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="reportId">Report ID</label>
+                <input id="reportId" name="reportId" value="@Model.Query.ReportId" class="form-control" />
             </div>
             <div class="col-12">
                 <span class="form-label d-block">Status</span>
@@ -108,10 +102,8 @@
             <div class="col-6 col-md-3 col-xl-2">
                 <partial name="_AutomationScope" model="Model.Query.Scope" />
             </div>
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-warning" asp-action="Index">Clear</a>
-            </div>
+                </div>
+            </details>
         </form>
 
         <p class="lu-live-label mb-2" data-au-refresh-label>This list updates on its own.</p>
@@ -228,26 +220,8 @@
                     </tbody>
                 </table>
             </div>
-            <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Report pages">
-                @if (bar.HasPrevious)
-                {
-                    <a class="btn btn-sm btn-au-link" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page - 1)">Previous</a>
-                }
-                else
-                {
-                    <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                }
-                <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
-                @if (bar.HasNext)
-                {
-                    <a class="btn btn-sm btn-au-link" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page + 1)">Next</a>
-                }
-                else
-                {
-                    <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                }
-            </nav>
         }
+        <partial name="_BottomPager" model="@(new BottomPager { Label = "Report pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = Model.Query.PageSize, Sizes = FacilityViewRules.PageSizes, Route = (page, size) => Model.Query.ToRoute(page: page, pageSize: size) })" />
         </div>
     </div>
 </div>

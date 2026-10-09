@@ -171,9 +171,12 @@ public class KafkaConsoleUxTests
         overview.Should().Contain("KafkaWindows.Groups");
         overview.Should().NotContain("foreach (var row in Model.Groups.Groups");
         overview.Should().Contain("Full topic table");
-        messages.Should().Contain("KafkaBrowseText.SeekLinks");
-        messages.Should().Contain(">Earlier</a>");
-        messages.Should().Contain(">Later</a>");
+        messages.Should().Contain("aria-label=\"Message pages\"");
+        messages.Should().Contain(">First</");
+        messages.Should().Contain(">Last</");
+        messages.Should().NotContain(">Earlier</a>");
+        messages.Should().NotContain(">Later</a>");
+        messages.Should().NotContain("name=\"limit\"");
     }
 
     [Fact]
@@ -200,17 +203,15 @@ public class KafkaConsoleUxTests
         }), null);
         parsed.PartPage.Should().Be(4);
 
-        var seek = new ThroughputKafkaPageQuery { View = ThroughputKafkaPageQuery.Messages, TopicName = "ResourcesAcquired", BrowseLimit = 25, OpenRecord = "0:1" };
-        var links = KafkaBrowseText.SeekLinks(seek, new KafkaBrowsePage
-        {
-            Records = Enumerable.Range(0, 25).Select(offset => new KafkaBrowseRecord { Offset = 100 + offset }).ToList()
-        });
-        links.Earlier.Should().BeTrue();
-        links.Later.Should().BeTrue();
-        links.EarlierHref.Should().Contain("offset=75");
-        links.LaterHref.Should().Contain("offset=125");
-        links.LaterHref.Should().NotContain("record=");
-        links.LaterHref.Should().Contain("mode=from-offset");
+        var read = KafkaMessageWindow.Locate(40, 25, 0, 5000);
+        read.Offset.Should().Be(975);
+        read.Count.Should().Be(25);
+        KafkaMessageWindow.Locate(1, 25, 0, 5000).Offset.Should().Be(0);
+        KafkaMessageWindow.Pages(2, 25, 120).Should().Be(1);
+        KafkaMessageWindow.Pages(0, 25, 120).Should().Be(5);
+        KafkaMessageWindow.Matches(
+            new KafkaBrowseRecord { Key = "cap", Value = "kept" },
+            null, "cap", null, null, null, null, null).Should().BeTrue();
     }
 
     private static int IndexOf(string text, string needle)

@@ -48,7 +48,7 @@ public sealed class ReportsListQuery
         SortDir
     });
 
-    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
+    public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null, int? pageSize = null)
     {
         var route = new Dictionary<string, string>(StringComparer.Ordinal);
         Add(route, "facilityId", FacilityId);
@@ -65,7 +65,8 @@ public sealed class ReportsListQuery
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
 
-        var size = FacilityViewRules.PageSizes.Contains(PageSize) ? PageSize : FacilityViewRules.DefaultPageSize;
+        var chosen = pageSize ?? PageSize;
+        var size = FacilityViewRules.PageSizes.Contains(chosen) ? chosen : FacilityViewRules.DefaultPageSize;
         if (size != FacilityViewRules.DefaultPageSize)
             route["pageSize"] = size.ToString();
 

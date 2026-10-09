@@ -399,8 +399,12 @@ public static class ReportsRules
         string? returnUrl,
         int? page = null,
         string? sort = null,
-        string? dir = null)
+        string? dir = null,
+        int? pageSize = null)
     {
+        var size = pageSize ?? query.PageSize;
+        if (!IssuePageSizes.Contains(size))
+            size = query.PageSize;
         var pairs = new (string Key, string? Value)[]
         {
             ("facilityId", facilityId),
@@ -413,7 +417,7 @@ public static class ReportsRules
             ("sort", sort ?? query.Sort),
             ("dir", dir ?? (query.Descending ? "desc" : "asc")),
             ("page", (page ?? query.Page).ToString()),
-            ("pageSize", query.PageSize.ToString())
+            ("pageSize", size.ToString())
         };
         var queryString = string.Join("&", pairs
             .Where(pair => !string.IsNullOrEmpty(pair.Value))
