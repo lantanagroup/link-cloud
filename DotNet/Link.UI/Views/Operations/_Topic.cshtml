@@ -166,7 +166,7 @@ else
                 </div>
             </div>
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview increase</span></button>
+                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview increase</span></button>
                 <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                 @if (!Model.Topics.ReadOnly)
                 {
@@ -235,7 +235,7 @@ else
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview family</span></button>
+                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview family</span></button>
                     <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                     @if (!Model.Topics.ReadOnly)
                     {
