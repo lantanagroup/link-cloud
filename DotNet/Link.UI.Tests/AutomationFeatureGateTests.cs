@@ -53,6 +53,18 @@ public class AutomationFeatureGateTests
     {
         var layout = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"));
         layout.Should().Contain("AutomationSurface.IsAutomationPath(Context.Request.Path)");
+        var dashboard = layout.IndexOf(">Dashboard", StringComparison.Ordinal);
+        var operations = layout.IndexOf(">Operations", StringComparison.Ordinal);
+        var tenants = layout.IndexOf(">Tenants", StringComparison.Ordinal);
+        var logs = layout.IndexOf(">Logs", StringComparison.Ordinal);
+        var automation = layout.IndexOf(">Automation", StringComparison.Ordinal);
+        var system = layout.IndexOf(">System", StringComparison.Ordinal);
+        dashboard.Should().BeGreaterThanOrEqualTo(0);
+        operations.Should().BeGreaterThan(dashboard);
+        tenants.Should().BeGreaterThan(operations);
+        logs.Should().BeGreaterThan(tenants);
+        automation.Should().BeGreaterThan(logs);
+        system.Should().BeGreaterThan(automation);
     }
 
     [Fact]

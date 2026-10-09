@@ -57,6 +57,9 @@
                 <a class="lu-nav-link @(Ctrl("Home") ? "active" : "")" asp-controller="Home" asp-action="Index">
                     <i class="bi bi-house-door me-2"></i>Dashboard
                 </a>
+                <a class="lu-nav-link @(Ctrl("Operations") ? "active" : "")" asp-controller="Operations" asp-action="Index">
+                    <i class="bi bi-speedometer2 me-2"></i>Operations
+                </a>
                 <a class="lu-nav-link @(Ctrl("Tenants") ? "active" : "")" asp-controller="Tenants" asp-action="Index">
                     <i class="bi bi-building me-2"></i>Tenants
                 </a>
@@ -69,18 +72,15 @@
                 <a class="lu-nav-link @(Ctrl("Logs") ? "active" : "")" asp-controller="Logs" asp-action="Index">
                     <i class="bi bi-journal-text me-2"></i>Logs
                 </a>
-                <a class="lu-nav-link @(Ctrl("System") ? "active" : "")" asp-controller="System" asp-action="Index">
-                    <i class="bi bi-gear me-2"></i>System
-                </a>
-                <a class="lu-nav-link @(Ctrl("Operations") ? "active" : "")" asp-controller="Operations" asp-action="Index">
-                    <i class="bi bi-speedometer2 me-2"></i>Operations
-                </a>
                 @if (LinkUiFeatures.Value.AutomationEnabled)
                 {
                     <a class="lu-nav-link @(AutomationSurface.IsAutomationPath(Context.Request.Path) ? "active" : "")" asp-controller="Automation" asp-action="Index">
                         <i class="bi bi-lightning-charge me-2"></i>Automation
                     </a>
                 }
+                <a class="lu-nav-link @(Ctrl("System") ? "active" : "")" asp-controller="System" asp-action="Index">
+                    <i class="bi bi-gear me-2"></i>System
+                </a>
             </nav>
             <div class="lu-sidebar-footer">
                 @if (user?.IsAuthenticated == true)
