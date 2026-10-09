@@ -118,6 +118,7 @@ public class SubmitPayloadListenerTests
     {
         var listener = CreateListener(suppressManifest: true);
         var result = BuildConsumeResult("facility-1", PayloadType.ReportSchedule);
+        var scheduleId = result.Message.Value.ReportScheduleId!.Value;
 
         await InvokeConsumeAsync(listener, result);
 
@@ -126,8 +127,9 @@ public class SubmitPayloadListenerTests
                 It.IsAny<string>(),
                 It.Is<Message<string, PayloadSubmittedValue>>(
                     m => m.Value.PayloadType == PayloadType.ReportSchedule
-                         && m.Key == KafkaKeys.ForPatient("facility-1", "patient-1")
+                         && m.Key == KafkaKeys.ForReport("facility-1", scheduleId)
                          && m.Value.FacilityId == "facility-1"
+                         && m.Value.ReportScheduleId == scheduleId
                          && m.Value.PatientId == "patient-1"),
                 It.IsAny<Action<DeliveryReport<string, PayloadSubmittedValue>>>()),
             Times.Once);
