@@ -125,6 +125,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             provider.GetRequiredService<IKubernetesResourceClient>());
     });
     builder.Services.AddSingleton<IKafkaOpsService, KafkaOpsService>();
+    builder.Services.AddSingleton<IKafkaBrowseSessionFactory, ConfluentBrowseSessionFactory>();
+    builder.Services.AddSingleton<IKafkaMessageBrowser, KafkaMessageBrowser>();
     builder.Services.AddHostedService<KafkaOpsWorker>();
 
     // Add fluent validation

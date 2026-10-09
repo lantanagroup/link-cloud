@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace Link.UI.Services;
 
@@ -270,6 +272,34 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendAsync<string>(HttpMethod.Get, "api/ops/kafka/migrations/" + id.ToString("D") + "/runbook", null, cancellationToken);
     }
 
+    public Task<KafkaOpsCall<KafkaBrowsePage>> GetMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue));
+        return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", mode, partitions, offset, timestamp, limit, key, headerName, headerValue), null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<KafkaFamilyView>> GetFamilyAsync(string topic, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Family(topic));
+        return SendAsync<KafkaFamilyView>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/family", null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<byte[]>> ExportMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+        {
+            var page = _fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue);
+            if (page.Value is null)
+                return Task.FromResult(new KafkaOpsCall<byte[]> { Status = page.Status, Error = page.Error });
+            var json = JsonSerializer.Serialize(page.Value.Records, ExportJson);
+            return Task.FromResult(new KafkaOpsCall<byte[]> { Status = 200, Value = Encoding.UTF8.GetBytes(json) });
+        }
+
+        return SendBytesAsync(MessagesPath(topic, "messages/export", mode, partitions, offset, timestamp, limit, key, headerName, headerValue), cancellationToken);
+    }
+
     public Task<KafkaOpsCall<string>> DeleteBackupAsync(string name, string confirmation, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
@@ -282,6 +312,56 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         if (_fixture.Active)
             return Task.FromResult(new KafkaOpsCall<KafkaMigrationRecord> { Status = 404, Error = "That migration was not found." });
         return SendAsync<KafkaMigrationRecord>(HttpMethod.Post, "api/ops/kafka/migrations/" + id.ToString("D") + "/" + action, body ?? new { }, cancellationToken);
+    }
+
+    private static readonly JsonSerializerOptions ExportJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
+    };
+
+    private static string MessagesPath(string topic, string action, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue)
+    {
+        var pairs = new List<string>
+        {
+            "mode=" + Uri.EscapeDataString(mode ?? ""),
+            "limit=" + limit.ToString()
+        };
+        foreach (var partition in partitions)
+            pairs.Add("partition=" + partition.ToString());
+        if (offset is long at)
+            pairs.Add("offset=" + at.ToString());
+        if (timestamp is long unixMs)
+            pairs.Add("timestamp=" + unixMs.ToString());
+        if (!string.IsNullOrEmpty(key))
+            pairs.Add("key=" + Uri.EscapeDataString(key));
+        if (!string.IsNullOrEmpty(headerName))
+            pairs.Add("headerName=" + Uri.EscapeDataString(headerName));
+        if (!string.IsNullOrEmpty(headerValue))
+            pairs.Add("headerValue=" + Uri.EscapeDataString(headerValue));
+        return "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/" + action + "?" + string.Join("&", pairs);
+    }
+
+    private async Task<KafkaOpsCall<byte[]>> SendBytesAsync(string path, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        var cookie = _httpContext.HttpContext?.Request.Headers.Cookie.ToString();
+        if (!string.IsNullOrWhiteSpace(cookie))
+            request.Headers.TryAddWithoutValidation("Cookie", cookie);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        using var response = await _http.SendAsync(request, cancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var text = Encoding.UTF8.GetString(bytes);
+            return new KafkaOpsCall<byte[]>
+            {
+                Status = (int)response.StatusCode,
+                Error = ProblemDetail(text) ?? "The operations service returned " + (int)response.StatusCode + "."
+            };
+        }
+
+        return new KafkaOpsCall<byte[]> { Status = (int)response.StatusCode, Value = bytes };
     }
 
     private async Task<KafkaOpsCall<T>> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken cancellationToken, string? correlationId = null, bool keepBodyOnFailure = false)

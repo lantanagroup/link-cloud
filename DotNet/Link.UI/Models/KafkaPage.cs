@@ -1,5 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Services;
 
 namespace Link.UI.Models;
@@ -10,6 +12,7 @@ public sealed record ThroughputKafkaPageQuery
     public const string Topic = "topic";
     public const string Consumers = "consumers";
     public const string Brokers = "brokers";
+    public const string Messages = "messages";
     public const string Migrate = "migrate";
 
     public string Q { get; init; } = "";
@@ -26,6 +29,15 @@ public sealed record ThroughputKafkaPageQuery
     public bool Tests { get; init; }
     public bool Advanced { get; init; }
     public string? ReturnUrl { get; init; }
+    public string BrowseMode { get; init; } = "newest";
+    public IReadOnlyList<int> BrowsePartitions { get; init; } = [];
+    public long? BrowseOffset { get; init; }
+    public long? BrowseTimestamp { get; init; }
+    public int BrowseLimit { get; init; } = 25;
+    public string BrowseKey { get; init; } = "";
+    public string BrowseHeaderName { get; init; } = "";
+    public string BrowseHeaderValue { get; init; } = "";
+    public string OpenRecord { get; init; } = "";
 
     public static ThroughputKafkaPageQuery From(IQueryCollection query, string? returnUrl)
     {
@@ -42,7 +54,7 @@ public sealed record ThroughputKafkaPageQuery
             sort = "topic";
         if (dir is not ("asc" or "desc"))
             dir = "asc";
-        if (view is not (Overview or Topic or Consumers or Brokers or Migrate))
+        if (view is not (Overview or Topic or Consumers or Brokers or Messages or Migrate))
             view = Overview;
 
         var q = One(query, "q");
@@ -50,6 +62,12 @@ public sealed record ThroughputKafkaPageQuery
             q = q[..200];
         var tests = One(query, "tests");
         var advanced = One(query, "advanced");
+        var mode = One(query, "mode").SanitizeAndRemove().ToLowerInvariant();
+        if (mode.Length == 0)
+            mode = "newest";
+        var limit = 25;
+        if (int.TryParse(One(query, "limit"), out var parsedLimit))
+            limit = parsedLimit;
 
         return new ThroughputKafkaPageQuery
         {
@@ -66,12 +84,22 @@ public sealed record ThroughputKafkaPageQuery
             Broker = One(query, "broker"),
             Tests = tests is "1" or "true",
             Advanced = advanced is "1" or "true",
-            ReturnUrl = returnUrl
+            ReturnUrl = returnUrl,
+            BrowseMode = mode,
+            BrowsePartitions = Partitions(query),
+            BrowseOffset = LongOrNull(One(query, "offset")),
+            BrowseTimestamp = LongOrNull(One(query, "timestamp")),
+            BrowseLimit = limit,
+            BrowseKey = Clip(One(query, "key").SanitizeAndRemove()),
+            BrowseHeaderName = Clip(One(query, "headerName").SanitizeAndRemove()),
+            BrowseHeaderValue = Clip(One(query, "headerValue").SanitizeAndRemove()),
+            OpenRecord = Record(One(query, "record"))
         };
     }
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null)
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false)
     {
+        var chosenView = view ?? View;
         var values = new Dictionary<string, string?>
         {
             ["q"] = q ?? Q,
@@ -81,7 +109,7 @@ public sealed record ThroughputKafkaPageQuery
             ["pageSize"] = PageSize.ToString(),
             ["family"] = family ?? Family,
             ["keyClass"] = keyClass ?? KeyClass,
-            ["view"] = view ?? View,
+            ["view"] = chosenView,
             ["group"] = group ?? Group,
             ["topic"] = topic ?? TopicName,
             ["broker"] = broker ?? Broker,
@@ -89,14 +117,87 @@ public sealed record ThroughputKafkaPageQuery
             ["advanced"] = (advanced ?? Advanced) ? "1" : "",
             ["returnUrl"] = ReturnUrl
         };
+        if (chosenView == Messages)
+        {
+            values["mode"] = BrowseMode;
+            values["limit"] = BrowseLimit.ToString();
+            if (BrowseOffset is long offset)
+                values["offset"] = offset.ToString();
+            if (BrowseTimestamp is long timestamp)
+                values["timestamp"] = timestamp.ToString();
+            if (BrowseKey.Length > 0)
+                values["key"] = BrowseKey;
+            if (BrowseHeaderName.Length > 0)
+                values["headerName"] = BrowseHeaderName;
+            if (BrowseHeaderValue.Length > 0)
+                values["headerValue"] = BrowseHeaderValue;
+            var open = closeRecord ? "" : record ?? OpenRecord;
+            if (open.Length > 0)
+                values["record"] = open;
+        }
+
         var pairs = values
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
             .Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value!));
-        return "/Operations/Kafka?" + string.Join("&", pairs);
+        var href = "/Operations/Kafka?" + string.Join("&", pairs);
+        if (chosenView == Messages)
+        {
+            foreach (var partition in BrowsePartitions)
+                href += "&partition=" + partition.ToString();
+        }
+
+        return href;
+    }
+
+    public string ExportHref()
+    {
+        var href = Href(view: Messages, closeRecord: true);
+        return "/Operations/Kafka/messages/export" + href["/Operations/Kafka".Length..];
     }
 
     private static string One(IQueryCollection query, string name) =>
         query.TryGetValue(name, out var values) ? values.ToString().Trim() : "";
+
+    private static List<int> Partitions(IQueryCollection query)
+    {
+        var ids = new List<int>();
+        if (!query.TryGetValue("partition", out var values))
+            return ids;
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+            foreach (var piece in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (int.TryParse(piece, out var id) && id >= 0 && !ids.Contains(id))
+                    ids.Add(id);
+                if (ids.Count >= 80)
+                    return ids;
+            }
+        }
+
+        return ids;
+    }
+
+    private static long? LongOrNull(string value) =>
+        long.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string Clip(string value) =>
+        value.Length <= 200 ? value : value[..200];
+
+    private static string Record(string value)
+    {
+        if (value.Length == 0 || value.Length > 40)
+            return "";
+        var split = value.Split(':');
+        if (split.Length != 2)
+            return "";
+        if (!int.TryParse(split[0], out var partition) || partition < 0)
+            return "";
+        if (!long.TryParse(split[1], out var offset) || offset < 0)
+            return "";
+        return partition.ToString() + ":" + offset.ToString();
+    }
 }
 
 public sealed record ThroughputKafkaPage
@@ -154,6 +255,9 @@ public sealed record ThroughputKafkaPage
     public KafkaTopicDetail? Detail { get; init; }
     public KafkaTopicConfigs? Configs { get; init; }
     public string? Runbook { get; init; }
+    public KafkaBrowsePage? Messages { get; init; }
+    public KafkaFamilyView? Family { get; init; }
+    public string? BrowseError { get; init; }
 
     public string ChartJson
     {

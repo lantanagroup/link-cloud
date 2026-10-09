@@ -1,3 +1,5 @@
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+
 namespace Link.UI.Services;
 
 public static class MigrationGroupList
@@ -225,4 +227,108 @@ public static class BrokerMovePreview
             .OrderBy(line => line.Internal)
             .ThenBy(line => line.Topic, StringComparer.Ordinal)
             .ToList();
+}
+
+public static class KafkaBrowseText
+{
+    public static string When(long unixMs)
+    {
+        if (unixMs <= 0)
+            return "—";
+        try
+        {
+            return LinkUiTime.Display(DateTimeOffset.FromUnixTimeMilliseconds(unixMs));
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return "—";
+        }
+    }
+
+    public static string MemberLabel(KafkaNamedTopic member)
+    {
+        if (member.Kind == KafkaBrowseAllowList.KindMain)
+            return "Main";
+        if (member.Kind == KafkaBrowseAllowList.KindError)
+            return "Error";
+        if (member.Kind == KafkaBrowseAllowList.KindRetry)
+            return ServiceLabel(member.Topic, "-Retry-", "Retry");
+        if (member.Kind == KafkaBrowseAllowList.KindRedrive)
+            return ServiceLabel(member.Topic, "-Redrive-", "Redrive");
+        return member.Topic;
+    }
+
+    public static string FacilityHref(string? facilityId) =>
+        string.IsNullOrWhiteSpace(facilityId) ? "" : "/Tenants/View/" + Uri.EscapeDataString(facilityId.Trim());
+
+    public static string ReportHref(string? facilityId, string? reportId)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(reportId))
+            return "";
+        return "/Tenants/Report/" + Uri.EscapeDataString(facilityId.Trim()) + "?reportId=" + Uri.EscapeDataString(reportId.Trim());
+    }
+
+    public static string RecordId(int partition, long offset) =>
+        partition.ToString() + ":" + offset.ToString();
+
+    public static string Verdict(KafkaBrowsePage? page, string? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error))
+            return "This read was refused.";
+        if (page is null)
+            return "";
+        if (page.Metadata.CapHit)
+            return "The read stopped at the safety cap.";
+        if (page.Metadata.Returned == 1)
+            return "Showing 1 record.";
+        return "Showing " + page.Metadata.Returned + " records.";
+    }
+
+    public static string NextStep(KafkaBrowsePage? page, string? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error))
+            return "Change the seek and fetch again.";
+        if (page is null)
+            return "";
+        if (page.Metadata.CapHit)
+            return "Narrow the partitions, the key, or the time, then fetch again.";
+        if (page.Metadata.Returned == 0)
+            return "Nothing matched. Widen the seek or clear the key filter.";
+        return "Open a row to read it, or export JSON. Export reads this seek again and writes an audit.";
+    }
+
+    public static string Tone(KafkaBrowsePage? page, string? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error))
+            return "alert-danger";
+        if (page?.Metadata.CapHit == true)
+            return "alert-warning";
+        return "alert-success";
+    }
+
+    public static string BadgeClass(KafkaBrowsePage? page, string? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error))
+            return "au-badge-danger";
+        if (page?.Metadata.CapHit == true)
+            return "au-badge-warning";
+        return "au-badge-success";
+    }
+
+    public static string Badge(KafkaBrowsePage? page, string? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error))
+            return "Refused";
+        if (page?.Metadata.CapHit == true)
+            return "Capped";
+        return "Fetched";
+    }
+
+    private static string ServiceLabel(string topic, string marker, string kind)
+    {
+        var index = topic.IndexOf(marker, StringComparison.Ordinal);
+        if (index < 0 || index + marker.Length >= topic.Length)
+            return kind;
+        return kind + " " + topic[(index + marker.Length)..];
+    }
 }

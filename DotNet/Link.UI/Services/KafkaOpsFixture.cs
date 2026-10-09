@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace Link.UI.Services;
 
@@ -411,6 +412,119 @@ public sealed class KafkaOpsFixture
             DryRunSummary = kind
         });
     }
+
+    public KafkaOpsCall<KafkaBrowsePage> Messages(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue)
+    {
+        var cleanMode = (mode ?? "").Trim().ToLowerInvariant();
+        if (cleanMode is not ("newest" or "oldest" or "from-offset" or "since"))
+            return Fail<KafkaBrowsePage>("Mode must be newest, oldest, from-offset, or since.");
+        if (limit < 1 || limit > KafkaBrowseLimits.MaxLimit)
+            return Fail<KafkaBrowsePage>("Limit must be from 1 to 50.");
+        if (cleanMode == "from-offset" && offset is null)
+            return Fail<KafkaBrowsePage>("From offset needs an offset.");
+        if (cleanMode == "since" && timestamp is null)
+            return Fail<KafkaBrowsePage>("Since time needs a timestamp.");
+
+        var admission = KafkaBrowseAllowList.Admit(topic, null);
+        if (!admission.Allowed)
+            return Fail<KafkaBrowsePage>(admission.Reason);
+
+        var page = SamplePage(admission.Topic, cleanMode);
+        if (string.Equals(key, "cap", StringComparison.Ordinal))
+        {
+            page.Metadata.CapHit = true;
+            page.Metadata.Truncated = true;
+            if (page.Records.Count > 0)
+                page.Records[0].Truncated = true;
+        }
+        else if (!string.IsNullOrEmpty(key))
+        {
+            page.Records = page.Records.Where(record => (record.Key ?? "").Contains(key, StringComparison.Ordinal)).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(headerName) && !string.IsNullOrEmpty(headerValue))
+        {
+            page.Records = page.Records.Where(record => record.Headers.Any(header =>
+                string.Equals(header.Name, headerName, StringComparison.OrdinalIgnoreCase)
+                && header.Value.Contains(headerValue, StringComparison.Ordinal))).ToList();
+        }
+
+        if (partitions.Count > 0)
+            page.Records = page.Records.Where(record => partitions.Contains(record.Partition)).ToList();
+        page.Records = page.Records.Take(limit).ToList();
+        page.Metadata.Returned = page.Records.Count;
+        return Ok(page);
+    }
+
+    public KafkaOpsCall<KafkaFamilyView> Family(string topic)
+    {
+        var admission = KafkaBrowseAllowList.Admit(topic, null);
+        if (!admission.Allowed)
+            return Fail<KafkaFamilyView>(admission.Reason);
+
+        var known = new HashSet<string>(_document.Topics.Topics.Select(row => row.Topic), StringComparer.Ordinal);
+        var members = KafkaBrowseAllowList.MembersOf(admission.Main).ToList();
+        foreach (var member in members)
+        {
+            var onBroker = known.Contains(member.Topic) || (member.Kind == KafkaBrowseAllowList.KindError && known.Contains(member.Main));
+            member.Exists = onBroker;
+            member.Browsable = true;
+            member.LagKnown = true;
+            if (!onBroker)
+                continue;
+            member.Partitions = 3;
+            member.HighWatermarkSum = member.Kind == KafkaBrowseAllowList.KindMain ? 120 : 9;
+            member.Lag = member.Kind == KafkaBrowseAllowList.KindMain ? 12 : 1;
+        }
+
+        return Ok(new KafkaFamilyView { Main = admission.Main, Members = members });
+    }
+
+    private static KafkaBrowsePage SamplePage(string topic, string mode)
+    {
+        var facilityId = "11111111-1111-1111-1111-111111111111";
+        var patientId = "pat-9";
+        var reportId = "22222222-2222-2222-2222-222222222222";
+        var correlationId = "33333333-3333-3333-3333-333333333333";
+        var key = "{\"facilityId\":\"" + facilityId + "\",\"patientId\":\"" + patientId + "\"}";
+        var value = "{\"reportId\":\"" + reportId + "\",\"patientId\":\"" + patientId + "\",\"resourceType\":\"Bundle\"}";
+        var headers = new List<KafkaBrowseHeader>
+        {
+            new() { Name = "X-Correlation-Id", Value = correlationId }
+        };
+        var first = Record(topic, 0, 120, 1_710_000_000_000, key, value, headers, false);
+        var failedValue = "{\"reportId\":\"" + reportId + "\",\"note\":\"empty bundle\"}";
+        var failedHeaders = new List<KafkaBrowseHeader>
+        {
+            new() { Name = "X-Correlation-Id", Value = correlationId },
+            new() { Name = "X-Exception-Message", Value = "The resource bundle was empty." },
+            new() { Name = "X-Exception-Service", Value = "Normalization" }
+        };
+        var second = Record(topic, 1, 88, 1_709_999_000_000, key, failedValue, failedHeaders, false);
+        return new KafkaBrowsePage
+        {
+            Topic = topic,
+            Mode = mode,
+            Records = [first, second],
+            Metadata = new KafkaBrowseMetadata { Returned = 2, ElapsedMs = 42 }
+        };
+    }
+
+    private static KafkaBrowseRecord Record(string topic, int partition, long offset, long timestamp, string key, string value, List<KafkaBrowseHeader> headers, bool truncated) =>
+        new()
+        {
+            Partition = partition,
+            Offset = offset,
+            TimestampUnixMs = timestamp,
+            Key = key,
+            Value = value,
+            ValueSummary = KafkaBrowseDecoder.Summary(value),
+            ValuePretty = KafkaBrowseDecoder.Pretty(value),
+            Truncated = truncated,
+            ByteSize = System.Text.Encoding.UTF8.GetByteCount(value),
+            Headers = headers,
+            Link = KafkaBrowseDecoder.Decode(topic, key, value, headers)
+        };
 
     public KafkaOpsCall<ChangeRequestRecord> Get(Guid id)
     {
