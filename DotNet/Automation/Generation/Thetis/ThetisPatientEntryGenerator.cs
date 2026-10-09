@@ -100,7 +100,7 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
         AlignEncounterToSharedStay(entries, anchors, request.Ids, encStart, encEnd, request.Profile);
 
         var stamped = ScenarioResourceGeneration.ApplyGenerationRequirements(entries, request.RequirementsPlan);
-        var stayLabel = request.Profile.RequiresInpatientEncounter() ? "ED/ICU/step-down" : "single-location";
+        var stayLabel = request.Profile.RequiresInpatientEncounter() ? "ED/ICU/step-down" : "outpatient";
         request.Output?.WriteLine(
             $"[Thetis] automation fixture overlay: stay locations={stayLabel}, " +
             $"generation-requirement applications={stamped}");
@@ -110,9 +110,11 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
 
     /// <summary>
     /// Overlay the Automation shared-stay graph onto the Thetis Encounter.
-    /// Inpatient stays get ED → ICU → step-down scaled to [encStart, encEnd].
-    /// AMB/EMER stays get a single ED location for the whole window so ICU/step-down
-    /// periods cannot invert on short outpatient durations.
+    /// Inpatient and emergency stays get ED, then ICU, then step-down, scaled to
+    /// [encStart, encEnd]. A stay whose class is not an initial-population class
+    /// gets one outpatient location for the whole window. That keeps the periods
+    /// from inverting, and it keeps the encounter out of the ED location the
+    /// measure treats as an initial-population location.
     /// </summary>
     private static void AlignEncounterToSharedStay(
         List<Bundle.EntryComponent> entries,
@@ -198,7 +200,7 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
     [
         new Encounter.LocationComponent
         {
-            Location = new ResourceReference($"Location/{ids.EdLocation}") { Display = "Emergency Department" },
+            Location = new ResourceReference($"Location/{ids.OutpatientLocation}") { Display = "Outpatient Clinic" },
             Status = Encounter.EncounterLocationStatus.Completed,
             Period = Period(encStart, encEnd)
         }
