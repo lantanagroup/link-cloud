@@ -307,15 +307,9 @@
         @if (Model.Metadata.TotalPages > 1)
         {
             <div class="card-body border-top d-flex justify-content-between align-items-center">
-                <a class="btn btn-sm btn-au-link @(Model.Metadata.PageNumber <= 1 ? "disabled" : "")"
- asp-action="Index"
- asp-route-pageNumber="@(Model.Metadata.PageNumber - 1)"
- asp-route-pageSize="@Model.Metadata.PageSize">Previous</a>
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Url.Action("Index", new { pageNumber = Model.Metadata.PageNumber - 1, pageSize = Model.Metadata.PageSize }), Enabled = Model.Metadata.PageNumber > 1 })" />
                 <span class="small text-muted">Page @Model.Metadata.PageNumber of @Model.Metadata.TotalPages</span>
-                <a class="btn btn-sm btn-au-link @(Model.Metadata.PageNumber>= Model.Metadata.TotalPages ? "disabled" : "")"
- asp-action="Index"
- asp-route-pageNumber="@(Model.Metadata.PageNumber + 1)"
- asp-route-pageSize="@Model.Metadata.PageSize">Next</a>
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Url.Action("Index", new { pageNumber = Model.Metadata.PageNumber + 1, pageSize = Model.Metadata.PageSize }), Enabled = Model.Metadata.PageNumber < Model.Metadata.TotalPages })" />
             </div>
         }
     </div>

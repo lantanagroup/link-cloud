@@ -138,14 +138,8 @@ else if (Model.TopicRows.Count > 0)
 <div class="lu-kafka-pager">
     <span>@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.</span>
     <span class="d-flex gap-2">
-        @if (query.Page > 1)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
-        }
-        @if (query.Page < Model.TopicPages)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
-        }
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.TopicPages })" />
     </span>
 </div>
 

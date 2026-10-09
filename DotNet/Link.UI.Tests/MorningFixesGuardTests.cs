@@ -470,6 +470,7 @@ public class MorningFixesGuardTests
         || opening.Contains("patient-sort-button", StringComparison.Ordinal)
         || opening.Contains("lu-nav-toggle", StringComparison.Ordinal)
         || opening.Contains("au-info-toggle", StringComparison.Ordinal)
+        || opening.Contains("lu-copy", StringComparison.Ordinal)
         || (opening.Contains("dropdown-toggle", StringComparison.Ordinal)
             && !opening.Contains("pc-picker-toggle", StringComparison.Ordinal));
 

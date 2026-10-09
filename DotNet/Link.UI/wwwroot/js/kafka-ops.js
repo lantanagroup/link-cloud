@@ -458,12 +458,17 @@
         note.className = "small text-muted";
         note.textContent = "Page " + page + " of " + pages;
         host.appendChild(note);
-        function go(label, target, enabled) {
+        function go(label, icon, target, enabled) {
             var button = document.createElement("button");
             button.type = "button";
-            button.className = "btn btn-sm btn-au-link";
-            button.textContent = label;
+            button.className = "lu-page-step";
             button.disabled = !enabled;
+            button.setAttribute("aria-label", label);
+            button.title = label;
+            var glyph = document.createElement("i");
+            glyph.className = "bi " + icon;
+            glyph.setAttribute("aria-hidden", "true");
+            button.appendChild(glyph);
             button.addEventListener("click", function () {
                 table.setAttribute("data-lu-page", String(target));
                 table.setAttribute("data-lu-needle", keywordParts().join("\n"));
@@ -471,10 +476,10 @@
             });
             host.appendChild(button);
         }
-        go("First", 1, page > 1);
-        go("Previous", page - 1, page > 1);
-        go("Next", page + 1, page < pages);
-        go("Last", pages, page < pages);
+        go("First", "bi-chevron-double-left", 1, page > 1);
+        go("Previous", "bi-chevron-left", page - 1, page > 1);
+        go("Next", "bi-chevron-right", page + 1, page < pages);
+        go("Last", "bi-chevron-double-right", pages, page < pages);
     }
 
     function loadFurther(link) {

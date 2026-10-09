@@ -141,8 +141,9 @@
         <input type="hidden" name="hq" id="browse-hq" value="@query.HeaderContains" />
         <input type="hidden" name="vq" id="browse-vq" value="@query.ValueContains" />
 
-        <fieldset class="border rounded p-3 mb-0 lu-search">
-            <legend class="float-none w-auto px-2 h6">Search</legend>
+        <section class="card au-card mb-0 lu-search">
+            <h3 class="card-header h6 mb-0">Search</h3>
+            <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-lg-5">
                     <label class="form-label" for="browse-q">Search</label>
@@ -201,7 +202,8 @@
             </details>
             <input type="hidden" name="msgPage" value="1" />
             <input type="hidden" name="more" value="@(advancedOpen ? "1" : "")" />
-        </fieldset>
+            </div>
+        </section>
         <div class="mt-2 mb-3">
             @if (browse is not null)
             {
@@ -350,37 +352,21 @@
             <span class="small text-muted">@matchLabel</span>
         }
         <span class="small text-muted">Page @messagePage of @messagePages</span>
-        @if (messagePage > 1)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: 1)">First</a>
-            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: messagePage - 1)">Previous</a>
-        }
-        else
-        {
-            <button type="button" class="btn btn-sm btn-au-link" disabled>First</button>
-            <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-        }
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = query.Href(msgPage: 1), Enabled = messagePage > 1 })" />
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(msgPage: messagePage - 1), Enabled = messagePage > 1 })" />
         @for (var number = windowStart; number <= windowEnd; number++)
         {
             if (number == messagePage)
             {
-                <span class="btn btn-sm lu-nav-current" aria-current="page">@number</span>
+                <span class="lu-page-num is-current" aria-current="page">@number</span>
             }
             else
             {
-                <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: number)">@number</a>
+                <a class="lu-page-num" href="@query.Href(msgPage: number)">@number</a>
             }
         }
-        @if (messagePage < messagePages)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: messagePage + 1)">Next</a>
-            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: messagePages)">Last</a>
-        }
-        else
-        {
-            <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-            <button type="button" class="btn btn-sm btn-au-link" disabled>Last</button>
-        }
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(msgPage: messagePage + 1), Enabled = messagePage < messagePages })" />
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = query.Href(msgPage: messagePages), Enabled = messagePage < messagePages })" />
         <form class="lu-pager-jump" method="get" action="/Operations/Kafka">
             <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
             <input type="hidden" name="topic" value="@topicName" />
@@ -413,11 +399,11 @@
         {
             if (size == pageSize)
             {
-                <span class="btn btn-sm lu-nav-current" aria-current="true">@size</span>
+                <span class="lu-page-num is-current" aria-current="true">@size</span>
             }
             else
             {
-                <a class="btn btn-sm btn-au-link" href="@query.Href(pageSize: size, msgPage: 1)">@size</a>
+                <a class="lu-page-num" href="@query.Href(pageSize: size, msgPage: 1)">@size</a>
             }
         }
         </div>

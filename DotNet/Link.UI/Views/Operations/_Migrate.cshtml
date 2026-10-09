@@ -169,17 +169,20 @@
         <input type="hidden" name="dryRunBackupSkipAcknowledged" value="@(Model.DryRunBackupSkipAcknowledged ? "true" : "false")" />
         <input type="hidden" name="dryRunAcknowledgedGroups" value="@string.Join(",", MigrationGroupList.Parse(Model.DryRunAcknowledgedGroups))" />
 
-        <fieldset class="border rounded p-3 mb-3">
-            <legend class="float-none w-auto px-2 h6">What to change</legend>
+        <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">What to change</h3>
+            <div class="card-body">
             <p class="form-text">Dry run and Request both use this count.</p>
             <div class="col-6 col-md-3">
                 <label class="form-label" for="migrate-partitions">Target partitions</label>
                 <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@targetPartitions" />
             </div>
-        </fieldset>
+            </div>
+        </section>
 
-        <fieldset class="border rounded p-3 mb-3">
-            <legend class="float-none w-auto px-2 h6">Safety options</legend>
+        <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">Safety options</h3>
+            <div class="card-body">
             <p class="form-text">Dry run and Request both use these. Leave them off unless you accept the risk.</p>
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" @(Model.DraftBackupSkip ? "checked" : null) />
@@ -191,18 +194,22 @@
                 <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged</label>
                 <p class="form-text">Required when the backup is skipped. The requester and the approver both accept that there is no backup.</p>
             </div>
-        </fieldset>
+            </div>
+        </section>
 
-        <fieldset class="border rounded p-3 mb-3">
-            <legend class="float-none w-auto px-2 h6">Groups to drop offsets for</legend>
+        <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">Groups to drop offsets for</h3>
+            <div class="card-body">
             <p class="form-text">Use this when a dry run says a group is inactive and still has lag. Type that group's exact name, then dry run again. The migration drops that group's offsets on this topic. An active group cannot be cleared here. Dry run and Request both send this list.</p>
             <label class="form-label" for="migrate-groups">Group names</label>
             <textarea class="form-control" id="migrate-groups" name="acknowledgedGroups" rows="2">@Model.DraftAcknowledgedGroups</textarea>
             <p class="form-text mb-0">Separate names with commas or new lines.</p>
-        </fieldset>
+            </div>
+        </section>
 
-        <fieldset class="border rounded p-3 mb-3">
-            <legend class="float-none w-auto px-2 h6">Request only</legend>
+        <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">Request only</h3>
+            <div class="card-body">
             <p class="form-text">A dry run does not read these. Request does.</p>
             <div class="row g-2">
                 <div class="col-12 col-md-4">
@@ -214,7 +221,8 @@
                     <input class="form-control" id="migrate-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
                 </div>
             </div>
-        </fieldset>
+            </div>
+        </section>
 
         @if (plan is not null)
         {
