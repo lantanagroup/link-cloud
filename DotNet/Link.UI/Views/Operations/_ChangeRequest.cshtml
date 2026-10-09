@@ -31,16 +31,31 @@
             }
             else if (request.Kind == "ReplicationFactor")
             {
-                <p>@request.Topic replication factor @request.BeforeReplicationFactor to @request.TargetReplicationFactor. Throttle @ReplicationFactorRules.ThrottleText(request.ThrottleBytesPerSecond). @(request.ThrottleCleared ? "The throttle has been cleared." : "The throttle stays until every replica is in the ISR.")</p>
-                @if (request.Steps.Count > 0)
+                var recorded = request.Steps;
+                var planned = new[]
                 {
-                    <ol id="kafka-replication-steps">
-                    @foreach (var step in request.Steps)
-                    {
-                        <li>@step</li>
-                    }
-                    </ol>
+                    "Set the replication throttle.",
+                    "Submit the partition reassignment.",
+                    "Wait until every replica is in the ISR.",
+                    "Clear the throttle."
+                };
+                var stages = new List<string>(recorded);
+                for (var index = recorded.Count; index < planned.Length; index++)
+                    stages.Add(planned[index]);
+                var complete = request.ThrottleCleared || string.Equals(request.Status, "Done", StringComparison.Ordinal);
+                <p>@request.Topic replication factor @request.BeforeReplicationFactor to @request.TargetReplicationFactor. Throttle @ReplicationFactorRules.ThrottleText(request.ThrottleBytesPerSecond). @(request.ThrottleCleared ? "The throttle has been cleared." : "The throttle stays until every replica is in the ISR.")</p>
+                <ol id="kafka-replication-steps" class="lu-rf-track" aria-label="Replication factor progress">
+                @for (var index = 0; index < stages.Count; index++)
+                {
+                    var done = complete || index < recorded.Count;
+                    var current = !done && index == recorded.Count;
+                    var mark = done ? "Done" : current ? "Now" : "Waiting";
+                    <li class="@(done ? "is-done" : current ? "is-current" : null)">
+                        <span class="lu-rf-mark">@mark</span>
+                        <strong>@stages[index]</strong>
+                    </li>
                 }
+                </ol>
             }
             else if (request.BrokerId >= 0)
             {
