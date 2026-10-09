@@ -142,6 +142,15 @@ public static class BrokerMovePreview
     public static bool IsInternalTopic(string topic) =>
         !string.IsNullOrWhiteSpace(topic) && topic.StartsWith('_');
 
+    public static string MoveSummary(bool accepted, bool alreadyEmpty, int moves)
+    {
+        if (alreadyEmpty)
+            return "Already empty.";
+        if (!accepted && moves == 0)
+            return "No moves were planned because the preview was refused.";
+        return moves + " move off or onto this broker.";
+    }
+
     public static IReadOnlyList<BrokerMoveTopicLine> Lines(IEnumerable<ReplicaMove> moves) =>
         moves
             .GroupBy(move => move.Topic ?? "", StringComparer.Ordinal)

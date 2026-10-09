@@ -178,6 +178,11 @@ public class KafkaOpsConsoleFixTests
         lines.Last().Partitions.Should().Be(2);
         lines.Last().Internal.Should().BeTrue();
         lines.Skip(BrokerMovePreview.FoldAfter).Should().HaveCount(2);
+        BrokerMovePreview.MoveSummary(false, false, 0)
+            .Should().Be("No moves were planned because the preview was refused.");
+        BrokerMovePreview.MoveSummary(true, true, 0).Should().Be("Already empty.");
+        BrokerMovePreview.MoveSummary(true, false, 4).Should().Be("4 move off or onto this broker.");
+        BrokerMovePreview.MoveSummary(false, false, 2).Should().Be("2 move off or onto this broker.");
     }
 
     [Fact]
@@ -233,6 +238,7 @@ public class KafkaOpsConsoleFixTests
         brokers.Should().Contain("class=\"btn btn-sm btn-au-execute lu-icon-btn\"");
         brokers.Should().NotContain("btn-au-link lu-icon-btn");
         brokers.Should().Contain("id=\"kafka-broker-result\"");
+        brokers.Should().Contain("BrokerMovePreview.MoveSummary(plan.Accepted, plan.AlreadyEmpty, plan.Moves.Count)");
 
         overview.Should().Contain("KafkaProduceRate.Text");
         overview.Should().Contain("KafkaControllerTile.Display");
