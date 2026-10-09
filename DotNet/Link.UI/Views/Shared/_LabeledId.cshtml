@@ -44,7 +44,7 @@
         {
             <code class="lu-facility-id" title="@value">@value</code>
         }
-        @if ((!empty || !string.IsNullOrWhiteSpace(Model.ValueElementId)) && Model.Copy)
+        @if ((!empty || !string.IsNullOrWhiteSpace(Model.ValueElementId)) && Model.Copy && LabeledIdRules.IsGuid(value))
         {
             <partial name="_CopyButton" model="@(new CopyTarget { Value = value, Label = copyLabel })" />
         }

@@ -49,6 +49,7 @@ public sealed class MigrationFacts
     public int DrainMinutes { get; set; }
     public int MetadataRefreshIntervalMs { get; set; } = 60_000;
     public List<GroupFact> Groups { get; set; } = [];
+    public List<string> AcknowledgedGroupIds { get; set; } = [];
     public List<string> StopSet { get; set; } = [];
     public List<string> Siblings { get; set; } = [];
     public string SizeClass { get; set; } = "small";
@@ -158,11 +159,22 @@ public static class MigrationPreflight
         return result;
     }
 
+    public static List<string> CanonicalGroups(IEnumerable<string>? names) =>
+        (names ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
     public static string Hash(MigrationFacts facts, IReadOnlyList<string> stopSet, IReadOnlyList<string> siblings)
     {
         var groups = facts.Groups
             .OrderBy(group => group.GroupId, StringComparer.Ordinal)
             .Select(group => group.GroupId + ":" + (group.Lag > 0 ? "lag" : "zero"));
+        var acknowledged = CanonicalGroups(
+            facts.AcknowledgedGroupIds.Concat(
+                facts.Groups.Where(group => group.Acknowledged).Select(group => group.GroupId)));
         var canonical = string.Join("|",
             facts.Topic,
             facts.CurrentPartitions.ToString(),
@@ -174,6 +186,8 @@ public static class MigrationPreflight
             facts.BackupSkip ? "skip" : "backup",
             facts.ReplicationFactor.ToString(),
             facts.CleanupPolicy);
+        if (acknowledged.Count > 0)
+            canonical += "|ack=" + string.Join(",", acknowledged);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
 

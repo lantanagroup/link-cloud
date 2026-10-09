@@ -6,10 +6,36 @@
     var plan = Model.MigrationPlan;
     var migration = Model.Migration;
     var topicName = topic?.Topic ?? query.TopicName;
+    var targetPartitions = Model.DraftPartitions > 0 ? Model.DraftPartitions : (topic?.Partitions ?? 3) + 1;
+    var migrateStep = 1;
+    if (migration is not null)
+        migrateStep = 5;
+    else if (plan is not null && plan.Accepted)
+        migrateStep = 4;
+    else if (plan is not null)
+        migrateStep = 3;
+    else if (!string.IsNullOrWhiteSpace(topicName))
+        migrateStep = 2;
+    var resultTone = plan is null ? "alert-secondary" : !plan.Accepted ? "alert-danger" : plan.Warnings.Count > 0 ? "alert-warning" : "alert-success";
+    var currentPartitions = topic?.Partitions ?? detail?.Partitions ?? 0;
 }
 
 <h2 class="h5 mt-3">Migrate a topic</h2>
-<p class="text-muted">An increase creates a verified backup, deletes the topic, and creates it empty at the new partition count. Consumer groups start at offset 0. The backup stays until a person confirms cleanup or the retention expires. Nothing is copied back onto the new topic.</p>
+<p>Migrating makes room for more partitions when an in-place increase is not the right tool. It stops the workloads that use the topic, copies the log to a backup, deletes the topic, and creates it empty at the new partition count. Consumer groups start at offset 0. Nothing is copied back onto the new topic. The backup stays until a person deletes it or retention expires.</p>
+<ol>
+    <li>Choose the topic and the target partition count.</li>
+    <li>Dry run checks the plan and changes nothing.</li>
+    <li>Review the result. A refusal lists each reason that blocks it.</li>
+    <li>Request submits the real migration for approval. Type the topic name first.</li>
+    <li>Track approval, execution, and recovery on this page.</li>
+</ol>
+<p class="mb-2">
+    <span class="badge @(migrateStep == 1 ? "au-badge-active" : "au-badge-muted")">1 Choose a topic</span>
+    <span class="badge @(migrateStep == 2 ? "au-badge-active" : "au-badge-muted")">2 Dry run</span>
+    <span class="badge @(migrateStep == 3 ? "au-badge-active" : "au-badge-muted")">3 Review</span>
+    <span class="badge @(migrateStep == 4 ? "au-badge-active" : "au-badge-muted")">4 Request</span>
+    <span class="badge @(migrateStep == 5 ? "au-badge-active" : "au-badge-muted")">5 Track</span>
+</p>
 
 <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Migrate" />
@@ -37,108 +63,88 @@
 
 @if (detail is not null)
 {
-    <div class="au-card card mt-3">
-        <div class="card-header">Topic detail</div>
-        <div class="card-body">
-            <p>Id <partial name="_LabeledId" model="@(new LabeledId { Label = "Topic id", Value = detail.TopicId, Compact = true, CopyLabel = "Copy topic id" })" /></p>
-            <p>@detail.Partitions partitions, RF @detail.ReplicationFactor, @(detail.FullIsr ? "full ISR" : "ISR short")@(detail.LeadersSkewed ? ", leaders skewed" : ""). Key @detail.KeyClass @detail.KeyShape.</p>
-            <p>@KafkaIncreaseEligibility.MigrationLine(detail.Eligibility, plan)</p>
-            <p>Estimated records @detail.EstimatedRecords. @(detail.PartitionDrift ? "Live count differs from topics.txt (3)." : "Live count matches topics.txt.")</p>
-            @if (detail.Held)
-            {
-                <p>This topic is held.</p>
-            }
-            <p>Stop set: @(detail.StopSet.Count == 0 ? "none" : string.Join(", ", detail.StopSet))</p>
-            <p>Producers: @(detail.Producers.Count == 0 ? "none" : string.Join("; ", detail.Producers))</p>
-            <p>Consumers: @(detail.Consumers.Count == 0 ? "none" : string.Join("; ", detail.Consumers))</p>
-            @if (!string.IsNullOrWhiteSpace(detail.Error))
-            {
-                <p class="text-muted">@detail.Error</p>
-            }
-            @if (detail.PartitionsDetail.Count > 0)
-            {
-                <div class="table-responsive">
-                    <table class="table table-sm mb-0">
-                        <thead>
-                            <tr><th>Partition</th><th>Leader</th><th>Replicas</th><th>ISR</th><th>Preferred</th><th>Start</th><th>End</th></tr>
-                        </thead>
-                        <tbody>
-                        @foreach (var row in detail.PartitionsDetail)
-                        {
-                            <tr>
-                                <td>@row.Partition</td>
-                                <td>@row.Leader</td>
-                                <td>@string.Join(", ", row.Replicas)</td>
-                                <td>@string.Join(", ", row.Isr)</td>
-                                <td>@(row.PreferredLeader ? "yes" : "no")</td>
-                                <td>@row.LogStart</td>
-                                <td>@row.HighWatermark</td>
-                            </tr>
-                        }
-                        </tbody>
-                    </table>
-                </div>
-            }
+    <details class="mt-3">
+        <summary>Topic settings — @detail.Partitions partitions, RF @detail.ReplicationFactor. @KafkaIncreaseEligibility.MigrationLine(detail.Eligibility, plan)</summary>
+        <div class="au-card card mt-2">
+            <div class="card-body">
+                <p>Id <partial name="_LabeledId" model="@(new LabeledId { Label = "Topic id", Value = detail.TopicId, Compact = true, CopyLabel = "Copy topic id" })" /></p>
+                <p>@detail.Partitions partitions, RF @detail.ReplicationFactor, @(detail.FullIsr ? "full ISR" : "ISR short")@(detail.LeadersSkewed ? ", leaders skewed" : ""). Key @detail.KeyClass @detail.KeyShape.</p>
+                <p>Estimated records @detail.EstimatedRecords. @(detail.PartitionDrift ? "Live count differs from topics.txt (3)." : "Live count matches topics.txt.")</p>
+                @if (detail.Held)
+                {
+                    <p>This topic is held.</p>
+                }
+                <p>Stop set: @(detail.StopSet.Count == 0 ? "none" : string.Join(", ", detail.StopSet))</p>
+                <p>Producers: @(detail.Producers.Count == 0 ? "none" : string.Join("; ", detail.Producers))</p>
+                <p>Consumers: @(detail.Consumers.Count == 0 ? "none" : string.Join("; ", detail.Consumers))</p>
+                @if (!string.IsNullOrWhiteSpace(detail.Error))
+                {
+                    <p class="text-muted">@detail.Error</p>
+                }
+                @if (detail.PartitionsDetail.Count > 0)
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr><th>Partition</th><th>Leader</th><th>Replicas</th><th>ISR</th><th>Preferred</th><th>Start</th><th>End</th></tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in detail.PartitionsDetail)
+                            {
+                                <tr>
+                                    <td>@row.Partition</td>
+                                    <td>@row.Leader</td>
+                                    <td>@string.Join(", ", row.Replicas)</td>
+                                    <td>@string.Join(", ", row.Isr)</td>
+                                    <td>@(row.PreferredLeader ? "yes" : "no")</td>
+                                    <td>@row.LogStart</td>
+                                    <td>@row.HighWatermark</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
         </div>
-    </div>
+    </details>
 }
 
 @if (Model.Configs is not null)
 {
-    <div class="au-card card mt-3">
-        <div class="card-header">Configs</div>
-        <div class="card-body">
-            <p>
-                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)">All</a>
-                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=sibling">Sibling</a>
-                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=broker">Broker default</a>
-                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=frozen">Frozen snapshot</a>
-            </p>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr><th>Name</th><th>Value</th><th>Source</th></tr></thead>
-                    <tbody>
-                    @foreach (var row in Model.Configs.Configs)
-                    {
-                        <tr><td>@row.Name</td><td>@row.Value</td><td>@row.Source</td></tr>
-                    }
-                    </tbody>
-                </table>
+    <details class="mt-3">
+        <summary>Topic configuration (@Model.Configs.Configs.Count settings)</summary>
+        <div class="au-card card mt-2">
+            <div class="card-body">
+                <p>
+                    <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)">All</a>
+                    <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=sibling">Sibling</a>
+                    <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=broker">Broker default</a>
+                    <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=frozen">Frozen snapshot</a>
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th>Name</th><th>Value</th><th>Source</th></tr></thead>
+                        <tbody>
+                        @foreach (var row in Model.Configs.Configs)
+                        {
+                            <tr><td>@row.Name</td><td>@row.Value</td><td>@row.Source</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                @foreach (var change in Model.Configs.Changes)
+                {
+                    <p class="mb-1">@change</p>
+                }
             </div>
-            @foreach (var change in Model.Configs.Changes)
-            {
-                <p class="mb-1">@change</p>
-            }
         </div>
-    </div>
-}
-
-@if (plan is not null)
-{
-    <div class="alert alert-secondary mt-3" role="status">
-        <p>@(plan.Accepted ? "Dry run accepted." : "Dry run refused.") @plan.Summary</p>
-        @if (MigrationDryRunText.ShowWindowLine(plan.Summary))
-        {
-            <p>Window @plan.WindowMinutes minutes. Alert at @plan.AlertMinutes minutes.</p>
-        }
-        <p>Plan hash @plan.PlanHash.</p>
-        <p>Stop set: @string.Join(", ", plan.StopSet)</p>
-        <p>Siblings grown before the stop: @string.Join(", ", plan.Siblings)</p>
-        @foreach (var warning in plan.Warnings)
-        {
-            <p class="mb-1">@warning</p>
-        }
-        @foreach (var item in plan.Errors)
-        {
-            <p class="mb-1">@item</p>
-        }
-        <p class="mb-0">In-place add keeps the topic name and remaps keys. Migrate stops the workloads, copies the log to the backup, and recreates an empty topic. Use an in-place add when the quiet window can be met.</p>
-    </div>
+    </details>
 }
 
 @if (!string.IsNullOrWhiteSpace(topicName))
 {
-    <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations" data-kafka-busy="Dry run is running.">
+    <form class="mt-3" method="post" action="/Operations/Kafka/migrations" data-kafka-busy="Dry run is running.">
         @Html.AntiForgeryToken()
         <input type="hidden" name="topic" value="@topicName" />
         <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
@@ -148,32 +154,105 @@
         <input type="hidden" name="dryRunBackupSkip" value="@(Model.DryRunBackupSkip ? "true" : "false")" />
         <input type="hidden" name="dryRunBackupSkipAcknowledged" value="@(Model.DryRunBackupSkipAcknowledged ? "true" : "false")" />
         <input type="hidden" name="dryRunAcknowledgedGroups" value="@string.Join(",", MigrationGroupList.Parse(Model.DryRunAcknowledgedGroups))" />
-        <div class="col-6 col-md-3">
-            <label class="form-label" for="migrate-partitions">Target partitions</label>
-            <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@(Model.DraftPartitions > 0 ? Model.DraftPartitions : (topic?.Partitions ?? 3) + 1)" />
-        </div>
-        <div class="col-auto form-check mt-4">
-            <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" @(Model.DraftBackupSkip ? "checked" : null) />
-            <label class="form-check-label" for="migrate-skip">Skip backup</label>
-        </div>
-        <div class="col-auto form-check mt-4">
-            <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" @(Model.DraftBackupSkipAcknowledged ? "checked" : null) />
-            <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged</label>
-        </div>
-        <div class="col-12">
-            <label class="form-label" for="migrate-groups">Groups to drop offsets for</label>
+
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">What to change</legend>
+            <p class="form-text">Dry run and Request both use this count.</p>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="migrate-partitions">Target partitions</label>
+                <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@targetPartitions" />
+            </div>
+        </fieldset>
+
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">Safety options</legend>
+            <p class="form-text">Dry run and Request both use these. Leave them off unless you accept the risk.</p>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" @(Model.DraftBackupSkip ? "checked" : null) />
+                <label class="form-check-label" for="migrate-skip">Skip backup</label>
+                <p class="form-text">No copy is made. The recreated topic starts empty and the old log is not kept.</p>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" @(Model.DraftBackupSkipAcknowledged ? "checked" : null) />
+                <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged</label>
+                <p class="form-text">Required when the backup is skipped. The requester and the approver both accept that there is no backup.</p>
+            </div>
+        </fieldset>
+
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">Groups to drop offsets for</legend>
+            <p class="form-text">Use this when a dry run says a group is inactive and still has lag. Type that group's exact name, then dry run again. The migration drops that group's offsets on this topic. An active group cannot be cleared here. Dry run and Request both send this list.</p>
+            <label class="form-label" for="migrate-groups">Group names</label>
             <textarea class="form-control" id="migrate-groups" name="acknowledgedGroups" rows="2">@Model.DraftAcknowledgedGroups</textarea>
-            <p class="form-text mb-0">When a dry run says a group is inactive and has lag, type that group name here and dry run again. Separate names with commas or new lines.</p>
-        </div>
-        <div class="col-12 col-md-4">
-            <label class="form-label" for="migrate-reason">Reason</label>
-            <input class="form-control" id="migrate-reason" name="reason" value="@Model.DraftReason" />
-        </div>
-        <div class="col-12 col-md-4">
-            <label class="form-label" for="migrate-confirm">Type the topic name</label>
-            <input class="form-control" id="migrate-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
-        </div>
-        <div class="col-auto mt-4">
+            <p class="form-text mb-0">Separate names with commas or new lines.</p>
+        </fieldset>
+
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">Request only</legend>
+            <p class="form-text">A dry run does not read these. Request does.</p>
+            <div class="row g-2">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="migrate-reason">Reason</label>
+                    <input class="form-control" id="migrate-reason" name="reason" value="@Model.DraftReason" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="migrate-confirm">Type the topic name</label>
+                    <input class="form-control" id="migrate-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
+                </div>
+            </div>
+        </fieldset>
+
+        @if (plan is not null)
+        {
+            <div id="kafka-dry-run-result" class="alert @resultTone" role="status" tabindex="-1" data-kafka-result data-plan-hash="@plan.PlanHash">
+                <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
+                <p>@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This migration cannot run yet.")</p>
+                <dl class="row mb-2">
+                    <dt class="col-sm-4">Partitions</dt>
+                    <dd class="col-sm-8">@currentPartitions to @targetPartitions</dd>
+                    <dt class="col-sm-4">Expected pause</dt>
+                    <dd class="col-sm-8">About @plan.WindowMinutes min, alert at @plan.AlertMinutes min.</dd>
+                    <dt class="col-sm-4">Consumers paused</dt>
+                    <dd class="col-sm-8">@(plan.StopSet.Count == 0 ? "none" : string.Join(", ", plan.StopSet))</dd>
+                    <dt class="col-sm-4">Related topics grown first</dt>
+                    <dd class="col-sm-8">@(plan.Siblings.Count == 0 ? "none" : string.Join(", ", plan.Siblings))</dd>
+                    <dt class="col-sm-4">Data and backup</dt>
+                    <dd class="col-sm-8">@(Model.DraftBackupSkip ? "The backup is skipped. The topic is deleted and created empty. Groups start at offset 0. Nothing is copied back." : "A verified backup is copied first. The topic is then deleted and created empty. Groups start at offset 0. Nothing is copied back. The backup stays until someone deletes it.")</dd>
+                </dl>
+                @if (!plan.Accepted && plan.Errors.Count > 0)
+                {
+                    <p class="mb-1">Blocking reasons</p>
+                    <ul>
+                    @foreach (var item in plan.Errors)
+                    {
+                        <li>@item</li>
+                    }
+                    </ul>
+                }
+                else if (!plan.Accepted && !string.IsNullOrWhiteSpace(plan.Summary))
+                {
+                    <p>@plan.Summary</p>
+                }
+                @if (plan.Warnings.Count > 0)
+                {
+                    <p class="mb-1">Warnings</p>
+                    <ul>
+                    @foreach (var warning in plan.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                    </ul>
+                }
+                <p class="mb-2">@(plan.Accepted ? "Ready. Type the topic name and press Request." : "Fix the items above, then dry run again.")</p>
+                <details>
+                    <summary>Details</summary>
+                    <p>Plan hash @plan.PlanHash.</p>
+                    <p class="mb-0">In-place add keeps the topic name and remaps keys. Migrate stops the workloads, copies the log to the backup, and recreates an empty topic. Use an in-place add when the quiet window can be met.</p>
+                </details>
+            </div>
+        }
+
+        <div class="mt-3">
             <button class="btn btn-au-neutral" type="submit" formaction="/Operations/Kafka/migrations/plan">Dry run</button>
             <button class="btn btn-success" type="submit">Request</button>
             <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
@@ -223,7 +302,7 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="migrationId" value="@migration.Id" />
                     <input type="hidden" name="topic" value="@migration.Topic" />
-                    <button class="btn btn-au-neutral" type="submit" aria-label="Abort migration">Abort</button>
+                    <button class="btn btn-warning" type="submit" aria-label="Abort migration">Abort</button>
                 </form>
             </div>
             <form class="row g-2 mt-3" method="post" action="/Operations/Kafka/migrations/go">
@@ -247,7 +326,7 @@
                     <input class="form-control" id="migrate-recover" name="confirmation" autocomplete="off" aria-label="Type the topic name to recover the original count" />
                 </div>
                 <div class="col-auto mt-4 d-flex flex-wrap gap-2">
-                    <button class="btn btn-au-neutral" type="submit" name="action" value="original">Recover original</button>
+                    <button class="btn btn-warning" type="submit" name="action" value="original">Recover original</button>
                     <button class="btn btn-au-neutral" type="submit" name="action" value="forward">Continue forward</button>
                     <button class="btn btn-au-neutral" type="submit" name="action" value="deleteForeign">Delete empty foreign topic</button>
                 </div>

@@ -9,6 +9,37 @@ namespace Link.UI.Tests;
 public class KafkaOpsConsoleFixTests
 {
     [Fact]
+    public void Controller_tile_says_not_reported_when_the_quorum_leader_is_hidden()
+    {
+        var hidden = KafkaControllerTile.Display(null, "The KRaft quorum leader is a separate node and is not exposed to this client.");
+        hidden.Value.Should().Be(KafkaControllerTile.NotReported);
+        hidden.Caption.Should().Be(KafkaControllerTile.SeparateNodeCaption);
+        hidden.Title.Should().Be("The KRaft quorum leader is a separate node and is not exposed to this client.");
+
+        var known = KafkaControllerTile.Display(100, "");
+        known.Value.Should().Be("100");
+        known.Caption.Should().Be(KafkaControllerTile.KnownCaption);
+        known.Title.Should().BeNull();
+
+        var unread = KafkaControllerTile.Display(null, " ");
+        unread.Value.Should().Be("—");
+        unread.Caption.Should().Be(KafkaControllerTile.KnownCaption);
+    }
+
+    [Fact]
+    public void Page_banner_does_not_repeat_the_dry_run_summary()
+    {
+        KafkaPlanBanner.BesidePlan(
+            "This topic is order-sensitive. Every subscribed group needs zero lag.",
+            "This topic is order-sensitive. Every subscribed group needs zero lag.",
+            true).Should().BeNull();
+        KafkaPlanBanner.BesidePlan("The operations service returned 400.", "Partitions can only increase.", true)
+            .Should().Be("The operations service returned 400.");
+        KafkaPlanBanner.BesidePlan("A reason is required.", null, false).Should().Be("A reason is required.");
+        KafkaPlanBanner.BesidePlan("  ", "Refused.", true).Should().BeNull();
+    }
+
+    [Fact]
     public void Acknowledged_groups_split_on_commas_and_new_lines_and_keep_order_stable()
     {
         MigrationGroupList.Parse(" zeta, alpha\nzeta; beta ").Should().Equal("alpha", "beta", "zeta");
@@ -52,7 +83,9 @@ public class KafkaOpsConsoleFixTests
             Errors = ["The quiet window is not met."]
         };
         KafkaIncreaseEligibility.Line("Eligible for an in-place increase.", refused, "ReadyToAcquire")
-            .Should().Be("Not eligible for an in-place increase. The quiet window is not met.");
+            .Should().Be("Not eligible for an in-place increase.");
+        KafkaIncreaseEligibility.Line("Not checked yet. Dry run an in-place increase to confirm it is eligible.", null, "ReadyToAcquire")
+            .Should().Be("Not checked yet. Dry run an in-place increase to confirm it is eligible.");
 
         var family = new PartitionPlan
         {
@@ -70,7 +103,7 @@ public class KafkaOpsConsoleFixTests
         KafkaIncreaseEligibility.MigrationLine(
                 "Eligible for an increase migration.",
                 new KafkaMigrationPlan { Accepted = false, Errors = ["Group X is inactive and has lag."] })
-            .Should().Be("Not eligible for a migration. Group X is inactive and has lag.");
+            .Should().Be("Not eligible for a migration.");
         KafkaIncreaseEligibility.MigrationLine("Eligible for an increase migration.", null)
             .Should().Be("Eligible for an increase migration.");
     }
@@ -155,13 +188,16 @@ public class KafkaOpsConsoleFixTests
 
         migrate.Should().Contain("name=\"acknowledgedGroups\"");
         migrate.Should().Contain("name=\"hasDryRunSnapshot\"");
-        migrate.Should().Contain("MigrationDryRunText.ShowWindowLine");
+        migrate.Should().Contain("id=\"kafka-dry-run-result\"");
         migrate.Should().Contain("KafkaIncreaseEligibility.MigrationLine");
         migrate.Should().Contain("data-kafka-busy=\"Dry run is running.\"");
         migrate.Should().Contain("class=\"btn btn-au-neutral\"");
         migrate.Should().Contain("class=\"btn btn-success\"");
+        migrate.Should().Contain("class=\"btn btn-warning\"");
+        migrate.Should().Contain("plan.Errors");
 
         topic.Should().Contain("KafkaIncreaseEligibility.Line");
+        topic.Should().Contain("id=\"kafka-partition-result\"");
         topic.Should().Contain("Preview increase");
         topic.Should().Contain("Preview family");
         topic.Should().Contain("class=\"btn btn-sm btn-au-neutral\"");
@@ -171,20 +207,36 @@ public class KafkaOpsConsoleFixTests
         consumers.Should().Contain("Preview add");
         consumers.Should().Contain("Preview remove");
         consumers.Should().Contain("Unknown");
+        consumers.Should().Contain("selected.Catalogued");
+        consumers.Should().Contain("Replica changes are hidden for an unknown group.");
 
         brokers.Should().Contain("KafkaLogDirs.Show");
         brokers.Should().Contain("BrokerMovePreview.Lines");
         brokers.Should().Contain("Show the rest");
         brokers.Should().Contain("(internal)");
+        brokers.Should().Contain("name=\"addBrokerReason\"");
         brokers.Should().Contain("Preview decommission");
         brokers.Should().Contain("Preview rebalance");
         brokers.Should().Contain("class=\"btn btn-sm btn-au-neutral\"");
+        brokers.Should().Contain("id=\"kafka-broker-result\"");
 
         overview.Should().Contain("KafkaProduceRate.Text");
+        overview.Should().Contain("KafkaControllerTile.Display");
+        File.ReadAllText(Path.Combine(dir!.FullName, "DotNet", "Link.UI", "Controllers", "OperationsController.cs"))
+            .Should().Contain("KafkaPlanBanner.BesidePlan");
+        overview.Should().NotContain("?? \"—\"");
         overview.Should().Contain("Unknown");
 
         script.Should().Contain("data-kafka-busy");
         script.Should().Contain("indexOf(\"/plan\")");
+        script.Should().Contain("setTimeout");
+        script.Should().Contain("button.disabled = true");
+        script.Should().Contain("data-kafka-result");
         script.Should().NotContain("rows.map(function (_, index)");
+
+        var labeled = File.ReadAllText(Path.Combine(root, "Views", "Shared", "_LabeledId.cshtml"));
+        labeled.Should().Contain("LabeledIdRules.IsGuid");
+        File.ReadAllText(Path.Combine(root, "Views", "Reports", "Index.cshtml")).Should().NotContain("Copy measures");
+        File.ReadAllText(Path.Combine(root, "Views", "Tenants", "_ViewReports.cshtml")).Should().NotContain("Copy measures");
     }
 }

@@ -12,6 +12,14 @@ using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
 
+public static class KafkaTopicEligibility
+{
+    public const string NotChecked = "Not checked yet. Dry run an in-place increase to confirm it is eligible.";
+
+    public static string PartitionAddReason(bool hardBlocked, string? blockReason) =>
+        hardBlocked ? blockReason ?? "" : NotChecked;
+}
+
 public interface IKafkaOpsService
 {
     Task<KafkaTopicsResponse> GetTopicsAsync(CancellationToken cancellationToken);
@@ -255,7 +263,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     PartitionDrift = partitions > 0 && partitions != 3,
                     Slice1Eligible = family.Slice1Eligible,
                     MigrationEligibility = family.Slice1Eligible ? "Eligible for an increase migration." : family.IneligibleReason,
-                    PartitionAddReason = entry.HardBlocked ? entry.BlockReason : "Eligible for an in-place increase."
+                    PartitionAddReason = KafkaTopicEligibility.PartitionAddReason(entry.HardBlocked, entry.BlockReason)
                 });
             }
         }

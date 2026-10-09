@@ -6,6 +6,7 @@
     var topicName = topic?.Topic ?? Model.DraftTopic;
     var openAdvanced = query.Advanced || Model.Plan is not null || Model.DraftReason.Length > 0;
     var increaseLine = topic is null ? null : KafkaIncreaseEligibility.Line(topic.PartitionAddReason, Model.Plan, topic.Topic);
+    var partitionTone = Model.Plan is null ? "alert-secondary" : Model.Plan.Accepted ? "alert-success" : "alert-danger";
 }
 
 <div class="au-card card mt-3">
@@ -176,30 +177,44 @@ else
         @if (Model.Plan is not null)
         {
             var plan = Model.Plan;
-            <div class="au-card card mt-3">
-                <div class="card-header">Dry run</div>
-                <div class="card-body">
-                    <p><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
-                    <p>@plan.CurrentPartitions to @plan.RequestedPartitions. Family @plan.Family. Key @plan.KeyClass @plan.KeyShape. Replica ceiling @plan.MaxReplicas.</p>
-                    @if (plan.FamilyCompletion)
-                    {
-                        <p>The main topic stays at @plan.CurrentPartitions. Siblings raised: @(plan.TopicsToRaise.Count == 0 ? "none" : string.Join(", ", plan.TopicsToRaise)).</p>
-                    }
-                    else
-                    {
-                        <p>Retry @plan.RetryTopic and error @plan.ErrorTopic increase with the main topic.</p>
-                    }
-                    <p>Quiet window @(plan.QuietWindowRequired ? (plan.QuietWindowMet ? "met" : "not met") : "not required"). @(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</p>
-                    @foreach (var note in plan.Notes)
-                    {
-                        <p class="mb-1">@note</p>
-                    }
+            <div id="kafka-partition-result" class="alert @partitionTone mt-3" role="status" tabindex="-1" data-kafka-result data-result-key="@(plan.Accepted)-@plan.Topic-@plan.RequestedPartitions-@plan.Errors.Count">
+                <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
+                <p>@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This increase cannot run yet.")</p>
+                <dl class="row mb-2">
+                    <dt class="col-sm-4">Partitions</dt>
+                    <dd class="col-sm-8">@plan.CurrentPartitions to @plan.RequestedPartitions</dd>
+                    <dt class="col-sm-4">Family</dt>
+                    <dd class="col-sm-8">@plan.Family. Key @plan.KeyClass @plan.KeyShape. Replica ceiling @plan.MaxReplicas.</dd>
+                    <dt class="col-sm-4">Related topics</dt>
+                    <dd class="col-sm-8">@(plan.FamilyCompletion ? "The main topic stays at " + plan.CurrentPartitions + ". Siblings raised: " + (plan.TopicsToRaise.Count == 0 ? "none" : string.Join(", ", plan.TopicsToRaise)) + "." : "Retry " + plan.RetryTopic + " and error " + plan.ErrorTopic + " increase with the main topic.")</dd>
+                    <dt class="col-sm-4">Quiet window</dt>
+                    <dd class="col-sm-8">@(plan.QuietWindowRequired ? (plan.QuietWindowMet ? "Met." : "Not met.") : "Not required.")</dd>
+                    <dt class="col-sm-4">Approval</dt>
+                    <dd class="col-sm-8">@(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
+                    <dt class="col-sm-4">Groups</dt>
+                    <dd class="col-sm-8">@(plan.AffectedGroups.Count == 0 ? "none" : string.Join(", ", plan.AffectedGroups))</dd>
+                </dl>
+                @if (plan.Errors.Count > 0)
+                {
+                    <p class="mb-1">Blocking reasons</p>
+                    <ul>
                     @foreach (var planError in plan.Errors)
                     {
-                        <p class="mb-1">@planError</p>
+                        <li>@planError</li>
                     }
-                    <p class="mb-0">Groups: @(plan.AffectedGroups.Count == 0 ? "none" : string.Join(", ", plan.AffectedGroups))</p>
-                </div>
+                    </ul>
+                }
+                <p class="mb-2">@(plan.Accepted ? "Ready. Type the topic name and submit the increase." : "Fix the items above, then preview again.")</p>
+                @if (plan.Notes.Count > 0)
+                {
+                    <details>
+                        <summary>Details</summary>
+                        @foreach (var note in plan.Notes)
+                        {
+                            <p class="mb-1">@note</p>
+                        }
+                    </details>
+                }
             </div>
         }
         @if (topic is not null && (topic.RetryPartitions > 0 && topic.RetryPartitions < topic.Partitions || topic.ErrorPartitions > 0 && topic.ErrorPartitions < topic.Partitions))

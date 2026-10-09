@@ -140,10 +140,6 @@
                             <td class="text-nowrap">@report.Created</td>
                             <td>
                                 <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
-                                @if (!string.IsNullOrWhiteSpace(report.Measures))
-                                {
-                                    <partial name="_CopyButton" model="@(new CopyTarget { Value = report.Measures, Label = "Copy measures" })" />
-                                }
                             </td>
                             <td><span class="badge text-bg-light border">@report.Frequency</span></td>
                             <td class="text-end">@(report.CensusCount?.ToString() ?? "—")</td>
