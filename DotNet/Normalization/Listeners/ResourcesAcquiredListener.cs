@@ -11,6 +11,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -136,8 +137,11 @@ public class ResourcesAcquiredListener : BackgroundService
                     var accounted = false;
                     try
                     {
-                        await ConsumeMessageAsync(result, consumeCancellationToken);
-                        accounted = true;
+                        accounted = await ConsumeMessageAsync(result, consumeCancellationToken);
+                        if (!accounted)
+                        {
+                            await DeadLetterCommit.RewindAsync(kafkaConsumer, result, _logger, consumeCancellationToken);
+                        }
                     }
                     catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                     {
@@ -182,15 +186,19 @@ public class ResourcesAcquiredListener : BackgroundService
     /// Separate from the consume loop (which owns only the offset commit) so that the failure routing —
     /// in particular which failures release the resource cache — is directly testable.
     /// </remarks>
-    public async Task ConsumeMessageAsync(ConsumeResult<string, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
+    public async Task<bool> ConsumeMessageAsync(ConsumeResult<string, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
     {
         try
         {
             await ProcessMessageAsync(result, consumeCancellationToken);
+            return true;
         }
         catch (DeadLetterException ex)
         {
-            _deadLetterExceptionHandler.HandleException(result, ex, FacilityIdOf(result.Message));
+            if (!_deadLetterExceptionHandler.HandleException(result, ex, FacilityIdOf(result.Message)))
+            {
+                return false;
+            }
 
             // Terminal failure: the message is on ResourcesAcquired-Error and will never be normalized,
             // so release its acquisition keys and the {correlationId} key normalization was writing.
@@ -199,10 +207,12 @@ public class ResourcesAcquiredListener : BackgroundService
                 result.Message.Value,
                 $"{nameof(KafkaTopic.ResourcesAcquired)} dead-lettered: {ex.Message}",
                 consumeCancellationToken);
+            return true;
         }
         catch (TransientException ex)
         {
             _transientExceptionHandler.HandleException(result, ex, FacilityIdOf(result.Message));
+            return true;
         }
         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
         {
@@ -213,6 +223,7 @@ public class ResourcesAcquiredListener : BackgroundService
             _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", FacilityIdOf(result?.Message).SanitizeForLog());
 
             _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), FacilityIdOf(result?.Message));
+            return true;
         }
     }
 

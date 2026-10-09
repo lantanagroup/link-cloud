@@ -121,8 +121,11 @@ namespace LantanaGroup.Link.Report.Listeners
                             var accounted = false;
                             try
                             {
-                                await ProcessMessageAsync(result, consumeCancellationToken);
-                                accounted = true;
+                                accounted = await ProcessMessageAsync(result, consumeCancellationToken);
+                                if (!accounted)
+                                {
+                                    await DeadLetterCommit.RewindAsync(consumer, result, _logger, consumeCancellationToken);
+                                }
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -169,14 +172,14 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        public async Task ProcessMessageAsync(ConsumeResult<string, GenerateReportValue> result, CancellationToken cancellationToken)
+        public async Task<bool> ProcessMessageAsync(ConsumeResult<string, GenerateReportValue> result, CancellationToken cancellationToken)
         {
             string facilityId = string.Empty;
             try
             {
                 if (result == null)
                 {
-                    return;
+                    return true;
                 }
 
                 using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
@@ -201,7 +204,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(
                         scope.ServiceProvider, _logger, Name, facilityId, value.AdhocReportId.ToString(), cancellationToken))
-                    return;
+                    return true;
 
                 if (value is { Regenerate: true, ReportId: not null })
                 {
@@ -409,20 +412,24 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList(), cancellationToken, inboundMetricsMode);
                 }
+
+                return true;
             }
             catch (DeadLetterException ex)
             {
-                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                return _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
             }
             catch (TransientException ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
             catch (TimeoutException ex)
             {
                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [GenerateReportRequested] at offset: {result.TopicPartitionOffset}";
                 var transientException = new TransientException(exceptionMessage, ex);
                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
+                return true;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -431,6 +438,7 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (Exception ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+                return true;
             }
         }
 

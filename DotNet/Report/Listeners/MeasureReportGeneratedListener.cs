@@ -99,8 +99,12 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                accounted = true;
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (TransientException ex)
                             {
@@ -113,8 +117,12 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId);
-                                accounted = true;
+                                accounted = await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             finally
                             {

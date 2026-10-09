@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -83,6 +84,21 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         consumeResult = result;
                         var accounted = false;
 
+                        async Task<bool> AccountDeadLetterAsync(Exception ex)
+                        {
+                            if (consumeResult == null)
+                            {
+                                return false;
+                            }
+
+                            return await DeadLetterCommit.AccountAsync(
+                                DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult)),
+                                consumer,
+                                consumeResult,
+                                Logger,
+                                consumeCancellationToken);
+                        }
+
                         try
                         {
                             if (consumeResult != null)
@@ -93,21 +109,19 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         catch (DeadLetterException ex)
                         {
-                            DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
-                            accounted = true;
+                            accounted = await AccountDeadLetterAsync(ex);
                         }
                         catch (TransientException ex)
                         {
                             if (RetryFailures)
                             {
                                 TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                                accounted = true;
                             }
                             else
                             {
-                                DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                                accounted = await AccountDeadLetterAsync(ex);
                             }
-
-                            accounted = true;
                         }
                         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                         {
@@ -122,13 +136,12 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                             if (RetryFailures)
                             {
                                 TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                                accounted = true;
                             }
                             else
                             {
-                                DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                                accounted = await AccountDeadLetterAsync(new DeadLetterException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex));
                             }
-
-                            accounted = true;
                         }
                         finally
                         {

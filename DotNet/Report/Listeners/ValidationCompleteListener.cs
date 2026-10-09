@@ -102,8 +102,12 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                accounted = true;
+                                accounted = result != null && await DeadLetterCommit.AccountAsync(
+                                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId),
+                                    consumer,
+                                    result,
+                                    _logger,
+                                    consumeCancellationToken);
                             }
                             catch (TransientException ex)
                             {
