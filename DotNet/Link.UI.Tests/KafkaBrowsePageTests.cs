@@ -76,7 +76,9 @@ public class KafkaBrowsePageTests
         page.Should().Contain("id=\"kafka-browse-result\"");
         page.Should().Contain("data-lu-result=\"kafka-browse\"");
         page.Should().Contain("lu-result-dismiss");
-        page.Should().Contain("Dismiss result");
+        page.Should().Contain("aria-label=\"Dismiss\"");
+        page.Should().NotContain("Dismiss result");
+        page.Should().NotContain("btn-warning lu-result-dismiss");
         page.Should().Contain("Blocking reasons");
         var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
         script.Should().Contain("lu-result-open:");

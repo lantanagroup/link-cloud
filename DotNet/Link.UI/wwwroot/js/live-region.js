@@ -599,9 +599,34 @@
         if (!date || isNaN(date.getTime())) return { text: value == null ? "" : String(value), title: "" };
         return { text: localFormat.format(date), title: utcTitle(date) };
     };
+    function wireDismiss(root) {
+        var scope = root && root.querySelectorAll ? root : document;
+        scope.querySelectorAll(".alert-success, .alert-danger, .alert-warning").forEach(function (alert) {
+            if (alert.querySelector(".lu-dismiss, .btn-close")) return;
+            if (alert.closest(".modal, .toast, .offcanvas")) return;
+            if (/display\s*:\s*none/i.test(alert.getAttribute("style") || "")) return;
+            if (/(Error|Errors|Warning|Warnings|Banner)$/.test(alert.id || "")) return;
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "lu-dismiss";
+            button.setAttribute("aria-label", "Dismiss");
+            button.innerHTML = "<span aria-hidden=\"true\">\u00d7</span>";
+            button.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                alert.hidden = true;
+            });
+            alert.classList.add("lu-alert");
+            alert.appendChild(button);
+        });
+    }
+
     document.addEventListener("au-refreshed", function (event) {
         var id = event.detail && event.detail.id;
-        paintTimes(id ? document.getElementById(id) : null);
+        var node = id ? document.getElementById(id) : null;
+        paintTimes(node);
+        wireDismiss(node || document);
     });
     paintTimes();
+    wireDismiss(document);
 })();

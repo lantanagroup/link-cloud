@@ -318,7 +318,7 @@ else
                         <summary>
                             <span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span>
                             <span class="lu-result-text">@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This replica change cannot run yet.")</span>
-                            <button type="button" class="btn btn-sm btn-warning lu-result-dismiss" aria-label="Dismiss result">Dismiss</button>
+                            <button type="button" class="lu-dismiss lu-result-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
                         </summary>
                         <div class="lu-result-body">
                     <dl class="row mb-2">

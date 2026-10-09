@@ -25,14 +25,14 @@
     {
         <div class="alert au-note alert-dismissible fade show" role="alert">
             <i class="bi bi-recycle me-1"></i> @cleanup
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close lu-dismiss" data-bs-dismiss="alert" aria-label="Dismiss"></button>
         </div>
     }
     @if (TempData["CleanupError"] is string cleanupError && !string.IsNullOrWhiteSpace(cleanupError))
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-1"></i> @cleanupError
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close lu-dismiss" data-bs-dismiss="alert" aria-label="Dismiss"></button>
         </div>
     }
 
@@ -332,7 +332,7 @@
         host.innerHTML = '<div class="alert alert-' + (isError ? 'danger' : 'info') + ' alert-dismissible fade show" role="alert">' +
             '<i class="bi ' + (isError ? 'bi-exclamation-triangle-fill' : 'bi-recycle') + ' me-1"></i> ' +
             message +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
+            '<button type="button" class="btn-close lu-dismiss" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>';
     }
 
     function setRunning(running) {

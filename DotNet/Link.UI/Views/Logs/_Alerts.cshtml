@@ -1,8 +1,8 @@
 @if (TempData["Message"] is string message)
 {
-    <div class="alert alert-success">@message</div>
+    <div class="alert alert-success lu-alert"><span class="lu-alert-text">@message</span><button type="button" class="lu-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button></div>
 }
 @if (TempData["Error"] is string actionError)
 {
-    <div class="alert alert-warning">@actionError</div>
+    <div class="alert alert-warning lu-alert"><span class="lu-alert-text">@actionError</span><button type="button" class="lu-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button></div>
 }
