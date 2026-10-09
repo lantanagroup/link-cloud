@@ -599,6 +599,38 @@
         if (!date || isNaN(date.getTime())) return { text: value == null ? "" : String(value), title: "" };
         return { text: localFormat.format(date), title: utcTitle(date) };
     };
+    function wireConditional(root) {
+        var scope = root && root.querySelectorAll ? root : document;
+        scope.querySelectorAll("[data-lu-when]").forEach(function (field) {
+            if (field.getAttribute("data-lu-when-bound") === "1") return;
+            field.setAttribute("data-lu-when-bound", "1");
+            var spec = field.getAttribute("data-lu-when") || "";
+            var split = spec.indexOf("=");
+            var id = split < 0 ? spec : spec.slice(0, split);
+            var expected = split < 0 ? null : spec.slice(split + 1);
+            var source = document.getElementById(id);
+            if (!source) return;
+            function apply() {
+                var on;
+                if (expected === null) {
+                    on = source.type === "checkbox" || source.type === "radio"
+                        ? source.checked
+                        : String(source.value || "").length > 0;
+                } else {
+                    on = String(source.value || "") === expected;
+                }
+                field.hidden = !on;
+                var nodes = field.matches("input, select, textarea")
+                    ? [field]
+                    : Array.prototype.slice.call(field.querySelectorAll("input, select, textarea"));
+                nodes.forEach(function (input) { input.disabled = !on; });
+            }
+            source.addEventListener("change", apply);
+            source.addEventListener("input", apply);
+            apply();
+        });
+    }
+
     function wireDismiss(root) {
         var scope = root && root.querySelectorAll ? root : document;
         scope.querySelectorAll(".alert-success, .alert-danger, .alert-warning").forEach(function (alert) {
@@ -625,8 +657,10 @@
         var id = event.detail && event.detail.id;
         var node = id ? document.getElementById(id) : null;
         paintTimes(node);
+        wireConditional(node || document);
         wireDismiss(node || document);
     });
     paintTimes();
+    wireConditional(document);
     wireDismiss(document);
 })();

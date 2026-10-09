@@ -8,8 +8,24 @@
     var query = Model.Query;
     var bar = Model.Paging;
     var origin = ReturnUrlRules.FromQuery(Context.Request);
-    string Href(int? page = null, string? sort = null, string? dir = null) =>
-        ReportsRules.IssueHref(query, Model.FacilityId, Model.ReportId, origin, page, sort, dir);
+    string Href(int? page = null, string? sort = null, string? dir = null, int? pageSize = null) =>
+        ReportsRules.IssueHref(query, Model.FacilityId, Model.ReportId, origin, page, sort, dir, pageSize);
+    Dictionary<string, string> IssueRoute(int page, int pageSize)
+    {
+        var href = Href(page, pageSize: pageSize);
+        var start = href.IndexOf('?');
+        var route = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (start < 0)
+            return route;
+        foreach (var part in href[(start + 1)..].Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var split = part.IndexOf('=');
+            if (split < 0)
+                continue;
+            route[Uri.UnescapeDataString(part[..split])] = Uri.UnescapeDataString(part[(split + 1)..]);
+        }
+        return route;
+    }
     string Mark(string column) => string.Equals(query.Sort, column, StringComparison.OrdinalIgnoreCase)
         ? (query.Descending ? " ↓" : " ↑")
         : "";
@@ -81,89 +97,80 @@ else
     <div class="au-card card">
         <div class="card-header">Issues</div>
         <div class="card-body">
-            <form method="get" class="row g-2 align-items-end mb-3 lu-issue-filters" data-au-filter="400" data-au-target="validationIssues" action="/Reports/Validation">
+            <form method="get" class="mb-3 lu-search lu-issue-filters" data-au-filter="400" data-au-target="validationIssues" action="/Reports/Validation">
                 <input type="hidden" name="facilityId" value="@Model.FacilityId" />
                 <input type="hidden" name="reportId" value="@Model.ReportId" />
                 <input type="hidden" name="sort" value="@query.Sort" />
                 <input type="hidden" name="dir" value="@(query.Descending ? "desc" : "asc")" />
-                <input type="hidden" name="page" value="@bar.Page" />
+                <input type="hidden" name="pageSize" value="@query.PageSize" />
                 <partial name="_ReturnField" />
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="issueSearch">Search</label>
-                    <input id="issueSearch" name="q" value="@query.Text" class="form-control" />
-                </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="issueSeverity">Severity</label>
-                    <select id="issueSeverity" name="severity" class="form-select">
-                        @if (query.Severity is null)
-                        {
-                            <option value="" selected>Any</option>
-                        }
-                        else
-                        {
-                            <option value="">Any</option>
-                        }
-                        @foreach (var severity in Model.SeverityOptions)
-                        {
-                            if (string.Equals(severity, query.Severity, StringComparison.OrdinalIgnoreCase))
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="issueSearch">Search</label>
+                        <input id="issueSearch" name="q" value="@query.Text" class="form-control" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="issueSeverity">Severity</label>
+                        <select id="issueSeverity" name="severity" class="form-select">
+                            @if (query.Severity is null)
                             {
-                                <option value="@severity" selected>@severity</option>
+                                <option value="" selected>Any</option>
                             }
                             else
                             {
-                                <option value="@severity">@severity</option>
+                                <option value="">Any</option>
                             }
-                        }
-                    </select>
-                </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="issueCode">Code</label>
-                    <input id="issueCode" name="code" value="@query.Code" class="form-control" />
-                </div>
-                <div class="col-12 col-md-2 col-category">
-                    <label class="form-label" for="issueCategory">Category</label>
-                    <select id="issueCategory" name="category" class="form-select">
-                        @if (query.Category is null)
-                        {
-                            <option value="" selected>All categories</option>
-                        }
-                        else
-                        {
-                            <option value="">All categories</option>
-                        }
-                        @foreach (var category in Model.CategoryOptions)
-                        {
-                            if (string.Equals(category, query.Category, StringComparison.OrdinalIgnoreCase))
+                            @foreach (var severity in Model.SeverityOptions)
                             {
-                                <option value="@category" selected>@category</option>
+                                if (string.Equals(severity, query.Severity, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <option value="@severity" selected>@severity</option>
+                                }
+                                else
+                                {
+                                    <option value="@severity">@severity</option>
+                                }
                             }
-                            else
-                            {
-                                <option value="@category">@category</option>
-                            }
-                        }
-                    </select>
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                        <a class="btn btn-warning" href="@ReportsRules.IssueHref(new ValidationIssueQuery(), Model.FacilityId, Model.ReportId, origin, 1, "severity", "desc")">Clear</a>
+                    </div>
                 </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="issuePageSize">Page size</label>
-                    <select id="issuePageSize" name="pageSize" class="form-select">
-                        @foreach (var size in ReportsRules.IssuePageSizes)
-                        {
-                            if (query.PageSize == size)
-                            {
-                                <option value="@size" selected>@size</option>
-                            }
-                            else
-                            {
-                                <option value="@size">@size</option>
-                            }
-                        }
-                    </select>
-                </div>
-                <div class="col-12 d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                    <a class="btn btn-warning" href="@ReportsRules.IssueHref(new ValidationIssueQuery(), Model.FacilityId, Model.ReportId, origin, 1, "severity", "desc")">Clear</a>
-                </div>
+                <details class="lu-advanced mt-2" @(string.IsNullOrWhiteSpace(query.Code) && string.IsNullOrWhiteSpace(query.Category) ? null : "open")>
+                    <summary>Advanced</summary>
+                    <div class="row g-2 align-items-end mt-1">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="issueCode">Code</label>
+                            <input id="issueCode" name="code" value="@query.Code" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-4 col-category">
+                            <label class="form-label" for="issueCategory">Category</label>
+                            <select id="issueCategory" name="category" class="form-select">
+                                @if (query.Category is null)
+                                {
+                                    <option value="" selected>All categories</option>
+                                }
+                                else
+                                {
+                                    <option value="">All categories</option>
+                                }
+                                @foreach (var category in Model.CategoryOptions)
+                                {
+                                    if (string.Equals(category, query.Category, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <option value="@category" selected>@category</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@category">@category</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </details>
             </form>
 
             <div id="validationIssues">
@@ -202,26 +209,8 @@ else
                             </tbody>
                         </table>
                     </div>
-                    <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Issue pages">
-                        @if (bar.HasPrevious)
-                        {
-                            <a class="btn btn-sm btn-au-link" href="@Href(bar.Page - 1)">Previous</a>
-                        }
-                        else
-                        {
-                            <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                        }
-                        <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
-                        @if (bar.HasNext)
-                        {
-                            <a class="btn btn-sm btn-au-link" href="@Href(bar.Page + 1)">Next</a>
-                        }
-                        else
-                        {
-                            <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                        }
-                    </nav>
                 }
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Issue pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = query.PageSize, Sizes = ReportsRules.IssuePageSizes, Path = "/Reports/Validation", Route = IssueRoute })" />
             </div>
         </div>
     </div>

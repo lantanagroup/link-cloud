@@ -186,7 +186,7 @@
                 <label class="form-check-label" for="migrate-skip">Skip backup</label>
                 <p class="form-text">No copy is made. The recreated topic starts empty and the old log is not kept.</p>
             </div>
-            <div class="form-check">
+            <div class="form-check" data-lu-when="migrate-skip">
                 <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" @(Model.DraftBackupSkipAcknowledged ? "checked" : null) />
                 <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged</label>
                 <p class="form-text">Required when the backup is skipped. The requester and the approver both accept that there is no backup.</p>

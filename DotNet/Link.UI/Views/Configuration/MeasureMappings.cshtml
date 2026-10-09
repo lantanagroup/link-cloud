@@ -4,9 +4,10 @@
     var query = Model.Query;
     var bar = Model.Paging;
     var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
-    Dictionary<string, string> Route(int page)
+    Dictionary<string, string> Route(int page, int pageSize = 0)
     {
-        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = size.ToString() };
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = chosen.ToString() };
         if (!string.IsNullOrWhiteSpace(query.Measure)) route["measure"] = query.Measure;
         if (!string.IsNullOrWhiteSpace(query.Dqm)) route["dqm"] = query.Dqm;
         if (!string.IsNullOrWhiteSpace(query.Frequency)) route["frequency"] = query.Frequency;
@@ -34,14 +35,12 @@ else
     <div class="au-card card mb-3">
         <div class="card-header">Search</div>
         <div class="card-body">
-            <form method="get" class="row g-2 align-items-end">
-                <div class="col-12 col-md-3">
+            <form method="get" class="lu-search">
+                <input type="hidden" name="pageSize" value="@size" />
+                <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
                     <label class="form-label" for="measure">Measure</label>
                     <input id="measure" name="measure" value="@query.Measure" class="form-control" maxlength="255" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <label class="form-label" for="dqm">dQM</label>
-                    <input id="dqm" name="dqm" value="@query.Dqm" class="form-control" maxlength="255" />
                 </div>
                 <div class="col-6 col-md-2">
                     <label class="form-label" for="frequency">Frequency</label>
@@ -60,26 +59,20 @@ else
                         }
                     </select>
                 </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="pageSize">Page size</label>
-                    <select id="pageSize" name="pageSize" class="form-select">
-                        @foreach (var option in ConfigurationRules.PageSizes)
-                        {
-                            if (size == option)
-                            {
-                                <option value="@option" selected>@option</option>
-                            }
-                            else
-                            {
-                                <option value="@option">@option</option>
-                            }
-                        }
-                    </select>
-                </div>
                 <div class="col-12 d-flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
                     <a class="btn btn-warning" asp-action="MeasureMappings">Clear</a>
                 </div>
+                </div>
+                <details class="lu-advanced mt-2" @(string.IsNullOrWhiteSpace(query.Dqm) ? null : "open")>
+                    <summary>Advanced</summary>
+                    <div class="row g-2 align-items-end mt-1">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="dqm">dQM</label>
+                            <input id="dqm" name="dqm" value="@query.Dqm" class="form-control" maxlength="255" />
+                        </div>
+                    </div>
+                </details>
             </form>
         </div>
     </div>
@@ -156,26 +149,8 @@ else
                             </tbody>
                         </table>
                     </div>
-                    <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Mapping pages">
-                        @if (bar.HasPrevious)
-                        {
-                            <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
-                        }
-                        else
-                        {
-                            <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                        }
-                        <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
-                        @if (bar.HasNext)
-                        {
-                            <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
-                        }
-                        else
-                        {
-                            <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                        }
-                    </nav>
                 }
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Mapping pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = ConfigurationRules.PageSizes, Route = Route })" />
             </div>
         </div>
     }

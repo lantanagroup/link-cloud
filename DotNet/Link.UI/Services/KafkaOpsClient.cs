@@ -299,11 +299,14 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendAsync<string>(HttpMethod.Get, "api/ops/kafka/migrations/" + id.ToString("D") + "/runbook", null, cancellationToken);
     }
 
-    public Task<KafkaOpsCall<KafkaBrowsePage>> GetMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken)
+    public Task<KafkaOpsCall<KafkaBrowsePage>> GetMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null)
     {
         if (_fixture.Active)
-            return Task.FromResult(_fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue));
-        return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", mode, partitions, offset, timestamp, limit, key, headerName, headerValue), null, cancellationToken);
+            return Task.FromResult(_fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue, page, text, header, valueContains, messageType, from, to));
+        var read = KafkaMessageWindow.Locate(page, limit, 0, long.MaxValue);
+        if (page > 1)
+            return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", "from-offset", partitions, read.Offset, null, read.Count, key, headerName, headerValue), null, cancellationToken);
+        return SendAsync<KafkaBrowsePage>(HttpMethod.Get, MessagesPath(topic, "messages", mode, partitions, offset, timestamp, read.Count, key, headerName, headerValue), null, cancellationToken);
     }
 
     public Task<KafkaOpsCall<KafkaFamilyView>> GetFamilyAsync(string topic, CancellationToken cancellationToken)
@@ -313,18 +316,22 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendAsync<KafkaFamilyView>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/family", null, cancellationToken);
     }
 
-    public Task<KafkaOpsCall<byte[]>> ExportMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken)
+    public Task<KafkaOpsCall<byte[]>> ExportMessagesAsync(string topic, string mode, IReadOnlyList<int> partitions, long? offset, long? timestamp, int limit, string key, string headerName, string headerValue, CancellationToken cancellationToken, int page = 1, string? text = null, string? header = null, string? valueContains = null, string? messageType = null, long? from = null, long? to = null)
     {
+        var read = KafkaMessageWindow.Locate(page, limit, 0, long.MaxValue);
+        var exportMode = page > 1 ? "from-offset" : mode;
+        var exportOffset = page > 1 ? read.Offset : offset;
+        var exportTimestamp = page > 1 ? null : timestamp;
         if (_fixture.Active)
         {
-            var page = _fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue);
-            if (page.Value is null)
-                return Task.FromResult(new KafkaOpsCall<byte[]> { Status = page.Status, Error = page.Error });
-            var json = JsonSerializer.Serialize(page.Value.Records, ExportJson);
+            var browsed = _fixture.Messages(topic, mode, partitions, offset, timestamp, limit, key, headerName, headerValue, page, text, header, valueContains, messageType, from, to);
+            if (browsed.Value is null)
+                return Task.FromResult(new KafkaOpsCall<byte[]> { Status = browsed.Status, Error = browsed.Error });
+            var json = JsonSerializer.Serialize(browsed.Value.Records, ExportJson);
             return Task.FromResult(new KafkaOpsCall<byte[]> { Status = 200, Value = Encoding.UTF8.GetBytes(json) });
         }
 
-        return SendBytesAsync(MessagesPath(topic, "messages/export", mode, partitions, offset, timestamp, limit, key, headerName, headerValue), cancellationToken);
+        return SendBytesAsync(MessagesPath(topic, "messages/export", exportMode, partitions, exportOffset, exportTimestamp, read.Count, key, headerName, headerValue), cancellationToken);
     }
 
     public Task<KafkaOpsCall<ChangeRequestRecord>> ProduceMessageAsync(string topic, string headers, string? key, string? value, string reason, string? confirmation, string correlationId, CancellationToken cancellationToken)

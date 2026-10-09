@@ -3,12 +3,13 @@
 @{
     var query = Model.Query;
     var bar = Model.Paging;
-    Dictionary<string, string> Route(int page)
+    Dictionary<string, string> Route(int page, int pageSize = 0)
     {
+        var chosen = pageSize is 10 or 25 or 50 ? pageSize : query.PageSize;
         var route = new Dictionary<string, string>
         {
             ["page"] = page.ToString(),
-            ["pageSize"] = query.PageSize.ToString()
+            ["pageSize"] = chosen.ToString()
         };
         if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
         if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
@@ -36,40 +37,45 @@
 <div class="au-card card mb-3">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end" data-au-filter="300" data-au-target="userResults">
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="searchText">Search</label>
-                <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="facilityId">Facility</label>
-                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" maxlength="255" />
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="role">Role</label>
-                <input id="role" name="role" value="@query.Role" class="form-control" maxlength="255" />
-            </div>
-            <div class="col-12 col-md-2">
-                <label class="form-label" for="claim">Claim</label>
-                <input id="claim" name="claim" value="@query.Claim" class="form-control" maxlength="255" />
-            </div>
-            <div class="col-6 col-md-1">
-                <label class="form-label" for="pageSize">Page size</label>
-                <input id="pageSize" name="pageSize" value="@query.PageSize" class="form-control" inputmode="numeric" />
-            </div>
-            <div class="col-12 col-md-1">
-                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-            </div>
-            <div class="col-12">
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" id="includeDeactivated" name="includeDeactivated" value="true" @(query.IncludeDeactivated ? "checked" : null) />
-                    <label class="form-check-label" for="includeDeactivated">Include deactivated</label>
+        <form method="get" class="lu-search" data-au-filter="300" data-au-target="userResults">
+            <input type="hidden" name="pageSize" value="@query.PageSize" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="searchText">Search</label>
+                    <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
                 </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(query.IncludeDeleted ? "checked" : null) />
-                    <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="Users">Clear</a>
                 </div>
             </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.FacilityId) || !string.IsNullOrWhiteSpace(query.Role) || !string.IsNullOrWhiteSpace(query.Claim) || query.IncludeDeactivated || query.IncludeDeleted) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="facilityId">Facility</label>
+                        <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="role">Role</label>
+                        <input id="role" name="role" value="@query.Role" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="claim">Claim</label>
+                        <input id="claim" name="claim" value="@query.Claim" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="includeDeactivated" name="includeDeactivated" value="true" @(query.IncludeDeactivated ? "checked" : null) />
+                            <label class="form-check-label" for="includeDeactivated">Include deactivated</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(query.IncludeDeleted ? "checked" : null) />
+                            <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                        </div>
+                    </div>
+                </div>
+            </details>
         </form>
     </div>
 </div>
@@ -162,18 +168,8 @@
                     </tbody>
                 </table>
             </div>
-            <nav aria-label="Accounts pages">
-                @if (bar.HasPrevious)
-                {
-                    <a class="btn btn-sm btn-au-link" asp-action="Users" asp-all-route-data="Route(bar.Page - 1)">Previous</a>
-                }
-                @if (bar.HasNext)
-                {
-                    <a class="btn btn-sm btn-au-link" asp-action="Users" asp-all-route-data="Route(bar.Page + 1)">Next</a>
-                }
-                <span class="text-muted small ms-2">@bar.TotalCount accounts</span>
-            </nav>
         }
+        <partial name="_BottomPager" model="@(new BottomPager { Label = "Account pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = query.PageSize, Sizes = new[] { 10, 25, 50 }, Route = Route })" />
         </div>
     </div>
 </div>

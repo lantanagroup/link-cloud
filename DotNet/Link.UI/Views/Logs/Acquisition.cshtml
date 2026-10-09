@@ -18,18 +18,12 @@
 <div class="au-card card">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end" data-au-filter="400" data-au-target="acquisitionResults">
+        <form method="get" class="lu-search" data-au-filter="400" data-au-target="acquisitionResults">
+            <input type="hidden" name="pageSize" value="@search.PageSize" />
+            <div class="row g-2 align-items-end">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="facilityId">Facility</label>
                 <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="patientId">Patient</label>
-                <input id="patientId" name="patientId" value="@query.PatientId" class="form-control" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="reportId">Report</label>
-                <input id="reportId" name="reportId" value="@query.ReportId" class="form-control" />
             </div>
             <div class="col-12 col-md-4">
                 <label class="form-label" for="resourceType">Resource type</label>
@@ -47,10 +41,6 @@
                         }
                     }
                 </select>
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="resourceId">Resource id</label>
-                <input id="resourceId" name="resourceId" value="@query.ResourceId" class="form-control" />
             </div>
             <div class="col-6 col-md-2">
                 <label class="form-label" for="queryPhase">Phase</label>
@@ -86,6 +76,26 @@
                     }
                 </select>
             </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Acquisition">Clear</a>
+            </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.PatientId) || !string.IsNullOrWhiteSpace(query.ReportId) || !string.IsNullOrWhiteSpace(query.ResourceId) || (query.Status?.Count > 0) || !string.IsNullOrWhiteSpace(query.Priority) || query.MinAgeHours != LogsRules.DefaultMinAgeHours || query.IncludeDeleted || query.CancellableOnly || !string.IsNullOrWhiteSpace(query.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="patientId">Patient</label>
+                <input id="patientId" name="patientId" value="@query.PatientId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="reportId">Report</label>
+                <input id="reportId" name="reportId" value="@query.ReportId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="resourceId">Resource id</label>
+                <input id="resourceId" name="resourceId" value="@query.ResourceId" class="form-control" />
+            </div>
             <div class="col-12">
                 <div class="form-label" id="statusLabel">Status</div>
                 <div class="d-flex flex-wrap gap-2" role="group" aria-labelledby="statusLabel">
@@ -118,22 +128,6 @@
                 <label class="form-label" for="minAgeHours">Min age (hours)</label>
                 <input id="minAgeHours" name="minAgeHours" type="number" min="0" max="@LogsRules.MaxMinAgeHours" value="@query.MinAgeHours" class="form-control" />
             </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label" for="pageSize">Page</label>
-                <select id="pageSize" name="pageSize" class="form-select">
-                    @foreach (var size in LogsRules.PageSizes)
-                    {
-                        if (search.PageSize == size)
-                        {
-                            <option value="@size" selected>@size</option>
-                        }
-                        else
-                        {
-                            <option value="@size">@size</option>
-                        }
-                    }
-                </select>
-            </div>
             <div class="col-12 d-flex flex-wrap gap-3">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(query.IncludeDeleted ? "checked" : null) />
@@ -147,10 +141,8 @@
             <div class="col-6 col-md-3">
                 <partial name="_AutomationScope" model="query.Scope" />
             </div>
-            <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-warning" asp-action="Acquisition">Clear</a>
-            </div>
+                </div>
+            </details>
         </form>
     </div>
 </div>

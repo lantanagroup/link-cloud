@@ -17,19 +17,36 @@
     var families = topics
         .GroupBy(row => string.IsNullOrWhiteSpace(row.Family) ? "Other" : row.Family, StringComparer.Ordinal)
         .OrderBy(group => group.Key, StringComparer.Ordinal);
+    var pageSize = KafkaWindows.Size(query.PageSize);
+    var messageLogEnd = members.FirstOrDefault(member => string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase))?.HighWatermarkSum ?? 0;
+    var messagePages = KafkaMessageWindow.Pages(browse?.Metadata.Total ?? 0, pageSize, messageLogEnd);
+    var messagePage = query.MsgPage > messagePages ? messagePages : query.MsgPage;
+    if (messagePage < 1)
+        messagePage = 1;
+    var windowStart = Math.Max(1, messagePage - 2);
+    var windowEnd = Math.Min(messagePages, messagePage + 2);
+    var matchLabel = browse is null
+        ? ""
+        : browse.Metadata.Total > 0
+            ? browse.Metadata.Total + " matches"
+            : browse.Records.Count == 0
+                ? "No matches"
+                : browse.Records.Count + " on this page";
+    string TimeValue(long? unix) => unix is long ms ? DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime.ToString("yyyy-MM-ddTHH:mm") : "";
+    var advancedOpen = query.More || query.BrowseKey.Length > 0 || query.HeaderContains.Length > 0 || query.ValueContains.Length > 0;
 }
 
 <h2 class="h5 mt-3">Read messages</h2>
-<p>This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Fetch shows one page. Export reads that same seek again and writes an audit of the rows it returns.</p>
+<p>This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Search narrows the messages. The pager reads one page at a time. Export reads that same page again and writes an audit of the rows it returns.</p>
 <ol class="lu-kafka-steps">
     <li>Choose the topic. The family tabs move between the main topic and its error, retry, and redrive topics.</li>
-    <li>Set the seek. Fetch reads that window and changes nothing on the broker.</li>
+    <li>Search. Every filter you fill in has to match. The page below is the only read.</li>
     <li>Open a row for the payload and the facility or report it belongs to.</li>
-    <li>Export JSON when you need a copy. That second read is audited.</li>
+    <li>Export JSON when you need a copy of this page. That second read is audited.</li>
 </ol>
 <p class="mb-2">
     <span class="badge @StatusPills.ForWizardStep(step, 1)">1 Choose a topic</span>
-    <span class="badge @StatusPills.ForWizardStep(step, 2)">2 Fetch</span>
+    <span class="badge @StatusPills.ForWizardStep(step, 2)">2 Search</span>
     <span class="badge @StatusPills.ForWizardStep(step, 3)">3 Review</span>
     <span class="badge @StatusPills.ForWizardStep(step, 4)">4 Export</span>
 </p>
@@ -37,18 +54,17 @@
 <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
-    <input type="hidden" name="mode" value="@query.BrowseMode" />
-    <input type="hidden" name="limit" value="@query.BrowseLimit" />
-    <input type="hidden" name="offset" value="@query.BrowseOffset" />
-    <input type="hidden" name="timestamp" value="@query.BrowseTimestamp" />
-    <input type="hidden" name="key" value="@query.BrowseKey" />
-    <input type="hidden" name="headerName" value="@query.BrowseHeaderName" />
-    <input type="hidden" name="headerValue" value="@query.BrowseHeaderValue" />
     <input type="hidden" name="q" value="@query.Q" />
-    @foreach (var partition in query.BrowsePartitions)
-    {
-        <input type="hidden" name="partition" value="@partition" />
-    }
+    <input type="hidden" name="pageSize" value="@pageSize" />
+    <input type="hidden" name="mq" value="@query.MessageText" />
+    <input type="hidden" name="key" value="@query.BrowseKey" />
+    <input type="hidden" name="hq" value="@query.HeaderContains" />
+    <input type="hidden" name="vq" value="@query.ValueContains" />
+    <input type="hidden" name="mtype" value="@query.MessageKind" />
+    <input type="hidden" name="mfrom" value="@TimeValue(query.MessageFrom)" />
+    <input type="hidden" name="mto" value="@TimeValue(query.MessageTo)" />
+    <input type="hidden" name="msgPage" value="1" />
+    <input type="hidden" name="more" value="@(query.More ? "1" : "")" />
     <div class="col-12 col-md-6">
         <label class="form-label" for="browse-topic">Topic</label>
         <select class="form-select" id="browse-topic" name="topic">
@@ -73,7 +89,7 @@
                 </optgroup>
             }
         </select>
-        <p class="form-text">Topics are grouped by family. This is one page of the search. Open keeps the current seek.</p>
+        <p class="form-text">Topics are grouped by family. Open keeps this search and starts at the first page.</p>
     </div>
     <div class="col-auto">
         <button class="btn btn-au-link" type="submit">Open</button>
@@ -85,44 +101,12 @@
     <nav class="lu-section-nav mt-3" aria-label="Topic family">
         @foreach (var member in members)
         {
-            <a class="@(string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase) ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: member.Topic, closeRecord: true)">
-                @KafkaBrowseText.MemberLabel(member)
-                @if (familyChecked && member.Exists && member.Lag > 0)
-                {
-                    <span class="badge au-badge-warning">Lag @member.Lag</span>
-                }
-                else if (familyChecked && member.Exists)
-                {
-                    <span class="badge au-badge-success">On broker</span>
-                }
-                else if (familyChecked)
-                {
-                    <span class="badge au-badge-muted">Missing</span>
-                }
-            </a>
+            <a class="@(string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase) ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: member.Topic, closeRecord: true)">@KafkaBrowseText.MemberLabel(member)</a>
         }
     </nav>
     @if (familyChecked)
     {
-        var here = members.FirstOrDefault(member => string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase));
-        <p class="text-muted mb-0">
-            @if (here is null)
-            {
-                <span>This name is not in the family.</span>
-            }
-            else if (!here.Exists)
-            {
-                <span>Not on the broker.</span>
-            }
-            else if (here.LagKnown)
-            {
-                <span>@here.Partitions partitions, high watermark @here.HighWatermarkSum. Group lag @here.Lag.</span>
-            }
-            else
-            {
-                <span>@here.Partitions partitions, high watermark @here.HighWatermarkSum. Group lag was not read.</span>
-            }
-        </p>
+        <p class="lu-kafka-stat mb-0">@KafkaBrowseText.FamilyStat(members)</p>
     }
 }
 
@@ -143,142 +127,119 @@
         <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
         <input type="hidden" name="page" value="1" />
 
-        <fieldset class="border rounded p-3 mb-3">
-            <legend class="float-none w-auto px-2 h6">Where to read</legend>
-            <p class="form-text">Fetch uses these. Nothing is committed.</p>
-            <div class="row g-2">
-                <div class="col-12 col-md-3">
-                    <label class="form-label" for="browse-mode">Mode</label>
-                    <select class="form-select" id="browse-mode" name="mode">
-                        @foreach (var mode in new[] { "newest", "oldest", "from-offset", "since" })
+        <fieldset class="border rounded p-3 mb-0 lu-search">
+            <legend class="float-none w-auto px-2 h6">Search</legend>
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-lg-5">
+                    <label class="form-label" for="browse-q">Search</label>
+                    <input class="form-control" id="browse-q" name="mq" value="@query.MessageText" />
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label" for="browse-kind">Message type</label>
+                    <select class="form-select" id="browse-kind" name="mtype">
+                        @foreach (var kind in new[] { "", "Main", "Error", "Retry", "Redrive" })
                         {
-                            if (mode == query.BrowseMode)
+                            var label = kind.Length == 0 ? "All types" : kind;
+                            if (kind == query.MessageKind)
                             {
-                                <option value="@mode" selected>@mode</option>
+                                <option value="@kind" selected>@label</option>
                             }
                             else
                             {
-                                <option value="@mode">@mode</option>
+                                <option value="@kind">@label</option>
                             }
                         }
                     </select>
-                    <p class="form-text">Newest takes the latest page. Oldest starts at the beginning. From offset and Since start at the position you give.</p>
                 </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="browse-limit">Limit</label>
-                    <input class="form-control" id="browse-limit" name="limit" type="number" min="1" max="50" value="@query.BrowseLimit" />
-                    <p class="form-text">Default 25. At most 50.</p>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label" for="browse-from">From</label>
+                    <input class="form-control" id="browse-from" name="mfrom" type="datetime-local" value="@TimeValue(query.MessageFrom)" />
                 </div>
-                <div class="col-12 col-md-3">
-                    <label class="form-label" for="browse-partition">Partitions</label>
-                    <input class="form-control" id="browse-partition" name="partition" value="@string.Join(", ", query.BrowsePartitions)" />
-                    <p class="form-text">Leave blank for every partition. Otherwise list them, such as 0, 2.</p>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label" for="browse-to">To</label>
+                    <input class="form-control" id="browse-to" name="mto" type="datetime-local" value="@TimeValue(query.MessageTo)" />
                 </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="browse-offset">Offset</label>
-                    <input class="form-control" id="browse-offset" name="offset" type="number" min="0" value="@query.BrowseOffset" />
-                    <p class="form-text">Used when the mode is from-offset.</p>
-                </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="browse-timestamp">Timestamp</label>
-                    <input class="form-control" id="browse-timestamp" name="timestamp" type="number" min="0" value="@query.BrowseTimestamp" />
-                    <p class="form-text">Unix time in milliseconds. Used when the mode is since.</p>
+                <div class="col-auto">
+                    <button class="btn btn-au-execute" type="submit">Search</button>
                 </div>
             </div>
-        </fieldset>
-
-        <fieldset class="border rounded p-3 mb-3">
-            <legend class="float-none w-auto px-2 h6">What to keep</legend>
-            <p class="form-text">A record has to match every filter you fill in. Leave them blank to keep the page as read.</p>
-            <div class="row g-2">
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="browse-key">Key contains</label>
-                    <input class="form-control" id="browse-key" name="key" value="@query.BrowseKey" />
-                </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="browse-header-name">Header name</label>
-                    <input class="form-control" id="browse-header-name" name="headerName" value="@query.BrowseHeaderName" />
-                </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="browse-header-value">Header value contains</label>
-                    <input class="form-control" id="browse-header-value" name="headerValue" value="@query.BrowseHeaderValue" />
-                    <p class="form-text">Both the name and the value are required before the header filter applies.</p>
-                </div>
-            </div>
-        </fieldset>
-
-        @if (fetched)
-        {
-            <div id="kafka-browse-result" class="alert @KafkaBrowseText.Tone(browse, error) lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-browse" data-result-key="@(browse?.Metadata.Returned)-@(browse?.Metadata.CapHit)-@error">
-                <details class="lu-result-details">
-                    <summary>
-                        <span class="badge @KafkaBrowseText.BadgeClass(browse, error)">@KafkaBrowseText.Badge(browse, error)</span>
-                        <span class="lu-result-text">@KafkaBrowseText.Verdict(browse, error)</span>
-                        <button type="button" class="lu-dismiss lu-result-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
-                    </summary>
-                    <div class="lu-result-body">
-                @if (browse is not null)
-                {
-                    <dl class="row mb-2">
-                        <dt class="col-sm-4">Topic</dt>
-                        <dd class="col-sm-8">@browse.Topic</dd>
-                        <dt class="col-sm-4">Mode</dt>
-                        <dd class="col-sm-8">@browse.Mode</dd>
-                        <dt class="col-sm-4">Returned</dt>
-                        <dd class="col-sm-8">@browse.Metadata.Returned</dd>
-                        <dt class="col-sm-4">Truncated</dt>
-                        <dd class="col-sm-8">@(browse.Metadata.Truncated ? "Yes. A record or the page was cut to stay inside the cap." : "No.")</dd>
-                        <dt class="col-sm-4">Cap hit</dt>
-                        <dd class="col-sm-8">@(browse.Metadata.CapHit ? "Yes. The scan, the byte budget, or the time limit stopped the read." : "No.")</dd>
-                        <dt class="col-sm-4">Elapsed</dt>
-                        <dd class="col-sm-8">@browse.Metadata.ElapsedMs ms</dd>
-                    </dl>
-                }
-                @if (!string.IsNullOrWhiteSpace(error))
-                {
-                    <p class="mb-1">Blocking reasons</p>
-                    <ul>
-                        <li>@error</li>
-                    </ul>
-                }
-                <p class="mb-2">@KafkaBrowseText.NextStep(browse, error)</p>
-                <details>
-                    <summary>Details</summary>
-                    <p class="mb-0">The read uses group @KafkaBrowseLimits.GroupId. Auto-commit is off, so this page does not move a consumer group. A page stops at @KafkaBrowseLimits.MaxLimit records, @KafkaBrowseLimits.MaxScanned scanned records, or @KafkaBrowseLimits.MaxPageBytes bytes.</p>
-                </details>
+            <details class="lu-advanced mt-3" @(advancedOpen ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="browse-header">Header contains</label>
+                        <input class="form-control" id="browse-header" name="hq" value="@query.HeaderContains" />
                     </div>
-                </details>
-            </div>
-        }
-
-        <div class="mt-3">
-            <button class="btn btn-au-execute" type="submit">Fetch</button>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="browse-key">Key contains</label>
+                        <input class="form-control" id="browse-key" name="key" value="@query.BrowseKey" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="browse-value">Value contains</label>
+                        <input class="form-control" id="browse-value" name="vq" value="@query.ValueContains" />
+                    </div>
+                </div>
+            </details>
+            <input type="hidden" name="msgPage" value="1" />
+            <input type="hidden" name="more" value="@(advancedOpen ? "1" : "")" />
+        </fieldset>
+        <div class="mt-2 mb-3">
             @if (browse is not null)
             {
                 <a class="btn btn-au-link" href="@query.ExportHref()">Export JSON</a>
             }
-            <a class="btn btn-warning" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear seek</a>
+            <a class="btn btn-warning" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear</a>
         </div>
+        <p class="visually-hidden">The read does not commit offsets.</p>
     </form>
+
+    @if (fetched)
+    {
+        <div id="kafka-browse-result" class="alert @KafkaBrowseText.Tone(browse, error) lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-browse" data-result-key="@(browse?.Metadata.Returned)-@(browse?.Metadata.CapHit)-@error">
+            <details class="lu-result-details">
+                <summary>
+                    <span class="badge @KafkaBrowseText.BadgeClass(browse, error)">@KafkaBrowseText.Badge(browse, error)</span>
+                    <span class="lu-result-text">@KafkaBrowseText.Verdict(browse, error)</span>
+                    <button type="button" class="lu-dismiss lu-result-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
+                </summary>
+                <div class="lu-result-body">
+            @if (browse is not null)
+            {
+                <dl class="row mb-2">
+                    <dt class="col-sm-4">Topic</dt>
+                    <dd class="col-sm-8">@browse.Topic</dd>
+                    <dt class="col-sm-4">Mode</dt>
+                    <dd class="col-sm-8">@browse.Mode</dd>
+                    <dt class="col-sm-4">Returned</dt>
+                    <dd class="col-sm-8">@browse.Metadata.Returned</dd>
+                    <dt class="col-sm-4">Truncated</dt>
+                    <dd class="col-sm-8">@(browse.Metadata.Truncated ? "Yes. A record or the page was cut to stay inside the cap." : "No.")</dd>
+                    <dt class="col-sm-4">Cap hit</dt>
+                    <dd class="col-sm-8">@(browse.Metadata.CapHit ? "Yes. The scan, the byte budget, or the time limit stopped the read." : "No.")</dd>
+                    <dt class="col-sm-4">Elapsed</dt>
+                    <dd class="col-sm-8">@browse.Metadata.ElapsedMs ms</dd>
+                </dl>
+            }
+            @if (!string.IsNullOrWhiteSpace(error))
+            {
+                <p class="mb-1">Blocking reasons</p>
+                <ul>
+                    <li>@error</li>
+                </ul>
+            }
+            <p class="mb-2">@KafkaBrowseText.NextStep(browse, error)</p>
+            <details>
+                <summary>Details</summary>
+                <p class="mb-0">The read uses group @KafkaBrowseLimits.GroupId. Auto-commit is off, so this page does not move a consumer group. A page stops at @KafkaBrowseLimits.MaxLimit records, @KafkaBrowseLimits.MaxScanned scanned records, or @KafkaBrowseLimits.MaxPageBytes bytes.</p>
+            </details>
+                </div>
+            </details>
+        </div>
+    }
 
     @if (browse is { Records.Count: > 0 })
     {
-        var seek = KafkaBrowseText.SeekLinks(query, browse);
         <h3 class="h6 mt-4">Records</h3>
-        <p class="text-muted">@browse.Records.Count shown. Open a row for the payload. Headers and the raw key stay inside that row. Offsets on this page run from @seek.Earliest to @seek.Latest. This is one page of offsets, not a cursor across partitions.</p>
-        <div class="lu-kafka-pager">
-            <span>At most @KafkaBrowseLimits.MaxLimit records. The read does not commit offsets.</span>
-            <span class="d-flex gap-2">
-                @if (seek.Earlier)
-                {
-                    <a class="btn btn-sm btn-au-link" href="@seek.EarlierHref">Earlier</a>
-                }
-                @if (seek.Later)
-                {
-                    <a class="btn btn-sm btn-au-link" href="@seek.LaterHref">Later</a>
-                }
-            </span>
-        </div>
         <div class="au-card card">
         <div class="table-responsive">
             <table class="table table-sm align-middle">
@@ -346,8 +307,86 @@
     }
     else if (browse is not null)
     {
-        <p class="text-muted mt-3">No records matched this seek.</p>
+        <p class="text-muted mt-3">No records matched this search.</p>
     }
+
+    <nav class="lu-pager" aria-label="Message pages">
+        @if (matchLabel.Length > 0)
+        {
+            <span class="small text-muted">@matchLabel</span>
+        }
+        <span class="small text-muted">Page @messagePage of @messagePages</span>
+        @if (messagePage > 1)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: 1)">First</a>
+            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: messagePage - 1)">Previous</a>
+        }
+        else
+        {
+            <button type="button" class="btn btn-sm btn-au-link" disabled>First</button>
+            <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
+        }
+        @for (var number = windowStart; number <= windowEnd; number++)
+        {
+            if (number == messagePage)
+            {
+                <span class="btn btn-sm lu-nav-current" aria-current="page">@number</span>
+            }
+            else
+            {
+                <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: number)">@number</a>
+            }
+        }
+        @if (messagePage < messagePages)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: messagePage + 1)">Next</a>
+            <a class="btn btn-sm btn-au-link" href="@query.Href(msgPage: messagePages)">Last</a>
+        }
+        else
+        {
+            <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
+            <button type="button" class="btn btn-sm btn-au-link" disabled>Last</button>
+        }
+        <form class="lu-pager-jump" method="get" action="/Operations/Kafka">
+            <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
+            <input type="hidden" name="topic" value="@topicName" />
+            <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+            <input type="hidden" name="q" value="@query.Q" />
+            <input type="hidden" name="sort" value="@query.Sort" />
+            <input type="hidden" name="dir" value="@query.Dir" />
+            <input type="hidden" name="pageSize" value="@pageSize" />
+            <input type="hidden" name="family" value="@query.Family" />
+            <input type="hidden" name="keyClass" value="@query.KeyClass" />
+            <input type="hidden" name="group" value="@query.Group" />
+            <input type="hidden" name="broker" value="@query.Broker" />
+            <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
+            <input type="hidden" name="mq" value="@query.MessageText" />
+            <input type="hidden" name="key" value="@query.BrowseKey" />
+            <input type="hidden" name="hq" value="@query.HeaderContains" />
+            <input type="hidden" name="vq" value="@query.ValueContains" />
+            <input type="hidden" name="mtype" value="@query.MessageKind" />
+            <input type="hidden" name="mfrom" value="@TimeValue(query.MessageFrom)" />
+            <input type="hidden" name="mto" value="@TimeValue(query.MessageTo)" />
+            <input type="hidden" name="more" value="@(advancedOpen ? "1" : "")" />
+            <input type="hidden" name="record" value="@query.OpenRecord" />
+            <input type="hidden" name="stage" value="@query.StageRecord" />
+            <label class="form-label mb-0" for="browse-jump">Page</label>
+            <input class="form-control form-control-sm" id="browse-jump" name="msgPage" type="number" min="1" max="@messagePages" value="@messagePage" />
+            <button class="btn btn-sm btn-au-execute" type="submit">Go</button>
+        </form>
+        <span class="small text-muted">Per page</span>
+        @foreach (var size in new[] { 10, 25, 50 })
+        {
+            if (size == pageSize)
+            {
+                <span class="btn btn-sm lu-nav-current" aria-current="true">@size</span>
+            }
+            else
+            {
+                <a class="btn btn-sm btn-au-link" href="@query.Href(pageSize: size, msgPage: 1)">@size</a>
+            }
+        }
+    </nav>
 
     <partial name="_ProduceMessage" model="Model" />
 }

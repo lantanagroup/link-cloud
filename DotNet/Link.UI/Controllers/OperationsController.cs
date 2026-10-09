@@ -149,17 +149,25 @@ public sealed class OperationsController : Controller
         if (string.IsNullOrWhiteSpace(query.TopicName))
             return Problem(detail: "A topic name is required.", statusCode: StatusCodes.Status400BadRequest);
 
+        var size = KafkaWindows.Size(query.PageSize);
         var call = await _kafka.ExportMessagesAsync(
             query.TopicName,
             query.BrowseMode,
             query.BrowsePartitions,
             query.BrowseOffset,
-            query.BrowseTimestamp,
-            query.BrowseLimit,
+            query.MessageFrom ?? query.BrowseTimestamp,
+            size,
             query.BrowseKey,
             query.BrowseHeaderName,
-            query.BrowseHeaderValue,
-            cancellationToken);
+            query.HeaderContains.Length > 0 ? query.HeaderContains : query.BrowseHeaderValue,
+            cancellationToken,
+            query.MsgPage,
+            query.MessageText,
+            query.HeaderContains,
+            query.ValueContains,
+            query.MessageKind,
+            query.MessageFrom,
+            query.MessageTo);
         if (call.Value is null)
             return Problem(detail: call.Error ?? "The export was refused.", statusCode: call.Status == 0 ? StatusCodes.Status502BadGateway : call.Status);
         return File(call.Value, "application/json", query.TopicName + "-messages.json");
@@ -511,17 +519,25 @@ public sealed class OperationsController : Controller
         {
             var familyCall = await _kafka.GetFamilyAsync(query.TopicName, cancellationToken);
             family = familyCall.Value;
+            var size = KafkaWindows.Size(query.PageSize);
             var messageCall = await _kafka.GetMessagesAsync(
                 query.TopicName,
                 query.BrowseMode,
                 query.BrowsePartitions,
                 query.BrowseOffset,
-                query.BrowseTimestamp,
-                query.BrowseLimit,
+                query.MessageFrom ?? query.BrowseTimestamp,
+                size,
                 query.BrowseKey,
                 query.BrowseHeaderName,
-                query.BrowseHeaderValue,
-                cancellationToken);
+                query.HeaderContains.Length > 0 ? query.HeaderContains : query.BrowseHeaderValue,
+                cancellationToken,
+                query.MsgPage,
+                query.MessageText,
+                query.HeaderContains,
+                query.ValueContains,
+                query.MessageKind,
+                query.MessageFrom,
+                query.MessageTo);
             messages = messageCall.Value;
             if (messages is null)
                 browseError = messageCall.Error ?? familyCall.Error;
@@ -854,11 +870,15 @@ public sealed class OperationsController : Controller
         {
             ["view"] = ThroughputKafkaPageQuery.Messages,
             ["topic"] = form.Topic ?? "",
-            ["mode"] = string.IsNullOrWhiteSpace(form.Mode) ? "newest" : form.Mode,
-            ["limit"] = form.Limit.ToString(),
             ["key"] = form.Key ?? "",
-            ["headerName"] = form.HeaderName ?? "",
-            ["headerValue"] = form.HeaderValue ?? "",
+            ["mq"] = form.MessageText ?? "",
+            ["hq"] = form.HeaderContains ?? "",
+            ["vq"] = form.ValueContains ?? "",
+            ["mtype"] = form.MessageKind ?? "",
+            ["mfrom"] = form.MessageFrom ?? "",
+            ["mto"] = form.MessageTo ?? "",
+            ["msgPage"] = form.MsgPage < 1 ? "1" : form.MsgPage.ToString(),
+            ["more"] = form.More ? "1" : "",
             ["record"] = form.Record ?? "",
             ["stage"] = form.Stage ?? "",
             ["q"] = form.Q ?? "",
@@ -874,12 +894,6 @@ public sealed class OperationsController : Controller
             ["advanced"] = form.Advanced ? "1" : "",
             ["returnUrl"] = ReturnUrlRules.Sanitize(form.ReturnUrl) ?? ""
         };
-        if (!string.IsNullOrWhiteSpace(form.Offset))
-            values["offset"] = form.Offset;
-        if (!string.IsNullOrWhiteSpace(form.Timestamp))
-            values["timestamp"] = form.Timestamp;
-        if (!string.IsNullOrWhiteSpace(form.BrowsePartition))
-            values["partition"] = form.BrowsePartition;
         return ThroughputKafkaPageQuery.From(new QueryCollection(values), ReturnUrlRules.Sanitize(form.ReturnUrl));
     }
 
@@ -974,4 +988,12 @@ public sealed class KafkaChangeForm
     public string? MessageHeaders { get; set; }
     public string? MessageKey { get; set; }
     public string? MessageValue { get; set; }
+    public string? MessageText { get; set; }
+    public string? HeaderContains { get; set; }
+    public string? ValueContains { get; set; }
+    public string? MessageKind { get; set; }
+    public string? MessageFrom { get; set; }
+    public string? MessageTo { get; set; }
+    public int MsgPage { get; set; } = 1;
+    public bool More { get; set; }
 }

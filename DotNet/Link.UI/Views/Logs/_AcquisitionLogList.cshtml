@@ -4,9 +4,9 @@
     var query = Model.Query;
     var search = Model.Search;
     var bar = Model.Paging;
-    Dictionary<string, string> Route(int? page = null, string? sortBy = null, string? sortDir = null)
+    Dictionary<string, string> Route(int? page = null, string? sortBy = null, string? sortDir = null, int? pageSize = null)
     {
-        var route = query.ToRoute(page, sortBy, sortDir);
+        var route = query.ToRoute(page, sortBy, sortDir, pageSize);
         if (Model.RunId is Guid runId)
             route["runId"] = runId.ToString("D");
         return route;
@@ -230,25 +230,7 @@ else
                     </div>
                     <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @search.MinAgeHours hours, and logs in a terminal status.</p>
                 </form>
-                <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Log pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" href="@Href(Route(bar.Page - 1))" @(Model.Embedded ? "data-da-panel" : null)>Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" href="@Href(Route(bar.Page + 1))" @(Model.Embedded ? "data-da-panel" : null)>Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Log pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = search.PageSize, Sizes = LogsRules.PageSizes, Path = Model.Embedded ? "/Logs/Acquisition/panel" : "/Logs/Acquisition", Panel = Model.Embedded, Route = (page, size) => Route(page, pageSize: size) })" />
             }
         </div>
     </div>

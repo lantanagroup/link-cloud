@@ -24,7 +24,7 @@ public class ButtonVocabularyTests
         string[] allowed =
         [
             "Resubmit", "Cancel", "Abort", "Close", "Clear", "Reject",
-            "Skip", "Undo", "Start over", "Recover", "Regenerate"
+            "Skip", "Undo", "Start over", "Recover", "Regenerate", "Stop"
         ];
         var hits = new List<string>();
         foreach (var file in SourceFiles())

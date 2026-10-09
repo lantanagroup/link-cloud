@@ -1,0 +1,86 @@
+@model BottomPager
+@{
+    var pages = Model.Pages < 1 ? 1 : Model.Pages > int.MaxValue ? int.MaxValue : (int)Model.Pages;
+    var current = Model.Page < 1 ? 1 : Model.Page;
+    if (current > pages)
+        current = pages;
+    var start = Math.Max(1, current - 2);
+    var end = Math.Min(pages, current + 2);
+    var path = string.IsNullOrWhiteSpace(Model.Path) ? Context.Request.Path.ToString() : Model.Path;
+    string Link(int number, int size)
+    {
+        if (Model.Href is not null)
+            return Model.Href(number, size);
+        var route = Model.Route?.Invoke(number, size) ?? new Dictionary<string, string>();
+        if (route.Count == 0)
+            return path;
+        return path + "?" + string.Join("&", route.Select(pair =>
+            Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+    }
+    var fields = Model.Route?.Invoke(current, Model.PageSize);
+}
+
+<nav class="lu-pager" aria-label="@Model.Label">
+    <span class="small text-muted">@Model.Total</span>
+    <span class="small text-muted">Page @current of @pages</span>
+    @if (current > 1)
+    {
+        <a class="btn btn-sm btn-au-link" href="@Link(1, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>First</a>
+        <a class="btn btn-sm btn-au-link" href="@Link(current - 1, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>Previous</a>
+    }
+    else
+    {
+        <button type="button" class="btn btn-sm btn-au-link" disabled>First</button>
+        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
+    }
+    @for (var number = start; number <= end; number++)
+    {
+        if (number == current)
+        {
+            <span class="btn btn-sm lu-nav-current" aria-current="page">@number</span>
+        }
+        else
+        {
+            <a class="btn btn-sm btn-au-link" href="@Link(number, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>@number</a>
+        }
+    }
+    @if (current < pages)
+    {
+        <a class="btn btn-sm btn-au-link" href="@Link(current + 1, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>Next</a>
+        <a class="btn btn-sm btn-au-link" href="@Link(pages, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>Last</a>
+    }
+    else
+    {
+        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
+        <button type="button" class="btn btn-sm btn-au-link" disabled>Last</button>
+    }
+    @if (!Model.Panel && fields is not null)
+    {
+        <form class="lu-pager-jump" method="get" action="@path">
+            @foreach (var pair in fields)
+            {
+                if (string.Equals(pair.Key, Model.PageKey, StringComparison.Ordinal))
+                    continue;
+                <input type="hidden" name="@pair.Key" value="@pair.Value" />
+            }
+            <label class="form-label mb-0" for="@("jump-" + Model.Label.Replace(' ', '-'))">Page</label>
+            <input class="form-control form-control-sm" id="@("jump-" + Model.Label.Replace(' ', '-'))" name="@Model.PageKey" type="number" min="1" max="@pages" value="@current" />
+            <button class="btn btn-sm btn-au-execute" type="submit">Go</button>
+        </form>
+    }
+    @if (Model.Sizes.Count > 0)
+    {
+        <span class="small text-muted">Per page</span>
+        @foreach (var size in Model.Sizes)
+        {
+            if (size == Model.PageSize)
+            {
+                <span class="btn btn-sm lu-nav-current" aria-current="true">@size</span>
+            }
+            else
+            {
+                <a class="btn btn-sm btn-au-link" href="@Link(1, size)" @(Model.Panel ? "data-da-panel" : null)>@size</a>
+            }
+        }
+    }
+</nav>

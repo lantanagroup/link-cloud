@@ -3,8 +3,8 @@
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.ReportId) ? "Report" : Model.ReportId;
     var bar = Model.Paging;
     var origin = ReturnUrlRules.FromQuery(Context.Request);
-    Dictionary<string, string> PageRoute(int page) =>
-        Model.Query.ToRoute(Model.ReportId, page).WithOrigin(origin);
+    Dictionary<string, string> PageRoute(int page, int pageSize) =>
+        Model.Query.ToRoute(Model.ReportId, page, pageSize: pageSize).WithOrigin(origin);
 }
 
 @{
@@ -87,9 +87,11 @@ else
             {
                 <div class="alert alert-warning">@Model.SectionError</div>
             }
-            <form method="get" asp-action="Report" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+            <form method="get" asp-action="Report" asp-route-id="@Model.FacilityId" class="mb-3 lu-search">
                 <input type="hidden" name="reportId" value="@Model.ReportId" />
+                <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
                 <partial name="_ReturnField" />
+                <div class="row g-2 align-items-end">
                 <div class="col-12 col-md-6">
                     <label class="form-label" for="patientId">Patient ID</label>
                     <input id="patientId" name="patientId" value="@Model.Query.PatientId" class="form-control" />
@@ -97,6 +99,7 @@ else
                 <div class="col-12 d-flex gap-2">
                     <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
                     <a class="btn btn-warning" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-returnUrl="@origin">Clear</a>
+                </div>
                 </div>
             </form>
 
@@ -192,26 +195,8 @@ else
                         </tbody>
                     </table>
                 </div>
-                <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Patient pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page - 1)">Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page + 1)">Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
             }
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Patient pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = Model.Query.PageSize, Sizes = FacilityViewRules.PageSizes, Route = PageRoute })" />
         </div>
     </div>
 }

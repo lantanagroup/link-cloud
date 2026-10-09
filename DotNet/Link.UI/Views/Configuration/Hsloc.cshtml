@@ -2,8 +2,9 @@
 @{
     var query = Model.Query;
     var bar = Model.Paging;
-    Dictionary<string, string> Route(int page)
+    Dictionary<string, string> Route(int page, int pageSize = 0)
     {
+        _ = pageSize;
         var route = new Dictionary<string, string> { ["page"] = page.ToString() };
         if (!string.IsNullOrWhiteSpace(query.Text)) route["text"] = query.Text;
         if (!string.IsNullOrWhiteSpace(query.Version)) route["version"] = query.Version;
@@ -22,7 +23,8 @@
 <div class="au-card card mb-3">
     <div class="card-header">Filter</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
+        <form method="get" class="lu-search">
+            <div class="row g-2 align-items-end">
             <div class="col-12 col-md-5">
                 <label class="form-label" for="text">Code or description</label>
                 <input id="text" name="text" value="@query.Text" class="form-control" maxlength="255" />
@@ -34,6 +36,7 @@
             <div class="col-12 col-md-4 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-execute">Filter</button>
                 <a class="btn btn-warning" asp-action="Hsloc">Clear</a>
+            </div>
             </div>
         </form>
     </div>
@@ -116,26 +119,8 @@ else
                         </tbody>
                     </table>
                 </div>
-                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="HSLOC pages">
-                    @if (bar.HasPrevious)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-                    }
-                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
-                    @if (bar.HasNext)
-                    {
-                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-                    }
-                </nav>
             }
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "HSLOC pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = bar.PageSize, Route = Route })" />
         </div>
     </div>
 }
