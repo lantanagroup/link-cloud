@@ -92,6 +92,10 @@ public static class StatusPills
     public static string ForMilestone(bool failed, bool completed) =>
         failed ? "au-badge-danger" : completed ? "au-badge-success" : "au-badge-muted";
 
+    /// <summary>A numbered step marker: the current step is active, the rest are muted.</summary>
+    public static string ForWizardStep(int current, int step) =>
+        current == step ? "au-badge-active" : "au-badge-muted";
+
     public static string ForCheck(bool passed, bool advisory) =>
         passed ? "au-badge-success" : advisory ? "au-badge-warning" : "au-badge-danger";
 
