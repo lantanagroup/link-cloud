@@ -22,7 +22,7 @@
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>All templates</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewFacility">New</button>
+            <button type="button" class="btn btn-sm btn-au-link" id="btnNewFacility">New</button>
         </div>
         <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0">
@@ -69,11 +69,11 @@
                         </td>
                         <td class="text-nowrap">
                             <div class="lu-row-actions">
-                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-facility-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(t.IsSystem ? "View" : "Edit")</span></button>
+                                <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-facility-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                 @if (!t.IsSystem)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-facility-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-facility-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                 }
                             </div>
                         </td>
@@ -161,7 +161,7 @@
         </div>
     </div>
     <div class="card-footer text-end">
-        <button type="button" class="btn btn-au-neutral" id="facilityCancel">Cancel</button>
+        <button type="button" class="btn btn-warning" id="facilityCancel">Cancel</button>
         <button type="button" class="btn btn-success" id="facilitySave">Save</button>
     </div>
 </div>

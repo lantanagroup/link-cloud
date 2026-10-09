@@ -93,7 +93,7 @@
                     {
                         var selected = statuses.Any(value => value.Split(',').Any(part => part.Trim().Equals(status, StringComparison.OrdinalIgnoreCase)));
                         <input class="btn-check" type="checkbox" name="status" id="status-@status" value="@status" autocomplete="off" @(selected ? "checked" : null) />
-                        <label class="btn btn-sm btn-au-neutral" for="status-@status">@status</label>
+                        <label class="btn btn-sm btn-au-link" for="status-@status">@status</label>
                     }
                 </div>
             </div>
@@ -148,8 +148,8 @@
                 <partial name="_AutomationScope" model="query.Scope" />
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-au-neutral" asp-action="Acquisition">Clear</a>
+                <button type="submit" class="btn btn-success"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Acquisition">Clear</a>
             </div>
         </form>
     </div>

@@ -110,6 +110,8 @@ public class UiPatternGuardTests
     {
         var hits = SourceLines()
             .Where(row => !IsSharedChartPalette(row.Where))
+            .Where(row => !row.Line.Contains("--au-link:", StringComparison.Ordinal)
+                && !row.Line.Contains("--au-link-active:", StringComparison.Ordinal))
             .SelectMany(row => ColorsIn(row.Line).Where(IsForbiddenHue).Select(color => row.Where + " " + color))
             .ToList();
 

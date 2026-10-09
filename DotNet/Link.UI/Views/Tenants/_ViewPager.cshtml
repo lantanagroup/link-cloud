@@ -5,19 +5,19 @@
 <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Pages">
     @if (bar.HasPrevious)
     {
-        <a class="btn btn-sm btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page - 1).WithOrigin(ReturnUrlRules.FromQuery(Context.Request))">Previous</a>
+        <a class="btn btn-sm btn-au-link" asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page - 1).WithOrigin(ReturnUrlRules.FromQuery(Context.Request))">Previous</a>
     }
     else
     {
-        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
     }
     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
     @if (bar.HasNext)
     {
-        <a class="btn btn-sm btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page + 1).WithOrigin(ReturnUrlRules.FromQuery(Context.Request))">Next</a>
+        <a class="btn btn-sm btn-au-link" asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page + 1).WithOrigin(ReturnUrlRules.FromQuery(Context.Request))">Next</a>
     }
     else
     {
-        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
     }
 </nav>

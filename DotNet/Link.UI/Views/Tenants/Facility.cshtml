@@ -9,7 +9,7 @@
     <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
     @if (!Model.IsCreate && !string.IsNullOrWhiteSpace(Model.FacilityId))
     {
-        <button type="button" class="btn btn-sm btn-au-neutral" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
+        <button type="button" class="btn btn-sm btn-au-link" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
     }
 </div>
 <h1 class="h3 mb-3">@heading</h1>
@@ -49,7 +49,7 @@ else
                 <span id="facilityDirtyFlag">No unsaved changes</span>
                 <div class="d-flex flex-wrap gap-2">
                     <button type="button" class="btn btn-success" id="facilitySaveButton" disabled>Save</button>
-                    <button type="button" class="btn btn-au-neutral" id="facilityCancelButton">Cancel</button>
+                    <button type="button" class="btn btn-warning" id="facilityCancelButton">Cancel</button>
                 </div>
                 <div id="facilitySaveResults" class="w-100 small" role="status"></div>
             </div>
@@ -60,7 +60,7 @@ else
             @if (!Model.IsCreate)
             {
                 <span class="d-flex align-items-center gap-2">
-                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)" title="View" aria-label="View"><i class="bi bi-eye" aria-hidden="true"></i></a>
+                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)" title="View" aria-label="View"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">View</span></a>
                 </span>
             }
         </div>
@@ -185,7 +185,7 @@ else
                                             </div>
                                             <div class="col-12 col-md-2">
                                                 <input class="d-none" type="checkbox" id="remove-@i" name="Schedules[@i].Remove" value="true" />
-                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-row-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-row-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             </div>
                                         </div>
                                     </div>
@@ -254,7 +254,7 @@ else
                                                 <input class="form-control" data-email-input value="@address" aria-label="Email address" maxlength="254" />
                                             </div>
                                             <div class="col-auto">
-                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-email-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-email-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             </div>
                                         </div>
                                     }

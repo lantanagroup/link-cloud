@@ -42,8 +42,8 @@ else
             @if (Model.CanDownloadJson)
             {
                 <div class="d-flex flex-wrap gap-2 mt-3">
-                    <a class="btn btn-au-neutral" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId" asp-route-json="true" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">View JSON</a>
-                    <a class="btn btn-au-neutral" asp-action="MeasureFile" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId">Download measure eval input</a>
+                    <a class="btn btn-au-link" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId" asp-route-json="true" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">View JSON</a>
+                    <a class="btn btn-au-link" asp-action="MeasureFile" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId">Download measure eval input</a>
                 </div>
             }
         </div>

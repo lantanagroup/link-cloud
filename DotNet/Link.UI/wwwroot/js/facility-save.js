@@ -185,7 +185,7 @@
     function undoButton(onClick) {
         var undo = document.createElement("button");
         undo.type = "button";
-        undo.className = "btn btn-sm btn-au-close";
+        undo.className = "btn btn-sm btn-warning";
         undo.textContent = "Undo";
         undo.addEventListener("click", function (event) {
             event.preventDefault();
@@ -304,7 +304,7 @@
         var label = rest || labels[action] || "this row";
         submit.type = "button";
         submit.className = "btn btn-sm btn-danger lu-icon-btn";
-        submit.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i>';
+        submit.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span>';
         submit.title = "Delete";
         submit.setAttribute("aria-label", "Delete " + label);
         submit.addEventListener("click", function () {
@@ -727,7 +727,7 @@
             row.setAttribute("data-collection-row", "");
             row.setAttribute("data-email-new", "true");
             row.innerHTML = '<div class="col"><input class="form-control" data-email-input aria-label="Email address" maxlength="254" /></div>'
-                + '<div class="col-auto"><button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-email-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button></div>';
+                + '<div class="col-auto"><button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-email-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button></div>';
             var box = form.querySelector("#notificationEmails");
             if (box) box.before(row);
             else host.appendChild(row);

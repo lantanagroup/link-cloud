@@ -290,10 +290,10 @@ else
                             }
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <a class="btn btn-au-neutral btn-sm lu-icon-btn" data-facility-swap="queryPlanItem" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@summary.Type" asp-route-planEdit="edit" title="Edit" aria-label="Edit @summary.Type"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                            <a class="btn btn-au-link btn-sm lu-icon-btn" data-facility-swap="queryPlanItem" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@summary.Type" asp-route-planEdit="edit" title="Edit" aria-label="Edit @summary.Type"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
                             <form method="post" data-au-save asp-action="DeleteQueryPlan" asp-route-id="@Model.FacilityId">
                                 <input type="hidden" name="type" value="@summary.Type" />
-                                <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @summary.Type"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @summary.Type"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                             </form>
                         </div>
                     </div>
@@ -303,7 +303,7 @@ else
                 {
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <p class="mb-0">New @plan.Type plan. It is saved with the facility.</p>
-                        <button type="button" class="btn btn-sm btn-au-neutral" id="queryPlanAddUndo">Undo</button>
+                        <button type="button" class="btn btn-sm btn-warning" id="queryPlanAddUndo">Undo</button>
                     </div>
                 }
                 @if (!plan.ReadFailed)
@@ -466,12 +466,12 @@ else
                             }
                             else
                             {
-                                <a class="btn btn-sm btn-au-neutral"
-                                   data-facility-swap="reportingOrgItem"
-                                   asp-action="Facility"
-                                   asp-route-id="@Model.FacilityId"
-                                   asp-route-orgConfig="@choice.Id"
-                                   asp-route-planType="@plan.Type">@choiceLabel</a>
+                                <a class="btn btn-sm btn-au-link"
+ data-facility-swap="reportingOrgItem"
+ asp-action="Facility"
+ asp-route-id="@Model.FacilityId"
+ asp-route-orgConfig="@choice.Id"
+ asp-route-planType="@plan.Type">@choiceLabel</a>
                             }
                         }
                     </div>
@@ -699,7 +699,7 @@ else
                     {
                         <div class="d-flex flex-wrap gap-2 mt-2">
                             <form method="post" data-au-save asp-action="TestSavedSftp" asp-route-id="@Model.FacilityId">
-                                <button type="submit" class="btn btn-au-neutral btn-sm">Test saved connection</button>
+                                <button type="submit" class="btn btn-au-link btn-sm">Test saved connection</button>
                             </form>
                             @if (sftp.CredentialsSaved == true)
                             {
@@ -742,7 +742,7 @@ else
                                 <input id="sftpTestPassword" name="Password" type="password" value="" class="form-control" autocomplete="new-password" />
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-au-neutral btn-sm mt-3">Test these details</button>
+                        <button type="submit" class="btn btn-au-link btn-sm mt-3">Test these details</button>
                     </form>
                 }
             </div>

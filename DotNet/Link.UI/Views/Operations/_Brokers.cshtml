@@ -45,7 +45,7 @@
                         <td>@row.LeaderCount</td>
                         <td>@Size(row.LogDirBytes)</td>
                         <td>
-                            <a class="btn btn-sm btn-au-neutral" href="@query.Href(broker: row.Id.ToString(), page: 1)" title="Open broker @row.Id" aria-label="Open broker @row.Id"><i class="bi bi-hdd" aria-hidden="true"></i></a>
+                            <a class="btn btn-sm btn-au-link" href="@query.Href(broker: row.Id.ToString(), page: 1)" title="Open broker @row.Id" aria-label="Open broker @row.Id"><i class="bi bi-hdd" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                         </td>
                     </tr>
                 }
@@ -72,7 +72,7 @@
                     <input class="form-control" id="add-broker-reason" name="reason" value="@Model.DraftReason" />
                 </div>
                 <div class="col-auto">
-                    <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
                 </div>
             </div>
         </form>
@@ -103,10 +103,10 @@ else
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-neutral lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission"><i class="bi bi-eye" aria-hidden="true"></i></button>
-                    <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission" title="Decommission broker" aria-label="Decommission broker"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></button>
-                    <button class="btn btn-sm btn-au-neutral lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance"><i class="bi bi-eye" aria-hidden="true"></i></button>
-                    <button class="btn btn-sm btn-success lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance" title="Rebalance onto this broker" aria-label="Rebalance onto this broker"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission" title="Decommission broker" aria-label="Decommission broker"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="ms-1">Decommission</span></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance" title="Rebalance onto this broker" aria-label="Rebalance onto this broker"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span class="ms-1">Rebalance</span></button>
                 </div>
             </form>
             @if (Model.MovePlan is not null)

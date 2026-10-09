@@ -84,19 +84,19 @@
                 <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/approve">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="query" />
-                    <button class="btn btn-sm btn-success lu-icon-btn" type="submit" title="Approve change" aria-label="Approve change"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-success lu-icon-btn" type="submit" title="Approve change" aria-label="Approve change"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Approve</span></button>
                 </form>
                 <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/execute">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="query" />
-                    <button class="btn btn-sm btn-success lu-icon-btn" type="submit" title="Execute change" aria-label="Execute change"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" title="Execute change" aria-label="Execute change"><i class="bi bi-play-fill" aria-hidden="true"></i><span class="ms-1">Execute</span></button>
                 </form>
                 @if (cancellable)
                 {
                     <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/cancel">
                         @Html.AntiForgeryToken()
                         <partial name="_QueryFields" model="query" />
-                        <button class="btn btn-sm btn-au-neutral lu-icon-btn" type="submit" title="Cancel reassignment" aria-label="Cancel reassignment"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                        <button class="btn btn-sm btn-warning lu-icon-btn" type="submit" title="Cancel reassignment" aria-label="Cancel reassignment"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
                     </form>
                 }
                 <form class="d-flex gap-2" method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/reject">
@@ -104,7 +104,7 @@
                     <partial name="_QueryFields" model="query" />
                     <label class="visually-hidden" for="reject-reason">Rejection reason</label>
                     <input class="form-control form-control-sm" id="reject-reason" name="reason" placeholder="Rejection reason" />
-                    <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" title="Reject change" aria-label="Reject change"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-warning lu-icon-btn" type="submit" title="Reject change" aria-label="Reject change"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Reject</span></button>
                 </form>
             </div>
         </div>

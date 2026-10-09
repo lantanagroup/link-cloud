@@ -10,10 +10,11 @@ public class LabeledIdTests
     {
         var button = File.ReadAllText(Repo("Views/Shared/_CopyButton.cshtml"));
         button.Should().Contain("bi-copy");
-        button.Should().Contain("btn-au-neutral");
+        button.Should().Contain("btn-au-link");
+        button.Should().NotContain("btn-au-neutral");
         button.Should().Contain("data-lu-copy");
         button.Should().Contain("aria-label");
-        button.Should().NotContain(">Copy<");
+        button.Should().Contain(">Copy</span>");
 
         var script = File.ReadAllText(Repo("wwwroot/js/live-region.js"));
         script.Should().Contain("bi-check2");

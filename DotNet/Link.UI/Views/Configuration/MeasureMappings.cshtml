@@ -77,8 +77,8 @@ else
                     </select>
                 </div>
                 <div class="col-12 d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                    <a class="btn btn-au-neutral" asp-action="MeasureMappings">Clear</a>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="MeasureMappings">Clear</a>
                 </div>
             </form>
         </div>
@@ -142,12 +142,12 @@ else
                                         <div class="lu-row-actions">
                                             <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveMapping">
                                                 <input type="hidden" name="Id" value="@row.Id" />
-                                                <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save mapping @row.Id"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
-                                                <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing mapping @row.Id"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save mapping @row.Id"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
+                                                <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing mapping @row.Id"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
                                             </form>
                                             <form method="post" data-au-save asp-action="DeleteMapping" onsubmit="return confirm('Delete this measure mapping?');">
                                                 <input type="hidden" name="id" value="@row.Id" />
-                                                <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete mapping @row.Id"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete mapping @row.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             </form>
                                         </div>
                                     </td>
@@ -159,20 +159,20 @@ else
                     <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Mapping pages">
                         @if (bar.HasPrevious)
                         {
-                            <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
+                            <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
                         }
                         else
                         {
-                            <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+                            <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
                         }
                         <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
                         @if (bar.HasNext)
                         {
-                            <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
+                            <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
                         }
                         else
                         {
-                            <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+                            <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
                         }
                     </nav>
                 }
@@ -205,7 +205,7 @@ else
                     </div>
                     <div class="col-12 col-md-2">
                         <button type="submit" class="btn btn-success">Save</button>
-                        <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
+                        <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
                     </div>
                 </form>
             </div>

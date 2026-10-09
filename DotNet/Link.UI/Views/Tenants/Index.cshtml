@@ -18,7 +18,7 @@
 <div class="au-card card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>Facilities</span>
-        <a class="btn btn-sm btn-success" asp-action="Create">New facility</a>
+        <a class="btn btn-sm btn-au-link" asp-action="Create">New facility</a>
     </div>
     <div class="card-body">
         @if (TempData["Message"] is string message)
@@ -61,7 +61,7 @@
                 <partial name="_AutomationScope" model="Model.Scope" />
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-search me-1"></i>Search</button>
             </div>
         </form>
         <div id="tenantResults" data-au-refresh="20000">
@@ -100,7 +100,7 @@
                             <td>
                                 <span class="d-inline-flex align-items-center gap-2">
                                     <a asp-action="View" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@tenant.DisplayName</a>
-                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Facility" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Configuration" aria-label="Configuration"><i class="bi bi-gear" aria-hidden="true"></i></a>
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Facility" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Configuration" aria-label="Configuration"><i class="bi bi-gear" aria-hidden="true"></i><span class="ms-1">Configuration</span></a>
                                 </span>
                             </td>
                             <td>
@@ -119,7 +119,7 @@
                                         {
                                             <input type="hidden" name="scope" value="@scopeQuery" />
                                         }
-                                        <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Restore" aria-label="Restore facility"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore facility"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
                                     </form>
                                 }
                                 else
@@ -135,20 +135,20 @@
             <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Tenant pages">
                 @if (Model.Page > 1)
                 {
-                    <a class="btn btn-sm btn-au-neutral" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page - 1, pageSize = Model.PageSize, scope = scopeQuery })">Previous</a>
+                    <a class="btn btn-sm btn-au-link" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page - 1, pageSize = Model.PageSize, scope = scopeQuery })">Previous</a>
                 }
                 else
                 {
-                    <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+                    <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
                 }
                 <span class="small text-muted">Page @Model.Page of @(Model.TotalPages == 0 ? 1 : Model.TotalPages) (@Model.TotalCount)</span>
                 @if (Model.Page < Model.TotalPages)
                 {
-                    <a class="btn btn-sm btn-au-neutral" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page + 1, pageSize = Model.PageSize, scope = scopeQuery })">Next</a>
+                    <a class="btn btn-sm btn-au-link" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page + 1, pageSize = Model.PageSize, scope = scopeQuery })">Next</a>
                 }
                 else
                 {
-                    <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+                    <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
                 }
             </nav>
             <p class="text-muted small mt-2 mb-0">@Model.TotalCount tenant(s). The name opens the facility. Configuration opens the editor.</p>
