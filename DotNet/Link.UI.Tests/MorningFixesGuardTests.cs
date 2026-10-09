@@ -279,7 +279,7 @@ public class MorningFixesGuardTests
         index.Should().Contain("Open Kafka");
 
         var kafka = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Kafka.cshtml"));
-        kafka.Should().Contain("btn btn-success\" type=\"submit\">Search");
+        kafka.Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
 
         var overview = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml"));
         overview.Should().Contain("bi-hdd-network");
@@ -332,6 +332,27 @@ public class MorningFixesGuardTests
 
         var health = File.ReadAllText(Path.Combine(Root(), "Views", "System", "Health.cshtml"));
         health.Should().Contain("btn btn-au-execute\">Check");
+    }
+
+    [Fact]
+    public void Execute_buttons_are_not_green()
+    {
+        var verb = new Regex(@"\b(Search|Submit|Request|Generate|Run|Execute|Check|Start|Post|Analyze|Evaluate|Send|Filter|Upload|Confirm step|Look up|Suggest)\b");
+        var button = new Regex(@"<(button|label)\b[^>]*\bbtn-success\b[^>]*>.*?</\1>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        var hits = new List<string>();
+        foreach (var file in ProductFiles("*.cshtml", "Views").Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js"))))
+        {
+            var text = File.ReadAllText(file);
+            foreach (Match match in button.Matches(text))
+            {
+                var plain = Regex.Replace(match.Value, "<[^>]+>", " ");
+                plain = Regex.Replace(plain, @"\s+", " ").Trim();
+                if (verb.IsMatch(plain))
+                    hits.Add(Rel(file) + " " + plain);
+            }
+        }
+
+        hits.Should().BeEmpty();
     }
 
     [Fact]

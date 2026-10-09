@@ -240,7 +240,8 @@ public class ReplicationFactorRulesTests
         form.Should().Contain(">Preview replication factor</span>");
         form.Should().Contain("btn-au-execute");
         form.Should().Contain(">Request</span>");
-        form.Should().Contain("btn-success");
+        form.Should().Contain("btn-au-execute lu-icon-btn\" type=\"submit\" formaction=\"/Operations/Kafka/replication-factor\"");
+        form.Should().NotContain("btn-success");
         form.Should().NotContain("btn-outline-");
         form.Should().Contain("lu-kafka-steps");
         form.Should().Contain("lu-kafka-summary");

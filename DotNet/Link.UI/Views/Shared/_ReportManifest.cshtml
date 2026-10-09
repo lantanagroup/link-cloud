@@ -111,7 +111,7 @@
                             <input type="hidden" name="typeSize" value="@Model.Query.TypeSize" />
                             <label class="visually-hidden" for="manifestTypeQuery">Search types</label>
                             <input id="manifestTypeQuery" name="typeQ" value="@Model.Query.TypeQuery" class="form-control form-control-sm" placeholder="Search types" />
-                            <button type="submit" class="btn btn-sm btn-success">Search</button>
+                            <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
                             <a class="btn btn-sm btn-warning" href="@Model.Href(clearType: true)">Clear</a>
                         </form>
                     </div>
@@ -190,7 +190,7 @@
                     <input type="hidden" name="typeSize" value="@Model.Query.TypeSize" />
                     <label class="visually-hidden" for="manifestPatientQuery">Search patients</label>
                     <input id="manifestPatientQuery" name="q" value="@Model.Query.PatientQuery" class="form-control form-control-sm" placeholder="@(Model.ShowGeneration ? "Patient id contains" : "Patient id")" />
-                    <button type="submit" class="btn btn-sm btn-success">Search</button>
+                    <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
                     <a class="btn btn-sm btn-warning" href="@Model.Href(clearPatient: true)">Clear</a>
                 </form>
             </div>
@@ -318,7 +318,7 @@
                             <input type="hidden" name="typeQ" value="@Model.Query.TypeQuery" />
                             <label class="visually-hidden" for="manifestCompareQuery">Search the comparison</label>
                             <input id="manifestCompareQuery" name="cmpQ" value="@Model.Query.CompareQuery" class="form-control form-control-sm" placeholder="Type or patient id" />
-                            <button type="submit" class="btn btn-sm btn-success">Search</button>
+                            <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
                             <a class="btn btn-sm btn-warning" href="@Model.Href(clearCompare: true)">Clear</a>
                         </form>
                         <table class="au-table table table-sm mb-3">
