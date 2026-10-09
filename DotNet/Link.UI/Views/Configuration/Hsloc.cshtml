@@ -32,8 +32,8 @@
                 <input id="filterVersion" name="version" value="@query.Version" class="form-control" maxlength="255" />
             </div>
             <div class="col-12 col-md-4 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-au-neutral">Filter</button>
-                <a class="btn btn-au-neutral" asp-action="Hsloc">Clear</a>
+                <button type="submit" class="btn btn-success">Filter</button>
+                <a class="btn btn-warning" asp-action="Hsloc">Clear</a>
             </div>
         </form>
     </div>
@@ -59,7 +59,7 @@
                 <input id="csv" name="csv" type="file" accept=".csv,text/csv" class="form-control" required />
             </div>
             <div class="col-12 col-md-2">
-                <button type="submit" class="btn btn-au-neutral">Replace</button>
+                <button type="submit" class="btn btn-success">Replace</button>
             </div>
         </form>
     </div>
@@ -108,7 +108,7 @@ else
                                         <input type="hidden" name="text" value="@query.Text" />
                                         <input type="hidden" name="version" value="@query.Version" />
                                         <input type="hidden" name="page" value="@bar.Page" />
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Code"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Code"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </td>
                             </tr>
@@ -119,20 +119,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="HSLOC pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
+                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
+                        <a class="btn btn-sm btn-au-link" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
                     }
                 </nav>
             }

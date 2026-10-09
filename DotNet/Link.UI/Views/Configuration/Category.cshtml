@@ -115,7 +115,7 @@
                                     <td>
                                         <form method="post" data-au-save asp-action="DeleteRule" asp-route-ruleId="@rule.Id" onsubmit="return confirm('Delete this rule? This cannot be undone.');">
                                             <input type="hidden" name="id" value="@form.Id" />
-                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete rule @rule.Id"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete rule @rule.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                         </form>
                                     </td>
                                 </tr>

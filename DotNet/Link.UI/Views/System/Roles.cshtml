@@ -27,7 +27,7 @@
             </div>
             <div class="col-12 col-md-2 d-flex gap-2">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
             </div>
         </form>
     </div>
@@ -73,10 +73,10 @@
                                 <div class="lu-row-actions">
                                     <form id="@formId" method="post" data-au-save asp-action="SaveRole">
                                         <input type="hidden" name="id" value="@role.Id" />
-                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @role.Name"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @role.Name"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
                                     </form>
                                     <form method="post" data-au-save asp-action="DeleteRole" asp-route-id="@role.Id" onsubmit="return confirm('Delete this role?');">
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @role.Name"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @role.Name"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </div>
                             </td>
@@ -126,7 +126,7 @@
                             </div>
                         }
                     </fieldset>
-                    <button type="submit" class="btn btn-sm btn-au-neutral mt-2">Save claims</button>
+                    <button type="submit" class="btn btn-sm btn-success mt-2">Save claims</button>
                 </form>
             }
             <p class="text-muted small mb-0">Clear every box and save to remove that role's claims.</p>

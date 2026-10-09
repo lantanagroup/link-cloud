@@ -34,11 +34,11 @@
     </div>
 
     <div class="d-flex gap-3 mb-3 flex-wrap" id="summaryBar">
-        <span class="badge au-badge-muted" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
+        <span class="text-muted" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
         <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == true)) passed</span>
         <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
         <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Skipped == true)) skipped</span>
-        <span class="badge bg-light text-dark border" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && (!s.IsIncludedInLatestRun || e.LastResult == null))) not run</span>
+        <span class="badge au-badge-muted" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && (!s.IsIncludedInLatestRun || e.LastResult == null))) not run</span>
     </div>
 
     <div id="runPhaseBanner" class="alert alert-secondary py-2 px-3 mb-3" style="display:none;">
@@ -53,7 +53,7 @@
                 <span id="seedRunStatus" class="badge au-badge-muted ms-2">Starting</span>
                 <div class="small text-muted" id="seedRunMeta"></div>
             </div>
-            <a id="seedRunLink" class="btn btn-sm btn-au-neutral" target="_blank" style="display:none;">
+            <a id="seedRunLink" class="btn btn-sm btn-au-link" target="_blank" style="display:none;">
                 <i class="bi bi-box-arrow-up-right me-1"></i>Open Run
             </a>
         </div>
@@ -84,9 +84,8 @@
                         <strong>@service.ServiceName</strong>
                         <span class="badge svc-summary ms-2 @serviceBadgeClass" data-service="@service.ServiceName">@serviceBadgeText</span>
                     </button>
-                    <button type="button" class="btn btn-sm btn-au-neutral btn-run-service me-2" data-service="@service.ServiceName">
-                        <i class="bi bi-play-fill"></i>
-                    </button>
+                    <button type="button" class="btn btn-sm btn-au-execute btn-run-service me-2" data-service="@service.ServiceName">
+                        <i class="bi bi-play-fill"></i><span class="ms-1">Run</span></button>
                 </div>
             </h2>
             <div id="collapse-@service.ServiceName" class="accordion-collapse collapse" data-bs-parent="#serviceAccordion">
@@ -171,9 +170,8 @@
                                     <td>
                                         @if (!ep.Definition.IsInformational)
                                         {
-                                            <button type="button" class="btn btn-sm btn-au-neutral btn-history" data-key="@key" title="History">
-                                                <i class="bi bi-clock-history"></i>
-                                            </button>
+                                            <button type="button" class="btn btn-sm btn-au-link btn-history" data-key="@key" title="History">
+                                                <i class="bi bi-clock-history"></i><span class="ms-1">History</span></button>
                                         }
                                     </td>
                                 </tr>

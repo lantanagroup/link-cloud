@@ -23,7 +23,7 @@
             </div>
             <div class="col-12 col-md-3">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
             </div>
         </form>
     </div>
@@ -61,11 +61,11 @@
                                 <div class="lu-row-actions">
                                     <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId">
                                         <input type="hidden" name="versionId" value="@row.Id" />
-                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Version"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Version"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Version"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
+                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Version"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
                                     </form>
                                     <form method="post" data-au-save asp-action="DeleteVersion" asp-route-versionId="@row.Id" asp-route-vendorId="@Model.VendorId" onsubmit="return confirm('Delete this version?');">
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Version"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Version"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </div>
                             </td>

@@ -14,7 +14,7 @@
             @foreach (var row in Model.TopicRows)
             {
                 var current = topic is not null && row.Topic == topic.Topic;
-                <a class="btn btn-sm @(current ? "btn-success" : "btn-au-neutral")" href="@query.Href(topic: row.Topic, page: 1)">@row.Topic</a>
+                <a class="btn btn-sm btn-au-link@(current ? " active" : "")" href="@query.Href(topic: row.Topic, page: 1)">@row.Topic</a>
             }
         </div>
         @if (Model.TopicRows.Count == 0)
@@ -116,7 +116,7 @@ else
 
     @if (topic.Slice1Eligible)
     {
-        <p class="mt-3"><a class="btn btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topic.Topic, page: 1)">Migrate instead</a> <span class="text-muted">@topic.MigrationEligibility An in-place add remaps keys. A migration recreates the topic empty and keeps the backup.</span></p>
+        <p class="mt-3"><a class="btn btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topic.Topic, page: 1)">Migrate instead</a> <span class="text-muted">@topic.MigrationEligibility An in-place add remaps keys. A migration recreates the topic empty and keeps the backup.</span></p>
     }
     else if (!string.IsNullOrWhiteSpace(topic.MigrationEligibility))
     {
@@ -164,10 +164,10 @@ else
                 </div>
             </div>
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
                 @if (!Model.Topics.ReadOnly)
                 {
-                    <button class="btn btn-sm btn-success" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-success lu-icon-btn" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
                 }
             </div>
         </form>
@@ -218,10 +218,10 @@ else
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
                     @if (!Model.Topics.ReadOnly)
                     {
-                        <button class="btn btn-sm btn-success" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                        <button class="btn btn-sm btn-success" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
                     }
                 </div>
             </form>

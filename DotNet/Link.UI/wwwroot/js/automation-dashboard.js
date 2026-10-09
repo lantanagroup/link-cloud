@@ -150,7 +150,7 @@
             time.setAttribute("data-created-at", run.createdAt || "");
             row.append(badge, time);
             var details = document.createElement("a");
-            details.className = "btn btn-sm btn-au-neutral mt-2 w-100";
+            details.className = "btn btn-sm btn-au-link mt-2 w-100";
             var back = window.location.pathname + window.location.search;
             details.href = "/Automation/Runs/" + encodeURIComponent(run.runId) + "?returnUrl=" + encodeURIComponent(back.charAt(0) === "/" ? back : "/Automation");
             details.textContent = "View Details";

@@ -20,7 +20,7 @@
                 @Html.AntiForgeryToken()
                 <input type="file" id="normGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
                 <button type="button" class="btn btn-sm btn-success" id="btnNormGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
-                <button type="button" class="btn btn-sm btn-au-neutral" id="btnNormGenerateReset">Start over</button>
+                <button type="button" class="btn btn-sm btn-warning" id="btnNormGenerateReset">Start over</button>
                 <span id="normGenSessionHint" class="small text-muted"></span>
             </div>
         </div>
@@ -29,17 +29,17 @@
     <ul class="lu-section-nav" id="normTabs" role="tablist">
         <li role="presentation">
             <button class="active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
-                <i class="bi bi-gear me-1"></i>Operations <span class="badge au-badge-muted">@operations.Count</span>
+                <i class="bi bi-gear me-1"></i>Operations <span class="text-muted">@operations.Count</span>
             </button>
         </li>
         <li role="presentation">
             <button id="tab-sequences" data-bs-toggle="tab" data-bs-target="#pane-sequences" type="button" role="tab">
-                <i class="bi bi-list-ol me-1"></i>Sequences <span class="badge au-badge-muted">@sequences.Count</span>
+                <i class="bi bi-list-ol me-1"></i>Sequences <span class="text-muted">@sequences.Count</span>
             </button>
         </li>
         <li role="presentation">
             <button id="tab-suites" data-bs-toggle="tab" data-bs-target="#pane-suites" type="button" role="tab">
-                <i class="bi bi-box me-1"></i>Suites <span class="badge au-badge-muted">@suites.Count</span>
+                <i class="bi bi-box me-1"></i>Suites <span class="text-muted">@suites.Count</span>
             </button>
         </li>
     </ul>
@@ -50,7 +50,7 @@
             <div class="au-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-gear me-2"></i>All Operations</span>
-                    <button type="button" class="btn btn-sm btn-success" id="btnNewOp" aria-label="Create new normalization operation" title="Create new normalization operation"><i class="bi bi-plus-lg"></i></button>
+                    <button type="button" class="btn btn-sm btn-au-link" id="btnNewOp" aria-label="Create new normalization operation" title="Create new normalization operation"><i class="bi bi-plus-lg"></i><span class="ms-1">New</span></button>
                 </div>
                 <div class="card-body p-0" data-au-table>
                     <table class="table au-table mb-0" id="opTable">
@@ -80,20 +80,20 @@
                                             <br /><small class="text-muted">@op.Description</small>
                                         }
                                     </td>
-                                    <td><span class="badge au-badge-muted">@op.OperationType</span></td>
+                                    <td>@op.OperationType</td>
                                     <td><small class="text-muted">@string.Join(", ", op.ResourceTypes)</small></td>
                                     <td>
-                                        @if (op.IsSystem) { <span class="badge bg-dark">System</span> }
-                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                        @if (op.IsSystem) { <text>System</text> }
+                                        else { <text>Custom</text> }
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(op.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="lu-row-actions">
-                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")" title="@(op.IsSystem ? "View" : "Edit")" aria-label="@(op.IsSystem ? "View" : "Edit")"><i class="bi @(op.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-op-clone" data-id="@op.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")" title="@(op.IsSystem ? "View" : "Edit")" aria-label="@(op.IsSystem ? "View" : "Edit")"><i class="bi @(op.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(op.IsSystem ? "View" : "Edit")</span></button>
+                                            <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-op-clone" data-id="@op.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                             @if (!op.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-op-delete" data-id="@op.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-op-delete" data-id="@op.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             }
                                         </div>
                                     </td>
@@ -114,7 +114,7 @@
             <div class="au-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-list-ol me-2"></i>All Sequences</span>
-                    <button type="button" class="btn btn-sm btn-success" id="btnNewSeq" aria-label="Create new normalization sequence" title="Create new normalization sequence"><i class="bi bi-plus-lg"></i></button>
+                    <button type="button" class="btn btn-sm btn-au-link" id="btnNewSeq" aria-label="Create new normalization sequence" title="Create new normalization sequence"><i class="bi bi-plus-lg"></i><span class="ms-1">New</span></button>
                 </div>
                 <div class="card-body p-0" data-au-table>
                     <table class="table au-table mb-0" id="seqTable">
@@ -142,19 +142,19 @@
                                             <br /><small class="text-muted">@seq.Description</small>
                                         }
                                     </td>
-                                    <td><span class="badge au-badge-muted">@seq.Entries.Count op(s)</span></td>
+                                    <td>@seq.Entries.Count op(s)</td>
                                     <td>
-                                        @if (seq.IsSystem) { <span class="badge bg-dark">System</span> }
-                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                        @if (seq.IsSystem) { <text>System</text> }
+                                        else { <text>Custom</text> }
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(seq.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="lu-row-actions">
-                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")" title="@(seq.IsSystem ? "View" : "Edit")" aria-label="@(seq.IsSystem ? "View" : "Edit")"><i class="bi @(seq.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-seq-clone" data-id="@seq.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")" title="@(seq.IsSystem ? "View" : "Edit")" aria-label="@(seq.IsSystem ? "View" : "Edit")"><i class="bi @(seq.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(seq.IsSystem ? "View" : "Edit")</span></button>
+                                            <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-seq-clone" data-id="@seq.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                             @if (!seq.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-seq-delete" data-id="@seq.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-seq-delete" data-id="@seq.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             }
                                         </div>
                                     </td>
@@ -175,7 +175,7 @@
             <div class="au-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-box me-2"></i>All Suites</span>
-                    <button type="button" class="btn btn-sm btn-success" id="btnNewSuite" aria-label="Create new normalization suite" title="Create new normalization suite"><i class="bi bi-plus-lg"></i></button>
+                    <button type="button" class="btn btn-sm btn-au-link" id="btnNewSuite" aria-label="Create new normalization suite" title="Create new normalization suite"><i class="bi bi-plus-lg"></i><span class="ms-1">New</span></button>
                 </div>
                 <div class="card-body p-0" data-au-table>
                     <table class="table au-table mb-0" id="suiteTable">
@@ -211,21 +211,21 @@
                                         <small class="text-muted">@suite.SequenceIds.Count seq, @suite.OperationIds.Count op(s)</small>
                                     </td>
                                     <td>
-                                        @if (suite.IsSystem) { <span class="badge bg-dark">System</span> }
-                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                        @if (suite.IsSystem) { <text>System</text> }
+                                        else { <text>Custom</text> }
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(suite.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="lu-row-actions">
-                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")" title="@(suite.IsSystem ? "View" : "Edit")" aria-label="@(suite.IsSystem ? "View" : "Edit")"><i class="bi @(suite.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                            <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-suite-clone" data-id="@suite.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")" title="@(suite.IsSystem ? "View" : "Edit")" aria-label="@(suite.IsSystem ? "View" : "Edit")"><i class="bi @(suite.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(suite.IsSystem ? "View" : "Edit")</span></button>
+                                            <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-suite-clone" data-id="@suite.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                             @if (!suite.IsDefault)
                                             {
-                                                <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-suite-default" data-id="@suite.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i></button>
+                                                <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-suite-default" data-id="@suite.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i><span class="ms-1">Default</span></button>
                                             }
                                             @if (!suite.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-suite-delete" data-id="@suite.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-suite-delete" data-id="@suite.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             }
                                         </div>
                                     </td>
@@ -251,7 +251,7 @@
                 <h5 class="mb-0" id="opModalTitle"><i class="bi bi-gear me-2"></i>Operation</h5>
                 <div class="d-flex gap-2 align-items-center">
                     <button type="button" class="btn btn-sm btn-success" id="btnOpSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnOpClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnOpClose">Close</button>
                 </div>
             </div>
             <div id="opFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -326,8 +326,8 @@
                             <div id="opCodeSystemMapRows"></div>
                             <div class="d-flex gap-2 mt-2 align-items-center">
                                 <button type="button" class="btn btn-sm btn-success" id="btnAddCodeSystemMap"><i class="bi bi-plus-lg me-1"></i>Add Code System Map</button>
-                                <button type="button" class="btn btn-sm btn-au-neutral" id="btnCodeMapLoadFromJson" title="Load the current JSON textarea content into the visual controls (JSON → controls).">Load from JSON</button>
-                                <button type="button" class="btn btn-sm btn-au-neutral" id="btnCodeMapSyncJson" title="Write the current visual controls into the JSON textarea (controls → JSON).">Sync JSON from Controls</button>
+                                <button type="button" class="btn btn-sm btn-success" id="btnCodeMapLoadFromJson" title="Load the current JSON textarea content into the visual controls (JSON → controls).">Load from JSON</button>
+                                <button type="button" class="btn btn-sm btn-success" id="btnCodeMapSyncJson" title="Write the current visual controls into the JSON textarea (controls → JSON).">Sync JSON from Controls</button>
                                 <span class="text-muted" title="Use the textarea and controls independently: Load from JSON copies textarea JSON into controls, and Sync JSON from Controls copies controls into the textarea.">
                                     <i class="bi bi-info-circle"></i>
                                 </span>
@@ -372,7 +372,7 @@
                 <h5 class="mb-0" id="seqModalTitle"><i class="bi bi-list-ol me-2"></i>Sequence</h5>
                 <div class="d-flex gap-2 align-items-center">
                     <button type="button" class="btn btn-sm btn-success" id="btnSeqSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnSeqClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnSeqClose">Close</button>
                 </div>
             </div>
             <div id="seqFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -412,7 +412,7 @@
                 <h5 class="mb-0" id="suiteModalTitle"><i class="bi bi-box me-2"></i>Suite</h5>
                 <div class="d-flex gap-2 align-items-center">
                     <button type="button" class="btn btn-sm btn-success" id="btnSuiteSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnSuiteClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnSuiteClose">Close</button>
                 </div>
             </div>
             <div id="suiteFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -611,7 +611,7 @@
             '<div class="col-md-4"><input class="form-control form-control-sm code-map-source-key" placeholder="Source Code" /></div>'
             + '<div class="col-md-3"><input class="form-control form-control-sm code-map-target-code" placeholder="Target Code" /></div>'
             + '<div class="col-md-4"><input class="form-control form-control-sm code-map-target-display" placeholder="Display" /></div>'
-            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>';
+            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button></div>';
 
         row.querySelector('.code-map-source-key').value = key || '';
         row.querySelector('.code-map-target-code').value = value?.code || value?.Code || '';
@@ -627,7 +627,7 @@
         card.innerHTML =
             '<div class="d-flex justify-content-between align-items-center mb-2">'
             + '<span class="fw-semibold">Code System Map</span>'
-            + '<button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button>'
+            + '<button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>'
             + '</div>'
             + '<div class="row g-2 mb-2">'
             + '<div class="col-md-6"><label class="form-label mb-1 small">Source System</label><input class="form-control form-control-sm csm-source-system" /></div>'
@@ -784,7 +784,7 @@
         removeButton.className = 'btn btn-sm btn-danger lu-icon-btn';
         removeButton.title = 'Remove';
         removeButton.setAttribute('aria-label', 'Remove');
-        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span>';
         removeButton.addEventListener('click', () => row.remove());
         col4.appendChild(removeButton);
 
@@ -981,11 +981,10 @@
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
         row.innerHTML = `
-            <span class="badge bg-dark" style="width:28px;">${seq}</span>
+            <span class="text-muted" style="min-width:1.5rem;display:inline-block;">${seq}</span>
             <select class="form-select form-select-sm seq-op-select"></select>
             <button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove">
-                <i class="bi bi-x-lg" aria-hidden="true"></i>
-            </button>`;
+                <i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>`;
 
         const select = row.querySelector('.seq-op-select');
 
@@ -1371,7 +1370,7 @@
         removeButton.className = 'btn btn-sm btn-danger lu-icon-btn';
         removeButton.title = 'Remove';
         removeButton.setAttribute('aria-label', 'Remove');
-        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span>';
 
         removeButton.addEventListener('click', () => {
             row.remove();
@@ -1420,7 +1419,7 @@
         removeButton.className = 'btn btn-sm btn-danger lu-icon-btn';
         removeButton.title = 'Remove';
         removeButton.setAttribute('aria-label', 'Remove');
-        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+        removeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span>';
 
         removeButton.addEventListener('click', () => {
             row.remove();
