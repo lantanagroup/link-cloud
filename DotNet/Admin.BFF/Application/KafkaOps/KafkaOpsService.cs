@@ -15,9 +15,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
 public static class KafkaTopicEligibility
 {
     public const string NotChecked = "Not checked yet. Dry run an in-place increase to confirm it is eligible.";
+    public const string MigrationNotChecked = "Not checked yet. Dry run a migration to confirm it is eligible.";
 
     public static string PartitionAddReason(bool hardBlocked, string? blockReason) =>
         hardBlocked ? blockReason ?? "" : NotChecked;
+
+    public static string MigrationCatalogLine(bool slice1Eligible, string? ineligibleReason) =>
+        slice1Eligible ? MigrationNotChecked : ineligibleReason ?? "";
 }
 
 public interface IKafkaOpsService
@@ -262,7 +266,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     TopicsFilePartitions = 3,
                     PartitionDrift = partitions > 0 && partitions != 3,
                     Slice1Eligible = family.Slice1Eligible,
-                    MigrationEligibility = family.Slice1Eligible ? "Eligible for an increase migration." : family.IneligibleReason,
+                    MigrationEligibility = KafkaTopicEligibility.MigrationCatalogLine(family.Slice1Eligible, family.IneligibleReason),
                     PartitionAddReason = KafkaTopicEligibility.PartitionAddReason(entry.HardBlocked, entry.BlockReason)
                 });
             }

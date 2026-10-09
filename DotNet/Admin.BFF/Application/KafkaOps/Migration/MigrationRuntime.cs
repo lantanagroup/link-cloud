@@ -313,7 +313,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
             KeyClass = entry?.KeyClass.ToString() ?? "",
             KeyShape = entry?.KeyShape ?? "",
             Slice1Eligible = family.Slice1Eligible,
-            Eligibility = family.Slice1Eligible ? "Eligible for an increase migration." : family.IneligibleReason,
+            Eligibility = KafkaTopicEligibility.MigrationCatalogLine(family.Slice1Eligible, family.IneligibleReason),
             Producers = family.Producers.Select(site => site.Workload + " " + site.Path).ToList(),
             Consumers = family.Consumers.Select(site => site.Workload + " " + site.Path).ToList(),
             StopSet = family.StopSet.ToList(),
