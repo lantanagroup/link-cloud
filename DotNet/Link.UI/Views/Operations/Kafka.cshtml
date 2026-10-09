@@ -5,7 +5,7 @@
 
 <partial name="_BackButton" model="@(new BackLink("/Operations", "Operations"))" />
 <h1 class="h3 mt-3">Kafka</h1>
-<p class="text-muted">Cluster health, consumer replicas, and brokers. Adding partitions is a separate, permanent action.</p>
+<p class="text-muted">Cluster health, consumer replicas, and brokers. Messages reads an allow-listed topic and does not commit offsets. Adding partitions is a separate, permanent action.</p>
 <partial name="_Nav" />
 
 <div id="kafkaResults" data-au-refresh="8000" data-au-page-url="@query.Href()">
@@ -14,6 +14,7 @@
         <a class="@(query.View == ThroughputKafkaPageQuery.Topic ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, page: 1)">Topic</a>
         <a class="@(query.View == ThroughputKafkaPageQuery.Consumers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, page: 1)">Consumers</a>
         <a class="@(query.View == ThroughputKafkaPageQuery.Brokers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Brokers, page: 1)">Brokers</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Messages ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, page: 1)">Messages</a>
         <a class="@(query.View == ThroughputKafkaPageQuery.Migrate ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, page: 1)">Migrate</a>
     </nav>
 
@@ -79,6 +80,21 @@
         <input type="hidden" name="topic" value="@query.TopicName" />
         <input type="hidden" name="broker" value="@query.Broker" />
         <input type="hidden" name="advanced" value="@(query.Advanced ? "1" : "")" />
+        @if (query.View == ThroughputKafkaPageQuery.Messages)
+        {
+            <input type="hidden" name="mode" value="@query.BrowseMode" />
+            <input type="hidden" name="limit" value="@query.BrowseLimit" />
+            <input type="hidden" name="offset" value="@query.BrowseOffset" />
+            <input type="hidden" name="timestamp" value="@query.BrowseTimestamp" />
+            <input type="hidden" name="key" value="@query.BrowseKey" />
+            <input type="hidden" name="headerName" value="@query.BrowseHeaderName" />
+            <input type="hidden" name="headerValue" value="@query.BrowseHeaderValue" />
+            <input type="hidden" name="record" value="@query.OpenRecord" />
+            @foreach (var partition in query.BrowsePartitions)
+            {
+                <input type="hidden" name="partition" value="@partition" />
+            }
+        }
         <input type="hidden" name="page" value="1" />
         <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
         <div class="col-auto">
@@ -98,6 +114,10 @@
     else if (query.View == ThroughputKafkaPageQuery.Consumers)
     {
         <partial name="_Consumers" model="Model" />
+    }
+    else if (query.View == ThroughputKafkaPageQuery.Messages)
+    {
+        <partial name="_Messages" model="Model" />
     }
     else if (query.View == ThroughputKafkaPageQuery.Migrate)
     {

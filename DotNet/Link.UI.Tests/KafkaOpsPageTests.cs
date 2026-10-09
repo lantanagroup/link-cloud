@@ -62,7 +62,7 @@ public class KafkaOpsPageTests
         text.Should().Contain("Overview");
         text.Should().Contain("Consumers");
         text.Should().Contain("Brokers");
-        text.Should().Contain("Advanced: add partitions");
+        text.Should().Contain("Add partitions");
         text.Should().Contain("Type the topic name");
         text.Should().Contain("LinkUiTime.Display");
         text.Should().Contain("_LabeledId");

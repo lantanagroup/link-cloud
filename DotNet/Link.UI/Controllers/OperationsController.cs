@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -136,6 +137,29 @@ public sealed class OperationsController : Controller
     {
         var page = await LoadAsync(requestId, null, null, null, null, null, cancellationToken);
         return View(page);
+    }
+
+    [HttpGet("Kafka/messages/export")]
+    public async Task<IActionResult> ExportMessages(CancellationToken cancellationToken)
+    {
+        var query = ThroughputKafkaPageQuery.From(Request.Query, null);
+        if (string.IsNullOrWhiteSpace(query.TopicName))
+            return Problem(detail: "A topic name is required.", statusCode: StatusCodes.Status400BadRequest);
+
+        var call = await _kafka.ExportMessagesAsync(
+            query.TopicName,
+            query.BrowseMode,
+            query.BrowsePartitions,
+            query.BrowseOffset,
+            query.BrowseTimestamp,
+            query.BrowseLimit,
+            query.BrowseKey,
+            query.BrowseHeaderName,
+            query.BrowseHeaderValue,
+            cancellationToken);
+        if (call.Value is null)
+            return Problem(detail: call.Error ?? "The export was refused.", statusCode: call.Status == 0 ? StatusCodes.Status502BadGateway : call.Status);
+        return File(call.Value, "application/json", query.TopicName + "-messages.json");
     }
 
     [HttpGet("Kafka/requests/{id:guid}")]
@@ -403,6 +427,29 @@ public sealed class OperationsController : Controller
         KafkaTopicConfigs? configs = null;
         KafkaMigrationRecord? migration = null;
         string? runbook = null;
+        KafkaBrowsePage? messages = null;
+        KafkaFamilyView? family = null;
+        string? browseError = null;
+        if (query.View == ThroughputKafkaPageQuery.Messages && !string.IsNullOrWhiteSpace(query.TopicName))
+        {
+            var familyCall = await _kafka.GetFamilyAsync(query.TopicName, cancellationToken);
+            family = familyCall.Value;
+            var messageCall = await _kafka.GetMessagesAsync(
+                query.TopicName,
+                query.BrowseMode,
+                query.BrowsePartitions,
+                query.BrowseOffset,
+                query.BrowseTimestamp,
+                query.BrowseLimit,
+                query.BrowseKey,
+                query.BrowseHeaderName,
+                query.BrowseHeaderValue,
+                cancellationToken);
+            messages = messageCall.Value;
+            if (messages is null)
+                browseError = messageCall.Error ?? familyCall.Error;
+        }
+
         if (query.View == ThroughputKafkaPageQuery.Migrate && !string.IsNullOrWhiteSpace(query.TopicName))
         {
             var detailCall = await _kafka.GetDetailAsync(query.TopicName, cancellationToken);
@@ -470,7 +517,10 @@ public sealed class OperationsController : Controller
             Detail = detail,
             Configs = configs,
             Migration = migration,
-            Runbook = runbook
+            Runbook = runbook,
+            Messages = messages,
+            Family = family,
+            BrowseError = browseError
         };
     }
 

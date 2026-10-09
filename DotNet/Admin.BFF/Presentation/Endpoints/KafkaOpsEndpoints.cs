@@ -1,14 +1,17 @@
 using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
 
-public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOpsEndpoints> logger, IMigrationRuntime? migrations = null) : IApi
+public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOpsEndpoints> logger, IMigrationRuntime? migrations = null, IKafkaMessageBrowser? browser = null) : IApi
 {
     public void RegisterEndpoints(WebApplication app)
     {
@@ -88,6 +91,12 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         group.MapPost("/backups/{name}/delete", DeleteBackup)
             .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
         group.MapGet("/holds", GetHolds)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapGet("/topics/{topic}/messages", GetMessages)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapGet("/topics/{topic}/messages/export", ExportMessages)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapGet("/topics/{topic}/family", GetBrowseFamily)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
     }
 
@@ -334,7 +343,7 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
 
     private IResult StatusFor(KafkaOpsRejectedException ex)
     {
-        if (ex is LeaseHeldException)
+        if (ex is LeaseHeldException or KafkaBrowseBusyException)
             return Conflict(ex.Message);
         return Problem(ex.Message, ex is KafkaOpsForbiddenException
             ? StatusCodes.Status403Forbidden
@@ -567,6 +576,161 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             return Results.Ok(Array.Empty<string>());
         return Results.Ok(await migrations.HoldsAsync(cancellationToken));
     }
+
+    private Task<IResult> GetMessages(
+        ClaimsPrincipal user,
+        string topic,
+        string? mode,
+        long? offset,
+        long? timestamp,
+        int? limit,
+        string? key,
+        string? headerName,
+        string? headerValue,
+        [FromQuery] int[]? partition,
+        CancellationToken cancellationToken) =>
+        Browse(user, topic, request => browser!.ReadAsync(request, cancellationToken), mode, offset, timestamp, limit, key, headerName, headerValue, partition, cancellationToken);
+
+    private async Task<IResult> ExportMessages(
+        ClaimsPrincipal user,
+        string topic,
+        string? mode,
+        long? offset,
+        long? timestamp,
+        int? limit,
+        string? key,
+        string? headerName,
+        string? headerValue,
+        [FromQuery] int[]? partition,
+        CancellationToken cancellationToken)
+    {
+        var denied = ViewDenied(user);
+        if (denied is not null)
+            return denied;
+        if (browser is null)
+            return Problem("Message browse is not available.", StatusCodes.Status503ServiceUnavailable);
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var page = await browser.ExportAsync(user, BrowseRequest(name, mode, offset, timestamp, limit, key, headerName, headerValue, partition), cancellationToken);
+            var json = JsonSerializer.Serialize(page.Records, ExportJson);
+            return Results.File(Encoding.UTF8.GetBytes(json), "application/json", name + "-messages.json");
+        }
+        catch (KafkaBrowseBrokerException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status502BadGateway);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private Task<IResult> GetBrowseFamily(ClaimsPrincipal user, string topic, CancellationToken cancellationToken)
+    {
+        var denied = ViewDenied(user);
+        if (denied is not null)
+            return Task.FromResult(denied);
+        if (browser is null)
+            return Task.FromResult(Problem("Message browse is not available.", StatusCodes.Status503ServiceUnavailable));
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Task.FromResult(Problem(invalid, StatusCodes.Status400BadRequest));
+        return FamilyCall(name, cancellationToken);
+    }
+
+    private async Task<IResult> FamilyCall(string topic, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Results.Ok(await browser!.FamilyAsync(topic, cancellationToken));
+        }
+        catch (KafkaBrowseBrokerException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status502BadGateway);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private async Task<IResult> Browse(
+        ClaimsPrincipal user,
+        string topic,
+        Func<KafkaBrowseRequest, Task<KafkaBrowsePage>> read,
+        string? mode,
+        long? offset,
+        long? timestamp,
+        int? limit,
+        string? key,
+        string? headerName,
+        string? headerValue,
+        int[]? partition,
+        CancellationToken cancellationToken)
+    {
+        var denied = ViewDenied(user);
+        if (denied is not null)
+            return denied;
+        if (browser is null)
+            return Problem("Message browse is not available.", StatusCodes.Status503ServiceUnavailable);
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var page = await read(BrowseRequest(name, mode, offset, timestamp, limit, key, headerName, headerValue, partition));
+            return Results.Ok(page);
+        }
+        catch (KafkaBrowseBrokerException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status502BadGateway);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private static KafkaBrowseRequest BrowseRequest(
+        string topic,
+        string? mode,
+        long? offset,
+        long? timestamp,
+        int? limit,
+        string? key,
+        string? headerName,
+        string? headerValue,
+        int[]? partition)
+    {
+        var cleanMode = (mode ?? "").SanitizeAndRemove().Trim().ToLowerInvariant();
+        return new KafkaBrowseRequest
+        {
+            Topic = topic,
+            Mode = cleanMode.Length == 0 ? "newest" : cleanMode,
+            Partitions = partition ?? [],
+            Offset = offset,
+            TimestampUnixMs = timestamp,
+            Limit = limit ?? KafkaBrowseLimits.DefaultLimit,
+            Key = (key ?? "").SanitizeAndRemove(),
+            HeaderName = (headerName ?? "").SanitizeAndRemove(),
+            HeaderValue = (headerValue ?? "").SanitizeAndRemove()
+        };
+    }
+
+    private IResult? ViewDenied(ClaimsPrincipal user)
+    {
+        if (kafkaOps.CanView(user))
+            return null;
+        if (user.Identity?.IsAuthenticated != true)
+            return Results.Unauthorized();
+        return Results.Forbid();
+    }
+
+    private static readonly JsonSerializerOptions ExportJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
+    };
 
     private Task<IResult> Migrate(ClaimsPrincipal user, Func<Task<MigrationRecord>> action, bool accepted = false)
     {

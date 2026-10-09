@@ -1,0 +1,409 @@
+@model ThroughputKafkaPage
+@using LantanaGroup.Link.Shared.Application.Models.Kafka
+@{
+    var query = Model.Query;
+    var topicName = Model.SelectedTopic?.Topic ?? query.TopicName;
+    var browse = Model.Messages;
+    var error = Model.BrowseError;
+    var fetched = browse is not null || !string.IsNullOrWhiteSpace(error);
+    var step = string.IsNullOrWhiteSpace(topicName) ? 1 : fetched ? 3 : 2;
+    var members = Model.Family is { Members.Count: > 0 }
+        ? (IReadOnlyList<KafkaNamedTopic>)Model.Family.Members
+        : KafkaBrowseAllowList.MembersOf(topicName);
+    var familyChecked = Model.Family is not null;
+    var topics = Model.Topics.Topics;
+    var topicKnown = topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal));
+    var families = topics
+        .GroupBy(row => string.IsNullOrWhiteSpace(row.Family) ? "Other" : row.Family, StringComparer.Ordinal)
+        .OrderBy(group => group.Key, StringComparer.Ordinal);
+}
+
+<h2 class="h5 mt-3">Read messages</h2>
+<p>This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Fetch shows one page. Export reads that same seek again and writes an audit of the rows it returns.</p>
+<ol>
+    <li>Choose the topic. The family tabs move between the main topic and its error, retry, and redrive topics.</li>
+    <li>Set the seek. Fetch reads that window and changes nothing on the broker.</li>
+    <li>Open a row for the payload and the facility or report it belongs to.</li>
+    <li>Export JSON when you need a copy. That second read is audited.</li>
+</ol>
+<p class="mb-2">
+    <span class="badge @StatusPills.ForWizardStep(step, 1)">1 Choose a topic</span>
+    <span class="badge @StatusPills.ForWizardStep(step, 2)">2 Fetch</span>
+    <span class="badge @StatusPills.ForWizardStep(step, 3)">3 Review</span>
+    <span class="badge @StatusPills.ForWizardStep(step, 4)">4 Export</span>
+</p>
+
+<form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
+    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
+    <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+    <input type="hidden" name="mode" value="@query.BrowseMode" />
+    <input type="hidden" name="limit" value="@query.BrowseLimit" />
+    <input type="hidden" name="offset" value="@query.BrowseOffset" />
+    <input type="hidden" name="timestamp" value="@query.BrowseTimestamp" />
+    <input type="hidden" name="key" value="@query.BrowseKey" />
+    <input type="hidden" name="headerName" value="@query.BrowseHeaderName" />
+    <input type="hidden" name="headerValue" value="@query.BrowseHeaderValue" />
+    <input type="hidden" name="q" value="@query.Q" />
+    @foreach (var partition in query.BrowsePartitions)
+    {
+        <input type="hidden" name="partition" value="@partition" />
+    }
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="browse-topic">Topic</label>
+        <select class="form-select" id="browse-topic" name="topic">
+            @if (!string.IsNullOrWhiteSpace(topicName) && !topicKnown)
+            {
+                <option value="@topicName" selected>@topicName</option>
+            }
+            @foreach (var family in families)
+            {
+                <optgroup label="@family.Key">
+                    @foreach (var row in family.OrderBy(row => row.Topic, StringComparer.Ordinal))
+                    {
+                        if (row.Topic == topicName)
+                        {
+                            <option value="@row.Topic" selected>@row.Topic</option>
+                        }
+                        else
+                        {
+                            <option value="@row.Topic">@row.Topic</option>
+                        }
+                    }
+                </optgroup>
+            }
+        </select>
+        <p class="form-text">Topics are grouped by family. Open keeps the current seek.</p>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-au-link" type="submit">Open</button>
+    </div>
+</form>
+
+@if (!string.IsNullOrWhiteSpace(topicName) && members.Count > 0)
+{
+    <nav class="lu-section-nav mt-3" aria-label="Topic family">
+        @foreach (var member in members)
+        {
+            <a class="@(string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase) ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: member.Topic, closeRecord: true)">
+                @KafkaBrowseText.MemberLabel(member)
+                @if (familyChecked && member.Exists && member.Lag > 0)
+                {
+                    <span class="badge au-badge-warning">Lag @member.Lag</span>
+                }
+                else if (familyChecked && member.Exists)
+                {
+                    <span class="badge au-badge-success">On broker</span>
+                }
+                else if (familyChecked)
+                {
+                    <span class="badge au-badge-muted">Missing</span>
+                }
+            </a>
+        }
+    </nav>
+    @if (familyChecked)
+    {
+        var here = members.FirstOrDefault(member => string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase));
+        <p class="text-muted mb-0">
+            @if (here is null)
+            {
+                <span>This name is not in the family.</span>
+            }
+            else if (!here.Exists)
+            {
+                <span>Not on the broker.</span>
+            }
+            else if (here.LagKnown)
+            {
+                <span>@here.Partitions partitions, high watermark @here.HighWatermarkSum. Group lag @here.Lag.</span>
+            }
+            else
+            {
+                <span>@here.Partitions partitions, high watermark @here.HighWatermarkSum. Group lag was not read.</span>
+            }
+        </p>
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(topicName))
+{
+    <form class="mt-3" method="get" action="/Operations/Kafka">
+        <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
+        <input type="hidden" name="topic" value="@topicName" />
+        <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+        <input type="hidden" name="q" value="@query.Q" />
+        <input type="hidden" name="sort" value="@query.Sort" />
+        <input type="hidden" name="dir" value="@query.Dir" />
+        <input type="hidden" name="pageSize" value="@query.PageSize" />
+        <input type="hidden" name="family" value="@query.Family" />
+        <input type="hidden" name="keyClass" value="@query.KeyClass" />
+        <input type="hidden" name="group" value="@query.Group" />
+        <input type="hidden" name="broker" value="@query.Broker" />
+        <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
+        <input type="hidden" name="page" value="1" />
+
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">Where to read</legend>
+            <p class="form-text">Fetch uses these. Nothing is committed.</p>
+            <div class="row g-2">
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="browse-mode">Mode</label>
+                    <select class="form-select" id="browse-mode" name="mode">
+                        @foreach (var mode in new[] { "newest", "oldest", "from-offset", "since" })
+                        {
+                            if (mode == query.BrowseMode)
+                            {
+                                <option value="@mode" selected>@mode</option>
+                            }
+                            else
+                            {
+                                <option value="@mode">@mode</option>
+                            }
+                        }
+                    </select>
+                    <p class="form-text">Newest takes the latest page. Oldest starts at the beginning. From offset and Since start at the position you give.</p>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="browse-limit">Limit</label>
+                    <input class="form-control" id="browse-limit" name="limit" type="number" min="1" max="50" value="@query.BrowseLimit" />
+                    <p class="form-text">Default 25. At most 50.</p>
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="browse-partition">Partitions</label>
+                    <input class="form-control" id="browse-partition" name="partition" value="@string.Join(", ", query.BrowsePartitions)" />
+                    <p class="form-text">Leave blank for every partition. Otherwise list them, such as 0, 2.</p>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="browse-offset">Offset</label>
+                    <input class="form-control" id="browse-offset" name="offset" type="number" min="0" value="@query.BrowseOffset" />
+                    <p class="form-text">Used when the mode is from-offset.</p>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="browse-timestamp">Timestamp</label>
+                    <input class="form-control" id="browse-timestamp" name="timestamp" type="number" min="0" value="@query.BrowseTimestamp" />
+                    <p class="form-text">Unix time in milliseconds. Used when the mode is since.</p>
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">What to keep</legend>
+            <p class="form-text">A record has to match every filter you fill in. Leave them blank to keep the page as read.</p>
+            <div class="row g-2">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="browse-key">Key contains</label>
+                    <input class="form-control" id="browse-key" name="key" value="@query.BrowseKey" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="browse-header-name">Header name</label>
+                    <input class="form-control" id="browse-header-name" name="headerName" value="@query.BrowseHeaderName" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="browse-header-value">Header value contains</label>
+                    <input class="form-control" id="browse-header-value" name="headerValue" value="@query.BrowseHeaderValue" />
+                    <p class="form-text">Both the name and the value are required before the header filter applies.</p>
+                </div>
+            </div>
+        </fieldset>
+
+        @if (fetched)
+        {
+            <div id="kafka-browse-result" class="alert @KafkaBrowseText.Tone(browse, error)" role="status" tabindex="-1" data-kafka-result data-result-key="@(browse?.Metadata.Returned)-@(browse?.Metadata.CapHit)-@error">
+                <p class="mb-2"><span class="badge @KafkaBrowseText.BadgeClass(browse, error)">@KafkaBrowseText.Badge(browse, error)</span></p>
+                <p>@KafkaBrowseText.Verdict(browse, error)</p>
+                @if (browse is not null)
+                {
+                    <dl class="row mb-2">
+                        <dt class="col-sm-4">Topic</dt>
+                        <dd class="col-sm-8">@browse.Topic</dd>
+                        <dt class="col-sm-4">Mode</dt>
+                        <dd class="col-sm-8">@browse.Mode</dd>
+                        <dt class="col-sm-4">Returned</dt>
+                        <dd class="col-sm-8">@browse.Metadata.Returned</dd>
+                        <dt class="col-sm-4">Truncated</dt>
+                        <dd class="col-sm-8">@(browse.Metadata.Truncated ? "Yes. A record or the page was cut to stay inside the cap." : "No.")</dd>
+                        <dt class="col-sm-4">Cap hit</dt>
+                        <dd class="col-sm-8">@(browse.Metadata.CapHit ? "Yes. The scan, the byte budget, or the time limit stopped the read." : "No.")</dd>
+                        <dt class="col-sm-4">Elapsed</dt>
+                        <dd class="col-sm-8">@browse.Metadata.ElapsedMs ms</dd>
+                    </dl>
+                }
+                @if (!string.IsNullOrWhiteSpace(error))
+                {
+                    <p class="mb-1">Blocking reasons</p>
+                    <ul>
+                        <li>@error</li>
+                    </ul>
+                }
+                <p class="mb-2">@KafkaBrowseText.NextStep(browse, error)</p>
+                <details>
+                    <summary>Details</summary>
+                    <p class="mb-0">The read uses group @KafkaBrowseLimits.GroupId. Auto-commit is off, so this page does not move a consumer group. A page stops at @KafkaBrowseLimits.MaxLimit records, @KafkaBrowseLimits.MaxScanned scanned records, or @KafkaBrowseLimits.MaxPageBytes bytes.</p>
+                </details>
+            </div>
+        }
+
+        <div class="mt-3">
+            <button class="btn btn-au-execute" type="submit">Fetch</button>
+            @if (browse is not null)
+            {
+                <a class="btn btn-au-link" href="@query.ExportHref()">Export JSON</a>
+            }
+            <a class="btn btn-warning" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear seek</a>
+        </div>
+    </form>
+
+    @if (browse is { Records.Count: > 0 })
+    {
+        <h3 class="h6 mt-4">Records</h3>
+        <p class="text-muted">@browse.Records.Count shown. Open a row for the payload. Headers and the raw key stay inside that row.</p>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Partition</th>
+                        <th>Offset</th>
+                        <th>Time</th>
+                        <th>Key</th>
+                        <th>Summary</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var record in browse.Records)
+                {
+                    var recordId = KafkaBrowseText.RecordId(record.Partition, record.Offset);
+                    var open = string.Equals(query.OpenRecord, recordId, StringComparison.Ordinal);
+                    var hasException = !string.IsNullOrWhiteSpace(record.Link.ExceptionMessage) || record.Link.ExceptionHeaders.Count > 0;
+                    <tr>
+                        <td>@record.Partition</td>
+                        <td>@record.Offset</td>
+                        <td>@KafkaBrowseText.When(record.TimestampUnixMs)</td>
+                        <td><code class="small">@record.Key</code></td>
+                        <td>@record.ValueSummary</td>
+                        <td>
+                            @if (record.Truncated)
+                            {
+                                <span class="badge au-badge-warning">Truncated</span>
+                            }
+                            @if (hasException)
+                            {
+                                <span class="badge au-badge-danger">Exception</span>
+                            }
+                            @if (!record.Truncated && !hasException)
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (open)
+                            {
+                                <a class="btn btn-sm btn-warning" href="@query.Href(closeRecord: true)">Close</a>
+                            }
+                            else
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@query.Href(record: recordId)">Open</a>
+                            }
+                        </td>
+                    </tr>
+                    @if (open)
+                    {
+                        var facilityHref = KafkaBrowseText.FacilityHref(record.Link.FacilityId);
+                        var reportHref = KafkaBrowseText.ReportHref(record.Link.FacilityId, record.Link.ReportId);
+                        <tr>
+                            <td colspan="7">
+                                <div class="au-card card">
+                                    <div class="card-body">
+                                        <p class="mb-2">
+                                            Partition @record.Partition, offset @record.Offset, @record.ByteSize bytes.
+                                            @if (record.Truncated)
+                                            {
+                                                <span>The value was cut to stay inside the byte cap.</span>
+                                            }
+                                        </p>
+                                        <p class="mb-2">
+                                            Facility
+                                            @if (facilityHref.Length > 0)
+                                            {
+                                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = record.Link.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = facilityHref, ReturnUrl = query.Href() })" />
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                            <span class="ms-3">Patient</span>
+                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = record.Link.PatientId, Compact = true, CopyLabel = "Copy patient id" })" />
+                                            <span class="ms-3">Report</span>
+                                            @if (reportHref.Length > 0)
+                                            {
+                                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = record.Link.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = reportHref, ReturnUrl = query.Href() })" />
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </p>
+                                        <p class="mb-2">
+                                            Correlation
+                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = record.Link.CorrelationId, Compact = true, CopyLabel = "Copy correlation id" })" />
+                                            @if (!string.IsNullOrWhiteSpace(record.Link.RetryCount))
+                                            {
+                                                <span class="ms-3">Retry count @record.Link.RetryCount</span>
+                                            }
+                                        </p>
+                                        @if (record.Link.ExceptionHeaders.Count > 0)
+                                        {
+                                            <p class="mb-1">Exception</p>
+                                            <ul>
+                                                @foreach (var header in record.Link.ExceptionHeaders)
+                                                {
+                                                    <li>@header.Name: @header.Value</li>
+                                                }
+                                            </ul>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(record.Link.ExceptionMessage))
+                                        {
+                                            <p>@record.Link.ExceptionMessage</p>
+                                        }
+                                        <h4 class="h6">Payload</h4>
+                                        <pre class="mb-2">@(record.ValuePretty ?? record.Value)</pre>
+                                        <details>
+                                            <summary>Headers (@record.Headers.Count) and key note</summary>
+                                            @if (!string.IsNullOrWhiteSpace(record.KeyNote))
+                                            {
+                                                <p>@record.KeyNote</p>
+                                            }
+                                            @if (record.Headers.Count == 0)
+                                            {
+                                                <p class="mb-0">No headers.</p>
+                                            }
+                                            else
+                                            {
+                                                <ul class="mb-0">
+                                                    @foreach (var header in record.Headers)
+                                                    {
+                                                        <li>@header.Name: @header.Value</li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </details>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (browse is not null)
+    {
+        <p class="text-muted mt-3">No records matched this seek.</p>
+    }
+}
+else
+{
+    <p class="text-muted mt-3">Choose a topic to read. Internal topics and names outside the catalog are refused.</p>
+}
