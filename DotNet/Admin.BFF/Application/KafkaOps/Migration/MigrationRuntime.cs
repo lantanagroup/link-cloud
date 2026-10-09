@@ -161,6 +161,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
             Requester = KafkaOpsService.UserName(user),
             Reason = body.Reason.Trim(),
             BackupSkipped = body.BackupSkip,
+            AcknowledgedGroups = MigrationPreflight.CanonicalGroups(body.AcknowledgedGroups),
             BackupTopic = KafkaTopicCatalog.BackupTopicName(topic, Guid.NewGuid()),
             StopProducers = family.ProducerWorkloads.ToList(),
             StopConsumers = family.ConsumerWorkloads.ToList(),
@@ -178,7 +179,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
     public async Task<MigrationRecord> ApproveAsync(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken)
     {
         var record = await GetAsync(user, id, mutate: true, cancellationToken);
-        var live = await PlanAsync(record.Topic, record.TargetPartitions, record.BackupSkipped, record.BackupSkipped, [], cancellationToken);
+        var live = await PlanAsync(record.Topic, record.TargetPartitions, record.BackupSkipped, record.BackupSkipped, record.AcknowledgedGroups, cancellationToken);
         var error = MigrationApprovals.ValidateApprove(record, KafkaOpsService.UserName(user), live.PlanHash);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
@@ -612,7 +613,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
         };
         if (record.Step == MigrationStep.A1)
         {
-            var dry = await PlanAsync(record.Topic, record.TargetPartitions, record.BackupSkipped, record.BackupSkipped, [], cancellationToken, record.Id);
+            var dry = await PlanAsync(record.Topic, record.TargetPartitions, record.BackupSkipped, record.BackupSkipped, record.AcknowledgedGroups, cancellationToken, record.Id);
             seen.PreflightOk = dry.Accepted;
             seen.PreflightError = dry.Accepted ? "" : dry.Summary;
             seen.LivePlanHash = dry.PlanHash;
@@ -786,6 +787,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
             MaxBackupMinutes = _options.MigrationMaxBackupMinutes,
             BackupSkip = backupSkip,
             BackupSkipAcknowledged = backupSkipAcknowledged,
+            AcknowledgedGroupIds = MigrationPreflight.CanonicalGroups(acknowledgedGroups),
             DiskKnown = false,
             UnknownDiskMaxBytes = _options.MigrationUnknownDiskMaxBytes,
             WorkloadsMapped = mapped,

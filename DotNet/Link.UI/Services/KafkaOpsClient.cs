@@ -209,7 +209,7 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
     public Task<KafkaOpsCall<KafkaTopicDetail>> GetDetailAsync(string topic, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
-            return Task.FromResult(new KafkaOpsCall<KafkaTopicDetail> { Status = 200, Value = new KafkaTopicDetail { Topic = topic } });
+            return Task.FromResult(_fixture.Detail(topic));
         return SendAsync<KafkaTopicDetail>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/detail", null, cancellationToken);
     }
 
@@ -217,7 +217,7 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
     {
         var query = string.IsNullOrWhiteSpace(diff) ? "" : "?diff=" + Uri.EscapeDataString(diff);
         if (_fixture.Active)
-            return Task.FromResult(new KafkaOpsCall<KafkaTopicConfigs> { Status = 200, Value = new KafkaTopicConfigs { Topic = topic, Diff = diff ?? "" } });
+            return Task.FromResult(_fixture.Configs(topic, diff));
         return SendAsync<KafkaTopicConfigs>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/configs" + query, null, cancellationToken);
     }
 
@@ -536,6 +536,7 @@ public sealed class ClusterSnapshot
 {
     public int BrokerCount { get; set; }
     public int? ControllerId { get; set; }
+    public string ControllerUnavailableReason { get; set; } = "";
     public int UnderReplicatedPartitions { get; set; }
     public int OfflinePartitions { get; set; }
     public int IsrShrunkPartitions { get; set; }

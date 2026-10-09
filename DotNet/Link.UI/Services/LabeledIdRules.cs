@@ -17,4 +17,10 @@ public static class LabeledIdRules
 
         return trimmed;
     }
+
+    public static bool IsGuid(string? value)
+    {
+        var text = value?.Trim() ?? "";
+        return text.Length > 0 && Guid.TryParse(text, out _);
+    }
 }
