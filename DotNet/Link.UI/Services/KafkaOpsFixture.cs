@@ -64,6 +64,45 @@ public sealed class KafkaOpsFixture
 
     public KafkaOpsCall<InfraStatus> Infra() => Ok(_document.Infra);
 
+    public KafkaOpsCall<KafkaTopicDetail> Detail(string topic)
+    {
+        var row = FindTopic(topic);
+        if (row is null)
+            return Fail<KafkaTopicDetail>("That topic was not found.");
+
+        return Ok(new KafkaTopicDetail
+        {
+            Topic = row.Topic,
+            TopicId = "6f1c2a90-7b14-4d2e-9a33-1c8e5b0d4f21",
+            Partitions = row.Partitions,
+            ReplicationFactor = row.ReplicationFactor,
+            FullIsr = row.FullIsr,
+            LeadersSkewed = row.LeadersSkewed,
+            KeyClass = row.KeyClass,
+            KeyShape = row.KeyShape,
+            Slice1Eligible = row.Slice1Eligible,
+            Eligibility = row.MigrationEligibility,
+            Consumers = row.Groups.ToList()
+        });
+    }
+
+    public KafkaOpsCall<KafkaTopicConfigs> Configs(string topic, string? diff)
+    {
+        var row = FindTopic(topic);
+        if (row is null)
+            return Fail<KafkaTopicConfigs>("That topic was not found.");
+
+        return Ok(new KafkaTopicConfigs
+        {
+            Topic = row.Topic,
+            Diff = diff ?? "",
+            Configs = row.Configs
+                .OrderBy(item => item.Key, StringComparer.Ordinal)
+                .Select(item => new KafkaConfigRow { Name = item.Key, Value = item.Value, Source = "fixture" })
+                .ToList()
+        });
+    }
+
     public KafkaOpsCall<PartitionPlan> PlanPartitions(string topic, int partitions, bool overrideQuietWindow, string? overrideReason)
     {
         var row = FindTopic(topic);
@@ -282,12 +321,13 @@ public sealed class KafkaOpsFixture
             plan.Notes.Add($"Broker {brokerId} has no replicas. It can be stopped once the cluster is green.");
         else
         {
+            var failures = new List<(string Topic, string Reason)>();
             foreach (var placement in held)
             {
                 var others = _document.Cluster.Brokers.Select(item => item.Id).Where(id => id != brokerId && !placement.Replicas.Contains(id)).ToList();
                 if (others.Count == 0)
                 {
-                    plan.Errors.Add($"Moving {placement.Topic}-{placement.Partition} off broker {brokerId} would drop the replication factor.");
+                    failures.Add((placement.Topic, $"would drop the replication factor if broker {brokerId} left."));
                     continue;
                 }
 
@@ -300,6 +340,18 @@ public sealed class KafkaOpsFixture
                     ToBroker = others[0],
                     Replicas = next
                 });
+            }
+
+            foreach (var group in failures
+                .GroupBy(item => (Topic: item.Topic ?? "", Reason: item.Reason))
+                .OrderBy(item => item.Key.Topic.StartsWith('_'))
+                .ThenBy(item => item.Key.Topic, StringComparer.Ordinal))
+            {
+                var topic = group.Key.Topic;
+                var count = group.Count();
+                var prefix = topic.StartsWith('_') ? "(internal) " : "";
+                var noun = count == 1 ? "partition" : "partitions";
+                plan.Errors.Add($"{prefix}{topic}: {count} {noun} {group.Key.Reason}");
             }
 
             plan.Notes.Add("Removing a broker moves every replica off it first. The broker is stopped only after it has no replicas, no leaders, and the cluster has no under-replicated or offline partitions.");

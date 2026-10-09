@@ -2,12 +2,13 @@
 @{
     var query = Model.Query;
     var cluster = Model.Cluster;
+    var controllerTile = KafkaControllerTile.Display(cluster.ControllerId, cluster.ControllerUnavailableReason);
     var origin = ReturnUrlRules.Here(Context.Request);
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
 
 <div class="row g-2 mt-3">
-    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@(cluster.ControllerId?.ToString() ?? "—")</div><div class="au-stat-label">Controller</div></div></div>
+    <div class="col"><div class="au-stat-tile" title="@controllerTile.Title"><div class="au-stat-value">@controllerTile.Value</div><div class="au-stat-label">@controllerTile.Caption</div></div></div>
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.BrokerCount</div><div class="au-stat-label">Brokers</div></div></div>
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.UnderReplicatedPartitions</div><div class="au-stat-label">Under-replicated</div></div></div>
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.OfflinePartitions</div><div class="au-stat-label">Offline</div></div></div>
@@ -55,7 +56,7 @@
                         <td>@(row.FullIsr ? "full" : "short")@(row.LeadersSkewed ? ", skewed" : "")</td>
                         <td>@row.SizeClass</td>
                         <td>@(row.LagKnown ? row.TotalLag.ToString() : "unknown")</td>
-                        <td>@row.ProduceRatePerSecond.ToString("0.###")</td>
+                        <td>@KafkaProduceRate.Text(row.ProduceRateKnown, row.ProduceRatePerSecond)</td>
                         <td>@row.MaxReplicas</td>
                         <td>
                             <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i><span class="ms-1">Open</span></a>
@@ -105,7 +106,7 @@
                 @foreach (var row in Model.Groups.Groups.OrderBy(item => item.GroupId, StringComparer.OrdinalIgnoreCase))
                 {
                     <tr>
-                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" /></td>
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
                         <td>@row.Members.Count</td>
                         <td>@row.TotalLag</td>

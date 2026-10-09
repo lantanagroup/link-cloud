@@ -285,7 +285,7 @@ public class MorningFixesGuardTests
         var topic = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Topic.cshtml"));
         topic.Should().Contain("btn-au-link");
         topic.Should().Contain("Migrate instead");
-        topic.Should().Contain(">Preview</span>");
+        topic.Should().Contain(">Preview increase</span>");
 
         var consumers = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Consumers.cshtml"));
         consumers.Should().Contain(">Open</span>");
