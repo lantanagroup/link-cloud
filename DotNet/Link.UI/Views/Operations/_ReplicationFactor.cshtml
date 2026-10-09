@@ -11,30 +11,48 @@
     var targetValue = query.Rf > 0 ? query.Rf : (topic.ReplicationFactor > 1 ? topic.ReplicationFactor - 1 : topic.ReplicationFactor);
     var throttleValue = query.RfThrottle > 0 ? query.RfThrottle : ReplicationFactorRules.DefaultThrottle;
     var plan = Model.ReplicationPlan;
-    var tone = plan is null ? "alert-secondary" : plan.Accepted ? "alert-success" : "alert-danger";
+    var rfStep = Model.Request?.Kind == "ReplicationFactor" ? 4 : plan is not null ? 3 : 1;
     <h2 class="h5 mt-4">Change replication factor</h2>
-    <p>This moves replicas with a partition reassignment. It does not change how many partitions the topic has. Preview shows the replica each partition would gain or lose, and whether the brokers and racks can hold it. The request sets a replication throttle, moves the replicas, waits until they are in sync, and then clears the throttle.</p>
+    <p>This moves replicas. It does not add or remove partitions. Preview the plan first. Nothing moves until the request is submitted, and the throttle is cleared only after every new replica is in the ISR.</p>
+    <ol class="lu-kafka-steps">
+        <li>Set the target factor and the throttle.</li>
+        <li>Preview the replica each partition would gain or lose.</li>
+        <li>Review the result. A refusal names the reason and changes nothing.</li>
+        <li>Type the topic name and request the change. Track it until the throttle clears.</li>
+    </ol>
+    <p class="mb-3">
+        <span class="badge @StatusPills.ForWizardStep(rfStep, 1)">1 Set the target</span>
+        <span class="badge @StatusPills.ForWizardStep(rfStep, 2)">2 Preview</span>
+        <span class="badge @StatusPills.ForWizardStep(rfStep, 3)">3 Review</span>
+        <span class="badge @StatusPills.ForWizardStep(rfStep, 4)">4 Track</span>
+    </p>
     <form class="mt-3" method="post" action="/Operations/Kafka/replication-factor/plan" data-kafka-busy="Dry run is running.">
         @Html.AntiForgeryToken()
         <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
         <input type="hidden" name="rfSize" value="@query.RfSize" />
         <fieldset class="border rounded p-3 mb-3">
             <legend class="float-none w-auto px-2 h6">What to change</legend>
-            <p class="form-text">The topic is at RF @topic.ReplicationFactor. min.insync.replicas is @minIsr. @online brokers are online. A higher target adds a replica. A lower target removes one. The leader stays.</p>
+            <p class="form-text">The topic is at replication factor @topic.ReplicationFactor. min.insync.replicas is @minIsr. @online brokers are online. A higher target adds a replica and prefers a free rack. A lower target removes one. The leader stays.</p>
             <div class="row g-2">
-                <div class="col-12 col-md-3">
+                <div class="col-12 col-md-4">
                     <label class="form-label" for="rf-target">Target replication factor</label>
                     <input class="form-control" id="rf-target" name="replicationFactor" type="number" min="1" max="64" value="@targetValue" />
+                    <p class="form-text">1 to 64. It cannot exceed the online brokers, and it cannot sit below min.insync.replicas.</p>
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-8">
                     <label class="form-label" for="rf-throttle">Replication throttle (bytes/s)</label>
                     <input class="form-control" id="rf-throttle" name="throttle" type="number" min="1" value="@throttleValue" />
                     <p class="form-text">How fast the new replicas are allowed to copy. @ReplicationFactorRules.ThrottleText(ReplicationFactorRules.DefaultThrottle) is the usual limit. The limit is removed after the ISR is complete.</p>
                 </div>
-                <div class="col-12 col-md-5">
-                    <label class="form-label" for="rf-search">Search the plan</label>
+            </div>
+        </fieldset>
+        <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 h6">Filter the preview</legend>
+            <p class="form-text">Optional. It does not change the plan. Preview again to apply it. The list stays worst first, one page at a time.</p>
+            <div class="row g-2">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="rf-search">Partition, broker, or rack</label>
                     <input class="form-control" id="rf-search" name="rfQ" value="@query.RfQ" />
-                    <p class="form-text">Partition, broker, or rack. Preview again to apply it. The list stays worst first.</p>
                 </div>
             </div>
         </fieldset>
@@ -54,6 +72,12 @@
         </fieldset>
         @if (plan is not null)
         {
+            var tone = plan.Accepted ? "alert-success" : "alert-danger";
+            var racks = plan.ChangedCount == 0
+                ? "No replica move was planned."
+                : plan.RackProblems == 0
+                    ? "Every changed partition keeps one replica per rack."
+                    : plan.RackProblems + " partitions share a rack.";
             <div id="kafka-replication-result" class="alert @tone mt-3 lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-replication" data-result-key="@(plan.Accepted)-@plan.Topic-@plan.TargetFactor-@plan.Errors.Count">
                 <details class="lu-result-details">
                     <summary>
@@ -62,22 +86,25 @@
                         <button type="button" class="btn btn-sm btn-warning lu-result-dismiss" aria-label="Dismiss result">Dismiss</button>
                     </summary>
                     <div class="lu-result-body">
-                        <dl class="row mb-2">
-                            <dt class="col-sm-4">Replication factor</dt>
-                            <dd class="col-sm-8">@plan.CurrentFactor to @plan.TargetFactor@(plan.Uneven ? " (partitions differ today)" : "")</dd>
-                            <dt class="col-sm-4">min.insync.replicas</dt>
-                            <dd class="col-sm-8">@plan.MinInSyncReplicas</dd>
-                            <dt class="col-sm-4">Online brokers</dt>
-                            <dd class="col-sm-8">@plan.OnlineBrokers</dd>
-                            <dt class="col-sm-4">Partitions</dt>
-                            <dd class="col-sm-8">@plan.ChangedCount of @plan.PartitionCount change. @plan.AddedReplicas added, @plan.RemovedReplicas removed.</dd>
-                            <dt class="col-sm-4">Racks</dt>
-                            <dd class="col-sm-8">@(plan.ChangedCount == 0 ? "No replica move was planned." : plan.RackProblems == 0 ? "Every changed partition keeps one replica per rack." : plan.RackProblems + " partitions share a rack.")</dd>
-                            <dt class="col-sm-4">Throttle</dt>
-                            <dd class="col-sm-8">@ReplicationFactorRules.ThrottleText(plan.ThrottleBytesPerSecond) (@plan.ThrottleBytesPerSecond bytes/s)</dd>
-                            <dt class="col-sm-4">Skew</dt>
-                            <dd class="col-sm-8">@plan.Skew</dd>
-                        </dl>
+                        <div class="lu-kafka-summary" aria-label="Replication plan summary">
+                            <div>
+                                <div class="lu-kafka-summary-value">@plan.CurrentFactor to @plan.TargetFactor</div>
+                                <div class="lu-kafka-summary-label">Replication factor@(plan.Uneven ? ", uneven today" : "")</div>
+                            </div>
+                            <div>
+                                <div class="lu-kafka-summary-value">@plan.ChangedCount<span class="lu-kafka-summary-of"> of @plan.PartitionCount</span></div>
+                                <div class="lu-kafka-summary-label">@plan.AddedReplicas added, @plan.RemovedReplicas removed</div>
+                            </div>
+                            <div>
+                                <div class="lu-kafka-summary-value">@ReplicationFactorRules.ThrottleText(plan.ThrottleBytesPerSecond)</div>
+                                <div class="lu-kafka-summary-label">Throttle, @plan.ThrottleBytesPerSecond bytes/s</div>
+                            </div>
+                            <div class="lu-kafka-summary-wide">
+                                <div class="lu-kafka-summary-value lu-kafka-summary-text">@plan.Skew</div>
+                                <div class="lu-kafka-summary-label">Skew</div>
+                            </div>
+                        </div>
+                        <p class="text-muted mt-2 mb-2">min.insync.replicas @plan.MinInSyncReplicas. @plan.OnlineBrokers brokers online. @racks</p>
                         @if (plan.Errors.Count > 0)
                         {
                             <p class="mb-1">Blocking reasons</p>
@@ -88,13 +115,7 @@
                             }
                             </ul>
                         }
-                        <p class="mb-2">@(plan.Accepted ? "Ready. Type the topic name and request the change." : "Fix the items above, then preview again.")</p>
-                        <ol class="mb-3">
-                            <li>Set the replication throttle on the brokers that gain or lose a replica.</li>
-                            <li>Submit the partition reassignment.</li>
-                            <li>Wait until every added replica is in the ISR.</li>
-                            <li>Clear the throttle.</li>
-                        </ol>
+                        <p class="mb-2">@(plan.Accepted ? "Ready. Type the topic name and request the change. The request sets the throttle, submits the reassignment, waits for the ISR, and then clears the throttle." : "Fix the items above, then preview again. Nothing has moved.")</p>
                         @if (plan.Hottest.Count > 0)
                         {
                             <p class="mb-1">Busiest brokers</p>
@@ -164,17 +185,18 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <div class="d-flex gap-2 mb-2">
+                            <div class="d-flex gap-2 align-items-center mb-2">
+                                <span class="text-muted">Page size</span>
                                 @foreach (var size in new[] { 10, 25, 50 })
                                 {
-                                    <a class="btn btn-sm @(size == plan.PageSize ? "lu-nav-current" : "btn-au-link")" href="@query.WithReplication(page: 1, size: size).Href()">@size</a>
+                                    <a class="btn btn-sm @(size == plan.PageSize ? "lu-nav-current" : "btn-au-link")" href="@query.WithReplication(page: 1, size: size).Href()" aria-current="@(size == plan.PageSize ? "page" : null)">@size</a>
                                 }
                             </div>
                             <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(plan.Page, plan.Pages, "Worst first.", plan.Page > 1 ? query.WithReplication(page: plan.Page - 1).Href() : "", plan.Page < plan.Pages ? query.WithReplication(page: plan.Page + 1).Href() : ""))" />
                         }
                         @if (plan.Notes.Count > 0)
                         {
-                            <details>
+                            <details class="lu-kafka-fold">
                                 <summary>How this plan is chosen</summary>
                                 @foreach (var note in plan.Notes)
                                 {

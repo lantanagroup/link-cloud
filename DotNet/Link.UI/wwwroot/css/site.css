@@ -3931,6 +3931,66 @@ tr.lu-kafka-problem > td:first-child {
   padding-top: .6rem;
   border-top: 1px solid var(--au-border);
 }
+.lu-result .lu-kafka-summary {
+  margin-top: 0;
+}
+.lu-result a.btn.lu-nav-current,
+.lu-result a.btn.lu-nav-current:hover,
+.lu-result a.btn.lu-nav-current:focus {
+  color: var(--au-text);
+  background: #fff;
+  border-color: var(--au-warning);
+  box-shadow: inset 0 -3px 0 var(--au-warning);
+}
+.lu-kafka-summary-of {
+  font-size: .72em;
+  font-weight: 650;
+  color: var(--au-muted);
+}
+.lu-rf-track {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: .5rem;
+  padding: 0;
+  margin: .25rem 0 .85rem;
+}
+.lu-rf-track li {
+  background: #fff;
+  border: 1px solid var(--au-border);
+  border-radius: var(--au-radius);
+  padding: .55rem .7rem .65rem;
+  min-width: 0;
+}
+.lu-rf-track .lu-rf-mark {
+  display: block;
+  margin-bottom: .2rem;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+}
+.lu-rf-track li.is-done {
+  background: var(--au-success-soft);
+  border-color: var(--au-success);
+}
+.lu-rf-track li.is-done .lu-rf-mark {
+  color: var(--au-success);
+}
+.lu-rf-track li.is-current {
+  border-color: var(--au-dark);
+  box-shadow: inset 0 -3px 0 var(--au-dark);
+}
+.lu-rf-track li.is-current .lu-rf-mark {
+  color: var(--au-dark);
+}
+.lu-rf-track strong {
+  display: block;
+  font-size: .9rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
 .lu-json-key { color: #9ec5ff; }
 .lu-json-string { color: #9be7b4; }
 .lu-json-number { color: #ffd56a; }
