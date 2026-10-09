@@ -85,6 +85,7 @@ builder.Services.AddHttpClient<KafkaOpsClient>((_, client) =>
     client.BaseAddress = new Uri(adminBffAddress);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddTransient<IKafkaTopicHoldSource>(sp => sp.GetRequiredService<KafkaOpsClient>());
 
 var proxyRoutes = new List<RouteConfig>
 {

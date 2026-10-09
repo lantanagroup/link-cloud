@@ -122,7 +122,7 @@ public static class LinkAutomationStartRules
 
     public static string ExplainStartFailure(Exception exception)
     {
-        if (exception is InvalidOperationException && !string.IsNullOrWhiteSpace(exception.Message))
+        if (exception is (InvalidOperationException or TopicHeldException) && !string.IsNullOrWhiteSpace(exception.Message))
         {
             var text = exception.Message.Sanitize().Trim();
             if (text.Length > 500)

@@ -49,8 +49,16 @@ namespace LantanaGroup.Link.Account.Persistence.Extensions
                 ClaimValue = nameof(LinkSystemPermissions.CanManageScaling)
             };
 
+            LinkRoleClaim migrateKafkaTopics = new()
+            {
+                Id = 5,
+                RoleId = userRole.Id,
+                ClaimType = LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions,
+                ClaimValue = nameof(LinkSystemPermissions.CanMigrateKafkaTopics)
+            };
+
             modelBuilder.Entity<LinkRole>().HasData(userRole);
-            modelBuilder.Entity<LinkRoleClaim>().HasData(linkRoleClaim, viewInfrastructure, manageKafkaTopics, manageScaling);
+            modelBuilder.Entity<LinkRoleClaim>().HasData(linkRoleClaim, viewInfrastructure, manageKafkaTopics, manageScaling, migrateKafkaTopics);
 
         }
     }

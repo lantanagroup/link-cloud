@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
 
-public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOpsEndpoints> logger) : IApi
+public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOpsEndpoints> logger, IMigrationRuntime? migrations = null) : IApi
 {
     public void RegisterEndpoints(WebApplication app)
     {
@@ -59,6 +59,36 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             .RequireAuthorization(PolicyNames.CanOperateKafka);
         group.MapPost("/change-requests/{id:guid}/cancel", Cancel)
             .RequireAuthorization(PolicyNames.CanOperateKafka);
+        group.MapGet("/topics/{topic}/detail", GetDetail)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapGet("/topics/{topic}/configs", GetConfigs)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/topics/{topic}/migrations/plan", PlanMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapPost("/migrations", RequestMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapGet("/migrations/{id:guid}", GetMigration)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/migrations/{id:guid}/approve", ApproveMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapPost("/migrations/{id:guid}/reject", RejectMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapPost("/migrations/{id:guid}/execute", ExecuteMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapPost("/migrations/{id:guid}/go", GoMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapPost("/migrations/{id:guid}/abort", AbortMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapPost("/migrations/{id:guid}/recover", RecoverMigration)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapPost("/migrations/{id:guid}/manual-step", ManualStep)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapGet("/migrations/{id:guid}/runbook", GetRunbook)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/backups/{name}/delete", DeleteBackup)
+            .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
+        group.MapGet("/holds", GetHolds)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
     }
 
     private async Task<IResult> GetTopics(ClaimsPrincipal user, CancellationToken cancellationToken)
@@ -302,10 +332,36 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
     private static string? Correlation(HttpContext http) =>
         http.Request.Headers["X-Correlation-Id"].FirstOrDefault();
 
-    private IResult StatusFor(KafkaOpsRejectedException ex) =>
-        Problem(ex.Message, ex is KafkaOpsForbiddenException
+    private IResult StatusFor(KafkaOpsRejectedException ex)
+    {
+        if (ex is LeaseHeldException)
+            return Conflict(ex.Message);
+        return Problem(ex.Message, ex is KafkaOpsForbiddenException
             ? StatusCodes.Status403Forbidden
             : StatusCodes.Status400BadRequest);
+    }
+
+    private IResult Conflict(string detail)
+    {
+        logger.LogInformation("Kafka ops request refused: {Detail}", detail.Sanitize());
+        return new RetryAfterProblem(detail, 5);
+    }
+
+    private sealed class RetryAfterProblem(string detail, int seconds) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext httpContext)
+        {
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            httpContext.Response.Headers.RetryAfter = seconds.ToString();
+            await httpContext.Response.WriteAsJsonAsync(new
+            {
+                type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                title = "Conflict",
+                status = StatusCodes.Status409Conflict,
+                detail
+            });
+        }
+    }
 
     private static bool TryToken(string? value, out string name)
     {
@@ -370,6 +426,182 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         return Results.Problem(detail: detail, statusCode: status);
     }
 
+    private async Task<IResult> GetDetail(ClaimsPrincipal user, string topic, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanView(user))
+            return Results.Forbid();
+        if (migrations is null)
+            return Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable);
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        return Results.Ok(await migrations.DetailAsync(name, cancellationToken));
+    }
+
+    private async Task<IResult> GetConfigs(ClaimsPrincipal user, string topic, string? diff, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanView(user))
+            return Results.Forbid();
+        if (migrations is null)
+            return Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable);
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        var compared = string.IsNullOrWhiteSpace(diff) ? "" : diff.Sanitize();
+        return Results.Ok(await migrations.ConfigsAsync(name, compared, cancellationToken));
+    }
+
+    private async Task<IResult> PlanMigration(ClaimsPrincipal user, string topic, MigrationRequestBody body, CancellationToken cancellationToken)
+    {
+        if (!migrations?.CanMigrate(user) ?? !kafkaOps.CanMigrate(user))
+            return Results.Forbid();
+        if (migrations is null)
+            return Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable);
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var plan = await migrations.PlanAsync(name, body.Partitions, body.BackupSkip, body.BackupSkipAcknowledged, body.AcknowledgedGroups, cancellationToken);
+            return plan.Accepted ? Results.Ok(plan) : Results.BadRequest(plan);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private Task<IResult> RequestMigration(ClaimsPrincipal user, MigrationRequestBody body, CancellationToken cancellationToken)
+    {
+        if (migrations is null || !migrations.CanMigrate(user))
+            return Task.FromResult(migrations is null
+                ? Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable)
+                : Results.Forbid());
+        return MigrationCall(async () =>
+        {
+            var record = await migrations.RequestAsync(user, body, cancellationToken);
+            return record;
+        }, created: true);
+    }
+
+    private Task<IResult> GetMigration(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken)
+    {
+        if (migrations is null)
+            return Task.FromResult(Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable));
+        if (!migrations.CanView(user) && !migrations.CanMigrate(user))
+            return Task.FromResult(Results.Forbid());
+        return MigrationCall(() => migrations.GetAsync(user, id, mutate: false, cancellationToken));
+    }
+
+    private Task<IResult> ApproveMigration(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken) =>
+        Migrate(user, () => migrations!.ApproveAsync(user, id, cancellationToken));
+
+    private Task<IResult> RejectMigration(ClaimsPrincipal user, Guid id, RejectBody body, CancellationToken cancellationToken) =>
+        Migrate(user, () => migrations!.RejectAsync(user, id, body.Reason ?? "", cancellationToken));
+
+    private Task<IResult> ExecuteMigration(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken) =>
+        Migrate(user, () => migrations!.ExecuteAsync(user, id, cancellationToken), accepted: true);
+
+    private Task<IResult> GoMigration(ClaimsPrincipal user, Guid id, MigrationCommandBody body, CancellationToken cancellationToken) =>
+        Migrate(user, () => migrations!.CommandAsync(user, id, MigrationCommand.Go, body.Confirmation, cancellationToken));
+
+    private Task<IResult> AbortMigration(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken) =>
+        Migrate(user, () => migrations!.CommandAsync(user, id, MigrationCommand.Abort, null, cancellationToken));
+
+    private Task<IResult> RecoverMigration(ClaimsPrincipal user, Guid id, MigrationCommandBody body, CancellationToken cancellationToken)
+    {
+        var command = (body.Action ?? "").Trim().ToLowerInvariant() switch
+        {
+            "forward" => MigrationCommand.RecoverForward,
+            "deleteforeign" or "delete-foreign" or "foreign" => MigrationCommand.DeleteForeign,
+            _ => MigrationCommand.RecoverOriginal
+        };
+        return Migrate(user, () => migrations!.CommandAsync(user, id, command, body.Confirmation, cancellationToken));
+    }
+
+    private Task<IResult> ManualStep(ClaimsPrincipal user, Guid id, ManualStepBody body, CancellationToken cancellationToken) =>
+        Migrate(user, () => migrations!.ManualStepAsync(user, id, (body.Workload ?? "").SanitizeAndRemove(), cancellationToken));
+
+    private async Task<IResult> GetRunbook(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken)
+    {
+        if (migrations is null)
+            return Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable);
+        if (!migrations.CanView(user) && !migrations.CanMigrate(user))
+            return Results.Forbid();
+        try
+        {
+            var text = await migrations.RunbookAsync(user, id, cancellationToken);
+            return Results.Text(text, "text/plain");
+        }
+        catch (KafkaOpsNotFoundException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status404NotFound);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private async Task<IResult> DeleteBackup(ClaimsPrincipal user, string name, BackupDeleteBody body, CancellationToken cancellationToken)
+    {
+        if (migrations is null || !migrations.CanMigrate(user))
+            return migrations is null
+                ? Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable)
+                : Results.Forbid();
+        if (!TryTopic(name, out var backup, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            await migrations.DeleteBackupAsync(user, backup, (body.Confirmation ?? "").SanitizeAndRemove(), cancellationToken);
+            return Results.NoContent();
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private async Task<IResult> GetHolds(ClaimsPrincipal user, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanView(user))
+            return Results.Forbid();
+        if (migrations is null)
+            return Results.Ok(Array.Empty<string>());
+        return Results.Ok(await migrations.HoldsAsync(cancellationToken));
+    }
+
+    private Task<IResult> Migrate(ClaimsPrincipal user, Func<Task<MigrationRecord>> action, bool accepted = false)
+    {
+        if (migrations is null || !migrations.CanMigrate(user))
+            return Task.FromResult(migrations is null
+                ? Problem("Topic migration is not available.", StatusCodes.Status503ServiceUnavailable)
+                : Results.Forbid());
+        return MigrationCall(action, accepted: accepted);
+    }
+
+    private async Task<IResult> MigrationCall(Func<Task<MigrationRecord>> action, bool created = false, bool accepted = false)
+    {
+        try
+        {
+            var record = await action();
+            if (created)
+                return Results.Created($"/api/ops/kafka/migrations/{record.Id}", record);
+            if (accepted)
+                return Results.Accepted($"/api/ops/kafka/migrations/{record.Id}", record);
+            return Results.Ok(record);
+        }
+        catch (KafkaOpsNotFoundException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status404NotFound);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+        catch (StaleFenceException ex)
+        {
+            return Conflict(ex.Message);
+        }
+    }
+
     private static readonly Regex TopicName = new("^[A-Za-z0-9._-]+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static bool TryTopic(string? topic, out string name, out string error)
@@ -384,6 +616,22 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         error = "";
         return true;
     }
+}
+
+public sealed class MigrationCommandBody
+{
+    public string? Confirmation { get; set; }
+    public string? Action { get; set; }
+}
+
+public sealed class ManualStepBody
+{
+    public string? Workload { get; set; }
+}
+
+public sealed class BackupDeleteBody
+{
+    public string? Confirmation { get; set; }
 }
 
 public sealed class PartitionPlanBody

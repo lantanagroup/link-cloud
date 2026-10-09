@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Link.UI.Services;
 
-public sealed class KafkaOpsClient
+public sealed class KafkaOpsClient : IKafkaTopicHoldSource
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -193,6 +193,97 @@ public sealed class KafkaOpsClient
         return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/change-requests/" + id.ToString("D") + "/cancel", new { }, cancellationToken);
     }
 
+    public Task<KafkaOpsCall<List<string>>> GetHoldsAsync(CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<List<string>> { Status = 200, Value = [] });
+        return SendAsync<List<string>>(HttpMethod.Get, "api/ops/kafka/holds", null, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetHeldTopicsAsync(CancellationToken cancellationToken)
+    {
+        var holds = await GetHoldsAsync(cancellationToken);
+        return holds.Value ?? [];
+    }
+
+    public Task<KafkaOpsCall<KafkaTopicDetail>> GetDetailAsync(string topic, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<KafkaTopicDetail> { Status = 200, Value = new KafkaTopicDetail { Topic = topic } });
+        return SendAsync<KafkaTopicDetail>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/detail", null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<KafkaTopicConfigs>> GetConfigsAsync(string topic, string? diff, CancellationToken cancellationToken)
+    {
+        var query = string.IsNullOrWhiteSpace(diff) ? "" : "?diff=" + Uri.EscapeDataString(diff);
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<KafkaTopicConfigs> { Status = 200, Value = new KafkaTopicConfigs { Topic = topic, Diff = diff ?? "" } });
+        return SendAsync<KafkaTopicConfigs>(HttpMethod.Get, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/configs" + query, null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<KafkaMigrationPlan>> PlanMigrationAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<KafkaMigrationPlan> { Status = 200, Value = new KafkaMigrationPlan { Accepted = false, Summary = "Fixture mode does not run a migration." } });
+        return SendAsync<KafkaMigrationPlan>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/migrations/plan", new { partitions, backupSkip, backupSkipAcknowledged }, cancellationToken, keepBodyOnFailure: true);
+    }
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> RequestMigrationAsync(string topic, int partitions, string reason, string confirmation, bool backupSkip, bool backupSkipAcknowledged, string planHash, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<KafkaMigrationRecord> { Status = 403, Error = "Fixture mode does not run a migration." });
+        return SendAsync<KafkaMigrationRecord>(HttpMethod.Post, "api/ops/kafka/migrations", new { topic, partitions, reason, confirmation, backupSkip, backupSkipAcknowledged, planHash }, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> GetMigrationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<KafkaMigrationRecord> { Status = 404, Error = "That migration was not found." });
+        return SendAsync<KafkaMigrationRecord>(HttpMethod.Get, "api/ops/kafka/migrations/" + id.ToString("D"), null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> ApproveMigrationAsync(Guid id, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "approve", null, cancellationToken);
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> RejectMigrationAsync(Guid id, string reason, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "reject", new { reason }, cancellationToken);
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> ExecuteMigrationAsync(Guid id, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "execute", new { }, cancellationToken);
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> GoMigrationAsync(Guid id, string confirmation, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "go", new { confirmation }, cancellationToken);
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> AbortMigrationAsync(Guid id, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "abort", new { }, cancellationToken);
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> RecoverMigrationAsync(Guid id, string confirmation, string action, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "recover", new { confirmation, action }, cancellationToken);
+
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> ManualStepAsync(Guid id, string workload, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "manual-step", new { workload }, cancellationToken);
+
+    public Task<KafkaOpsCall<string>> RunbookAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<string> { Status = 200, Value = "The recreated topic starts empty. Consumer groups are committed at offset 0. The backup is kept." });
+        return SendAsync<string>(HttpMethod.Get, "api/ops/kafka/migrations/" + id.ToString("D") + "/runbook", null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<string>> DeleteBackupAsync(string name, string confirmation, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<string> { Status = 204, Value = "" });
+        return SendAsync<string>(HttpMethod.Post, "api/ops/kafka/backups/" + Uri.EscapeDataString(name) + "/delete", new { confirmation }, cancellationToken);
+    }
+
+    private Task<KafkaOpsCall<KafkaMigrationRecord>> PostMigrationAsync(Guid id, string action, object? body, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(new KafkaOpsCall<KafkaMigrationRecord> { Status = 404, Error = "That migration was not found." });
+        return SendAsync<KafkaMigrationRecord>(HttpMethod.Post, "api/ops/kafka/migrations/" + id.ToString("D") + "/" + action, body ?? new { }, cancellationToken);
+    }
+
     private async Task<KafkaOpsCall<T>> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken cancellationToken, string? correlationId = null, bool keepBodyOnFailure = false)
     {
         using var request = new HttpRequestMessage(method, path);
@@ -231,7 +322,10 @@ public sealed class KafkaOpsClient
         }
 
         if (string.IsNullOrWhiteSpace(text))
-            return new KafkaOpsCall<T> { Status = (int)response.StatusCode };
+            return new KafkaOpsCall<T> { Status = (int)response.StatusCode, Value = typeof(T) == typeof(string) ? (T)(object)"" : default };
+
+        if (typeof(T) == typeof(string))
+            return new KafkaOpsCall<T> { Status = (int)response.StatusCode, Value = (T)(object)text };
 
         var value = JsonSerializer.Deserialize<T>(text, Json);
         return new KafkaOpsCall<T> { Status = (int)response.StatusCode, Value = value };
@@ -295,6 +389,7 @@ public sealed class KafkaTopicRow
     public int RetryPartitions { get; set; }
     public int ErrorPartitions { get; set; }
     public bool RetryBehind { get; set; }
+    public bool ErrorBehind { get; set; }
     public int ReplicationFactor { get; set; }
     public Dictionary<string, string> Configs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public double ProduceRatePerSecond { get; set; }
@@ -303,6 +398,18 @@ public sealed class KafkaTopicRow
     public int MaxReplicas { get; set; }
     public List<string> Groups { get; set; } = [];
     public string? Error { get; set; }
+    public bool FullIsr { get; set; } = true;
+    public bool LeadersSkewed { get; set; }
+    public long EstimatedBytes { get; set; }
+    public string SizeClass { get; set; } = "";
+    public bool ServiceRetryBehind { get; set; }
+    public bool ServiceRedriveBehind { get; set; }
+    public bool PinnedSiblingBehind { get; set; }
+    public int TopicsFilePartitions { get; set; } = 3;
+    public bool PartitionDrift { get; set; }
+    public bool Slice1Eligible { get; set; }
+    public string MigrationEligibility { get; set; } = "";
+    public string PartitionAddReason { get; set; } = "";
 }
 
 public sealed class KafkaGroupsResponse
@@ -489,6 +596,108 @@ public sealed class BrokerMovePlan
     public List<ReplicaMove> Moves { get; set; } = [];
     public bool SecondApproverRequired { get; set; } = true;
     public string Summary { get; set; } = "";
+}
+
+public sealed class KafkaMigrationPlan
+{
+    public bool Accepted { get; set; }
+    public List<string> Errors { get; set; } = [];
+    public List<string> Warnings { get; set; } = [];
+    public string PlanHash { get; set; } = "";
+    public int WindowMinutes { get; set; }
+    public int AlertMinutes { get; set; }
+    public List<string> StopSet { get; set; } = [];
+    public List<string> Siblings { get; set; } = [];
+    public string Summary { get; set; } = "";
+}
+
+public sealed class KafkaMigrationRecord
+{
+    public Guid Id { get; set; }
+    public string Topic { get; set; } = "";
+    public int OriginalPartitions { get; set; }
+    public int TargetPartitions { get; set; }
+    public int Step { get; set; }
+    public string PlanHash { get; set; } = "";
+    public string Requester { get; set; } = "";
+    public string Approver { get; set; } = "";
+    public string Executor { get; set; } = "";
+    public string Reason { get; set; } = "";
+    public bool BackupSkipped { get; set; }
+    public bool BackupCleanupRequired { get; set; }
+    public string BackupTopic { get; set; } = "";
+    public string Failure { get; set; } = "";
+    public string Evidence { get; set; } = "";
+    public bool ManualChecklist { get; set; }
+    public List<string> StopProducers { get; set; } = [];
+    public List<string> StopConsumers { get; set; } = [];
+    public List<KafkaMigrationTimelineEntry> Timeline { get; set; } = [];
+
+    public string StepName => Step >= 0 && Step < StepNames.Length ? StepNames[Step] : Step.ToString();
+
+    public static readonly string[] StepNames =
+    [
+        "Planned", "Pending", "Approved", "A1", "A2", "A3", "A4",
+        "B1", "B2", "B3", "B4", "B5", "B6", "B7", "H1",
+        "C1", "C2", "C3", "C4", "C5", "D1", "D2", "D3",
+        "Done", "RollingBack", "RolledBack", "NeedsAttention", "Rejected"
+    ];
+}
+
+public sealed class KafkaMigrationTimelineEntry
+{
+    public int Sequence { get; set; }
+    public int Step { get; set; }
+    public string Text { get; set; } = "";
+    public DateTimeOffset At { get; set; }
+}
+
+public sealed class KafkaTopicDetail
+{
+    public string Topic { get; set; } = "";
+    public string? Error { get; set; }
+    public string TopicId { get; set; } = "";
+    public int Partitions { get; set; }
+    public int ReplicationFactor { get; set; }
+    public bool FullIsr { get; set; }
+    public bool LeadersSkewed { get; set; }
+    public string KeyClass { get; set; } = "";
+    public string KeyShape { get; set; } = "";
+    public bool Slice1Eligible { get; set; }
+    public string Eligibility { get; set; } = "";
+    public List<string> Producers { get; set; } = [];
+    public List<string> Consumers { get; set; } = [];
+    public List<string> StopSet { get; set; } = [];
+    public bool Held { get; set; }
+    public long EstimatedRecords { get; set; }
+    public bool PartitionDrift { get; set; }
+    public List<KafkaPartitionFact> PartitionsDetail { get; set; } = [];
+}
+
+public sealed class KafkaPartitionFact
+{
+    public int Partition { get; set; }
+    public int Leader { get; set; }
+    public List<int> Replicas { get; set; } = [];
+    public List<int> Isr { get; set; } = [];
+    public bool PreferredLeader { get; set; }
+    public long LogStart { get; set; }
+    public long HighWatermark { get; set; }
+}
+
+public sealed class KafkaTopicConfigs
+{
+    public string Topic { get; set; } = "";
+    public string Diff { get; set; } = "";
+    public List<KafkaConfigRow> Configs { get; set; } = [];
+    public List<string> Changes { get; set; } = [];
+}
+
+public sealed class KafkaConfigRow
+{
+    public string Name { get; set; } = "";
+    public string Value { get; set; } = "";
+    public string Source { get; set; } = "";
 }
 
 public sealed class ReplicaMove
