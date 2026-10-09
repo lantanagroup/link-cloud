@@ -75,9 +75,10 @@ public class KafkaBrowsePageTests
         page.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">What to keep</legend>");
         page.Should().Contain("id=\"kafka-browse-result\"");
         page.Should().Contain("Blocking reasons");
-        page.Should().Contain("KafkaBrowseText.FacilityHref");
-        page.Should().Contain("KafkaBrowseText.ReportHref");
-        page.Should().Contain("ValuePretty");
+        var detail = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_MessageDetail.cshtml"));
+        detail.Should().Contain("KafkaBrowseText.FacilityHref");
+        detail.Should().Contain("KafkaBrowseText.ReportHref");
+        detail.Should().Contain("ValuePretty");
         page.Should().Contain("Export JSON");
         page.Should().Contain("btn btn-au-execute");
         page.Should().Contain("btn btn-au-link");
@@ -98,6 +99,20 @@ public class KafkaBrowsePageTests
             .Should().Be("/Tenants/Report/11111111-1111-1111-1111-111111111111?reportId=22222222-2222-2222-2222-222222222222");
         KafkaBrowseText.FacilityHref(" ").Should().BeEmpty();
         KafkaBrowseText.ReportHref("fac", null).Should().BeEmpty();
+        KafkaBrowseText.MessageType("ResourcesAcquired").Should().Be("ResourcesAcquired Main");
+        KafkaBrowseText.MessageType("ResourcesAcquired-Error").Should().Be("ResourcesAcquired Error");
+        KafkaBrowseText.KeyBadge("").Should().Be("No key");
+        KafkaBrowseText.KeyBadge(new string('k', 40)).Should().EndWith("…").And.HaveLength(33);
+        var highlighted = KafkaBrowseText.PayloadHtml(
+            "{\n  \"reportId\": \"abc\",\n  \"ok\": true,\n  \"n\": 1,\n  \"x\": null\n}",
+            null);
+        highlighted.Should().Contain("lu-json-key");
+        highlighted.Should().Contain("lu-json-string");
+        highlighted.Should().Contain("lu-json-bool");
+        highlighted.Should().Contain("lu-json-number");
+        highlighted.Should().Contain("lu-json-null");
+        highlighted.Should().NotContain("<script");
+        KafkaBrowseText.PayloadHtml(null, "<script>alert(1)</script>").Should().Contain("&lt;script&gt;").And.NotContain("<script");
         KafkaBrowseText.Verdict(null, "That topic is not in the catalog.").Should().Be("This read was refused.");
         KafkaBrowseText.NextStep(null, "That topic is not in the catalog.").Should().Contain("fetch again");
         var capped = new KafkaBrowsePage { Metadata = new KafkaBrowseMetadata { CapHit = true, Returned = 1 } };

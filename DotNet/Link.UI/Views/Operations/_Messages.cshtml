@@ -325,87 +325,9 @@
                     </tr>
                     @if (open)
                     {
-                        var facilityHref = KafkaBrowseText.FacilityHref(record.Link.FacilityId);
-                        var reportHref = KafkaBrowseText.ReportHref(record.Link.FacilityId, record.Link.ReportId);
-                        <tr>
+                        <tr class="lu-msg-row">
                             <td colspan="7">
-                                <div class="au-card card">
-                                    <div class="card-body">
-                                        <p class="mb-2">
-                                            Partition @record.Partition, offset @record.Offset, @record.ByteSize bytes.
-                                            @if (record.Truncated)
-                                            {
-                                                <span>The value was cut to stay inside the byte cap.</span>
-                                            }
-                                        </p>
-                                        <p class="mb-2">
-                                            Facility
-                                            @if (facilityHref.Length > 0)
-                                            {
-                                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = record.Link.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = facilityHref, ReturnUrl = query.Href() })" />
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted">—</span>
-                                            }
-                                            <span class="ms-3">Patient</span>
-                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = record.Link.PatientId, Compact = true, CopyLabel = "Copy patient id" })" />
-                                            <span class="ms-3">Report</span>
-                                            @if (reportHref.Length > 0)
-                                            {
-                                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = record.Link.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = reportHref, ReturnUrl = query.Href() })" />
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted">—</span>
-                                            }
-                                        </p>
-                                        <p class="mb-2">
-                                            Correlation
-                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = record.Link.CorrelationId, Compact = true, CopyLabel = "Copy correlation id" })" />
-                                            @if (!string.IsNullOrWhiteSpace(record.Link.RetryCount))
-                                            {
-                                                <span class="ms-3">Retry count @record.Link.RetryCount</span>
-                                            }
-                                        </p>
-                                        @if (record.Link.ExceptionHeaders.Count > 0)
-                                        {
-                                            <p class="mb-1">Exception</p>
-                                            <ul>
-                                                @foreach (var header in record.Link.ExceptionHeaders)
-                                                {
-                                                    <li>@header.Name: @header.Value</li>
-                                                }
-                                            </ul>
-                                        }
-                                        else if (!string.IsNullOrWhiteSpace(record.Link.ExceptionMessage))
-                                        {
-                                            <p>@record.Link.ExceptionMessage</p>
-                                        }
-                                        <h4 class="h6">Payload</h4>
-                                        <pre class="mb-2">@(record.ValuePretty ?? record.Value)</pre>
-                                        <details>
-                                            <summary>Headers (@record.Headers.Count) and key note</summary>
-                                            @if (!string.IsNullOrWhiteSpace(record.KeyNote))
-                                            {
-                                                <p>@record.KeyNote</p>
-                                            }
-                                            @if (record.Headers.Count == 0)
-                                            {
-                                                <p class="mb-0">No headers.</p>
-                                            }
-                                            else
-                                            {
-                                                <ul class="mb-0">
-                                                    @foreach (var header in record.Headers)
-                                                    {
-                                                        <li>@header.Name: @header.Value</li>
-                                                    }
-                                                </ul>
-                                            }
-                                        </details>
-                                    </div>
-                                </div>
+                                <partial name="_MessageDetail" model="@(new KafkaMessageOpen { Topic = topicName, Record = record, ReturnHref = query.Href() })" />
                             </td>
                         </tr>
                     }
