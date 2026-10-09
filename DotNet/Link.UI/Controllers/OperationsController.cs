@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -211,6 +212,39 @@ public sealed class OperationsController : Controller
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error });
         return Redirect(page.Query.Href(topic: form.Topic) + "&requestId=" + created.Value.Id.ToString("D"));
+    }
+
+    [HttpPost("Kafka/replication-factor/plan")]
+    [ValidateAntiForgeryToken]
+    public IActionResult PlanReplication(KafkaChangeForm form)
+    {
+        var query = ReplicationQuery(form) with { RfPage = 1 };
+        return Redirect(query.Href());
+    }
+
+    [HttpPost("Kafka/replication-factor")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateReplication(KafkaChangeForm form, CancellationToken cancellationToken)
+    {
+        var query = ReplicationQuery(form);
+        var page = WithDraft(await LoadAsync(null, null, null, null, null, query, cancellationToken), form);
+        if (string.IsNullOrWhiteSpace(form.Reason))
+            return View("Kafka", page with { Error = "A reason is required." });
+        if (!string.Equals((form.Confirmation ?? "").Trim(), query.TopicName, StringComparison.Ordinal))
+            return View("Kafka", page with { Error = "Type the topic name to confirm. The replication factor changes only after the request." });
+
+        var created = await _kafka.CreateReplicationFactorAsync(
+            query.TopicName,
+            query.Rf,
+            query.RfThrottle,
+            form.Reason ?? "",
+            form.Confirmation,
+            Guid.NewGuid().ToString("N"),
+            cancellationToken);
+        if (created.Value is null)
+            return View("Kafka", page with { Error = created.Error });
+        var done = query with { Rf = 0, RfQ = "", RfThrottle = 0 };
+        return Redirect(done.Href() + "&requestId=" + created.Value.Id.ToString("D"));
     }
 
     [HttpPost("Kafka/requests")]
@@ -484,6 +518,21 @@ public sealed class OperationsController : Controller
         error ??= topics.Error ?? groups.Error ?? cluster.Error ?? capabilities.Error;
         if (string.IsNullOrWhiteSpace(error))
             error = topics.GroupsError;
+        ReplicationFactorPlan? replicationPlan = null;
+        if (query.View == ThroughputKafkaPageQuery.Topic && query.Rf > 0 && !string.IsNullOrWhiteSpace(query.TopicName))
+        {
+            var replication = await _kafka.PlanReplicationFactorAsync(
+                query.TopicName,
+                query.Rf,
+                query.RfThrottle,
+                query.RfQ,
+                query.RfPage,
+                query.RfSize,
+                cancellationToken);
+            replicationPlan = replication.Value;
+            error = KafkaPlanBanner.BesidePlan(error ?? replication.Error, replicationPlan?.Summary, replicationPlan is not null);
+        }
+
         return new ThroughputKafkaPage
         {
             Query = query,
@@ -507,6 +556,7 @@ public sealed class OperationsController : Controller
             Plan = plan,
             ScalePlan = scalePlan,
             MovePlan = movePlan,
+            ReplicationPlan = replicationPlan,
             Request = request,
             Error = error,
             SelectedGroup = selectedGroup,
@@ -744,6 +794,28 @@ public sealed class OperationsController : Controller
     private static int BrokerId(ThroughputKafkaPage page, KafkaChangeForm form) =>
         form.BrokerId >= 0 ? form.BrokerId : page.SelectedBroker?.Id ?? -1;
 
+    private static ThroughputKafkaPageQuery ReplicationQuery(KafkaChangeForm form)
+    {
+        var query = QueryFrom(form);
+        var search = (form.RfQ ?? "").SanitizeAndRemove();
+        if (search.Length > 40)
+            search = search[..40];
+        var throttle = form.Throttle;
+        if (throttle < 0 || throttle > ReplicationFactorRules.MaxThrottle)
+            throttle = 0;
+        return query with
+        {
+            View = ThroughputKafkaPageQuery.Topic,
+            TopicName = string.IsNullOrWhiteSpace(form.Topic) ? query.TopicName : form.Topic.Trim(),
+            Advanced = true,
+            Rf = form.ReplicationFactor is < 0 or > 64 ? 0 : form.ReplicationFactor,
+            RfThrottle = throttle,
+            RfPage = form.RfPage < 1 ? 1 : form.RfPage,
+            RfSize = form.RfSize is 10 or 25 or 50 ? form.RfSize : 25,
+            RfQ = search
+        };
+    }
+
     private static ThroughputKafkaPageQuery QueryFrom(KafkaChangeForm form)
     {
         var view = form.View;
@@ -792,6 +864,11 @@ public sealed class KafkaChangeForm
     public int Replicas { get; set; }
     public int Delta { get; set; } = 1;
     public string? Adjust { get; set; }
+    public int ReplicationFactor { get; set; }
+    public long Throttle { get; set; }
+    public int RfPage { get; set; } = 1;
+    public int RfSize { get; set; } = 25;
+    public string? RfQ { get; set; }
     public bool Tests { get; set; }
     public bool Advanced { get; set; }
     public string? ReturnUrl { get; set; }

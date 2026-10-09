@@ -29,6 +29,19 @@
             {
                 <p>Group @request.GroupId from @request.BeforeReplicas to @request.DesiredReplicas members.</p>
             }
+            else if (request.Kind == "ReplicationFactor")
+            {
+                <p>@request.Topic replication factor @request.BeforeReplicationFactor to @request.TargetReplicationFactor. Throttle @ReplicationFactorRules.ThrottleText(request.ThrottleBytesPerSecond). @(request.ThrottleCleared ? "The throttle has been cleared." : "The throttle stays until every replica is in the ISR.")</p>
+                @if (request.Steps.Count > 0)
+                {
+                    <ol id="kafka-replication-steps">
+                    @foreach (var step in request.Steps)
+                    {
+                        <li>@step</li>
+                    }
+                    </ol>
+                }
+            }
             else if (request.BrokerId >= 0)
             {
                 <p>Broker @request.BrokerId.</p>

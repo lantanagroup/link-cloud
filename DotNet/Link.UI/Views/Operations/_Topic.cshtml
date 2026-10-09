@@ -338,6 +338,7 @@ else
             }
         </div>
     </form>
+    <partial name="_ReplicationFactor" model="Model" />
     @if (topic is not null && (topic.RetryPartitions > 0 && topic.RetryPartitions < topic.Partitions || topic.ErrorPartitions > 0 && topic.ErrorPartitions < topic.Partitions))
     {
         <form class="mt-3" method="post" action="/Operations/Kafka/family/plan" data-kafka-busy="Dry run is running.">
