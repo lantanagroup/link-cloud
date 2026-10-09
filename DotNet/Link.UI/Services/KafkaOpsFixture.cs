@@ -83,7 +83,21 @@ public sealed class KafkaOpsFixture
             KeyShape = row.KeyShape,
             Slice1Eligible = row.Slice1Eligible,
             Eligibility = row.MigrationEligibility,
-            Consumers = row.Groups.ToList()
+            Consumers = row.Groups.ToList(),
+            PartitionsDetail = _document.Cluster.Placements
+                .Where(item => string.Equals(item.Topic, row.Topic, StringComparison.Ordinal))
+                .OrderBy(item => item.Partition)
+                .Select(item => new KafkaPartitionFact
+                {
+                    Partition = item.Partition,
+                    Leader = item.Leader,
+                    Replicas = item.Replicas.ToList(),
+                    Isr = item.Isr.ToList(),
+                    PreferredLeader = item.Replicas.Count > 0 && item.Leader == item.Replicas[0],
+                    LogStart = 0,
+                    HighWatermark = Math.Max(0, 40 - (item.Partition * 10))
+                })
+                .ToList()
         });
     }
 

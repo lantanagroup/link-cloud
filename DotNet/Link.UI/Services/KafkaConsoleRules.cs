@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Link.UI.Models;
 
 namespace Link.UI.Services;
 
@@ -324,11 +325,262 @@ public static class KafkaBrowseText
         return "Fetched";
     }
 
+    public static KafkaBrowseSeekLinks SeekLinks(ThroughputKafkaPageQuery query, KafkaBrowsePage? page)
+    {
+        if (page is null || page.Records.Count == 0)
+            return new KafkaBrowseSeekLinks(false, "", false, "", 0, 0);
+
+        var applied = query.BrowseLimit < 1
+            ? KafkaBrowseLimits.DefaultLimit
+            : Math.Min(query.BrowseLimit, KafkaBrowseLimits.MaxLimit);
+        var earliest = page.Records.Min(record => record.Offset);
+        var latest = page.Records.Max(record => record.Offset);
+        var earlierAt = Math.Max(0, earliest - applied);
+        var laterAt = latest == long.MaxValue ? latest : latest + 1;
+        var earlier = earliest > 0;
+        var later = page.Records.Count >= applied;
+        return new KafkaBrowseSeekLinks(
+            earlier,
+            earlier ? query.WithSeek("from-offset", earlierAt).Href() : "",
+            later,
+            later ? query.WithSeek("from-offset", laterAt).Href() : "",
+            earliest,
+            latest);
+    }
+
     private static string ServiceLabel(string topic, string marker, string kind)
     {
         var index = topic.IndexOf(marker, StringComparison.Ordinal);
         if (index < 0 || index + marker.Length >= topic.Length)
             return kind;
         return kind + " " + topic[(index + marker.Length)..];
+    }
+}
+
+public sealed record KafkaBrowseSeekLinks(bool Earlier, string EarlierHref, bool Later, string LaterHref, long Earliest, long Latest);
+
+public sealed record KafkaSummaryStrip(int Total, string TotalLabel, int Attention, string HottestLabel, string Hottest, string Skew);
+
+public sealed record KafkaWindowPager(int Page, int Pages, string Note, string Previous, string Next);
+
+public sealed record KafkaWindow<T>
+{
+    public int Total { get; init; }
+    public int Hot { get; init; }
+    public long Hottest { get; init; }
+    public string Skew { get; init; } = "";
+    public int Page { get; init; } = 1;
+    public int Pages { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+    public IReadOnlyList<T> Rows { get; init; } = [];
+    public IReadOnlyList<T> HottestRows { get; init; } = [];
+
+    public string CapNote =>
+        Hot > HottestRows.Count
+            ? HottestRows.Count + " of " + Hot + " shown. The rest are in the paged list, worst first."
+            : "";
+}
+
+public static class KafkaWindows
+{
+    public const int HottestCap = 8;
+    public const int AssignmentCap = 6;
+    public const int UnownedCap = 8;
+
+    public static int Size(int pageSize) => pageSize is 10 or 25 or 50 ? pageSize : 25;
+
+    public static KafkaWindow<KafkaPartitionDetail> Topic(IReadOnlyList<KafkaPartitionDetail> rows, int page, int pageSize)
+    {
+        bool Hot(KafkaPartitionDetail row) =>
+            KafkaAttention.Partition(row.Leader, row.Replicas, row.InSync, row.Lag.Select(item => item.Lag));
+        long Heat(KafkaPartitionDetail row) => row.Lag.Count == 0 ? 0 : row.Lag.Max(item => item.Lag);
+        var ordered = rows
+            .OrderByDescending(Hot)
+            .ThenByDescending(Heat)
+            .ThenBy(row => row.Partition)
+            .ToList();
+        var hottest = ordered.Count == 0 ? 0 : ordered.Max(Heat);
+        var skew = rows.Count == 0 ? "No partitions were reported." : LeaderSkew(rows.Select(row => row.Leader));
+        return Slice(ordered, ordered.Count(Hot), hottest, skew, page, pageSize, Hot);
+    }
+
+    public static KafkaWindow<KafkaPartitionLagRow> Committed(IReadOnlyList<KafkaPartitionLagRow> rows, int page, int pageSize)
+    {
+        bool Hot(KafkaPartitionLagRow row) => KafkaAttention.CommittedPartition(row.Lag, row.Owned);
+        var ordered = rows
+            .OrderByDescending(Hot)
+            .ThenByDescending(row => row.Lag)
+            .ThenBy(row => row.Topic, StringComparer.Ordinal)
+            .ThenBy(row => row.Partition)
+            .ToList();
+        var hottest = ordered.Count == 0 ? 0 : ordered.Max(row => row.Lag);
+        var skew = rows.Count == 0 ? "No committed partitions." : LagSkew(rows);
+        return Slice(ordered, ordered.Count(Hot), hottest, skew, page, pageSize, Hot);
+    }
+
+    public static KafkaWindow<KafkaPartitionFact> Facts(IReadOnlyList<KafkaPartitionFact> rows, int page, int pageSize)
+    {
+        bool Hot(KafkaPartitionFact row) => !row.PreferredLeader || row.Isr.Count < row.Replicas.Count || row.Leader < 0;
+        long Span(KafkaPartitionFact row) =>
+            row.HighWatermark < 0 || row.LogStart < 0 || row.HighWatermark < row.LogStart
+                ? 0
+                : row.HighWatermark - row.LogStart;
+        var ordered = rows
+            .OrderByDescending(Hot)
+            .ThenByDescending(Span)
+            .ThenBy(row => row.Partition)
+            .ToList();
+        var hottest = ordered.Count == 0 ? 0 : ordered.Max(Span);
+        var skew = rows.Count == 0 ? "No partitions were reported." : LeaderSkew(rows.Select(row => row.Leader));
+        return Slice(ordered, ordered.Count(Hot), hottest, skew, page, pageSize, Hot);
+    }
+
+    public static KafkaWindow<KafkaGroupRow> Groups(IReadOnlyList<KafkaGroupRow> rows, int page, int pageSize)
+    {
+        bool Hot(KafkaGroupRow row) => KafkaAttention.Group(row);
+        var ordered = rows
+            .OrderByDescending(Hot)
+            .ThenByDescending(row => row.TotalLag)
+            .ThenBy(row => row.GroupId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var hottest = ordered.Count == 0 ? 0 : ordered.Max(row => row.TotalLag);
+        return Slice(ordered, ordered.Count(Hot), hottest, GroupSkew(rows), page, pageSize, Hot);
+    }
+
+    public static KafkaWindow<KafkaTopicCapability> DeniedRights(IReadOnlyList<KafkaTopicCapability> topics, int page, int pageSize)
+    {
+        var denied = topics
+            .Where(right => right.CanAlterPartitions == false)
+            .OrderBy(right => right.Topic, StringComparer.Ordinal)
+            .ToList();
+        return Slice(denied, denied.Count, 0, "", page, pageSize, static _ => false);
+    }
+
+    public static string LeaderSkew(IEnumerable<int> leaders)
+    {
+        var online = leaders.Where(id => id >= 0).ToList();
+        if (online.Count == 0)
+            return "No leader is online.";
+
+        var counts = online
+            .GroupBy(id => id)
+            .Select(group => (Id: group.Key, Count: group.Count()))
+            .OrderByDescending(row => row.Count)
+            .ThenBy(row => row.Id)
+            .ToList();
+        if (counts.Count == 1)
+            return "Broker " + counts[0].Id + " leads every partition.";
+
+        var even = (int)Math.Ceiling(online.Count / (double)counts.Count);
+        var top = counts[0];
+        if (top.Count > even)
+            return "Broker " + top.Id + " leads " + top.Count + " of " + online.Count + " partitions.";
+
+        return "Leaders are spread across " + counts.Count + " brokers.";
+    }
+
+    public static string LagSkew(IEnumerable<KafkaPartitionLagRow> rows)
+    {
+        var list = rows.ToList();
+        if (list.Count == 0)
+            return "No committed partitions.";
+
+        var byTopic = list
+            .GroupBy(row => row.Topic ?? "", StringComparer.Ordinal)
+            .Select(group => (Topic: group.Key, Lag: group.Sum(row => row.Lag)))
+            .OrderByDescending(row => row.Lag)
+            .ThenBy(row => row.Topic, StringComparer.Ordinal)
+            .ToList();
+        var total = byTopic.Sum(row => row.Lag);
+        if (total <= 0)
+            return "Lag is even. Every committed partition is caught up.";
+        if (byTopic.Count == 1)
+            return byTopic[0].Topic + " holds all " + total + " of the lag.";
+
+        var even = (long)Math.Ceiling(total / (double)byTopic.Count);
+        var top = byTopic[0];
+        if (top.Lag > even)
+            return top.Topic + " holds " + top.Lag + " of " + total + " lag.";
+
+        return "Lag is spread across " + byTopic.Count + " topics.";
+    }
+
+    public static string GroupSkew(IReadOnlyList<KafkaGroupRow> rows)
+    {
+        if (rows.Count == 0)
+            return "No groups were reported.";
+
+        var total = rows.Sum(row => row.TotalLag);
+        var lagging = rows
+            .Where(row => row.TotalLag > 0)
+            .OrderByDescending(row => row.TotalLag)
+            .ThenBy(row => row.GroupId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (total <= 0 || lagging.Count == 0)
+            return "Lag is even. No group is behind.";
+        if (lagging.Count == 1)
+            return lagging[0].GroupId + " holds all " + total + " of the lag.";
+
+        var even = (long)Math.Ceiling(total / (double)rows.Count);
+        var top = lagging[0];
+        if (top.TotalLag > even)
+            return top.GroupId + " holds " + top.TotalLag + " of " + total + " lag.";
+
+        return "Lag is spread across " + lagging.Count + " groups.";
+    }
+
+    public static string AssignmentText(IReadOnlyList<string>? ids)
+    {
+        if (ids is null || ids.Count == 0)
+            return "—";
+        if (ids.Count > AssignmentCap)
+            return ids.Count + " partitions";
+        return string.Join(", ", ids);
+    }
+
+    public static string UnownedText(IReadOnlyList<string>? ids)
+    {
+        if (ids is null || ids.Count == 0)
+            return "";
+        var shown = string.Join(", ", ids.Take(UnownedCap));
+        if (ids.Count > UnownedCap)
+            return ids.Count + " unowned: " + shown + ", …";
+        return ids.Count + " unowned: " + shown;
+    }
+
+    public static string LagByGroup(IReadOnlyList<KafkaPartitionLagRow>? lag)
+    {
+        if (lag is null || lag.Count == 0)
+            return "";
+        var ordered = lag
+            .OrderByDescending(item => item.Lag)
+            .ThenBy(item => item.GroupId, StringComparer.Ordinal)
+            .ToList();
+        var shown = string.Join("; ", ordered.Take(AssignmentCap).Select(item => item.GroupId + " " + item.Lag));
+        if (ordered.Count > AssignmentCap)
+            shown += "; " + (ordered.Count - AssignmentCap) + " more";
+        return shown;
+    }
+
+    private static KafkaWindow<T> Slice<T>(List<T> worstFirst, int hot, long hottest, string skew, int page, int pageSize, Func<T, bool> isHot)
+    {
+        var size = Size(pageSize);
+        var total = worstFirst.Count;
+        var pages = Math.Max(1, (int)Math.Ceiling(total / (double)size));
+        var current = page < 1 ? 1 : Math.Min(page, pages);
+        var start = (current - 1) * size;
+        var rows = total == 0 ? [] : worstFirst.Skip(start).Take(size).ToList();
+        return new KafkaWindow<T>
+        {
+            Total = total,
+            Hot = hot,
+            Hottest = hottest,
+            Skew = skew,
+            Page = current,
+            Pages = pages,
+            PageSize = size,
+            Rows = rows,
+            HottestRows = worstFirst.Where(isHot).Take(HottestCap).ToList()
+        };
     }
 }

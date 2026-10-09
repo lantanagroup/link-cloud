@@ -6,7 +6,6 @@
     var topicName = topic?.Topic ?? Model.DraftTopic;
     var increaseLine = topic is null ? null : KafkaIncreaseEligibility.Line(topic.PartitionAddReason, Model.Plan, topic.Topic);
     var partitionTone = Model.Plan is null ? "alert-secondary" : Model.Plan.Accepted ? "alert-success" : "alert-danger";
-    var hotPartitions = Model.Partitions.Where(row => KafkaAttention.Partition(row.Leader, row.Replicas, row.InSync, row.Lag.Select(item => item.Lag))).ToList();
     var topicStep = 1;
     if (Model.Plan is not null && Model.Plan.Accepted)
         topicStep = 5;
@@ -18,9 +17,9 @@
 
 <h2 class="h5 mt-3">One topic</h2>
 <p>Placement, lag, and partition changes for a single topic. An increase is permanent. Preview it first. Nothing changes until the request is approved and executed.</p>
-<ol>
+<ol class="lu-kafka-steps">
     <li>Choose the topic.</li>
-    <li>Read the partitions that are offline or behind. The full placement stays folded.</li>
+    <li>Read the partitions that are offline or behind. Placement is one page, worst first.</li>
     <li>Preview an increase, or a family completion when only the siblings are behind.</li>
     <li>Review the result. A refusal lists each reason.</li>
     <li>Submit the request. Type the topic name first.</li>
@@ -90,29 +89,89 @@ else
         <p class="mt-3">This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero.</p>
     }
 
-    @if (hotPartitions.Count > 0)
+    @if (Model.Partitions.Count == 0)
     {
+        <p class="text-muted mt-3 mb-0">Placement for this topic is not in the cluster metadata.</p>
+    }
+    else
+    {
+        var placement = KafkaWindows.Topic(Model.Partitions, query.PartPage, query.PageSize);
+        <partial name="_KafkaSummary" model="@(new KafkaSummaryStrip(placement.Total, "Partitions", placement.Hot, "Hottest lag", placement.Hottest.ToString("N0"), placement.Skew))" />
+        @if (placement.Hot > 0)
+        {
+            <div class="au-card card mt-3">
+                <div class="card-header">Partitions that need attention (@placement.Hot)</div>
+                <div class="card-body">
+                    <p>A partition is listed here when its leader is offline, its ISR is short, or a group still has lag on it.</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Partition</th>
+                                    <th>Leader</th>
+                                    <th>ISR</th>
+                                    <th>Lag by group</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in placement.HottestRows)
+                            {
+                                <tr class="lu-kafka-problem">
+                                    <td>@row.Partition</td>
+                                    <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
+                                    <td>@row.InSync</td>
+                                    <td>
+                                        @if (row.Lag.Count == 0)
+                                        {
+                                            <span class="text-muted">No group lag</span>
+                                        }
+                                        else
+                                        {
+                                            @KafkaWindows.LagByGroup(row.Lag)
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (placement.CapNote.Length > 0)
+                    {
+                        <p class="text-muted mt-2 mb-0">@placement.CapNote</p>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="mt-3 mb-0">No partition is offline or behind.</p>
+        }
+
         <div class="au-card card mt-3">
-            <div class="card-header">Partitions that need attention (@hotPartitions.Count)</div>
+            <div class="card-header">Partition placement</div>
             <div class="card-body">
-                <p>A partition is listed here when its leader is offline, its ISR is short, or a group still has lag on it.</p>
+                <p class="text-muted">One page, worst first. Offline and behind partitions come before the ones that are caught up.</p>
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead>
                             <tr>
                                 <th>Partition</th>
                                 <th>Leader</th>
+                                <th>Replicas</th>
                                 <th>ISR</th>
+                                <th>High watermark</th>
                                 <th>Lag by group</th>
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var row in hotPartitions)
+                        @foreach (var row in placement.Rows)
                         {
-                            <tr class="lu-kafka-problem">
+                            <tr class="@(KafkaAttention.Partition(row.Leader, row.Replicas, row.InSync, row.Lag.Select(item => item.Lag)) ? "lu-kafka-problem" : null)">
                                 <td>@row.Partition</td>
                                 <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
+                                <td>@row.Replicas</td>
                                 <td>@row.InSync</td>
+                                <td>@(row.HighWatermark < 0 ? "—" : row.HighWatermark.ToString())</td>
                                 <td>
                                     @if (row.Lag.Count == 0)
                                     {
@@ -120,7 +179,7 @@ else
                                     }
                                     else
                                     {
-                                        @string.Join("; ", row.Lag.Select(item => item.GroupId + " " + item.Lag))
+                                        @KafkaWindows.LagByGroup(row.Lag)
                                     }
                                 </td>
                             </tr>
@@ -128,60 +187,10 @@ else
                         </tbody>
                     </table>
                 </div>
+                <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(placement.Page, placement.Pages, "Worst first.", placement.Page > 1 ? query.Href(part: placement.Page - 1) : "", placement.Page < placement.Pages ? query.Href(part: placement.Page + 1) : ""))" />
             </div>
         </div>
     }
-    else
-    {
-        <p class="mt-3 mb-0">No partition is offline or behind.</p>
-    }
-
-    <details class="lu-kafka-fold">
-        <summary>Partition placement (@Model.Partitions.Count)</summary>
-        @if (Model.Partitions.Count == 0)
-        {
-            <p class="text-muted mb-0 mt-2">Placement for this topic is not in the cluster metadata.</p>
-        }
-        else
-        {
-            <div class="table-responsive mt-3">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Partition</th>
-                            <th>Leader</th>
-                            <th>Replicas</th>
-                            <th>ISR</th>
-                            <th>High watermark</th>
-                            <th>Lag by group</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var row in Model.Partitions)
-                    {
-                        <tr class="@(KafkaAttention.Partition(row.Leader, row.Replicas, row.InSync, row.Lag.Select(item => item.Lag)) ? "lu-kafka-problem" : null)">
-                            <td>@row.Partition</td>
-                            <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
-                            <td>@row.Replicas</td>
-                            <td>@row.InSync</td>
-                            <td>@(row.HighWatermark < 0 ? "—" : row.HighWatermark.ToString())</td>
-                            <td>
-                                @if (row.Lag.Count == 0)
-                                {
-                                    <span class="text-muted">No group lag</span>
-                                }
-                                else
-                                {
-                                    @string.Join("; ", row.Lag.Select(item => item.GroupId + " " + item.Lag))
-                                }
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </details>
 
     <details class="lu-kafka-fold">
         <summary>Topic configuration (@topic.Configs.Count settings)</summary>
@@ -194,7 +203,7 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                @foreach (var config in topic.Configs.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+                @foreach (var config in topic.Configs.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase).Take(query.PageSize))
                 {
                     <tr>
                         <td>@config.Key</td>
@@ -204,6 +213,10 @@ else
                 </tbody>
             </table>
         </div>
+        @if (topic.Configs.Count > query.PageSize)
+        {
+            <p class="text-muted mt-2 mb-0">Showing @query.PageSize of @topic.Configs.Count settings.</p>
+        }
     </details>
 
     <h2 class="h5 mt-4">Partition lag</h2>
