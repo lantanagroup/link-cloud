@@ -2,7 +2,9 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Primitives;
 
 namespace Link.UI.Controllers;
 
@@ -161,6 +163,47 @@ public sealed class OperationsController : Controller
         if (call.Value is null)
             return Problem(detail: call.Error ?? "The export was refused.", statusCode: call.Status == 0 ? StatusCodes.Status502BadGateway : call.Status);
         return File(call.Value, "application/json", query.TopicName + "-messages.json");
+    }
+
+    [HttpPost("Kafka/messages")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProduceMessage(KafkaChangeForm form, CancellationToken cancellationToken)
+    {
+        var query = MessageQuery(form);
+        var page = WithDraft(await LoadAsync(null, null, null, null, null, query, cancellationToken), form);
+        var draft = new KafkaProduceDraft
+        {
+            Topic = (form.Topic ?? "").Trim(),
+            Headers = form.MessageHeaders ?? "",
+            Key = form.MessageKey ?? "",
+            Value = form.MessageValue ?? "",
+            FromStage = false
+        };
+        if (string.IsNullOrWhiteSpace(form.Reason))
+            return View("Kafka", page with { Error = KafkaProduceRules.ReasonSentence, ProduceDraft = draft });
+        if (form.Reason.Trim().Length > KafkaProduceRules.MaxReason)
+            return View("Kafka", page with { Error = KafkaProduceRules.ReasonLengthSentence, ProduceDraft = draft });
+        if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
+            return View("Kafka", page with { Error = KafkaProduceRules.ConfirmSentence, ProduceDraft = draft });
+
+        var review = KafkaProduceRules.Evaluate(form.Topic, form.MessageHeaders, form.MessageKey, form.MessageValue);
+        if (!review.Accepted)
+            return View("Kafka", page with { Error = review.Error, ProduceDraft = draft with { Summary = review.Error } });
+
+        var created = await _kafka.ProduceMessageAsync(
+            form.Topic ?? "",
+            form.MessageHeaders ?? "",
+            form.MessageKey,
+            form.MessageValue,
+            form.Reason.Trim(),
+            form.Confirmation,
+            Guid.NewGuid().ToString("N"),
+            cancellationToken);
+        if (created.Value is null)
+            return View("Kafka", page with { Error = created.Error, ProduceDraft = draft with { Summary = review.Summary } });
+
+        var done = query with { StageRecord = "" };
+        return Redirect(done.Href() + "&requestId=" + created.Value.Id.ToString("D"));
     }
 
     [HttpGet("Kafka/requests/{id:guid}")]
@@ -484,6 +527,16 @@ public sealed class OperationsController : Controller
                 browseError = messageCall.Error ?? familyCall.Error;
         }
 
+        KafkaProduceDraft? produceDraft = null;
+        if (query.View == ThroughputKafkaPageQuery.Messages && query.StageRecord.Length > 0 && messages is not null)
+        {
+            var staged = messages.Records.FirstOrDefault(record =>
+                string.Equals(KafkaBrowseText.RecordId(record.Partition, record.Offset), query.StageRecord, StringComparison.Ordinal));
+            produceDraft = staged is null
+                ? new KafkaProduceDraft { Topic = query.TopicName, Summary = KafkaProduceRules.MissingSentence, FromStage = true }
+                : KafkaProduceRules.FromRecord(query.TopicName, staged);
+        }
+
         if (query.View == ThroughputKafkaPageQuery.Migrate && !string.IsNullOrWhiteSpace(query.TopicName))
         {
             var detailCall = await _kafka.GetDetailAsync(query.TopicName, cancellationToken);
@@ -570,7 +623,8 @@ public sealed class OperationsController : Controller
             Runbook = runbook,
             Messages = messages,
             Family = family,
-            BrowseError = browseError
+            BrowseError = browseError,
+            ProduceDraft = produceDraft
         };
     }
 
@@ -794,6 +848,41 @@ public sealed class OperationsController : Controller
     private static int BrokerId(ThroughputKafkaPage page, KafkaChangeForm form) =>
         form.BrokerId >= 0 ? form.BrokerId : page.SelectedBroker?.Id ?? -1;
 
+    private static ThroughputKafkaPageQuery MessageQuery(KafkaChangeForm form)
+    {
+        var values = new Dictionary<string, StringValues>
+        {
+            ["view"] = ThroughputKafkaPageQuery.Messages,
+            ["topic"] = form.Topic ?? "",
+            ["mode"] = string.IsNullOrWhiteSpace(form.Mode) ? "newest" : form.Mode,
+            ["limit"] = form.Limit.ToString(),
+            ["key"] = form.Key ?? "",
+            ["headerName"] = form.HeaderName ?? "",
+            ["headerValue"] = form.HeaderValue ?? "",
+            ["record"] = form.Record ?? "",
+            ["stage"] = form.Stage ?? "",
+            ["q"] = form.Q ?? "",
+            ["sort"] = string.IsNullOrWhiteSpace(form.Sort) ? "topic" : form.Sort,
+            ["dir"] = form.Dir == "desc" ? "desc" : "asc",
+            ["page"] = form.Page < 1 ? "1" : form.Page.ToString(),
+            ["pageSize"] = (form.PageSize is 10 or 25 or 50 ? form.PageSize : 25).ToString(),
+            ["family"] = form.Family ?? "",
+            ["keyClass"] = form.KeyClass ?? "",
+            ["group"] = form.Group ?? "",
+            ["broker"] = form.Broker ?? "",
+            ["tests"] = form.Tests ? "1" : "",
+            ["advanced"] = form.Advanced ? "1" : "",
+            ["returnUrl"] = ReturnUrlRules.Sanitize(form.ReturnUrl) ?? ""
+        };
+        if (!string.IsNullOrWhiteSpace(form.Offset))
+            values["offset"] = form.Offset;
+        if (!string.IsNullOrWhiteSpace(form.Timestamp))
+            values["timestamp"] = form.Timestamp;
+        if (!string.IsNullOrWhiteSpace(form.BrowsePartition))
+            values["partition"] = form.BrowsePartition;
+        return ThroughputKafkaPageQuery.From(new QueryCollection(values), ReturnUrlRules.Sanitize(form.ReturnUrl));
+    }
+
     private static ThroughputKafkaPageQuery ReplicationQuery(KafkaChangeForm form)
     {
         var query = QueryFrom(form);
@@ -872,4 +961,17 @@ public sealed class KafkaChangeForm
     public bool Tests { get; set; }
     public bool Advanced { get; set; }
     public string? ReturnUrl { get; set; }
+    public string? Mode { get; set; }
+    public int Limit { get; set; } = 25;
+    public string? Offset { get; set; }
+    public string? Timestamp { get; set; }
+    public string? Key { get; set; }
+    public string? HeaderName { get; set; }
+    public string? HeaderValue { get; set; }
+    public string? Record { get; set; }
+    public string? Stage { get; set; }
+    public string? BrowsePartition { get; set; }
+    public string? MessageHeaders { get; set; }
+    public string? MessageKey { get; set; }
+    public string? MessageValue { get; set; }
 }

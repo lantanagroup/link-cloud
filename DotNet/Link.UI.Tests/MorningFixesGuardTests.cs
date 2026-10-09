@@ -139,8 +139,11 @@ public class MorningFixesGuardTests
             .Select(Rel)
             .ToList();
         copyPartials.Should().BeEmpty();
-        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_MessageDetail.cshtml"))
-            .Should().Contain("Copy payload");
+        var messageDetail = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_MessageDetail.cshtml"));
+        messageDetail.Should().Contain("Copy headers");
+        messageDetail.Should().Contain("Copy key");
+        messageDetail.Should().Contain("Copy value");
+        messageDetail.Should().Contain("Copy all");
 
         var inline = ProductFiles("*.cshtml", "Views")
             .Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js")))

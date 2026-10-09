@@ -80,8 +80,152 @@
         wireConfirm();
         bindBusy(root);
         wireResults(root);
+        wireProduce();
         focusResult(root);
         watchRequest();
+    }
+
+    function wireProduce() {
+        if (document.documentElement.getAttribute("data-produce-wired") === "1") {
+            syncProduce();
+            return;
+        }
+        document.documentElement.setAttribute("data-produce-wired", "1");
+        document.addEventListener("click", function (event) {
+            var tab = event.target && event.target.closest ? event.target.closest("[data-msg-tab]") : null;
+            if (tab) {
+                showMessageTab(tab.getAttribute("data-msg-tab"));
+                return;
+            }
+            var restage = event.target && event.target.closest ? event.target.closest("[data-restage]") : null;
+            if (restage) {
+                event.preventDefault();
+                applyRestage(restage);
+                return;
+            }
+            var paste = event.target && event.target.closest ? event.target.closest("#kafka-paste-message") : null;
+            if (paste) {
+                event.preventDefault();
+                pasteMessage();
+            }
+        });
+        document.addEventListener("input", function (event) {
+            var form = event.target && event.target.closest ? event.target.closest("#kafka-produce") : null;
+            if (!form) return;
+            form.setAttribute("data-produce-dirty", "1");
+            if (event.target && event.target.id === "produce-topic") {
+                var confirm = document.getElementById("produce-confirm");
+                if (confirm) confirm.setAttribute("data-topic", event.target.value || "");
+            }
+            syncProduce();
+        });
+        syncProduce();
+    }
+
+    function showMessageTab(name) {
+        document.querySelectorAll("[data-msg-pane]").forEach(function (pane) {
+            pane.hidden = pane.getAttribute("data-msg-pane") !== name;
+        });
+        document.querySelectorAll("[data-msg-tab]").forEach(function (tab) {
+            var on = tab.getAttribute("data-msg-tab") === name;
+            tab.classList.toggle("active", on);
+            tab.setAttribute("aria-selected", on ? "true" : "false");
+        });
+    }
+
+    function applyRestage(button) {
+        var form = document.getElementById("kafka-produce");
+        var node = document.getElementById(button.getAttribute("data-restage") || "");
+        if (!form || !node) return;
+        var payload;
+        try {
+            payload = JSON.parse(node.textContent || "");
+        } catch (err) {
+            return;
+        }
+        fillProduce(form, payload);
+        var topic = button.getAttribute("data-topic") || "";
+        var topicBox = form.querySelector("[name='topic']");
+        if (topicBox && topic) topicBox.value = topic;
+        var confirm = document.getElementById("produce-confirm");
+        if (confirm) confirm.setAttribute("data-topic", topicBox ? topicBox.value : topic);
+        var stage = button.getAttribute("data-stage") || "";
+        if (stage && window.history && history.replaceState) {
+            try {
+                var url = new URL(window.location.href);
+                url.searchParams.set("stage", stage);
+                history.replaceState(null, "", url.pathname + url.search + url.hash);
+            } catch (err) { /* keep the current address */ }
+        }
+        syncProduce();
+        form.scrollIntoView({ block: "nearest" });
+    }
+
+    function pasteMessage() {
+        var form = document.getElementById("kafka-produce");
+        var summary = document.getElementById("kafka-produce-summary");
+        if (!form) return;
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            if (summary) summary.textContent = "Clipboard read is not available. Paste headers, key, and value into the fields.";
+            return;
+        }
+        navigator.clipboard.readText().then(function (text) {
+            var payload;
+            try {
+                payload = JSON.parse(text);
+            } catch (err) {
+                if (summary) summary.textContent = "That clipboard is not a copied message. Paste headers, key, and value into the fields.";
+                return;
+            }
+            if (!payload || (payload.headers == null && payload.key == null && payload.value == null)) {
+                if (summary) summary.textContent = "That clipboard is not a copied message. Paste headers, key, and value into the fields.";
+                return;
+            }
+            fillProduce(form, payload);
+            syncProduce();
+            form.scrollIntoView({ block: "nearest" });
+        }).catch(function () {
+            if (summary) summary.textContent = "Clipboard read was blocked. Paste headers, key, and value into the fields.";
+        });
+    }
+
+    function fillProduce(form, payload) {
+        var lines = headerLines(payload.headers);
+        var headersBox = form.querySelector("[name='messageHeaders']");
+        var keyBox = form.querySelector("[name='messageKey']");
+        var valueBox = form.querySelector("[name='messageValue']");
+        if (headersBox) headersBox.value = lines.join("\n");
+        if (keyBox) keyBox.value = payload.key == null ? "" : String(payload.key);
+        if (valueBox) valueBox.value = payload.value == null ? "" : String(payload.value);
+        form.setAttribute("data-produce-dirty", "1");
+        var summary = document.getElementById("kafka-produce-summary");
+        if (summary) summary.textContent = "Review this replica. " + lines.length + " headers. Nothing is produced until you type the topic name.";
+    }
+
+    function headerLines(headers) {
+        var lines = [];
+        if (Array.isArray(headers)) {
+            headers.forEach(function (header) {
+                if (!header) return;
+                lines.push(String(header.name || "") + ": " + String(header.value == null ? "" : header.value));
+            });
+            return lines;
+        }
+        if (headers && typeof headers === "object") {
+            Object.keys(headers).forEach(function (name) {
+                lines.push(name + ": " + String(headers[name] == null ? "" : headers[name]));
+            });
+        }
+        return lines;
+    }
+
+    function syncProduce() {
+        var input = document.getElementById("produce-confirm");
+        var button = document.getElementById("produce-submit");
+        var topic = document.getElementById("produce-topic");
+        if (!input || !button) return;
+        var expected = topic ? topic.value : (input.getAttribute("data-topic") || "");
+        button.disabled = input.value !== expected || expected.length === 0;
     }
 
     function wireResults(root) {

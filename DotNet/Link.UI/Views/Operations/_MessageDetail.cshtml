@@ -4,7 +4,11 @@
     var record = Model.Record;
     var facilityHref = KafkaBrowseText.FacilityHref(record.Link.FacilityId);
     var reportHref = KafkaBrowseText.ReportHref(record.Link.FacilityId, record.Link.ReportId);
-    var payload = record.ValuePretty ?? record.Value ?? "";
+    var payload = record.Value ?? "";
+    var headersText = KafkaProduceRules.HeadersText(record.Headers);
+    var clipboard = KafkaProduceRules.ClipboardJson(record.Headers, record.Key, payload);
+    var recordId = KafkaBrowseText.RecordId(record.Partition, record.Offset);
+    var restageId = "kafka-restage-" + recordId.Replace(':', '-');
     var hasException = !string.IsNullOrWhiteSpace(record.Link.ExceptionMessage) || record.Link.ExceptionHeaders.Count > 0;
 }
 <article class="lu-msg">
@@ -35,8 +39,10 @@
             {
                 <span class="badge au-badge-danger">Exception</span>
             }
+            <button type="button" class="btn btn-sm btn-au-link" data-restage="@restageId" data-stage="@recordId" data-topic="@Model.Topic">Re-stage</button>
         </div>
     </header>
+    <script type="application/json" id="@restageId">@Html.Raw(clipboard)</script>
     @if (record.Truncated)
     {
         <p class="lu-msg-note">The value was cut to stay inside the byte cap.</p>
@@ -45,82 +51,121 @@
     {
         <p class="lu-msg-note lu-msg-note-danger">@record.Link.ExceptionMessage</p>
     }
-    <div class="lu-msg-ids">
-        <div>
-            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = record.Link.FacilityId, CopyLabel = "Copy facility id", LinkHref = facilityHref, ReturnUrl = Model.ReturnHref })" />
-        </div>
-        <div>
-            <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = record.Link.PatientId, CopyLabel = "Copy patient id" })" />
-        </div>
-        <div>
-            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = record.Link.ReportId, CopyLabel = "Copy report id", LinkHref = reportHref, ReturnUrl = Model.ReturnHref })" />
-        </div>
-        <div>
-            <partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = record.Link.CorrelationId, CopyLabel = "Copy correlation id" })" />
-        </div>
-        @if (!string.IsNullOrWhiteSpace(record.Link.RetryCount))
-        {
+    <nav class="lu-section-nav lu-msg-tabs" role="tablist" aria-label="Opened message">
+        <button type="button" class="active" id="kafka-msg-details-tab" data-msg-tab="details" role="tab" aria-selected="true" aria-controls="kafka-msg-details">Details</button>
+        <button type="button" id="kafka-msg-raw-tab" data-msg-tab="raw" role="tab" aria-selected="false" aria-controls="kafka-msg-raw">Raw</button>
+    </nav>
+    <div class="lu-msg-pane" id="kafka-msg-details" data-msg-pane="details" role="tabpanel" aria-labelledby="kafka-msg-details-tab">
+        <div class="lu-msg-ids">
             <div>
-                <span class="lu-id-label">Retry count</span>
-                <span>@record.Link.RetryCount</span>
+                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = record.Link.FacilityId, CopyLabel = "Copy facility id", LinkHref = facilityHref, ReturnUrl = Model.ReturnHref })" />
             </div>
-        }
-    </div>
-    @if (!string.IsNullOrWhiteSpace(record.KeyNote))
-    {
-        <p class="lu-msg-note">@record.KeyNote</p>
-    }
-    <section class="lu-msg-section">
-        <h4 class="h6">Headers</h4>
-        @if (record.Headers.Count == 0)
-        {
-            <p class="text-muted mb-0">No headers on this record.</p>
-        }
-        else
-        {
-            <p class="text-muted">@record.Headers.Count on this record.</p>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Header</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var header in record.Headers)
-                    {
-                        <tr>
-                            <td>@header.Name</td>
-                            <td>
-                                <partial name="_LabeledId" model="@(new LabeledId { Label = header.Name, Value = header.Value, Compact = true, CopyLabel = "Copy " + header.Name })" />
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
+            <div>
+                <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = record.Link.PatientId, CopyLabel = "Copy patient id" })" />
             </div>
-        }
-    </section>
-    <section class="lu-msg-section">
-        <div class="lu-msg-payload-wrap">
-            <details class="lu-msg-payload" open>
-                <summary>Payload</summary>
-                @if (payload.Length == 0)
-                {
-                    <p class="text-muted mb-0">This record has no payload.</p>
-                }
-                else
-                {
-                    <pre class="lu-json">@Html.Raw(KafkaBrowseText.PayloadHtml(record.ValuePretty, record.Value))</pre>
-                }
-            </details>
-            @if (payload.Length > 0)
+            <div>
+                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = record.Link.ReportId, CopyLabel = "Copy report id", LinkHref = reportHref, ReturnUrl = Model.ReturnHref })" />
+            </div>
+            <div>
+                <partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = record.Link.CorrelationId, CopyLabel = "Copy correlation id" })" />
+            </div>
+            @if (!string.IsNullOrWhiteSpace(record.Link.RetryCount))
             {
-                <div class="lu-msg-payload-tools">
-                    <partial name="_CopyButton" model="@(new CopyTarget { Value = payload, Label = "Copy payload" })" />
+                <div>
+                    <span class="lu-id-label">Retry count</span>
+                    <span>@record.Link.RetryCount</span>
                 </div>
             }
         </div>
-    </section>
+        @if (!string.IsNullOrWhiteSpace(record.KeyNote))
+        {
+            <p class="lu-msg-note">@record.KeyNote</p>
+        }
+        <section class="lu-msg-section">
+            <h4 class="h6">Headers</h4>
+            @if (record.Headers.Count == 0)
+            {
+                <p class="text-muted mb-0">No headers on this record.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Header</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var header in record.Headers.Take(KafkaProduceRules.MaxHeaders))
+                        {
+                            <tr>
+                                <td>@header.Name</td>
+                                <td>
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = header.Name, Value = header.Value, Compact = true, CopyLabel = "Copy " + header.Name })" />
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                @if (record.Headers.Count > KafkaProduceRules.MaxHeaders)
+                {
+                    <p class="text-muted mb-0">@KafkaProduceRules.MaxHeaders of @record.Headers.Count headers shown.</p>
+                }
+            }
+        </section>
+        <section class="lu-msg-section">
+            <h4 class="h6">Payload</h4>
+            <p class="mb-0">@(string.IsNullOrWhiteSpace(record.ValueSummary) ? "No payload summary." : record.ValueSummary)</p>
+        </section>
+    </div>
+    <div class="lu-msg-pane" id="kafka-msg-raw" data-msg-pane="raw" role="tabpanel" aria-labelledby="kafka-msg-raw-tab" hidden>
+        <div class="lu-msg-copy">
+            <partial name="_CopyButton" model="@(new CopyTarget { Value = clipboard, Label = "Copy all", Text = "Copy all" })" />
+        </div>
+        <section class="lu-msg-raw">
+            <div class="lu-msg-copy">
+                <partial name="_CopyButton" model="@(new CopyTarget { Value = headersText, Label = "Copy headers", Text = "Copy headers" })" />
+            </div>
+            <h4 class="h6">Headers</h4>
+            @if (headersText.Length == 0)
+            {
+                <p class="text-muted mb-0">No headers on this record.</p>
+            }
+            else
+            {
+                <pre>@headersText</pre>
+            }
+        </section>
+        <section class="lu-msg-raw">
+            <div class="lu-msg-copy">
+                <partial name="_CopyButton" model="@(new CopyTarget { Value = record.Key ?? "", Label = "Copy key", Text = "Copy key" })" />
+            </div>
+            <h4 class="h6">Key</h4>
+            @if (string.IsNullOrEmpty(record.Key))
+            {
+                <p class="text-muted mb-0">No key on this record.</p>
+            }
+            else
+            {
+                <pre>@record.Key</pre>
+            }
+        </section>
+        <section class="lu-msg-raw">
+            <div class="lu-msg-copy">
+                <partial name="_CopyButton" model="@(new CopyTarget { Value = payload, Label = "Copy value", Text = "Copy value" })" />
+            </div>
+            <h4 class="h6">Value</h4>
+            @if (payload.Length == 0 && string.IsNullOrEmpty(record.ValuePretty))
+            {
+                <p class="text-muted mb-0">This record has no payload.</p>
+            }
+            else
+            {
+                <pre class="lu-json">@Html.Raw(KafkaBrowseText.PayloadHtml(record.ValuePretty, record.Value))</pre>
+            }
+        </section>
+    </div>
 </article>

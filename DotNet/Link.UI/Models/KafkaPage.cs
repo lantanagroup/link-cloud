@@ -39,6 +39,7 @@ public sealed record ThroughputKafkaPageQuery
     public string BrowseHeaderName { get; init; } = "";
     public string BrowseHeaderValue { get; init; } = "";
     public string OpenRecord { get; init; } = "";
+    public string StageRecord { get; init; } = "";
     public int Rf { get; init; }
     public int RfPage { get; init; } = 1;
     public int RfSize { get; init; } = 25;
@@ -119,6 +120,7 @@ public sealed record ThroughputKafkaPageQuery
             BrowseHeaderName = Clip(One(query, "headerName").SanitizeAndRemove()),
             BrowseHeaderValue = Clip(One(query, "headerValue").SanitizeAndRemove()),
             OpenRecord = Record(One(query, "record")),
+            StageRecord = Record(One(query, "stage")),
             Rf = rf,
             RfPage = rfPage,
             RfSize = rfSize,
@@ -135,7 +137,7 @@ public sealed record ThroughputKafkaPageQuery
             RfQ = search ?? RfQ
         };
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null)
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false)
     {
         var chosenView = view ?? View;
         var partPage = part ?? PartPage;
@@ -194,6 +196,9 @@ public sealed record ThroughputKafkaPageQuery
             var open = closeRecord ? "" : record ?? OpenRecord;
             if (open.Length > 0)
                 values["record"] = open;
+            var staged = closeStage || changed ? "" : stage ?? StageRecord;
+            if (staged.Length > 0)
+                values["stage"] = staged;
         }
 
         var pairs = values
@@ -215,7 +220,8 @@ public sealed record ThroughputKafkaPageQuery
             View = Messages,
             BrowseMode = string.IsNullOrWhiteSpace(mode) ? "newest" : mode.Trim().ToLowerInvariant(),
             BrowseOffset = offset,
-            OpenRecord = ""
+            OpenRecord = "",
+            StageRecord = ""
         };
 
     public string ExportHref()
@@ -328,6 +334,7 @@ public sealed record ThroughputKafkaPage
     public KafkaBrowsePage? Messages { get; init; }
     public KafkaFamilyView? Family { get; init; }
     public string? BrowseError { get; init; }
+    public KafkaProduceDraft? ProduceDraft { get; init; }
 
     public string ChartJson
     {

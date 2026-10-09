@@ -158,6 +158,115 @@ public class KafkaBrowsePageTests
         fixture.Family("__consumer_offsets").Error.Should().NotBeNullOrWhiteSpace();
     }
 
+    [Fact]
+    public void Open_message_has_details_raw_and_a_guarded_produce()
+    {
+        var root = RepoRoot();
+        var detail = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_MessageDetail.cshtml"));
+        detail.Should().Contain("data-msg-tab=\"details\"");
+        detail.Should().Contain("data-msg-tab=\"raw\"");
+        detail.Should().Contain(">Details</button>");
+        detail.Should().Contain(">Raw</button>");
+        detail.Should().Contain("Copy headers");
+        detail.Should().Contain("Copy key");
+        detail.Should().Contain("Copy value");
+        detail.Should().Contain("Copy all");
+        detail.Should().Contain("data-restage=");
+        detail.Should().Contain(">Re-stage</button>");
+        detail.Should().Contain("btn btn-sm btn-au-link");
+        detail.Should().Contain("ValuePretty");
+
+        var produce = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_ProduceMessage.cshtml"));
+        produce.Should().Contain("id=\"kafka-produce\"");
+        produce.Should().Contain("Paste message");
+        produce.Should().Contain("btn btn-au-link");
+        produce.Should().Contain("id=\"produce-submit\"");
+        produce.Should().Contain("btn btn-au-execute");
+        produce.Should().Contain(">Produce</button>");
+        produce.Should().Contain("btn btn-warning");
+        produce.Should().Contain(">Cancel</a>");
+        produce.Should().Contain("Nothing is sent until you type the topic name.");
+        produce.Should().NotContain("btn-primary");
+        produce.Should().NotContain("btn-outline-");
+        produce.Should().NotContain("btn-success");
+
+        var page = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Messages.cshtml"));
+        page.Should().Contain("name=\"_ProduceMessage\"");
+
+        var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
+        script.Should().Contain("data-restage");
+        script.Should().Contain("kafka-paste-message");
+        var live = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "live-region.js"));
+        live.Should().Contain("data-produce-dirty");
+    }
+
+    [Fact]
+    public void Clipboard_round_trips_and_produce_waits_for_confirmation()
+    {
+        var headers = new List<KafkaBrowseHeader>
+        {
+            new() { Name = "X-Correlation-Id", Value = "abc" },
+            new() { Name = "X-Note", Value = "a: b" }
+        };
+        var json = KafkaProduceRules.ClipboardJson(headers, "fac-1", "{\"ok\":true}");
+        json.Should().Contain("\"headers\"");
+        json.Should().Contain("\"key\"");
+        json.Should().Contain("\"value\"");
+        KafkaProduceRules.TryReadClipboard(json, out var text, out var key, out var value, out var error).Should().BeTrue();
+        error.Should().BeEmpty();
+        text.Should().Be("X-Correlation-Id: abc\nX-Note: a: b");
+        key.Should().Be("fac-1");
+        value.Should().Be("{\"ok\":true}");
+
+        var map = """{"headers":{"X-Correlation-Id":"abc"},"key":"k","value":"v"}""";
+        KafkaProduceRules.TryReadClipboard(map, out var mapped, out _, out _, out _).Should().BeTrue();
+        mapped.Should().Contain("X-Correlation-Id: abc");
+        KafkaProduceRules.TryReadClipboard("not json", out _, out _, out _, out var refused).Should().BeFalse();
+        refused.Should().Contain("clipboard");
+
+        var review = KafkaProduceRules.Evaluate("ResourcesAcquired", text, key, value);
+        review.Accepted.Should().BeTrue();
+        review.Topic.Should().Be("ResourcesAcquired");
+        review.Headers.Should().HaveCount(2);
+        review.Headers[1].Value.Should().Be("a: b");
+        review.Summary.Should().Contain("One message on ResourcesAcquired");
+
+        KafkaProduceRules.Evaluate("NotAPipelineTopic", "", "k", "v").Accepted.Should().BeFalse();
+        KafkaProduceRules.Evaluate("ResourcesAcquired", "NoColon", "k", "v").Error.Should().Contain("colon");
+        KafkaProduceRules.Evaluate("ResourcesAcquired", "", "k", new string('x', KafkaProduceRules.MaxValueBytes + 1)).Error.Should().Contain("too long");
+
+        var staged = new ThroughputKafkaPageQuery
+        {
+            View = ThroughputKafkaPageQuery.Messages,
+            TopicName = "ResourcesAcquired",
+            StageRecord = "0:120",
+            OpenRecord = "0:120"
+        };
+        staged.Href().Should().Contain("stage=0%3A120");
+        staged.Href(closeStage: true).Should().NotContain("stage=");
+        staged.Href(view: ThroughputKafkaPageQuery.Overview, page: 1).Should().NotContain("stage=");
+        staged.WithSeek("from-offset", 10).Href().Should().NotContain("stage=");
+
+        var fixture = Fixture();
+        fixture.ProduceMessage("ResourcesAcquired", text, key, value, "restage a copy", "wrong", "corr").Error.Should().Be(KafkaProduceRules.ConfirmSentence);
+        fixture.ProduceMessage("ResourcesAcquired", text, key, value, " ", "ResourcesAcquired", "corr").Error.Should().Be(KafkaProduceRules.ReasonSentence);
+        fixture.ProduceMessage("NotAPipelineTopic", text, key, value, "restage a copy", "NotAPipelineTopic", "corr").Error.Should().NotBeNullOrWhiteSpace();
+
+        var created = fixture.ProduceMessage("ResourcesAcquired", text, key, value, "restage a copy", "ResourcesAcquired", "corr-produce");
+        created.Value.Should().NotBeNull();
+        created.Value!.Kind.Should().Be("Produce");
+        created.Value.Status.Should().Be("Done");
+        created.Value.Topic.Should().Be("ResourcesAcquired");
+        var again = fixture.ProduceMessage("ResourcesAcquired", text, key, value, "restage a copy", "ResourcesAcquired", "corr-produce");
+        again.Error.Should().BeNullOrWhiteSpace();
+
+        var page = fixture.Messages("ResourcesAcquired", "newest", [], null, null, 25, "", "", "");
+        page.Value!.Records[0].Key.Should().Be("fac-1");
+        page.Value.Records[0].Headers.Should().Contain(header => header.Name == "X-Note" && header.Value == "a: b");
+        page.Value.Records.Count.Should().BeLessThanOrEqualTo(25);
+        page.Value.Metadata.Returned.Should().Be(page.Value.Records.Count);
+    }
+
     private static KafkaOpsFixture Fixture()
     {
         var configuration = new ConfigurationBuilder()

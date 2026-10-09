@@ -3878,6 +3878,43 @@ tr.lu-kafka-problem > td:first-child {
   top: .28rem;
   right: .45rem;
 }
+.lu-msg-tabs {
+  margin: .85rem 1rem .15rem;
+}
+.lu-msg-pane {
+  padding-top: .35rem;
+}
+.lu-msg-copy {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: .35rem;
+}
+.lu-msg-raw {
+  margin: 0 1rem .9rem;
+  padding: .75rem;
+  border: 1px solid var(--au-border);
+  border-radius: var(--au-radius);
+  background: var(--au-bg);
+  min-width: 0;
+  max-width: calc(100% - 2rem);
+}
+.lu-msg-raw pre,
+.lu-msg,
+#kafka-produce,
+#kafka-produce fieldset {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.lu-msg-raw pre {
+  margin: .4rem 0 0;
+  max-height: 16rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.lu-produce-summary {
+  margin: 0 0 .75rem;
+}
 .lu-kafka pre.lu-json {
   margin: 0;
   max-height: 22rem;

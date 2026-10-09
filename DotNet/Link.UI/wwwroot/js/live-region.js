@@ -158,7 +158,7 @@
             if (!res.ok) return;
             return res.text().then(function (html) {
                 if (!node.isConnected) return;
-                if (!push && (focusedIn(node) || document.hidden)) return;
+                if (!push && (focusedIn(node) || document.hidden || node.querySelector("#kafka-produce.lu-produce-hold, [data-produce-dirty='1']"))) return;
                 var held = checkedKeys(node);
                 var doc = new DOMParser().parseFromString(html, "text/html");
                 var fresh = doc.getElementById(node.id);

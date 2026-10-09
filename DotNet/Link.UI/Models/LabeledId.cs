@@ -21,4 +21,5 @@ public sealed class CopyTarget
 {
     public string Value { get; init; } = "";
     public string Label { get; init; } = "Copy";
+    public string Text { get; init; } = "";
 }
