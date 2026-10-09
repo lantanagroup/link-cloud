@@ -59,6 +59,7 @@ public interface IReportServiceClient
         string? sortBy = null,
         int pageSize = 10,
         int pageNumber = 1,
+        SortOrder? sortOrder = null,
         CancellationToken cancellationToken = default);
 
     // --- Resources ---

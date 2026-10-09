@@ -639,6 +639,195 @@ public sealed class ReportsService
         };
     }
 
+    public async Task<ReportManifestPage> LoadManifestAsync(
+        string? facilityId,
+        string? reportId,
+        ReportManifestQuery query,
+        string path,
+        IReadOnlyDictionary<string, string> route,
+        Func<string, string?> patientHref,
+        CancellationToken cancellationToken)
+    {
+        var opened = await OpenReportAsync(facilityId, reportId, cancellationToken);
+        var page = new ReportManifestPage
+        {
+            FacilityId = opened.Page.FacilityId,
+            FacilityName = opened.Page.FacilityName,
+            ReportId = opened.Page.ReportId,
+            NotFound = opened.Page.NotFound,
+            LoadError = opened.Page.LoadError,
+            Report = opened.Page.Report
+        };
+        if (page.LoadError is not null || page.NotFound || opened.Schedule is null || _reports is null)
+            return page;
+
+        var scheduleId = opened.Schedule.Id.ToString();
+        var contents = new List<ManifestCountRow>();
+        var heading = "Populations";
+        string? totalLabel = null;
+        try
+        {
+            var populations = await _reports.GetPopulationsByScheduleAsync(scheduleId, cancellationToken: cancellationToken);
+            if (populations.IsSuccessStatusCode && populations.Body is not null)
+            {
+                foreach (var population in populations.Body)
+                {
+                    var measure = string.IsNullOrWhiteSpace(population.Measure) ? population.ReportType : population.Measure;
+                    foreach (var group in population.GroupPopulations ?? [])
+                    {
+                        var name = string.IsNullOrWhiteSpace(group.PopulationId) ? measure : measure + " " + group.PopulationId;
+                        contents.Add(new ManifestCountRow
+                        {
+                            Name = name,
+                            Primary = group.TotalPopulationCount,
+                            Total = group.TotalPopulationCount
+                        });
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Report populations failed. ReportId={ReportId}", page.ReportId.Sanitize());
+        }
+
+        if (contents.Count == 0)
+        {
+            heading = "Patients by status";
+            totalLabel = "Patients";
+            try
+            {
+                var summary = await _reports.GetEntrySummaryByScheduleAsync(scheduleId, cancellationToken);
+                if (summary.IsSuccessStatusCode && summary.Body is not null)
+                {
+                    foreach (var pair in summary.Body.ReportingStatusCounts)
+                    {
+                        contents.Add(new ManifestCountRow
+                        {
+                            Name = ReportManifestRules.Words(pair.Key),
+                            Primary = pair.Value,
+                            Total = pair.Value
+                        });
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Report entry summary failed. ReportId={ReportId}", page.ReportId.Sanitize());
+            }
+        }
+
+        var sortBy = query.Sort == "id" ? "patientid" : "reportingstatus";
+        var sortOrder = query.Descending ? SortOrder.Descending : SortOrder.Ascending;
+        IReadOnlyList<ManifestPatientRow> patients = [];
+        var patientBar = new PageBar { Page = query.Page, PageSize = query.PageSize };
+        string? patientNote = null;
+        try
+        {
+            var entries = await _reports.SearchEntriesAsync(
+                page.FacilityId,
+                query.PatientQuery,
+                scheduleId,
+                sortBy: sortBy,
+                pageSize: query.PageSize,
+                pageNumber: query.Page,
+                sortOrder: sortOrder,
+                cancellationToken: cancellationToken);
+            if (!entries.IsSuccessStatusCode || entries.Body is null)
+            {
+                patientNote = FacilityFormRules.ServiceMessage("Report", entries.StatusCode, entries.RawBody);
+            }
+            else
+            {
+                patients = entries.Body.Records.Select(entry =>
+                {
+                    var counts = entry.MeasureReports
+                        .SelectMany(report => report.ResourceCount ?? [])
+                        .GroupBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                        .Select(group => (Name: group.Key, Count: group.Sum(pair => pair.Value)))
+                        .OrderByDescending(row => row.Count)
+                        .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    var total = counts.Sum(row => row.Count);
+                    var shown = counts.Take(4).Select(row => row.Name + " " + row.Count.ToString("N0")).ToList();
+                    var extra = counts.Count - shown.Count;
+                    var detail = shown.Count == 0 ? null : string.Join(", ", shown) + (extra > 0 ? " +" + extra : "");
+                    return ReportManifestRules.PatientRow(
+                        entry.PatientId,
+                        entry.ReportingStatus.ToString(),
+                        entry.SubmissionStatus?.ToString(),
+                        total,
+                        detail,
+                        patientHref(entry.PatientId));
+                }).ToList();
+                var metadata = entries.Body.Metadata;
+                patientBar = new PageBar
+                {
+                    Page = metadata?.PageNumber > 0 ? metadata.PageNumber : query.Page,
+                    PageSize = metadata?.PageSize > 0 ? metadata.PageSize : query.PageSize,
+                    TotalCount = metadata?.TotalCount ?? patients.Count,
+                    TotalPages = metadata?.TotalPages ?? (patients.Count == 0 ? 0 : 1)
+                };
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Report manifest patients failed. ReportId={ReportId}", page.ReportId.Sanitize());
+            patientNote = "Report service call failed.";
+        }
+
+        var patientCount = (int)patientBar.TotalCount;
+        if (string.IsNullOrWhiteSpace(query.PatientQuery))
+        {
+            try
+            {
+                var counted = await _reports.GetEntryCountByScheduleAsync(scheduleId, cancellationToken);
+                if (counted.IsSuccessStatusCode)
+                    patientCount = counted.Body;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Report entry count failed. ReportId={ReportId}", page.ReportId.Sanitize());
+            }
+        }
+
+        var measures = opened.Schedule.ReportTypes ?? [];
+        page.Manifest = ReportManifestRules.FromReport(
+            new ReportManifestFacts
+            {
+                PatientCount = patientCount,
+                InitialPopulation = page.Report?.InitialPopulationCount ?? 0,
+                ContentTotal = contents.Sum(row => row.Total),
+                Measures = measures,
+                Contents = contents,
+                ContentsHeading = heading,
+                TotalLabel = totalLabel,
+                Patients = patients,
+                PatientPaging = patientBar,
+                PatientNote = patientNote
+            },
+            query,
+            path,
+            route);
+        return page;
+    }
+
     private async Task<(ReportSectionPage Page, ReportScheduleApiModel? Schedule)> OpenReportAsync(
         string? facilityId,
         string? reportId,
