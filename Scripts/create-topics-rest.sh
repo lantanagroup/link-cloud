@@ -68,10 +68,15 @@ while IFS=: read -r TOPIC PARTITIONS REPLICAS PARAMETERS || [[ -n "$TOPIC" ]]; d
     fi
   else
     echo "Creating topic '$TOPIC' with $PARTITIONS partitions and $REPLICAS replicas..."
-    curl -s -u "$USERNAME:$PASSWORD" \
+    CREATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+      -u "$USERNAME:$PASSWORD" \
       -X POST "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics" \
       -H "Content-Type: application/json" \
-      -d "{\"topic_name\": \"$TOPIC\", \"partitions_count\": $PARTITIONS, \"replication_factor\": $REPLICAS}"
+      -d "{\"topic_name\": \"$TOPIC\", \"partitions_count\": $PARTITIONS, \"replication_factor\": $REPLICAS}")
+    if [[ "$CREATE_CODE" != "200" && "$CREATE_CODE" != "201" ]]; then
+      echo "ERROR: Failed to create '$TOPIC' (HTTP $CREATE_CODE)."
+      exit 1
+    fi
   fi
 
   echo

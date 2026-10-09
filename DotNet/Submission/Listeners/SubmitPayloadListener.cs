@@ -169,12 +169,13 @@ namespace LantanaGroup.Link.Submission.Listeners
                         reportScheduleId,
                         facilityId);
 
-                    _payloadSubmittedProducer.Produce(
+                    await _payloadSubmittedProducer.ProduceAsync(
                         correlationId,
                         facilityId,
                         reportScheduleId.Value,
                         value.PayloadType,
-                        patientId);
+                        patientId,
+                        cancellationToken);
                     accounted = true;
                     return;
                 }
@@ -231,12 +232,13 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 if (uploaded)
                 {
-                    _payloadSubmittedProducer.Produce(
+                    await _payloadSubmittedProducer.ProduceAsync(
                         correlationId,
                         facilityId,
                         reportScheduleId.Value,
                         value.PayloadType,
-                        patientId);
+                        patientId,
+                        cancellationToken);
                 }
 
                 accounted = true;
@@ -254,6 +256,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                     result,
                     _logger,
                     cancellationToken);
+            }
+            catch (ProduceException<string, PayloadSubmittedValue> ex)
+            {
+                _logger.LogError(ex, "PayloadSubmitted delivery failed for facility {FacilityId}. The source offset stays uncommitted.", facilityId);
+                if (result != null)
+                {
+                    await DeadLetterCommit.RewindAsync(_consumer, result, _logger, cancellationToken);
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

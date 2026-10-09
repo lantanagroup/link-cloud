@@ -51,6 +51,12 @@ public class SubmitPayloadListenerTests
         _storageServiceMock
             .Setup(s => s.UploadToExternalAsync(It.IsAny<SubmitPayloadKey>(), It.IsAny<SubmitPayloadValue>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        _payloadProducerMock
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, PayloadSubmittedValue>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeliveryResult<string, PayloadSubmittedValue>());
     }
 
     private SubmitPayloadListener CreateListener(bool suppressManifest) =>
@@ -123,7 +129,7 @@ public class SubmitPayloadListenerTests
         await InvokeConsumeAsync(listener, result);
 
         _payloadProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, PayloadSubmittedValue>>(
                     m => m.Value.PayloadType == PayloadType.ReportSchedule
@@ -131,7 +137,7 @@ public class SubmitPayloadListenerTests
                          && m.Value.FacilityId == "facility-1"
                          && m.Value.ReportScheduleId == scheduleId
                          && m.Value.PatientId == "patient-1"),
-                It.IsAny<Action<DeliveryReport<string, PayloadSubmittedValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -150,10 +156,10 @@ public class SubmitPayloadListenerTests
             s => s.UploadToExternalAsync(It.IsAny<SubmitPayloadKey>(), It.IsAny<SubmitPayloadValue>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _payloadProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, PayloadSubmittedValue>>(),
-                It.IsAny<Action<DeliveryReport<string, PayloadSubmittedValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -172,10 +178,10 @@ public class SubmitPayloadListenerTests
             s => s.UploadToExternalAsync(It.IsAny<SubmitPayloadKey>(), It.IsAny<SubmitPayloadValue>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _payloadProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, PayloadSubmittedValue>>(),
-                It.IsAny<Action<DeliveryReport<string, PayloadSubmittedValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
