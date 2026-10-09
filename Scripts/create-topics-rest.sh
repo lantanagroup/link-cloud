@@ -37,7 +37,7 @@ echo
 
 # === Read and process each line from topics.txt ===
 while IFS=: read -r TOPIC PARTITIONS REPLICAS PARAMETERS || [[ -n "$TOPIC" ]]; do
-  [[ -z "$TOPIC" ]] && continue  # skip empty lines
+  [[ -z "$TOPIC" || "$TOPIC" =~ ^# ]] && continue
 
   echo "Checking if topic '$TOPIC' exists..."
 

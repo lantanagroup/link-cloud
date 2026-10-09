@@ -221,7 +221,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
                 
                 await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry,
-                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers));
+                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers), cancellationToken);
             }
             else
             {

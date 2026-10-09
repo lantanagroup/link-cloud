@@ -61,19 +61,26 @@ public class RetryJob : IJob
                     darKey = PayloadSubmittedRedrive.Key(retryModel.Key, retryModel.Value);
                 }
 
-                producer.Produce(destination,
+                // ProduceAsync throws when the broker rejects the record. Flush with no
+                // delivery handler does not, and the job delete below would drop the redrive.
+                await producer.ProduceAsync(destination,
                     new Message<string, string>
                     {
                         Key = darKey,
                         Value = darValue,
                         Headers = headers
-                    });
-
-                producer.Flush();
+                    },
+                    context.CancellationToken);
             }
 
             // remove the job from the scheduler
             await RetryScheduleService.DeleteJob(retryModel, await _schedulerFactory.GetScheduler());
+        }
+        catch (KafkaException ex)
+        {
+            _logger.LogError(ex, "Retry publish was not acknowledged. The job will run again.");
+            await Task.Delay(TimeSpan.FromSeconds(1), context.CancellationToken);
+            throw new JobExecutionException(ex) { RefireImmediately = true };
         }
         catch (Exception ex)
         {

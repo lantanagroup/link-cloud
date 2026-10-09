@@ -163,7 +163,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     // Do not cancel the delivery wait. A cancelled caller can still leave the
                     // record on the broker, and a retry would upload the manifest again.
                     await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
-                        payloadUri: payloadUri?.ToString(), cancellationToken: CancellationToken.None);
+                        patientId: null, correlationId: null, payloadUri: payloadUri?.ToString(), metricsMode: null, cancellationToken: CancellationToken.None);
                 }
                 catch (Exception ex)
                 {

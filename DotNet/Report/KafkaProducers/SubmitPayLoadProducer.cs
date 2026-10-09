@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _logger = logger;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null, string? metricsMode = null, CancellationToken cancellationToken = default)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId, string? correlationId, string? payloadUri, string? metricsMode, CancellationToken cancellationToken)
         {
             _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), patientId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
