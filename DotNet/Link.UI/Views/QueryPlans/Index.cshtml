@@ -12,9 +12,8 @@
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-list-ul me-2"></i>All Query Plans</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewQp">
-                <i class="bi bi-plus-lg"></i>
-            </button>
+            <button type="button" class="btn btn-sm btn-au-link" id="btnNewQp">
+                <i class="bi bi-plus-lg"></i><span class="ms-1">New</span></button>
         </div>
         <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0" id="qpTable">
@@ -76,15 +75,15 @@
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
                                 <div class="lu-row-actions">
-                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
-                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-qp-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(t.IsSystem ? "View" : "Edit")</span></button>
+                                    <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-qp-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
                                     @if (!t.IsDefault)
                                     {
-                                        <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-qp-default" data-id="@t.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-qp-default" data-id="@t.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i><span class="ms-1">Default</span></button>
                                     }
                                     @if (!t.IsSystem)
                                     {
-                                        <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-qp-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-qp-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     }
                                 </div>
                             </td>
@@ -111,7 +110,7 @@
                     <button type="button" class="btn btn-sm btn-success" id="btnModalSave" style="display:none;">
                         <i class="bi bi-floppy me-1"></i>Save
                     </button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnModalClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnModalClose">Close</button>
                 </div>
             </div>
             <div id="qpFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -175,8 +174,7 @@
                                                 <span class="au-info-icon" data-bs-toggle="tooltip" title="Patient-scoped queries that fetch core clinical data (Encounter, MedicationRequest, etc.) using the patient ID and report date range."><i class="bi bi-info-circle"></i></span>
                                             </span>
                                             <button type="button" class="btn btn-sm btn-success qp-add-query-btn" data-target="initialQueryRows">
-                                                <i class="bi bi-plus-lg"></i>
-                                            </button>
+                                                <i class="bi bi-plus-lg"></i><span class="ms-1">Add</span></button>
                                         </div>
                                         <div class="card-body">
                                             <div id="initialQueryRows" class="qp-query-list"></div>
@@ -193,8 +191,7 @@
                                                 <span class="au-info-icon" data-bs-toggle="tooltip" title="Supplemental queries run after initial queries. Reference queries follow references from acquired resources to fetch related data (e.g. Medication from MedicationRequest.medicationReference)."><i class="bi bi-info-circle"></i></span>
                                             </span>
                                             <button type="button" class="btn btn-sm btn-success qp-add-query-btn" data-target="supplementalQueryRows">
-                                                <i class="bi bi-plus-lg"></i>
-                                            </button>
+                                                <i class="bi bi-plus-lg"></i><span class="ms-1">Add</span></button>
                                         </div>
                                         <div class="card-body">
                                             <div id="supplementalQueryRows" class="qp-query-list"></div>
@@ -214,11 +211,11 @@
                                 The JSON should match the DataAcquisition query plan format (with <code>InitialQueries</code> and <code>SupplementalQueries</code> as numbered objects or arrays).
                             </p>
                             <div class="d-flex gap-2 mb-2">
-                                <label class="btn btn-sm btn-au-neutral mb-0" for="jsonFileInput">
+                                <label class="btn btn-sm btn-success mb-0" for="jsonFileInput">
                                     <i class="bi bi-upload me-1"></i>Upload File
                                 </label>
                                 <input type="file" id="jsonFileInput" accept=".json,application/json" class="d-none" />
-                                <button type="button" class="btn btn-sm btn-au-neutral" id="btnJsonClear">
+                                <button type="button" class="btn btn-sm btn-warning" id="btnJsonClear">
                                     <i class="bi bi-x-lg me-1"></i>Clear
                                 </button>
                             </div>
@@ -340,7 +337,7 @@
             '<input class="form-control qp-p-literal" placeholder="literal value" value="' + esc(p.literal) + '" style="flex:1;min-width:100px;" title="Literal value (e.g. order, imaging,laboratory)" />' +
             '<input class="form-control qp-p-resource" placeholder="resource" value="' + esc(p.resource) + '" style="width:95px;" title="Resource type for ResourceIds (e.g. Encounter)" />' +
             '<input class="form-control qp-p-paged" placeholder="paged" value="' + esc(p.pagedValue) + '" style="width:60px;" title="Page size for ResourceIds" />' +
-            '<button type="button" class="btn btn-sm btn-danger lu-icon-btn qp-remove-param-btn" title="Remove parameter" aria-label="Remove parameter"><i class="bi bi-x-lg" aria-hidden="true"></i></button>';
+            '<button type="button" class="btn btn-sm btn-danger lu-icon-btn qp-remove-param-btn" title="Remove parameter" aria-label="Remove parameter"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>';
 
         container.appendChild(row);
 
@@ -386,7 +383,7 @@
                 '<option value="Reference"' + (isRef ? ' selected' : '') + '>Reference</option>' +
             '</select>' +
             '<div style="flex:1;"></div>' +
-            '<button type="button" class="btn btn-sm btn-danger lu-icon-btn qp-remove-query-btn" title="Remove query" aria-label="Remove query"><i class="bi bi-trash" aria-hidden="true"></i></button>';
+            '<button type="button" class="btn btn-sm btn-danger lu-icon-btn qp-remove-query-btn" title="Remove query" aria-label="Remove query"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Remove</span></button>';
         card.appendChild(header);
 
         // Body

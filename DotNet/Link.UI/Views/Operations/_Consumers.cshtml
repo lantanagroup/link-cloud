@@ -42,7 +42,7 @@
                         <td>@row.TotalLag</td>
                         <td>@row.UnownedPartitions.Count</td>
                         <td>
-                            <a class="btn btn-sm btn-au-neutral" href="@query.Href(group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i></a>
+                            <a class="btn btn-sm btn-au-link" href="@query.Href(group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                         </td>
                     </tr>
                 }
@@ -147,10 +147,10 @@ else
                     </div>
                 </div>
                 <div class="d-flex gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-neutral lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview adding replicas" aria-label="Preview adding replicas"><i class="bi bi-eye" aria-hidden="true"></i></button>
-                    <button class="btn btn-sm btn-success lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas" title="Add replicas" aria-label="Add replicas"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
-                    <button class="btn btn-sm btn-au-neutral lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview removing replicas" aria-label="Preview removing replicas"><i class="bi bi-eye" aria-hidden="true"></i></button>
-                    <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas" title="Remove replicas" aria-label="Remove replicas"><i class="bi bi-dash-lg" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview adding replicas" aria-label="Preview adding replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-success lu-icon-btn" type="submit" name="adjust" value="add" formaction="/Operations/Kafka/groups/replicas" title="Add replicas" aria-label="Add replicas"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
+                    <button class="btn btn-sm btn-au-link lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas/plan" title="Preview removing replicas" aria-label="Preview removing replicas"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+                    <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" name="adjust" value="remove" formaction="/Operations/Kafka/groups/replicas" title="Remove replicas" aria-label="Remove replicas"><i class="bi bi-dash-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
                 </div>
             </form>
             @if (Model.ScalePlan is not null)

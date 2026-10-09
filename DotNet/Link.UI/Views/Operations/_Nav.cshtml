@@ -1,6 +1,6 @@
 @{
     var active = ViewData["OperationsSection"] as string ?? "";
-    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-neutral";
+    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-link";
 }
 <nav class="lu-section-nav" aria-label="Throughput and scaling">
     <a class="@Btn("kafka")" asp-controller="Operations" asp-action="Kafka"><i class="bi bi-hdd-network me-1"></i>Kafka</a>

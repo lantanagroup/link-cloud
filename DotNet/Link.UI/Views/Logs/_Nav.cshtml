@@ -1,6 +1,6 @@
 @{
     var active = ViewData["LogsSection"] as string ?? "";
-    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-neutral";
+    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-link";
 }
 <nav class="lu-section-nav" aria-label="Logs">
     <a class="@Btn("acquisition")" asp-controller="Logs" asp-action="Acquisition"><i class="bi bi-journal-text me-1"></i>Acquisition</a>

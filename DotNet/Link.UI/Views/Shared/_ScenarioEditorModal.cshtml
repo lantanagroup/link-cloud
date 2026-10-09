@@ -53,7 +53,7 @@
                     <button type="button" class="btn btn-sm btn-success" id="btnModalSave" style="display:none;">
                         <i class="bi bi-floppy me-1"></i>Save
                     </button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnModalClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnModalClose">Close</button>
                 </div>
             </div>
             <div id="formErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -128,16 +128,16 @@
                                 </div>
                             }
                             <div class="mt-2">
-                                <a class="btn btn-sm btn-au-neutral" id="editMeasuresLink" data-base="@Url.Action("Index", "Measures")" href="@Url.Action("Index", "Measures")">Edit measures</a>
+                                <a class="btn btn-sm btn-au-link" id="editMeasuresLink" data-base="@Url.Action("Index", "Measures")" href="@Url.Action("Index", "Measures")">Edit measures</a>
                             </div>
                         </div>
                         <div class="col-12">
                             <label class="form-label d-block">Facility configuration</label>
                             <div class="btn-group" role="group" aria-label="Facility configuration mode">
                                 <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeFacility" value="Facility" autocomplete="off" checked />
-                                <label class="btn btn-au-neutral" for="FacilityModeFacility">Facility template</label>
+                                <label class="btn btn-au-link" for="FacilityModeFacility">Facility template</label>
                                 <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeAlaCarte" value="AlaCarte" autocomplete="off" />
-                                <label class="btn btn-au-neutral" for="FacilityModeAlaCarte">Ala carte</label>
+                                <label class="btn btn-au-link" for="FacilityModeAlaCarte">Ala carte</label>
                             </div>
                             <div class="form-text">Facility mode uses one template. Ala carte chooses each piece and does not select a facility.</div>
                         </div>
@@ -194,13 +194,13 @@
                         </div>
                         <div class="col-12 facility-alacarte">
                             <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-sm btn-au-neutral" id="editQueryPlanLink" data-base="@Url.Action("Index", "QueryPlans")" href="@Url.Action("Index", "QueryPlans")">Edit query plan</a>
-                                <a class="btn btn-sm btn-au-neutral" id="editNormalizationLink" data-base="@Url.Action("Index", "Normalizations")" href="@Url.Action("Index", "Normalizations")">Edit normalization</a>
-                                <a class="btn btn-sm btn-au-neutral" id="editOrganizationMapLink" data-base="@Url.Action("Index", "OrganizationResourceMaps")" href="@Url.Action("Index", "OrganizationResourceMaps")">Edit organization map</a>
+                                <a class="btn btn-sm btn-au-link" id="editQueryPlanLink" data-base="@Url.Action("Index", "QueryPlans")" href="@Url.Action("Index", "QueryPlans")">Edit query plan</a>
+                                <a class="btn btn-sm btn-au-link" id="editNormalizationLink" data-base="@Url.Action("Index", "Normalizations")" href="@Url.Action("Index", "Normalizations")">Edit normalization</a>
+                                <a class="btn btn-sm btn-au-link" id="editOrganizationMapLink" data-base="@Url.Action("Index", "OrganizationResourceMaps")" href="@Url.Action("Index", "OrganizationResourceMaps")">Edit organization map</a>
                             </div>
                         </div>
                         <div class="col-12" id="editFacilityTemplateRow">
-                            <a class="btn btn-sm btn-au-neutral" id="editFacilityTemplateLink" data-base="@Url.Action("Index", "FacilityTemplates")" href="@Url.Action("Index", "FacilityTemplates")">Edit facility template</a>
+                            <a class="btn btn-sm btn-au-link" id="editFacilityTemplateLink" data-base="@Url.Action("Index", "FacilityTemplates")" href="@Url.Action("Index", "FacilityTemplates")">Edit facility template</a>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="Seed">Seed</label>
@@ -310,7 +310,7 @@
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center gap-2">
                                         <span class="fw-semibold"><i class="bi bi-people-fill me-1"></i>Cohorts</span>
-                                        <button type="button" class="btn btn-sm btn-au-neutral au-info-toggle" data-help="cohortHelpPanel" aria-label="About cohorts" aria-expanded="false"><i class="bi bi-info-circle me-1"></i>How cohorts work</button>
+                                        <button type="button" class="btn btn-sm btn-au-link au-info-toggle" data-help="cohortHelpPanel" aria-label="About cohorts" aria-expanded="false"><i class="bi bi-info-circle me-1"></i>How cohorts work</button>
                                     </div>
                                     <div id="cohortHelpPanel" class="au-help-text" hidden>
                                         <p>Each row is <strong>how many</strong> of one saved Patient Configuration to generate. Stay timing, encounter, and clinical content live on that configuration so you can configure a patient once and reuse it.</p>
@@ -348,7 +348,7 @@
                                     </div>
                                     <div class="d-flex gap-2" id="cohortActions">
                                         <button type="button" class="btn btn-sm btn-success" id="addQualifyingCohort">+ Inpatient pneumonia</button>
-                                        <button type="button" class="btn btn-sm btn-au-neutral" id="addNonQualifyingCohort">+ Ambulatory pneumonia</button>
+                                        <button type="button" class="btn btn-sm btn-au-link" id="addNonQualifyingCohort">+ Ambulatory pneumonia</button>
                                     </div>
                                 </div>
                             </div>
@@ -384,7 +384,7 @@
                                             <input type="text" class="form-control" id="newImportedPatientId" placeholder="e.g. patient-123" maxlength="128" style="width:200px;" />
                                             <button type="button" class="btn btn-success" id="btnAddImportedById">+ Add by ID</button>
                                         </div>
-                                        <label class="btn btn-au-neutral btn-sm mb-0">
+                                        <label class="btn btn-success btn-sm mb-0">
                                             <i class="bi bi-upload me-1"></i>Upload Bundle JSON
                                             <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
                                         </label>
@@ -411,7 +411,7 @@
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:700px;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;" class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0" id="replaceFhirModalTitle"><i class="bi bi-exclamation-triangle me-2"></i>Patient Already Exists on FHIR Server</h6>
-                <button type="button" class="btn btn-sm btn-au-close" id="btnReplaceFhirClose">Close</button>
+                <button type="button" class="btn btn-sm btn-warning" id="btnReplaceFhirClose">Close</button>
             </div>
             <div class="p-3">
                 <p class="mb-2">This patient already exists on the FHIR server.</p>
@@ -431,9 +431,9 @@
                     <div id="replaceFhirHoldFill" class="progress-bar bg-danger" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="width:0%"></div>
                 </div>
                 <div class="d-flex justify-content-end gap-2 mt-3">
-                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnReplaceFhirCancel">Cancel</button>
-                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnUseServerData">Use FHIR Server Data</button>
-                    <button type="button" class="btn btn-danger btn-sm" id="btnReplaceFhirConfirm">
+                    <button type="button" class="btn btn-warning btn-sm" id="btnReplaceFhirCancel">Cancel</button>
+                    <button type="button" class="btn btn-au-link btn-sm" id="btnUseServerData">Use FHIR Server Data</button>
+                    <button type="button" class="btn btn-success btn-sm" id="btnReplaceFhirConfirm">
                         <i class="bi bi-arrow-repeat me-1"></i>Purge + Replace
                     </button>
                 </div>
@@ -451,8 +451,8 @@
                     <button type="button" class="au-info-toggle au-info-toggle-on-dark" data-help="pcCohortActionsHelp" aria-label="About saving a configuration" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                 </h5>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-success" id="btnPcCohortSaveAs">Save configuration</button>
-                    <button type="button" class="btn btn-sm btn-au-close" id="btnPcCohortClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-link" id="btnPcCohortSaveAs">Save configuration</button>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnPcCohortClose">Close</button>
                 </div>
             </div>
             <div id="pcCohortErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -1207,7 +1207,7 @@
                 }).join('');
             return '<div class="d-flex gap-1 pc-cohort-config-cell">' +
                 '<select class="form-select form-select-sm cohort-patient-config">' + opts + '</select>' +
-                '<button type="button" class="btn btn-sm btn-au-neutral btn-cohort-customize" title="Configure this patient">Configure</button>' +
+                '<button type="button" class="btn btn-sm btn-au-link btn-cohort-customize" title="Configure this patient">Configure</button>' +
                 '</div>';
         }
         function syncPatientConfigLock(row, applyDefaults) {
@@ -1217,7 +1217,7 @@
             var btn = row.querySelector('.btn-cohort-customize');
             if (!btn) return;
             btn.textContent = 'Configure';
-            btn.classList.add('btn-au-neutral');
+            btn.classList.add('btn-au-link');
         }
         function addCohortRow(count, patientConfigurationId, intent, rMin, rMax) {
             var idx = cohortRows.children.length;
@@ -1226,7 +1226,7 @@
                 '<td><input type="number" class="form-control form-control-sm cohort-count" min="1" value="' + (count || 1) + '" /></td>' +
                 '<td>' + buildPatientConfigSelect(patientConfigurationId || '') + '</td>' +
                 '<td class="cohort-predicted-cell align-middle"></td>' +
-                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-remove-cohort" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button></td>';
+                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-remove-cohort" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button></td>';
             if (intent) tr.dataset.intentJson = JSON.stringify(intent);
             if (patientConfigurationId) tr.dataset.patientConfigurationId = patientConfigurationId;
             var cfg = findPatientConfig(patientConfigurationId);
@@ -1789,7 +1789,7 @@
                 ? '<span><i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>Bundle</span>'
                 : '<span><i class="bi bi-cloud-arrow-down me-1" aria-hidden="true"></i>By ID</span>';
             var fileLabel = row.source === 'Bundle' && row.fileName ? '<div class="small text-muted">' + esc(row.fileName) + '</div>' : '';
-            var detectBtn = '<button type="button" class="btn btn-sm btn-au-neutral btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';
+            var detectBtn = '<button type="button" class="btn btn-sm btn-au-execute btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i><span class="ms-1">Re-run auto-detection</span></button>';
             var tr = document.createElement('tr');
             tr.dataset.source = row.source || 'ExistingId';
             tr.dataset.uploadedBundleId = row.uploadedBundleId || '';
@@ -1810,7 +1810,7 @@
                 '<td><div class="imp-elig-editor">' + importedRowEligEditor(elig) + '</div></td>' +
                 '<td class="imp-encounter-cell align-middle small"></td>' +
                 '<td class="align-middle text-center">' + detectBtn + '</td>' +
-                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-remove-imported" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i></button></td>';
+                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-remove-imported" title="Remove" aria-label="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button></td>';
             importedRows.appendChild(tr);
             renderImportedEncounterCell(tr);
             reindexImported();

@@ -11,14 +11,14 @@
 <div class="d-flex flex-wrap gap-2 mb-3">
     <form method="post" data-au-save asp-action="Initialize" onsubmit="return confirm('Initialize implementation guides from the published packages?');">
         <input type="hidden" name="categories" value="false" />
-        <button type="submit" class="btn btn-au-neutral">Initialize guides</button>
+        <button type="submit" class="btn btn-au-execute">Initialize guides</button>
     </form>
     <form method="post" data-au-save asp-action="Initialize" onsubmit="return confirm('Initialize validation categories from the published packages?');">
         <input type="hidden" name="categories" value="true" />
-        <button type="submit" class="btn btn-au-neutral">Initialize categories</button>
+        <button type="submit" class="btn btn-au-execute">Initialize categories</button>
     </form>
-    <a class="btn btn-au-neutral" asp-action="Dependencies" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">All dependencies</a>
-    <a class="btn btn-au-neutral" asp-action="ExportCategories">Export categories</a>
+    <a class="btn btn-au-link" asp-action="Dependencies" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">All dependencies</a>
+    <a class="btn btn-au-link" asp-action="ExportCategories">Export categories</a>
 </div>
 
 <div class="au-card card mb-3 d-none" id="packageUpload" data-lu-panel data-lu-hide-on-cancel>
@@ -35,7 +35,7 @@
             </div>
             <div class="col-12 col-md-3">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The name is the artifact name. The file is sent as the package bytes. The limit is 8 MB.</p>
@@ -51,7 +51,7 @@
                 <input id="categoryFile" name="file" type="file" accept="application/json,.json" class="form-control" required />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-danger">Import and replace</button>
+                <button type="submit" class="btn btn-success">Import and replace</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Use an export from this page. uncategorized cannot be imported. The limit is 8 MB.</p>
@@ -93,7 +93,7 @@
                             <td>
                                 @if (string.Equals(row.Type, "PACKAGE", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Package" asp-route-name="@row.Name" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Package" asp-route-name="@row.Name" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                                 }
                             </td>
                         </tr>
@@ -119,7 +119,7 @@
                 <input id="id" name="id" class="form-control" maxlength="64" required />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-au-neutral">Open</button>
+                <button type="submit" class="btn btn-au-link">Open</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">A category that is not saved yet can be created from the next page. uncategorized is reserved.</p>
@@ -161,7 +161,7 @@
                                 }
                                 else
                                 {
-                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Category" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Category" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
                                 }
                             </td>
                         </tr>

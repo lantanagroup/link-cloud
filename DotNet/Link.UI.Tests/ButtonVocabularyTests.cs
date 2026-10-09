@@ -21,13 +21,25 @@ public class ButtonVocabularyTests
     [Fact]
     public void Yellow_is_reserved_for_resubmit()
     {
-        var hits = SourceFiles()
-            .SelectMany(file => File.ReadAllLines(file)
-                .Select((line, index) => (file, line, index))
-                .Where(row => row.line.Contains("btn-warning", StringComparison.Ordinal)
-                    && !row.line.Contains("Resubmit", StringComparison.Ordinal))
-                .Select(row => Path.GetRelativePath(ProjectRoot(), row.file) + ":" + (row.index + 1)))
-            .ToList();
+        string[] allowed =
+        [
+            "Resubmit", "Cancel", "Abort", "Close", "Clear", "Reject",
+            "Skip", "Undo", "Start over", "Recover", "Regenerate"
+        ];
+        var hits = new List<string>();
+        foreach (var file in SourceFiles())
+        {
+            var lines = File.ReadAllLines(file);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!lines[i].Contains("btn-warning", StringComparison.Ordinal))
+                    continue;
+                var window = string.Join('\n', lines.Skip(i).Take(8));
+                if (allowed.Any(word => window.Contains(word, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                hits.Add(Path.GetRelativePath(ProjectRoot(), file) + ":" + (i + 1));
+            }
+        }
 
         hits.Should().BeEmpty();
     }

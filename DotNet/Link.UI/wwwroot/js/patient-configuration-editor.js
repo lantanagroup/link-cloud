@@ -215,10 +215,10 @@
         var html = pickerResultsHtml(host, keepQuery);
         host.innerHTML =
             '<div class="dropdown">' +
-                '<button type="button" class="btn btn-sm btn-au-neutral dropdown-toggle w-100 pc-picker-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-display="static"></button>' +
+                '<button type="button" class="btn btn-sm btn-au-link dropdown-toggle w-100 pc-picker-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-display="static"> <span class="ms-1">None</span></button>' +
                 '<div class="dropdown-menu p-2 pc-picker-menu">' +
                     '<input type="text" class="form-control form-control-sm mb-2 pc-picker-search" autocomplete="off" placeholder="' + esc(placeholder) + '" value="' + esc(keepQuery) + '" />' +
-                    '<div class="mb-1"><button type="button" class="btn btn-sm btn-au-neutral pc-picker-clear">Clear</button></div>' +
+                    '<div class="mb-1"><button type="button" class="btn btn-sm btn-warning pc-picker-clear">Clear</button></div>' +
                     '<div class="pc-picker-list">' + html.list + '</div>' +
                     '<div class="pc-picker-add-slot">' + html.add + '</div>' +
                 '</div>' +
