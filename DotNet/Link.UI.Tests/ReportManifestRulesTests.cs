@@ -196,6 +196,145 @@ public class ReportManifestRulesTests
         model.Patients[0].BadgeClass.Should().Be("au-badge-danger");
         model.Patients[0].Status.Should().Be("Failed Validation");
         model.Href().Should().Be("/Reports/Manifest?facilityId=fixture&reportId=" + ReportManifestRules.SampleId);
+        model.Patients.Should().OnlyContain(row => row.Measures.Count == 0);
+    }
+
+    [Fact]
+    public void A_rate_is_numerator_over_denominator_and_a_missing_denominator_has_none()
+    {
+        var highlights = ReportManifestRules.Highlights(
+        [
+            ("NHSN", "initial-population", 36),
+            ("NHSN", "denominator", 30),
+            ("NHSN", "denominator-exclusion", 4),
+            ("NHSN", "numerator", 22),
+            ("Other", "denominator", 0),
+            ("Other", "numerator", 5),
+            ("Custom", "custom-population", 9)
+        ]);
+
+        highlights.Should().HaveCount(3);
+        highlights[0].Measure.Should().Be("NHSN");
+        highlights[0].InitialPopulation.Should().Be(36);
+        highlights[0].DenominatorExclusion.Should().Be(4);
+        highlights[0].Rate.Should().Be("73.3%");
+        highlights.Single(row => row.Measure == "Other").Rate.Should().BeNull();
+        highlights.Single(row => row.Measure == "Custom").Other.Should().ContainSingle();
+        highlights.Single(row => row.Measure == "Custom").Numerator.Should().BeNull();
+        ReportManifestRules.PopulationHelp("Numerator").Should().NotBeNullOrWhiteSpace();
+        ReportManifestRules.PopulationLabel("initial-population").Should().Be("Initial Population");
+    }
+
+    [Fact]
+    public void A_patient_is_marked_only_from_a_population_the_report_stored()
+    {
+        var slots = new List<PopulationSlot>
+        {
+            new()
+            {
+                Measure = "NHSN",
+                PopulationId = "numerator",
+                MeasureReportIds = ["mr-in"]
+            },
+            new()
+            {
+                Measure = "NHSN",
+                PopulationId = "initial-population",
+                MeasureReportIds = ["mr-in", "mr-out"]
+            },
+            new()
+            {
+                Measure = "Cohort",
+                PopulationId = "initial-population",
+                MeasureReportIds = ["mr-cohort"]
+            }
+        };
+
+        var inNumerator = ReportManifestRules.ReportBadges(["mr-in"], slots);
+        inNumerator.Should().ContainSingle();
+        inNumerator[0].Qualifies.Should().BeTrue();
+        inNumerator[0].Outcome.Should().Be("In Numerator");
+        inNumerator[0].BadgeClass.Should().Be("au-badge-success");
+
+        var outside = ReportManifestRules.ReportBadges(["mr-out"], slots);
+        outside.Should().ContainSingle();
+        outside[0].Qualifies.Should().BeFalse();
+        outside[0].Outcome.Should().Be("Not in Numerator");
+        outside[0].BadgeClass.Should().Be("au-badge-danger");
+
+        var cohort = ReportManifestRules.ReportBadges(["mr-cohort"], slots);
+        cohort.Should().ContainSingle();
+        cohort[0].Name.Should().Be("Cohort");
+        cohort[0].Outcome.Should().Be("In Initial Population");
+
+        ReportManifestRules.ReportBadges(["mr-unknown"], slots).Should().BeEmpty();
+        ReportManifestRules.ReportBadges([], slots).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_run_badge_is_a_prediction_and_stays_off_when_eligibility_was_not_recorded()
+    {
+        var marked = ReportManifestRules.PredictedBadges(
+            ["NHSN Acute Care Hospital Monthly"],
+            ["NhsnAcuteCareHospitalMonthlyInitialPopulation"],
+            ["NhsnAcuteCareHospitalMonthlyInitialPopulation"]);
+        marked.Should().ContainSingle();
+        marked[0].Name.Should().Be("NHSN Acute Care Hospital Monthly");
+        marked[0].Qualifies.Should().BeTrue();
+        marked[0].Outcome.Should().Be("Predicted to qualify");
+
+        var missed = ReportManifestRules.PredictedBadges(
+            ["NHSN Acute Care Hospital Monthly"],
+            ["NhsnAcuteCareHospitalMonthlyInitialPopulation"],
+            []);
+        missed[0].Qualifies.Should().BeFalse();
+        missed[0].Outcome.Should().Be("Not predicted to qualify");
+
+        ReportManifestRules.PredictedBadges(
+            ["NHSN Acute Care Hospital Monthly"],
+            ["NhsnAcuteCareHospitalMonthlyInitialPopulation"],
+            null).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void The_sample_report_is_an_overview_and_the_patient_table_opens_details()
+    {
+        var page = ReportManifestRules.SampleReport(Query());
+        var model = page.Manifest!;
+        model.Lead.Should().NotContain("patient table");
+        model.Populations.Should().ContainSingle();
+        model.Populations[0].Rate.Should().Be("73.3%");
+        model.ShowValidation.Should().BeTrue();
+        model.PassedValidation.Should().Be(37);
+        model.FailedValidation.Should().Be(3);
+        model.ChartTypes.Should().NotBeEmpty();
+        model.StatusChart.Should().HaveCount(3);
+        model.ContentsAreStatus.Should().BeFalse();
+        model.Patients[0].PatientId.Should().Be("11111111-1111-1111-1111-111111111112");
+        model.Patients[0].Measures.Should().ContainSingle();
+        model.Patients[0].Measures[0].Qualifies.Should().BeFalse();
+        model.Patients[0].ResourceRefs.Should().HaveCount(12);
+        model.Patients[0].Links.Should().Contain(link => link.Label == "Acquisition log");
+        model.Patients[3].Measures[0].Qualifies.Should().BeTrue();
+
+        var view = File.ReadAllText(Path.Combine(ProjectRoot(), "Views", "Shared", "_ReportManifest.cshtml"));
+        view.Should().NotContain("<th>Detail</th>");
+        view.Should().Contain(">View</button>");
+        view.Should().Contain("id=\"manifestPatientModal\"");
+        view.Should().Contain("name = item.Name");
+        view.Should().Contain("href = item.Href");
+        view.Should().Contain("id = item.Id");
+        view.Should().Contain("Patients by validation");
+        view.Should().NotContain("maintainAspectRatio: true");
+    }
+
+    private static string ProjectRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DotNet", "Link.UI", "Link.UI.csproj")))
+            dir = dir.Parent;
+        dir.Should().NotBeNull();
+        return Path.Combine(dir!.FullName, "DotNet", "Link.UI");
     }
 
     private static ReportManifestQuery Query(

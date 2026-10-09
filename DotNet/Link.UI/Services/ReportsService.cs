@@ -663,6 +663,8 @@ public sealed class ReportsService
 
         var scheduleId = opened.Schedule.Id.ToString();
         var contents = new List<ManifestCountRow>();
+        var populationRows = new List<(string Measure, string PopulationId, int Count)>();
+        var slots = new List<PopulationSlot>();
         var heading = "Populations";
         string? totalLabel = null;
         try
@@ -673,14 +675,29 @@ public sealed class ReportsService
                 foreach (var population in populations.Body)
                 {
                     var measure = string.IsNullOrWhiteSpace(population.Measure) ? population.ReportType : population.Measure;
+                    if (string.IsNullOrWhiteSpace(measure))
+                        continue;
+
                     foreach (var group in population.GroupPopulations ?? [])
                     {
-                        var name = string.IsNullOrWhiteSpace(group.PopulationId) ? measure : measure + " " + group.PopulationId;
+                        var label = ReportManifestRules.PopulationLabel(group.PopulationId);
+                        var name = string.IsNullOrWhiteSpace(label) ? measure.Trim() : measure.Trim() + " / " + label;
                         contents.Add(new ManifestCountRow
                         {
                             Name = name,
                             Primary = group.TotalPopulationCount,
                             Total = group.TotalPopulationCount
+                        });
+                        populationRows.Add((measure.Trim(), group.PopulationId, group.TotalPopulationCount));
+                        slots.Add(new PopulationSlot
+                        {
+                            Measure = measure.Trim(),
+                            PopulationId = group.PopulationId,
+                            MeasureReportIds = (group.MeasureReportPopulations ?? [])
+                                .Select(item => item.MeasureReportId)
+                                .Where(id => !string.IsNullOrWhiteSpace(id))
+                                .Select(id => id.Trim())
+                                .ToList()
                         });
                     }
                 }
@@ -695,16 +712,23 @@ public sealed class ReportsService
             _logger.LogError(ex, "Report populations failed. ReportId={ReportId}", page.ReportId.Sanitize());
         }
 
-        if (contents.Count == 0)
+        int? passedValidation = null;
+        int? failedValidation = null;
+        int? pendingValidation = null;
+        try
         {
-            heading = "Patients by status";
-            totalLabel = "Patients";
-            try
+            var summary = await _reports.GetEntrySummaryByScheduleAsync(scheduleId, cancellationToken);
+            if (summary.IsSuccessStatusCode && summary.Body is not null)
             {
-                var summary = await _reports.GetEntrySummaryByScheduleAsync(scheduleId, cancellationToken);
-                if (summary.IsSuccessStatusCode && summary.Body is not null)
+                var counts = summary.Body.ReportingStatusCounts ?? new Dictionary<string, int>();
+                passedValidation = StatusCount(counts, "PassedValidation");
+                failedValidation = StatusCount(counts, "FailedValidation");
+                pendingValidation = StatusCount(counts, "PendingValidation");
+                if (contents.Count == 0)
                 {
-                    foreach (var pair in summary.Body.ReportingStatusCounts)
+                    heading = "Patients by status";
+                    totalLabel = "Patients";
+                    foreach (var pair in counts)
                     {
                         contents.Add(new ManifestCountRow
                         {
@@ -715,14 +739,14 @@ public sealed class ReportsService
                     }
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Report entry summary failed. ReportId={ReportId}", page.ReportId.Sanitize());
-            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Report entry summary failed. ReportId={ReportId}", page.ReportId.Sanitize());
         }
 
         var sortBy = query.Sort == "id" ? "patientid" : "reportingstatus";
@@ -760,13 +784,28 @@ public sealed class ReportsService
                     var shown = counts.Take(4).Select(row => row.Name + " " + row.Count.ToString("N0")).ToList();
                     var extra = counts.Count - shown.Count;
                     var detail = shown.Count == 0 ? null : string.Join(", ", shown) + (extra > 0 ? " +" + extra : "");
+                    var reportIds = (entry.MeasureReports ?? [])
+                        .Select(report => report.MeasureReportId)
+                        .ToList();
+                    var updated = ReportManifestRules.When(entry.ModifyDate) ?? ReportManifestRules.When(entry.CreateDate);
+                    var events = new List<ManifestTimelineEvent>();
+                    AddEvent(events, "Identified", entry.CreateDate);
+                    AddEvent(events, "Acquisition evaluated", entry.AcquisitionEvaluatedAt);
+                    AddEvent(events, "Normalization evaluated", entry.NormalizationEvaluatedAt);
+                    if (entry.ModifyDate is not null && entry.ModifyDate != entry.CreateDate)
+                        AddEvent(events, "Last updated", entry.ModifyDate);
                     return ReportManifestRules.PatientRow(
                         entry.PatientId,
                         entry.ReportingStatus.ToString(),
                         entry.SubmissionStatus?.ToString(),
                         total,
                         detail,
-                        patientHref(entry.PatientId));
+                        patientHref(entry.PatientId),
+                        updated,
+                        ReportManifestRules.ReportBadges(reportIds, slots),
+                        ReportManifestRules.ResourceCounts(counts.Select(row => new KeyValuePair<string, int>(row.Name, row.Count))),
+                        events,
+                        PatientLinks(entry.PatientId, patientHref(entry.PatientId), page.FacilityId, page.ReportId));
                 }).ToList();
                 var metadata = entries.Body.Metadata;
                 patientBar = new PageBar
@@ -818,6 +857,10 @@ public sealed class ReportsService
                 Contents = contents,
                 ContentsHeading = heading,
                 TotalLabel = totalLabel,
+                Populations = ReportManifestRules.Highlights(populationRows),
+                PassedValidation = passedValidation,
+                FailedValidation = failedValidation,
+                PendingValidation = pendingValidation,
                 Patients = patients,
                 PatientPaging = patientBar,
                 PatientNote = patientNote
@@ -988,6 +1031,52 @@ public sealed class ReportsService
     };
 
     private static ReportsAction Fail(string message) => new(false, message);
+
+    private static int StatusCount(IReadOnlyDictionary<string, int> counts, string name)
+    {
+        if (counts.TryGetValue(name, out var count))
+            return count;
+
+        foreach (var pair in counts)
+        {
+            if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase))
+                return pair.Value;
+        }
+
+        return 0;
+    }
+
+    private static void AddEvent(List<ManifestTimelineEvent> events, string label, DateTime? when)
+    {
+        var text = ReportManifestRules.When(when);
+        if (text is not null)
+            events.Add(new ManifestTimelineEvent { Label = label, When = text });
+    }
+
+    private static List<ManifestLink> PatientLinks(string patientId, string? measureHref, string? facilityId, string? reportId)
+    {
+        var links = new List<ManifestLink>();
+        if (!string.IsNullOrWhiteSpace(measureHref))
+            links.Add(new ManifestLink { Label = "Measure report", Href = measureHref });
+
+        if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(patientId))
+            return links;
+
+        var facility = Uri.EscapeDataString(facilityId.Trim());
+        var patient = Uri.EscapeDataString(patientId.Trim());
+        var report = string.IsNullOrWhiteSpace(reportId) ? string.Empty : "&reportId=" + Uri.EscapeDataString(reportId.Trim());
+        links.Add(new ManifestLink
+        {
+            Label = "Acquisition log",
+            Href = "/Logs/Acquisition?facilityId=" + facility + "&patientId=" + patient + report
+        });
+        links.Add(new ManifestLink
+        {
+            Label = "Audit log",
+            Href = "/Logs/Audit?facilityId=" + facility + "&searchText=" + patient
+        });
+        return links;
+    }
 
     private static bool Blank(string? value) => string.IsNullOrWhiteSpace(value);
 }

@@ -80,13 +80,27 @@ public static partial class ReportManifestRules
         };
     }
 
-    public static ManifestPatientRow PatientRow(string patientId, string? reportingStatus, string? submissionStatus, int total, string? types, string? href)
+    public static ManifestPatientRow PatientRow(
+        string patientId,
+        string? reportingStatus,
+        string? submissionStatus,
+        int total,
+        string? types,
+        string? href,
+        string? updated = null,
+        IReadOnlyList<ManifestMeasureBadge>? measures = null,
+        IReadOnlyList<ManifestResourceCount>? resources = null,
+        IReadOnlyList<ManifestTimelineEvent>? events = null,
+        IReadOnlyList<ManifestLink>? links = null,
+        IReadOnlyList<ManifestResourceRef>? resourceRefs = null)
     {
         var status = Words(reportingStatus);
         if (status.Length == 0)
             status = "Not recorded";
 
-        var detail = string.IsNullOrWhiteSpace(types) ? Words(submissionStatus) : types.Trim();
+        var submission = Words(submissionStatus);
+        var resourceTypes = string.IsNullOrWhiteSpace(types) ? string.Empty : types.Trim();
+        var detail = resourceTypes.Length == 0 ? submission : resourceTypes;
         if (detail.Length == 0)
             detail = "No resources recorded";
 
@@ -96,9 +110,213 @@ public static partial class ReportManifestRules
             Status = status,
             BadgeClass = BadgeClass(reportingStatus),
             Detail = detail,
+            Submission = submission,
+            ResourceTypes = resourceTypes,
             Total = total,
-            Href = href
+            Updated = updated?.Trim() ?? string.Empty,
+            Href = href,
+            Measures = measures ?? [],
+            Resources = resources ?? [],
+            Events = events ?? [],
+            Links = links ?? [],
+            ResourceRefs = resourceRefs ?? []
         };
+    }
+
+    public static string PopulationLabel(string? populationId) => Classify(populationId) switch
+    {
+        PopulationKind.InitialPopulation => "Initial Population",
+        PopulationKind.Denominator => "Denominator",
+        PopulationKind.DenominatorExclusion => "Denominator Exclusion",
+        PopulationKind.DenominatorException => "Denominator Exception",
+        PopulationKind.Numerator => "Numerator",
+        PopulationKind.NumeratorExclusion => "Numerator Exclusion",
+        _ => Words(populationId)
+    };
+
+    /// <summary>Plain-English help for a measure term. Null when the term is not one of these.</summary>
+    public static string? PopulationHelp(string? term) => (term ?? string.Empty).Trim() switch
+    {
+        "Initial Population" => "Patients who meet the measure's starting rules for this reporting period.",
+        "Denominator" => "Patients from the Initial Population who are eligible to be scored.",
+        "Denominator Exclusion" => "Patients removed from the Denominator for a reason the measure defines.",
+        "Denominator Exception" => "Patients left out of the score because the measure allows an exception.",
+        "Numerator" => "Patients in the Denominator who meet the measure's success condition.",
+        "Numerator Exclusion" => "Patients removed from the Numerator for a reason the measure defines.",
+        "Rate" => "Numerator divided by Denominator. Shown only when both counts are present and the Denominator is greater than zero.",
+        _ => null
+    };
+
+    public static IReadOnlyList<ManifestPopulationHighlight> Highlights(
+        IEnumerable<(string Measure, string PopulationId, int Count)> rows)
+    {
+        return rows
+            .Where(row => !string.IsNullOrWhiteSpace(row.Measure))
+            .GroupBy(row => row.Measure.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                int? initial = null;
+                int? denominator = null;
+                int? denominatorExclusion = null;
+                int? denominatorException = null;
+                int? numerator = null;
+                int? numeratorExclusion = null;
+                var other = new List<ManifestCountRow>();
+                foreach (var row in group)
+                {
+                    var count = Math.Max(0, row.Count);
+                    switch (Classify(row.PopulationId))
+                    {
+                        case PopulationKind.InitialPopulation:
+                            initial = (initial ?? 0) + count;
+                            break;
+                        case PopulationKind.Denominator:
+                            denominator = (denominator ?? 0) + count;
+                            break;
+                        case PopulationKind.DenominatorExclusion:
+                            denominatorExclusion = (denominatorExclusion ?? 0) + count;
+                            break;
+                        case PopulationKind.DenominatorException:
+                            denominatorException = (denominatorException ?? 0) + count;
+                            break;
+                        case PopulationKind.Numerator:
+                            numerator = (numerator ?? 0) + count;
+                            break;
+                        case PopulationKind.NumeratorExclusion:
+                            numeratorExclusion = (numeratorExclusion ?? 0) + count;
+                            break;
+                        default:
+                            var name = PopulationLabel(row.PopulationId);
+                            if (name.Length > 0)
+                                other.Add(new ManifestCountRow { Name = name, Primary = count, Total = count });
+                            break;
+                    }
+                }
+
+                return new ManifestPopulationHighlight
+                {
+                    Measure = group.Key,
+                    InitialPopulation = initial,
+                    Denominator = denominator,
+                    DenominatorExclusion = denominatorExclusion,
+                    DenominatorException = denominatorException,
+                    Numerator = numerator,
+                    NumeratorExclusion = numeratorExclusion,
+                    Rate = numerator is int scored && denominator is > 0
+                        ? (scored * 100d / denominator.Value).ToString("0.0", CultureInfo.InvariantCulture) + "%"
+                        : null,
+                    Other = other
+                };
+            })
+            .OrderByDescending(row => row.InitialPopulation ?? row.Denominator ?? row.Numerator ?? 0)
+            .ThenBy(row => row.Measure, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Badges for a real report. A patient is marked only when their measure report id is in a population
+    /// the report actually stored. No numerator is invented for a cohort that only has an Initial Population.
+    /// </summary>
+    public static IReadOnlyList<ManifestMeasureBadge> ReportBadges(
+        IReadOnlyCollection<string?> patientMeasureReportIds,
+        IReadOnlyList<PopulationSlot> slots)
+    {
+        if (slots.Count == 0)
+            return [];
+
+        var owned = new HashSet<string>(
+            patientMeasureReportIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+        if (owned.Count == 0)
+            return [];
+
+        var badges = new List<ManifestMeasureBadge>();
+        foreach (var measure in slots.GroupBy(slot => slot.Measure.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            if (measure.Key.Length == 0)
+                continue;
+
+            var known = measure
+                .Select(slot => (Kind: Classify(slot.PopulationId), slot))
+                .Where(row => row.Kind != PopulationKind.Other)
+                .ToList();
+            if (known.Count == 0)
+                continue;
+
+            var appears = known.Any(row => row.slot.MeasureReportIds.Any(id => owned.Contains(id)));
+            if (!appears)
+                continue;
+
+            bool In(PopulationKind kind) => known
+                .Where(row => row.Kind == kind)
+                .Any(row => row.slot.MeasureReportIds.Any(id => owned.Contains(id)));
+
+            if (known.Any(row => row.Kind == PopulationKind.Numerator))
+            {
+                var qualifies = In(PopulationKind.Numerator);
+                badges.Add(Badge(measure.Key, qualifies ? "In Numerator" : "Not in Numerator", qualifies));
+            }
+            else if (known.Any(row => row.Kind == PopulationKind.InitialPopulation))
+            {
+                var qualifies = In(PopulationKind.InitialPopulation);
+                badges.Add(Badge(measure.Key, qualifies ? "In Initial Population" : "Not in Initial Population", qualifies));
+            }
+        }
+
+        return badges;
+    }
+
+    /// <summary>
+    /// Automation stores a predicted Initial Population, not a scored Numerator.
+    /// <paramref name="qualifying"/> null means this patient was not in the eligibility map.
+    /// </summary>
+    public static IReadOnlyList<ManifestMeasureBadge> PredictedBadges(
+        IReadOnlyList<string> measures,
+        IReadOnlyList<string>? aliases,
+        IReadOnlyList<string>? qualifying)
+    {
+        if (qualifying is null)
+            return [];
+
+        var displays = measures.Where(measure => !string.IsNullOrWhiteSpace(measure)).Select(measure => measure.Trim()).ToList();
+        var names = aliases?.Where(measure => !string.IsNullOrWhiteSpace(measure)).Select(measure => measure.Trim()).ToList() ?? [];
+        var count = Math.Max(displays.Count, names.Count);
+        var badges = new List<ManifestMeasureBadge>(count);
+        for (var index = 0; index < count; index++)
+        {
+            var display = index < displays.Count ? displays[index] : names[index];
+            var alias = index < names.Count ? names[index] : display;
+            var qualifies = qualifying.Any(name =>
+                string.Equals(name?.Trim(), display, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name?.Trim(), alias, StringComparison.OrdinalIgnoreCase));
+            badges.Add(Badge(display, qualifies ? "Predicted to qualify" : "Not predicted to qualify", qualifies));
+        }
+
+        return badges;
+    }
+
+    public static IReadOnlyList<ManifestResourceCount> ResourceCounts(IEnumerable<KeyValuePair<string, int>>? counts)
+    {
+        if (counts is null)
+            return [];
+
+        return counts
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(pair => new ManifestResourceCount { Name = pair.Key.Trim(), Count = pair.Value })
+            .ToList();
+    }
+
+    public static string? When(DateTime? value)
+    {
+        if (value is null)
+            return null;
+
+        var stamp = value.Value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+            : value.Value.ToUniversalTime();
+        return stamp.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC";
     }
 
     public static ReportManifestModel FromReport(
@@ -107,11 +325,23 @@ public static partial class ReportManifestRules
         string path,
         IReadOnlyDictionary<string, string> route)
     {
-        var types = PageTypes(facts.Contents, query);
+        var useResources = facts.ResourceTypes.Count > 0;
+        var typeRows = useResources ? facts.ResourceTypes : facts.Contents;
+        var heading = useResources ? "Resource types" : facts.ContentsHeading;
+        var contentsAreStatus = !useResources
+            && string.Equals(heading, "Patients by status", StringComparison.OrdinalIgnoreCase);
+        var types = PageTypes(typeRows, query);
         var hottest = types.Sorted.FirstOrDefault();
+        var status = new List<ManifestCountRow>();
+        if (facts.PassedValidation is int passed)
+            status.Add(new ManifestCountRow { Name = "Passed validation", Primary = passed, Total = passed });
+        if (facts.FailedValidation is int failed)
+            status.Add(new ManifestCountRow { Name = "Failed validation", Primary = failed, Total = failed });
+        if (facts.PendingValidation is int pending)
+            status.Add(new ManifestCountRow { Name = "Pending validation", Primary = pending, Total = pending });
         return new ReportManifestModel
         {
-            Lead = "Patients and populations on this report. The list is one page, with failed validation first.",
+            Lead = "Report overview. Counts, the largest resource types, and population highlights are here. Open Patients for one row per patient.",
             Notice = facts.Notice,
             PatientNote = facts.PatientNote,
             ShowComparison = false,
@@ -127,15 +357,23 @@ public static partial class ReportManifestRules
             HottestCount = hottest?.Total ?? 0,
             TotalLabel = string.IsNullOrWhiteSpace(facts.TotalLabel) ? "Population total" : facts.TotalLabel,
             PatientResourceLabel = string.IsNullOrWhiteSpace(facts.PatientResourceLabel) ? "Initial population" : facts.PatientResourceLabel,
-            TypeHeading = facts.ContentsHeading,
+            TypeHeading = heading,
+            ContentsAreStatus = contentsAreStatus,
             EligibilityText = facts.PatientCount == 0
                 ? "No patients on this report."
-                : facts.PatientCount.ToString("N0", CultureInfo.InvariantCulture) + " patients. This page lists " + facts.Patients.Count.ToString("N0", CultureInfo.InvariantCulture) + ".",
+                : facts.PatientCount.ToString("N0", CultureInfo.InvariantCulture) + " patients.",
             Measures = facts.Measures,
             MeasureCount = facts.Measures.Count,
             Types = types.Page,
             TypePaging = types.Bar,
-            ChartTypes = types.Sorted.Take(ReportManifestModel.ChartCap).ToList(),
+            ChartTypes = contentsAreStatus || useResources
+                ? types.Sorted.Take(ReportManifestModel.ChartCap).ToList()
+                : [],
+            StatusChart = status,
+            Populations = facts.Populations,
+            PassedValidation = facts.PassedValidation,
+            FailedValidation = facts.FailedValidation,
+            PendingValidation = facts.PendingValidation,
             Patients = facts.Patients,
             PatientPaging = facts.PatientPaging,
             DefaultSort = "status",
@@ -211,6 +449,9 @@ public static partial class ReportManifestRules
         });
 
         var patientPage = Slice(patientRows, query.Page, query.PageSize);
+        var eligibilityKnown = eligibility.Count > 0;
+        var measureDisplays = (snapshot.MeasureIds ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).ToList();
+        var measureAliases = (snapshot.SelectedMeasures ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).ToList();
         var shown = patientPage.Page.Select(row =>
         {
             byPatient.TryGetValue(row.Id, out var counts);
@@ -219,13 +460,19 @@ public static partial class ReportManifestRules
             cohort.Patterns.TryGetValue(row.Id, out var fallbackPattern);
             cohort.Names.TryGetValue(row.Id, out var configuration);
             var qualifying = measures?.Where(measure => !string.IsNullOrWhiteSpace(measure)).ToList() ?? [];
+            var recorded = eligibility.ContainsKey(row.Id);
             return new ManifestPatientRow
             {
                 PatientId = row.Id,
                 Status = qualifying.Count == 0 ? "None" : qualifying.Count + " measure" + (qualifying.Count == 1 ? string.Empty : "s"),
                 BadgeClass = qualifying.Count == 0 ? "au-badge-muted" : "au-badge-success",
                 Detail = TopTypes(counts, 4),
+                ResourceTypes = TopTypes(counts, 4),
                 Total = row.Total,
+                Resources = ResourceCounts(counts),
+                Measures = eligibilityKnown && recorded
+                    ? PredictedBadges(measureDisplays, measureAliases, qualifying)
+                    : [],
                 Pattern = ShortPattern(string.IsNullOrWhiteSpace(pattern) ? fallbackPattern : pattern),
                 Configuration = string.IsNullOrWhiteSpace(configuration) ? "No configuration" : configuration,
                 HasBundle = templates.ContainsKey(row.Id)
@@ -289,23 +536,82 @@ public static partial class ReportManifestRules
 
     public static ReportManifestPage SampleReport(ReportManifestQuery query, string? returnUrl = null)
     {
+        const string measure = "NHSN Acute Care Hospital";
         var patients = Enumerable.Range(1, 40).Select(index =>
         {
             var failed = index <= 3;
+            var id = index == 1
+                ? "11111111-1111-1111-1111-111111111112"
+                : "patient-" + index.ToString("00", CultureInfo.InvariantCulture);
+            var resources = new List<ManifestResourceCount>
+            {
+                new() { Name = "Observation", Count = 41 - index },
+                new() { Name = "Encounter", Count = 1 }
+            };
+            var refs = Enumerable.Range(0, index == 1 ? 12 : 2).Select(offset => new ManifestResourceRef
+            {
+                Type = offset % 2 == 0 ? "Observation" : "Encounter",
+                Id = "22222222-2222-2222-2222-" + (index * 100 + offset).ToString("000000000000", CultureInfo.InvariantCulture)
+            }).ToList();
             return PatientRow(
-                "patient-" + index.ToString("00", CultureInfo.InvariantCulture),
+                id,
                 failed ? "FailedValidation" : "PassedValidation",
                 failed ? "FailedSubmission" : "Submitted",
-                total: (41 - index) * 3,
-                types: "Observation " + (41 - index),
-                href: null);
+                total: resources.Sum(row => row.Count),
+                types: "Observation " + (41 - index) + ", Encounter 1",
+                href: "/Reports/Measure?facilityId=" + SampleFacilityId + "&reportId=" + SampleId + "&patientId=" + Uri.EscapeDataString(id),
+                updated: "2026-03-11 15:42 UTC",
+                measures:
+                [
+                    new ManifestMeasureBadge
+                    {
+                        Name = measure,
+                        Outcome = failed ? "Not in Numerator" : "In Numerator",
+                        Qualifies = !failed,
+                        BadgeClass = failed ? "au-badge-danger" : "au-badge-success"
+                    }
+                ],
+                resources: resources,
+                events:
+                [
+                    new ManifestTimelineEvent { Label = "Identified", When = "2026-03-01 08:00 UTC" },
+                    new ManifestTimelineEvent { Label = "Acquisition evaluated", When = "2026-03-02 09:15 UTC" },
+                    new ManifestTimelineEvent { Label = "Normalization evaluated", When = "2026-03-02 09:40 UTC" },
+                    new ManifestTimelineEvent { Label = "Last updated", When = "2026-03-11 15:42 UTC" }
+                ],
+                links:
+                [
+                    new ManifestLink
+                    {
+                        Label = "Measure report",
+                        Href = "/Reports/Measure?facilityId=" + SampleFacilityId + "&reportId=" + SampleId + "&patientId=" + Uri.EscapeDataString(id)
+                    },
+                    new ManifestLink
+                    {
+                        Label = "Acquisition log",
+                        Href = "/Logs/Acquisition?facilityId=" + SampleFacilityId + "&reportId=" + SampleId + "&patientId=" + Uri.EscapeDataString(id)
+                    },
+                    new ManifestLink
+                    {
+                        Label = "Audit log",
+                        Href = "/Logs/Audit?facilityId=" + SampleFacilityId + "&searchText=" + Uri.EscapeDataString(id)
+                    }
+                ],
+                resourceRefs: refs);
         }).ToList();
-        var contents = Enumerable.Range(1, 12).Select(index => new ManifestCountRow
+        var resourceTypes = new (string Name, int Total)[]
         {
-            Name = index == 1 ? "Initial population" : "Population " + index,
-            Total = (13 - index) * 20,
-            Primary = (13 - index) * 20
-        }).ToList();
+            ("Observation", 840),
+            ("Encounter", 40),
+            ("Condition", 210),
+            ("Procedure", 96),
+            ("MedicationRequest", 180),
+            ("DiagnosticReport", 64),
+            ("AllergyIntolerance", 22),
+            ("ServiceRequest", 48),
+            ("Specimen", 30),
+            ("Patient", 40)
+        }.Select(row => new ManifestCountRow { Name = row.Name, Primary = row.Total, Total = row.Total }).ToList();
         var page = Slice(patients, query.Page, query.PageSize);
         var route = new Dictionary<string, string>
         {
@@ -319,10 +625,23 @@ public static partial class ReportManifestRules
             {
                 PatientCount = patients.Count,
                 InitialPopulation = 36,
-                ContentTotal = contents.Sum(row => row.Total),
-                Measures = ["NHSN Acute Care Hospital"],
-                Contents = contents,
-                ContentsHeading = "Populations",
+                ContentTotal = resourceTypes.Sum(row => row.Total),
+                Measures = [measure],
+                ResourceTypes = resourceTypes,
+                Contents = resourceTypes,
+                ContentsHeading = "Resource types",
+                TotalLabel = "Resources",
+                PatientResourceLabel = "Initial Population",
+                Populations = Highlights(
+                [
+                    (measure, "initial-population", 36),
+                    (measure, "denominator", 30),
+                    (measure, "denominator-exclusion", 4),
+                    (measure, "numerator", 22)
+                ]),
+                PassedValidation = 37,
+                FailedValidation = 3,
+                PendingValidation = 0,
                 Patients = page.Page,
                 PatientPaging = page.Bar,
                 Notice = "Fixture data. Nothing here was read from a report service."
@@ -362,8 +681,9 @@ public static partial class ReportManifestRules
             expected[ids[index]] = new Dictionary<string, int> { ["Observation"] = Math.Max(0, total - 2), ["Encounter"] = 1 };
             if (index >= 3)
                 actualPatients[ids[index]] = new Dictionary<string, int> { ["Observation"] = Math.Max(0, total - 2), ["Encounter"] = 1 };
-            if (index % 2 == 0)
-                eligibility[ids[index]] = ["NhsnAcuteCareHospitalMonthlyInitialPopulation"];
+            eligibility[ids[index]] = index % 2 == 0
+                ? ["NhsnAcuteCareHospitalMonthlyInitialPopulation"]
+                : [];
         }
 
         var snapshot = new GenerationManifestSnapshot
@@ -751,6 +1071,40 @@ public static partial class ReportManifestRules
 
     private static bool Try(JsonElement element, string camel, string pascal, out JsonElement value) =>
         element.TryGetProperty(camel, out value) || element.TryGetProperty(pascal, out value);
+
+    private static ManifestMeasureBadge Badge(string name, string outcome, bool qualifies) => new()
+    {
+        Name = name,
+        Outcome = outcome,
+        Qualifies = qualifies,
+        BadgeClass = qualifies ? "au-badge-success" : "au-badge-danger"
+    };
+
+    private static PopulationKind Classify(string? populationId)
+    {
+        var key = (populationId ?? string.Empty).Trim().Replace(' ', '-').ToLowerInvariant();
+        return key switch
+        {
+            "initial-population" => PopulationKind.InitialPopulation,
+            "denominator" => PopulationKind.Denominator,
+            "denominator-exclusion" => PopulationKind.DenominatorExclusion,
+            "denominator-exception" => PopulationKind.DenominatorException,
+            "numerator" => PopulationKind.Numerator,
+            "numerator-exclusion" => PopulationKind.NumeratorExclusion,
+            _ => PopulationKind.Other
+        };
+    }
+
+    private enum PopulationKind
+    {
+        Other,
+        InitialPopulation,
+        Denominator,
+        DenominatorExclusion,
+        DenominatorException,
+        Numerator,
+        NumeratorExclusion
+    }
 
     private static int ClampSize(int size) =>
         ReportManifestQuery.PageSizes.Contains(size) ? size : ReportManifestQuery.DefaultPageSize;
