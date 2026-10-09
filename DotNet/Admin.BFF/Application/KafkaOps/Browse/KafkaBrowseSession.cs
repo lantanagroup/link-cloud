@@ -130,9 +130,9 @@ public sealed class ConfluentBrowseSession : IKafkaBrowseSession
 
     public void AssignAndSeek(IReadOnlyList<KafkaBrowseSeek> seeks)
     {
-        _consumer.Assign(seeks.Select(seek => new TopicPartition(seek.Topic, seek.Partition)).ToList());
-        foreach (var seek in seeks)
-            _consumer.Seek(new TopicPartitionOffset(seek.Topic, seek.Partition, seek.Offset));
+        // The offset has to travel with Assign. A later Seek runs before librdkafka
+        // has applied the assignment and fails with Local: Erroneous state.
+        _consumer.Assign(seeks.Select(seek => new TopicPartitionOffset(seek.Topic, seek.Partition, seek.Offset)).ToList());
     }
 
     public KafkaBrowsePolled? Poll(TimeSpan wait)

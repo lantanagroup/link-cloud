@@ -161,6 +161,69 @@ public class KafkaMessageBrowserTests
     }
 
     [Fact]
+    public void AssignAndSeek_AssignsTopicPartitionOffsetsInOneStep()
+    {
+        var consumer = new Mock<IConsumer<byte[], byte[]>>();
+        List<TopicPartitionOffset>? assigned = null;
+        consumer
+            .Setup(item => item.Assign(It.IsAny<IEnumerable<TopicPartitionOffset>>()))
+            .Callback<IEnumerable<TopicPartitionOffset>>(offsets => assigned = offsets.ToList());
+
+        var session = new ConfluentBrowseSession(consumer.Object);
+        session.AssignAndSeek(
+        [
+            new KafkaBrowseSeek { Topic = "ResourcesAcquired", Partition = 0, Offset = 12 },
+            new KafkaBrowseSeek { Topic = "ResourcesAcquired", Partition = 3, Offset = 40 }
+        ]);
+
+        Assert.NotNull(assigned);
+        Assert.Equal(2, assigned!.Count);
+        Assert.Equal("ResourcesAcquired", assigned[0].Topic);
+        Assert.Equal(0, assigned[0].Partition.Value);
+        Assert.Equal(12, assigned[0].Offset.Value);
+        Assert.Equal(3, assigned[1].Partition.Value);
+        Assert.Equal(40, assigned[1].Offset.Value);
+        consumer.Verify(item => item.Assign(It.IsAny<IEnumerable<TopicPartitionOffset>>()), Times.Once);
+        consumer.Verify(item => item.Assign(It.IsAny<IEnumerable<TopicPartition>>()), Times.Never);
+        consumer.Verify(item => item.Seek(It.IsAny<TopicPartitionOffset>()), Times.Never);
+    }
+
+    [Fact]
+    public void AssignAndSeek_DoesNotSeekBeforeTheAssignmentIsApplied()
+    {
+        var config = ConfluentBrowseSession.BrowseConfig(new KafkaConnection
+        {
+            BootstrapServers = ["127.0.0.1:1"]
+        });
+        config.SocketTimeoutMs = 200;
+        config.ReconnectBackoffMs = 10_000;
+        config.ReconnectBackoffMaxMs = 10_000;
+
+        var consumer = new ConsumerBuilder<byte[], byte[]>(config)
+            .SetErrorHandler((_, _) => { })
+            .SetLogHandler((_, _) => { })
+            .Build();
+        var session = new ConfluentBrowseSession(consumer);
+        try
+        {
+            var thrown = Record.Exception(() => session.AssignAndSeek(
+            [
+                new KafkaBrowseSeek { Topic = "ResourcesAcquired", Partition = 0, Offset = 12 },
+                new KafkaBrowseSeek { Topic = "ResourcesAcquired", Partition = 1, Offset = 4 }
+            ]));
+
+            Assert.Null(thrown);
+            Assert.Equal(2, consumer.Assignment.Count);
+            Assert.Contains(consumer.Assignment, partition => partition.Partition.Value == 0);
+            Assert.Contains(consumer.Assignment, partition => partition.Partition.Value == 1);
+        }
+        finally
+        {
+            session.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task Export_WritesAnAuditAndStillDoesNotCommit()
     {
         var sessions = new FakeSessions();
