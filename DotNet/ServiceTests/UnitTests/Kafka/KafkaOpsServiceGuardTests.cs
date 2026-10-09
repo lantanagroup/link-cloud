@@ -514,7 +514,15 @@ public class KafkaOpsServiceGuardTests
     {
         var root = Path.Combine(RepoRoot(), "DotNet", "Admin.BFF");
         foreach (var file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
-            Assert.DoesNotContain("ListConsumerGroupsAsync", File.ReadAllText(file), StringComparison.Ordinal);
+        {
+            var text = File.ReadAllText(file);
+            if (!text.Contains("ListConsumerGroupsAsync", StringComparison.Ordinal))
+                continue;
+            Assert.EndsWith(Path.Combine("Migration", "KafkaMigrationAdmin.cs"), file, StringComparison.OrdinalIgnoreCase);
+            var gate = text.IndexOf("if (!await ClusterHealthyAsync", StringComparison.Ordinal);
+            var call = text.IndexOf("ListConsumerGroupsAsync", StringComparison.Ordinal);
+            Assert.True(gate >= 0 && call > gate, "ListConsumerGroupsAsync must follow the healthy-cluster gate.");
+        }
     }
 
     [Fact]

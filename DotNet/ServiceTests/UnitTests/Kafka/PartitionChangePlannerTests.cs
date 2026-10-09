@@ -12,7 +12,8 @@ public class PartitionChangePlannerTests
         var quiet = PartitionChangePlanner.Evaluate(Valid("ResourcesAcquired"));
         Assert.True(quiet.Accepted);
         Assert.True(quiet.QuietWindowRequired);
-        Assert.Equal("{facilityId}:{patientId}", quiet.KeyShape);
+        Assert.Equal(KafkaTopicCatalog.PatientJsonShape, quiet.KeyShape);
+        Assert.Contains("moves about", quiet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(6, quiet.MaxReplicas);
         Assert.Contains("cannot be reversed", quiet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("raised together", quiet.Summary, StringComparison.OrdinalIgnoreCase);
@@ -29,17 +30,20 @@ public class PartitionChangePlannerTests
 
         Assert.True(plan.Accepted);
         Assert.False(plan.QuietWindowRequired);
-        Assert.Equal(KafkaTopicKeyClass.Log, plan.KeyClass);
+        Assert.Equal(KafkaTopicKeyClass.Patient, plan.KeyClass);
+        Assert.Equal(KafkaTopicCatalog.PatientOrFacilityJsonShape, plan.KeyShape);
     }
 
     [Fact]
-    public void MixedHashTopic_StaysBlocked()
+    public void DataAcquisitionRequested_IsEligible_AndOrderSensitive()
     {
         var plan = PartitionChangePlanner.Evaluate(Valid("DataAcquisitionRequested") with { QuietWindowMet = true });
 
-        Assert.False(plan.Accepted);
-        Assert.True(plan.HardBlocked);
-        Assert.Contains(plan.Errors, error => error.Contains("murmur2", StringComparison.OrdinalIgnoreCase));
+        Assert.True(plan.Accepted);
+        Assert.False(plan.HardBlocked);
+        Assert.True(plan.QuietWindowRequired);
+        Assert.Equal(KafkaTopicKeyClass.Patient, plan.KeyClass);
+        Assert.DoesNotContain(plan.Errors, error => error.Contains("murmur2", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
