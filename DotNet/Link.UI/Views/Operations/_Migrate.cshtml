@@ -30,11 +30,11 @@
     <li>Track approval, execution, and recovery on this page.</li>
 </ol>
 <p class="mb-2">
-    <span class="badge @(migrateStep == 1 ? "au-badge-active" : "au-badge-muted")">1 Choose a topic</span>
-    <span class="badge @(migrateStep == 2 ? "au-badge-active" : "au-badge-muted")">2 Dry run</span>
-    <span class="badge @(migrateStep == 3 ? "au-badge-active" : "au-badge-muted")">3 Review</span>
-    <span class="badge @(migrateStep == 4 ? "au-badge-active" : "au-badge-muted")">4 Request</span>
-    <span class="badge @(migrateStep == 5 ? "au-badge-active" : "au-badge-muted")">5 Track</span>
+    <span class="badge @StatusPills.ForWizardStep(migrateStep, 1)">1 Choose a topic</span>
+    <span class="badge @StatusPills.ForWizardStep(migrateStep, 2)">2 Dry run</span>
+    <span class="badge @StatusPills.ForWizardStep(migrateStep, 3)">3 Review</span>
+    <span class="badge @StatusPills.ForWizardStep(migrateStep, 4)">4 Request</span>
+    <span class="badge @StatusPills.ForWizardStep(migrateStep, 5)">5 Track</span>
 </p>
 
 <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
