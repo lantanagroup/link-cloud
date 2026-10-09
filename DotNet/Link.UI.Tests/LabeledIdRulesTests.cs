@@ -16,4 +16,17 @@ public class LabeledIdRulesTests
     {
         LabeledIdRules.DisplayName(name, value).Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData("6c5466db-d467-46a1-b89e-2a9adc72b0f7", true)]
+    [InlineData("6C5466DBD46746A1B89E2A9ADC72B0F7", true)]
+    [InlineData("ReadyToAcquire", false)]
+    [InlineData("1", false)]
+    [InlineData("measureeval", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Copy_is_offered_only_for_a_guid(string? value, bool expected)
+    {
+        LabeledIdRules.IsGuid(value).Should().Be(expected);
+    }
 }

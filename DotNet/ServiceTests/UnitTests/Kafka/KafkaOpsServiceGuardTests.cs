@@ -510,7 +510,7 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
-    public void Console_DoesNotListConsumerGroups()
+    public void Console_ListsBrokerGroupsOnlyAfterTheCatalogDescribe()
     {
         var root = Path.Combine(RepoRoot(), "DotNet", "Admin.BFF");
         foreach (var file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
@@ -518,11 +518,53 @@ public class KafkaOpsServiceGuardTests
             var text = File.ReadAllText(file);
             if (!text.Contains("ListConsumerGroupsAsync", StringComparison.Ordinal))
                 continue;
-            Assert.EndsWith(Path.Combine("Migration", "KafkaMigrationAdmin.cs"), file, StringComparison.OrdinalIgnoreCase);
-            var gate = text.IndexOf("if (!await ClusterHealthyAsync", StringComparison.Ordinal);
-            var call = text.IndexOf("ListConsumerGroupsAsync", StringComparison.Ordinal);
-            Assert.True(gate >= 0 && call > gate, "ListConsumerGroupsAsync must follow the healthy-cluster gate.");
+
+            if (file.EndsWith(Path.Combine("Migration", "KafkaMigrationAdmin.cs"), StringComparison.OrdinalIgnoreCase))
+            {
+                var gate = text.IndexOf("if (!await ClusterHealthyAsync", StringComparison.Ordinal);
+                var call = text.IndexOf("ListConsumerGroupsAsync", StringComparison.Ordinal);
+                Assert.True(gate >= 0 && call > gate, "ListConsumerGroupsAsync must follow the healthy-cluster gate.");
+                continue;
+            }
+
+            Assert.EndsWith("KafkaBrokerGateway.cs", file, StringComparison.OrdinalIgnoreCase);
+            var catalog = text.IndexOf("await DescribeCatalogGroupsAsync", StringComparison.Ordinal);
+            var listed = text.IndexOf("await ListedGroupIdsAsync", StringComparison.Ordinal);
+            Assert.True(catalog >= 0 && listed > catalog, "Broker groups are listed only after the catalog describe succeeds.");
         }
+    }
+
+    [Fact]
+    public async Task ForeignGroup_IsListedWhenTheBrokerReportsIt()
+    {
+        var admin = new Mock<IAdminClient>();
+        admin.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult
+            {
+                ConsumerGroupDescriptions =
+                [
+                    new ConsumerGroupDescription { GroupId = "Report", Error = new Error(ErrorCode.GroupIdNotFound) }
+                ]
+            });
+        admin.Setup(client => client.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()))
+            .ReturnsAsync(new ListConsumerGroupsResult
+            {
+                Valid =
+                [
+                    new ConsumerGroupListing { GroupId = "foreign-blocker" },
+                    new ConsumerGroupListing { GroupId = "e2e-diag-hidden" },
+                    new ConsumerGroupListing { GroupId = "Dynamic:hidden" }
+                ]
+            });
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>())).Returns(admin.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        var groups = await gateway.DescribeGroupsAsync(false, 1, CancellationToken.None);
+
+        Assert.Contains(groups, group => group.GroupId == "Report" && group.Catalogued);
+        Assert.Contains(groups, group => group.GroupId == "foreign-blocker" && !group.Catalogued && group.State == "Empty");
+        Assert.DoesNotContain(groups, group => group.GroupId == "e2e-diag-hidden" || group.GroupId == "Dynamic:hidden");
     }
 
     [Fact]

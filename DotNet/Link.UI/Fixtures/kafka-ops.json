@@ -149,7 +149,8 @@
   },
   "cluster": {
     "brokerCount": 3,
-    "controllerId": 0,
+    "controllerId": null,
+    "controllerUnavailableReason": "The KRaft quorum leader is a separate node and is not exposed to this client.",
     "underReplicatedPartitions": 0,
     "offlinePartitions": 0,
     "isrShrunkPartitions": 0,
