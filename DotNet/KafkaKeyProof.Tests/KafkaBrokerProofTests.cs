@@ -6,18 +6,14 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 namespace LantanaGroup.Link.KafkaKeyProof.Tests;
 
 /// <summary>
-/// Broker checks. Each test returns immediately when KAFKA_BOOTSTRAP is unset.
+/// Broker checks. Each test is skipped when KAFKA_BOOTSTRAP is unset.
 /// </summary>
 public class KafkaBrokerProofTests
 {
-    [Fact]
+    [BrokerRequiredFact]
     public async Task RetryTopicIsNotVisibleToTheMainTopicConsumer()
     {
-        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
-        if (string.IsNullOrWhiteSpace(bootstrap))
-        {
-            return;
-        }
+        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP")!;
 
         var main = "proof-retry-main-" + Guid.NewGuid().ToString("N");
         var retry = KafkaTopicNames.Retry(main, "Report");
@@ -43,14 +39,10 @@ public class KafkaBrokerProofTests
         Assert.Equal("retry-value", retryRecord.Message.Value);
     }
 
-    [Fact]
+    [BrokerRequiredFact]
     public async Task TwoConsumersRebalanceWithoutLossOrDuplicate()
     {
-        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
-        if (string.IsNullOrWhiteSpace(bootstrap))
-        {
-            return;
-        }
+        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP")!;
 
         var topic = "proof-rebalance-" + Guid.NewGuid().ToString("N");
         var group = "proof-rebalance-group-" + Guid.NewGuid().ToString("N");
@@ -97,14 +89,10 @@ public class KafkaBrokerProofTests
         Assert.All(produced, key => Assert.Equal(1, seen[key]));
     }
 
-    [Fact]
+    [BrokerRequiredFact]
     public async Task GrowingPartitionsKeepsAnExistingKeyOnItsPartition()
     {
-        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
-        if (string.IsNullOrWhiteSpace(bootstrap))
-        {
-            return;
-        }
+        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP")!;
 
         var topic = "proof-grow-" + Guid.NewGuid().ToString("N");
         var key = KafkaKeys.ForPatient("facility-proof", "patient-proof");

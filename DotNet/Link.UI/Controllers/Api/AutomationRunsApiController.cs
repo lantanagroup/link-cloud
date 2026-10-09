@@ -1,4 +1,5 @@
 using Automation.UI.Models;
+using Link.UI.Services;
 using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
@@ -43,6 +44,10 @@ public sealed class AutomationRunsApiController(
         try
         {
             runId = await runManager.StartAsync(startRequest, cancellationToken);
+        }
+        catch (TopicHeldException ex)
+        {
+            return Conflict(new { error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {

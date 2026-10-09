@@ -1,0 +1,293 @@
+# Override only. This file does not define a Kafka cluster.
+# Brokers stay in the base file (controller, kafka-1, kafka-2, kafka-3).
+#
+# The migration under test recreates the topic empty and writes every group
+# offset to 0. The _linkmig- backup is kept. This override does not copy the
+# backup onto the recreated topic.
+#
+# docker compose -p silo-bug-investigator-kafka -f /workspace/silos/bug-investigator/kafka-proof/compose.yaml -f Scripts/kafka-migration-proof/compose.migration.yml up -d --scale mig-producer=2 --scale mig-consumer-measureeval=2
+#
+# Services land on the merged project's default network.
+# They reach the brokers at KAFKA_BOOTSTRAP (default kafka-1:9092).
+# mig-stray-producer starts only with --profile stray.
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  mig-producer:
+    image: python:3.12-slim
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka-1:9092}
+      MIG_TOPIC: ${MIG_TOPIC:-ResourcesNormalized}
+      MIG_RATE: ${MIG_RATE:-100}
+      MIG_KEYS: ${MIG_KEYS:-10000}
+      MIG_REPLICAS: "2"
+    volumes:
+      - mig-seq:/data
+      - mig-logs:/logs
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        pip install --disable-pip-version-check -q kafka-python==2.2.15
+        python -u - <<'PY'
+        import fcntl, json, os, socket, time
+        from kafka import KafkaProducer
+
+        bootstrap = os.environ.get("KAFKA_BOOTSTRAP", "kafka-1:9092")
+        topic = os.environ.get("MIG_TOPIC", "ResourcesNormalized")
+        rate = float(os.environ.get("MIG_RATE", "100"))
+        key_count = int(os.environ.get("MIG_KEYS", "10000"))
+        replicas = int(os.environ.get("MIG_REPLICAS", "2"))
+        host = socket.gethostname()
+        os.makedirs("/data", exist_ok=True)
+        os.makedirs("/logs", exist_ok=True)
+
+        def locked(path, fn):
+            with open(path, "a+") as handle:
+                fcntl.flock(handle, fcntl.LOCK_EX)
+                try:
+                    return fn(handle)
+                finally:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
+
+        def assign_slot():
+            def read(handle):
+                slots = {}
+                try:
+                    with open("/data/slots.json", "r", encoding="utf-8") as fh:
+                        slots = json.load(fh)
+                except FileNotFoundError:
+                    slots = {}
+                if host not in slots:
+                    used = set(int(value) for value in slots.values())
+                    slot = 0
+                    while slot in used:
+                        slot += 1
+                    slots[host] = slot
+                    with open("/data/slots.json", "w", encoding="utf-8") as fh:
+                        json.dump(slots, fh)
+                        fh.flush()
+                        os.fsync(fh.fileno())
+                return int(slots[host])
+            return locked("/data/slots.lock", read)
+
+        slot = assign_slot()
+        seq_path = f"/data/seq-{slot}.json"
+        try:
+            with open(seq_path, "r", encoding="utf-8") as fh:
+                seq = {int(key): int(value) for key, value in json.load(fh).items()}
+        except FileNotFoundError:
+            seq = {}
+
+        def save():
+            tmp = seq_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({str(key): value for key, value in seq.items()}, fh)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, seq_path)
+
+        producer = None
+        while producer is None:
+            try:
+                producer = KafkaProducer(
+                    bootstrap_servers=bootstrap,
+                    acks="all",
+                    retries=5,
+                    max_in_flight_requests_per_connection=1,
+                    linger_ms=0,
+                )
+            except Exception:
+                time.sleep(2)
+
+        mine = list(range(slot, key_count, replicas))
+        pause = 1.0 / rate if rate > 0 else 0
+        cursor = 0
+        while True:
+            key_n = mine[cursor % len(mine)]
+            cursor += 1
+            nxt = seq.get(key_n, 0) + 1
+            key = json.dumps({"facilityId": "proof", "patientId": f"p{key_n:05d}"}, separators=(",", ":")).encode("utf-8")
+            value = json.dumps({"seq": nxt}).encode("utf-8")
+            meta = producer.send(topic, key=key, value=value).get(timeout=30)
+            seq[key_n] = nxt
+            save()
+            line = json.dumps({
+                "key": key.decode("utf-8"),
+                "seq": nxt,
+                "partition": meta.partition,
+                "offset": meta.offset,
+                "acked": True,
+            })
+            def append(handle, text=line):
+                with open("/logs/producer-acks.jsonl", "a", encoding="utf-8") as fh:
+                    fh.write(text + "\n")
+                    fh.flush()
+            locked("/logs/producer-acks.lock", append)
+            print(line, flush=True)
+            if pause:
+                time.sleep(pause)
+        PY
+
+  mig-consumer-measureeval:
+    image: python:3.12-slim
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka-1:9092}
+      MIG_TOPIC: ${MIG_TOPIC:-ResourcesNormalized}
+      MIG_GROUP: measureeval
+    volumes:
+      - mig-logs:/logs
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        pip install --disable-pip-version-check -q kafka-python==2.2.15
+        python -u - <<'PY'
+        import fcntl, json, os, time
+        from kafka import KafkaConsumer
+
+        bootstrap = os.environ.get("KAFKA_BOOTSTRAP", "kafka-1:9092")
+        topic = os.environ.get("MIG_TOPIC", "ResourcesNormalized")
+        group = os.environ["MIG_GROUP"]
+        os.makedirs("/logs", exist_ok=True)
+        path = f"/logs/consumer-{group}.jsonl"
+        consumer = None
+        while consumer is None:
+            try:
+                consumer = KafkaConsumer(
+                    topic,
+                    bootstrap_servers=bootstrap,
+                    group_id=group,
+                    enable_auto_commit=False,
+                    auto_offset_reset="earliest",
+                    max_poll_records=1,
+                )
+            except Exception:
+                time.sleep(2)
+        while True:
+            batches = consumer.poll(timeout_ms=1000, max_records=1)
+            for messages in batches.values():
+                for msg in messages:
+                    try:
+                        seq = json.loads(msg.value.decode("utf-8")).get("seq")
+                    except Exception:
+                        seq = None
+                    line = json.dumps({
+                        "group": group,
+                        "key": (msg.key or b"").decode("utf-8", "replace"),
+                        "seq": seq,
+                        "partition": msg.partition,
+                        "offset": msg.offset,
+                    })
+                    with open("/logs/consumer.lock", "a", encoding="utf-8") as lock:
+                        fcntl.flock(lock, fcntl.LOCK_EX)
+                        with open(path, "a", encoding="utf-8") as fh:
+                            fh.write(line + "\n")
+                            fh.flush()
+                            os.fsync(fh.fileno())
+                        fcntl.flock(lock, fcntl.LOCK_UN)
+                    consumer.commit()
+                    print(line, flush=True)
+        PY
+
+  mig-consumer-g2:
+    image: python:3.12-slim
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka-1:9092}
+      MIG_TOPIC: ${MIG_TOPIC:-ResourcesNormalized}
+      MIG_GROUP: g2
+    volumes:
+      - mig-logs:/logs
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        pip install --disable-pip-version-check -q kafka-python==2.2.15
+        python -u - <<'PY'
+        import fcntl, json, os, time
+        from kafka import KafkaConsumer
+
+        bootstrap = os.environ.get("KAFKA_BOOTSTRAP", "kafka-1:9092")
+        topic = os.environ.get("MIG_TOPIC", "ResourcesNormalized")
+        group = os.environ["MIG_GROUP"]
+        os.makedirs("/logs", exist_ok=True)
+        path = f"/logs/consumer-{group}.jsonl"
+        consumer = None
+        while consumer is None:
+            try:
+                consumer = KafkaConsumer(
+                    topic,
+                    bootstrap_servers=bootstrap,
+                    group_id=group,
+                    enable_auto_commit=False,
+                    auto_offset_reset="earliest",
+                    max_poll_records=1,
+                )
+            except Exception:
+                time.sleep(2)
+        while True:
+            batches = consumer.poll(timeout_ms=1000, max_records=1)
+            for messages in batches.values():
+                for msg in messages:
+                    try:
+                        seq = json.loads(msg.value.decode("utf-8")).get("seq")
+                    except Exception:
+                        seq = None
+                    line = json.dumps({
+                        "group": group,
+                        "key": (msg.key or b"").decode("utf-8", "replace"),
+                        "seq": seq,
+                        "partition": msg.partition,
+                        "offset": msg.offset,
+                    })
+                    with open("/logs/consumer.lock", "a", encoding="utf-8") as lock:
+                        fcntl.flock(lock, fcntl.LOCK_EX)
+                        with open(path, "a", encoding="utf-8") as fh:
+                            fh.write(line + "\n")
+                            fh.flush()
+                            os.fsync(fh.fileno())
+                        fcntl.flock(lock, fcntl.LOCK_UN)
+                    consumer.commit()
+                    print(line, flush=True)
+        PY
+
+  mig-stray-producer:
+    image: python:3.12-slim
+    profiles: ["stray"]
+    restart: "no"
+    environment:
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka-1:9092}
+      MIG_TOPIC: ${MIG_TOPIC:-ResourcesNormalized}
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        pip install --disable-pip-version-check -q kafka-python==2.2.15
+        python -u - <<'PY'
+        import json, os, time
+        from kafka import KafkaProducer
+
+        bootstrap = os.environ.get("KAFKA_BOOTSTRAP", "kafka-1:9092")
+        topic = os.environ.get("MIG_TOPIC", "ResourcesNormalized")
+        producer = None
+        while producer is None:
+            try:
+                producer = KafkaProducer(bootstrap_servers=bootstrap, acks="all")
+            except Exception:
+                time.sleep(2)
+        key = json.dumps({"facilityId": "stray", "patientId": "stray"}, separators=(",", ":")).encode("utf-8")
+        while True:
+            producer.send(topic, key=key, value=b'{"seq":0,"stray":true}').get(timeout=30)
+            print("stray", flush=True)
+            time.sleep(1)
+        PY
+
+volumes:
+  mig-seq:
+  mig-logs:

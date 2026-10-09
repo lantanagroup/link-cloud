@@ -26,15 +26,11 @@ public class KafkaPartitionProofTests
         Assert.Equal(expected, KafkaMurmur2.Partition(key, partitionCount));
     }
 
-    [Theory]
+    [BrokerRequiredTheory]
     [MemberData(nameof(PartitionCounts))]
     public async Task DataAcquisitionRequestedKey_LandsOnTheMurmur2Partition(int partitionCount)
     {
-        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
-        if (string.IsNullOrWhiteSpace(bootstrap))
-        {
-            return;
-        }
+        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP")!;
 
         var key = KafkaKeys.ForPatient("facility-proof", "patient-proof");
         var topic = "proof-data-acquisition-requested-" + partitionCount;

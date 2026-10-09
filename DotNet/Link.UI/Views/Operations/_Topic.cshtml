@@ -39,7 +39,7 @@ else
             <p>Key @topic.KeyClass <span class="text-muted">@topic.KeyShape</span>. Partitions @topic.Partitions. Retry @topic.RetryPartitions. Error @topic.ErrorPartitions. RF @topic.ReplicationFactor. Replica ceiling @topic.MaxReplicas.</p>
             @if (topic.HardBlocked)
             {
-                <div class="alert alert-secondary" role="status">Partition changes for this topic are blocked. .NET producers hash the facility key with CRC32 and MeasureEval hashes it with murmur2, so one facility can land on different partitions.</div>
+                <div class="alert alert-secondary" role="status">Partition changes for this topic are blocked.</div>
             }
             else if (topic.OrderSensitive && topic.KeyClass == "Facility")
             {
@@ -114,10 +114,23 @@ else
     <h2 class="h5 mt-4">Partition lag</h2>
     <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
 
+    @if (topic.Slice1Eligible)
+    {
+        <p class="mt-3"><a class="btn btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topic.Topic, page: 1)">Migrate instead</a> <span class="text-muted">@topic.MigrationEligibility An in-place add remaps keys. A migration recreates the topic empty and keeps the backup.</span></p>
+    }
+    else if (!string.IsNullOrWhiteSpace(topic.MigrationEligibility))
+    {
+        <p class="text-muted mt-3">@topic.MigrationEligibility</p>
+    }
+    @if (!string.IsNullOrWhiteSpace(topic.PartitionAddReason))
+    {
+        <p class="text-muted">@topic.PartitionAddReason</p>
+    }
+
     <details class="mt-4" @(openAdvanced ? "open" : null)>
         <summary>Advanced: add partitions</summary>
         <div class="alert alert-secondary mt-3" role="status">
-            Adding partitions is permanent and cannot be reversed. Existing keys are remapped. The main topic, its retry topic, and its error topic increase together. None of them can shrink.
+            Adding partitions is permanent and cannot be reversed. Existing keys are remapped. The main topic, its retry topic, and its error topic increase together. None of them can shrink. When the family is uneven, the action below raises only the siblings that are behind and leaves the main topic unchanged.
             @if (topic.KeyClass == "Facility")
             {
                 <span>One facility can never use more than one partition.</span>
@@ -166,7 +179,14 @@ else
                 <div class="card-body">
                     <p><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
                     <p>@plan.CurrentPartitions to @plan.RequestedPartitions. Family @plan.Family. Key @plan.KeyClass @plan.KeyShape. Replica ceiling @plan.MaxReplicas.</p>
-                    <p>Retry @plan.RetryTopic and error @plan.ErrorTopic increase with the main topic.</p>
+                    @if (plan.FamilyCompletion)
+                    {
+                        <p>The main topic stays at @plan.CurrentPartitions. Siblings raised: @(plan.TopicsToRaise.Count == 0 ? "none" : string.Join(", ", plan.TopicsToRaise)).</p>
+                    }
+                    else
+                    {
+                        <p>Retry @plan.RetryTopic and error @plan.ErrorTopic increase with the main topic.</p>
+                    }
                     <p>Quiet window @(plan.QuietWindowRequired ? (plan.QuietWindowMet ? "met" : "not met") : "not required"). @(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</p>
                     @foreach (var note in plan.Notes)
                     {
@@ -179,6 +199,32 @@ else
                     <p class="mb-0">Groups: @(plan.AffectedGroups.Count == 0 ? "none" : string.Join(", ", plan.AffectedGroups))</p>
                 </div>
             </div>
+        }
+        @if (topic is not null && (topic.RetryPartitions > 0 && topic.RetryPartitions < topic.Partitions || topic.ErrorPartitions > 0 && topic.ErrorPartitions < topic.Partitions))
+        {
+            <form class="mt-3" method="post" action="/Operations/Kafka/family/plan">
+                @Html.AntiForgeryToken()
+                <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />
+                <input type="hidden" name="topic" value="@topicName" />
+                <p>The family is uneven. Complete it by raising only the retry and error topics up to @topic.Partitions. The main topic stays as it is.</p>
+                <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="family-reason">Reason</label>
+                        <input class="form-control" id="family-reason" name="reason" value="@Model.DraftReason" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="family-confirm">Type the topic name</label>
+                        <input class="form-control" id="family-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" />
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                    @if (!Model.Topics.ReadOnly)
+                    {
+                        <button class="btn btn-sm btn-success" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                    }
+                </div>
+            </form>
         }
     </details>
 }
