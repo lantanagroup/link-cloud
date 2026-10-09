@@ -293,14 +293,15 @@ public class MigrationMachineTests
         };
         var copied = source.Select(record => new CopiedRecord
         {
-            Partition = 1,
-            Offset = record.Offset,
+            Partition = record.Offset == 0 ? 4 : 1,
+            Offset = record.Offset == 0 ? 50 : 3,
             Key = record.Key,
             Value = record.Value,
             TimestampMs = record.TimestampMs,
             Headers = [new CopiedHeader { Name = KafkaTopicCatalog.MigrationHeader, Value = System.Text.Encoding.UTF8.GetBytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;" + "ResourcesNormalized" + ";" + record.Partition + ";" + record.Offset) }]
         }).ToList();
         Assert.True(LogCopier.Matches(source, copied));
+        Assert.Equal(LogCopier.Digest(source), LogCopier.Digest(copied));
         var changed = copied[0];
         copied[0] = new CopiedRecord
         {
@@ -312,6 +313,85 @@ public class MigrationMachineTests
             Headers = changed.Headers
         };
         Assert.False(LogCopier.Matches(source, copied));
+    }
+
+    [Fact]
+    public void BrokerDefaultConfigs_AreRead_AndAreNotCreateOverrides()
+    {
+        var facts = new MigrationTopicFacts();
+        KafkaMigrationAdmin.ApplyDescribedConfigs(facts,
+        [
+            new TopicConfigRow { Name = "cleanup.policy", Value = "delete", Source = "DefaultConfig" },
+            new TopicConfigRow { Name = "min.insync.replicas", Value = "2", Source = "DefaultConfig" },
+            new TopicConfigRow { Name = "retention.ms", Value = "1000", Source = "DynamicTopicConfig" },
+            new TopicConfigRow { Name = "segment.bytes", Value = "1073741824", Source = "DefaultConfig" }
+        ]);
+        Assert.Equal("delete", facts.EffectiveCleanupPolicy);
+        Assert.Equal(2, facts.EffectiveMinInSyncReplicas);
+        Assert.Equal("1000", facts.Configs["retention.ms"]);
+        Assert.False(facts.Configs.ContainsKey("cleanup.policy"));
+        Assert.False(facts.Configs.ContainsKey("min.insync.replicas"));
+        Assert.False(facts.Configs.ContainsKey("segment.bytes"));
+    }
+
+    [Fact]
+    public void CatalogGroupWithNoCommit_IsNotAssignedOffsets()
+    {
+        var world = MigrationWorld.Create();
+        var record = MigrationDriver.Until(world.Record(), world, MigrationStep.C5);
+        var seen = world.Observe(record);
+        var width = seen.HighWatermarks.Count;
+        seen.Groups["measureeval-events"] = new GroupObservation
+        {
+            State = "Empty",
+            Members = 0,
+            Lag = 0,
+            Committed = Enumerable.Repeat(-1L, width).ToList()
+        };
+        var tick = MigrationMachine.Describe(record, seen, MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
+        var writes = tick.Effects.OfType<MigrationEffect.WriteOffsets>().Select(item => item.Group).ToList();
+        Assert.Contains("measureeval", writes);
+        Assert.DoesNotContain("measureeval-events", writes);
+        world.Apply(tick.Effects, tick.Persist ?? record);
+        var after = world.Observe(tick.Persist ?? record);
+        after.Groups["measureeval-events"] = new GroupObservation
+        {
+            State = "Empty",
+            Members = 0,
+            Committed = Enumerable.Repeat(-1L, after.HighWatermarks.Count).ToList()
+        };
+        var advanced = MigrationMachine.Describe(tick.Persist ?? record, after, MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
+        Assert.Equal(MigrationStep.D1, advanced.Completed!.Step);
+        Assert.True(MigrationGroups.Ready("Empty", 0, [-1, -1]));
+    }
+
+    [Fact]
+    public void StartedB6_IsNotedOnce()
+    {
+        var world = MigrationWorld.Create();
+        var record = MigrationDriver.Until(world.Record(), world, MigrationStep.B6);
+        var seen = world.Observe(record);
+        seen.BackupVerified = false;
+        seen.HeaderConsistent = false;
+        var first = MigrationMachine.Describe(record, seen, MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
+        var noted = first.Persist!;
+        Assert.Equal(1, noted.Timeline.Count(entry => entry.Text == "Started B6"));
+        var second = MigrationMachine.Describe(noted, seen, MigrationCommand.Tick, record.Executor, null, world.Now, world.Limits);
+        Assert.Equal(1, (second.Persist ?? noted).Timeline.Count(entry => entry.Text == "Started B6"));
+    }
+
+    [Fact]
+    public void SkippedBackup_DoesNotSayTheTempTopicWasKept()
+    {
+        var world = MigrationWorld.Create();
+        var record = world.Record();
+        record.BackupSkipped = true;
+        record = MigrationDriver.Until(record, world, MigrationStep.H1);
+        Assert.False(world.Topics.ContainsKey(record.BackupTopic));
+        record = MigrationDriver.Command(record, world, MigrationCommand.Abort, record.Executor, null);
+        Assert.Equal(MigrationStep.RolledBack, record.Step);
+        Assert.Contains(record.Timeline, entry => entry.Text.Contains("No temp topic was created", StringComparison.Ordinal));
+        Assert.False(record.BackupCleanupRequired);
     }
 
     [Fact]
@@ -405,6 +485,12 @@ public class MigrationMachineTests
         var compact = MigrationWorld.Facts();
         compact.CleanupPolicy = "compact";
         Assert.Contains(MigrationPreflight.Evaluate(compact).Errors, error => error.Contains("Compacted", StringComparison.Ordinal));
+        var brokerDefault = MigrationWorld.Facts();
+        brokerDefault.CleanupPolicy = "";
+        Assert.True(MigrationPreflight.Evaluate(brokerDefault).Accepted, string.Join(" ", MigrationPreflight.Evaluate(brokerDefault).Errors));
+        var missingInSync = MigrationWorld.Facts();
+        missingInSync.MinInSyncReplicas = 0;
+        Assert.Contains(MigrationPreflight.Evaluate(missingInSync).Errors, error => error.Contains("could not be read", StringComparison.Ordinal));
     }
 
     [Fact]
