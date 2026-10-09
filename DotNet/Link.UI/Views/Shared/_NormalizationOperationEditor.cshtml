@@ -109,11 +109,19 @@
                             <span class="small text-muted">Page @panel.PageNumber of @panel.TotalPages</span>
                             @if (panel.PageNumber > 1)
                             {
-                                <a data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationPage="@(panel.PageNumber - 1)" asp-route-sequenceType="@panel.SequenceType">Previous</a>
+                                <a class="lu-page-step" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationPage="@(panel.PageNumber - 1)" asp-route-sequenceType="@panel.SequenceType" aria-label="Previous" title="Previous"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
+                            }
+                            else
+                            {
+                                <button type="button" class="lu-page-step" disabled aria-label="Previous" title="Previous"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
                             }
                             @if (panel.PageNumber < panel.TotalPages)
                             {
-                                <a data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationPage="@(panel.PageNumber + 1)" asp-route-sequenceType="@panel.SequenceType">Next</a>
+                                <a class="lu-page-step" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationPage="@(panel.PageNumber + 1)" asp-route-sequenceType="@panel.SequenceType" aria-label="Next" title="Next"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                            }
+                            else
+                            {
+                                <button type="button" class="lu-page-step" disabled aria-label="Next" title="Next"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
                             }
                         </div>
                     }

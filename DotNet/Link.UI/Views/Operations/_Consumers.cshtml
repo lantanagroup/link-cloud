@@ -124,14 +124,8 @@ else if (Model.GroupRows.Count > 0)
 <div class="lu-kafka-pager">
     <span>@Model.GroupCount groups. Page @query.Page of @Model.GroupPages.</span>
     <span class="d-flex gap-2">
-        @if (query.Page > 1)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
-        }
-        @if (query.Page < Model.GroupPages)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
-        }
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.GroupPages })" />
     </span>
 </div>
 
@@ -294,22 +288,26 @@ else
         <form method="post" action="/Operations/Kafka/groups/replicas/plan" data-kafka-busy="Dry run is running.">
             @Html.AntiForgeryToken()
             <partial name="_QueryFields" model="@(query with { Group = selected.GroupId })" />
-            <fieldset class="border rounded p-3 mb-3">
-                <legend class="float-none w-auto px-2 h6">What to change</legend>
+            <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">What to change</h3>
+            <div class="card-body">
                 <p class="form-text">This is how many members to add or to remove, not the final count. Preview and Submit both use it. The button you press chooses the direction.</p>
                 <div class="col-6 col-md-2">
                     <label class="form-label" for="replica-delta">Replicas</label>
                     <input class="form-control" id="replica-delta" name="delta" type="number" min="1" max="100" value="@(Model.DraftDelta < 1 ? 1 : Model.DraftDelta)" />
                 </div>
-            </fieldset>
-            <fieldset class="border rounded p-3 mb-3">
-                <legend class="float-none w-auto px-2 h6">Request only</legend>
+            </div>
+        </section>
+            <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">Request only</h3>
+            <div class="card-body">
                 <p class="form-text">A preview does not read this. Add and Remove do.</p>
                 <div class="col-12 col-md-6">
                     <label class="form-label" for="replica-reason">Reason</label>
                     <input class="form-control" id="replica-reason" name="reason" value="@Model.DraftReason" />
                 </div>
-            </fieldset>
+            </div>
+        </section>
             @if (Model.ScalePlan is not null)
             {
                 var plan = Model.ScalePlan;

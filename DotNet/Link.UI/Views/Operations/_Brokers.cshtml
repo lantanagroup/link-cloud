@@ -133,14 +133,8 @@ else if (Model.BrokerRows.Count > 0)
 <div class="lu-kafka-pager">
     <span>@Model.BrokerCount brokers. Page @query.Page of @Model.BrokerPages.</span>
     <span class="d-flex gap-2">
-        @if (query.Page > 1)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
-        }
-        @if (query.Page < Model.BrokerPages)
-        {
-            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
-        }
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.BrokerPages })" />
     </span>
 </div>
 
@@ -151,8 +145,9 @@ else if (Model.BrokerRows.Count > 0)
         <form method="post" action="/Operations/Kafka/brokers">
             @Html.AntiForgeryToken()
             <partial name="_QueryFields" model="query" />
-            <fieldset class="border rounded p-3 mb-0">
-                <legend class="float-none w-auto px-2 h6">Register</legend>
+            <section class="card au-card mb-0">
+            <h3 class="card-header h6 mb-0">Register</h3>
+            <div class="card-body">
                 <p class="form-text">This request does not move partitions. Open the new broker afterwards to preview a rebalance onto it.</p>
                 <div class="row g-2 align-items-end">
                     <div class="col-12 col-md-6">
@@ -163,7 +158,8 @@ else if (Model.BrokerRows.Count > 0)
                         <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
                     </div>
                 </div>
-            </fieldset>
+            </div>
+        </section>
         </form>
     </div>
 </div>
@@ -185,14 +181,16 @@ else
                 @Html.AntiForgeryToken()
                 <partial name="_QueryFields" model="@(query with { Broker = selected.Id.ToString() })" />
                 <input type="hidden" name="brokerId" value="@selected.Id" />
-                <fieldset class="border rounded p-3 mb-3">
-                    <legend class="float-none w-auto px-2 h6">Request only</legend>
+                <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">Request only</h3>
+            <div class="card-body">
                     <p class="form-text">A preview does not read the reason. Decommission and Rebalance do. Preview decommission plans moves off this broker. Preview rebalance plans moves onto it.</p>
                     <div class="col-12 col-md-6">
                         <label class="form-label" for="broker-reason">Reason</label>
                         <input class="form-control" id="broker-reason" name="reason" value="@Model.DraftReason" />
                     </div>
-                </fieldset>
+            </div>
+        </section>
                 @if (Model.MovePlan is not null)
                 {
                     var plan = Model.MovePlan;

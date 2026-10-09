@@ -2,13 +2,7 @@
 <div class="lu-kafka-pager">
     <span>Page @Model.Page of @Model.Pages. @Model.Note</span>
     <span class="d-flex gap-2">
-        @if (!string.IsNullOrEmpty(Model.Previous))
-        {
-            <a class="btn btn-sm btn-au-link" href="@Model.Previous">Previous</a>
-        }
-        @if (!string.IsNullOrEmpty(Model.Next))
-        {
-            <a class="btn btn-sm btn-au-link" href="@Model.Next">Next</a>
-        }
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Previous, Enabled = !string.IsNullOrEmpty(Model.Previous) })" />
+        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Next, Enabled = !string.IsNullOrEmpty(Model.Next) })" />
     </span>
 </div>

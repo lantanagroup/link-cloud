@@ -86,7 +86,8 @@ public class KafkaBrowsePageTests
         var shell = File.ReadAllText(Path.Combine(root, "Views", "Operations", "Kafka.cshtml"));
         page.Should().Contain("does not commit offsets");
         page.Should().Contain("Topic family");
-        page.Should().Contain("<legend class=\"float-none w-auto px-2 h6\">Search</legend>");
+        page.Should().Contain("<h3 class=\"card-header h6 mb-0\">Search</h3>");
+        page.Should().NotContain("<legend");
         page.Should().NotContain("Where to read");
         page.Should().NotContain("What to keep");
         page.Should().NotContain("name=\"limit\"");

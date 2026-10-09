@@ -11,7 +11,9 @@
         : "Review the topic, headers, key, and value. Produce sends one new record. Nothing is sent until you type the topic name.";
     var hold = draft is { FromStage: false };
 }
-<form id="kafka-produce" class="mt-4@(hold ? " lu-produce-hold" : null)" method="post" action="/Operations/Kafka/messages">
+<form id="kafka-produce" class="card au-card mt-4@(hold ? " lu-produce-hold" : null)" method="post" action="/Operations/Kafka/messages">
+    <h2 class="card-header h5 mb-0">Produce a message</h2>
+    <div class="card-body">
     @Html.AntiForgeryToken()
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
@@ -36,9 +38,9 @@
     <input type="hidden" name="more" value="@(query.More ? "true" : "false")" />
     <input type="hidden" name="record" value="@query.OpenRecord" />
     <input type="hidden" name="stage" value="@query.StageRecord" />
-    <h2 class="h5">Produce a message</h2>
-    <fieldset class="border rounded p-3 mb-3">
-        <legend class="float-none w-auto px-2 h6">Message</legend>
+    <section class="card au-card mb-3">
+            <h3 class="card-header h6 mb-0">Message</h3>
+            <div class="card-body">
         <div class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="produce-topic">Topic</label>
@@ -60,9 +62,11 @@
         <div class="mt-3">
             <button class="btn btn-au-link" id="kafka-paste-message" type="button">Paste message</button>
         </div>
-    </fieldset>
-    <fieldset class="border rounded p-3 mb-3">
-        <legend class="float-none w-auto px-2 h6">Review</legend>
+            </div>
+        </section>
+    <section class="card au-card mb-0">
+            <h3 class="card-header h6 mb-0">Review</h3>
+            <div class="card-body">
         <p class="lu-produce-summary" id="kafka-produce-summary">@summary</p>
         <div class="row g-2">
             <div class="col-12 col-md-6">
@@ -78,5 +82,7 @@
             <button class="btn btn-au-execute" id="produce-submit" type="submit">Produce</button>
             <a class="btn btn-warning" href="@query.Href(closeStage: true)">Cancel</a>
         </div>
-    </fieldset>
+            </div>
+        </section>
+    </div>
 </form>

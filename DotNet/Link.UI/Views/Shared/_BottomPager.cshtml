@@ -23,37 +23,21 @@
 <nav class="lu-pager" aria-label="@Model.Label">
     <span class="small text-muted">@Model.Total</span>
     <span class="small text-muted">Page @current of @pages</span>
-    @if (current > 1)
-    {
-        <a class="btn btn-sm btn-au-link" href="@Link(1, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>First</a>
-        <a class="btn btn-sm btn-au-link" href="@Link(current - 1, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>Previous</a>
-    }
-    else
-    {
-        <button type="button" class="btn btn-sm btn-au-link" disabled>First</button>
-        <button type="button" class="btn btn-sm btn-au-link" disabled>Previous</button>
-    }
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Link(1, Model.PageSize), Enabled = current > 1, Panel = Model.Panel })" />
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Link(current - 1, Model.PageSize), Enabled = current > 1, Panel = Model.Panel })" />
     @for (var number = start; number <= end; number++)
     {
         if (number == current)
         {
-            <span class="btn btn-sm lu-nav-current" aria-current="page">@number</span>
+            <span class="lu-page-num is-current" aria-current="page">@number</span>
         }
         else
         {
-            <a class="btn btn-sm btn-au-link" href="@Link(number, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>@number</a>
+            <a class="lu-page-num" href="@Link(number, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>@number</a>
         }
     }
-    @if (current < pages)
-    {
-        <a class="btn btn-sm btn-au-link" href="@Link(current + 1, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>Next</a>
-        <a class="btn btn-sm btn-au-link" href="@Link(pages, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>Last</a>
-    }
-    else
-    {
-        <button type="button" class="btn btn-sm btn-au-link" disabled>Next</button>
-        <button type="button" class="btn btn-sm btn-au-link" disabled>Last</button>
-    }
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Link(current + 1, Model.PageSize), Enabled = current < pages, Panel = Model.Panel })" />
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Link(pages, Model.PageSize), Enabled = current < pages, Panel = Model.Panel })" />
     @if (!Model.Panel && fields is not null)
     {
         <form class="lu-pager-jump" method="get" action="@path">
@@ -75,11 +59,11 @@
         {
             if (size == Model.PageSize)
             {
-                <span class="btn btn-sm lu-nav-current" aria-current="true">@size</span>
+                <span class="lu-page-num is-current" aria-current="true">@size</span>
             }
             else
             {
-                <a class="btn btn-sm btn-au-link" href="@Link(1, size)" @(Model.Panel ? "data-da-panel" : null)>@size</a>
+                <a class="lu-page-num" href="@Link(1, size)" @(Model.Panel ? "data-da-panel" : null)>@size</a>
             }
         }
     }
