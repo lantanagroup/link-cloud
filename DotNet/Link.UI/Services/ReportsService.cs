@@ -805,7 +805,8 @@ public sealed class ReportsService
                         ReportManifestRules.ReportBadges(reportIds, slots),
                         ReportManifestRules.ResourceCounts(counts.Select(row => new KeyValuePair<string, int>(row.Name, row.Count))),
                         events,
-                        PatientLinks(entry.PatientId, patientHref(entry.PatientId), page.FacilityId, page.ReportId));
+                        PatientLinks(entry.PatientId, patientHref(entry.PatientId), page.FacilityId, page.ReportId),
+                        membership: ReportManifestRules.MembershipFor(reportIds, slots));
                 }).ToList();
                 var metadata = entries.Body.Metadata;
                 patientBar = new PageBar
@@ -847,6 +848,14 @@ public sealed class ReportsService
         }
 
         var measures = opened.Schedule.ReportTypes ?? [];
+        var highlights = ReportManifestRules.Highlights(populationRows);
+        var members = ReportManifestRules.PopulationPage(
+            patients,
+            query.Stage,
+            query.StageMeasure,
+            query.PopulationPage,
+            query.PageSize,
+            ReportManifestRules.StageTotal(highlights, query.StageMeasure, query.Stage));
         page.Manifest = ReportManifestRules.FromReport(
             new ReportManifestFacts
             {
@@ -857,13 +866,16 @@ public sealed class ReportsService
                 Contents = contents,
                 ContentsHeading = heading,
                 TotalLabel = totalLabel,
-                Populations = ReportManifestRules.Highlights(populationRows),
+                Populations = highlights,
                 PassedValidation = passedValidation,
                 FailedValidation = failedValidation,
                 PendingValidation = pendingValidation,
                 Patients = patients,
                 PatientPaging = patientBar,
-                PatientNote = patientNote
+                PatientNote = patientNote,
+                PopulationPatients = members.Page,
+                PopulationPaging = members.Bar,
+                PopulationNote = members.Note
             },
             query,
             path,

@@ -326,7 +326,95 @@ public class ReportManifestRulesTests
         view.Should().Contain("id = item.Id");
         view.Should().Contain("Patients by validation");
         view.Should().NotContain("maintainAspectRatio: true");
+        view.Should().Contain("id=\"manifest-populations\"");
     }
+
+    [Fact]
+    public void A_population_funnel_uses_the_initial_population_and_opens_its_patients()
+    {
+        var model = ReportManifestRules.SampleReport(Stage("numerator", "NHSN Acute Care Hospital")).Manifest!;
+
+        model.PopulationsOpen.Should().BeTrue();
+        model.Funnels.Should().ContainSingle();
+        model.Funnels[0].Rate.Should().Be("73.3%");
+        model.Funnels[0].Stages.Single(stage => stage.Key == "initial-population").Percent.Should().Be("100.0%");
+        model.Funnels[0].Stages.Single(stage => stage.Key == "denominator").Percent.Should().Be("83.3%");
+        model.Funnels[0].Stages.Single(stage => stage.Key == "denominator-exclusion").Percent.Should().Be("11.1%");
+        model.Funnels[0].Stages.Single(stage => stage.Key == "numerator").Percent.Should().Be("61.1%");
+        model.PopulationPaging.TotalCount.Should().Be(22);
+        model.PopulationNote.Should().BeNull();
+        model.PopulationPatients.Should().Contain(row => row.PatientId == "patient-04");
+        model.PopulationPatients.Should().NotContain(row => row.PatientId == "11111111-1111-1111-1111-111111111112");
+        model.Href(populationPage: 2, tab: "populations").Should().Contain("stage=numerator").And.Contain("popPage=2");
+
+        var initial = ReportManifestRules.SampleReport(Stage("initial-population", "NHSN Acute Care Hospital", page: 2)).Manifest!;
+        initial.PopulationPaging.TotalCount.Should().Be(36);
+        initial.PopulationPatients.Should().HaveCount(11);
+
+        ReportManifestRules.Normalize(null, null, null, null, null, 1, 25, 1, 25, 1, 25, 1, "status", "<b>", null, 0, "nope")
+            .Stage.Should().BeNull();
+    }
+
+    [Fact]
+    public void Measures_are_compared_largest_initial_population_first()
+    {
+        var highlights = ReportManifestRules.Highlights(
+        [
+            ("Narrow", "initial-population", 3),
+            ("Narrow", "denominator", 2),
+            ("Narrow", "numerator", 1),
+            ("Wide", "initial-population", 10),
+            ("Wide", "denominator", 8),
+            ("Wide", "numerator", 4)
+        ]);
+        var model = ReportManifestRules.FromReport(
+            new ReportManifestFacts { Populations = highlights },
+            Query(),
+            "/Reports/Manifest",
+            new Dictionary<string, string>());
+
+        model.PopulationComparison.Select(row => row.Measure).Should().Equal("Wide", "Narrow");
+        model.PopulationComparison[0].Rate.Should().Be("50.0%");
+        model.Funnels.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void A_run_shows_predicted_patients_against_the_upload()
+    {
+        var model = ReportManifestRules.SampleAutomation(Query(), "/Automation/manifest", bundlePath: null);
+
+        model.Prediction.Should().NotBeNull();
+        model.Prediction!.Predicted.Should().Be(20);
+        model.Prediction.NotPredicted.Should().Be(20);
+        model.Prediction.InActual.Should().Be(18);
+        model.Prediction.MissingFromActual.Should().Be(2);
+        model.Funnels.Should().BeEmpty();
+
+        var missing = ReportManifestRules.SampleAutomation(Stage("missing", page: 1, sort: "total"), "/Automation/manifest", bundlePath: null);
+        missing.PopulationPaging.TotalCount.Should().Be(2);
+        missing.PopulationPatients.Select(row => row.PatientId).Should().BeEquivalentTo(["patient-01", "patient-03"]);
+    }
+
+    [Fact]
+    public void A_page_that_is_not_the_whole_population_says_so()
+    {
+        var rows = new[]
+        {
+            new ManifestPatientRow
+            {
+                PatientId = "patient-04",
+                Membership = [new ManifestMembership { Measure = "NHSN", Key = "numerator" }]
+            }
+        };
+
+        var page = ReportManifestRules.PopulationPage(rows, "numerator", "NHSN", 1, 25, 22);
+
+        page.Page.Should().ContainSingle();
+        page.Note.Should().Contain("not every patient");
+    }
+
+    private static ReportManifestQuery Stage(string stage, string? measure = null, int page = 1, string sort = "status") =>
+        ReportManifestRules.Normalize(null, null, null, null, null, 1, 25, 1, 25, 1, 25, 1, sort, stage, measure, page, "populations");
 
     private static string ProjectRoot()
     {
