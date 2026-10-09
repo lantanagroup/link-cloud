@@ -3883,6 +3883,46 @@ tr.lu-kafka-problem > td:first-child {
   font-size: .8125rem;
   line-height: 1.5;
 }
+.lu-result {
+  padding: .4rem .7rem;
+}
+.lu-result > .lu-result-details > summary {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  cursor: pointer;
+  list-style: none;
+  min-height: 1.85rem;
+}
+.lu-result > .lu-result-details > summary::-webkit-details-marker {
+  display: none;
+}
+.lu-result > .lu-result-details > summary::before {
+  content: "";
+  width: .4rem;
+  height: .4rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  flex: 0 0 auto;
+  opacity: .7;
+}
+.lu-result > .lu-result-details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.lu-result-text {
+  font-weight: 650;
+  min-width: 0;
+}
+.lu-result-dismiss {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.lu-result-body {
+  margin-top: .65rem;
+  padding-top: .6rem;
+  border-top: 1px solid var(--au-border);
+}
 .lu-json-key { color: #9ec5ff; }
 .lu-json-string { color: #9be7b4; }
 .lu-json-number { color: #ffd56a; }

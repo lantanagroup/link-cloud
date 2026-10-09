@@ -282,9 +282,14 @@ else
         @if (Model.Plan is not null)
         {
             var plan = Model.Plan;
-            <div id="kafka-partition-result" class="alert @partitionTone mt-3" role="status" tabindex="-1" data-kafka-result data-result-key="@(plan.Accepted)-@plan.Topic-@plan.RequestedPartitions-@plan.Errors.Count">
-                <p class="mb-2"><span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span></p>
-                <p>@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This increase cannot run yet.")</p>
+            <div id="kafka-partition-result" class="alert @partitionTone mt-3 lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-partition" data-result-key="@(plan.Accepted)-@plan.Topic-@plan.RequestedPartitions-@plan.Errors.Count">
+                <details class="lu-result-details">
+                    <summary>
+                        <span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span>
+                        <span class="lu-result-text">@(plan.Accepted ? "Dry run accepted. Nothing has changed yet." : "This increase cannot run yet.")</span>
+                        <button type="button" class="btn btn-sm btn-warning lu-result-dismiss" aria-label="Dismiss result">Dismiss</button>
+                    </summary>
+                    <div class="lu-result-body">
                 <dl class="row mb-2">
                     <dt class="col-sm-4">Partitions</dt>
                     <dd class="col-sm-8">@plan.CurrentPartitions to @plan.RequestedPartitions</dd>
@@ -320,6 +325,8 @@ else
                         }
                     </details>
                 }
+                    </div>
+                </details>
             </div>
         }
         <div class="d-flex gap-2 mt-3">
