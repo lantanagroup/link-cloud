@@ -110,9 +110,9 @@ public class EhrPatientListModel
 
     /// <summary>
     /// The patients present on this EHR List. Response-only: it is populated solely by
-    /// GET /api/data/{facilityId}/fhirQueryList when includePatients=true, and is ignored on POST/PUT.
+    /// GET /api/data-acquisition/{facilityId}/fhirQueryList when includePatients=true, and is ignored on POST/PUT.
     /// </summary>
-    [Description("A list of patients. Only populated in the response of GET /api/data/{facilityId}/fhirQueryList when includePatients=true is passed.")]
+    [Description("A list of patients. Only populated in the response of GET /api/data-acquisition/{facilityId}/fhirQueryList when includePatients=true is passed.")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<EhrPatientListPatientModel>? Patients { get; set; }
 

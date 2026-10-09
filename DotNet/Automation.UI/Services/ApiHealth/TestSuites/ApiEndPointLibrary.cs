@@ -174,7 +174,7 @@ public static class ApiEndPointLibrary
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildDataAcquisitionMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data/info"),
+        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data-acquisition/info"),
         [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
     };
 

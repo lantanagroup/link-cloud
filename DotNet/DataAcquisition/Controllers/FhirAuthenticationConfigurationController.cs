@@ -152,7 +152,7 @@ public class FhirAuthenticationConfigurationController : ControllerBase
     /// Validates the facility id rather than repairing it. <c>SanitizeAndRemove</c> strips characters
     /// instead of failing, so "fac!ility@1" becomes "facility1" - on an endpoint that reads and
     /// overwrites credentials, that would serve or overwrite a different facility than the caller
-    /// named. See docs/other-vendor-oauth-configuration.md.
+    /// named. See dev-docs/other-vendor-oauth-configuration.md.
     /// </summary>
     private static string Validated(string? facilityId)
     {

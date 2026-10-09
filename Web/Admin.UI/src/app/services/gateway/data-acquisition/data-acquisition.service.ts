@@ -39,7 +39,7 @@ export class DataAcquisitionService {
   }
 
   getFhirQueryConfiguration(facilityId: string): Observable<IDataAcquisitionQueryConfigModel> {
-    return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryConfiguration`)
+    return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/fhirQueryConfiguration`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR query configuration.`)),
         catchError((error) => {
@@ -49,7 +49,7 @@ export class DataAcquisitionService {
   }
 
   createFhirQueryConfiguration(facilityId: string, fhirQueryConfig: IDataAcquisitionQueryConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryConfiguration`, fhirQueryConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhirQueryConfiguration`, fhirQueryConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -62,7 +62,7 @@ export class DataAcquisitionService {
   }
 
   updateFhirQueryConfiguration(facilityId: string, fhirQueryConfig: IDataAcquisitionQueryConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryConfiguration`, fhirQueryConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhirQueryConfiguration`, fhirQueryConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -75,7 +75,7 @@ export class DataAcquisitionService {
   }
 
   deleteFhirQueryConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryConfiguration`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/fhirQueryConfiguration`)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration deletion was sent.`)),
         catchError((error) => {
@@ -85,7 +85,7 @@ export class DataAcquisitionService {
   }
 
   getFhirListConfiguration(facilityId: string): Observable<IDataAcquisitionFhirListConfigModel> {
-    return this.http.get<IDataAcquisitionFhirListConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)
+    return this.http.get<IDataAcquisitionFhirListConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/fhirQueryList`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR list configuration.`)),
         catchError((error) => {
@@ -95,7 +95,7 @@ export class DataAcquisitionService {
   }
 
   getQueryPlanConfiguration(facilityId: string, type: string): Observable<IQueryPlanModel> {
-    return this.http.get<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan?type=${type}`)
+    return this.http.get<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/QueryPlan?type=${type}`)
       .pipe(
         tap(_ => console.log(`Fetched Query Plan configuration.`)),
         map((response: IQueryPlanModel) => {
@@ -109,7 +109,7 @@ export class DataAcquisitionService {
 
 
   createQueryPlanConfiguration(facilityId: string, queryPlan: IQueryPlanModel): Observable<IQueryPlanModel> {
-    return this.http.post<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`, queryPlan)
+    return this.http.post<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/QueryPlan`, queryPlan)
       .pipe(
         tap(_ => console.log(`Post Query Plan configuration.`)),
         map((response) => {
@@ -123,7 +123,7 @@ export class DataAcquisitionService {
   }
 
   updateQueryPlanConfiguration(facilityId: string, queryPlan: IQueryPlanModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`, queryPlan)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/QueryPlan`, queryPlan)
       .pipe(
         tap(_ => console.log(`Update Query Plan configuration.`)),
         map((response) => {
@@ -137,7 +137,7 @@ export class DataAcquisitionService {
   }
 
   deleteQueryPlanConfiguration(facilityId: string, type: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan?type=${type}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/QueryPlan?type=${type}`)
       .pipe(
         tap(_ => console.log(`Delete Query Plan configuration.`)),
         catchError((error) => {
@@ -147,7 +147,7 @@ export class DataAcquisitionService {
   }
 
   deleteAllQueryPlanConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan/All`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/QueryPlan/All`)
       .pipe(
         tap(_ => console.log(`Delete All Query Plan configuration.`)),
         catchError((error) => {
@@ -157,7 +157,7 @@ export class DataAcquisitionService {
   }
 
   createFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhirQueryList`, fhirListConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -171,7 +171,7 @@ export class DataAcquisitionService {
 
   //NOTE: currently no PUT endpoint for fhir list. Commenting this out for now.
   updateFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/fhirQueryList`, fhirListConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -184,7 +184,7 @@ export class DataAcquisitionService {
   }
 
   deleteFhirListConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/fhirQueryList`)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration deletion was sent.`)),
         catchError((error) => {
@@ -194,7 +194,7 @@ export class DataAcquisitionService {
   }
 
   getAuthenticationConfig(facilityId: string, queryConfigType: string) {
-    return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`)
+    return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/${queryConfigType}/authentication`)
       .pipe(
         tap(_ => console.log(`Fetched authentication configuration.`)),
         catchError((error) => {
@@ -204,7 +204,7 @@ export class DataAcquisitionService {
   }
 
   createAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
       .pipe(
         tap(_ => console.log(`Request for authentication configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -217,7 +217,7 @@ export class DataAcquisitionService {
   }
 
   updateAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
       .pipe(
         tap(_ => console.log(`Request for authentication configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -232,7 +232,7 @@ export class DataAcquisitionService {
   // SFTP Configuration Methods
 
   getSftpConfiguration(facilityId: string): Observable<ISftpConfigurationModel> {
-    return this.http.get<ISftpConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations`)
+    return this.http.get<ISftpConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations`)
       .pipe(
         tap(_ => console.log(`Fetched SFTP configuration.`)),
         catchError((error) => {
@@ -242,7 +242,7 @@ export class DataAcquisitionService {
   }
 
   createSftpConfiguration(facilityId: string, config: ICreateSftpConfigurationModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations`, config)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations`, config)
       .pipe(
         tap(_ => console.log(`Request for SFTP configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -255,7 +255,7 @@ export class DataAcquisitionService {
   }
 
   updateSftpConfiguration(facilityId: string, configId: string, config: ISftpConfigurationModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/${configId}`, config)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations/${configId}`, config)
       .pipe(
         tap(_ => console.log(`Request for SFTP configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -268,7 +268,7 @@ export class DataAcquisitionService {
   }
 
   deleteSftpConfiguration(facilityId: string, configId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/${configId}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations/${configId}`)
       .pipe(
         tap(_ => console.log(`Request for SFTP configuration deletion was sent.`)),
         catchError((error) => {
@@ -280,7 +280,7 @@ export class DataAcquisitionService {
   // SFTP Credentials Methods
 
   getSftpCredentialStatus(facilityId: string): Observable<ISftpCredentialStatusModel> {
-    return this.http.get<ISftpCredentialStatusModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/credentials/status`)
+    return this.http.get<ISftpCredentialStatusModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations/credentials/status`)
       .pipe(
         tap(_ => console.log(`Fetched SFTP credential status.`)),
         catchError((error) => {
@@ -290,7 +290,7 @@ export class DataAcquisitionService {
   }
 
   updateSftpCredentials(facilityId: string, credentials: ISftpCredentialsModel): Observable<void> {
-    return this.http.put<void>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/credentials`, credentials)
+    return this.http.put<void>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations/credentials`, credentials)
       .pipe(
         tap(_ => console.log(`Request for SFTP credentials update was sent.`)),
         catchError((error) => {
@@ -300,7 +300,7 @@ export class DataAcquisitionService {
   }
 
   deleteSftpCredentials(facilityId: string): Observable<void> {
-    return this.http.delete<void>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/credentials`)
+    return this.http.delete<void>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations/credentials`)
       .pipe(
         tap(_ => console.log(`Request for SFTP credentials deletion was sent.`)),
         catchError((error) => {
@@ -310,7 +310,7 @@ export class DataAcquisitionService {
   }
 
   testSftpConnection(facilityId: string): Observable<ISftpConnectionTestResult> {
-    return this.http.post<ISftpConnectionTestResult>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/sftp-configurations/test-connection`, {})
+    return this.http.post<ISftpConnectionTestResult>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/${facilityId}/sftp-configurations/test-connection`, {})
       .pipe(
         tap(_ => console.log(`SFTP connection test request was sent.`)),
         catchError((error) => {
@@ -337,7 +337,7 @@ export class DataAcquisitionService {
     sortBy?: string,
     sortOrder?: number
   ): Observable<IPagedOrganizationLocationMapping> {
-    const url = `${this.appConfigService.config?.baseApiUrl}/data/location-mappings/facility/${facilityId}/search`;
+    const url = `${this.appConfigService.config?.baseApiUrl}/data-acquisition/location-mappings/facility/${facilityId}/search`;
 
     let params = new HttpParams()
       .set('pageNumber', (pageNumber + 1).toString())
@@ -393,7 +393,7 @@ export class DataAcquisitionService {
     sortBy?: string,
     sortOrder?: number
   ): Observable<IPagedEncounterMapping> {
-    const url = `${this.appConfigService.config?.baseApiUrl}/data/encounter-mappings/facilities/${facilityId}/search`;
+    const url = `${this.appConfigService.config?.baseApiUrl}/data-acquisition/encounter-mappings/facilities/${facilityId}/search`;
 
     let params = new HttpParams()
       .set('pageNumber', (pageNumber + 1).toString())
@@ -429,7 +429,7 @@ export class DataAcquisitionService {
   // Fetches a single location mapping by its primary key. Used by the Encounters tab's
   // location-details dialog, reached via an encounter row's organizationLocationMappingId.
   getLocationMappingById(id: number): Observable<IOrganizationLocationMappingModel> {
-    const url = `${this.appConfigService.config?.baseApiUrl}/data/location-mappings/${id}`;
+    const url = `${this.appConfigService.config?.baseApiUrl}/data-acquisition/location-mappings/${id}`;
     return this.http.get<IOrganizationLocationMappingModel>(url)
       .pipe(
         catchError((error) => this.errorHandler.handleError(error, false))
@@ -439,7 +439,7 @@ export class DataAcquisitionService {
   // Reporting Organization (Location Config) Methods
 
   getLocationConfigurations(facilityId: string): Observable<IOrganizationLocationConfigurationModel[]> {
-    return this.http.get<IOrganizationLocationConfigurationModel[]>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/facility/${facilityId}`)
+    return this.http.get<IOrganizationLocationConfigurationModel[]>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/location-config/facility/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched location configurations.`)),
         catchError((error) => {
@@ -449,7 +449,7 @@ export class DataAcquisitionService {
   }
 
   createLocationConfiguration(facilityId: string, config: ICreateOrganizationLocationConfigurationModel): Observable<IOrganizationLocationConfigurationModel> {
-    return this.http.post<IOrganizationLocationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/facility/${facilityId}`, config)
+    return this.http.post<IOrganizationLocationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/location-config/facility/${facilityId}`, config)
       .pipe(
         tap(_ => console.log(`Request for location configuration creation was sent.`)),
         map((response: IOrganizationLocationConfigurationModel) => {
@@ -463,7 +463,7 @@ export class DataAcquisitionService {
   }
 
   updateLocationConfiguration(configId: number, config: IUpdateOrganizationLocationConfigurationModel): Observable<IOrganizationLocationConfigurationModel> {
-    return this.http.put<IOrganizationLocationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/${configId}`, config)
+    return this.http.put<IOrganizationLocationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/location-config/${configId}`, config)
       .pipe(
         tap(_ => console.log(`Request for location configuration update was sent.`)),
         map((response: IOrganizationLocationConfigurationModel) => {
@@ -477,7 +477,7 @@ export class DataAcquisitionService {
   }
 
   deleteLocationConfiguration(configId: number): Observable<any> {
-    return this.http.delete<any>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/${configId}`)
+    return this.http.delete<any>(`${this.appConfigService.config?.baseApiUrl}/data-acquisition/location-config/${configId}`)
       .pipe(
         tap(_ => console.log(`Request for location configuration deletion was sent.`)),
         catchError((error) => {

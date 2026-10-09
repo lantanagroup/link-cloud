@@ -118,7 +118,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{link-admin-bff-base}}/api/data/{{facilityId}}/QueryPlan",
+            "url": "{{link-admin-bff-base}}/api/data-acquisition/{{facilityId}}/QueryPlan",
             "description": "INITIAL: Encounter (Parameter) + Condition (Parameter, depends on Encounter ids) + Location (Reference). SUPPLEMENTAL: a throwaway Observation (validator requires >=1). Parameter queries must precede Reference queries.",
             "body": {
               "mode": "raw",
@@ -141,7 +141,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{link-admin-bff-base}}/api/data/fhirQueryConfiguration",
+            "url": "{{link-admin-bff-base}}/api/data-acquisition/fhirQueryConfiguration",
             "description": "Points the facility at fhir-server:8080 and turns on EnableLocationResolutionMapping so encounter Locations are resolved and evaluated against the org-location conditions.",
             "body": {
               "mode": "raw",
@@ -169,7 +169,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{link-admin-bff-base}}/api/data/location-config/facility/{{facilityId}}",
+            "url": "{{link-admin-bff-base}}/api/data-acquisition/location-config/facility/{{facilityId}}",
             "description": "Active org-location config. FhirPath: a Location is an org location when its identifier (system 'http://hospital.example.org/locations') value is hosp-a or hosp-b. Children inherit org status through partOf.",
             "body": {
               "mode": "raw",
@@ -248,7 +248,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{link-admin-bff-base}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-a",
+            "url": "{{link-admin-bff-base}}/api/data-acquisition/encounter-mappings/facilities/{{facilityId}}/patients/patient-a",
             "description": "Encounter at org location hosp-a -> mappedToOrg true."
           },
           "event": [
@@ -271,7 +271,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{link-admin-bff-base}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-b",
+            "url": "{{link-admin-bff-base}}/api/data-acquisition/encounter-mappings/facilities/{{facilityId}}/patients/patient-b",
             "description": "Encounter at org location hosp-b -> mappedToOrg true."
           },
           "event": [
@@ -294,7 +294,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{link-admin-bff-base}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-c",
+            "url": "{{link-admin-bff-base}}/api/data-acquisition/encounter-mappings/facilities/{{facilityId}}/patients/patient-c",
             "description": "Encounter at non-org location hosp-c -> mappedToOrg false."
           },
           "event": [
@@ -317,7 +317,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{link-admin-bff-base}}/api/data/acquisition-logs/facility/{{facilityId}}/patient/patient-c",
+            "url": "{{link-admin-bff-base}}/api/data-acquisition/acquisition-logs/facility/{{facilityId}}/patient/patient-c",
             "description": "Non-org patient: dependent Condition log is preempted (NotReportable)."
           },
           "event": [

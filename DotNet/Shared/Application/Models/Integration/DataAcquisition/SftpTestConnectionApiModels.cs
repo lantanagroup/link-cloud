@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
-// Wire models for POST api/data/sftp-configurations/test-connection. They mirror the Data Acquisition
+// Wire models for POST api/data-acquisition/sftp-configurations/test-connection. They mirror the Data Acquisition
 // models of the same shape (SftpTestConnectionRequestModel and friends) by hand, so keep the two in step.
 
 /// <summary>

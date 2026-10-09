@@ -15,7 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 
-[Route("api/data/sftp-logs")]
+[Route("api/data-acquisition/sftp-logs")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class SftpLogController : ControllerBase
@@ -172,7 +172,7 @@ public class SftpLogController : ControllerBase
 
             var createdLog = await _manager.CreateAsync(model, cancellationToken);
 
-            return Created($"/api/data/sftp-logs/{createdLog.ExternalId}", createdLog);
+            return CreatedAtAction(nameof(GetSftpLogByExternalId), new { logId = createdLog.ExternalId }, createdLog);
 
         }
         catch (MissingFacilityIdException ex)
