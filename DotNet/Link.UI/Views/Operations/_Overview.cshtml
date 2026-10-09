@@ -4,9 +4,17 @@
     var cluster = Model.Cluster;
     var controllerTile = KafkaControllerTile.Display(cluster.ControllerId, cluster.ControllerUnavailableReason);
     var origin = ReturnUrlRules.Here(Context.Request);
-    var topicProblems = Model.TopicRows.Where(KafkaAttention.Topic).ToList();
-    var groupProblems = Model.Groups.Groups.Where(KafkaAttention.Group).ToList();
+    var topicHot = Model.TopicRows
+        .Where(KafkaAttention.Topic)
+        .OrderByDescending(row => row.LagKnown ? row.TotalLag : long.MaxValue)
+        .ThenBy(row => row.Topic, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    var topicProblems = topicHot.Take(KafkaWindows.HottestCap).ToList();
+    var groupWindow = KafkaWindows.Groups(Model.Groups.Groups, query.PartPage, query.PageSize);
+    var groupProblems = groupWindow.HottestRows;
     var rightsDenied = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions == false);
+    var rightsUnknown = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions is null);
+    var rightsWindow = KafkaWindows.DeniedRights(Model.Capabilities.Topics, query.PartPage, query.PageSize);
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
 
@@ -25,7 +33,7 @@
 @if (topicProblems.Count > 0)
 {
     <div class="au-card card mt-3">
-        <div class="card-header">Topics that need attention (@topicProblems.Count)</div>
+        <div class="card-header">Topics that need attention (@topicHot.Count)</div>
         <div class="card-body">
             <p>These topics on this page are behind, uneven, or blocked. Open one to see placement, or migrate when an in-place increase is the wrong tool.</p>
             <div class="table-responsive">
@@ -57,6 +65,10 @@
                     </tbody>
                 </table>
             </div>
+            @if (topicHot.Count > topicProblems.Count)
+            {
+                <p class="text-muted mt-2 mb-0">@topicProblems.Count of @topicHot.Count shown. The rest are in the topic table on this page.</p>
+            }
         </div>
     </div>
 }
@@ -123,22 +135,24 @@ else if (Model.TopicRows.Count > 0)
         <p class="text-muted mb-0 mt-2">No topics match this search.</p>
     }
 </details>
-<p class="text-muted mt-2 mb-0">@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.</p>
-<div class="d-flex gap-2 mt-2">
-    @if (query.Page > 1)
-    {
-        <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
-    }
-    @if (query.Page < Model.TopicPages)
-    {
-        <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
-    }
+<div class="lu-kafka-pager">
+    <span>@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.</span>
+    <span class="d-flex gap-2">
+        @if (query.Page > 1)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
+        }
+        @if (query.Page < Model.TopicPages)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
+        }
+    </span>
 </div>
 
 @if (groupProblems.Count > 0)
 {
     <div class="au-card card mt-3">
-        <div class="card-header">Groups that need attention (@groupProblems.Count)</div>
+        <div class="card-header">Groups that need attention (@groupWindow.Hot)</div>
         <div class="card-body">
             <p>Open a group to preview a replica change. The preview changes nothing.</p>
             <div class="table-responsive">
@@ -166,16 +180,20 @@ else if (Model.TopicRows.Count > 0)
                     </tbody>
                 </table>
             </div>
+            @if (groupWindow.CapNote.Length > 0)
+            {
+                <p class="text-muted mt-2 mb-0">@groupWindow.CapNote</p>
+            }
         </div>
     </div>
 }
-else if (Model.Groups.Groups.Count > 0)
+else if (groupWindow.Total > 0)
 {
     <p class="mt-3 mb-0">No group needs attention.</p>
 }
 
 <details class="lu-kafka-fold">
-    <summary>Full group table (@Model.Groups.Groups.Count)</summary>
+    <summary>Groups (@groupWindow.Rows.Count of @groupWindow.Total, worst first)</summary>
     <div class="table-responsive mt-3">
         <table class="table table-sm mb-0">
             <thead>
@@ -188,7 +206,7 @@ else if (Model.Groups.Groups.Count > 0)
                 </tr>
             </thead>
             <tbody>
-            @foreach (var row in Model.Groups.Groups.OrderBy(item => item.GroupId, StringComparer.OrdinalIgnoreCase))
+            @foreach (var row in groupWindow.Rows)
             {
                 <tr class="@(KafkaAttention.Group(row) ? "lu-kafka-problem" : null)">
                     <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
@@ -203,6 +221,8 @@ else if (Model.Groups.Groups.Count > 0)
             </tbody>
         </table>
     </div>
+    <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(groupWindow.Page, groupWindow.Pages, "Worst first.", groupWindow.Page > 1 ? query.Href(part: groupWindow.Page - 1) : "", groupWindow.Page < groupWindow.Pages ? query.Href(part: groupWindow.Page + 1) : ""))" />
+    <p class="mt-2 mb-0"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, page: 1)">Open the group list</a></p>
 </details>
 
 <h2 class="h5 mt-4">Produce rate and lag</h2>
@@ -217,27 +237,48 @@ else if (Model.Groups.Groups.Count > 0)
         {
             <p class="text-muted">@Model.Capabilities.Error</p>
         }
-        <p>Alter is what an in-place partition increase needs. Unknown means the client did not report the right.</p>
-        <div class="table-responsive">
-            <table class="table table-sm mb-0">
-                <thead>
-                    <tr>
-                        <th>Topic</th>
-                        <th>Can alter partitions</th>
-                        <th>Authorized operations</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var right in Model.Capabilities.Topics.OrderBy(item => item.Topic, StringComparer.Ordinal))
-                {
-                    <tr class="@(right.CanAlterPartitions == false ? "lu-kafka-problem" : null)">
-                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = right.Topic, Compact = true, CopyLabel = "Copy topic" })" /></td>
-                        <td>@(right.CanAlterPartitions is null ? "Unknown" : right.CanAlterPartitions.Value ? "Yes" : "No")</td>
-                        <td>@(right.AuthorizedOperations.Count == 0 ? (right.Error ?? "None reported") : string.Join(", ", right.AuthorizedOperations))</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
+        <p>Alter is what an in-place partition increase needs. Unknown means the client did not report the right. This list is only the topics that cannot alter partitions.</p>
+        @if (Model.Capabilities.Topics.Count == 0)
+        {
+            <p class="mb-0">No topic rights were reported.</p>
+        }
+        else if (rightsWindow.Total == 0)
+        {
+            <p class="mb-0">Every reported topic can alter partitions.</p>
+        }
+        else if (rightsWindow.Rows.Count == 0)
+        {
+            <p class="mb-0">No denied topic on this page.</p>
+        }
+        else
+        {
+            <p>Showing @rightsWindow.Rows.Count of @rightsDenied that cannot alter partitions.</p>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Topic</th>
+                            <th>Can alter partitions</th>
+                            <th>Authorized operations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var right in rightsWindow.Rows)
+                    {
+                        <tr class="lu-kafka-problem">
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = right.Topic, Compact = true, CopyLabel = "Copy topic" })" /></td>
+                            <td>No</td>
+                            <td>@(right.AuthorizedOperations.Count == 0 ? (right.Error ?? "None reported") : string.Join(", ", right.AuthorizedOperations.Take(8)))</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(rightsWindow.Page, rightsWindow.Pages, "Alphabetical.", rightsWindow.Page > 1 ? query.Href(part: rightsWindow.Page - 1) : "", rightsWindow.Page < rightsWindow.Pages ? query.Href(part: rightsWindow.Page + 1) : ""))" />
+        }
+        @if (rightsUnknown > 0)
+        {
+            <p class="text-muted mb-0">@rightsUnknown topics did not report the alter right. They stay off this list.</p>
+        }
     </div>
 </details>

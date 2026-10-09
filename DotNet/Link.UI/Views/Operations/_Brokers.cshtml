@@ -4,7 +4,8 @@
     var origin = ReturnUrlRules.Here(Context.Request);
     var selected = Model.SelectedBroker;
     var showLogDirs = KafkaLogDirs.Show(Model.Cluster);
-    var brokerProblems = Model.BrokerRows.Where(KafkaAttention.Broker).ToList();
+    var brokerHot = Model.BrokerRows.Where(KafkaAttention.Broker).OrderBy(row => row.Id).ToList();
+    var brokerProblems = brokerHot.Take(KafkaWindows.HottestCap).ToList();
     var brokerStep = 1;
     if (Model.MovePlan is not null && Model.MovePlan.Accepted)
         brokerStep = 4;
@@ -18,7 +19,7 @@
 
 <h2 class="h5 mt-3">Brokers</h2>
 <p>Add a broker, or open one to preview a move. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions.</p>
-<ol>
+<ol class="lu-kafka-steps">
     <li>Choose a broker, or register a new one. A rebalance onto a new broker is a separate request.</li>
     <li>Preview a decommission or a rebalance.</li>
     <li>Review the result. A refusal lists each reason. If no moves were planned, the result says so.</li>
@@ -43,7 +44,7 @@
 @if (brokerProblems.Count > 0)
 {
     <div class="au-card card mt-3">
-        <div class="card-header">Brokers that need attention (@brokerProblems.Count)</div>
+        <div class="card-header">Brokers that need attention (@brokerHot.Count)</div>
         <div class="card-body">
             <p>A broker is listed here when it is not up.</p>
             <div class="table-responsive">
@@ -71,6 +72,10 @@
                     </tbody>
                 </table>
             </div>
+            @if (brokerHot.Count > brokerProblems.Count)
+            {
+                <p class="text-muted mt-2 mb-0">@brokerProblems.Count of @brokerHot.Count shown. The rest are in the broker table on this page.</p>
+            }
         </div>
     </div>
 }
@@ -125,6 +130,19 @@ else if (Model.BrokerRows.Count > 0)
         <p class="text-muted mb-0 mt-2">No brokers match this search.</p>
     }
 </details>
+<div class="lu-kafka-pager">
+    <span>@Model.BrokerCount brokers. Page @query.Page of @Model.BrokerPages.</span>
+    <span class="d-flex gap-2">
+        @if (query.Page > 1)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page - 1)">Previous</a>
+        }
+        @if (query.Page < Model.BrokerPages)
+        {
+            <a class="btn btn-sm btn-au-link" href="@query.Href(page: query.Page + 1)">Next</a>
+        }
+    </span>
+</div>
 
 <div class="au-card card mt-3">
     <div class="card-header">Add a broker</div>
