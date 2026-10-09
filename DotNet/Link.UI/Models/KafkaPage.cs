@@ -39,6 +39,11 @@ public sealed record ThroughputKafkaPageQuery
     public string BrowseHeaderName { get; init; } = "";
     public string BrowseHeaderValue { get; init; } = "";
     public string OpenRecord { get; init; } = "";
+    public int Rf { get; init; }
+    public int RfPage { get; init; } = 1;
+    public int RfSize { get; init; } = 25;
+    public string RfQ { get; init; } = "";
+    public long RfThrottle { get; init; }
 
     public static ThroughputKafkaPageQuery From(IQueryCollection query, string? returnUrl)
     {
@@ -72,6 +77,21 @@ public sealed record ThroughputKafkaPageQuery
         var limit = 25;
         if (int.TryParse(One(query, "limit"), out var parsedLimit))
             limit = parsedLimit;
+        var rf = int.TryParse(One(query, "rf"), out var rfValue) ? rfValue : 0;
+        if (rf is < 0 or > 64)
+            rf = 0;
+        var rfPage = int.TryParse(One(query, "rfPage"), out var rfPageValue) ? rfPageValue : 1;
+        if (rfPage < 1)
+            rfPage = 1;
+        var rfSize = int.TryParse(One(query, "rfSize"), out var rfSizeValue) ? rfSizeValue : 25;
+        if (rfSize is not (10 or 25 or 50))
+            rfSize = 25;
+        var rfQuery = One(query, "rfQ").SanitizeAndRemove();
+        if (rfQuery.Length > 40)
+            rfQuery = rfQuery[..40];
+        var rfThrottle = long.TryParse(One(query, "rfThrottle"), out var throttleValue) ? throttleValue : 0;
+        if (rfThrottle < 0 || rfThrottle > ReplicationFactorRules.MaxThrottle)
+            rfThrottle = 0;
 
         return new ThroughputKafkaPageQuery
         {
@@ -98,9 +118,22 @@ public sealed record ThroughputKafkaPageQuery
             BrowseKey = Clip(One(query, "key").SanitizeAndRemove()),
             BrowseHeaderName = Clip(One(query, "headerName").SanitizeAndRemove()),
             BrowseHeaderValue = Clip(One(query, "headerValue").SanitizeAndRemove()),
-            OpenRecord = Record(One(query, "record"))
+            OpenRecord = Record(One(query, "record")),
+            Rf = rf,
+            RfPage = rfPage,
+            RfSize = rfSize,
+            RfQ = rfQuery,
+            RfThrottle = rfThrottle
         };
     }
+
+    public ThroughputKafkaPageQuery WithReplication(int? page = null, int? size = null, string? search = null) =>
+        this with
+        {
+            RfPage = page is > 0 ? page.Value : RfPage,
+            RfSize = size is 10 or 25 or 50 ? size.Value : RfSize,
+            RfQ = search ?? RfQ
+        };
 
     public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null)
     {
@@ -131,6 +164,19 @@ public sealed record ThroughputKafkaPageQuery
         };
         if (partPage > 1)
             values["part"] = partPage.ToString();
+        var rf = changed ? 0 : Rf;
+        if (rf > 0 && chosenView == Topic)
+        {
+            values["rf"] = rf.ToString();
+            if (RfPage > 1)
+                values["rfPage"] = RfPage.ToString();
+            if (RfSize is 10 or 50)
+                values["rfSize"] = RfSize.ToString();
+            if (RfQ.Length > 0)
+                values["rfQ"] = RfQ;
+            if (RfThrottle > 0)
+                values["rfThrottle"] = RfThrottle.ToString();
+        }
         if (chosenView == Messages)
         {
             values["mode"] = BrowseMode;
@@ -246,6 +292,7 @@ public sealed record ThroughputKafkaPage
     public PartitionPlan? Plan { get; init; }
     public ReplicaScalePlan? ScalePlan { get; init; }
     public BrokerMovePlan? MovePlan { get; init; }
+    public ReplicationFactorPlan? ReplicationPlan { get; init; }
     public ChangeRequestRecord? Request { get; init; }
     public string? Message { get; init; }
     public string? Error { get; init; }

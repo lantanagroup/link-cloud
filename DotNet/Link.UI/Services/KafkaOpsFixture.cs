@@ -6,6 +6,8 @@ namespace Link.UI.Services;
 /// <summary>
 /// Recorded operations responses for the Kafka page when no broker is attached.
 /// LinkUi:KafkaOpsFixture turns it on. Replica and broker changes stay disabled.
+/// A replication-factor change is a partition reassignment, so a safe plan is applied here:
+/// throttle, reassignment, ISR, then the throttle is cleared.
 /// </summary>
 public sealed class KafkaOpsFixture
 {
@@ -266,6 +268,123 @@ public sealed class KafkaOpsFixture
             CorrelationId = correlationId,
             CreatedUtc = DateTimeOffset.UtcNow
         });
+    }
+
+    public KafkaOpsCall<ReplicationFactorPlan> PlanReplicationFactor(string topic, int target, long throttle, string? search, int page, int pageSize)
+    {
+        lock (_gate)
+            return PlanReplicationFactorUnlocked(topic, target, throttle, search, page, pageSize);
+    }
+
+    public KafkaOpsCall<ChangeRequestRecord> CreateReplicationFactor(string topic, int target, long throttle, string reason, string? confirmation, string correlationId)
+    {
+        if (!string.Equals((confirmation ?? "").Trim(), topic, StringComparison.Ordinal))
+            return Fail<ChangeRequestRecord>("Type the topic name to confirm. The replication factor changes only after the request.");
+        if (string.IsNullOrWhiteSpace(reason))
+            return Fail<ChangeRequestRecord>("A reason is required.");
+        lock (_gate)
+        {
+            if (_document.Topics.ReadOnly)
+                return Fail<ChangeRequestRecord>("Kafka changes are read-only in this environment.");
+
+            var evaluation = EvaluateReplication(topic, target, throttle, "", 1, 25);
+            if (!evaluation.Plan.Accepted)
+                return Fail<ChangeRequestRecord>(evaluation.Plan.Summary);
+
+            foreach (var row in evaluation.Assignments)
+            {
+                var placement = _document.Cluster.Placements.FirstOrDefault(item =>
+                    string.Equals(item.Topic, topic, StringComparison.Ordinal) && item.Partition == row.Partition);
+                if (placement is null)
+                    continue;
+                placement.Leader = row.Leader;
+                placement.Replicas = row.After.ToList();
+                placement.Isr = row.After.ToList();
+            }
+
+            var topicRow = FindTopic(topic);
+            if (topicRow is not null)
+                topicRow.ReplicationFactor = target;
+
+            var steps = ReplicationFactorRules.CompletedSteps(evaluation.Plan.ThrottleBytesPerSecond, evaluation.Plan.PartitionCount).ToList();
+            var now = DateTimeOffset.UtcNow;
+            return Store(new ChangeRequestRecord
+            {
+                Id = Guid.NewGuid(),
+                Kind = "ReplicationFactor",
+                Topic = topic,
+                Family = topicRow?.Family ?? topic,
+                BeforeReplicationFactor = evaluation.Plan.CurrentFactor,
+                TargetReplicationFactor = target,
+                ThrottleBytesPerSecond = evaluation.Plan.ThrottleBytesPerSecond,
+                ThrottleCleared = true,
+                BeforePartitions = topicRow?.Partitions ?? evaluation.Plan.PartitionCount,
+                RequestedPartitions = topicRow?.Partitions ?? evaluation.Plan.PartitionCount,
+                Reason = reason.Trim(),
+                Requester = "anonymous",
+                Status = "Done",
+                DryRunSummary = evaluation.Plan.Summary,
+                Progress = "Throttle cleared. Every replica is in the ISR.",
+                Steps = steps,
+                CorrelationId = correlationId,
+                CreatedUtc = now,
+                ExecutedUtc = now,
+                ConvergedUtc = now,
+                ClosedUtc = now
+            });
+        }
+    }
+
+    private KafkaOpsCall<ReplicationFactorPlan> PlanReplicationFactorUnlocked(string topic, int target, long throttle, string? search, int page, int pageSize)
+    {
+        var evaluation = EvaluateReplication(topic, target, throttle, search, page, pageSize);
+        return evaluation.Plan.Accepted ? Ok(evaluation.Plan) : Bad(evaluation.Plan);
+    }
+
+    private ReplicationFactorEvaluation EvaluateReplication(string topic, int target, long throttle, string? search, int page, int pageSize)
+    {
+        var row = FindTopic(topic);
+        var minIsr = 1;
+        var configured = false;
+        if (row is not null && row.Configs.TryGetValue("min.insync.replicas", out var raw))
+        {
+            configured = true;
+            if (int.TryParse(raw, out var parsed) && parsed > 0)
+                minIsr = parsed;
+        }
+
+        if (row is null)
+        {
+            var missing = new ReplicationFactorPlan
+            {
+                Topic = topic,
+                TargetFactor = target,
+                ThrottleBytesPerSecond = throttle
+            };
+            missing.Errors.Add("The topic is not in the catalog.");
+            missing.Summary = missing.Errors[0];
+            return new ReplicationFactorEvaluation { Plan = missing };
+        }
+
+        if (configured && minIsr == 1 && row.Configs.TryGetValue("min.insync.replicas", out var text) && !int.TryParse(text, out _))
+        {
+            var invalid = new ReplicationFactorPlan { Topic = topic, TargetFactor = target };
+            invalid.Errors.Add("min.insync.replicas is not a number.");
+            invalid.Summary = invalid.Errors[0];
+            return new ReplicationFactorEvaluation { Plan = invalid };
+        }
+
+        return ReplicationFactorRules.Evaluate(
+            topic,
+            target,
+            throttle,
+            minIsr,
+            configured,
+            _document.Cluster.Brokers,
+            _document.Cluster.Placements,
+            search,
+            page,
+            pageSize);
     }
 
     public KafkaOpsCall<ReplicaScalePlan> PlanScale(string groupId, int replicas)
@@ -654,6 +773,7 @@ public sealed class KafkaOpsFixture
             PartitionPlan plan => plan.Summary,
             ReplicaScalePlan plan => plan.Summary,
             BrokerMovePlan plan => plan.Summary,
+            ReplicationFactorPlan plan => plan.Summary,
             _ => "The dry run was refused."
         }
     };
