@@ -15,22 +15,26 @@
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
 
-<h2 class="h5 mt-3">Consumer replicas</h2>
-<p>A replica is a member of a consumer group. Add or remove members only after a preview. A count above the partition ceiling is refused, because the extra member would sit idle.</p>
-<ol class="lu-kafka-steps">
+<section class="card au-card mt-3 mb-3">
+<h2 class="card-header h6 mb-0">Consumer replicas</h2>
+<div class="card-body">
+<p class="mb-2">A replica is a member of a consumer group. Add or remove members only after a preview. A count above the partition ceiling is refused, because the extra member would sit idle.</p>
+<ol class="lu-kafka-steps mb-2">
     <li>Choose the group. Groups that are behind or unowned are listed first.</li>
     <li>Read lag and members. Committed partitions are one page, worst first.</li>
     <li>Preview an add or a remove. Nothing changes.</li>
     <li>Review the result. A refusal lists each reason.</li>
     <li>Submit the add or the remove. The reason is required.</li>
 </ol>
-<p class="mb-2">
+<p class="mb-0">
     <span class="badge @StatusPills.ForWizardStep(consumerStep, 1)">1 Choose a group</span>
     <span class="badge @StatusPills.ForWizardStep(consumerStep, 2)">2 Read lag</span>
     <span class="badge @StatusPills.ForWizardStep(consumerStep, 3)">3 Preview</span>
     <span class="badge @StatusPills.ForWizardStep(consumerStep, 4)">4 Review</span>
     <span class="badge @StatusPills.ForWizardStep(consumerStep, 5)">5 Submit</span>
 </p>
+</div>
+</section>
 
 @if (!Model.Infra.Enabled)
 {
