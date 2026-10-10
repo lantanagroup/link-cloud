@@ -2,11 +2,23 @@
 @using System.Text.Encodings.Web
 @using System.Text.Json
 @{
-    var measures = Model.Measures.Take(ReportManifestModel.ChartCap).ToList();
     var jsonOptions = new JsonSerializerOptions { Encoder = JavaScriptEncoder.Default };
-    var chartTypes = JsonSerializer.Serialize(Model.ChartTypes.Select(row => new { row.Name, row.Total }), jsonOptions);
     var chartPatients = JsonSerializer.Serialize(Model.ChartPatients.Select(row => new { row.PatientId, row.Total }), jsonOptions);
-    var statusChart = JsonSerializer.Serialize(Model.StatusChart.Select(row => new { row.Name, row.Total }), jsonOptions);
+    var donutRows = Model.ChartTypes.ToList();
+    var donutShown = donutRows.Sum(row => (long)row.Total);
+    var donutOther = string.IsNullOrWhiteSpace(Model.Query.TypeQuery) && Model.TotalResourceCount > donutShown
+        ? (int)(Model.TotalResourceCount - donutShown)
+        : 0;
+    if (donutOther > 0)
+        donutRows.Add(new ManifestCountRow { Name = "Other", Primary = donutOther, Total = donutOther });
+    var donutTotal = donutRows.Sum(row => row.Total);
+    var donutColors = new List<string>(ReportManifestRules.DonutColors);
+    if (donutOther > 0)
+        donutColors.Add(ReportManifestRules.DonutOtherColor);
+    var donutGradient = ReportManifestRules.DonutGradient(donutRows.Select(row => row.Total).ToList(), donutColors);
+    var donutCenter = Model.ContentsAreStatus ? "patients" : "resources";
+    string SliceColor(int index) => donutColors[Math.Min(index, Math.Max(0, donutColors.Count - 1))];
+    string SlicePercent(int value) => donutTotal <= 0 ? "0%" : (value * 100.0 / donutTotal).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
     var detailRows = Model.Patients.ToList();
     foreach (var extra in Model.PopulationPatients)
     {
@@ -48,94 +60,6 @@
     string Count(int value) => value.ToString("N0");
 }
 
-@if (!string.IsNullOrWhiteSpace(Model.Notice))
-{
-    <div class="alert au-note">@Model.Notice</div>
-}
-<p class="mb-3">@Model.Lead</p>
-@if (Model.ShowGeneration && Model.TemplateVersion is > 0)
-{
-    if (Model.TemplateStale)
-    {
-        <div class="alert alert-warning">This run used generation templates v@(Model.TemplateVersion). The latest for this scenario is v@(Model.LatestTemplateVersion). A download replays the templates stored for this run.</div>
-    }
-    else
-    {
-        <div class="alert au-note">Patient bundles are replayed from generation templates v@(Model.TemplateVersion).</div>
-    }
-}
-
-<div class="row g-3 mb-3">
-    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PatientCount)</div><div class="au-stat-label">Patients</div></div></div>
-    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.TotalResourceCount)</div><div class="au-stat-label">@Model.TotalLabel</div></div></div>
-    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PatientResourceCount)</div><div class="au-stat-label">@Model.PatientResourceLabel @if (ReportManifestRules.PopulationHelp(Model.PatientResourceLabel) is string populationHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + Model.PatientResourceLabel, Text = populationHelp })" /> }</div></div></div>
-    @if (Model.ShowShared)
-    {
-        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.SharedResourceCount)</div><div class="au-stat-label">Shared</div></div></div>
-    }
-    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.TypeCount)</div><div class="au-stat-label">@Model.TypeHeading</div></div></div>
-    @if (Model.ShowValidation)
-    {
-        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PassedValidation ?? 0)</div><div class="au-stat-label">Passed validation</div></div></div>
-        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.FailedValidation ?? 0)</div><div class="au-stat-label">Failed validation</div></div></div>
-        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(Model.PendingValidation ?? 0)</div><div class="au-stat-label">Pending validation</div></div></div>
-    }
-</div>
-<p class="small text-muted">@Model.EligibilityText @(string.IsNullOrWhiteSpace(Model.HottestName) ? "" : "Largest is " + Model.HottestName + ", " + Count(Model.HottestCount) + ".")</p>
-@if (populationCards.Count > 0)
-{
-    <div class="row g-3 mb-3">
-        @foreach (var highlight in populationCards)
-        {
-            <div class="col-lg-6">
-                <section class="card au-card mb-0 h-100">
-                    <h3 class="card-header h6 mb-0"><a class="text-white" href="@Model.Href(tab: "populations", clearStage: true)">@highlight.Measure</a></h3>
-                    <div class="card-body">
-                        <div class="row g-2">
-                            @if (highlight.InitialPopulation is int initialPopulation)
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(initialPopulation)</div><div class="au-stat-label">Initial Population <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Initial Population")" aria-label="About Initial Population"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
-                            }
-                            @if (highlight.Denominator is int denominator)
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominator)</div><div class="au-stat-label">Denominator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator")" aria-label="About Denominator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
-                            }
-                            @if (highlight.DenominatorExclusion is int denominatorExclusion)
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorExclusion)</div><div class="au-stat-label">Denominator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exclusion")" aria-label="About Denominator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
-                            }
-                            @if (highlight.DenominatorException is int denominatorException)
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorException)</div><div class="au-stat-label">Denominator Exception <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exception")" aria-label="About Denominator Exception"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
-                            }
-                            @if (highlight.Numerator is int numerator)
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numerator)</div><div class="au-stat-label">Numerator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator")" aria-label="About Numerator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
-                            }
-                            @if (highlight.NumeratorExclusion is int numeratorExclusion)
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numeratorExclusion)</div><div class="au-stat-label">Numerator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator Exclusion")" aria-label="About Numerator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(highlight.Rate))
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@highlight.Rate</div><div class="au-stat-label">Rate <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Rate")" aria-label="About Rate"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
-                            }
-                            @foreach (var other in highlight.Other)
-                            {
-                                <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(other.Total)</div><div class="au-stat-label">@other.Name</div></div></div>
-                            }
-                        </div>
-                    </div>
-                </section>
-            </div>
-        }
-    </div>
-    @if (Model.Populations.Count > populationCards.Count)
-    {
-        <p class="small text-muted">@populationCards.Count of @Model.Populations.Count measures shown.</p>
-    }
-}
-
 <ul class="lu-section-nav" role="tablist">
     <li><button class="@(overviewOpen ? "active" : null)" data-manifest-tab="#manifest-overview" type="button">Overview</button></li>
     <li><button class="@(patientsOpen ? "active" : null)" data-manifest-tab="#manifest-patients" type="button">Patients <span class="text-muted ms-1">@Count(Model.PatientCount)</span></button></li>
@@ -148,134 +72,208 @@
 
 <div class="tab-content">
     <div class="tab-pane fade @(overviewOpen ? "show active" : null)" id="manifest-overview">
-        <div class="row g-3">
-            <div class="col-lg-5">
-                <div class="au-card">
-                    <div class="card-header">Measures <span class="text-muted">@Model.MeasureCount</span></div>
-                    <div class="card-body">
-                        @if (measures.Count == 0)
+        @if (Model.ShowGeneration && Model.TemplateStale)
+        {
+            <div class="alert alert-warning">This run used generation templates v@(Model.TemplateVersion). The latest for this scenario is v@(Model.LatestTemplateVersion). A download replays the templates stored for this run.</div>
+        }
+        @if (populationCards.Count == 0 && Model.Measures.Count > 0)
+        {
+            <section class="card au-card">
+                <h3 class="card-header h6 mb-0">Measures</h3>
+                <div class="card-body">
+                    <ul class="lu-measure-list mb-0">
+                        @foreach (var measure in Model.Measures.Take(ReportManifestModel.ChartCap))
                         {
-                            <p class="mb-0 text-muted">No measures recorded.</p>
+                            <li>@measure</li>
                         }
-                        else
-                        {
-                            <ul class="mb-0">
-                                @foreach (var measure in measures)
-                                {
-                                    <li>@measure</li>
-                                }
-                            </ul>
-                            @if (Model.MeasureCount > measures.Count)
-                            {
-                                <p class="small text-muted mb-0 mt-2">@measures.Count of @Model.MeasureCount shown.</p>
-                            }
-                        }
-                    </div>
+                    </ul>
+                    @if (Model.MeasureCount > ReportManifestModel.ChartCap)
+                    {
+                        <p class="small text-muted mb-0 mt-2">@ReportManifestModel.ChartCap of @Model.MeasureCount shown.</p>
+                    }
                 </div>
-                @if (Model.ShowQueryPlan)
+            </section>
+        }
+        @if (populationCards.Count > 0)
+        {
+            <div class="row g-3 mb-3">
+                @foreach (var highlight in populationCards)
                 {
-                    <div class="au-card">
-                        <div class="card-header">Query plan</div>
-                        <div class="card-body">
-                            <p class="mb-1">Acquired @Model.AcquiredTypes.Count. Parameter queries @Model.ParameterTypes.Count. CQL referenced @Model.CqlTypes.Count.</p>
-                            <p class="small text-muted mb-0">@(string.Join(", ", Model.AcquiredTypes.Take(ReportManifestModel.ChartCap)))@(Model.AcquiredTypes.Count > ReportManifestModel.ChartCap ? " and " + (Model.AcquiredTypes.Count - ReportManifestModel.ChartCap) + " more." : "")</p>
-                        </div>
+                    <div class="col-lg-6">
+                        <section class="card au-card mb-0 h-100">
+                            <h3 class="card-header h6 mb-0"><a class="text-white" href="@Model.Href(tab: "populations", clearStage: true)">@highlight.Measure</a></h3>
+                            <div class="card-body">
+                                <div class="row g-2">
+                                    @if (highlight.InitialPopulation is int initialPopulation)
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(initialPopulation)</div><div class="au-stat-label">Initial Population <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Initial Population")" aria-label="About Initial Population"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                    }
+                                    @if (highlight.Denominator is int denominator)
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominator)</div><div class="au-stat-label">Denominator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator")" aria-label="About Denominator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                    }
+                                    @if (highlight.DenominatorExclusion is int denominatorExclusion)
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorExclusion)</div><div class="au-stat-label">Denominator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exclusion")" aria-label="About Denominator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                    }
+                                    @if (highlight.DenominatorException is int denominatorException)
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorException)</div><div class="au-stat-label">Denominator Exception <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exception")" aria-label="About Denominator Exception"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                    }
+                                    @if (highlight.Numerator is int numerator)
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numerator)</div><div class="au-stat-label">Numerator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator")" aria-label="About Numerator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                    }
+                                    @if (highlight.NumeratorExclusion is int numeratorExclusion)
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numeratorExclusion)</div><div class="au-stat-label">Numerator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator Exclusion")" aria-label="About Numerator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(highlight.Rate))
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@highlight.Rate</div><div class="au-stat-label">Rate <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Rate")" aria-label="About Rate"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                    }
+                                    @foreach (var other in highlight.Other)
+                                    {
+                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(other.Total)</div><div class="au-stat-label">@other.Name</div></div></div>
+                                    }
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 }
             </div>
-            <div class="col-lg-7">
-                @if (Model.ChartTypes.Count > 0)
-                {
-                    <div class="au-card">
-                        <div class="card-header">Largest @Model.TypeHeading.ToLowerInvariant()</div>
-                        <div class="card-body">
-                            <div class="lu-chart-donut"><canvas id="resourceDistChart"></canvas></div>
-                            @if (Model.TypeCount > ReportManifestModel.ChartCap)
-                            {
-                                <p class="small text-muted mb-0 mt-2">The chart shows the @ReportManifestModel.ChartCap largest. The table pages every row, largest first.</p>
-                            }
+        }
+        @if (donutRows.Count > 0)
+        {
+            <section class="card au-card">
+                <h3 class="card-header h6 mb-0 d-flex justify-content-between align-items-center">
+                    <span>@Model.TypeHeading</span>
+                    <span>@Count(donutTotal)</span>
+                </h3>
+                <div class="card-body">
+                    <div class="lu-donut-layout">
+                        <div class="lu-donut-chart">
+                            <div class="lu-donut-ring" style="background: conic-gradient(@donutGradient)" role="img" aria-label="@Model.TypeHeading">
+                                <div class="lu-donut-hole">
+                                    <span class="lu-donut-total">@Count(donutTotal)</span>
+                                    <span class="lu-donut-total-label">@donutCenter</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                }
-                @if (Model.StatusChart.Count > 0 && !Model.ContentsAreStatus)
-                {
-                    <div class="au-card">
-                        <div class="card-header">Patients by validation</div>
-                        <div class="card-body">
-                            <div class="lu-chart-donut"><canvas id="patientStatusChart"></canvas></div>
-                        </div>
-                    </div>
-                }
-                <div class="au-card">
-                    <div class="card-header d-flex justify-content-between align-items-center gap-2">
-                        <span>@Model.TypeHeading</span>
-                        <form method="get" action="@Model.Path" class="d-flex gap-2">
-                            @foreach (var pair in Model.Route)
+                        <ul class="lu-donut-legend">
+                            @for (var index = 0; index < donutRows.Count; index++)
                             {
-                                <input type="hidden" name="@pair.Key" value="@pair.Value" />
+                                <li>
+                                    <span class="lu-donut-swatch" style="background:@SliceColor(index)"></span>
+                                    <span class="lu-donut-name">@donutRows[index].Name</span>
+                                    <span class="lu-donut-count">@Count(donutRows[index].Total)</span>
+                                    <span class="lu-donut-pct">@SlicePercent(donutRows[index].Total)</span>
+                                </li>
                             }
-                            <input type="hidden" name="q" value="@Model.Query.PatientQuery" />
-                            <input type="hidden" name="sort" value="@Model.Query.Sort" />
-                            <input type="hidden" name="dir" value="@(Model.Query.Descending ? "desc" : "asc")" />
-                            <input type="hidden" name="page" value="@Model.Query.Page" />
-                            <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
-                            <input type="hidden" name="typeSize" value="@Model.Query.TypeSize" />
-                            <label class="visually-hidden" for="manifestTypeQuery">Search types</label>
-                            <input id="manifestTypeQuery" name="typeQ" value="@Model.Query.TypeQuery" class="form-control form-control-sm" placeholder="Search types" />
-                            <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
-                            <a class="btn btn-sm btn-warning" href="@Model.Href(clearType: true)">Clear</a>
-                        </form>
-                    </div>
-                    <div class="card-body p-0">
-                        @if (Model.Types.Count == 0)
-                        {
-                            <p class="p-3 mb-0">No matching rows.</p>
-                        }
-                        else
-                        {
-                            <table class="au-table table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>@nameHeader</th>
-                                        @if (Model.ShowSplit)
-                                        {
-                                            <th class="text-end">Patient</th>
-                                            <th class="text-end">Shared</th>
-                                        }
-                                        <th class="text-end">@countHeader</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                @foreach (var row in Model.Types)
-                                {
-                                    <tr>
-                                        <td>@row.Name</td>
-                                        @if (Model.ShowSplit)
-                                        {
-                                            <td class="text-end">@(row.Primary > 0 ? Count(row.Primary) : "—")</td>
-                                            <td class="text-end">@(row.Secondary > 0 ? Count(row.Secondary) : "—")</td>
-                                        }
-                                        <td class="text-end">@Count(row.Total)</td>
-                                    </tr>
-                                }
-                                </tbody>
-                            </table>
-                        }
-                    </div>
-                    <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
-                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(typePage: 1), Enabled = Model.TypePaging.Page > 1 })" />
-                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(typePage: Model.TypePaging.Page - 1), Enabled = Model.TypePaging.HasPrevious })" />
-                        <span class="small text-muted">Page @Model.TypePaging.Page of @(Model.TypePaging.TotalPages == 0 ? 1 : Model.TypePaging.TotalPages) (@Model.TypePaging.TotalCount)</span>
-                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(typePage: Model.TypePaging.Page + 1), Enabled = Model.TypePaging.HasNext })" />
-                        <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(typePage: (int)Model.TypePaging.TotalPages), Enabled = Model.TypePaging.HasNext })" />
-                        @foreach (var size in ReportManifestQuery.PageSizes)
-                        {
-                            <a class="btn btn-sm @(size == Model.Query.TypeSize ? "lu-nav-current" : "btn-au-link")" href="@Model.Href(typeSize: size)">@size</a>
-                        }
+                        </ul>
                     </div>
                 </div>
+            </section>
+        }
+        @if (Model.ShowValidation)
+        {
+            <section class="card au-card">
+                <h3 class="card-header h6 mb-0">Validation</h3>
+                <div class="card-body">
+                    <div class="lu-manifest-kpis">
+                        <div><span class="lu-kpi-value">@Count(Model.PatientCount)</span><span class="lu-kpi-label">Patients</span></div>
+                        <div><span class="lu-kpi-value">@Count(Model.PassedValidation ?? 0)</span><span class="lu-kpi-label">Passed validation</span></div>
+                        <div><span class="lu-kpi-value">@Count(Model.FailedValidation ?? 0)</span><span class="lu-kpi-label">Failed validation</span></div>
+                        <div><span class="lu-kpi-value">@Count(Model.PendingValidation ?? 0)</span><span class="lu-kpi-label">Pending validation</span></div>
+                    </div>
+                </div>
+            </section>
+        }
+        @if (Model.ShowQueryPlan)
+        {
+            <section class="card au-card">
+                <h3 class="card-header h6 mb-0">Query plan</h3>
+                <div class="card-body">
+                    <div class="lu-manifest-kpis">
+                        <div><span class="lu-kpi-value">@Count(Model.AcquiredTypes.Count)</span><span class="lu-kpi-label">Acquired</span></div>
+                        <div><span class="lu-kpi-value">@Count(Model.ParameterTypes.Count)</span><span class="lu-kpi-label">Parameter queries</span></div>
+                        <div><span class="lu-kpi-value">@Count(Model.CqlTypes.Count)</span><span class="lu-kpi-label">CQL referenced</span></div>
+                    </div>
+                    @if (Model.AcquiredTypes.Count > 0)
+                    {
+                        <p class="small text-muted mb-0 mt-3">@(string.Join(", ", Model.AcquiredTypes.Take(ReportManifestModel.ChartCap)))@(Model.AcquiredTypes.Count > ReportManifestModel.ChartCap ? " and " + (Model.AcquiredTypes.Count - ReportManifestModel.ChartCap) + " more." : "")</p>
+                    }
+                </div>
+            </section>
+        }
+        <section class="card au-card">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span>@(donutRows.Count > 0 ? "All " + Model.TypeHeading.ToLowerInvariant() : Model.TypeHeading)</span>
+                <form method="get" action="@Model.Path" class="d-flex gap-2">
+                    @foreach (var pair in Model.Route)
+                    {
+                        <input type="hidden" name="@pair.Key" value="@pair.Value" />
+                    }
+                    <input type="hidden" name="q" value="@Model.Query.PatientQuery" />
+                    <input type="hidden" name="sort" value="@Model.Query.Sort" />
+                    <input type="hidden" name="dir" value="@(Model.Query.Descending ? "desc" : "asc")" />
+                    <input type="hidden" name="page" value="@Model.Query.Page" />
+                    <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
+                    <input type="hidden" name="typeSize" value="@Model.Query.TypeSize" />
+                    <label class="visually-hidden" for="manifestTypeQuery">Search types</label>
+                    <input id="manifestTypeQuery" name="typeQ" value="@Model.Query.TypeQuery" class="form-control form-control-sm" placeholder="Search types" />
+                    <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
+                    <a class="btn btn-sm btn-warning" href="@Model.Href(clearType: true)">Clear</a>
+                </form>
             </div>
-        </div>
+            <div class="card-body p-0">
+                @if (Model.Types.Count == 0)
+                {
+                    <p class="p-3 mb-0">No matching rows.</p>
+                }
+                else
+                {
+                    <table class="au-table table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>@nameHeader</th>
+                                @if (Model.ShowSplit)
+                                {
+                                    <th class="text-end">Patient</th>
+                                    <th class="text-end">Shared</th>
+                                }
+                                <th class="text-end">@countHeader</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Types)
+                        {
+                            <tr>
+                                <td>@row.Name</td>
+                                @if (Model.ShowSplit)
+                                {
+                                    <td class="text-end">@(row.Primary > 0 ? Count(row.Primary) : "—")</td>
+                                    <td class="text-end">@(row.Secondary > 0 ? Count(row.Secondary) : "—")</td>
+                                }
+                                <td class="text-end">@Count(row.Total)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div>
+            <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(typePage: 1), Enabled = Model.TypePaging.Page > 1 })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(typePage: Model.TypePaging.Page - 1), Enabled = Model.TypePaging.HasPrevious })" />
+                <span class="small text-muted">Page @Model.TypePaging.Page of @(Model.TypePaging.TotalPages == 0 ? 1 : Model.TypePaging.TotalPages) (@Model.TypePaging.TotalCount)</span>
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(typePage: Model.TypePaging.Page + 1), Enabled = Model.TypePaging.HasNext })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(typePage: (int)Model.TypePaging.TotalPages), Enabled = Model.TypePaging.HasNext })" />
+                @foreach (var size in ReportManifestQuery.PageSizes)
+                {
+                    <a class="btn btn-sm @(size == Model.Query.TypeSize ? "lu-nav-current" : "btn-au-link")" href="@Model.Href(typeSize: size)">@size</a>
+                }
+            </div>
+        </section>
     </div>
 
     <div class="tab-pane fade @(patientsOpen ? "show active" : null)" id="manifest-patients">
@@ -795,10 +793,10 @@
             });
         });
     });
-    var types = @Html.Raw(chartTypes);
     var patients = @Html.Raw(chartPatients);
-    var statuses = @Html.Raw(statusChart);
     var details = @Html.Raw(patientDetails);
+    var donutColors = @Html.Raw(JsonSerializer.Serialize(ReportManifestRules.DonutColors));
+    var donutOther = @Html.Raw(JsonSerializer.Serialize(ReportManifestRules.DonutOtherColor));
     var palette = (window.luChartPalette && window.luChartPalette.manifest) || [];
     function draw(id, labels, data, kind) {
         var canvas = document.getElementById(id);
@@ -811,12 +809,81 @@
         new Chart(canvas, {
             type: kind,
             data: { labels: labels, datasets: [{ data: data, backgroundColor: labels.map(function (_, index) { return palette[index % palette.length]; }), borderWidth: 1 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: kind === "doughnut" && !labels.some(function (label) { return String(label).length > 16; }), position: "right" } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     }
-    draw("resourceDistChart", types.map(function (row) { return row.Name; }), types.map(function (row) { return row.Total; }), "doughnut");
-    draw("patientStatusChart", statuses.map(function (row) { return row.Name; }), statuses.map(function (row) { return row.Total; }), "doughnut");
     draw("patientBarChart", patients.map(function (row) { return row.PatientId; }), patients.map(function (row) { return row.Total; }), "bar");
+
+    function mountDonut(host, rows, centerLabel) {
+        host.replaceChildren();
+        var clean = (rows || []).filter(function (row) { return Number(row.count || row.total || 0) > 0; });
+        if (!clean.length) {
+            note(host, "No resource counts were recorded.");
+            return;
+        }
+        clean.sort(function (left, right) { return Number(right.count || right.total || 0) - Number(left.count || left.total || 0); });
+        var slices = clean.slice(0, 8).map(function (row, index) {
+            return { name: row.name || "—", total: Number(row.count || row.total || 0), color: donutColors[index % donutColors.length] };
+        });
+        if (clean.length > 8) {
+            var rest = clean.slice(8).reduce(function (sum, row) { return sum + Number(row.count || row.total || 0); }, 0);
+            if (rest > 0) slices.push({ name: "Other", total: rest, color: donutOther });
+        }
+        var total = slices.reduce(function (sum, row) { return sum + row.total; }, 0);
+        var cursor = 0;
+        var stops = slices.map(function (row) {
+            var next = cursor + (total ? row.total * 100 / total : 0);
+            var stop = row.color + " " + cursor.toFixed(3) + "% " + next.toFixed(3) + "%";
+            cursor = next;
+            return stop;
+        }).join(", ");
+        var layout = document.createElement("div");
+        layout.className = "lu-donut-layout";
+        var chart = document.createElement("div");
+        chart.className = "lu-donut-chart";
+        var ring = document.createElement("div");
+        ring.className = "lu-donut-ring";
+        ring.style.background = "conic-gradient(" + stops + ")";
+        ring.setAttribute("role", "img");
+        ring.setAttribute("aria-label", "Resources by type");
+        var hole = document.createElement("div");
+        hole.className = "lu-donut-hole";
+        var strong = document.createElement("span");
+        strong.className = "lu-donut-total";
+        strong.textContent = total.toLocaleString();
+        var caption = document.createElement("span");
+        caption.className = "lu-donut-total-label";
+        caption.textContent = centerLabel || "resources";
+        hole.appendChild(strong);
+        hole.appendChild(caption);
+        ring.appendChild(hole);
+        chart.appendChild(ring);
+        var legend = document.createElement("ul");
+        legend.className = "lu-donut-legend";
+        slices.forEach(function (row) {
+            var item = document.createElement("li");
+            var swatch = document.createElement("span");
+            swatch.className = "lu-donut-swatch";
+            swatch.style.background = row.color;
+            var name = document.createElement("span");
+            name.className = "lu-donut-name";
+            name.textContent = row.name;
+            var count = document.createElement("span");
+            count.className = "lu-donut-count";
+            count.textContent = row.total.toLocaleString();
+            var pct = document.createElement("span");
+            pct.className = "lu-donut-pct";
+            pct.textContent = (total ? (row.total * 100 / total).toFixed(1) : "0.0") + "%";
+            item.appendChild(swatch);
+            item.appendChild(name);
+            item.appendChild(count);
+            item.appendChild(pct);
+            legend.appendChild(item);
+        });
+        layout.appendChild(chart);
+        layout.appendChild(legend);
+        host.appendChild(layout);
+    }
 
     var openRow = null;
     var refPage = 0;
@@ -938,27 +1005,7 @@
             measures.appendChild(row);
         });
 
-        var resources = document.getElementById("manifest-patient-resources");
-        resources.replaceChildren();
-        if (!openRow.resources || !openRow.resources.length) note(resources, "No resource counts were recorded.");
-        else {
-            var table = document.createElement("table");
-            table.className = "au-table table table-sm mb-0";
-            var body = document.createElement("tbody");
-            openRow.resources.forEach(function (item) {
-                var row = document.createElement("tr");
-                var name = document.createElement("td");
-                name.textContent = item.name || "—";
-                var count = document.createElement("td");
-                count.className = "text-end";
-                count.textContent = Number(item.count || 0).toLocaleString();
-                row.appendChild(name);
-                row.appendChild(count);
-                body.appendChild(row);
-            });
-            table.appendChild(body);
-            resources.appendChild(table);
-        }
+        mountDonut(document.getElementById("manifest-patient-resources"), openRow.resources, "resources");
 
         fillRefs();
 

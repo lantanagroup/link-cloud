@@ -15,6 +15,32 @@ public static partial class ReportManifestRules
 {
     public const string SampleFacilityId = "fixture";
     public static readonly Guid SampleId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    public static readonly string[] DonutColors =
+    [
+        "#343a40", "#28a745", "#ffc107", "#dc3545", "#6f42c1", "#111111", "#fd7e14", "#545c64"
+    ];
+    public const string DonutOtherColor = "#adb5bd";
+
+    public static string DonutGradient(IReadOnlyList<int> totals, IReadOnlyList<string> colors)
+    {
+        var sum = 0;
+        foreach (var total in totals)
+            sum += Math.Max(0, total);
+        if (sum <= 0 || colors.Count == 0)
+            return "#e6e6e6";
+
+        var parts = new List<string>(totals.Count);
+        double cursor = 0;
+        for (var index = 0; index < totals.Count; index++)
+        {
+            var next = cursor + Math.Max(0, totals[index]) * 100.0 / sum;
+            var color = colors[Math.Min(index, colors.Count - 1)];
+            parts.Add(color + " " + cursor.ToString("0.###", CultureInfo.InvariantCulture) + "% " + next.ToString("0.###", CultureInfo.InvariantCulture) + "%");
+            cursor = next;
+        }
+
+        return string.Join(", ", parts);
+    }
 
     public static bool IsSample(string? facilityId, string? reportId) =>
         string.Equals(facilityId.Sanitize().Trim(), SampleFacilityId, StringComparison.OrdinalIgnoreCase)
@@ -452,8 +478,8 @@ public static partial class ReportManifestRules
             status.Add(new ManifestCountRow { Name = "Pending validation", Primary = pending, Total = pending });
         return new ReportManifestModel
         {
-            Lead = "Report overview. Counts, the largest resource types, and population highlights are here. Open Patients for one row per patient, or Populations for the measure funnel.",
-            Notice = facts.Notice,
+            Lead = "",
+            Notice = null,
             PatientNote = facts.PatientNote,
             ShowComparison = false,
             ShowGeneration = false,
@@ -470,9 +496,7 @@ public static partial class ReportManifestRules
             PatientResourceLabel = string.IsNullOrWhiteSpace(facts.PatientResourceLabel) ? "Initial population" : facts.PatientResourceLabel,
             TypeHeading = heading,
             ContentsAreStatus = contentsAreStatus,
-            EligibilityText = facts.PatientCount == 0
-                ? "No patients on this report."
-                : facts.PatientCount.ToString("N0", CultureInfo.InvariantCulture) + " patients.",
+            EligibilityText = "",
             Measures = facts.Measures,
             MeasureCount = facts.Measures.Count,
             Types = types.Page,
@@ -660,7 +684,6 @@ public static partial class ReportManifestRules
             populationNote = "This run did not store a scored " + PopulationLabel(query.Stage) + ".";
         }
 
-        var qualifyingCount = eligibility.Count(pair => pair.Value is { Count: > 0 });
         var hottest = types.Sorted.FirstOrDefault();
         var patientResources = patientCounts.Values.Sum();
         var sharedResources = sharedCounts.Values.Sum();
@@ -670,8 +693,8 @@ public static partial class ReportManifestRules
 
         return new ReportManifestModel
         {
-            Lead = "Resources this run generated. The largest types and patients are first. Opening this page changes nothing on the run.",
-            Notice = notice,
+            Lead = "",
+            Notice = null,
             ShowComparison = showComparison,
             ShowGeneration = true,
             ShowShared = true,
@@ -690,9 +713,7 @@ public static partial class ReportManifestRules
             HottestName = hottest?.Name,
             HottestCount = hottest?.Total ?? 0,
             TypeHeading = "Resource types",
-            EligibilityText = ids.Count == 0
-                ? "No patients on this manifest."
-                : qualifyingCount.ToString("N0", CultureInfo.InvariantCulture) + " of " + ids.Count.ToString("N0", CultureInfo.InvariantCulture) + " patients qualify.",
+            EligibilityText = "",
             Measures = (snapshot.MeasureIds ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).ToList(),
             MeasureCount = snapshot.MeasureIds?.Count ?? 0,
             AcquiredTypes = snapshot.AcquiredResourceTypes ?? [],
@@ -862,8 +883,7 @@ public static partial class ReportManifestRules
                 PatientPaging = page.Bar,
                 PopulationPatients = members.Page,
                 PopulationPaging = members.Bar,
-                PopulationNote = members.Note,
-                Notice = "Fixture data. Nothing here was read from a report service."
+                PopulationNote = members.Note
             },
             query,
             "/Reports/Manifest",
@@ -954,8 +974,7 @@ public static partial class ReportManifestRules
             runConfigurationJson: null,
             configurationNames: null,
             templateVersion: 3,
-            latestTemplateVersion: 4,
-            notice: "Fixture data. Nothing here was read from a run.");
+            latestTemplateVersion: 4);
     }
 
     private static ManifestComparison Compare(
