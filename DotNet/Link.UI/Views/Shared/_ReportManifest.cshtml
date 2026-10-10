@@ -1094,7 +1094,7 @@
         if (!openRow.measures || !openRow.measures.length) note(measures, "No population membership was recorded for this patient.");
         else openRow.measures.forEach(function (item) {
             var row = document.createElement("p");
-            row.className = "mb-1";
+            row.className = "lu-measure-chip";
             var badge = document.createElement("span");
             badge.className = "badge " + (item.tone || "au-badge-muted");
             badge.textContent = item.name || "Measure";

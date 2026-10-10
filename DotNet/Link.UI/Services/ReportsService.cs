@@ -957,6 +957,12 @@ public sealed class ReportsService
         return (page, schedule.Body);
     }
 
+    public async Task<ReportScheduleApiModel?> TryScheduleAsync(string? facilityId, string? reportId, CancellationToken cancellationToken)
+    {
+        var opened = await OpenReportAsync(facilityId, reportId, cancellationToken);
+        return opened.Page.LoadError is null ? opened.Schedule : null;
+    }
+
     public async Task<IReadOnlyList<ReportCountRow>> LoadCountsAsync(string? ids, CancellationToken cancellationToken)
     {
         var parsed = (ids ?? string.Empty)

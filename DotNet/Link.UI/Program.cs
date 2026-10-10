@@ -80,6 +80,9 @@ builder.Services.AddHttpClient<IAdminBffUserService, AdminBffUserService>((_, cl
     client.BaseAddress = new Uri(adminBffAddress);
     client.Timeout = TimeSpan.FromSeconds(15);
 });
+builder.Services.Configure<SubmissionReadOptions>(builder.Configuration.GetSection(SubmissionReadOptions.Section));
+builder.Services.AddSingleton<ISubmissionBlobStore, AzureSubmissionBlobStore>();
+builder.Services.AddSingleton<PatientSubmissionReader>();
 builder.Services.AddSingleton<KafkaOpsFixture>();
 builder.Services.AddHttpClient<KafkaOpsClient>((_, client) =>
 {
