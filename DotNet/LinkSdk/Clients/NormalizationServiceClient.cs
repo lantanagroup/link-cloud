@@ -26,6 +26,15 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public NormalizationServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
+
     public Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchFacilityOperationsAsync(
         string facilityId,
         bool includeDisabled = true,
