@@ -5,7 +5,7 @@
 
     var button = document.createElement("button");
     button.type = "button";
-    button.className = "btn btn-sm btn-au-link lu-icon-btn lu-copy lu-cell-copy";
+    button.className = "btn btn-sm lu-icon-btn lu-copy lu-cell-copy";
     button.innerHTML = '<i class="bi bi-copy" aria-hidden="true"></i><span class="visually-hidden">Copy</span>';
     button.setAttribute("aria-label", "Copy");
     button.title = "Copy";

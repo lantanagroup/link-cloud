@@ -120,7 +120,12 @@ public class MorningFixesGuardTests
         copy.Should().Contain("(hover: none), (pointer: coarse)");
         copy.Should().Contain("data-nocopy");
         copy.Should().Contain("data-copy");
+        copy.Should().NotContain("btn-au-link");
         copy.Should().NotContain("IsGuid");
+        var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
+        css.Should().Contain("td.lu-copy-host");
+        css.Should().Contain("padding-right: 2.2rem");
+        css.Should().Contain(".btn.lu-cell-copy");
         copy.Should().NotContain("querySelectorAll(\"td\")");
         copy.Should().NotContain("querySelectorAll('td')");
         copy.Should().NotContain("rows.forEach");

@@ -49,7 +49,7 @@ public sealed class ReportsService
     private readonly LinkUiFeatureOptions _options;
     private readonly IMemoryCache _counts;
     private readonly ILogger<ReportsService> _logger;
-    private readonly Func<CancellationToken, Task<AutomationOwnershipIndex>>? _ownership;
+    private readonly Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? _ownership;
 
     public ReportsService(
         IFacilityServiceClient facilities,
@@ -60,7 +60,7 @@ public sealed class ReportsService
         IOptions<LinkUiFeatureOptions> options,
         IMemoryCache counts,
         ILogger<ReportsService> logger,
-        Func<CancellationToken, Task<AutomationOwnershipIndex>>? ownership = null)
+        Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? ownership = null)
     {
         _facilities = facilities;
         _reports = reports;
@@ -86,7 +86,7 @@ public sealed class ReportsService
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<IMemoryCache>(),
             services.GetRequiredService<ILogger<ReportsService>>(),
-            ownership.GetAsync);
+            ownership.GetSnapshotAsync);
     }
 
     public async Task<ReportActivityLoad> LoadActivityCountsAsync(int days, CancellationToken cancellationToken)
@@ -287,7 +287,14 @@ public sealed class ReportsService
             return page;
         }
 
-        if (await AutomationOwnsAsync(facilityId, cancellationToken))
+        var gate = await OwnershipGateAsync(facilityId, cancellationToken);
+        if (gate.Unreachable)
+        {
+            page.Error = AutomationMarkRules.OwnershipUnreachable;
+            return page;
+        }
+
+        if (gate.Blocked)
         {
             page.Error = AutomationMarkRules.AdHocReportBlocked;
             return page;
@@ -1062,13 +1069,17 @@ public sealed class ReportsService
         Report = source.Report
     };
 
-    private async Task<bool> AutomationOwnsAsync(string? facilityId, CancellationToken cancellationToken)
+    private readonly record struct OwnershipGate(bool Blocked, bool Unreachable);
+
+    private async Task<OwnershipGate> OwnershipGateAsync(string? facilityId, CancellationToken cancellationToken)
     {
         if (!_options.AutomationEnabled || _ownership is null)
-            return false;
+            return new(false, false);
 
-        var index = await _ownership(cancellationToken);
-        return index.Contains(facilityId);
+        var (index, reachable) = await _ownership(cancellationToken);
+        if (!reachable)
+            return new(true, true);
+        return new(index.Contains(facilityId), false);
     }
 
     private static ReportsAction Fail(string message) => new(false, message);
