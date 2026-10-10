@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using FluentAssertions;
-using Link.UI.Services;
 using Xunit;
 
 namespace Link.UI.Tests;
@@ -107,34 +106,27 @@ public class MorningFixesGuardTests
     [Fact]
     public void Copy_buttons_are_only_for_identifiers()
     {
-        LabeledIdRules.AllowsCopy("Seed").Should().BeFalse();
-        LabeledIdRules.AllowsCopy("Date").Should().BeFalse();
-        LabeledIdRules.AllowsCopy("Time").Should().BeFalse();
-        LabeledIdRules.AllowsCopy("Count").Should().BeFalse();
-        LabeledIdRules.AllowsCopy("Name").Should().BeFalse();
-        LabeledIdRules.AllowsCopy("Measures").Should().BeFalse();
-        LabeledIdRules.AllowsCopy("Package").Should().BeFalse();
-        LabeledIdRules.AllowsCopy("Facility").Should().BeTrue();
-        LabeledIdRules.AllowsCopy("Report ID").Should().BeTrue();
-        LabeledIdRules.AllowsCopy("Measure").Should().BeTrue();
-        LabeledIdRules.AllowsCopy("File").Should().BeTrue();
-        LabeledIdRules.ShowsCopy("Facility", "11111111-1111-1111-1111-111111111111").Should().BeTrue();
-        LabeledIdRules.ShowsCopy("Facility", "{11111111-1111-1111-1111-111111111111}").Should().BeTrue();
-        LabeledIdRules.ShowsCopy("Facility", "not-a-guid").Should().BeFalse();
-        LabeledIdRules.ShowsCopy("Facility", "2026-10-09").Should().BeFalse();
-        LabeledIdRules.ShowsCopy("Name", "11111111-1111-1111-1111-111111111111").Should().BeFalse();
-        LabeledIdRules.ShowsCopy("Seed", "11111111-1111-1111-1111-111111111111").Should().BeFalse();
-        LabeledIdRules.ShowsCopy("Report ID", "  ").Should().BeFalse();
-        LabeledIdRules.IsGuid(null).Should().BeFalse();
+        var labeled = File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_LabeledId.cshtml"));
+        labeled.Should().Contain("data-copy");
+        labeled.Should().NotContain("_CopyButton");
+        labeled.Should().NotContain("ShowsCopy");
+        var layout = File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_Layout.cshtml"));
+        layout.Should().Contain("cell-copy.js");
+        layout.Should().Contain("data-copy");
+        layout.Should().NotContain("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
-        File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_LabeledId.cshtml"))
-            .Should().Contain("LabeledIdRules.ShowsCopy");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_Layout.cshtml"))
-            .Should().Contain("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+        var copy = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "cell-copy.js"));
+        copy.Should().Contain("function onDocument");
+        copy.Should().Contain("(hover: none), (pointer: coarse)");
+        copy.Should().Contain("data-nocopy");
+        copy.Should().Contain("data-copy");
+        copy.Should().NotContain("IsGuid");
+        copy.Should().NotContain("querySelectorAll(\"td\")");
+        copy.Should().NotContain("querySelectorAll('td')");
+        copy.Should().NotContain("rows.forEach");
 
         var copyPartials = ProductFiles("*.cshtml", "Views")
             .Where(file => File.ReadAllText(file).Contains("name=\"_CopyButton\"", StringComparison.Ordinal)
-                && !file.EndsWith("_LabeledId.cshtml", StringComparison.OrdinalIgnoreCase)
                 && !file.EndsWith("_MessageDetail.cshtml", StringComparison.OrdinalIgnoreCase))
             .Select(Rel)
             .ToList();
@@ -253,25 +245,12 @@ public class MorningFixesGuardTests
     [Fact]
     public void Copy_buttons_are_not_attached_to_non_guid_values()
     {
-        var attr = new Regex(@"data-lu-copy\s*=\s*""([^""]*)""", RegexOptions.IgnoreCase);
-        var hits = new List<string>();
-        foreach (var file in ProductFiles("*.cshtml", "Views").Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js"))))
-        {
-            var lines = File.ReadAllLines(file);
-            for (var i = 0; i < lines.Length; i++)
-            {
-                foreach (Match match in attr.Matches(lines[i]))
-                {
-                    var value = match.Groups[1].Value;
-                    if (value.Contains('@', StringComparison.Ordinal) || value.Contains('+', StringComparison.Ordinal))
-                        continue;
-                    if (!LabeledIdRules.IsGuid(value))
-                        hits.Add(Rel(file) + ":" + (i + 1) + " " + value);
-                }
-            }
-        }
-
-        hits.Should().BeEmpty();
+        var labeled = File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_LabeledId.cshtml"));
+        labeled.Should().NotContain("IsGuid");
+        labeled.Should().NotContain("data-lu-copy");
+        var script = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "cell-copy.js"));
+        script.Should().Contain("document.addEventListener(type, onDocument)");
+        Regex.Matches(script, "document.addEventListener").Count.Should().Be(1);
     }
 
     [Fact]

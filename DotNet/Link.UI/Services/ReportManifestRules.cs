@@ -128,6 +128,27 @@ public static partial class ReportManifestRules
         };
     }
 
+    /// <summary>
+    /// Submission column tone. Submitted is green, failure is red, work still open is yellow,
+    /// and anything else is the light neutral badge.
+    /// </summary>
+    public static string SubmissionBadgeClass(string? status)
+    {
+        var key = (status ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+        if (key.Length == 0 || key is "—" or "-" or "–")
+            return "au-badge-muted";
+        if (key.Contains("fail", StringComparison.Ordinal) || key.Contains("error", StringComparison.Ordinal))
+            return "au-badge-danger";
+        if (key.Contains("pending", StringComparison.Ordinal)
+            || key.Contains("notsubmitted", StringComparison.Ordinal)
+            || key.Contains("inprogress", StringComparison.Ordinal)
+            || key.Contains("submitting", StringComparison.Ordinal))
+            return "au-badge-warning";
+        if (key == "submitted")
+            return "au-badge-success";
+        return "au-badge-muted";
+    }
+
     public static ManifestPatientRow PatientRow(
         string patientId,
         string? reportingStatus,

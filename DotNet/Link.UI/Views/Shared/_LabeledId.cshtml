@@ -3,8 +3,6 @@
     var value = Model.Value?.Trim() ?? "";
     var displayName = LabeledIdRules.DisplayName(Model.Name, value);
     var empty = string.IsNullOrWhiteSpace(value) || value == "—" || value == "-";
-    var allowCopy = Model.Copy && LabeledIdRules.ShowsCopy(Model.Label, value);
-    var copyLabel = string.IsNullOrWhiteSpace(Model.CopyLabel) ? "Copy " + Model.Label.ToLowerInvariant() : Model.CopyLabel;
     var href = ReturnUrlRules.WithReturn(Model.LinkHref, Model.ReturnUrl);
     var safeLink = !string.IsNullOrWhiteSpace(href)
         && href.StartsWith('/')
@@ -26,11 +24,15 @@
         {
             if (safeLink && !empty)
             {
-                <a class="lu-clip" href="@href" title="@value" id="@Model.ValueElementId">@value</a>
+                <a class="lu-clip" href="@href" title="@value" id="@Model.ValueElementId" data-copy="@value">@value</a>
+            }
+            else if (empty)
+            {
+                <code class="lu-facility-id" id="@Model.ValueElementId">—</code>
             }
             else
             {
-                <code class="lu-facility-id" title="@(empty ? null : value)" id="@Model.ValueElementId">@(empty ? "—" : value)</code>
+                <code class="lu-facility-id" title="@value" id="@Model.ValueElementId" data-copy="@value">@value</code>
             }
         }
         else if (empty)
@@ -39,15 +41,11 @@
         }
         else if (safeLink)
         {
-            <a class="lu-clip" href="@href" title="@value">@value</a>
+            <a class="lu-clip" href="@href" title="@value" data-copy="@value">@value</a>
         }
         else
         {
-            <code class="lu-facility-id" title="@value">@value</code>
-        }
-        @if ((!empty || !string.IsNullOrWhiteSpace(Model.ValueElementId)) && allowCopy)
-        {
-            <partial name="_CopyButton" model="@(new CopyTarget { Value = value, Label = copyLabel })" />
+            <code class="lu-facility-id" title="@value" data-copy="@value">@value</code>
         }
     </span>
 </span>
