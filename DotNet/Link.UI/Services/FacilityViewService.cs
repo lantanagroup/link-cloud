@@ -37,6 +37,7 @@ public sealed class FacilityViewService
     private readonly IAdminBffIntegrationClient? _admin;
     private readonly LinkUiFeatureOptions _options;
     private readonly ILogger<FacilityViewService> _logger;
+    private readonly Func<CancellationToken, Task<AutomationOwnershipIndex>>? _ownership;
 
     public FacilityViewService(
         IFacilityServiceClient facilities,
@@ -46,7 +47,8 @@ public sealed class FacilityViewService
         IDmrpServiceClient? dmrp,
         IAdminBffIntegrationClient? admin,
         IOptions<LinkUiFeatureOptions> options,
-        ILogger<FacilityViewService> logger)
+        ILogger<FacilityViewService> logger,
+        Func<CancellationToken, Task<AutomationOwnershipIndex>>? ownership = null)
     {
         _facilities = facilities;
         _reports = reports;
@@ -56,12 +58,14 @@ public sealed class FacilityViewService
         _admin = admin;
         _options = options.Value;
         _logger = logger;
+        _ownership = ownership;
     }
 
     public static FacilityViewService Create(IServiceProvider services)
     {
         var registry = services.GetRequiredService<IOptions<ServiceRegistry>>().Value;
         var options = services.GetRequiredService<IOptions<LinkUiFeatureOptions>>();
+        var ownership = services.GetRequiredService<AutomationOwnershipLookup>();
         return new FacilityViewService(
             services.GetRequiredService<IFacilityServiceClient>(),
             Blank(registry.ReportServiceUrl) ? null : services.GetRequiredService<IReportServiceClient>(),
@@ -70,7 +74,8 @@ public sealed class FacilityViewService
             options.Value.DmrpEnabled ? services.GetRequiredService<IDmrpServiceClient>() : null,
             Blank(registry.AdminBffServiceUrl) ? null : services.GetRequiredService<IAdminBffIntegrationClient>(),
             options,
-            services.GetRequiredService<ILogger<FacilityViewService>>());
+            services.GetRequiredService<ILogger<FacilityViewService>>(),
+            ownership.GetAsync);
     }
 
     public async Task<FacilityViewModel> LoadAsync(string? facilityId, FacilityViewQuery? query, CancellationToken cancellationToken)
@@ -239,8 +244,13 @@ public sealed class FacilityViewService
     public Task<FacilityViewAction> ResubmitAsync(string? facilityId, string? reportId, bool bypassSubmission, CancellationToken cancellationToken) =>
         ChangeReportAsync(facilityId, reportId, includeDeleted: false, cancellationToken, async (id, report, schedule) =>
         {
-            if (!FacilityViewRules.CanResubmit(schedule.Status, schedule.IsDeleted == true))
-                return Fail("Only a submitted report can be resubmitted.");
+            var owned = await AutomationOwnsAsync(id, cancellationToken);
+            if (!FacilityViewRules.CanResubmit(schedule.Status, schedule.IsDeleted == true, owned))
+            {
+                return Fail(owned
+                    ? AutomationMarkRules.AdHocReportBlocked
+                    : "Only a submitted report can be resubmitted.");
+            }
 
             var response = await _facilities.RegenerateReportAsync(id, new RegenerateReportRequest
             {
@@ -727,6 +737,15 @@ public sealed class FacilityViewService
         EncounterMapping = row.EncounterMappingStatus.ToString(),
         Hsloc = row.HslocMappingStatus.ToString()
     };
+
+    private async Task<bool> AutomationOwnsAsync(string? facilityId, CancellationToken cancellationToken)
+    {
+        if (!_options.AutomationEnabled || _ownership is null)
+            return false;
+
+        var index = await _ownership(cancellationToken);
+        return index.Contains(facilityId);
+    }
 
     private static FacilityViewAction Done(string message) => new(true, message);
     private static FacilityViewAction Fail(string message) => new(false, message);

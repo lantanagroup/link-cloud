@@ -453,6 +453,7 @@ public sealed class TenantsController : Controller
     {
         var page = await _view.LoadAsync(id, query, cancellationToken);
         await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
+        HideOwnedResubmit(page.Reports, page.AutomationRunId);
         ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
         return View(page);
     }
@@ -466,6 +467,7 @@ public sealed class TenantsController : Controller
     {
         var page = await _view.LoadReportAsync(id, reportId, query, cancellationToken);
         await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
+        HideOwnedResubmit(page.Report, page.AutomationRunId);
         ViewData["Title"] = page.ReportId.Length == 0 ? "Report" : page.ReportId;
         return View(page);
     }
@@ -688,6 +690,21 @@ public sealed class TenantsController : Controller
         await StampAsync(result.Page.FacilityId, runId => result.Page.AutomationRunId = runId, HttpContext.RequestAborted);
         ViewData["Title"] = title;
         return View("Facility", result.Page);
+    }
+
+    private static void HideOwnedResubmit(FacilityReportRow? report, string? automationRunId)
+    {
+        if (report is not null)
+            HideOwnedResubmit([report], automationRunId);
+    }
+
+    private static void HideOwnedResubmit(IEnumerable<FacilityReportRow> reports, string? automationRunId)
+    {
+        if (string.IsNullOrWhiteSpace(automationRunId))
+            return;
+
+        foreach (var report in reports)
+            report.CanResubmit = FacilityViewRules.CanResubmit(report.Status, report.Deleted, isAutomationOwned: true);
     }
 
     private async Task StampAsync(string? facilityId, Action<string?> assign, CancellationToken cancellationToken)
