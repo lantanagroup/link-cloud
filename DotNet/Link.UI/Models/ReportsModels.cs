@@ -115,6 +115,9 @@ public sealed class GenerateReportPage
     public string? MeasuresNote { get; set; }
     public string? Error { get; set; }
     public Guid? GeneratedReportId { get; set; }
+
+    /// <summary>When automation is on, this form rejects facilities an automation run owns.</summary>
+    public bool AutomationFacilitiesExcluded { get; set; }
 }
 
 public class ReportSectionPage
