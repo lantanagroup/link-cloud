@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Audit;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Filters;
 using Yarp.ReverseProxy.Transforms;
 
@@ -20,6 +21,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
                     if (proxyOptions.Environment.IsDevelopment() && enableAnonymous)
                         logger.Error("Anonymous access is enabled in development mode. This is a security risk.");
+
+                    // Background callers send a system token plus the user who started the work.
+                    // Log that pairing once per proxied call; header values are never trusted for access.
+                    builderContext.AddRequestTransform(transformContext =>
+                    {
+                        var entry = InitiatedByAudit.Read(transformContext.HttpContext);
+                        if (entry is { } e)
+                        {
+                            logger.Information(
+                                "Proxied {Method} {Route} as {Principal}, started by {InitiatedById} ({InitiatedByName})",
+                                transformContext.HttpContext.Request.Method,
+                                builderContext.Route.RouteId,
+                                e.Principal,
+                                e.InitiatedById,
+                                e.InitiatedByName ?? string.Empty);
+                        }
+                        return ValueTask.CompletedTask;
+                    });
 
                     if (!enableAnonymous)
                     {

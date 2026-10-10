@@ -22,6 +22,15 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public TerminologyServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
+
     /// <inheritdoc />
     // Flurl drops a null query parameter, so an unsupplied filter is omitted from the URL rather than
     // sent empty -- which matters here, because the service rejects a blank codeSystem or valueSet

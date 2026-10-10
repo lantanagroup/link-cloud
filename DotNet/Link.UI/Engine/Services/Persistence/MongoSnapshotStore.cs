@@ -129,6 +129,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.SetOnInsert(r => r.RunId, summary.RunId)
         };
 
+        // The initiator is set once at start; later summaries without it must not clear it.
+        if (!string.IsNullOrWhiteSpace(summary.InitiatedById))
+        {
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.InitiatedById, summary.InitiatedById));
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.InitiatedByName, summary.InitiatedByName));
+        }
+
         // A later summary written before the flag is set must not clear a true marker.
         if (summary.AutomationCreatedFacility)
             updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.AutomationCreatedFacility, true));
@@ -504,6 +511,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             FinishedAt = doc.FinishedAt,
             Error = doc.Error,
             RetentionNotice = doc.RetentionNotice,
+            InitiatedById = doc.InitiatedById,
+            InitiatedByName = doc.InitiatedByName,
             Duration = Link.UI.Services.RunDuration.Resolve(
                 doc.Duration,
                 doc.Status,
