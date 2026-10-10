@@ -1,7 +1,15 @@
 /* Patient resource explorer and the on-demand type graph. Clusters only; identifiers stay paged. */
 (function () {
     var graphUrl = "";
-    var colors = ["#343a40", "#28a745", "#ffc107", "#dc3545", "#6f42c1", "#111111", "#fd7e14", "#545c64", "#adb5bd"];
+    function cssColor(name, fallback) {
+        try {
+            var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return value || fallback;
+        } catch (ignore) {
+            return fallback;
+        }
+    }
+    var colors = ["#343a40", cssColor("--au-success", "#1e7e34"), "#ffc107", "#dc3545", "#6f42c1", "#111111", "#fd7e14", "#545c64", "#adb5bd"];
     var summaryAbort = null;
     var pageAbort = null;
     var state = null;
@@ -643,7 +651,7 @@
             row.appendChild(idCell("Resource", node.id));
             var open = document.createElement("button");
             open.type = "button";
-            open.className = "btn btn-sm btn-au-link lu-icon-btn";
+            open.className = "btn btn-sm lu-icon-btn lu-icon-quiet";
             open.title = "Open";
             open.setAttribute("aria-label", "Open resource");
             var eye = document.createElement("i");
@@ -718,18 +726,14 @@
         var pre = document.createElement("pre");
         pre.className = "lu-graph-raw mb-2";
         pre.textContent = body.json || body.note || "No JSON was kept for this resource.";
-        var copy = document.createElement("button");
-        copy.type = "button";
-        copy.className = "btn btn-sm btn-au-link lu-icon-btn lu-copy";
-        copy.setAttribute("data-lu-copy", body.json || "");
-        copy.title = "Copy resource";
-        copy.setAttribute("aria-label", "Copy resource");
-        var mark = document.createElement("i");
-        mark.className = "bi bi-copy";
-        mark.setAttribute("aria-hidden", "true");
-        copy.appendChild(mark);
-        if (!body.json) copy.disabled = true;
-        raw.appendChild(copy);
+        if (window.luCopyControl) {
+            var copyHost = document.createElement("div");
+            copyHost.className = "lu-msg-copy";
+            copyHost.innerHTML = window.luCopyControl(body.json || "", "Copy resource");
+            var copy = copyHost.querySelector("button");
+            if (copy && !body.json) copy.disabled = true;
+            raw.appendChild(copyHost);
+        }
         raw.appendChild(pre);
         aside.appendChild(details);
         aside.appendChild(raw);
