@@ -28,6 +28,10 @@
         <div class="col-12 col-md-6">
             <label class="form-label" for="facilityId">Facility ID</label>
             <input id="facilityId" name="facilityId" value="@input.FacilityId" class="form-control" required />
+            @if (Model.AutomationFacilitiesExcluded)
+            {
+                <div class="form-text">Automation facilities cannot be used here.</div>
+            }
         </div>
         <div class="col-12 col-md-6">
             <label class="form-label" for="cadence">Period</label>

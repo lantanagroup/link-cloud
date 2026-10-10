@@ -220,7 +220,7 @@ public sealed class FacilityReportRow
     public bool Deleted { get; init; }
     public int? CensusCount { get; init; }
     public int? InitialPopulationCount { get; init; }
-    public bool CanResubmit { get; init; }
+    public bool CanResubmit { get; set; }
     public bool CanAbort { get; init; }
     public bool CanCleanUp { get; init; }
     public bool CanRestore { get; init; }
