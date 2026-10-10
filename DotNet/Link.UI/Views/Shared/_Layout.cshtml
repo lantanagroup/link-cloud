@@ -23,6 +23,13 @@
     <script src="~/js/chart-frame.js" asp-append-version="true"></script>
     <script src="~/js/lu-query.js" asp-append-version="true"></script>
     <script>
+        window.luCopyControl = function (value, label) {
+            var raw = value == null ? "" : String(value);
+            var safe = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            var title = String(label || "Copy").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            return '<button type="button" class="btn btn-sm btn-au-link lu-icon-btn lu-copy" data-lu-copy="' + safe
+                + '" title="' + title + '" aria-label="' + title + '"><i class="bi bi-copy" aria-hidden="true"></i><span class="visually-hidden">Copy</span></button>';
+        };
         window.luLabeledId = function (label, value) {
             var raw = value == null ? "" : String(value);
             var trimmed = raw.trim();
