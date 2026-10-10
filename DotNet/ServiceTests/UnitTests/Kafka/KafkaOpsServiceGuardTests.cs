@@ -35,6 +35,150 @@ public class KafkaOpsServiceGuardTests
         Assert.True(KafkaOpsExecution.Allows(false, true, KafkaChangeKind.ScaleReplicas));
         Assert.False(KafkaOpsExecution.Allows(true, false, KafkaChangeKind.ScaleReplicas));
         Assert.False(KafkaOpsExecution.Allows(false, false, KafkaChangeKind.ScaleReplicas));
+        Assert.True(KafkaOpsExecution.Allows(true, false, KafkaChangeKind.ReplicationFactor));
+        Assert.False(KafkaOpsExecution.Allows(false, true, KafkaChangeKind.ReplicationFactor));
+        Assert.True(KafkaOpsExecution.Allows(true, false, KafkaChangeKind.Produce));
+        Assert.False(KafkaOpsExecution.Allows(false, true, KafkaChangeKind.Produce));
+    }
+
+    [Fact]
+    public void Routes_MapReplicationFactorAndProduce()
+    {
+        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Admin.BFF", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs"));
+        Assert.Contains("MapPost(\"/topics/{topic}/replication-factor/plan\"", text, StringComparison.Ordinal);
+        Assert.Contains("MapPost(\"/topics/{topic}/replication-factor\"", text, StringComparison.Ordinal);
+        Assert.Contains("MapPost(\"/topics/{topic}/messages\"", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReplicationFactorPlan_KeepsTheLeaderAndRefusesAnUnsafeTarget()
+    {
+        var brokers = new List<BrokerSnapshot>
+        {
+            new() { Id = 0, Rack = "a", State = "up", PartitionCount = 4 },
+            new() { Id = 1, Rack = "b", State = "up", PartitionCount = 4 },
+            new() { Id = 2, Rack = "c", State = "up", PartitionCount = 4 }
+        };
+        var placements = new List<PartitionPlacement>
+        {
+            new() { Topic = "ResourcesAcquired", Partition = 0, Leader = 0, Replicas = [0, 1, 2], Isr = [0, 1, 2] },
+            new() { Topic = "ResourcesAcquired", Partition = 1, Leader = 1, Replicas = [1, 2, 0], Isr = [1, 2, 0] },
+            new() { Topic = "ResourcesAcquired", Partition = 2, Leader = 2, Replicas = [2, 0, 1], Isr = [2, 0, 1] }
+        };
+
+        var evaluation = ReplicationFactorPlanner.Evaluate("ResourcesAcquired", 2, 10_485_760, 2, true, brokers, placements, "", 1, 25);
+        Assert.True(evaluation.Plan.Accepted, evaluation.Plan.Summary);
+        Assert.Contains("3 to 2", evaluation.Plan.Summary, StringComparison.Ordinal);
+        Assert.Equal(3, evaluation.Assignments.Count);
+        Assert.All(evaluation.Assignments, row =>
+        {
+            Assert.Equal(2, row.After.Count);
+            Assert.Contains(row.Leader, row.After);
+            Assert.DoesNotContain(row.Leader, row.Removed);
+        });
+
+        var high = ReplicationFactorPlanner.Evaluate("ResourcesAcquired", 4, 10_485_760, 2, true, brokers, placements, "", 1, 25);
+        Assert.False(high.Plan.Accepted);
+        Assert.Contains("online", high.Plan.Summary, StringComparison.Ordinal);
+
+        var low = ReplicationFactorPlanner.Evaluate("ResourcesAcquired", 1, 10_485_760, 2, true, brokers, placements, "", 1, 25);
+        Assert.False(low.Plan.Accepted);
+        Assert.Contains("min.insync.replicas", low.Plan.Summary, StringComparison.Ordinal);
+
+        var throttle = ReplicationFactorPlanner.Evaluate("ResourcesAcquired", 2, 0, 2, true, brokers, placements, "", 1, 25);
+        Assert.False(throttle.Plan.Accepted);
+        Assert.Contains("throttle", throttle.Plan.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReplicationFactor_SubmitsAThrottledReassignment_ThenClearsItWhenTheIsrIsFull()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: true);
+        broker.Configs["min.insync.replicas"] = "1";
+        broker.Brokers =
+        [
+            new BrokerSnapshot { Id = 0, Rack = "a", State = "up", PartitionCount = 4 },
+            new BrokerSnapshot { Id = 1, Rack = "b", State = "up", PartitionCount = 4 },
+            new BrokerSnapshot { Id = 2, Rack = "c", State = "up", PartitionCount = 4 }
+        ];
+        broker.Placements.AddRange(
+        [
+            new PartitionPlacement { Topic = "ResourcesAcquired", Partition = 0, Leader = 0, Replicas = [0, 1, 2], Isr = [0, 1, 2] },
+            new PartitionPlacement { Topic = "ResourcesAcquired", Partition = 1, Leader = 1, Replicas = [1, 2, 0], Isr = [1, 2, 0] }
+        ]);
+
+        var refused = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateReplicationFactorAsync(Operator(), "ResourcesAcquired", 2, 10_485_760, "drop a replica", "wrong", "corr", CancellationToken.None));
+        Assert.Contains("topic name", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, infra.ApplyCalls);
+
+        var missing = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateReplicationFactorAsync(Operator(), "ResourcesAcquired", 2, 10_485_760, " ", "ResourcesAcquired", "corr", CancellationToken.None));
+        Assert.Contains("reason", missing.Message, StringComparison.OrdinalIgnoreCase);
+
+        var created = await service.CreateReplicationFactorAsync(Operator(), "ResourcesAcquired", 2, 10_485_760, "drop a replica", "ResourcesAcquired", "corr-rf", CancellationToken.None);
+        Assert.Equal(KafkaChangeKind.ReplicationFactor, created.Kind);
+        Assert.Equal(KafkaChangeStatus.Converging, created.Status);
+        Assert.Equal(3, created.BeforeReplicationFactor);
+        Assert.Equal(2, created.TargetReplicationFactor);
+        Assert.Equal(10_485_760, created.ThrottleBytesPerSecond);
+        Assert.Equal(10_485_760, infra.LastThrottle);
+        Assert.StartsWith("link-ops-", created.RebalanceName, StringComparison.Ordinal);
+        Assert.Contains("Throttle set to", created.Steps[0], StringComparison.Ordinal);
+        Assert.False(created.ThrottleCleared);
+        Assert.Equal(1, infra.ApplyCalls);
+
+        await service.TrackAsync(CancellationToken.None);
+        var waiting = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Converging, waiting!.Status);
+        Assert.False(waiting.ThrottleCleared);
+
+        using var document = JsonDocument.Parse(infra.LastJson);
+        broker.Placements.Clear();
+        foreach (var entry in document.RootElement.GetProperty("partitions").EnumerateArray())
+        {
+            var replicas = entry.GetProperty("replicas").EnumerateArray().Select(item => item.GetInt32()).ToList();
+            broker.Placements.Add(new PartitionPlacement
+            {
+                Topic = entry.GetProperty("topic").GetString() ?? "",
+                Partition = entry.GetProperty("partition").GetInt32(),
+                Leader = replicas[0],
+                Replicas = replicas,
+                Isr = replicas.ToList()
+            });
+        }
+
+        await service.TrackAsync(CancellationToken.None);
+        var done = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Done, done!.Status);
+        Assert.True(done.ThrottleCleared);
+        Assert.Contains(done.Steps, step => step == "Throttle cleared.");
+        Assert.Equal(1, infra.ReleaseCalls);
+        Assert.Contains("Throttle cleared", done.Progress, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Produce_RequiresConfirmationAndWritesOneCatalogMessage()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: false);
+        var wrong = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ProduceMessageAsync(Operator(), "ResourcesAcquired", "X-Note: a: b", "fac-1", "{\"ok\":true}", "restage a copy", "wrong", "corr", CancellationToken.None));
+        Assert.Equal(KafkaProduceGuard.ConfirmSentence, wrong.Message);
+        Assert.Empty(broker.Produced);
+
+        var unknown = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ProduceMessageAsync(Operator(), "NotAPipelineTopic", "", "k", "v", "restage a copy", "NotAPipelineTopic", "corr", CancellationToken.None));
+        Assert.Contains("catalog", unknown.Message, StringComparison.OrdinalIgnoreCase);
+
+        var created = await service.ProduceMessageAsync(Operator(), "ResourcesAcquired", "X-Note: a: b", "fac-1", "{\"ok\":true}", "restage a copy", "ResourcesAcquired", "corr-produce", CancellationToken.None);
+        Assert.Equal(KafkaChangeKind.Produce, created.Kind);
+        Assert.Equal(KafkaChangeStatus.Done, created.Status);
+        Assert.Equal("ResourcesAcquired", created.Topic);
+        Assert.Equal("One message was produced.", created.Progress);
+        Assert.Single(broker.Produced);
+        Assert.Equal("fac-1", broker.Produced[0].Key);
+        Assert.Equal("{\"ok\":true}", broker.Produced[0].Value);
+        Assert.Contains(broker.Produced[0].Headers, header => header.Name == "X-Note" && header.Value == "a: b");
     }
 
     [Fact]
@@ -1563,6 +1707,9 @@ public class KafkaOpsServiceGuardTests
         public int CancelCalls { get; private set; }
         public int ReleaseCalls { get; private set; }
         public string LastRebalanceName { get; private set; } = "";
+        public long LastThrottle { get; private set; } = -1;
+        public string LastJson { get; private set; } = "";
+        public int ApplyCalls { get; private set; }
 
         public Task ScaleGroupAsync(string groupId, int replicas, CancellationToken cancellationToken)
         {
@@ -1579,8 +1726,14 @@ public class KafkaOpsServiceGuardTests
             return Task.CompletedTask;
         }
 
-        public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken)
+        public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken) =>
+            ApplyReassignmentAsync(reassignmentJson, rebalanceName, 0, cancellationToken);
+
+        public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, long throttleBytesPerSecond, CancellationToken cancellationToken)
         {
+            ApplyCalls++;
+            LastThrottle = throttleBytesPerSecond;
+            LastJson = reassignmentJson;
             LastRebalanceName = rebalanceName;
             return Task.CompletedTask;
         }
@@ -1613,6 +1766,9 @@ public class KafkaOpsServiceGuardTests
         public List<(string Topic, int Count)> Increases { get; } = [];
         public string? FailIncreaseTopic { get; set; }
         public List<PartitionPlacement> Placements { get; } = [];
+        public List<BrokerSnapshot>? Brokers { get; set; }
+        public Dictionary<string, string> Configs { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<(string Topic, string? Key, string? Value, List<KafkaProduceHeader> Headers)> Produced { get; } = [];
         public ReassignmentListing Reassignments { get; set; } = new() { Known = true };
         public List<ElectionType> Elections { get; } = [];
         public Exception? ElectionError { get; set; }
@@ -1632,7 +1788,8 @@ public class KafkaOpsServiceGuardTests
                 Partitions = _counts.TryGetValue(name, out var count) ? count : 3,
                 ReplicationFactor = 3,
                 HighWatermarks = [0],
-                CanAlterPartitions = true
+                CanAlterPartitions = true,
+                Configs = new Dictionary<string, string>(Configs, StringComparer.OrdinalIgnoreCase)
             }).ToList();
             return Task.FromResult(rows);
         }
@@ -1656,6 +1813,12 @@ public class KafkaOpsServiceGuardTests
             return Task.CompletedTask;
         }
 
+        public Task ProduceRecordAsync(string topic, string? key, string? value, IReadOnlyList<KafkaProduceHeader> headers, CancellationToken cancellationToken)
+        {
+            Produced.Add((topic, key, value, headers.ToList()));
+            return Task.CompletedTask;
+        }
+
         public Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken)
         {
             if (string.Equals(topic, FailIncreaseTopic, StringComparison.OrdinalIgnoreCase))
@@ -1667,19 +1830,20 @@ public class KafkaOpsServiceGuardTests
 
         public Task<ClusterSnapshot> DescribeClusterAsync(CancellationToken cancellationToken)
         {
+            var brokers = Brokers ??
+            [
+                new BrokerSnapshot { Id = 0, State = "up" },
+                new BrokerSnapshot { Id = 1, State = "up" },
+                new BrokerSnapshot { Id = 2, State = "up" },
+                new BrokerSnapshot { Id = 3, State = "up" }
+            ];
             return Task.FromResult(new ClusterSnapshot
             {
-                BrokerCount = 4,
+                BrokerCount = brokers.Count,
                 ControllerId = ControllerId,
                 ControllerRolesKnown = RolesKnown,
                 ControllerEligibleIds = Eligible.ToList(),
-                Brokers =
-                [
-                    new BrokerSnapshot { Id = 0, State = "up" },
-                    new BrokerSnapshot { Id = 1, State = "up" },
-                    new BrokerSnapshot { Id = 2, State = "up" },
-                    new BrokerSnapshot { Id = 3, State = "up" }
-                ],
+                Brokers = brokers.ToList(),
                 Placements = Placements.ToList()
             });
         }
