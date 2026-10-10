@@ -25,7 +25,7 @@
     </div>
     <div data-au-table>
         <div class="table-responsive">
-            <table class="table au-table mb-0">
+            <table class="table au-table table-sm align-middle mb-0">
                 <thead>
                     <tr>
                         <th>@Html.Raw(Header("runName", "Run"))</th>
@@ -55,7 +55,7 @@
                         <td>@run.PatientCount</td>
                         <td>@run.Seed</td>
                         <td>
-                            <span class="badge run-status-badge @Badge(run)" data-run-id="@run.RunId">@run.StatusLabel</span>
+                            <span class="badge @Badge(run)" data-run-id="@run.RunId">@run.StatusLabel</span>
                         </td>
                         <td class="small text-muted">@(run.Duration ?? "–")</td>
                         <td>@LinkUiTime.Display(run.CreatedAt)</td>
