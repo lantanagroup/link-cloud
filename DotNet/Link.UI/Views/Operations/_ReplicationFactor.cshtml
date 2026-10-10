@@ -12,20 +12,24 @@
     var throttleValue = query.RfThrottle > 0 ? query.RfThrottle : ReplicationFactorRules.DefaultThrottle;
     var plan = Model.ReplicationPlan;
     var rfStep = Model.Request?.Kind == "ReplicationFactor" ? 4 : plan is not null ? 3 : 1;
-    <h2 class="h5 mt-4">Change replication factor</h2>
-    <p>This moves replicas. It does not add or remove partitions. Preview the plan first. Nothing moves until the request is submitted, and the throttle is cleared only after every new replica is in the ISR.</p>
-    <ol class="lu-kafka-steps">
+    <section class="card au-card mt-4 mb-3">
+    <h2 class="card-header h6 mb-0">Change replication factor</h2>
+    <div class="card-body">
+    <p class="mb-2">This moves replicas. It does not add or remove partitions. Preview the plan first. Nothing moves until the request is submitted, and the throttle is cleared only after every new replica is in the ISR.</p>
+    <ol class="lu-kafka-steps mb-2">
         <li>Set the target factor and the throttle.</li>
         <li>Preview the replica each partition would gain or lose.</li>
         <li>Review the result. A refusal names the reason and changes nothing.</li>
         <li>Type the topic name and request the change. Track it until the throttle clears.</li>
     </ol>
-    <p class="mb-3">
+    <p class="mb-0">
         <span class="badge @StatusPills.ForWizardStep(rfStep, 1)">1 Set the target</span>
         <span class="badge @StatusPills.ForWizardStep(rfStep, 2)">2 Preview</span>
         <span class="badge @StatusPills.ForWizardStep(rfStep, 3)">3 Review</span>
         <span class="badge @StatusPills.ForWizardStep(rfStep, 4)">4 Track</span>
     </p>
+    </div>
+    </section>
     <form class="mt-3" method="post" action="/Operations/Kafka/replication-factor/plan" data-kafka-busy="Dry run is running.">
         @Html.AntiForgeryToken()
         <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true })" />

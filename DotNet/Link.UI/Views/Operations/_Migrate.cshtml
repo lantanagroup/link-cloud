@@ -20,22 +20,26 @@
     var currentPartitions = topic?.Partitions ?? detail?.Partitions ?? 0;
 }
 
-<h2 class="h5 mt-3">Migrate a topic</h2>
-<p>Migrating makes room for more partitions when an in-place increase is not the right tool. It stops the workloads that use the topic, copies the log to a backup, deletes the topic, and creates it empty at the new partition count. Consumer groups start at offset 0. Nothing is copied back onto the new topic. The backup stays until a person deletes it or retention expires.</p>
-<ol class="lu-kafka-steps">
+<section class="card au-card mt-3 mb-3">
+<h2 class="card-header h6 mb-0">Migrate a topic</h2>
+<div class="card-body">
+<p class="mb-2">Migrating makes room for more partitions when an in-place increase is not the right tool. It stops the workloads that use the topic, copies the log to a backup, deletes the topic, and creates it empty at the new partition count. Consumer groups start at offset 0. Nothing is copied back onto the new topic. The backup stays until a person deletes it or retention expires.</p>
+<ol class="lu-kafka-steps mb-2">
     <li>Choose the topic and the target partition count.</li>
     <li>Dry run checks the plan and changes nothing.</li>
     <li>Review the result. A refusal lists each reason that blocks it.</li>
     <li>Request submits the real migration for approval. Type the topic name first.</li>
     <li>Track approval, execution, and recovery on this page.</li>
 </ol>
-<p class="mb-2">
+<p class="mb-0">
     <span class="badge @StatusPills.ForWizardStep(migrateStep, 1)">1 Choose a topic</span>
     <span class="badge @StatusPills.ForWizardStep(migrateStep, 2)">2 Dry run</span>
     <span class="badge @StatusPills.ForWizardStep(migrateStep, 3)">3 Review</span>
     <span class="badge @StatusPills.ForWizardStep(migrateStep, 4)">4 Request</span>
     <span class="badge @StatusPills.ForWizardStep(migrateStep, 5)">5 Track</span>
 </p>
+</div>
+</section>
 
 <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Migrate" />
