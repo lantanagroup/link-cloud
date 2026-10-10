@@ -9,6 +9,15 @@ namespace Link.UI.Tests;
 public class ReportManifestRulesTests
 {
     [Fact]
+    public void A_donut_gradient_splits_the_circle_by_count()
+    {
+        ReportManifestRules.DonutGradient([1, 1], ["#111111", "#28a745"])
+            .Should().Be("#111111 0% 50%, #28a745 50% 100%");
+        ReportManifestRules.DonutGradient([], ["#111111"]).Should().Be("#e6e6e6");
+        ReportManifestRules.DonutGradient([0], ["#111111"]).Should().Be("#e6e6e6");
+    }
+
+    [Fact]
     public void Page_size_stays_on_the_allowed_set()
     {
         var query = ReportManifestRules.Normalize("  ", "nope", "asc", null, null, 0, 15, 0, 0, 0, 1000, -1, "total");
@@ -301,7 +310,9 @@ public class ReportManifestRulesTests
     {
         var page = ReportManifestRules.SampleReport(Query());
         var model = page.Manifest!;
-        model.Lead.Should().NotContain("patient table");
+        model.Lead.Should().BeEmpty();
+        model.Notice.Should().BeNull();
+        model.EligibilityText.Should().BeEmpty();
         model.Populations.Should().ContainSingle();
         model.Populations[0].Rate.Should().Be("73.3%");
         model.ShowValidation.Should().BeTrue();
@@ -324,8 +335,16 @@ public class ReportManifestRulesTests
         view.Should().Contain("name = item.Name");
         view.Should().Contain("href = item.Href");
         view.Should().Contain("id = item.Id");
-        view.Should().Contain("Patients by validation");
+        view.Should().Contain("lu-donut-legend");
+        view.Should().Contain("lu-donut-ring");
+        view.Should().Contain("Passed validation");
+        view.Should().Contain("mountDonut");
+        view.Should().NotContain("Fixture data");
+        view.Should().NotContain("Report overview");
+        view.Should().NotContain("Largest is");
+        view.Should().NotContain("Patients by validation");
         view.Should().NotContain("maintainAspectRatio: true");
+        view.IndexOf("lu-section-nav", StringComparison.Ordinal).Should().BeLessThan(view.IndexOf("id=\"manifest-overview\"", StringComparison.Ordinal));
         view.Should().Contain("id=\"manifest-populations\"");
     }
 

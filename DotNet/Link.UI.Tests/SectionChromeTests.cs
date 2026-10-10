@@ -80,7 +80,7 @@ public class SectionChromeTests
         run.Should().NotContain("maintainAspectRatio: true");
 
         var manifest = File.ReadAllText(Path.Combine(root, "Views", "Shared", "_ReportManifest.cshtml"));
-        manifest.Should().Contain("lu-chart-donut");
+        manifest.Should().Contain("lu-donut-ring");
         manifest.Should().Contain("class=\"lu-chart mb-3\"");
         manifest.Should().NotContain("maintainAspectRatio: true");
         manifest.Should().NotContain("max-height:320px");
