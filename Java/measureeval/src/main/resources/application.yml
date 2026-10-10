@@ -20,7 +20,13 @@ management:
     diskspace:
       enabled: false
     mongo:
-      enabled: false
+      enabled: false   # auto Mongo indicator disabled; MongoHealthIndicator checks the ping
+      timeout-ms: 2000 # backstop deadline for the ping; an unreachable mongod otherwise blocks for
+                       # the driver's serverSelectionTimeoutMS (30s by default), which pushes /health
+                       # past the BFF's 5s health-check timeout and blanks the dashboard entries.
+                       # Spring runs indicators sequentially, so this has to leave room for the
+                       # resource-cache check below: 2s + 2s (its Redis command timeout) stays under 5s
+                       # even with both backends unreachable at once.
     redis:
       enabled: false     # auto Redis indicator disabled; ResourceCacheHealthIndicator checks Redis + ABS
     resource-cache:
