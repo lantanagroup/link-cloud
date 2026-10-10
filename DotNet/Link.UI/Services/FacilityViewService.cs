@@ -37,7 +37,7 @@ public sealed class FacilityViewService
     private readonly IAdminBffIntegrationClient? _admin;
     private readonly LinkUiFeatureOptions _options;
     private readonly ILogger<FacilityViewService> _logger;
-    private readonly Func<CancellationToken, Task<AutomationOwnershipIndex>>? _ownership;
+    private readonly Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? _ownership;
 
     public FacilityViewService(
         IFacilityServiceClient facilities,
@@ -48,7 +48,7 @@ public sealed class FacilityViewService
         IAdminBffIntegrationClient? admin,
         IOptions<LinkUiFeatureOptions> options,
         ILogger<FacilityViewService> logger,
-        Func<CancellationToken, Task<AutomationOwnershipIndex>>? ownership = null)
+        Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? ownership = null)
     {
         _facilities = facilities;
         _reports = reports;
@@ -75,7 +75,7 @@ public sealed class FacilityViewService
             Blank(registry.AdminBffServiceUrl) ? null : services.GetRequiredService<IAdminBffIntegrationClient>(),
             options,
             services.GetRequiredService<ILogger<FacilityViewService>>(),
-            ownership.GetAsync);
+            ownership.GetSnapshotAsync);
     }
 
     public async Task<FacilityViewModel> LoadAsync(string? facilityId, FacilityViewQuery? query, CancellationToken cancellationToken)
@@ -204,6 +204,7 @@ public sealed class FacilityViewService
 
             var counts = await CountsAsync(schedule.Body.Id, cancellationToken);
             page.Report = ToReportRow(schedule.Body, counts.Census, counts.Population);
+            await StampResubmitAsync(page.Report, page.FacilityId, cancellationToken);
 
             var pageSize = FacilityViewRules.ClampPageSize(query.PageSize);
             var pageNumber = FacilityViewRules.ClampPage(query.Page);
@@ -244,10 +245,12 @@ public sealed class FacilityViewService
     public Task<FacilityViewAction> ResubmitAsync(string? facilityId, string? reportId, bool bypassSubmission, CancellationToken cancellationToken) =>
         ChangeReportAsync(facilityId, reportId, includeDeleted: false, cancellationToken, async (id, report, schedule) =>
         {
-            var owned = await AutomationOwnsAsync(id, cancellationToken);
-            if (!FacilityViewRules.CanResubmit(schedule.Status, schedule.IsDeleted == true, owned))
+            var gate = await OwnershipGateAsync(id, cancellationToken);
+            if (gate.Unreachable)
+                return Fail(AutomationMarkRules.OwnershipUnreachable);
+            if (!FacilityViewRules.CanResubmit(schedule.Status, schedule.IsDeleted == true, gate.Blocked))
             {
-                return Fail(owned
+                return Fail(gate.Blocked
                     ? AutomationMarkRules.AdHocReportBlocked
                     : "Only a submitted report can be resubmitted.");
             }
@@ -395,6 +398,7 @@ public sealed class FacilityViewService
         var counts = await Task.WhenAll(records.Select(record => CountsAsync(record.Id, cancellationToken)));
         page.Paging = Bar(response.Body.Metadata, pageNumber, pageSize, records.Count);
         page.Reports = records.Select((record, index) => ToReportRow(record, counts[index].Census, counts[index].Population)).ToList();
+        await StampResubmitAsync(page.Reports, page.FacilityId, cancellationToken);
     }
 
     private async Task<(int? Census, int? Population)> CountsAsync(Guid reportId, CancellationToken cancellationToken)
@@ -738,13 +742,38 @@ public sealed class FacilityViewService
         Hsloc = row.HslocMappingStatus.ToString()
     };
 
-    private async Task<bool> AutomationOwnsAsync(string? facilityId, CancellationToken cancellationToken)
+    private async Task StampResubmitAsync(FacilityReportRow? row, string? facilityId, CancellationToken cancellationToken)
+    {
+        if (row is null)
+            return;
+        await StampResubmitAsync([row], facilityId, cancellationToken);
+    }
+
+    /// <summary>
+    /// One ownership read for the facility, then every row on the page.
+    /// A miss closes resubmit. An empty index is not the same as "this facility is not owned".
+    /// </summary>
+    private async Task StampResubmitAsync(IReadOnlyList<FacilityReportRow> rows, string? facilityId, CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0)
+            return;
+
+        var gate = await OwnershipGateAsync(facilityId, cancellationToken);
+        foreach (var row in rows)
+            row.CanResubmit = FacilityViewRules.CanResubmit(row.Status, row.Deleted, gate.Blocked);
+    }
+
+    private readonly record struct OwnershipGate(bool Blocked, bool Unreachable);
+
+    private async Task<OwnershipGate> OwnershipGateAsync(string? facilityId, CancellationToken cancellationToken)
     {
         if (!_options.AutomationEnabled || _ownership is null)
-            return false;
+            return new(false, false);
 
-        var index = await _ownership(cancellationToken);
-        return index.Contains(facilityId);
+        var (index, reachable) = await _ownership(cancellationToken);
+        if (!reachable)
+            return new(true, true);
+        return new(index.Contains(facilityId), false);
     }
 
     private static FacilityViewAction Done(string message) => new(true, message);
