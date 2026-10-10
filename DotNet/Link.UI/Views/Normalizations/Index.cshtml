@@ -80,7 +80,7 @@
                                             <br /><small class="text-muted">@op.Description</small>
                                         }
                                     </td>
-                                    <td>@op.OperationType</td>
+                                    <td>@FacilityNormalizationRules.Label(op.OperationType)</td>
                                     <td><small class="text-muted">@string.Join(", ", op.ResourceTypes)</small></td>
                                     <td>
                                         @if (op.IsSystem) { <text>System</text> }
@@ -268,13 +268,10 @@
                         <div class="col-md-6">
                             <label class="form-label" for="OpType">Operation Type</label>
                             <select class="form-select" id="OpType">
-                                <option value="CopyProperty">CopyProperty</option>
-                                <option value="CopyLocation">CopyLocation</option>
-                                <option value="CopyLocationAliasToTypeIteratively">CopyLocationAliasToTypeIteratively</option>
-                                <option value="ConditionalTransform">ConditionalTransform</option>
-                                <option value="CodeMap">CodeMap</option>
-                                <option value="HSLOCMap">HSLOCMap</option>
-                                <option value="RemoveExtensions">RemoveExtensions</option>
+                                @foreach (var operationType in FacilityNormalizationRules.OperationTypes)
+                                {
+                                    <option value="@operationType">@FacilityNormalizationRules.Label(operationType)</option>
+                                }
                             </select>
                         </div>
                         <div class="col-12">
@@ -311,8 +308,14 @@
                             <button type="button" class="btn btn-sm btn-success mt-1" id="btnAddCondition"><i class="bi bi-plus-lg me-1"></i>Add Condition</button>
                         </div>
 
+                        <div class="col-12 op-field op-field-CopyLocation">
+                            <p class="small text-muted mb-0">@FacilityNormalizationRules.CopyLocationDescription</p>
+                        </div>
+                        <div class="col-12 op-field op-field-CopyLocationAliasToTypeIteratively">
+                            <p class="small text-muted mb-0">@FacilityNormalizationRules.CopyAliasDescription</p>
+                        </div>
                         <div class="col-12 op-field op-field-HSLOCMap">
-                            <p class="small text-muted mb-0">HSLOCMap copies Location identifier and alias (including partOf ancestors) onto type, then applies Code System Maps. Target system must be the NHSN HSLOC URL. Do not map a parent hospital identifier if children partOf that hospital.</p>
+                            <p class="small text-muted mb-0">@FacilityNormalizationRules.HslocDescription</p>
                         </div>
 
                         @* --- CodeMap / HSLOCMap fields --- *@
@@ -456,6 +459,8 @@
     const allOperations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(operations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     const allSequences = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sequences, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     const allSuites = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(suites, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+    const operationLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(FacilityNormalizationRules.OperationTypes.ToDictionary(type => type, FacilityNormalizationRules.Label)));
+    function operationLabel(type) { return operationLabels[type] || type; }
     const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
 
     function postJson(url, body) {
@@ -991,7 +996,7 @@
         allOperations.forEach(o => {
             const option = document.createElement('option');
             option.value = o.id;
-            option.textContent = `${o.name} (${o.operationType})`;
+            option.textContent = `${o.name} (${operationLabel(o.operationType)})`;
             option.selected = o.id === selectedOperationId;
             select.appendChild(option);
         });
@@ -1246,7 +1251,7 @@
                 if (!operation) return;
 
                 option.textContent =
-                    `${operation.name} (${operation.operationType})`;
+                    `${operation.name} (${operationLabel(operation.operationType)})`;
 
                 if (sources.length > 0) {
                     option.textContent +=
@@ -1400,7 +1405,7 @@
         allOperations.forEach(o => {
             const option = document.createElement('option');
             option.value = o.id;
-            option.textContent = `${o.name} (${o.operationType})`;
+            option.textContent = `${o.name} (${operationLabel(o.operationType)})`;
 
             if (o.id === selectedId) {
                 option.selected = true;

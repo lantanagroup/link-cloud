@@ -236,6 +236,120 @@ public static class ResourceGraphRules
         return index;
     }
 
+    /// <summary>
+    /// One pass over a patient NDJSON file. Returns one page of matches and the match count.
+    /// Resource bodies stay on the stream.
+    /// </summary>
+    public static async Task<ResourceGraphPage> PageNdjsonAsync(
+        Stream stream,
+        string patientId,
+        string? type,
+        string? query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        var size = pageSize <= 0 ? DefaultPageSize : Math.Min(pageSize, MaxPageSize);
+        var wanted = (type ?? string.Empty).Trim();
+        var text = (query ?? string.Empty).Trim();
+        var requested = Math.Max(page, 1);
+        var skip = (requested - 1) * size;
+        var window = new List<ResourceGraphRecord>(size);
+        var totals = new Dictionary<string, int>(StringComparer.Ordinal);
+        var typeTotal = 0;
+        using (var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 64 * 1024, leaveOpen: true))
+        {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (line is null)
+                break;
+            line = line.Trim();
+            if (line.Length == 0 || line[0] != '{')
+                continue;
+            if (text.Length > 0 && line.IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            if (!TryLineResource(line, out var lineType, out var lineId))
+                continue;
+            if (string.Equals(lineType, "Patient", StringComparison.Ordinal)
+                && string.Equals(lineId, patientId, StringComparison.Ordinal))
+                continue;
+
+            totals.TryGetValue(lineType, out var seen);
+            totals[lineType] = seen + 1;
+            if (wanted.Length > 0 && !string.Equals(lineType, wanted, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (typeTotal >= skip && window.Count < size)
+            {
+                string? snippet = null;
+                if (text.Length > 0 && lineId.IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    var at = line.IndexOf(text, StringComparison.OrdinalIgnoreCase);
+                    if (at >= 0)
+                        snippet = Clip(line, at, text.Length);
+                }
+
+                window.Add(new ResourceGraphRecord(lineType, lineId, [], snippet));
+            }
+
+            typeTotal++;
+        }
+        }
+
+        var pages = typeTotal == 0 ? 0 : (int)Math.Ceiling(typeTotal / (double)size);
+        var current = pages == 0 ? 1 : Math.Min(requested, pages);
+        if (current != requested && stream.CanSeek)
+        {
+            stream.Position = 0;
+            return await PageNdjsonAsync(stream, patientId, wanted, text, current, size, cancellationToken);
+        }
+
+        var matched = text.Length == 0
+            ? null
+            : totals
+                .OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => new ResourceTypeCount(pair.Key, pair.Value))
+                .ToList();
+        var elapsed = (int)Math.Max(0, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+        return new ResourceGraphPage(wanted, window, new ResourceGraphMetadata(size, current, typeTotal, pages), elapsed, matched);
+    }
+
+    private static bool TryLineResource(string line, out string type, out string id)
+    {
+        type = string.Empty;
+        id = string.Empty;
+        try
+        {
+            using var document = JsonDocument.Parse(line);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("resourceType", out var typeNode)
+                || typeNode.ValueKind != JsonValueKind.String
+                || !root.TryGetProperty("id", out var idNode)
+                || idNode.ValueKind != JsonValueKind.String)
+                return false;
+
+            type = typeNode.GetString() ?? string.Empty;
+            id = idNode.GetString() ?? string.Empty;
+            return type.Length > 0 && id.Length > 0;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    internal static string Clip(string hay, int at, int length)
+    {
+        var start = Math.Max(0, at - 24);
+        var end = Math.Min(hay.Length, at + Math.Max(length, 0) + 24);
+        var clip = hay[start..end].Replace('\r', ' ').Replace('\n', ' ');
+        return clip.Length <= 80 ? clip : clip[..80];
+    }
+
     public static ResourceGraphIndex Unavailable(string patientId, string error)
     {
         var index = Finish(patientId, [], null, false, false, false, error, Stopwatch.GetTimestamp());
@@ -779,6 +893,7 @@ public sealed class ResourceGraphIndex
     public string PatientId { get; }
     public string Origin { get; internal set; } = "bundle";
     public SubmissionBlobAddress? Address { get; internal set; }
+    public bool HasSearchableBodies => _synthetic || _slices is { Count: > 0 };
     public int Total => _nodes.Count;
     public bool Truncated { get; }
     public bool BodiesDropped { get; }
@@ -818,32 +933,60 @@ public sealed class ResourceGraphIndex
         return raw with { Json = pretty, Truncated = truncated, Note = null };
     }
 
-    public ResourceGraphPage Page(string? type, string? query, int page, int pageSize)
+    public ResourceGraphPage Page(string? type, string? query, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var started = Stopwatch.GetTimestamp();
         var size = pageSize <= 0 ? ResourceGraphRules.DefaultPageSize : Math.Min(pageSize, ResourceGraphRules.MaxPageSize);
         var wanted = (type ?? string.Empty).Trim();
         var text = (query ?? string.Empty).Trim();
         var requested = Math.Max(page, 1);
-        var window = TakePage(wanted, text, (requested - 1) * size, size, out var total);
+        var matched = text.Length == 0 ? null : new Dictionary<string, int>(StringComparer.Ordinal);
+        var window = TakePage(wanted, text, (requested - 1) * size, size, matched, cancellationToken, out var total);
         var pages = total == 0 ? 0 : (int)Math.Ceiling(total / (double)size);
         var current = pages == 0 ? 1 : Math.Min(requested, pages);
         if (current != requested)
-            window = TakePage(wanted, text, (current - 1) * size, size, out _);
-        var taken = window.Select(node => new ResourceGraphRecord(node.Type, node.Id, node.Refs)).ToList();
+            window = TakePage(wanted, text, (current - 1) * size, size, matched: null, cancellationToken, out _);
+        var taken = window.Select(node => new ResourceGraphRecord(
+            node.Type,
+            node.Id,
+            node.Refs,
+            text.Length == 0 ? null : Snippet(node, text))).ToList();
         var elapsed = (int)Math.Max(0, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
-        return new ResourceGraphPage(wanted, taken, new ResourceGraphMetadata(size, current, total, pages), elapsed);
+        IReadOnlyList<ResourceTypeCount>? matchedTypes = matched is null
+            ? null
+            : matched
+                .OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => new ResourceTypeCount(pair.Key, pair.Value))
+                .ToList();
+        return new ResourceGraphPage(wanted, taken, new ResourceGraphMetadata(size, current, total, pages), elapsed, matchedTypes);
     }
 
-    private List<GraphNode> TakePage(string type, string text, int skip, int size, out int total)
+    private List<GraphNode> TakePage(
+        string type,
+        string text,
+        int skip,
+        int size,
+        Dictionary<string, int>? matched,
+        CancellationToken cancellationToken,
+        out int total)
     {
         total = 0;
         var window = new List<GraphNode>(size);
+        var seen = 0;
         foreach (var node in _nodes)
         {
-            if (type.Length > 0 && !string.Equals(node.Type, type, StringComparison.OrdinalIgnoreCase))
-                continue;
+            if ((++seen & 1023) == 0)
+                cancellationToken.ThrowIfCancellationRequested();
             if (text.Length > 0 && !Matches(node, text))
+                continue;
+            if (matched is not null)
+            {
+                matched.TryGetValue(node.Type, out var count);
+                matched[node.Type] = count + 1;
+            }
+
+            if (type.Length > 0 && !string.Equals(node.Type, type, StringComparison.OrdinalIgnoreCase))
                 continue;
             if (total >= skip && window.Count < size)
                 window.Add(node);
@@ -889,10 +1032,67 @@ public sealed class ResourceGraphIndex
         return new ResourceGraphRaw(found.Type, found.Id, found.Refs, null, false, note);
     }
 
-    private static bool Matches(GraphNode node, string text) =>
+    private bool Matches(GraphNode node, string text) =>
         node.Id.Contains(text, StringComparison.OrdinalIgnoreCase)
         || node.Type.Contains(text, StringComparison.OrdinalIgnoreCase)
-        || node.Refs.Any(item => item.Contains(text, StringComparison.OrdinalIgnoreCase));
+        || node.Refs.Any(item => item.Contains(text, StringComparison.OrdinalIgnoreCase))
+        || SliceHas(node, text)
+        || SyntheticHas(node, text);
+
+    private bool SliceHas(GraphNode node, string text) =>
+        _slices is not null
+        && _slices.TryGetValue(node.Type + "/" + node.Id, out var slice)
+        && slice.Contains(text, StringComparison.OrdinalIgnoreCase);
+
+    private bool SyntheticHas(GraphNode node, string text)
+    {
+        if (!_synthetic)
+            return false;
+        if (FieldHas("resourceType", text) || FieldHas("status", text) || FieldHas("final", text)
+            || FieldHas("subject", text) || FieldHas("reference", text))
+            return true;
+        if (string.Equals(node.Type, "Observation", StringComparison.Ordinal) && FieldHas("encounter", text))
+            return true;
+        return ("Patient/" + PatientId).Contains(text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool FieldHas(string field, string text) =>
+        field.Contains(text, StringComparison.OrdinalIgnoreCase);
+
+    private string? Snippet(GraphNode node, string text)
+    {
+        if (text.Length == 0 || node.Id.Contains(text, StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (_slices is not null && _slices.TryGetValue(node.Type + "/" + node.Id, out var slice))
+        {
+            var at = slice.IndexOf(text, StringComparison.OrdinalIgnoreCase);
+            if (at >= 0)
+                return ResourceGraphRules.Clip(slice, at, text.Length);
+        }
+
+        if (!_synthetic)
+            return null;
+        foreach (var field in SyntheticFields(node))
+        {
+            var at = field.IndexOf(text, StringComparison.OrdinalIgnoreCase);
+            if (at >= 0)
+                return ResourceGraphRules.Clip(field, at, text.Length);
+        }
+
+        return null;
+    }
+
+    private IEnumerable<string> SyntheticFields(GraphNode node)
+    {
+        yield return "resourceType";
+        yield return "status";
+        yield return "final";
+        yield return "subject";
+        yield return "reference";
+        yield return "Patient/" + PatientId;
+        if (string.Equals(node.Type, "Observation", StringComparison.Ordinal))
+            yield return "encounter";
+    }
 
     private string SyntheticJson(GraphNode node)
     {
@@ -934,7 +1134,7 @@ public sealed class ResourceGraphIndex
 
 public sealed record ResourceTypeCount(string Name, int Count);
 
-public sealed record ResourceGraphRecord(string Type, string Id, IReadOnlyList<string> Refs);
+public sealed record ResourceGraphRecord(string Type, string Id, IReadOnlyList<string> Refs, string? Snippet = null);
 
 public sealed record ResourceGraphMetadata(int PageSize, int PageNumber, int TotalCount, int TotalPages);
 
@@ -942,7 +1142,8 @@ public sealed record ResourceGraphPage(
     string Type,
     IReadOnlyList<ResourceGraphRecord> Records,
     ResourceGraphMetadata Metadata,
-    int ElapsedMs);
+    int ElapsedMs,
+    IReadOnlyList<ResourceTypeCount>? MatchedTypes = null);
 
 public sealed record ResourceGraphRaw(
     string Type,
