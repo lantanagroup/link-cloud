@@ -15,22 +15,26 @@
         topicStep = 2;
 }
 
-<h2 class="h5 mt-3">One topic</h2>
-<p>Placement, lag, and partition changes for a single topic. An increase is permanent. Preview it first. Nothing changes until the request is approved and executed.</p>
-<ol class="lu-kafka-steps">
+<section class="card au-card mt-3 mb-3">
+<h2 class="card-header h6 mb-0">One topic</h2>
+<div class="card-body">
+<p class="mb-2">Placement, lag, and partition changes for a single topic. An increase is permanent. Preview it first. Nothing changes until the request is approved and executed.</p>
+<ol class="lu-kafka-steps mb-2">
     <li>Choose the topic.</li>
     <li>Read the partitions that are offline or behind. Placement is one page, worst first.</li>
     <li>Preview an increase, or a family completion when only the siblings are behind.</li>
     <li>Review the result. A refusal lists each reason.</li>
     <li>Submit the request. Type the topic name first.</li>
 </ol>
-<p class="mb-2">
+<p class="mb-0">
     <span class="badge @StatusPills.ForWizardStep(topicStep, 1)">1 Choose a topic</span>
     <span class="badge @StatusPills.ForWizardStep(topicStep, 2)">2 Read placement</span>
     <span class="badge @StatusPills.ForWizardStep(topicStep, 3)">3 Preview</span>
     <span class="badge @StatusPills.ForWizardStep(topicStep, 4)">4 Review</span>
     <span class="badge @StatusPills.ForWizardStep(topicStep, 5)">5 Submit</span>
 </p>
+</div>
+</section>
 
 <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Topic" />

@@ -17,20 +17,24 @@
     string Size(long bytes) => bytes < 0 ? "Not available" : bytes.ToString("N0");
 }
 
-<h2 class="h5 mt-3">Brokers</h2>
-<p>Add a broker, or open one to preview a move. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions.</p>
-<ol class="lu-kafka-steps">
+<section class="card au-card mt-3 mb-3">
+<h2 class="card-header h6 mb-0">Brokers</h2>
+<div class="card-body">
+<p class="mb-2">Add a broker, or open one to preview a move. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions.</p>
+<ol class="lu-kafka-steps mb-2">
     <li>Choose a broker, or register a new one. A rebalance onto a new broker is a separate request.</li>
     <li>Preview a decommission or a rebalance.</li>
     <li>Review the result. A refusal lists each reason. If no moves were planned, the result says so.</li>
     <li>Submit the change. A second approver is required before it runs.</li>
 </ol>
-<p class="mb-2">
+<p class="mb-0">
     <span class="badge @StatusPills.ForWizardStep(brokerStep, 1)">1 Choose a broker</span>
     <span class="badge @StatusPills.ForWizardStep(brokerStep, 2)">2 Preview</span>
     <span class="badge @StatusPills.ForWizardStep(brokerStep, 3)">3 Review</span>
     <span class="badge @StatusPills.ForWizardStep(brokerStep, 4)">4 Submit</span>
 </p>
+</div>
+</section>
 
 @if (!Model.Infra.Enabled)
 {

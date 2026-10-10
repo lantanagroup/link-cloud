@@ -4542,12 +4542,38 @@ tr.lu-kafka-problem > td:first-child {
 .lu-json-string { color: #9be7b4; }
 .lu-json-number { color: #ffd56a; }
 
+fieldset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
 fieldset > legend {
   float: none;
-  width: 100%;
+  width: auto;
   padding: 0;
-  margin: 0 0 .75rem;
+  margin: 0 0 .5rem;
   position: static;
+  font-size: .95rem;
+}
+.lu-page-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.85rem;
+  padding: 0 .6rem;
+  border: 1px solid #d5d8dc;
+  border-radius: .35rem;
+  background: #fff;
+  color: #222;
+  font-size: .8rem;
+  line-height: 1;
+}
+.lu-page-go:hover,
+.lu-page-go:focus {
+  background: rgba(17, 17, 17, .06);
+  border-color: #111;
+  color: #111;
 }
 
 .lu-page-step,

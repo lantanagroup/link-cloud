@@ -49,7 +49,7 @@
             }
             <label class="form-label mb-0" for="@("jump-" + Model.Label.Replace(' ', '-'))">Page</label>
             <input class="form-control form-control-sm" id="@("jump-" + Model.Label.Replace(' ', '-'))" name="@Model.PageKey" type="number" min="1" max="@pages" value="@current" />
-            <button class="btn btn-sm btn-au-execute" type="submit">Go</button>
+            <button class="lu-page-go" type="submit">Go</button>
         </form>
     }
     @if (Model.Sizes.Count > 0)

@@ -47,20 +47,24 @@
     var clock = DateTimeOffset.UtcNow;
 }
 
-<h2 class="h5 mt-3">Read messages</h2>
-<p>This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Time, message type, and an exact facility and patient key narrow what is read. A keyword filters the messages already loaded and does not read again. Search further reads the next batch. An unfiltered topic is paged one page at a time. Export reads that same page again and writes an audit of the rows it returns.</p>
-<ol class="lu-kafka-steps">
+<section class="card au-card mt-3 mb-3">
+<h2 class="card-header h6 mb-0">Read messages</h2>
+<div class="card-body">
+<p class="mb-2">This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Time, message type, and an exact facility and patient key narrow what is read. A keyword filters the messages already loaded and does not read again. Search further reads the next batch. An unfiltered topic is paged one page at a time. Export reads that same page again and writes an audit of the rows it returns.</p>
+<ol class="lu-kafka-steps mb-2">
     <li>Choose the topic. The family tabs move between the main topic and its error, retry, and redrive topics.</li>
     <li>Search. Time, type, and an exact facility and patient key narrow the read. A keyword filters the loaded messages on this page.</li>
     <li>Open a row for the payload and the facility or report it belongs to.</li>
     <li>Export JSON when you need a copy of this page. That second read is audited.</li>
 </ol>
-<p class="mb-2">
+<p class="mb-0">
     <span class="badge @StatusPills.ForWizardStep(step, 1)">1 Choose a topic</span>
     <span class="badge @StatusPills.ForWizardStep(step, 2)">2 Search</span>
     <span class="badge @StatusPills.ForWizardStep(step, 3)">3 Review</span>
     <span class="badge @StatusPills.ForWizardStep(step, 4)">4 Export</span>
 </p>
+</div>
+</section>
 
 <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
