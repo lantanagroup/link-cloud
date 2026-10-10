@@ -39,7 +39,6 @@
     }), jsonOptions);
     var showMeasures = Model.Patients.Any(row => row.Measures.Count > 0);
     var showSubmission = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Submission));
-    var showResourceTypes = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.ResourceTypes));
     var showUpdated = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Updated));
     var countHeader = Model.ContentsAreStatus || Model.TypeHeading == "Populations" ? "Patients" : "Total";
     var nameHeader = Model.TypeHeading == "Populations" ? "Population" : "Name";
@@ -390,10 +389,6 @@
                                 {
                                     <th>Measures <span class="au-info-icon" data-bs-toggle="tooltip" title="Green means the patient is in the Numerator when this report has one. Red means they are not. A cohort measure with only an Initial Population uses that instead. A run shows a prediction, not a scored Numerator. A badge is left off when the data does not say." aria-label="About measure badges"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
                                 }
-                                @if (showResourceTypes)
-                                {
-                                    <th>Resource types</th>
-                                }
                                 @if (Model.ShowTotals)
                                 {
                                     <th class="text-end">
@@ -430,14 +425,23 @@
                             patientIndex++;
                             <tr>
                                 <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = row.Href })" /></td>
-                                <td><span class="badge @row.BadgeClass">@row.Status</span></td>
+                                <td data-nocopy><span class="badge @row.BadgeClass">@row.Status</span></td>
                                 @if (showSubmission)
                                 {
-                                    <td>@(string.IsNullOrWhiteSpace(row.Submission) ? "—" : row.Submission)</td>
+                                    <td data-nocopy>
+                                        @if (string.IsNullOrWhiteSpace(row.Submission))
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @ReportManifestRules.SubmissionBadgeClass(row.Submission)">@row.Submission</span>
+                                        }
+                                    </td>
                                 }
                                 @if (showMeasures)
                                 {
-                                    <td>
+                                    <td data-nocopy>
                                         @if (row.Measures.Count == 0)
                                         {
                                             <span class="text-muted">—</span>
@@ -452,10 +456,6 @@
                                         }
                                     </td>
                                 }
-                                @if (showResourceTypes)
-                                {
-                                    <td>@(string.IsNullOrWhiteSpace(row.ResourceTypes) ? "—" : row.ResourceTypes)</td>
-                                }
                                 @if (Model.ShowTotals)
                                 {
                                     <td class="text-end">@Count(row.Total)</td>
@@ -468,14 +468,14 @@
                                 {
                                     <td>@row.Pattern</td>
                                     <td>@row.Configuration</td>
-                                    <td class="text-end">
+                                    <td class="text-end" data-nocopy>
                                         @if (row.HasBundle && !string.IsNullOrWhiteSpace(Model.BundlePath))
                                         {
                                             <a class="btn btn-sm btn-au-link" href="@Model.BundlePath&amp;patientId=@Uri.EscapeDataString(row.PatientId)">Download</a>
                                         }
                                     </td>
                                 }
-                                <td class="text-end"><button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@index" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
+                                <td class="text-end" data-nocopy><button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@index" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
                             </tr>
                         }
                         </tbody>

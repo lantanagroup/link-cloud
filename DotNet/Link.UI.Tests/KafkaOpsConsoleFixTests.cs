@@ -264,9 +264,9 @@ public class KafkaOpsConsoleFixTests
         script.Should().NotContain("rows.map(function (_, index)");
 
         var labeled = File.ReadAllText(Path.Combine(root, "Views", "Shared", "_LabeledId.cshtml"));
-        labeled.Should().Contain("LabeledIdRules.ShowsCopy");
-        LabeledIdRules.ShowsCopy("Facility", "ReadyToAcquire").Should().BeFalse();
-        LabeledIdRules.ShowsCopy("Facility", "6C5466DBD46746A1B89E2A9ADC72B0F7").Should().BeTrue();
+        labeled.Should().Contain("data-copy");
+        labeled.Should().NotContain("ShowsCopy");
+        labeled.Should().NotContain("_CopyButton");
         File.ReadAllText(Path.Combine(root, "Views", "Reports", "Index.cshtml")).Should().NotContain("Copy measures");
         File.ReadAllText(Path.Combine(root, "Views", "Tenants", "_ViewReports.cshtml")).Should().NotContain("Copy measures");
     }

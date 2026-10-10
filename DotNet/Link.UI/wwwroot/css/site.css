@@ -3124,6 +3124,28 @@ a.lu-clip {
   border-color: #fff;
   color: #fff;
 }
+.lu-cell-copy {
+  position: absolute;
+  top: 50%;
+  right: .35rem;
+  z-index: 1;
+  margin: 0;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+td.lu-copy-host {
+  position: relative;
+}
+@media (hover: hover) and (pointer: fine) {
+  td.lu-copy-host > .btn.lu-copy.lu-cell-copy,
+  td.lu-copy-host > .btn.lu-copy.lu-cell-copy:focus {
+    background-color: #f3f3f3;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 @media (max-width: 575.98px) {
   .lu-row-actions {
     flex-wrap: wrap;
