@@ -1,8 +1,19 @@
 /* Patient resource explorer and the on-demand type graph. Clusters only; identifiers stay paged. */
 (function () {
     var graphUrl = "";
-    var colors = (window.luChartPalette && window.luChartPalette.manifest && window.luChartPalette.manifest.slice())
-        || ["#3b82c4", "#2aa89a", "#e0a045", "#d16a8a", "#7b6ad6", "#e07a3d", "#4aa3c7", "#6a9a4a", "#c46bb5", "#5c7cfa"];
+    var colors = (window.luChartPalette && window.luChartPalette.manifest && window.luChartPalette.manifest.slice()) || [];
+
+    function hubColor() {
+        return colors.length ? colors[0] : "#6a9a4a";
+    }
+
+    function fade(hex, alpha) {
+        var raw = String(hex || "").replace("#", "");
+        if (raw.length === 3) raw = raw[0] + raw[0] + raw[1] + raw[1] + raw[2] + raw[2];
+        var value = parseInt(raw, 16);
+        if (!raw || raw.length !== 6 || !isFinite(value)) return "rgba(17,17,17," + alpha + ")";
+        return "rgba(" + ((value >> 16) & 255) + "," + ((value >> 8) & 255) + "," + (value & 255) + "," + alpha + ")";
+    }
     var summaryAbort = null;
     var pageAbort = null;
     var state = null;
@@ -470,7 +481,7 @@
         ctx.fillStyle = "#1a1a1a";
         ctx.fillText(name, x, y - 7);
         ctx.font = "11px system-ui, sans-serif";
-        ctx.fillStyle = "#5c656d";
+        ctx.fillStyle = "#666";
         ctx.fillText(countText, x, y + 8);
     }
 
@@ -497,7 +508,7 @@
         state.types.forEach(function (type) {
             var quiet = state.selected && state.selected.name !== type.name;
             ctx.globalAlpha = quiet ? 0.35 : 1;
-            ctx.strokeStyle = "rgba(59,130,196,.28)";
+            ctx.strokeStyle = fade(hubColor(), ".28");
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(center.cx, center.cy);
@@ -506,7 +517,7 @@
             ctx.globalAlpha = 1;
         });
         ctx.beginPath();
-        ctx.fillStyle = "#3b82c4";
+        ctx.fillStyle = hubColor();
         ctx.arc(center.cx, center.cy, 28, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = "#fff";
@@ -523,7 +534,7 @@
             ctx.arc(type.x, type.y, type.r, 0, Math.PI * 2);
             ctx.fill();
             ctx.lineWidth = selected ? 3 : 1.5;
-            ctx.strokeStyle = selected ? "#245f96" : "rgba(255,255,255,.85)";
+            ctx.strokeStyle = selected ? "#1a1a1a" : "rgba(255,255,255,.85)";
             ctx.stroke();
             ctx.globalAlpha = 1;
         });

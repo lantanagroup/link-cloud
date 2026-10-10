@@ -135,11 +135,11 @@
                                 var skipVendorType = panel.VendorOwned && operationType == "HSLOCMap";
                                 if (!skipVendorType && panel.VendorOwned)
                                 {
-                                    <a class="btn btn-au-link btn-sm" asp-controller="Configuration" asp-action="Operations" asp-route-editType="@operationType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                                    <a class="btn btn-success btn-sm" asp-controller="Configuration" asp-action="Operations" asp-route-editType="@operationType">Add @FacilityNormalizationRules.Label(operationType)</a>
                                 }
                                 else if (!skipVendorType)
                                 {
-                                    <a class="btn btn-au-link btn-sm" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationType="@operationType" asp-route-sequenceType="@panel.SequenceType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                                    <a class="btn btn-success btn-sm" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationType="@operationType" asp-route-sequenceType="@panel.SequenceType">Add @FacilityNormalizationRules.Label(operationType)</a>
                                 }
                             }
                         </div>
