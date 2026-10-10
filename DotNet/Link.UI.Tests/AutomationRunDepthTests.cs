@@ -106,6 +106,52 @@ public class AutomationRunDepthTests
         runJs.Should().Contain("refreshStoredLogs");
     }
 
+    [Fact]
+    public void Shared_surfaces_reuse_one_partial_one_pill_and_drop_the_dead_log_routes()
+    {
+        var detail = Read("DotNet/Link.UI/Views/Automation/_RunDetail.cshtml");
+        detail.Should().Contain("~/Views/Shared/_AdvancedPerformance.cshtml");
+        detail.Should().Contain("asp-controller=\"Reports\"");
+        detail.Should().Contain("asp-action=\"Validation\"");
+        detail.Should().Contain("asp-route-reportId=\"@Model.ReportId\"");
+        Read("DotNet/Link.UI/Views/Metrics/Details.cshtml").Should().Contain("PartialAsync(\"_AdvancedPerformance\"");
+        Read("DotNet/Link.UI/Views/Shared/_AdvancedPerformance.cshtml").Should().Contain("Model.PreviousRunHref");
+
+        var root = RepoRoot();
+        File.Exists(Path.Combine(root, "DotNet", "Link.UI", "Views", "Automation", "_AdvancedPerformance.cshtml")).Should().BeFalse();
+        File.Exists(Path.Combine(root, "DotNet", "Link.UI", "Views", "Metrics", "_AdvancedPerformance.cshtml")).Should().BeFalse();
+
+        var normalization = Read("DotNet/Link.UI/Views/Normalizations/Index.cshtml");
+        normalization.Should().Contain("FacilityNormalizationRules.Label");
+        normalization.Should().Contain("FacilityNormalizationRules.HslocDescription");
+        normalization.Should().Contain("FacilityNormalizationRules.CopyLocationDescription");
+        normalization.Should().Contain("FacilityNormalizationRules.CopyAliasDescription");
+        normalization.Should().Contain("function operationLabel");
+
+        Read("DotNet/Link.UI/Views/System/Health.cshtml").Should().Contain("asp-controller=\"ApiHealth\"");
+        Read("DotNet/Link.UI/Views/ApiHealth/Index.cshtml").Should().Contain("asp-action=\"Health\"");
+
+        var recent = Read("DotNet/Link.UI/Views/Automation/_RecentRuns.cshtml");
+        recent.Should().Contain("StatusPills.ForRun");
+        recent.Should().NotContain("run-status-badge");
+        Read("DotNet/Link.UI/Views/Reports/Index.cshtml").Should().Contain("StatusPills.ForSchedule");
+
+        var depth = Read("DotNet/Link.UI/Controllers/AutomationController.RunDepth.cs");
+        depth.Should().NotContain("acquisition-logs");
+        depth.Should().NotContain("acquisition-log");
+        depth.Should().Contain("PreviousRunHref");
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DotNet", "Link.UI", "Link.UI.csproj")))
+            dir = dir.Parent;
+
+        dir.Should().NotBeNull();
+        return dir!.FullName;
+    }
+
     private static string Read(string relative)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

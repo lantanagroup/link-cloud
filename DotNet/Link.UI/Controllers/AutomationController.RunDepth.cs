@@ -5,8 +5,6 @@ using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Models;
-using LantanaGroup.Link.Sdk.Clients;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -381,249 +379,10 @@ public sealed partial class AutomationController
         if (detail == null)
             return NoContent();
 
-        return PartialView("~/Views/Automation/_AdvancedPerformance.cshtml", detail);
-    }
+        if (detail.PreviousRunId is Guid previous)
+            detail.PreviousRunHref = Url.Action("Run", "Automation", new { id = previous });
 
-    [HttpGet("acquisition-logs")]
-    public async Task<IActionResult> DataAcquisitionLogs(
-        Guid id,
-        int pageNumber = 1,
-        int pageSize = 50,
-        string sortBy = "Id",
-        string sortOrder = "Ascending",
-        string? searchTerm = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (EngineOff() is { } off)
-            return off;
-
-        var client = _services.GetService<IDataAcquisitionServiceClient>();
-        if (client is null)
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
-
-        var run = await _manager!.GetRunForDisplayAsync(id, cancellationToken);
-        if (run == null)
-            return NotFound();
-
-        var facilityId = run.FacilityId;
-        var reportId = run.ReportId;
-        var allowedSortBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "ExecutionDate", "CreateDate", "CompletionDate", "FacilityId", "PatientId",
-            "QueryType", "QueryPhase", "Status", "Priority", "Id", "RetryAttempts",
-            "IsDeleted", "ReportTrackingId"
-        };
-        if (!allowedSortBy.Contains(sortBy))
-            sortBy = "Id";
-
-        sortOrder = string.Equals(sortOrder, "Descending", StringComparison.OrdinalIgnoreCase)
-            ? "Descending"
-            : "Ascending";
-
-        var normalizedSearchTerm = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm.Sanitize().Trim();
-        if (string.IsNullOrWhiteSpace(normalizedSearchTerm))
-            normalizedSearchTerm = null;
-
-        if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(reportId))
-            return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 } });
-
-        try
-        {
-            var result = await client.SearchAcquisitionLogsAsync(
-                facilityId,
-                reportId,
-                pageSize,
-                pageNumber,
-                sortBy,
-                sortOrder,
-                normalizedSearchTerm,
-                cancellationToken);
-
-            if ((result?.Body?.Records?.Count ?? 0) == 0
-                && (result?.Body != null || result?.IsSuccessStatusCode == true))
-            {
-                var fallback = await client.SearchAcquisitionLogsAsync(
-                    string.Empty,
-                    reportId,
-                    pageSize,
-                    pageNumber,
-                    sortBy,
-                    sortOrder,
-                    normalizedSearchTerm,
-                    cancellationToken);
-                if (AcquisitionLogAvailability.PreferFallback(
-                        result?.Body != null,
-                        fallback?.Body?.Records?.Count ?? 0,
-                        fallback?.Body != null))
-                    result = fallback;
-            }
-
-            var read = AcquisitionLogAvailability.Classify(result?.StatusCode, result?.Body != null);
-            if (read.Unavailable)
-                return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 }, unavailable = true });
-            if (read.ErrorStatus is int status)
-                return StatusCode(status);
-
-            var records = (result?.Body?.Records ?? [])
-                .Select(r => new
-                {
-                    r.Id,
-                    r.PatientId,
-                    Status = r.Status?.ToString(),
-                    QueryPhase = r.QueryPhase?.ToString(),
-                    IsReferenceLog = r.IsReferenceLog
-                                     || string.Equals(r.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
-                                     || r.ReferenceResourceCount > 0,
-                    r.ReferenceResourceCount,
-                    ResourceTypes = (r.ResourceTypes ?? [])
-                        .Concat(r.FhirQuery.SelectMany(q => q.ResourceTypes ?? []))
-                        .Where(rt => !string.IsNullOrWhiteSpace(rt))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList()
-                })
-                .ToList();
-
-            var metadata = new
-            {
-                TotalCount = result?.Body?.Metadata?.TotalCount ?? 0,
-                PageNumber = result?.Body?.Metadata?.PageNumber ?? pageNumber,
-                PageSize = result?.Body?.Metadata?.PageSize ?? pageSize,
-                TotalPages = result?.Body?.Metadata?.TotalPages ?? 0
-            };
-
-            return Json(new { records, metadata });
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Failed to load data acquisition logs for run {RunId}.",
-                id);
-            return StatusCode(StatusCodes.Status502BadGateway);
-        }
-    }
-
-    [HttpGet("acquisition-log")]
-    public async Task<IActionResult> DataAcquisitionLogDetail(
-        Guid id,
-        long logId,
-        CancellationToken cancellationToken = default)
-    {
-        if (EngineOff() is { } off)
-            return off;
-
-        var client = _services.GetService<IDataAcquisitionServiceClient>();
-        if (client is null)
-            return StatusCode(StatusCodes.Status503ServiceUnavailable);
-
-        var run = await _manager!.GetRunForDisplayAsync(id, cancellationToken);
-        if (run == null)
-            return NotFound();
-
-        try
-        {
-            var detailed = await client.GetAcquisitionLogByIdAsync(logId, cancellationToken);
-            var detailRead = AcquisitionLogAvailability.Classify(
-                detailed?.StatusCode, detailed?.Body != null, notFoundIsMissing: true);
-            if (detailRead.Unavailable)
-                return Json(new { unavailable = true });
-            if (detailRead.ErrorStatus is int detailStatus)
-                return StatusCode(detailStatus);
-
-            var referenceResourceIds = new List<string>();
-            try
-            {
-                var pageNum = 1;
-                const int refPageSize = 100;
-                while (true)
-                {
-                    var refPage = await client.GetReferenceResourcesForLogAsync(logId, refPageSize, pageNum, cancellationToken);
-                    var refRecords = refPage?.Body?.Records ?? [];
-                    if (refRecords.Count == 0)
-                        break;
-
-                    referenceResourceIds.AddRange(
-                        refRecords
-                            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
-                            .Select(r => $"{r.ResourceType}/{r.ResourceId}"));
-
-                    if (refRecords.Count < refPageSize)
-                        break;
-                    pageNum++;
-                }
-            }
-            catch (Exception refEx)
-            {
-                _logger.LogWarning(refEx, "Failed to load reference resources for acquisition log {LogId}.", logId);
-            }
-
-            var queries = (detailed!.Body?.FhirQuery ?? [])
-                .Select(q =>
-                {
-                    var firstResource = q.ResourceTypes?.FirstOrDefault();
-                    var paramJoin = string.Join("&", q.QueryParameters ?? []);
-                    return q.QueryType switch
-                    {
-                        FhirQueryType.Search => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}?{paramJoin}",
-                        FhirQueryType.SearchPost => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}/_search [{string.Join(",", q.QueryParameters ?? [])}]",
-                        FhirQueryType.Read => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}/{paramJoin}",
-                        FhirQueryType.BulkDataPoll => paramJoin,
-                        FhirQueryType.BulkDataRequest => "BulkDataRequest",
-                        _ => string.Empty
-                    };
-                })
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .ToList();
-
-            var queryType = (detailed.Body?.FhirQuery ?? [])
-                .Select(q => q.QueryType.ToString())
-                .FirstOrDefault();
-
-            return Json(new
-            {
-                detailed.Body?.Id,
-                detailed.Body?.PatientId,
-                Status = detailed.Body?.Status?.ToString(),
-                QueryPhase = detailed.Body?.QueryPhase?.ToString(),
-                IsReferenceLog = detailed.Body?.IsReferenceLog == true
-                                 || string.Equals(detailed.Body?.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
-                                 || (detailed.Body?.ReferenceResourceCount ?? 0) > 0,
-                ReferenceResourceCount = detailed.Body?.ReferenceResourceCount ?? 0,
-                detailed.Body?.ReportTrackingId,
-                detailed.Body?.CorrelationId,
-                detailed.Body?.TraceId,
-                detailed.Body?.FhirVersion,
-                detailed.Body?.Priority,
-                detailed.Body?.RetryAttempts,
-                QueryType = queryType,
-                Queries = queries,
-                detailed.Body?.CompletionDate,
-                CompletionTimeMilliseconds = detailed.Body?.CompletionTimeMilliseconds,
-                ResourceTypes = (detailed.Body?.ResourceTypes ?? [])
-                    .Concat((detailed.Body?.FhirQuery ?? []).SelectMany(q => q.ResourceTypes ?? []))
-                    .Concat(referenceResourceIds
-                        .Select(r => r.Contains('/') ? r.Split('/')[0] : r)
-                        .Where(rt => !string.IsNullOrWhiteSpace(rt)))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
-                ResourceAcquiredIds = detailed.Body?.ResourceAcquiredIds?.ToList() ?? new List<string>(),
-                ReferenceResourceIds = referenceResourceIds,
-                Notes = detailed.Body?.Notes?.ToList() ?? new List<string>()
-            });
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load acquisition log {LogId} for run {RunId}.", logId, id);
-            return StatusCode(StatusCodes.Status502BadGateway);
-        }
+        return PartialView("~/Views/Shared/_AdvancedPerformance.cshtml", detail);
     }
 
     [HttpGet("logs")]
@@ -698,7 +457,12 @@ public sealed partial class AutomationController
             {
                 var presenter = _services.GetService<MetricsRunPresenter>();
                 if (presenter is not null)
-                    ViewBag.Performance = await presenter.GetCapturedAsync(detail.RunId, cancellationToken);
+                {
+                    var captured = await presenter.GetCapturedAsync(detail.RunId, cancellationToken);
+                    if (captured?.PreviousRunId is Guid previous)
+                        captured.PreviousRunHref = Url.Action("Run", "Automation", new { id = previous });
+                    ViewBag.Performance = captured;
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

@@ -426,6 +426,11 @@ public class ReportManifestRulesTests
         var graph = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "js", "resource-graph.js"));
         graph.Should().Contain("lu-icon-quiet");
         graph.Should().Contain("pageSize: 25");
+        graph.Should().Contain("manifest-graph-filter");
+        graph.Should().Contain("}, 1000);");
+        graph.Should().Contain("new AbortController()");
+        graph.Should().Contain("lu-match");
+        graph.Should().Contain(" matches");
     }
 
     [Fact]

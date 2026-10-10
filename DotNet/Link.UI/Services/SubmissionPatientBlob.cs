@@ -281,6 +281,40 @@ public sealed class PatientSubmissionReader
         }
     }
 
+    public async Task<ResourceGraphPage?> PageAsync(
+        SubmissionBlobAddress address,
+        string patientId,
+        string? type,
+        string? query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        if (!_store.IsConfigured || string.IsNullOrWhiteSpace(address.Name))
+            return null;
+
+        Stream? stream;
+        try
+        {
+            stream = await _store.OpenAsync(address.Name, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "The submitted patient file could not be searched.");
+            return null;
+        }
+
+        if (stream is null)
+            return null;
+
+        await using (stream)
+            return await ResourceGraphRules.PageNdjsonAsync(stream, patientId, type, query, page, pageSize, cancellationToken);
+    }
+
     public Task<string?> ReadBodyAsync(SubmissionBlobAddress address, long offset, int length, CancellationToken cancellationToken)
     {
         if (!_store.IsConfigured || string.IsNullOrWhiteSpace(address.Name))
