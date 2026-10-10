@@ -15,6 +15,8 @@ public class ValidationMetrics {
     private final LongCounter validationIssuesCounter;
     private final DoubleHistogram validationDuration;
     private final DoubleHistogram categorizationDuration;
+    private final LongCounter validateCodeCacheHit;
+    private final LongCounter validateCodeCacheMiss;
     private final DoubleHistogram reportFetchDuration;
 
     public ValidationMetrics(OpenTelemetry openTelemetry) {
@@ -38,6 +40,12 @@ public class ValidationMetrics {
                 .setUnit("ms")
                 .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
                 .build();
+        validateCodeCacheHit = meter.counterBuilder("link.validation.cache.validate-code.hit")
+                .setDescription("Count of validateCode lookups served from the local cache")
+                .build();
+        validateCodeCacheMiss = meter.counterBuilder("link.validation.cache.validate-code.miss")
+                .setDescription("Count of validateCode lookups that missed the cache and hit the terminology service")
+                .build();
     }
 
     public void addToValidationCounter(Attributes attributes) {
@@ -60,6 +68,14 @@ public class ValidationMetrics {
 
     public void recordCategorizationDuration(double millis, Attributes attributes) {
         categorizationDuration.record(millis, attributes);
+    }
+
+    public void incrementValidateCodeCacheHit() {
+        validateCodeCacheHit.add(1L);
+    }
+
+    public void incrementValidateCodeCacheMiss() {
+        validateCodeCacheMiss.add(1L);
     }
 
     public void recordReportFetchDuration(double millis, Attributes attributes) {
