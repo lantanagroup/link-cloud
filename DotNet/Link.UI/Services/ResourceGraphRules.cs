@@ -41,11 +41,16 @@ public static class ResourceGraphRules
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    private const int CacheSlots = 4;
     private static readonly byte[] Newline = [(byte)'\n'];
     private static readonly object CacheGate = new();
-    private static string? CachedKey;
-    private static ResourceGraphIndex? CachedIndex;
-    private static long CachedAt;
+    private static readonly Dictionary<string, CacheSlot> Cache = new(StringComparer.Ordinal);
+
+    private sealed class CacheSlot
+    {
+        public ResourceGraphIndex Index = null!;
+        public long At;
+    }
 
     public static int ScaleMixTotal
     {
@@ -89,8 +94,12 @@ public static class ResourceGraphRules
         return true;
     }
 
-    public static ResourceGraphIndex Build(GraphSpec spec, CancellationToken cancellationToken, int cap = MaxEntries) =>
-        Collect(EnumerateSynthetic(spec, cancellationToken), spec.PatientId, synthetic: true, Math.Clamp(cap, 1, MaxEntries), cancellationToken);
+    public static ResourceGraphIndex Build(GraphSpec spec, CancellationToken cancellationToken, int cap = MaxEntries)
+    {
+        var index = Collect(EnumerateSynthetic(spec, cancellationToken), spec.PatientId, synthetic: true, Math.Clamp(cap, 1, MaxEntries), cancellationToken);
+        index.Origin = "fixture";
+        return index;
+    }
 
     public static ResourceGraphIndex ReadBundle(string? json, string patientId, CancellationToken cancellationToken, int cap = MaxEntries)
     {
@@ -129,6 +138,114 @@ public static class ResourceGraphRules
         return Finish(patientId, nodes, slices, dropped, truncated, false, error, started);
     }
 
+    /// <summary>
+    /// One FHIR resource per line. Bodies are not kept. Each node records the byte span so one resource can be read later.
+    /// </summary>
+    public static async Task<ResourceGraphIndex> ReadNdjsonAsync(
+        Stream stream,
+        string patientId,
+        CancellationToken cancellationToken,
+        int cap = MaxEntries,
+        Func<int, CancellationToken, ValueTask>? onProgress = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        cap = Math.Clamp(cap, 1, MaxEntries);
+        var started = Stopwatch.GetTimestamp();
+        var nodes = new List<GraphNode>(256);
+        var truncated = false;
+        var sawResource = false;
+        var failed = 0;
+        var buffer = new byte[64 * 1024];
+        var filled = 0;
+        var lineStart = 0;
+        long baseOffset = 0;
+
+        while (!truncated)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (lineStart > 0 && lineStart == filled)
+            {
+                baseOffset += lineStart;
+                lineStart = 0;
+                filled = 0;
+            }
+            else if (lineStart > 0)
+            {
+                Buffer.BlockCopy(buffer, lineStart, buffer, 0, filled - lineStart);
+                baseOffset += lineStart;
+                filled -= lineStart;
+                lineStart = 0;
+            }
+
+            if (filled == buffer.Length)
+            {
+                if (buffer.Length >= 1_048_576)
+                {
+                    failed++;
+                    var skipped = await SkipToNewlineAsync(stream, cancellationToken);
+                    baseOffset += filled + skipped;
+                    filled = 0;
+                    continue;
+                }
+
+                Array.Resize(ref buffer, Math.Min(buffer.Length * 2, 1_048_576));
+            }
+
+            var read = await stream.ReadAsync(buffer.AsMemory(filled, buffer.Length - filled), cancellationToken);
+            if (read == 0)
+            {
+                if (filled > lineStart)
+                    TakeNdjsonLine(buffer.AsSpan(lineStart, filled - lineStart), baseOffset + lineStart, patientId, cap, nodes, ref truncated, ref sawResource, ref failed);
+                break;
+            }
+
+            filled += read;
+            while (!truncated)
+            {
+                var newline = -1;
+                for (var i = lineStart; i < filled; i++)
+                {
+                    if (buffer[i] == (byte)'\n')
+                    {
+                        newline = i;
+                        break;
+                    }
+                }
+
+                if (newline < 0)
+                    break;
+
+                var length = newline - lineStart;
+                if (length > 0 && buffer[lineStart + length - 1] == (byte)'\r')
+                    length--;
+                if (length > 0)
+                    TakeNdjsonLine(buffer.AsSpan(lineStart, length), baseOffset + lineStart, patientId, cap, nodes, ref truncated, ref sawResource, ref failed);
+
+                lineStart = newline + 1;
+                if (!truncated && onProgress is not null && nodes.Count > 0 && nodes.Count % ProgressEvery == 0)
+                    await onProgress(nodes.Count, cancellationToken);
+            }
+        }
+
+        string? error = null;
+        if (nodes.Count == 0 && !sawResource)
+            error = failed > 0 ? "The submission could not be read." : "The submission was empty.";
+
+        var index = Finish(patientId, nodes, null, false, truncated, false, error, started);
+        index.Origin = "submission";
+        return index;
+    }
+
+    public static ResourceGraphIndex Unavailable(string patientId, string error)
+    {
+        var index = Finish(patientId, [], null, false, false, false, error, Stopwatch.GetTimestamp());
+        index.Origin = "submission";
+        return index;
+    }
+
+    public static Task WriteProgressAsync(Stream stream, int read, CancellationToken cancellationToken) =>
+        WriteLineAsync(stream, new { kind = "progress", read, cap = MaxEntries }, cancellationToken);
+
     public static async Task SummarizeAsync(ResourceGraphIndex index, Stream stream, CancellationToken cancellationToken)
     {
         var marks = index.ProgressMarks;
@@ -136,10 +253,14 @@ public static class ResourceGraphRules
         {
             if (!marks.Contains(mark))
                 continue;
-            await WriteLineAsync(stream, new { kind = "progress", read = mark, cap = MaxEntries }, cancellationToken);
+            await WriteProgressAsync(stream, mark, cancellationToken);
         }
 
-        await WriteLineAsync(stream, new
+        await WriteDoneAsync(index, stream, cancellationToken);
+    }
+
+    public static Task WriteDoneAsync(ResourceGraphIndex index, Stream stream, CancellationToken cancellationToken) =>
+        WriteLineAsync(stream, new
         {
             kind = "done",
             patientId = index.PatientId,
@@ -147,17 +268,31 @@ public static class ResourceGraphRules
             truncated = index.Truncated,
             elapsedMs = index.ElapsedMs,
             error = index.Error,
+            source = index.Origin,
             types = index.Types.Select(type => new { name = type.Name, count = type.Count })
         }, cancellationToken);
-    }
 
     public static void Remember(string key, ResourceGraphIndex index)
     {
         lock (CacheGate)
         {
-            CachedKey = key;
-            CachedIndex = index;
-            CachedAt = Environment.TickCount64;
+            Cache[key] = new CacheSlot { Index = index, At = Environment.TickCount64 };
+            while (Cache.Count > CacheSlots)
+            {
+                string? oldest = null;
+                var oldestAt = long.MaxValue;
+                foreach (var pair in Cache)
+                {
+                    if (pair.Value.At >= oldestAt)
+                        continue;
+                    oldestAt = pair.Value.At;
+                    oldest = pair.Key;
+                }
+
+                if (oldest is null)
+                    break;
+                Cache.Remove(oldest);
+            }
         }
     }
 
@@ -165,11 +300,16 @@ public static class ResourceGraphRules
     {
         lock (CacheGate)
         {
-            if (!string.Equals(CachedKey, key, StringComparison.Ordinal) || CachedIndex is null)
+            if (!Cache.TryGetValue(key, out var slot))
                 return null;
-            if (Environment.TickCount64 - CachedAt > 120_000)
+            if (Environment.TickCount64 - slot.At > 120_000)
+            {
+                Cache.Remove(key);
                 return null;
-            return CachedIndex;
+            }
+
+            slot.At = Environment.TickCount64;
+            return slot.Index;
         }
     }
 
@@ -268,6 +408,117 @@ public static class ResourceGraphRules
         if (string.Equals(type, "Observation", StringComparison.Ordinal))
             return [patient, "Encounter/" + SyntheticId(firstEncounter)];
         return [patient];
+    }
+
+    private static async Task<int> SkipToNewlineAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        var skipped = 0;
+        var one = new byte[1];
+        while (skipped < 1_048_576)
+        {
+            var read = await stream.ReadAsync(one.AsMemory(0, 1), cancellationToken);
+            if (read == 0 || one[0] == (byte)'\n')
+                break;
+            skipped++;
+        }
+
+        return skipped + 1;
+    }
+
+    private static void TakeNdjsonLine(
+        ReadOnlySpan<byte> line,
+        long offset,
+        string patientId,
+        int cap,
+        List<GraphNode> nodes,
+        ref bool truncated,
+        ref bool sawResource,
+        ref int failed)
+    {
+        if (truncated)
+            return;
+
+        var start = 0;
+        while (start < line.Length && line[start] is (byte)' ' or (byte)'\t')
+            start++;
+        if (start >= line.Length || line[start] != (byte)'{')
+        {
+            if (start < line.Length)
+                failed++;
+            return;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(line[start..].ToArray());
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("resourceType", out var typeNode)
+                || typeNode.ValueKind != JsonValueKind.String
+                || !root.TryGetProperty("id", out var idNode)
+                || idNode.ValueKind != JsonValueKind.String)
+            {
+                failed++;
+                return;
+            }
+
+            var type = typeNode.GetString();
+            var id = idNode.GetString();
+            if (string.IsNullOrEmpty(type) || string.IsNullOrEmpty(id))
+            {
+                failed++;
+                return;
+            }
+
+            sawResource = true;
+            if (string.Equals(type, "Patient", StringComparison.Ordinal)
+                && string.Equals(id, patientId, StringComparison.Ordinal))
+                return;
+
+            if (nodes.Count >= cap)
+            {
+                truncated = true;
+                return;
+            }
+
+            var refs = new List<string>(4);
+            CollectRefs(root, refs);
+            var kept = refs.Distinct(StringComparer.Ordinal).Take(MaxRefsOnNode).ToArray();
+            var length = line.Length - start;
+            nodes.Add(new GraphNode(type, id, kept, offset + start, length));
+        }
+        catch (JsonException)
+        {
+            failed++;
+        }
+    }
+
+    private static void CollectRefs(JsonElement element, List<string> refs)
+    {
+        if (refs.Count >= MaxRefsOnNode * 2)
+            return;
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.NameEquals("reference") && property.Value.ValueKind == JsonValueKind.String)
+                {
+                    var normalized = NormalizeRef(property.Value.GetString());
+                    if (normalized is not null)
+                        refs.Add(normalized);
+                }
+                else if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                {
+                    CollectRefs(property.Value, refs);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+                CollectRefs(item, refs);
+        }
     }
 
     private static void Walk(
@@ -526,6 +777,8 @@ public sealed class ResourceGraphIndex
     }
 
     public string PatientId { get; }
+    public string Origin { get; internal set; } = "bundle";
+    public SubmissionBlobAddress? Address { get; internal set; }
     public int Total => _nodes.Count;
     public bool Truncated { get; }
     public bool BodiesDropped { get; }
@@ -533,6 +786,37 @@ public sealed class ResourceGraphIndex
     public int ElapsedMs { get; }
     public IReadOnlyList<ResourceTypeCount> Types { get; }
     internal HashSet<int> ProgressMarks { get; }
+
+    public bool TrySpan(string? type, string? id, out long offset, out int length)
+    {
+        offset = -1;
+        length = 0;
+        var wantedType = (type ?? string.Empty).Trim();
+        var wantedId = (id ?? string.Empty).Trim();
+        foreach (var node in _nodes)
+        {
+            if (!string.Equals(node.Type, wantedType, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(node.Id, wantedId, StringComparison.Ordinal)
+                || node.BodyOffset < 0
+                || node.BodyLength <= 0)
+                continue;
+
+            offset = node.BodyOffset;
+            length = node.BodyLength;
+            return true;
+        }
+
+        return false;
+    }
+
+    public static ResourceGraphRaw WithBody(ResourceGraphRaw raw, string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return raw with { Note = "This resource could not be read from the submission." };
+
+        var pretty = Pretty(json, out var truncated);
+        return raw with { Json = pretty, Truncated = truncated, Note = null };
+    }
 
     public ResourceGraphPage Page(string? type, string? query, int page, int pageSize)
     {
@@ -595,6 +879,9 @@ public sealed class ResourceGraphIndex
 
         if (_synthetic)
             return new ResourceGraphRaw(found.Type, found.Id, found.Refs, SyntheticJson(found), false, null);
+
+        if (found.BodyOffset >= 0 && found.BodyLength > 0)
+            return new ResourceGraphRaw(found.Type, found.Id, found.Refs, null, false, null);
 
         var note = BodiesDropped
             ? "This bundle is too large to keep each resource. Download the measure eval input for the full JSON."
@@ -667,14 +954,18 @@ public sealed record ResourceGraphRaw(
 
 internal sealed class GraphNode
 {
-    public GraphNode(string type, string id, string[] refs)
+    public GraphNode(string type, string id, string[] refs, long bodyOffset = -1, int bodyLength = 0)
     {
         Type = type;
         Id = id;
         Refs = refs;
+        BodyOffset = bodyOffset;
+        BodyLength = bodyLength;
     }
 
     public string Type { get; }
     public string Id { get; }
     public string[] Refs { get; }
+    public long BodyOffset { get; }
+    public int BodyLength { get; }
 }

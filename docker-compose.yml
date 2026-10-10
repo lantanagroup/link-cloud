@@ -759,6 +759,9 @@ services:
       ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: link-ui
+      SubmissionRead__ExternalConnectionString: ${AZURITE_CONNECTION_STRING}
+      SubmissionRead__ExternalContainerName: ${EXTERNAL_BLOB_CONTAINER_NAME}
+      SubmissionRead__FlattenHierarchy: ${EXTERNAL_BLOB_FLATTEN_HIERARCHY:-false}
       MongoDB__DatabaseName: link-ui
       ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
       KafkaConnection__BootstrapServers__0: kafka_b:9092

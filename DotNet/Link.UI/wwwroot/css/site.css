@@ -1435,9 +1435,45 @@ a.au-scenario-card:hover {
   box-shadow: inset 0 -2px 0 #ffc107;
 }
 .lu-patient-modal { max-width: min(1080px, 96vw); }
-.lu-patient-modal .lu-facility-id,
-.lu-patient-modal .lu-clip { max-width: none; }
-.lu-graph-aside .lu-facility-id,
+.lu-patient-modal .modal-content,
+.lu-patient-modal .modal-body { overflow-x: hidden; }
+.lu-patient-modal .card,
+.lu-patient-modal .lu-resource-graph,
+.lu-patient-modal pre,
+.lu-patient-modal table { max-width: 100%; }
+.lu-patient-modal .lu-facility-id {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.lu-patient-modal .lu-clip {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#manifest-patient-measures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+}
+#manifest-patient-measures p {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin: 0;
+  padding: .3rem .55rem;
+  border: 1px solid var(--au-border);
+  border-radius: .4rem;
+  background: #fafafa;
+}
+.lu-graph-aside .lu-facility-id {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
 .lu-graph-aside .lu-clip {
   max-width: 100%;
   white-space: normal;
@@ -2872,6 +2908,37 @@ a.lu-clip {
 }
 .au-card .card-header .lu-id-label {
   color: #adb5bd;
+}
+.au-card > .card-header .btn-au-execute,
+.au-card > .card-header .btn-au-execute:hover,
+.au-card > .card-header .btn-au-execute:focus,
+.au-card > .card-header .btn-au-execute:active {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .72);
+  box-shadow: none;
+}
+.au-card > .card-header .btn-au-execute:hover,
+.au-card > .card-header .btn-au-execute:focus {
+  background: rgba(255, 255, 255, .14);
+  border-color: #fff;
+}
+.lu-id-strip .lu-labeled-id {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: .2rem .45rem;
+}
+.lu-id-strip .lu-id-name,
+.lu-id-strip .lu-id-value,
+.lu-id-strip .lu-clip,
+.lu-id-strip .lu-facility-id {
+  white-space: nowrap;
+}
+.lu-id-strip .lu-id-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 24rem;
 }
 .lu-row-actions {
   display: flex;
