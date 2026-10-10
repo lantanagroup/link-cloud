@@ -78,7 +78,13 @@ public sealed class ReportsController : Controller
             }
 
             foreach (var report in page.Reports)
+            {
                 report.AutomationRunId = ownership.RunIdFor(report.FacilityId);
+                report.CanResubmit = FacilityViewRules.CanResubmit(
+                    report.Status,
+                    report.Deleted,
+                    ownership.Contains(report.FacilityId));
+            }
         }
 
         ViewData["Title"] = "Reports";
