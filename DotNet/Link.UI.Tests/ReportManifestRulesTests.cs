@@ -339,6 +339,10 @@ public class ReportManifestRulesTests
         view.Should().Contain("lu-donut-ring");
         view.Should().Contain("Passed validation");
         view.Should().Contain("mountDonut");
+        view.Should().Contain("Interactive mode");
+        view.Should().Contain("resource-graph.js");
+        view.Should().Contain("id=\"manifest-resource-explorer\"");
+        view.Should().NotContain("Linked resources");
         view.Should().NotContain("Fixture data");
         view.Should().NotContain("Report overview");
         view.Should().NotContain("Largest is");
