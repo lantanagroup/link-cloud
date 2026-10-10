@@ -109,6 +109,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
                 FacilityId = id,
                 FacilityName = allowNullName ? name : name ?? id,
                 TimeZone = "America/Chicago",
+                IsTest = true,
                 Vendor = vendor,
                 ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
             };
@@ -232,6 +233,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
                     FacilityId = facilityId,
                     FacilityName = facilityId + "-Updated",
                     TimeZone = "America/Chicago",
+                    IsTest = true,
                     Vendor = new VendorModel { Name = "Epic" },
                     ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
                 };

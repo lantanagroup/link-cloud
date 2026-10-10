@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Sdk.Clients;
+﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
@@ -16,7 +18,6 @@ public sealed class TenantsController : Controller
     private readonly FacilityHubService _hub;
     private readonly FacilityViewService _view;
     private readonly ConfigurationService _configuration;
-    private readonly AutomationOwnershipLookup _ownership;
     private readonly IOptions<LinkUiFeatureOptions> _features;
     private readonly ILogger<TenantsController> _logger;
 
@@ -25,7 +26,6 @@ public sealed class TenantsController : Controller
         FacilityHubService hub,
         FacilityViewService view,
         ConfigurationService configuration,
-        AutomationOwnershipLookup ownership,
         IOptions<LinkUiFeatureOptions> features,
         ILogger<TenantsController> logger)
     {
@@ -33,7 +33,6 @@ public sealed class TenantsController : Controller
         _hub = hub;
         _view = view;
         _configuration = configuration;
-        _ownership = ownership;
         _features = features;
         _logger = logger;
     }
@@ -49,59 +48,35 @@ public sealed class TenantsController : Controller
         ViewData["Title"] = "Tenants";
         var automationOn = _features.Value.AutomationEnabled;
         var normalized = automationOn ? AutomationMarkRules.NormalizeScope(scope) : AutomationMarkRules.Real;
-        var ownership = automationOn
-            ? await _ownership.GetAsync(cancellationToken)
-            : AutomationOwnershipIndex.Empty;
 
         try
         {
-            var activeResponse = await _facilityServiceClient.GetFacilityListAsync(
+            var response = await _facilityServiceClient.GetFacilitySummariesAsync(
                 search: search,
-                includeDeleted: false,
+                includeDeleted: includeDeleted,
                 cancellationToken: cancellationToken);
-            if (!TryMapFacilities(activeResponse, out var active))
+            if (!TryMapSummaries(response, out var summaries))
             {
                 _logger.LogWarning(
                     "Facility list failed with status {StatusCode}. RequestUrl={RequestUrl} TraceId={TraceId}",
-                    activeResponse.StatusCode,
-                    activeResponse.RequestUrl,
-                    activeResponse.TraceId);
-                return View(FacilityListError(search, includeDeleted, normalized, activeResponse.StatusCode));
+                    response.StatusCode,
+                    response.RequestUrl,
+                    response.TraceId);
+                return View(FacilityListError(search, includeDeleted, normalized, response.StatusCode));
             }
 
-            string? deletedNote = null;
-            Dictionary<string, string> all = active;
-            if (includeDeleted)
-            {
-                var allResponse = await _facilityServiceClient.GetFacilityListAsync(
-                    search: search,
-                    includeDeleted: true,
-                    cancellationToken: cancellationToken);
-                if (!TryMapFacilities(allResponse, out all))
-                {
-                    all = active;
-                    deletedNote = "Deleted facilities could not be loaded.";
-                    _logger.LogWarning(
-                        "Deleted facility list failed with status {StatusCode}. RequestUrl={RequestUrl} TraceId={TraceId}",
-                        allResponse.StatusCode,
-                        allResponse.RequestUrl,
-                        allResponse.TraceId);
-                }
-            }
+            await MergeExactIdAsync(search, includeDeleted, summaries, cancellationToken);
 
-            await MergeExactIdAsync(search, includeDeleted, active, all, cancellationToken);
-
-            var activeKeys = new HashSet<string>(active.Keys, StringComparer.OrdinalIgnoreCase);
-            var tenants = all
-                .Select(kvp => new TenantListItem
+            var tenants = summaries
+                .Select(item => new TenantListItem
                 {
-                    FacilityId = kvp.Key,
-                    DisplayName = string.IsNullOrWhiteSpace(kvp.Value) ? kvp.Key : kvp.Value,
-                    IsDeleted = !activeKeys.Contains(kvp.Key),
-                    AutomationRunId = automationOn ? ownership.RunIdFor(kvp.Key) : null
+                    FacilityId = item.FacilityId,
+                    DisplayName = string.IsNullOrWhiteSpace(item.FacilityName) ? item.FacilityId : item.FacilityName,
+                    IsDeleted = item.IsDeleted,
+                    IsTest = item.IsTest
                 })
                 .Where(item => includeDeleted || !item.IsDeleted)
-                .Where(item => !automationOn || AutomationMarkRules.Visible(normalized, item.AutomationRunId is not null))
+                .Where(item => !automationOn || AutomationMarkRules.Visible(normalized, item.IsTest))
                 .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(item => item.FacilityId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -114,7 +89,6 @@ public sealed class TenantsController : Controller
                 IncludeDeleted = includeDeleted,
                 Tenants = slice.Items,
                 LoadedSuccessfully = true,
-                DeletedNote = deletedNote,
                 Page = slice.PageNumber,
                 PageSize = slice.PageSize,
                 TotalCount = slice.TotalCount,
@@ -205,7 +179,6 @@ public sealed class TenantsController : Controller
         if (!page.IsCreate && !page.NotFound && string.IsNullOrWhiteSpace(page.LoadError) && !string.IsNullOrWhiteSpace(page.FacilityId))
             page.Notification = await _configuration.LoadFacilityNotificationAsync(page.FacilityId, cancellationToken);
         RestoreNormalizationTempData(page);
-        await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
         var editor = planEdit.Sanitize();
         if (string.Equals(editor, "add", StringComparison.OrdinalIgnoreCase)
             || string.Equals(editor, "edit", StringComparison.OrdinalIgnoreCase))
@@ -452,8 +425,6 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> View([FromRoute] string? id, FacilityViewQuery query, CancellationToken cancellationToken)
     {
         var page = await _view.LoadAsync(id, query, cancellationToken);
-        await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
-        HideOwnedResubmit(page.Reports, page.AutomationRunId);
         ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
         return View(page);
     }
@@ -466,8 +437,6 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var page = await _view.LoadReportAsync(id, reportId, query, cancellationToken);
-        await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
-        HideOwnedResubmit(page.Report, page.AutomationRunId);
         ViewData["Title"] = page.ReportId.Length == 0 ? "Report" : page.ReportId;
         return View(page);
     }
@@ -520,75 +489,41 @@ public sealed class TenantsController : Controller
     private async Task MergeExactIdAsync(
         string? search,
         bool includeDeleted,
-        Dictionary<string, string> active,
-        Dictionary<string, string> all,
+        List<FacilitySummary> rows,
         CancellationToken cancellationToken)
     {
-        if (!TenantListSearch.ShouldLookupExactId(search, all.Keys))
+        if (!TenantListSearch.ShouldLookupExactId(search, rows.Select(row => row.FacilityId)))
             return;
 
         var term = search!.Trim();
-        var activeFull = await _facilityServiceClient.GetFacilityListAsync(
+        var full = await _facilityServiceClient.GetFacilitySummariesAsync(
             search: null,
-            includeDeleted: false,
+            includeDeleted: includeDeleted,
             cancellationToken: cancellationToken);
-        if (!TryMapFacilities(activeFull, out var activeById))
+        if (!TryMapSummaries(full, out var all))
             return;
 
-        if (TryFind(activeById, term, out var activeId, out var activeName))
-        {
-            TenantListSearch.AddExact(active, all, includeDeleted, activeId, activeName, isDeleted: false);
-            return;
-        }
-
-        if (!includeDeleted)
+        var match = all.FirstOrDefault(row => string.Equals(row.FacilityId, term, StringComparison.OrdinalIgnoreCase));
+        if (match is null || (!includeDeleted && match.IsDeleted))
             return;
 
-        var deletedFull = await _facilityServiceClient.GetFacilityListAsync(
-            search: null,
-            includeDeleted: true,
-            cancellationToken: cancellationToken);
-        if (!TryMapFacilities(deletedFull, out var allById))
-            return;
-        if (TryFind(allById, term, out var deletedId, out var deletedName))
-            TenantListSearch.AddExact(active, all, includeDeleted: true, deletedId, deletedName, isDeleted: true);
+        rows.Add(match);
     }
 
-    private static bool TryFind(
-        Dictionary<string, string> facilities,
-        string term,
-        out string id,
-        out string name)
+    private static bool TryMapSummaries(
+        LinkApiResponse<List<FacilitySummary>> response,
+        out List<FacilitySummary> facilities)
     {
-        foreach (var pair in facilities)
-        {
-            if (!string.Equals(pair.Key, term, StringComparison.OrdinalIgnoreCase))
-                continue;
-            id = pair.Key;
-            name = pair.Value;
-            return true;
-        }
-
-        id = "";
-        name = "";
-        return false;
-    }
-
-    private static bool TryMapFacilities(
-        LantanaGroup.Link.Sdk.ApiClient.LinkApiResponse<Dictionary<string, string>> response,
-        out Dictionary<string, string> facilities)
-    {
-        // Tenant returns 204 when the facility list is empty.
         if (response.StatusCode == StatusCodes.Status204NoContent
             || (response.IsSuccessStatusCode && response.Body is { Count: 0 }))
         {
-            facilities = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            facilities = [];
             return true;
         }
 
         if (!response.IsSuccessStatusCode || response.Body is null)
         {
-            facilities = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            facilities = [];
             return false;
         }
 
@@ -666,54 +601,29 @@ public sealed class TenantsController : Controller
             page.Normalization.Editor.TestResource = resource;
     }
 
-    private async Task<IActionResult> FromResult(FacilityWriteResult result, string title)
+    private Task<IActionResult> FromResult(FacilityWriteResult result, string title)
     {
         if (result.RedirectToList)
         {
             TempData["Message"] = result.RedirectMessage;
-            return RedirectToAction(nameof(Index));
+            return Task.FromResult<IActionResult>(RedirectToAction(nameof(Index)));
         }
 
         if (result.RedirectFacilityId is not null)
         {
             TempData["Message"] = result.RedirectMessage;
-            return RedirectToAction(nameof(Facility), new
+            return Task.FromResult<IActionResult>(RedirectToAction(nameof(Facility), new
             {
                 id = result.RedirectFacilityId,
                 planType = result.RedirectPlanType,
                 orgConfig = result.RedirectReportingOrgId,
                 sequenceType = result.RedirectSequenceType,
                 operationPage = result.RedirectOperationPage
-            });
+            }));
         }
 
-        await StampAsync(result.Page.FacilityId, runId => result.Page.AutomationRunId = runId, HttpContext.RequestAborted);
         ViewData["Title"] = title;
-        return View("Facility", result.Page);
-    }
-
-    private static void HideOwnedResubmit(FacilityReportRow? report, string? automationRunId)
-    {
-        if (report is not null)
-            HideOwnedResubmit([report], automationRunId);
-    }
-
-    private static void HideOwnedResubmit(IEnumerable<FacilityReportRow> reports, string? automationRunId)
-    {
-        if (string.IsNullOrWhiteSpace(automationRunId))
-            return;
-
-        foreach (var report in reports)
-            report.CanResubmit = FacilityViewRules.CanResubmit(report.Status, report.Deleted, isAutomationOwned: true);
-    }
-
-    private async Task StampAsync(string? facilityId, Action<string?> assign, CancellationToken cancellationToken)
-    {
-        if (!_features.Value.AutomationEnabled || string.IsNullOrWhiteSpace(facilityId))
-            return;
-
-        var ownership = await _ownership.GetAsync(cancellationToken);
-        assign(ownership.RunIdFor(facilityId));
+        return Task.FromResult<IActionResult>(View("Facility", result.Page));
     }
 
     private async Task<IActionResult> ReportAction(

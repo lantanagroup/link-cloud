@@ -13,7 +13,7 @@ public sealed class TenantListItem
     public string FacilityId { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
     public bool IsDeleted { get; init; }
-    public string? AutomationRunId { get; init; }
+    public bool IsTest { get; init; }
 }
 
 public sealed class TenantListViewModel

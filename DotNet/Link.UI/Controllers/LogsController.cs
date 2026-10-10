@@ -10,13 +10,13 @@ namespace Link.UI.Controllers;
 public sealed class LogsController : Controller
 {
     private readonly LogsService _logs;
-    private readonly AutomationOwnershipLookup _ownership;
+    private readonly FacilityTestLookup _tests;
     private readonly IOptions<LinkUiFeatureOptions> _features;
 
-    public LogsController(LogsService logs, AutomationOwnershipLookup ownership, IOptions<LinkUiFeatureOptions> features)
+    public LogsController(LogsService logs, FacilityTestLookup tests, IOptions<LinkUiFeatureOptions> features)
     {
         _logs = logs;
-        _ownership = ownership;
+        _tests = tests;
         _features = features;
     }
 
@@ -228,38 +228,26 @@ public sealed class LogsController : Controller
         }
 
         query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
-        var ownership = await _ownership.GetAsync(cancellationToken);
-        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
-        AcquisitionLogListPage page;
-        if (AutomationMarkRules.IsAutomation(query.Scope))
+        var scope = await _tests.ResolvePageAsync(true, query.Scope, query.FacilityId, cancellationToken);
+        if (scope.EmptyNote is not null)
         {
-            if (facility is not null && !ownership.Contains(facility))
-                page = NotOwnedAcquisition(query);
-            else if (facility is null)
-            {
-                var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
-                page = await _logs.LoadAcquisitionForFacilitiesAsync(query, ids, truncated, cancellationToken);
-            }
-            else
-                page = await _logs.LoadAcquisitionAsync(query, cancellationToken);
-        }
-        else if (facility is not null && ownership.Contains(facility) && AutomationMarkRules.IsReal(query.Scope))
-        {
-            page = NotOwnedAcquisition(query);
-            page.ScopeNote = AutomationMarkRules.OwnedFacilityNote;
-        }
-        else
-        {
-            page = await _logs.LoadAcquisitionAsync(query, cancellationToken);
-            if (AutomationMarkRules.IsReal(query.Scope))
-            {
-                page.Logs = AutomationMarkRules.DropOwned(page.Logs, row => row.FacilityId, ownership, out var hidAny);
-                page.ScopeNote = AutomationMarkRules.WithHiddenNote(page.ScopeNote, hidAny);
-            }
+            var empty = NotOwnedAcquisition(query);
+            empty.ScopeNote = scope.EmptyNote;
+            return empty;
         }
 
-        foreach (var row in page.Logs)
-            row.AutomationRunId = ownership.RunIdFor(row.FacilityId);
+        var page = scope.UseNamedFacility
+            ? await _logs.LoadAcquisitionAsync(query, cancellationToken)
+            : await _logs.LoadAcquisitionForFacilitiesAsync(query, scope.FacilityIds, scope.Truncated, cancellationToken);
+        await StampRowsAsync(
+            page.Logs,
+            scope,
+            rows => page.Logs = rows,
+            () => page.ScopeNote,
+            note => page.ScopeNote = note,
+            row => row.FacilityId,
+            (row, isTest) => row.IsTest = isTest,
+            cancellationToken);
         return page;
     }
 
@@ -273,37 +261,22 @@ public sealed class LogsController : Controller
         }
 
         query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
-        var ownership = await _ownership.GetAsync(cancellationToken);
-        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
-        SftpLogListPage page;
-        if (AutomationMarkRules.IsAutomation(query.Scope))
-        {
-            if (facility is not null && !ownership.Contains(facility))
-                page = EmptySftp(query, AutomationMarkRules.NotOwnedNote);
-            else if (facility is null)
-            {
-                var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
-                page = await _logs.LoadSftpForFacilitiesAsync(query, ids, truncated, cancellationToken);
-            }
-            else
-                page = await _logs.LoadSftpAsync(query, cancellationToken);
-        }
-        else if (facility is not null && ownership.Contains(facility) && AutomationMarkRules.IsReal(query.Scope))
-        {
-            page = EmptySftp(query, AutomationMarkRules.OwnedFacilityNote);
-        }
-        else
-        {
-            page = await _logs.LoadSftpAsync(query, cancellationToken);
-            if (AutomationMarkRules.IsReal(query.Scope))
-            {
-                page.Logs = AutomationMarkRules.DropOwned(page.Logs, row => row.FacilityId, ownership, out var hidAny);
-                page.ScopeNote = AutomationMarkRules.WithHiddenNote(page.ScopeNote, hidAny);
-            }
-        }
+        var scope = await _tests.ResolvePageAsync(true, query.Scope, query.FacilityId, cancellationToken);
+        if (scope.EmptyNote is not null)
+            return EmptySftp(query, scope.EmptyNote);
 
-        foreach (var row in page.Logs)
-            row.AutomationRunId = ownership.RunIdFor(row.FacilityId);
+        var page = scope.UseNamedFacility
+            ? await _logs.LoadSftpAsync(query, cancellationToken)
+            : await _logs.LoadSftpForFacilitiesAsync(query, scope.FacilityIds, scope.Truncated, cancellationToken);
+        await StampRowsAsync(
+            page.Logs,
+            scope,
+            rows => page.Logs = rows,
+            () => page.ScopeNote,
+            note => page.ScopeNote = note,
+            row => row.FacilityId,
+            (row, isTest) => row.IsTest = isTest,
+            cancellationToken);
         return page;
     }
 
@@ -325,37 +298,22 @@ public sealed class LogsController : Controller
         }
 
         query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
-        var ownership = await _ownership.GetAsync(cancellationToken);
-        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
-        AuditListPage page;
-        if (AutomationMarkRules.IsAutomation(query.Scope))
-        {
-            if (facility is not null && !ownership.Contains(facility))
-                page = EmptyAudit(query, AutomationMarkRules.NotOwnedNote);
-            else if (facility is null)
-            {
-                var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
-                page = await _logs.LoadAuditForFacilitiesAsync(query, ids, truncated, cancellationToken);
-            }
-            else
-                page = await _logs.LoadAuditAsync(query, cancellationToken);
-        }
-        else if (facility is not null && ownership.Contains(facility) && AutomationMarkRules.IsReal(query.Scope))
-        {
-            page = EmptyAudit(query, AutomationMarkRules.OwnedFacilityNote);
-        }
-        else
-        {
-            page = await _logs.LoadAuditAsync(query, cancellationToken);
-            if (AutomationMarkRules.IsReal(query.Scope))
-            {
-                page.Events = AutomationMarkRules.DropOwned(page.Events, row => row.FacilityId, ownership, out var hidAny);
-                page.ScopeNote = AutomationMarkRules.WithHiddenNote(page.ScopeNote, hidAny);
-            }
-        }
+        var scope = await _tests.ResolvePageAsync(true, query.Scope, query.FacilityId, cancellationToken);
+        if (scope.EmptyNote is not null)
+            return EmptyAudit(query, scope.EmptyNote);
 
-        foreach (var row in page.Events)
-            row.AutomationRunId = ownership.RunIdFor(row.FacilityId);
+        var page = scope.UseNamedFacility
+            ? await _logs.LoadAuditAsync(query, cancellationToken)
+            : await _logs.LoadAuditForFacilitiesAsync(query, scope.FacilityIds, scope.Truncated, cancellationToken);
+        await StampRowsAsync(
+            page.Events,
+            scope,
+            rows => page.Events = rows,
+            () => page.ScopeNote,
+            note => page.ScopeNote = note,
+            row => row.FacilityId,
+            (row, isTest) => row.IsTest = isTest,
+            cancellationToken);
         return page;
     }
 
@@ -366,6 +324,51 @@ public sealed class LogsController : Controller
         ScopeNote = note,
         Paging = new PageBar { Page = 1, PageSize = LogsRules.ClampAuditPageSize(query.PageSize) }
     };
+
+    private async Task StampRowsAsync<T>(
+        IReadOnlyList<T> rows,
+        FacilityPageScope scope,
+        Action<IReadOnlyList<T>> setRows,
+        Func<string?> note,
+        Action<string?> setNote,
+        Func<T, string?> facilityId,
+        Action<T, bool> setTest,
+        CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0)
+            return;
+
+        var flags = scope.KnownTest
+            ? FacilityTestIndex.FromIds(DistinctIds(rows, facilityId), truncated: false)
+            : await _tests.ForIdsAsync(rows.Select(facilityId), cancellationToken);
+        if (scope.DropTestRows && flags.Reachable)
+        {
+            var kept = AutomationMarkRules.DropOwned(rows, facilityId, flags.IsTest, out var hidAny);
+            setRows(kept);
+            setNote(AutomationMarkRules.WithHiddenNote(note(), hidAny));
+            rows = kept;
+        }
+
+        foreach (var row in rows)
+            setTest(row, flags.Reachable && flags.IsTest(facilityId(row)));
+    }
+
+    private static List<string> DistinctIds<T>(IEnumerable<T> rows, Func<T, string?> facilityId)
+    {
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            var raw = facilityId(row);
+            if (string.IsNullOrWhiteSpace(raw))
+                continue;
+            var id = raw.Trim();
+            if (seen.Add(id))
+                ids.Add(id);
+        }
+
+        return ids;
+    }
 
     private static AcquisitionLogListPage NotOwnedAcquisition(AcquisitionQuery query)
     {

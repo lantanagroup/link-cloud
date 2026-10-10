@@ -53,6 +53,8 @@ builder.Services.AddSingleton(sp => AutomationRunReader.Create(
     sp.GetRequiredService<IConfiguration>(),
     sp.GetRequiredService<ILogger<AutomationRunReader>>()));
 builder.Services.AddSingleton<AutomationOwnershipLookup>();
+builder.Services.AddScoped<FacilityTestLookup>();
+builder.Services.AddHostedService<TestFacilityBackfill>();
 builder.Services.AddScoped(HomeOverviewService.Create);
 builder.Services.AddScoped<IHomeOverview>(sp => sp.GetRequiredService<HomeOverviewService>());
 

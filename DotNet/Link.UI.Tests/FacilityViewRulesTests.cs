@@ -87,9 +87,9 @@ public class FacilityViewRulesTests
         FacilityViewRules.CanResubmit(ScheduleStatus.CompletedNotSubmitted, deleted: false).Should().BeTrue();
         FacilityViewRules.CanResubmit(ScheduleStatus.Submitted, deleted: true).Should().BeFalse();
         FacilityViewRules.CanResubmit(ScheduleStatus.New, deleted: false).Should().BeFalse();
-        FacilityViewRules.CanResubmit(ScheduleStatus.Submitted, deleted: false, isAutomationOwned: true).Should().BeFalse();
-        FacilityViewRules.CanResubmit(ScheduleStatus.CompletedNotSubmitted, deleted: false, isAutomationOwned: true).Should().BeFalse();
-        FacilityViewRules.CanResubmit(ScheduleStatus.Submitted, deleted: false, isAutomationOwned: false).Should().BeTrue();
+        FacilityViewRules.CanResubmit(ScheduleStatus.Submitted, deleted: false, isTest: true).Should().BeFalse();
+        FacilityViewRules.CanResubmit(ScheduleStatus.CompletedNotSubmitted, deleted: false, isTest: true).Should().BeFalse();
+        FacilityViewRules.CanResubmit(ScheduleStatus.Submitted, deleted: false, isTest: false).Should().BeTrue();
 
         FacilityViewRules.CanAbort(ScheduleStatus.New, deleted: false).Should().BeTrue();
         FacilityViewRules.CanAbort(ScheduleStatus.EndOfPeriod, deleted: false).Should().BeTrue();

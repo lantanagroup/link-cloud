@@ -208,7 +208,7 @@ public static class HomeOverviewRules
         string? message,
         long total,
         IEnumerable<FacilityReportRow>? rows,
-        AutomationOwnershipIndex? ownership = null)
+        IReadOnlySet<string>? testFacilityIds = null)
     {
         if (!reachable)
         {
@@ -229,7 +229,9 @@ public static class HomeOverviewRules
                 Status = row.StatusLabel,
                 Badge = FacilityViewRules.StatusBadge(row.Status),
                 When = row.Created,
-                AutomationRunId = ownership?.RunIdFor(row.FacilityId)
+                IsTest = testFacilityIds is not null
+                    && !string.IsNullOrWhiteSpace(row.FacilityId)
+                    && testFacilityIds.Contains(row.FacilityId)
             }).ToList()
         };
     }

@@ -176,7 +176,10 @@ public sealed class FacilityHubService
             return FacilityWriteResult.Stay(page);
         }
 
-        var response = await FacilityConfigurationService.UpdateFacilityAsync(_facilities, id, model!, cancellationToken);
+        // The editor does not expose IsTest. A save keeps the flag that was loaded.
+        model!.IsTest = page.IsTest;
+
+        var response = await FacilityConfigurationService.UpdateFacilityAsync(_facilities, id, model, cancellationToken);
         if (!response.Success)
         {
             LogFailure("Facility update", id, response);
@@ -530,6 +533,7 @@ public sealed class FacilityHubService
         {
             FacilityId = facility.FacilityId,
             FacilityName = facility.FacilityName,
+            IsTest = facility.IsTest,
             TimeZone = facility.TimeZone,
             VendorVersionId = vendorId?.ToString(),
             VendorListLoaded = vendors.Loaded,

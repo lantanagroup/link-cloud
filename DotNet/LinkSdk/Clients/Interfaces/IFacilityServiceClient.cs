@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
@@ -25,6 +26,21 @@ public interface IFacilityServiceClient
     Task<LinkApiResponse> RestoreAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> SearchFacilitiesAsync(string? facilityId = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<Dictionary<string, string>>> GetFacilityListAsync(string? search = null, bool includeDeleted = false, CancellationToken cancellationToken = default);
+
+    /// <summary>Facility page rows, including <see cref="FacilitySummary.IsTest"/>.</summary>
+    Task<LinkApiResponse<List<FacilitySummary>>> GetFacilitySummariesAsync(string? search = null, bool includeDeleted = false, CancellationToken cancellationToken = default);
+
+    /// <summary>Test flag for the facility ids on one page.</summary>
+    Task<LinkApiResponse<List<FacilityFlag>>> GetFacilityFlagsAsync(FacilityFlagRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Paged facilities. <paramref name="isTest"/> limits the page to test or real facilities.</summary>
+    Task<LinkApiResponse<PagedConfigModel<FacilityModel>>> SearchFacilitiesPageAsync(
+        bool? isTest = null,
+        string? sortBy = null,
+        string? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Facility totals, and how many of an optional id set exist: <c>POST /api/Facility/counts</c>.</summary>
     Task<LinkApiResponse<FacilityCounts>> GetFacilityCountsAsync(FacilityCountRequest request, CancellationToken cancellationToken = default);

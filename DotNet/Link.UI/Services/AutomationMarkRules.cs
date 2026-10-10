@@ -70,13 +70,20 @@ public static class AutomationMarkRules
         IReadOnlyList<T> rows,
         Func<T, string?> facilityId,
         AutomationOwnershipIndex ownership,
+        out bool hidAny) =>
+        DropOwned(rows, facilityId, ownership.Contains, out hidAny);
+
+    public static List<T> DropOwned<T>(
+        IReadOnlyList<T> rows,
+        Func<T, string?> facilityId,
+        Func<string?, bool> isTest,
         out bool hidAny)
     {
         hidAny = false;
         var kept = new List<T>(rows.Count);
         foreach (var row in rows)
         {
-            if (ownership.Contains(facilityId(row)))
+            if (isTest(facilityId(row)))
                 hidAny = true;
             else
                 kept.Add(row);

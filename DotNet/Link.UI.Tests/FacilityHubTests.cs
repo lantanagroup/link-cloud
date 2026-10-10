@@ -5,6 +5,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Link.UI.Models;
 using Link.UI.Services;
@@ -192,6 +193,27 @@ public class FacilityHubServiceTests
         facilities.CreatedBody!.ScheduledReports.Daily.Should().BeEmpty();
         facilities.CreatedBody.ScheduledReports.Weekly.Should().BeEmpty();
         facilities.CreatedBody.ScheduledReports.Monthly.Should().BeEmpty();
+        facilities.CreatedBody.IsTest.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Saving_a_test_facility_keeps_is_test()
+    {
+        var facilities = Facility("hub-1");
+        facilities.Facility.Body!.IsTest = true;
+        var hub = Hub(facilities, census: null, queryDispatch: null, dmrp: true);
+
+        var result = await hub.UpdateAsync("hub-1", new FacilityEditInput
+        {
+            FacilityId = "hub-1",
+            FacilityName = "Hub",
+            TimeZone = "America/Chicago"
+        }, CancellationToken.None);
+
+        result.RedirectFacilityId.Should().Be("hub-1");
+        facilities.UpdatedBody.Should().NotBeNull();
+        facilities.UpdatedBody!.IsTest.Should().BeTrue();
+        facilities.UpdatedBody.FacilityName.Should().Be("Hub");
     }
 
     [Fact]
@@ -354,8 +376,13 @@ sealed class FakeFacilities : IFacilityServiceClient
         return Task.FromResult(Created);
     }
 
-    public Task<LinkApiResponse<FacilityModel>> UpdateAsync(string facilityId, FacilityModel request, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+    public FacilityModel? UpdatedBody { get; private set; }
+
+    public Task<LinkApiResponse<FacilityModel>> UpdateAsync(string facilityId, FacilityModel request, CancellationToken cancellationToken = default)
+    {
+        UpdatedBody = request;
+        return Task.FromResult(new LinkApiResponse<FacilityModel> { StatusCode = StatusCodes.Status200OK, Body = request });
+    }
 
     public LinkApiResponse SoftDeleted { get; set; } = new() { StatusCode = 204 };
     public string? SoftDeletedId { get; private set; }
@@ -380,6 +407,9 @@ sealed class FakeFacilities : IFacilityServiceClient
     public Task<LinkApiResponse> RestoreAsync(string facilityId, CancellationToken cancellationToken = default) => Unused();
     public Task<LinkApiResponse> SearchFacilitiesAsync(string? facilityId = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default) => Unused();
     public Task<LinkApiResponse<Dictionary<string, string>>> GetFacilityListAsync(string? search = null, bool includeDeleted = false, CancellationToken cancellationToken = default) => Unused<Dictionary<string, string>>();
+    public Task<LinkApiResponse<List<FacilitySummary>>> GetFacilitySummariesAsync(string? search = null, bool includeDeleted = false, CancellationToken cancellationToken = default) => Unused<List<FacilitySummary>>();
+    public Task<LinkApiResponse<List<FacilityFlag>>> GetFacilityFlagsAsync(FacilityFlagRequest request, CancellationToken cancellationToken = default) => Unused<List<FacilityFlag>>();
+    public Task<LinkApiResponse<PagedConfigModel<FacilityModel>>> SearchFacilitiesPageAsync(bool? isTest = null, string? sortBy = null, string? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default) => Unused<PagedConfigModel<FacilityModel>>();
     public Task<LinkApiResponse<FacilityCounts>> GetFacilityCountsAsync(FacilityCountRequest request, CancellationToken cancellationToken = default) => Unused<FacilityCounts>();
     public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> GenerateAdhocReportAsync(string facilityId, AdHocReportRequest request, CancellationToken cancellationToken = default) => Unused<GenerateAdhocReportResponseApiModel>();
     public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> RegenerateReportAsync(string facilityId, RegenerateReportRequest request, CancellationToken cancellationToken = default) => Unused<GenerateAdhocReportResponseApiModel>();

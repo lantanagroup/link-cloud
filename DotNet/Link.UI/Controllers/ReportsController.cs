@@ -11,7 +11,7 @@ public sealed class ReportsController : Controller
 {
     private readonly ReportsService _reports;
     private readonly FacilityViewService _view;
-    private readonly AutomationOwnershipLookup _ownership;
+    private readonly FacilityTestLookup _tests;
     private readonly IOptions<LinkUiFeatureOptions> _features;
     private readonly KafkaOpsFixture _fixture;
     private readonly PatientSubmissionReader _submission;
@@ -19,14 +19,14 @@ public sealed class ReportsController : Controller
     public ReportsController(
         ReportsService reports,
         FacilityViewService view,
-        AutomationOwnershipLookup ownership,
+        FacilityTestLookup tests,
         IOptions<LinkUiFeatureOptions> features,
         KafkaOpsFixture fixture,
         PatientSubmissionReader submission)
     {
         _reports = reports;
         _view = view;
-        _ownership = ownership;
+        _tests = tests;
         _features = features;
         _fixture = fixture;
         _submission = submission;
@@ -36,59 +36,57 @@ public sealed class ReportsController : Controller
     public async Task<IActionResult> Index(ReportsListQuery query, CancellationToken cancellationToken)
     {
         query ??= new ReportsListQuery();
-        ReportsListModel page;
-        if (!_features.Value.AutomationEnabled)
-        {
+        var automationOn = _features.Value.AutomationEnabled;
+        if (!automationOn)
             query.Scope = null;
-            page = await _reports.LoadListAsync(query, cancellationToken);
-        }
         else
-        {
             query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
-            var (ownership, ownershipReachable) = await _ownership.GetSnapshotAsync(cancellationToken);
-            var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
-            if (AutomationMarkRules.IsAutomation(query.Scope))
-            {
-                if (facility is not null && !ownership.Contains(facility))
-                {
-                    page = EmptyReports(query, AutomationMarkRules.NotOwnedNote);
-                }
-                else if (facility is null)
-                {
-                    var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
-                    page = await _reports.LoadForFacilitiesAsync(query, ids, truncated, cancellationToken);
-                }
-                else
-                {
-                    page = await _reports.LoadListAsync(query, cancellationToken);
-                }
-            }
-            else if (facility is not null && ownership.Contains(facility) && AutomationMarkRules.IsReal(query.Scope))
-            {
-                page = EmptyReports(query, AutomationMarkRules.OwnedFacilityNote);
-            }
-            else
-            {
-                page = await _reports.LoadListAsync(query, cancellationToken);
-                if (AutomationMarkRules.IsReal(query.Scope))
-                {
-                    page.Reports = AutomationMarkRules.DropOwned(page.Reports, report => report.FacilityId, ownership, out var hidAny);
-                    page.ScopeNote = AutomationMarkRules.WithHiddenNote(page.ScopeNote, hidAny);
-                }
-            }
 
-            foreach (var report in page.Reports)
-            {
-                report.AutomationRunId = ownership.RunIdFor(report.FacilityId);
-                report.CanResubmit = FacilityViewRules.CanResubmit(
-                    report.Status,
-                    report.Deleted,
-                    !ownershipReachable || ownership.Contains(report.FacilityId));
-            }
+        var scope = await _tests.ResolvePageAsync(automationOn, query.Scope, query.FacilityId, cancellationToken);
+        ReportsListModel page;
+        if (scope.EmptyNote is not null)
+            page = EmptyReports(query, scope.EmptyNote);
+        else if (!scope.UseNamedFacility)
+            page = await _reports.LoadForFacilitiesAsync(query, scope.FacilityIds, scope.Truncated, cancellationToken);
+        else
+            page = await _reports.LoadListAsync(query, cancellationToken);
+
+        var flags = scope.KnownTest
+            ? FacilityTestIndex.FromIds(TestIds(page.Reports), truncated: false)
+            : await _tests.ForIdsAsync(page.Reports.Select(report => report.FacilityId), cancellationToken);
+        if (scope.DropTestRows && flags.Reachable)
+        {
+            page.Reports = AutomationMarkRules.DropOwned(page.Reports, report => report.FacilityId, flags.IsTest, out var hidAny);
+            page.ScopeNote = AutomationMarkRules.WithHiddenNote(page.ScopeNote, hidAny);
+        }
+
+        foreach (var report in page.Reports)
+        {
+            report.IsTest = automationOn && flags.Reachable && flags.IsTest(report.FacilityId);
+            report.CanResubmit = FacilityViewRules.CanResubmit(
+                report.Status,
+                report.Deleted,
+                !flags.Reachable || flags.IsTest(report.FacilityId));
         }
 
         ViewData["Title"] = "Reports";
         return View(page);
+    }
+
+    private static List<string> TestIds(IEnumerable<FacilityReportRow> reports)
+    {
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var report in reports)
+        {
+            if (string.IsNullOrWhiteSpace(report.FacilityId))
+                continue;
+            var id = report.FacilityId.Trim();
+            if (seen.Add(id))
+                ids.Add(id);
+        }
+
+        return ids;
     }
 
     private static ReportsListModel EmptyReports(ReportsListQuery query, string note) => new()

@@ -100,7 +100,7 @@
                         <tr>
                             <td>
                                 <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = tenant.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", new { id = tenant.FacilityId }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
-                                <partial name="_AutomationBadge" model="tenant.AutomationRunId" />
+                                <partial name="_AutomationBadge" model="tenant.IsTest" />
                             </td>
                             <td>
                                 <span class="d-inline-flex align-items-center gap-2">

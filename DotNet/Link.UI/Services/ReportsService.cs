@@ -49,7 +49,6 @@ public sealed class ReportsService
     private readonly LinkUiFeatureOptions _options;
     private readonly IMemoryCache _counts;
     private readonly ILogger<ReportsService> _logger;
-    private readonly Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? _ownership;
 
     public ReportsService(
         IFacilityServiceClient facilities,
@@ -59,8 +58,7 @@ public sealed class ReportsService
         IMeasureEvalServiceClient? measure,
         IOptions<LinkUiFeatureOptions> options,
         IMemoryCache counts,
-        ILogger<ReportsService> logger,
-        Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? ownership = null)
+        ILogger<ReportsService> logger)
     {
         _facilities = facilities;
         _reports = reports;
@@ -70,13 +68,11 @@ public sealed class ReportsService
         _options = options.Value;
         _counts = counts;
         _logger = logger;
-        _ownership = ownership;
     }
 
     public static ReportsService Create(IServiceProvider services)
     {
         var registry = services.GetRequiredService<IOptions<ServiceRegistry>>().Value;
-        var ownership = services.GetRequiredService<AutomationOwnershipLookup>();
         return new ReportsService(
             services.GetRequiredService<IFacilityServiceClient>(),
             Blank(registry.ReportServiceUrl) ? null : services.GetRequiredService<IReportServiceClient>(),
@@ -85,8 +81,7 @@ public sealed class ReportsService
             Blank(registry.MeasureServiceUrl) ? null : services.GetRequiredService<IMeasureEvalServiceClient>(),
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<IMemoryCache>(),
-            services.GetRequiredService<ILogger<ReportsService>>(),
-            ownership.GetSnapshotAsync);
+            services.GetRequiredService<ILogger<ReportsService>>());
     }
 
     public async Task<ReportActivityLoad> LoadActivityCountsAsync(int days, CancellationToken cancellationToken)
@@ -287,14 +282,35 @@ public sealed class ReportsService
             return page;
         }
 
-        var gate = await OwnershipGateAsync(facilityId, cancellationToken);
-        if (gate.Unreachable)
+        LinkApiResponse<FacilityModel> facility;
+        try
+        {
+            facility = await _facilities.GetAsync(facilityId!, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Facility test flag could not be read. FacilityId={FacilityId}", facilityId.Sanitize());
+            page.Error = AutomationMarkRules.OwnershipUnreachable;
+            return page;
+        }
+
+        if (facility.StatusCode == StatusCodes.Status404NotFound)
+        {
+            page.Error = "That facility was not found.";
+            return page;
+        }
+
+        if (!facility.IsSuccessStatusCode || facility.Body is null)
         {
             page.Error = AutomationMarkRules.OwnershipUnreachable;
             return page;
         }
 
-        if (gate.Blocked)
+        if (facility.Body.IsTest)
         {
             page.Error = AutomationMarkRules.AdHocReportBlocked;
             return page;
@@ -317,19 +333,6 @@ public sealed class ReportsService
 
         try
         {
-            var facility = await _facilities.GetAsync(facilityId!, cancellationToken);
-            if (facility.StatusCode == StatusCodes.Status404NotFound)
-            {
-                page.Error = "That facility was not found.";
-                return page;
-            }
-
-            if (!facility.IsSuccessStatusCode || facility.Body is null)
-            {
-                page.Error = FacilityFormRules.ServiceMessage("Tenant", facility.StatusCode, facility.RawBody);
-                return page;
-            }
-
             if (!ReportsRules.TryReportingPeriod(
                     input.Cadence,
                     FacilityViewRules.ParseDate(input.StartDate),
@@ -1068,19 +1071,6 @@ public sealed class ReportsService
         LoadError = source.LoadError,
         Report = source.Report
     };
-
-    private readonly record struct OwnershipGate(bool Blocked, bool Unreachable);
-
-    private async Task<OwnershipGate> OwnershipGateAsync(string? facilityId, CancellationToken cancellationToken)
-    {
-        if (!_options.AutomationEnabled || _ownership is null)
-            return new(false, false);
-
-        var (index, reachable) = await _ownership(cancellationToken);
-        if (!reachable)
-            return new(true, true);
-        return new(index.Contains(facilityId), false);
-    }
 
     private static ReportsAction Fail(string message) => new(false, message);
 
