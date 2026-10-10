@@ -1380,6 +1380,132 @@ a.au-scenario-card:hover {
   color: var(--au-muted);
 }
 .lu-donut-count { font-weight: 650; color: var(--au-text); }
+.lu-patient-modal { max-width: min(1080px, 96vw); }
+.lu-patient-modal .lu-facility-id,
+.lu-patient-modal .lu-clip { max-width: none; }
+.lu-graph-aside .lu-facility-id,
+.lu-graph-aside .lu-clip {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+.lu-graph-count {
+  margin-left: .55rem;
+  font-weight: 500;
+  font-size: .8rem;
+  color: #ced4da;
+}
+.lu-graph-pager {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .2rem;
+  margin-top: .45rem;
+}
+.lu-explorer-search { margin-bottom: .75rem; }
+.lu-type-toggle,
+.lu-type-row {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  gap: .35rem .5rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--au-border);
+  padding: .5rem .1rem;
+  color: inherit;
+}
+.lu-type-row { grid-template-columns: minmax(0, 1fr) auto; }
+.lu-type-toggle:hover,
+.lu-type-toggle:focus-visible { background: #fafafa; }
+.lu-type-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+.lu-type-bar {
+  display: block;
+  height: .3rem;
+  border-radius: 99px;
+  background: #eee;
+  grid-column: 1 / -1;
+}
+.lu-type-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+}
+.lu-type-panel { padding: .4rem .1rem .7rem 1.4rem; }
+.lu-resource-graph {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1rem;
+  align-items: start;
+}
+.lu-resource-canvas {
+  width: 100%;
+  height: 420px;
+  background: #fbfbfb;
+  border: 1px solid var(--au-border);
+  border-radius: .5rem;
+  cursor: grab;
+  touch-action: none;
+}
+.lu-graph-aside {
+  min-width: 0;
+  max-height: 420px;
+  overflow: auto;
+}
+.lu-graph-progress {
+  height: .35rem;
+  background: #eee;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: .35rem;
+}
+.lu-graph-progress-bar {
+  height: 100%;
+  width: 0;
+  background: #111;
+  transition: width .2s ease;
+}
+.lu-graph-tabs {
+  display: flex;
+  gap: .25rem;
+  border-bottom: 1px solid var(--au-border);
+  margin-bottom: .6rem;
+}
+.lu-graph-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: .35rem .55rem;
+  color: inherit;
+}
+.lu-graph-tabs button[aria-selected="true"] {
+  border-bottom-color: #ffc107;
+  font-weight: 650;
+}
+.lu-graph-raw {
+  background: var(--au-dark);
+  color: #f4f4f4;
+  border-radius: .4rem;
+  padding: .75rem;
+  margin-top: .5rem;
+  max-height: 260px;
+  overflow: auto;
+  font-size: .78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 800px) {
+  .lu-resource-graph { grid-template-columns: 1fr; }
+  .lu-graph-aside { max-height: none; }
+}
 .lu-measure-list {
   list-style: none;
   margin: 0;

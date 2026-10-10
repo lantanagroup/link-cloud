@@ -1,4 +1,5 @@
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -227,9 +228,12 @@ public sealed class ReportsController : Controller
             stage, stageMeasure, popPage, tab);
         var returnUrl = ReturnUrlRules.FromQuery(Request);
         ReportManifestPage model;
+        var scale = _fixture.Active && string.Equals(Request.Query["scale"], "1", StringComparison.Ordinal);
         if (_fixture.Active && ReportManifestRules.IsSample(facilityId, reportId))
         {
-            model = ReportManifestRules.SampleReport(query, returnUrl);
+            model = scale
+                ? ReportManifestRules.ScaleReport(query, returnUrl)
+                : ReportManifestRules.SampleReport(query, returnUrl);
         }
         else
         {
@@ -253,6 +257,111 @@ public sealed class ReportsController : Controller
 
         ViewData["Title"] = "Report manifest";
         return View(model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> PatientGraph(
+        string? facilityId,
+        string? reportId,
+        string? patientId,
+        string? part,
+        string? type,
+        string? q,
+        string? id,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var patient = (patientId ?? string.Empty).Sanitize().Trim();
+        if (patient.Length is 0 or > 80)
+            return Problem(detail: "A patient id is required.", statusCode: StatusCodes.Status400BadRequest);
+
+        var facility = (facilityId ?? string.Empty).Sanitize().Trim();
+        var report = (reportId ?? string.Empty).Sanitize().Trim();
+        var scale = _fixture.Active
+            && ReportManifestRules.IsSample(facility, report)
+            && string.Equals(Request.Query["scale"], "1", StringComparison.Ordinal);
+        var key = facility + "|" + report + "|" + patient + "|" + (scale ? "1" : "0");
+        var index = ResourceGraphRules.Recall(key);
+        if (index is null)
+        {
+            var loaded = await LoadGraphAsync(facility, report, patient, scale, cancellationToken);
+            if (loaded.Problem is not null)
+                return loaded.Problem;
+            index = loaded.Index!;
+            ResourceGraphRules.Remember(key, index);
+        }
+
+        if (!string.IsNullOrWhiteSpace(index.Error) && index.Total == 0)
+            return Problem(detail: index.Error, statusCode: StatusCodes.Status400BadRequest);
+
+        var which = (part ?? "summary").Sanitize().Trim().ToLowerInvariant();
+        var typeName = Bound(type, 64);
+        var query = Bound(q, 80);
+        var resourceId = Bound(id, 80);
+        if (which == "page")
+            return Json(index.Page(typeName, query, page, pageSize));
+        if (which == "raw")
+        {
+            var raw = index.Raw(typeName, resourceId);
+            if (raw is null)
+                return Problem(detail: "That resource is not in this graph.", statusCode: StatusCodes.Status404NotFound);
+            return Json(raw);
+        }
+
+        Response.ContentType = "application/x-ndjson; charset=utf-8";
+        Response.Headers.CacheControl = "no-store";
+        await ResourceGraphRules.SummarizeAsync(index, Response.Body, cancellationToken);
+        return new EmptyResult();
+    }
+
+    private async Task<(ResourceGraphIndex? Index, IActionResult? Problem)> LoadGraphAsync(
+        string facilityId,
+        string reportId,
+        string patientId,
+        bool scale,
+        CancellationToken cancellationToken)
+    {
+        if (_fixture.Active && ReportManifestRules.IsSample(facilityId, reportId))
+        {
+            if (!ResourceGraphRules.TryFixture(patientId, scale, out var spec))
+                return (null, Problem(detail: "That patient is not on this report.", statusCode: StatusCodes.Status404NotFound));
+            return (ResourceGraphRules.Build(spec, cancellationToken), null);
+        }
+
+        try
+        {
+            var read = await _reports.ReadPatientBundleAsync(facilityId, reportId, patientId, cancellationToken);
+            if (!read.Action.Succeeded || string.IsNullOrWhiteSpace(read.Body))
+            {
+                var message = (read.Action.Message ?? string.Empty).Sanitize().Trim();
+                var status = message.Contains("not on this report", StringComparison.OrdinalIgnoreCase)
+                    ? StatusCodes.Status404NotFound
+                    : message.Contains("not configured", StringComparison.OrdinalIgnoreCase)
+                        ? StatusCodes.Status503ServiceUnavailable
+                        : StatusCodes.Status502BadGateway;
+                if (message.Length == 0)
+                    message = "The bundle could not be read.";
+                return (null, Problem(detail: message, statusCode: status));
+            }
+
+            var index = ResourceGraphRules.ReadBundle(read.Body, read.PatientId ?? patientId, cancellationToken);
+            return (index, null);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return (null, Problem(detail: "MeasureEval could not be read.", statusCode: StatusCodes.Status502BadGateway));
+        }
+    }
+
+    private static string Bound(string? value, int max)
+    {
+        var text = (value ?? string.Empty).Sanitize().Trim();
+        return text.Length <= max ? text : text[..max];
     }
 
     private static string PatientMeasureHref(string? facilityId, string? reportId, string patientId, string? returnUrl)
