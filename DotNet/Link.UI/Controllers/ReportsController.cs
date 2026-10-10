@@ -14,19 +14,22 @@ public sealed class ReportsController : Controller
     private readonly AutomationOwnershipLookup _ownership;
     private readonly IOptions<LinkUiFeatureOptions> _features;
     private readonly KafkaOpsFixture _fixture;
+    private readonly PatientSubmissionReader _submission;
 
     public ReportsController(
         ReportsService reports,
         FacilityViewService view,
         AutomationOwnershipLookup ownership,
         IOptions<LinkUiFeatureOptions> features,
-        KafkaOpsFixture fixture)
+        KafkaOpsFixture fixture,
+        PatientSubmissionReader submission)
     {
         _reports = reports;
         _view = view;
         _ownership = ownership;
         _features = features;
         _fixture = fixture;
+        _submission = submission;
     }
 
     [HttpGet]
@@ -283,6 +286,15 @@ public sealed class ReportsController : Controller
             && string.Equals(Request.Query["scale"], "1", StringComparison.Ordinal);
         var key = facility + "|" + report + "|" + patient + "|" + (scale ? "1" : "0");
         var index = ResourceGraphRules.Recall(key);
+        var sample = _fixture.Active && ReportManifestRules.IsSample(facility, report);
+        if (index is null && !sample)
+        {
+            var streamed = await TrySubmissionAsync(facility, report, patient, which: (part ?? "summary").Sanitize().Trim().ToLowerInvariant(), key, cancellationToken);
+            if (streamed.Handled)
+                return streamed.Result!;
+            index = streamed.Index;
+        }
+
         if (index is null)
         {
             var loaded = await LoadGraphAsync(facility, report, patient, scale, cancellationToken);
@@ -306,6 +318,14 @@ public sealed class ReportsController : Controller
             var raw = index.Raw(typeName, resourceId);
             if (raw is null)
                 return Problem(detail: "That resource is not in this graph.", statusCode: StatusCodes.Status404NotFound);
+            if (raw.Json is null
+                && index.Address is not null
+                && index.TrySpan(typeName, resourceId, out var offset, out var length))
+            {
+                var body = await _submission.ReadBodyAsync(index.Address, offset, length, cancellationToken);
+                raw = ResourceGraphIndex.WithBody(raw, body);
+            }
+
             return Json(raw);
         }
 
@@ -313,6 +333,93 @@ public sealed class ReportsController : Controller
         Response.Headers.CacheControl = "no-store";
         await ResourceGraphRules.SummarizeAsync(index, Response.Body, cancellationToken);
         return new EmptyResult();
+    }
+
+    private async Task<(bool Handled, IActionResult? Result, ResourceGraphIndex? Index)> TrySubmissionAsync(
+        string facilityId,
+        string reportId,
+        string patientId,
+        string which,
+        string key,
+        CancellationToken cancellationToken)
+    {
+        if (!_submission.IsConfigured)
+            return (false, null, null);
+
+        LantanaGroup.Link.Shared.Application.Models.Integration.Report.ReportScheduleApiModel? schedule;
+        try
+        {
+            schedule = await _reports.TryScheduleAsync(facilityId, reportId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return (false, null, null);
+        }
+
+        if (schedule is null)
+            return (false, null, null);
+
+        var summary = which == "summary";
+        var started = false;
+        try
+        {
+            var built = await _submission.ReadAsync(
+                schedule,
+                patientId,
+                summary
+                    ? ct =>
+                    {
+                        Response.ContentType = "application/x-ndjson; charset=utf-8";
+                        Response.Headers.CacheControl = "no-store";
+                        started = true;
+                        return Task.CompletedTask;
+                    }
+                    : null,
+                summary
+                    ? (read, ct) => new ValueTask(ResourceGraphRules.WriteProgressAsync(Response.Body, read, ct))
+                    : null,
+                cancellationToken);
+            if (built is null)
+                return (false, null, null);
+
+            ResourceGraphRules.Remember(key, built);
+            if (!summary)
+                return (false, null, built);
+
+            if (!started)
+            {
+                Response.ContentType = "application/x-ndjson; charset=utf-8";
+                Response.Headers.CacheControl = "no-store";
+            }
+
+            await ResourceGraphRules.WriteDoneAsync(built, Response.Body, cancellationToken);
+            return (true, new EmptyResult(), built);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            if (!started)
+                return (false, null, null);
+
+            var failed = ResourceGraphRules.Unavailable(patientId, "The submission could not be read.");
+            try
+            {
+                await ResourceGraphRules.WriteDoneAsync(failed, Response.Body, cancellationToken);
+            }
+            catch (Exception)
+            {
+                // The response already started. There is no second chance to change the status.
+            }
+
+            return (true, new EmptyResult(), null);
+        }
     }
 
     private async Task<(ResourceGraphIndex? Index, IActionResult? Problem)> LoadGraphAsync(

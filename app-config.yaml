@@ -787,6 +787,30 @@ services:
       description: "Whether the weekly scenario-run history purge is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
       required: false
       defaultValue: "false"
+    - key: "SubmissionRead:ExternalConnectionString"
+      description: "Connection string for the external submission container. Interactive mode streams patient-{id}.ndjson from that container. When unset, Interactive mode reads the MeasureEval patient bundle instead. This is not InternalBlobStorage, which Link.UI uses for automation bundles."
+      required: false
+      sensitive: true
+    - key: "SubmissionRead:ExternalContainerName"
+      description: "Name of the external submission container Submission writes, for example external."
+      required: false
+    - key: "SubmissionRead:ExternalBlobRoot"
+      description: "Optional path prefix Submission prepends on the external container. Match ExternalBlobStorage:BlobRoot. Leave empty when that root is empty."
+      required: false
+    - key: "SubmissionRead:InternalBlobRoot"
+      description: "Report's internal blob root, used only to strip that prefix when the schedule payload folder is turned into the external blob name. Leave empty when Report has no blob root. This is not Link.UI's automation blob root."
+      required: false
+    - key: "SubmissionRead:FlattenHierarchy"
+      description: "Match Submission ExternalBlobStorage:FlattenHierarchy. When true the patient file sits beside the report folder name instead of inside it."
+      required: false
+      defaultValue: "false"
+    - key: "SubmissionRead:UseMeasurePrefix"
+      description: "Match Submission ExternalBlobStorage:UseMeasurePrefix. When true a measure folder is inserted under the external root."
+      required: false
+      defaultValue: "false"
+    - key: "SubmissionRead:MeasurePrefixesByReportType"
+      description: "Map of report type to external folder name. Used only when SubmissionRead:UseMeasurePrefix is true. Match ExternalBlobStorage:MeasurePrefixesByReportType."
+      required: false
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."
