@@ -5,6 +5,8 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Http;
@@ -91,6 +93,73 @@ public class AutomationReportGuardTests
     }
 
     [Fact]
+    public async Task Resubmit_refuses_when_ownership_cannot_be_read()
+    {
+        var regenerated = 0;
+        var lookups = 0;
+        var service = View(automationEnabled: true, owned: false, () => regenerated++, () => lookups++, reachable: false);
+
+        var result = await service.ResubmitAsync(FacilityId, ReportId.ToString(), bypassSubmission: true, CancellationToken.None);
+
+        result.Succeeded.Should().BeFalse();
+        result.Message.Should().Be(AutomationMarkRules.OwnershipUnreachable);
+        regenerated.Should().Be(0);
+        lookups.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Ad_hoc_generate_refuses_when_ownership_cannot_be_read()
+    {
+        var tenantCalls = 0;
+        var lookups = 0;
+        var service = Reports(automationEnabled: true, owned: false, () => tenantCalls++, () => lookups++, reachable: false);
+
+        var page = await service.GenerateAsync(new GenerateReportInput { FacilityId = FacilityId }, CancellationToken.None);
+
+        page.Error.Should().Be(AutomationMarkRules.OwnershipUnreachable);
+        page.GeneratedReportId.Should().BeNull();
+        tenantCalls.Should().Be(0);
+        lookups.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Facility_report_rows_hide_resubmit_for_an_owned_facility()
+    {
+        var lookups = 0;
+        var service = Listed(owned: true, () => lookups++);
+
+        var page = await service.LoadAsync(FacilityId, new FacilityViewQuery(), CancellationToken.None);
+
+        page.Reports.Should().ContainSingle();
+        page.Reports[0].CanResubmit.Should().BeFalse();
+        lookups.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Facility_report_rows_hide_resubmit_when_ownership_cannot_be_read()
+    {
+        var lookups = 0;
+        var service = Listed(owned: false, () => lookups++, reachable: false);
+
+        var page = await service.LoadAsync(FacilityId, new FacilityViewQuery(), CancellationToken.None);
+
+        page.Reports.Should().ContainSingle();
+        page.Reports[0].CanResubmit.Should().BeFalse();
+        lookups.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Facility_report_rows_keep_resubmit_when_the_facility_is_not_owned()
+    {
+        var service = Listed(owned: false, () => { });
+
+        var page = await service.LoadAsync(FacilityId, new FacilityViewQuery(), CancellationToken.None);
+
+        page.Reports.Should().ContainSingle();
+        page.Reports[0].CanResubmit.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Ad_hoc_generate_skips_the_ownership_read_when_automation_is_off()
     {
         var lookups = 0;
@@ -118,17 +187,26 @@ public class AutomationReportGuardTests
         }
 
         var reports = File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/ReportsController.cs"));
-        reports.Should().Contain("ownership.Contains(report.FacilityId)");
+        reports.Should().Contain("GetSnapshotAsync");
+        reports.Should().Contain("!ownershipReachable || ownership.Contains(report.FacilityId)");
+
+        var view = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/FacilityViewService.cs"));
+        view.Should().Contain("GetSnapshotAsync");
+        view.Should().Contain("OwnershipUnreachable");
+
+        var generate = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/ReportsService.cs"));
+        generate.Should().Contain("GetSnapshotAsync");
+        generate.Should().Contain("OwnershipUnreachable");
 
         var tenants = File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/TenantsController.cs"));
         tenants.Should().Contain("isAutomationOwned: true");
 
-        var generate = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Generate.cshtml"));
-        generate.Should().Contain("AutomationFacilitiesExcluded");
-        generate.Should().Contain("Automation facilities cannot be used here.");
+        var form = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Generate.cshtml"));
+        form.Should().Contain("AutomationFacilitiesExcluded");
+        form.Should().Contain("Automation facilities cannot be used here.");
     }
 
-    private static FacilityViewService View(bool automationEnabled, bool owned, Action regenerated, Action lookedUp)
+    private static FacilityViewService View(bool automationEnabled, bool owned, Action regenerated, Action lookedUp, bool reachable = true)
     {
         var facilities = Stub.Create<IFacilityServiceClient>(new Dictionary<string, Func<object?[]?, object?>>(StringComparer.Ordinal)
         {
@@ -164,10 +242,51 @@ public class AutomationReportGuardTests
             admin: null,
             Options.Create(new LinkUiFeatureOptions { AutomationEnabled = automationEnabled }),
             NullLogger<FacilityViewService>.Instance,
-            Ownership(owned, lookedUp));
+            Ownership(owned, lookedUp, reachable));
     }
 
-    private static ReportsService Reports(bool automationEnabled, bool owned, Action tenantCalled, Action lookedUp)
+    private static FacilityViewService Listed(bool owned, Action lookedUp, bool reachable = true)
+    {
+        var facilities = Stub.Create<IFacilityServiceClient>(new Dictionary<string, Func<object?[]?, object?>>(StringComparer.Ordinal)
+        {
+            ["GetAsync"] = _ => Task.FromResult(new LinkApiResponse<FacilityModel>
+            {
+                StatusCode = StatusCodes.Status200OK,
+                Body = new FacilityModel { FacilityId = FacilityId, FacilityName = "Owned hospital" }
+            })
+        });
+        var reports = Stub.Create<IReportServiceClient>(new Dictionary<string, Func<object?[]?, object?>>(StringComparer.Ordinal)
+        {
+            ["SearchFacilitySchedulesAsync"] = _ => Task.FromResult(new LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>
+            {
+                StatusCode = StatusCodes.Status200OK,
+                Body = new PagedConfigModel<ReportScheduleApiModel>(
+                    [
+                        new ReportScheduleApiModel
+                        {
+                            Id = ReportId,
+                            FacilityId = FacilityId,
+                            Status = ScheduleStatus.Submitted
+                        }
+                    ],
+                    new PaginationMetadata(10, 1, 1))
+            }),
+            ["GetEntryCountByScheduleAsync"] = _ => Task.FromResult(new LinkApiResponse<int> { StatusCode = StatusCodes.Status200OK, Body = 2 }),
+            ["GetInitialPopulationCountAsync"] = _ => Task.FromResult(new LinkApiResponse<int> { StatusCode = StatusCodes.Status200OK, Body = 1 })
+        });
+        return new FacilityViewService(
+            facilities,
+            reports,
+            acquisition: null,
+            normalization: null,
+            dmrp: null,
+            admin: null,
+            Options.Create(new LinkUiFeatureOptions { AutomationEnabled = true }),
+            NullLogger<FacilityViewService>.Instance,
+            Ownership(owned, lookedUp, reachable));
+    }
+
+    private static ReportsService Reports(bool automationEnabled, bool owned, Action tenantCalled, Action lookedUp, bool reachable = true)
     {
         var facilities = Stub.Create<IFacilityServiceClient>(new Dictionary<string, Func<object?[]?, object?>>(StringComparer.Ordinal)
         {
@@ -191,20 +310,27 @@ public class AutomationReportGuardTests
             Options.Create(new LinkUiFeatureOptions { AutomationEnabled = automationEnabled }),
             new MemoryCache(new MemoryCacheOptions()),
             NullLogger<ReportsService>.Instance,
-            Ownership(owned, lookedUp));
+            Ownership(owned, lookedUp, reachable));
     }
 
-    private static Func<CancellationToken, Task<AutomationOwnershipIndex>> Ownership(bool owned, Action lookedUp) =>
+    private static Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>> Ownership(
+        bool owned,
+        Action lookedUp,
+        bool reachable = true) =>
         _ =>
         {
             lookedUp();
+            if (!reachable)
+                return Task.FromResult((AutomationOwnershipIndex.Empty, false));
             if (!owned)
-                return Task.FromResult(AutomationOwnershipIndex.Empty);
+                return Task.FromResult((AutomationOwnershipIndex.Empty, true));
 
             var runId = "11111111-1111-1111-1111-111111111111";
-            return Task.FromResult(new AutomationOwnershipIndex(
-                [FacilityId],
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [FacilityId] = runId }));
+            return Task.FromResult((
+                new AutomationOwnershipIndex(
+                    [FacilityId],
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [FacilityId] = runId }),
+                true));
         };
 
     private static string RepoFile(string relative)

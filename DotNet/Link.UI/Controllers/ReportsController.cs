@@ -45,7 +45,7 @@ public sealed class ReportsController : Controller
         else
         {
             query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
-            var ownership = await _ownership.GetAsync(cancellationToken);
+            var (ownership, ownershipReachable) = await _ownership.GetSnapshotAsync(cancellationToken);
             var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
             if (AutomationMarkRules.IsAutomation(query.Scope))
             {
@@ -83,7 +83,7 @@ public sealed class ReportsController : Controller
                 report.CanResubmit = FacilityViewRules.CanResubmit(
                     report.Status,
                     report.Deleted,
-                    ownership.Contains(report.FacilityId));
+                    !ownershipReachable || ownership.Contains(report.FacilityId));
             }
         }
 
