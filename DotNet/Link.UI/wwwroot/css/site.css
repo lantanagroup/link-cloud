@@ -1307,6 +1307,113 @@ a.au-scenario-card:hover {
   width: 100% !important;
   height: 100% !important;
 }
+.lu-donut-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.75rem 2.5rem;
+}
+.lu-donut-chart {
+  width: 260px;
+  height: 260px;
+  margin-inline: auto;
+}
+.lu-donut-ring {
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.lu-donut-hole {
+  width: 62%;
+  height: 62%;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.lu-donut-total {
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.lu-donut-total-label {
+  font-size: .72rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+}
+.lu-donut-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: .4rem 2rem;
+  width: max-content;
+  max-width: 100%;
+}
+.lu-donut-legend li {
+  display: flex;
+  align-items: baseline;
+  gap: .45rem;
+  min-width: 0;
+}
+.lu-donut-swatch {
+  width: .75rem;
+  height: .75rem;
+  border-radius: 2px;
+  align-self: center;
+}
+.lu-donut-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lu-donut-count,
+.lu-donut-pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--au-muted);
+}
+.lu-donut-count { font-weight: 650; color: var(--au-text); }
+.lu-measure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lu-measure-list li {
+  padding: .4rem 0;
+  border-bottom: 1px solid var(--au-border);
+}
+.lu-measure-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.lu-measure-list li:first-child { padding-top: 0; }
+.lu-manifest-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .85rem 1.75rem;
+}
+.lu-kpi-value {
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.lu-kpi-label {
+  display: block;
+  margin-top: .15rem;
+  font-size: .72rem;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+}
+@media (max-width: 720px) {
+  .lu-donut-layout { grid-template-columns: 1fr; }
+}
 .au-trend-axis {
   font-size: 10px;
   fill: var(--au-muted);
@@ -2082,6 +2189,8 @@ a.lu-clip {
   align-items: center;
   gap: .35rem .75rem;
 }
+.lu-id-strip .lu-clip,
+.lu-id-strip .lu-facility-id { max-width: none; }
 .au-dash .au-kpi-card { padding: .4rem .65rem; }
 .au-dash .au-kpi-value { font-size: 1.2rem; }
 .au-dash .au-kpi-label { margin-top: .05rem; }
