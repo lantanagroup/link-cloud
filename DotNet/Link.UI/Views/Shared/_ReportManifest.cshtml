@@ -58,6 +58,18 @@
         _ => ReportManifestRules.PopulationLabel(Model.Query.Stage)
     };
     string Count(int value) => value.ToString("N0");
+    var graphUrl = "";
+    if (string.Equals(Model.Path, "/Reports/Manifest", StringComparison.Ordinal)
+        && Model.Route.TryGetValue("facilityId", out var graphFacility)
+        && Model.Route.TryGetValue("reportId", out var graphReport)
+        && !string.IsNullOrWhiteSpace(graphFacility)
+        && !string.IsNullOrWhiteSpace(graphReport))
+    {
+        graphUrl = "/Reports/PatientGraph?facilityId=" + Uri.EscapeDataString(graphFacility)
+            + "&reportId=" + Uri.EscapeDataString(graphReport);
+        if (Model.Route.TryGetValue("scale", out var graphScale) && graphScale == "1")
+            graphUrl += "&scale=1";
+    }
 }
 
 <ul class="lu-section-nav" role="tablist">
@@ -735,8 +747,8 @@
     }
 </div>
 
-<div class="modal fade" id="manifestPatientModal" tabindex="-1" aria-labelledby="manifestPatientTitle" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+<div class="modal fade" id="manifestPatientModal" tabindex="-1" aria-labelledby="manifestPatientTitle" aria-hidden="true" data-graph-url="@graphUrl">
+    <div class="modal-dialog modal-dialog-scrollable lu-patient-modal">
         <div class="modal-content au-card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h2 class="h5 mb-0" id="manifestPatientTitle">Patient details</h2>
@@ -753,10 +765,38 @@
                 </section>
                 <section class="card au-card mb-3">
                     <h3 class="card-header h6 mb-0">Resources by type</h3>
-                    <div class="card-body" id="manifest-patient-resources"></div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-end mb-2" id="manifest-interactive-bar">
+                            <button type="button" class="btn btn-sm btn-au-execute" id="manifest-interactive" data-manifest-interactive>Interactive mode</button>
+                        </div>
+                        <div id="manifest-patient-resources"></div>
+                    </div>
                 </section>
-                <section class="card au-card mb-3">
-                    <h3 class="card-header h6 mb-0">Linked resources</h3>
+                <section class="card au-card mb-3" id="manifest-resource-graph" hidden>
+                    <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                        <h3 class="h6 mb-0">Resource graph <span id="manifest-graph-count" class="lu-graph-count"></span></h3>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-warning" id="manifest-graph-cancel" hidden>Cancel</button>
+                            <button type="button" class="lu-dismiss" id="manifest-graph-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="lu-graph-progress" id="manifest-graph-progress" hidden>
+                            <div class="lu-graph-progress-bar" id="manifest-graph-bar"></div>
+                        </div>
+                        <p class="small text-muted mb-2" id="manifest-graph-status"></p>
+                        <div class="alert alert-danger lu-alert" id="manifest-graph-error" hidden>
+                            <span class="lu-alert-text" id="manifest-graph-error-text"></span>
+                            <button type="button" class="lu-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
+                        </div>
+                        <div class="lu-resource-graph" id="manifest-graph-body" hidden>
+                            <canvas id="manifest-graph-canvas" class="lu-resource-canvas" role="img" aria-label="Resource graph"></canvas>
+                            <div id="manifest-graph-aside" class="lu-graph-aside"></div>
+                        </div>
+                    </div>
+                </section>
+                <section class="card au-card mb-3" id="manifest-resource-explorer">
+                    <h3 class="card-header h6 mb-0">Resources</h3>
                     <div class="card-body" id="manifest-patient-refs"></div>
                 </section>
                 <section class="card au-card mb-3">
@@ -773,6 +813,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="~/js/resource-graph.js" asp-append-version="true"></script>
 <script>
 (function () {
     document.querySelectorAll("[data-manifest-tab]").forEach(function (button) {
@@ -797,6 +838,8 @@
     var details = @Html.Raw(patientDetails);
     var donutColors = @Html.Raw(JsonSerializer.Serialize(ReportManifestRules.DonutColors));
     var donutOther = @Html.Raw(JsonSerializer.Serialize(ReportManifestRules.DonutOtherColor));
+    var graphUrl = @Html.Raw(JsonSerializer.Serialize(graphUrl));
+    if (window.luResourceGraph) window.luResourceGraph.mount(graphUrl, donutColors.concat([donutOther]));
     var palette = (window.luChartPalette && window.luChartPalette.manifest) || [];
     function draw(id, labels, data, kind) {
         var canvas = document.getElementById(id);
@@ -1007,7 +1050,10 @@
 
         mountDonut(document.getElementById("manifest-patient-resources"), openRow.resources, "resources");
 
-        fillRefs();
+        window.luManifestPatient = openRow;
+        if (window.luResourceExplorer) window.luResourceExplorer.render(openRow, graphUrl);
+        else fillRefs();
+        if (window.luResourceGraph) window.luResourceGraph.close();
 
         var events = document.getElementById("manifest-patient-events");
         events.replaceChildren();
