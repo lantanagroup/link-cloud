@@ -39,6 +39,8 @@ internal sealed class MutableRunState(
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
     public string? Error { get; set; }
     public string? RetentionNotice { get; set; }
+    /// <summary>The user who pressed Run. Background service calls name this user to Admin.BFF.</summary>
+    public AutomationRunInitiator Initiator { get; set; } = AutomationRunInitiator.System;
     public List<string> Logs { get; } = [];
     public CancellationTokenSource RunCancellation { get; } = new();
     public bool CancelRequested { get; set; }

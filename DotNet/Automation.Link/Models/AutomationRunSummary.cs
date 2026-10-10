@@ -20,6 +20,9 @@ public class AutomationRunSummary
     public string? Error { get; set; }
     /// <summary>Short note of what this run kept or removed. Empty when both cleanup settings are off.</summary>
     public string? RetentionNotice { get; set; }
+    /// <summary>Who started the run (Admin.BFF user email or id). Sent as the audit initiator on background service calls.</summary>
+    public string? InitiatedById { get; set; }
+    public string? InitiatedByName { get; set; }
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
     public string? Duration { get; set; }
     public string? FacilityId { get; set; }

@@ -26,6 +26,18 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
         _serviceRegistry = serviceRegistry;
     }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public FacilityServiceClient(
+        AdminBffRoute route,
+        IOptions<ServiceRegistry> serviceRegistry,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    {
+        _serviceRegistry = serviceRegistry;
+    }
+
     public Task<LinkApiResponse<FacilityModel>> CreateAsync(
         FacilityModel request,
         CancellationToken cancellationToken = default) =>
