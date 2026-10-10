@@ -66,7 +66,10 @@
 </div>
 </section>
 
-<form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
+<section class="card au-card mb-3">
+<h2 class="card-header h6 mb-0">Topic</h2>
+<div class="card-body">
+<form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
     <input type="hidden" name="q" value="@query.Q" />
@@ -104,7 +107,7 @@
                 </optgroup>
             }
         </select>
-        <p class="form-text">Topics are grouped by family. Open keeps this search and starts at the first page.</p>
+        <p class="form-text mb-0">Topics are grouped by family. Open keeps this search and starts at the first page.</p>
     </div>
     <div class="col-auto">
         <button class="btn btn-au-link" type="submit">Open</button>
@@ -124,6 +127,12 @@
         <p class="lu-kafka-stat mb-0">@KafkaBrowseText.FamilyStat(members)</p>
     }
 }
+@if (string.IsNullOrWhiteSpace(topicName))
+{
+    <p class="text-muted mb-0 mt-2">Choose a topic to read. Internal topics and names outside the catalog are refused.</p>
+}
+</div>
+</section>
 
 @if (!string.IsNullOrWhiteSpace(topicName))
 {
@@ -396,7 +405,7 @@
             <input type="hidden" name="stage" value="@query.StageRecord" />
             <label class="form-label mb-0" for="browse-jump">Page</label>
             <input class="form-control form-control-sm" id="browse-jump" name="msgPage" type="number" min="1" max="@messagePages" value="@messagePage" />
-            <button class="btn btn-sm btn-au-execute" type="submit">Go</button>
+            <button class="lu-page-go" type="submit">Go</button>
         </form>
         <span class="small text-muted">Per page</span>
         @foreach (var size in new[] { 10, 25, 50 })
@@ -414,8 +423,4 @@
     </nav>
 
     <partial name="_ProduceMessage" model="Model" />
-}
-else
-{
-    <p class="text-muted mt-3">Choose a topic to read. Internal topics and names outside the catalog are refused.</p>
 }

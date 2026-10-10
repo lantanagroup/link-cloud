@@ -36,7 +36,10 @@
 </div>
 </section>
 
-<form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
+<section class="card au-card mb-3">
+<h2 class="card-header h6 mb-0">Topic</h2>
+<div class="card-body">
+<form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Topic" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
     <div class="col-12 col-md-6">
@@ -54,7 +57,7 @@
                 }
             }
         </select>
-        <p class="form-text">The list follows the search above.</p>
+        <p class="form-text mb-0">The list follows the search above.</p>
     </div>
     <div class="col-auto">
         <button class="btn btn-au-link" type="submit">Open</button>
@@ -62,14 +65,15 @@
 </form>
 @if (Model.TopicRows.Count == 0)
 {
-    <p class="text-muted mt-3">No topics match this search.</p>
+    <p class="text-muted mb-0 mt-2">No topics match this search.</p>
 }
-
-@if (topic is null)
+else if (topic is null)
 {
-    <p class="text-muted mt-3">Select a topic to see leaders, replicas, in-sync replicas, and lag.</p>
+    <p class="text-muted mb-0 mt-2">Select a topic to see leaders, replicas, in-sync replicas, and lag.</p>
 }
-else
+</div>
+</section>
+@if (topic is not null)
 {
     <div class="au-card card mt-3">
         <div class="card-header">@topic.Topic</div>

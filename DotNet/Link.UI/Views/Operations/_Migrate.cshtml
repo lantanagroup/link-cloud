@@ -41,7 +41,10 @@
 </div>
 </section>
 
-<form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
+<section class="card au-card mb-3">
+<h2 class="card-header h6 mb-0">Topic</h2>
+<div class="card-body">
+<form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Migrate" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
     <div class="col-12 col-md-6">
@@ -64,6 +67,8 @@
         <button class="btn btn-au-link" type="submit">Open</button>
     </div>
 </form>
+</div>
+</section>
 
 @if (detail is not null)
 {
