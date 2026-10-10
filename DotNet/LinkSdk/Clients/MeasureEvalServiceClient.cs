@@ -20,6 +20,15 @@ public class MeasureEvalServiceClient : LinkApiClientBase, IMeasureEvalServiceCl
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public MeasureEvalServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
+
     public Task<LinkApiResponse> PutMeasureDefinitionAsync(string bundleJson, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request("measureeval/measure-definition").WithHeader("Content-Type", "application/json").PutStringAsync(bundleJson, cancellationToken: cancellationToken));
 

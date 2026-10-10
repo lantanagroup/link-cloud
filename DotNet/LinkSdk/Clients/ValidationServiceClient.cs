@@ -22,6 +22,15 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public ValidationServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
+
     public Task<LinkApiResponse> InitializeArtifactsAsync(CancellationToken cancellationToken = default) =>
         SendAsync(() => Request("validation/artifact/$initialize").PostAsync(cancellationToken: cancellationToken));
 

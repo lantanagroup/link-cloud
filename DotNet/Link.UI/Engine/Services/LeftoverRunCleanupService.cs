@@ -127,6 +127,8 @@ public sealed class LeftoverRunCleanupService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Hosted work has no user; name the cleanup service as the initiator on Admin.BFF calls.
+        using var callScope = BackgroundServiceCallScope.Begin(AutomationRunInitiator.LeftoverCleanup);
         _stopping = stoppingToken;
         var startup = await settingsStore.GetEffectiveAsync(stoppingToken);
         if (!startup.Enabled)
