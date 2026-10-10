@@ -13,5 +13,7 @@ namespace LantanaGroup.Link.Tenant.Business.Models
         public VendorModel? Vendor { get; set; }
 
         public bool? IsDeleted { get; set; }
+
+        public bool? IsTest { get; set; }
     }
 }

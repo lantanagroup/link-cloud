@@ -24,7 +24,7 @@ public sealed class HomeOverviewService : IHomeOverview
     public const string CacheKey = "link-ui:home-overview";
 
     private readonly IFacilityServiceClient _facilities;
-    private readonly AutomationOwnershipLookup _ownership;
+    private readonly FacilityTestLookup _tests;
     private readonly ReportsService _reports;
     private readonly SystemService _system;
     private readonly AutomationRunReader _runs;
@@ -37,7 +37,7 @@ public sealed class HomeOverviewService : IHomeOverview
 
     public HomeOverviewService(
         IFacilityServiceClient facilities,
-        AutomationOwnershipLookup ownership,
+        FacilityTestLookup tests,
         ReportsService reports,
         SystemService system,
         AutomationRunReader runs,
@@ -49,7 +49,7 @@ public sealed class HomeOverviewService : IHomeOverview
         ILogger<HomeOverviewService> logger)
     {
         _facilities = facilities;
-        _ownership = ownership;
+        _tests = tests;
         _reports = reports;
         _system = system;
         _runs = runs;
@@ -63,7 +63,7 @@ public sealed class HomeOverviewService : IHomeOverview
 
     public static HomeOverviewService Create(IServiceProvider services) => new(
         services.GetRequiredService<IFacilityServiceClient>(),
-        services.GetRequiredService<AutomationOwnershipLookup>(),
+        services.GetRequiredService<FacilityTestLookup>(),
         services.GetRequiredService<ReportsService>(),
         services.GetRequiredService<SystemService>(),
         services.GetRequiredService<AutomationRunReader>(),
@@ -141,53 +141,18 @@ public sealed class HomeOverviewService : IHomeOverview
 
     private async Task<FacilityCard> LoadFacilityCountsAsync(CancellationToken cancellationToken, bool classify)
     {
-        if (!classify)
-            return await ReadFacilityTotalAsync(cancellationToken, ownershipReachable: true, classify: false);
-
-        var (index, ownershipReachable) = await _ownership.GetSnapshotAsync(cancellationToken);
-        if (!ownershipReachable)
-            return await ReadFacilityTotalAsync(cancellationToken, ownershipReachable: false, classify: true);
-
-        var matched = 0;
-        var total = 0;
-        var first = true;
-        foreach (var batch in HomeOverviewRules.FacilityIdBatches(index.FacilityIds))
-        {
-            var response = await _facilities.GetFacilityCountsAsync(
-                new FacilityCountRequest { FacilityIds = batch.ToList() },
-                cancellationToken);
-            if (!TryCount(response, out var body, out var message) || body.Matched is not int batchMatched)
-            {
-                return HomeOverviewRules.FacilitiesFromCounts(
-                    false,
-                    message ?? "Tenant service returned an incomplete count.",
-                    0,
-                    null,
-                    true,
-                    true);
-            }
-
-            if (first)
-            {
-                total = body.Total;
-                first = false;
-            }
-
-            matched += batchMatched;
-        }
-
-        return HomeOverviewRules.FacilitiesFromCounts(true, null, total, matched, true, true);
-    }
-
-    private async Task<FacilityCard> ReadFacilityTotalAsync(
-        CancellationToken cancellationToken,
-        bool ownershipReachable,
-        bool classify)
-    {
         var response = await _facilities.GetFacilityCountsAsync(new FacilityCountRequest(), cancellationToken);
         if (!TryCount(response, out var body, out var message))
-            return HomeOverviewRules.FacilitiesFromCounts(false, message, 0, null, ownershipReachable, classify);
-        return HomeOverviewRules.FacilitiesFromCounts(true, null, body.Total, null, ownershipReachable, classify);
+            return HomeOverviewRules.FacilitiesFromCounts(false, message, 0, null, true, classify);
+
+        // Test travels with the facility total. One counts call covers the split.
+        return HomeOverviewRules.FacilitiesFromCounts(
+            true,
+            null,
+            body.Total,
+            classify ? body.Test : null,
+            true,
+            classify);
     }
 
     private static bool TryCount<T>(LinkApiResponse<T> response, out T body, out string? message)
@@ -217,10 +182,15 @@ public sealed class HomeOverviewService : IHomeOverview
             }, token);
             if (page.LoadError is not null)
                 return HomeOverviewRules.Reports(false, page.LoadError, 0, null);
-            AutomationOwnershipIndex? ownership = null;
-            if (stamp)
-                ownership = (await _ownership.GetSnapshotAsync(token)).Index;
-            return HomeOverviewRules.Reports(true, null, page.Paging.TotalCount, page.Reports, ownership);
+            IReadOnlySet<string>? testIds = null;
+            if (stamp && page.Reports.Count > 0)
+            {
+                var flags = await _tests.ForIdsAsync(page.Reports.Select(row => row.FacilityId), token);
+                if (flags.Reachable)
+                    testIds = new HashSet<string>(flags.Ids, StringComparer.OrdinalIgnoreCase);
+            }
+
+            return HomeOverviewRules.Reports(true, null, page.Paging.TotalCount, page.Reports, testIds);
         }, failure => HomeOverviewRules.Reports(
             false,
             failure == HomeOverviewRules.CardFailure.Timeout

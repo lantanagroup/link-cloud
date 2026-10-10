@@ -37,7 +37,6 @@ public sealed class FacilityViewService
     private readonly IAdminBffIntegrationClient? _admin;
     private readonly LinkUiFeatureOptions _options;
     private readonly ILogger<FacilityViewService> _logger;
-    private readonly Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? _ownership;
 
     public FacilityViewService(
         IFacilityServiceClient facilities,
@@ -47,8 +46,7 @@ public sealed class FacilityViewService
         IDmrpServiceClient? dmrp,
         IAdminBffIntegrationClient? admin,
         IOptions<LinkUiFeatureOptions> options,
-        ILogger<FacilityViewService> logger,
-        Func<CancellationToken, Task<(AutomationOwnershipIndex Index, bool Reachable)>>? ownership = null)
+        ILogger<FacilityViewService> logger)
     {
         _facilities = facilities;
         _reports = reports;
@@ -58,14 +56,12 @@ public sealed class FacilityViewService
         _admin = admin;
         _options = options.Value;
         _logger = logger;
-        _ownership = ownership;
     }
 
     public static FacilityViewService Create(IServiceProvider services)
     {
         var registry = services.GetRequiredService<IOptions<ServiceRegistry>>().Value;
         var options = services.GetRequiredService<IOptions<LinkUiFeatureOptions>>();
-        var ownership = services.GetRequiredService<AutomationOwnershipLookup>();
         return new FacilityViewService(
             services.GetRequiredService<IFacilityServiceClient>(),
             Blank(registry.ReportServiceUrl) ? null : services.GetRequiredService<IReportServiceClient>(),
@@ -74,8 +70,7 @@ public sealed class FacilityViewService
             options.Value.DmrpEnabled ? services.GetRequiredService<IDmrpServiceClient>() : null,
             Blank(registry.AdminBffServiceUrl) ? null : services.GetRequiredService<IAdminBffIntegrationClient>(),
             options,
-            services.GetRequiredService<ILogger<FacilityViewService>>(),
-            ownership.GetSnapshotAsync);
+            services.GetRequiredService<ILogger<FacilityViewService>>());
     }
 
     public async Task<FacilityViewModel> LoadAsync(string? facilityId, FacilityViewQuery? query, CancellationToken cancellationToken)
@@ -179,6 +174,7 @@ public sealed class FacilityViewService
             else
             {
                 page.FacilityName = facility.Body.FacilityName;
+                page.IsTest = facility.Body.IsTest;
             }
 
             var schedule = await _reports.GetScheduleAsync(page.ReportId, cancellationToken);
@@ -204,7 +200,7 @@ public sealed class FacilityViewService
 
             var counts = await CountsAsync(schedule.Body.Id, cancellationToken);
             page.Report = ToReportRow(schedule.Body, counts.Census, counts.Population);
-            await StampResubmitAsync(page.Report, page.FacilityId, cancellationToken);
+            StampResubmit(page.Report, page.IsTest);
 
             var pageSize = FacilityViewRules.ClampPageSize(query.PageSize);
             var pageNumber = FacilityViewRules.ClampPage(query.Page);
@@ -245,12 +241,12 @@ public sealed class FacilityViewService
     public Task<FacilityViewAction> ResubmitAsync(string? facilityId, string? reportId, bool bypassSubmission, CancellationToken cancellationToken) =>
         ChangeReportAsync(facilityId, reportId, includeDeleted: false, cancellationToken, async (id, report, schedule) =>
         {
-            var gate = await OwnershipGateAsync(id, cancellationToken);
-            if (gate.Unreachable)
+            var read = await ReadTestAsync(id, cancellationToken);
+            if (!read.Reachable)
                 return Fail(AutomationMarkRules.OwnershipUnreachable);
-            if (!FacilityViewRules.CanResubmit(schedule.Status, schedule.IsDeleted == true, gate.Blocked))
+            if (!FacilityViewRules.CanResubmit(schedule.Status, schedule.IsDeleted == true, read.IsTest))
             {
-                return Fail(gate.Blocked
+                return Fail(read.IsTest
                     ? AutomationMarkRules.AdHocReportBlocked
                     : "Only a submitted report can be resubmitted.");
             }
@@ -345,6 +341,7 @@ public sealed class FacilityViewService
         }
 
         page.FacilityName = facility.Body.FacilityName;
+        page.IsTest = facility.Body.IsTest;
         page.Enrolled = FacilityViewRules.Enrolled(facility.Body.ScheduledReports);
         return true;
     }
@@ -398,7 +395,7 @@ public sealed class FacilityViewService
         var counts = await Task.WhenAll(records.Select(record => CountsAsync(record.Id, cancellationToken)));
         page.Paging = Bar(response.Body.Metadata, pageNumber, pageSize, records.Count);
         page.Reports = records.Select((record, index) => ToReportRow(record, counts[index].Census, counts[index].Population)).ToList();
-        await StampResubmitAsync(page.Reports, page.FacilityId, cancellationToken);
+        StampResubmit(page.Reports, page.IsTest);
     }
 
     private async Task<(int? Census, int? Population)> CountsAsync(Guid reportId, CancellationToken cancellationToken)
@@ -742,38 +739,49 @@ public sealed class FacilityViewService
         Hsloc = row.HslocMappingStatus.ToString()
     };
 
-    private async Task StampResubmitAsync(FacilityReportRow? row, string? facilityId, CancellationToken cancellationToken)
+    private static void StampResubmit(FacilityReportRow? row, bool isTest)
     {
         if (row is null)
             return;
-        await StampResubmitAsync([row], facilityId, cancellationToken);
+        StampResubmit([row], isTest);
     }
 
     /// <summary>
-    /// One ownership read for the facility, then every row on the page.
-    /// A miss closes resubmit. An empty index is not the same as "this facility is not owned".
+    /// The facility record already carried <paramref name="isTest"/>. A test facility cannot be resubmitted.
     /// </summary>
-    private async Task StampResubmitAsync(IReadOnlyList<FacilityReportRow> rows, string? facilityId, CancellationToken cancellationToken)
+    private static void StampResubmit(IReadOnlyList<FacilityReportRow> rows, bool isTest)
     {
-        if (rows.Count == 0)
-            return;
-
-        var gate = await OwnershipGateAsync(facilityId, cancellationToken);
         foreach (var row in rows)
-            row.CanResubmit = FacilityViewRules.CanResubmit(row.Status, row.Deleted, gate.Blocked);
+        {
+            row.IsTest = isTest;
+            row.CanResubmit = FacilityViewRules.CanResubmit(row.Status, row.Deleted, isTest);
+        }
     }
 
-    private readonly record struct OwnershipGate(bool Blocked, bool Unreachable);
-
-    private async Task<OwnershipGate> OwnershipGateAsync(string? facilityId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads <see cref="FacilityModel.IsTest"/>. A 404 is a known real facility.
+    /// Any other miss closes resubmit: a missing answer is not "this facility is real".
+    /// </summary>
+    private async Task<FacilityTestRead> ReadTestAsync(string facilityId, CancellationToken cancellationToken)
     {
-        if (!_options.AutomationEnabled || _ownership is null)
-            return new(false, false);
-
-        var (index, reachable) = await _ownership(cancellationToken);
-        if (!reachable)
-            return new(true, true);
-        return new(index.Contains(facilityId), false);
+        try
+        {
+            var response = await _facilities.GetAsync(facilityId, cancellationToken);
+            if (response.StatusCode == StatusCodes.Status404NotFound)
+                return FacilityTestRead.Known(false);
+            if (!response.IsSuccessStatusCode || response.Body is null)
+                return FacilityTestRead.Miss;
+            return FacilityTestRead.Known(response.Body.IsTest);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Facility test flag could not be read. FacilityId={FacilityId}", facilityId.Sanitize());
+            return FacilityTestRead.Miss;
+        }
     }
 
     private static FacilityViewAction Done(string message) => new(true, message);

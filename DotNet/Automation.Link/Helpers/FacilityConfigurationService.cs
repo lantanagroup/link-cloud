@@ -27,6 +27,12 @@ public static partial class FacilityConfigurationService
     private const string FacilityTimeZone = "America/Chicago";
 
     /// <summary>
+    /// A facility this service creates or saves belongs to a scenario run. The flag stays true
+    /// across the follow-up saves that would otherwise post a model without it.
+    /// </summary>
+    private static void MarkTest(FacilityModel model) => model.IsTest = true;
+
+    /// <summary>
     /// Legacy callers omit the vendor and still create an Epic facility.
     /// An explicit vendor is sent as given. An explicit blank vendor is omitted.
     /// </summary>
@@ -61,7 +67,8 @@ public static partial class FacilityConfigurationService
             VendorVersionId = vendorVersionId,
             ScheduledReports = dmrpEnabled
                 ? MonthlySchedule([])
-                : existing.ScheduledReports ?? MonthlySchedule([])
+                : existing.ScheduledReports ?? MonthlySchedule([]),
+            IsTest = true
         }, cancellationToken);
 
         if (!updated.IsSuccessStatusCode)
@@ -253,8 +260,10 @@ public static partial class FacilityConfigurationService
             TimeZone = FacilityTimeZone,
             // Empty under DMRP, and not merely unselected: a request that names any report is refused
             // outright. The measures are enrolled below instead.
-            ScheduledReports = MonthlySchedule(dmrpEnabled ? [] : measureIds)
+            ScheduledReports = MonthlySchedule(dmrpEnabled ? [] : measureIds),
+            IsTest = true
         };
+        MarkTest(facility);
         await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
         var createResponse = await facilityClient.CreateAsync(facility, cancellationToken);
 
@@ -361,8 +370,10 @@ public static partial class FacilityConfigurationService
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            ScheduledReports = MonthlySchedule([])
+            ScheduledReports = MonthlySchedule([]),
+            IsTest = true
         };
+        MarkTest(facility);
         await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
         var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
 
@@ -912,8 +923,10 @@ public static partial class FacilityConfigurationService
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            ScheduledReports = MonthlySchedule([])
+            ScheduledReports = MonthlySchedule([]),
+            IsTest = true
         };
+        MarkTest(facility);
         await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
         var created = await facilityClient.CreateAsync(facility, cancellationToken);
 
@@ -948,8 +961,10 @@ public static partial class FacilityConfigurationService
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            ScheduledReports = MonthlySchedule([])
+            ScheduledReports = MonthlySchedule([]),
+            IsTest = true
         };
+        MarkTest(facility);
         await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
         var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
 

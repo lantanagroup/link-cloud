@@ -131,7 +131,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
             string? facilityName, string? timeZone, VendorModel? vendor, string? sortBy, SortOrder? sortOrder,
-            int pageSize = 10, int pageNumber = 1, bool includeDeleted = false,
+            int pageSize = 10, int pageNumber = 1, bool includeDeleted = false, bool? isTest = null,
             CancellationToken cancellationToken = default)
         {
             facilityId = facilityId?.Sanitize();
@@ -144,7 +144,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 pageNumber = 1;
             }
 
-            if (string.IsNullOrEmpty(facilityId) && string.IsNullOrEmpty(facilityName))
+            if (string.IsNullOrEmpty(sortBy)
+                && string.IsNullOrEmpty(facilityId)
+                && string.IsNullOrEmpty(facilityName))
             {
                 sortBy = "FacilityId";
             }
@@ -158,7 +160,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 TimeZone = timeZone,
-                Vendor = vendor
+                Vendor = vendor,
+                IsTest = isTest
             };
             var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, includeDeleted, cancellationToken);
 
@@ -212,6 +215,55 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 Activity.Current?.AddException(ex);
                 _logger.LogError(ex, "Exception Encountered in FacilityController.GetFacilityList");
                 return Problem("An error occurred while getting all facilities", null, 500);
+            }
+        }
+
+        /// <summary>
+        /// Facility id, name, and whether it is a test facility. One payload for a facility page.
+        /// </summary>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<FacilitySummary>))]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpGet("summaries")]
+        public async Task<IActionResult> GetFacilitySummaries([FromQuery] string? search, bool includeDeleted = false, CancellationToken cancellationToken = default)
+        {
+            search = search?.Sanitize();
+            try
+            {
+                var summaries = await _facilityQueries.SummariesAsync(search, includeDeleted, cancellationToken);
+                return Ok(summaries);
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                Activity.Current?.AddException(ex);
+                _logger.LogError(ex, "Exception Encountered in FacilityController.GetFacilitySummaries");
+                return Problem("An error occurred while getting facilities", null, 500);
+            }
+        }
+
+        /// <summary>
+        /// Test flag for a set of facility ids. Callers stamp a page they already loaded.
+        /// </summary>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<FacilityFlag>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpPost("flags")]
+        public async Task<IActionResult> FacilityFlags([FromBody] FacilityFlagRequest? request, CancellationToken cancellationToken)
+        {
+            if (!AggregateCountLimits.TryFacilityIds(request?.FacilityIds, out var ids, out var error))
+                return BadRequest(error);
+
+            try
+            {
+                var flags = await _facilityQueries.FlagsAsync(ids ?? [], cancellationToken);
+                return Ok(flags);
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                Activity.Current?.AddException(ex);
+                _logger.LogError(ex, "Exception Encountered in FacilityController.FacilityFlags");
+                return Problem("An error occurred while reading facility flags", null, 500);
             }
         }
 

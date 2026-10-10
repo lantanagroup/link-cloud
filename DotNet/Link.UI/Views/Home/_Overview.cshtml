@@ -263,7 +263,7 @@
                                 <span class="home-row-main">
                                     <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, CopyLabel = "Copy facility id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }), ReturnUrl = origin })" />
                                     <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = report.Id, CopyLabel = "Copy report id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }), ReturnUrl = origin })" />
-                                    <partial name="_AutomationBadge" model="report.AutomationRunId" />
+                                    <partial name="_AutomationBadge" model="report.IsTest" />
                                 </span>
                                 <a class="home-row-time text-muted small" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id" asp-route-returnUrl="@origin">@report.When</a>
                             </div>

@@ -24,6 +24,13 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
         [JsonPropertyName("isDeleted")]
         public bool? IsDeleted { get; set; }
 
+        /// <summary>
+        /// Test (automation) facility. Optional on input; a missing value is false.
+        /// </summary>
+        [DataMember]
+        [JsonPropertyName("isTest")]
+        public bool IsTest { get; set; }
+
         [JsonPropertyName("vendor")]
         public VendorModel? Vendor { get; set; }
 

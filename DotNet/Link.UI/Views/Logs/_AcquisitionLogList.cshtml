@@ -198,7 +198,7 @@ else
                                     {
                                         <td data-da-col="facility">
                                             <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
-                                            <partial name="_AutomationBadge" model="row.AutomationRunId" />
+                                            <partial name="_AutomationBadge" model="row.IsTest" />
                                         </td>
                                     }
                                     <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
