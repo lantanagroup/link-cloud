@@ -178,8 +178,12 @@ public static class FacilityViewRules
 
     public static string StatusBadge(ScheduleStatus status) => StatusPills.ForSchedule(status);
 
-    public static bool CanResubmit(ScheduleStatus status, bool deleted) =>
-        !deleted && status is ScheduleStatus.Submitted or ScheduleStatus.CompletedNotSubmitted;
+    /// <summary>
+    /// A submitted report can be resubmitted. An automation-owned facility cannot:
+    /// those reports change only inside a scenario run.
+    /// </summary>
+    public static bool CanResubmit(ScheduleStatus status, bool deleted, bool isAutomationOwned = false) =>
+        !isAutomationOwned && !deleted && status is ScheduleStatus.Submitted or ScheduleStatus.CompletedNotSubmitted;
 
     public static bool CanAbort(ScheduleStatus status, bool deleted) =>
         !deleted && status is ScheduleStatus.New or ScheduleStatus.EndOfPeriod;

@@ -189,6 +189,8 @@
         </div>
     </div>
 </div>
+@if (Model.Reports.Any(report => report.CanResubmit))
+{
 <div class="modal fade" id="resubmitDialog" tabindex="-1" aria-labelledby="resubmitTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form method="post" id="resubmitForm" class="modal-content" data-au-save asp-action="ResubmitReport" asp-route-id="@Model.FacilityId">
@@ -207,3 +209,4 @@
         </form>
     </div>
 </div>
+}

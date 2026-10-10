@@ -49,6 +49,7 @@ public sealed class ReportsService
     private readonly LinkUiFeatureOptions _options;
     private readonly IMemoryCache _counts;
     private readonly ILogger<ReportsService> _logger;
+    private readonly Func<CancellationToken, Task<AutomationOwnershipIndex>>? _ownership;
 
     public ReportsService(
         IFacilityServiceClient facilities,
@@ -58,7 +59,8 @@ public sealed class ReportsService
         IMeasureEvalServiceClient? measure,
         IOptions<LinkUiFeatureOptions> options,
         IMemoryCache counts,
-        ILogger<ReportsService> logger)
+        ILogger<ReportsService> logger,
+        Func<CancellationToken, Task<AutomationOwnershipIndex>>? ownership = null)
     {
         _facilities = facilities;
         _reports = reports;
@@ -68,11 +70,13 @@ public sealed class ReportsService
         _options = options.Value;
         _counts = counts;
         _logger = logger;
+        _ownership = ownership;
     }
 
     public static ReportsService Create(IServiceProvider services)
     {
         var registry = services.GetRequiredService<IOptions<ServiceRegistry>>().Value;
+        var ownership = services.GetRequiredService<AutomationOwnershipLookup>();
         return new ReportsService(
             services.GetRequiredService<IFacilityServiceClient>(),
             Blank(registry.ReportServiceUrl) ? null : services.GetRequiredService<IReportServiceClient>(),
@@ -81,7 +85,8 @@ public sealed class ReportsService
             Blank(registry.MeasureServiceUrl) ? null : services.GetRequiredService<IMeasureEvalServiceClient>(),
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<IMemoryCache>(),
-            services.GetRequiredService<ILogger<ReportsService>>());
+            services.GetRequiredService<ILogger<ReportsService>>(),
+            ownership.GetAsync);
     }
 
     public async Task<ReportActivityLoad> LoadActivityCountsAsync(int days, CancellationToken cancellationToken)
@@ -232,7 +237,10 @@ public sealed class ReportsService
 
     public async Task<GenerateReportPage> LoadGenerateAsync(CancellationToken cancellationToken)
     {
-        var page = new GenerateReportPage();
+        var page = new GenerateReportPage
+        {
+            AutomationFacilitiesExcluded = _options.AutomationEnabled
+        };
         if (_measure is null)
         {
             page.MeasuresNote = MeasureNotConfigured + " Type the measure ids below.";
@@ -276,6 +284,12 @@ public sealed class ReportsService
         if (!FacilityFormRules.IsValidFacilityId(facilityId, _options.NumericOnlyFacilityId))
         {
             page.Error = FacilityFormRules.FacilityIdRule(_options.NumericOnlyFacilityId);
+            return page;
+        }
+
+        if (await AutomationOwnsAsync(facilityId, cancellationToken))
+        {
+            page.Error = AutomationMarkRules.AdHocReportBlocked;
             return page;
         }
 
@@ -1047,6 +1061,15 @@ public sealed class ReportsService
         LoadError = source.LoadError,
         Report = source.Report
     };
+
+    private async Task<bool> AutomationOwnsAsync(string? facilityId, CancellationToken cancellationToken)
+    {
+        if (!_options.AutomationEnabled || _ownership is null)
+            return false;
+
+        var index = await _ownership(cancellationToken);
+        return index.Contains(facilityId);
+    }
 
     private static ReportsAction Fail(string message) => new(false, message);
 
