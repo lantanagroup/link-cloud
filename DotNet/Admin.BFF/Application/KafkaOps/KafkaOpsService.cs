@@ -42,6 +42,9 @@ public interface IKafkaOpsService
     Task<ChangeRequestRecord> CreateRebalanceAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken);
     Task<InfraStatus> PlanAddBrokerAsync(CancellationToken cancellationToken);
     Task<ChangeRequestRecord> CreateAddBrokerAsync(ClaimsPrincipal user, string reason, string? correlationId, CancellationToken cancellationToken);
+    Task<ReplicationFactorPlan> PlanReplicationFactorAsync(string topic, int replicationFactor, long throttleBytesPerSecond, string? search, int page, int pageSize, CancellationToken cancellationToken);
+    Task<ChangeRequestRecord> CreateReplicationFactorAsync(ClaimsPrincipal user, string topic, int replicationFactor, long throttleBytesPerSecond, string reason, string? confirmation, string? correlationId, CancellationToken cancellationToken);
+    Task<ChangeRequestRecord> ProduceMessageAsync(ClaimsPrincipal user, string topic, string? headers, string? key, string? value, string reason, string? confirmation, string? correlationId, CancellationToken cancellationToken);
     Task<ChangeRequestRecord> CancelAsync(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken);
     InfraStatus Infra { get; }
     bool CanScale(ClaimsPrincipal user);

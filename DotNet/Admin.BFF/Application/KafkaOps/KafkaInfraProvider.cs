@@ -28,6 +28,9 @@ public interface IKafkaInfraProvider
     Task AddBrokerAsync(CancellationToken cancellationToken);
     Task RemoveBrokerAsync(int brokerId, CancellationToken cancellationToken);
     Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken);
+
+    Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, long throttleBytesPerSecond, CancellationToken cancellationToken) =>
+        ApplyReassignmentAsync(reassignmentJson, rebalanceName, false, cancellationToken);
     Task CancelReassignmentAsync(string rebalanceName, CancellationToken cancellationToken);
     Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken);
     Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken);
@@ -163,11 +166,16 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
         return ComposeAsync(cancellationToken, null, "stop", prefix + brokerId);
     }
 
-    public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken)
+    public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken) =>
+        ApplyReassignmentAsync(reassignmentJson, rebalanceName, _options.ReassignmentThrottleBytesPerSecond, cancellationToken);
+
+    public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, long throttleBytesPerSecond, CancellationToken cancellationToken)
     {
         KafkaRebalanceNames.Require(rebalanceName);
-        var throttle = _options.ReassignmentThrottleBytesPerSecond > 0
-            ? " --throttle " + _options.ReassignmentThrottleBytesPerSecond
+        if (throttleBytesPerSecond < 0 || throttleBytesPerSecond > 1_073_741_824)
+            throw new KafkaOpsRejectedException("The throttle is not valid.");
+        var throttle = throttleBytesPerSecond > 0
+            ? " --throttle " + throttleBytesPerSecond.ToString(System.Globalization.CultureInfo.InvariantCulture)
             : "";
         var file = "/tmp/" + rebalanceName + ".json";
         var script = "cat > " + file + " && /opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +

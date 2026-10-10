@@ -92,12 +92,87 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             .RequireAuthorization(PolicyNames.CanMigrateKafkaTopics);
         group.MapGet("/holds", GetHolds)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/topics/{topic}/replication-factor/plan", PlanReplicationFactor)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/topics/{topic}/replication-factor", CreateReplicationFactor)
+            .RequireAuthorization(PolicyNames.CanManageKafkaTopics);
+        group.MapPost("/topics/{topic}/messages", ProduceMessage)
+            .RequireAuthorization(PolicyNames.CanManageKafkaTopics);
         group.MapGet("/topics/{topic}/messages", GetMessages)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapGet("/topics/{topic}/messages/export", ExportMessages)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapGet("/topics/{topic}/family", GetBrowseFamily)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+    }
+
+    private async Task<IResult> PlanReplicationFactor(ClaimsPrincipal user, string topic, ReplicationFactorPlanBody body, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanView(user))
+            return Results.Forbid();
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var search = (body.Search ?? "").Sanitize();
+            var plan = await kafkaOps.PlanReplicationFactorAsync(name, body.ReplicationFactor, body.ThrottleBytesPerSecond, search, body.Page, body.PageSize, cancellationToken);
+            return plan.Accepted ? Results.Ok(plan) : Results.BadRequest(plan);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private async Task<IResult> CreateReplicationFactor(ClaimsPrincipal user, string topic, ReplicationFactorBody body, HttpContext http, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanManage(user))
+            return Results.Forbid();
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var record = await kafkaOps.CreateReplicationFactorAsync(
+                user,
+                name,
+                body.ReplicationFactor,
+                body.ThrottleBytesPerSecond,
+                (body.Reason ?? "").Sanitize(),
+                (body.Confirmation ?? "").Sanitize(),
+                Correlation(http),
+                cancellationToken);
+            return Results.Created($"/api/ops/kafka/change-requests/{record.Id}", record);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private async Task<IResult> ProduceMessage(ClaimsPrincipal user, string topic, ProduceMessageBody body, HttpContext http, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanManage(user))
+            return Results.Forbid();
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var record = await kafkaOps.ProduceMessageAsync(
+                user,
+                name,
+                (body.Headers ?? "").Sanitize(),
+                (body.Key ?? "").Sanitize(),
+                (body.Value ?? "").Sanitize(),
+                (body.Reason ?? "").Sanitize(),
+                (body.Confirmation ?? "").Sanitize(),
+                Correlation(http),
+                cancellationToken);
+            return Results.Created($"/api/ops/kafka/change-requests/{record.Id}", record);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
     }
 
     private async Task<IResult> GetTopics(ClaimsPrincipal user, CancellationToken cancellationToken)
@@ -858,4 +933,30 @@ public sealed class ReasonBody
 public sealed class RejectBody
 {
     public string? Reason { get; set; }
+}
+
+public sealed class ReplicationFactorPlanBody
+{
+    public int ReplicationFactor { get; set; }
+    public long ThrottleBytesPerSecond { get; set; }
+    public string? Search { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 25;
+}
+
+public sealed class ReplicationFactorBody
+{
+    public int ReplicationFactor { get; set; }
+    public long ThrottleBytesPerSecond { get; set; }
+    public string? Reason { get; set; }
+    public string? Confirmation { get; set; }
+}
+
+public sealed class ProduceMessageBody
+{
+    public string? Headers { get; set; }
+    public string? Key { get; set; }
+    public string? Value { get; set; }
+    public string? Reason { get; set; }
+    public string? Confirmation { get; set; }
 }

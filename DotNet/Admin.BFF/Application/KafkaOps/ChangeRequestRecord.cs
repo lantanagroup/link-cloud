@@ -27,7 +27,9 @@ public enum KafkaChangeKind
     AddBroker,
     DecommissionBroker,
     Rebalance,
-    CancelReassignment
+    CancelReassignment,
+    ReplicationFactor,
+    Produce
 }
 
 public sealed class GroupProgress
@@ -87,6 +89,11 @@ public sealed class ChangeRequestRecord
     public List<GroupProgress> Groups { get; set; } = [];
     public int PollFailures { get; set; }
     public DateTimeOffset? NextPollUtc { get; set; }
+    public int BeforeReplicationFactor { get; set; }
+    public int TargetReplicationFactor { get; set; }
+    public long ThrottleBytesPerSecond { get; set; }
+    public bool ThrottleCleared { get; set; }
+    public List<string> Steps { get; set; } = [];
 }
 
 public sealed class OffsetCheckpoint

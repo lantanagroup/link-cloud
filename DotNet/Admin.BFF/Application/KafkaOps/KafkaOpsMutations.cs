@@ -361,6 +361,7 @@ public sealed partial class KafkaOpsService
                 KafkaChangeKind.AddBroker => await BrokerAddedAsync(record, cancellationToken),
                 KafkaChangeKind.DecommissionBroker => await DecommissionSettledAsync(record, cancellationToken),
                 KafkaChangeKind.Rebalance => await RebalanceSettledAsync(record, cancellationToken),
+                KafkaChangeKind.ReplicationFactor => await ReplicationFactorSettledAsync(record, cancellationToken),
                 _ => false
             };
             if (!done)
@@ -391,6 +392,8 @@ public sealed partial class KafkaOpsService
         if (done)
         {
             await FinishMoveAsync(record, cancellationToken);
+            if (record.Kind == KafkaChangeKind.ReplicationFactor && !await ClearReplicationThrottleAsync(record, cancellationToken))
+                return;
             record.Status = KafkaChangeStatus.Done;
             record.ClosedUtc = DateTimeOffset.UtcNow;
             record.ConvergedUtc = DateTimeOffset.UtcNow;
@@ -398,7 +401,8 @@ public sealed partial class KafkaOpsService
             record.NextPollUtc = null;
             record.Failure = "";
             await SaveAsync(record, cancellationToken);
-            await ReleaseRebalanceAsync(record, cancellationToken);
+            if (record.Kind != KafkaChangeKind.ReplicationFactor)
+                await ReleaseRebalanceAsync(record, cancellationToken);
             await AuditAsync(record, "converged", cancellationToken);
             return;
         }
@@ -593,7 +597,9 @@ public sealed partial class KafkaOpsService
 
     private void EnsureActor(ClaimsPrincipal user, KafkaChangeKind kind)
     {
-        var allowed = kind is KafkaChangeKind.PartitionIncrease or KafkaChangeKind.CompleteTopicFamily ? CanManage(user) : CanScale(user);
+        var allowed = kind is KafkaChangeKind.PartitionIncrease or KafkaChangeKind.CompleteTopicFamily or KafkaChangeKind.ReplicationFactor or KafkaChangeKind.Produce
+            ? CanManage(user)
+            : CanScale(user);
         if (!allowed)
             throw new KafkaOpsForbiddenException("You are not allowed to run this change.");
     }
@@ -671,7 +677,7 @@ public sealed partial class KafkaOpsService
     }
 
     private static bool OwnsRebalanceResource(ChangeRequestRecord record) =>
-        record.Kind is KafkaChangeKind.DecommissionBroker or KafkaChangeKind.Rebalance;
+        record.Kind is KafkaChangeKind.DecommissionBroker or KafkaChangeKind.Rebalance or KafkaChangeKind.ReplicationFactor;
 
     private static bool BlocksForReassignment(ChangeRequestRecord record) =>
         OwnsRebalanceResource(record)

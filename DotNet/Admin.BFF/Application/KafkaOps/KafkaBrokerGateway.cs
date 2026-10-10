@@ -1,3 +1,4 @@
+using System.Text;
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -71,6 +72,7 @@ public interface IKafkaBrokerGateway
     Task<ClusterSnapshot> DescribeClusterAsync(CancellationToken cancellationToken);
     Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken);
     Task ElectPreferredLeadersAsync(IReadOnlyList<TopicPartition> partitions, CancellationToken cancellationToken);
+    Task ProduceRecordAsync(string topic, string? key, string? value, IReadOnlyList<KafkaProduceHeader> headers, CancellationToken cancellationToken);
 }
 
 public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
@@ -327,6 +329,32 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         return views;
     }
 
+    public async Task ProduceRecordAsync(string topic, string? key, string? value, IReadOnlyList<KafkaProduceHeader> headers, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var config = _connection.CreateProducerConfig();
+        config.AllowAutoCreateTopics = false;
+        config.Acks = Acks.All;
+        config.ClientId = "LinkAdminBFF-produce";
+        using var producer = new ProducerBuilder<string, string>(config).Build();
+        var message = new Message<string, string>
+        {
+            Key = key ?? "",
+            Value = value ?? "",
+            Headers = new Headers()
+        };
+        foreach (var header in headers)
+            message.Headers.Add(header.Name, Encoding.UTF8.GetBytes(header.Value ?? ""));
+        try
+        {
+            await producer.ProduceAsync(topic, message, cancellationToken);
+        }
+        finally
+        {
+            producer.Flush(TimeSpan.FromSeconds(15));
+        }
+    }
+
     public Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -545,7 +573,9 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         var config = new AdminClientConfig
         {
             BootstrapServers = string.Join(",", _connection.BootstrapServers ?? []),
-            ClientId = "LinkAdminBFF-ops"
+            ClientId = "LinkAdminBFF-ops",
+            // Replica and ISR polls must see a reassignment finish inside the change timeout.
+            TopicMetadataRefreshIntervalMs = 5_000
         };
         if (_connection.SaslProtocolEnabled)
         {
