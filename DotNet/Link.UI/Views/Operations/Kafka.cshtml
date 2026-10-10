@@ -28,7 +28,10 @@
         <div class="alert alert-secondary" role="status">This environment is read-only. Kafka changes are refused.</div>
     }
 
-    <form class="row g-2 align-items-end mt-3" method="get" action="/Operations/Kafka">
+    <section class="card au-card mt-3">
+    <h2 class="card-header h6 mb-0">Search</h2>
+    <div class="card-body">
+    <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
         <div class="col-12 col-md-4">
             <label class="form-label" for="kafka-q">Search</label>
             <input class="form-control" id="kafka-q" name="q" value="@query.Q" />
@@ -101,7 +104,9 @@
             <button class="btn btn-au-execute" type="submit">Search</button>
         </div>
     </form>
-    <p class="text-muted mb-0">Groups named e2e-diag-* and Dynamic:* stay hidden unless Include test groups is checked. <span class="lu-live-label">Live</span></p>
+    <p class="text-muted mb-0 mt-2">Groups named e2e-diag-* and Dynamic:* stay hidden unless Include test groups is checked. <span class="lu-live-label">Live</span></p>
+    </div>
+    </section>
 
     @if (query.View == ThroughputKafkaPageQuery.Overview)
     {
