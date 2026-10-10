@@ -1496,6 +1496,8 @@ a.au-scenario-card:hover {
   margin-top: .45rem;
 }
 .lu-explorer-search { margin-bottom: .75rem; }
+.lu-graph-filter { margin-bottom: .75rem; }
+mark.lu-match { background: #fff3bf; color: inherit; padding: 0 .1rem; }
 .lu-type-toggle,
 .lu-type-row {
   display: grid;

@@ -40,6 +40,10 @@ public sealed class MetricsRunDetailViewModel : MetricsRunListItem
     public IReadOnlyList<string> BenchmarkViolations { get; set; } = [];
     public IReadOnlyList<string> RegressionFlags { get; set; } = [];
     public Guid? PreviousRunId { get; set; }
+
+    /// <summary>Where "View previous run" goes. The run page and the metrics page set this.</summary>
+    public string? PreviousRunHref { get; set; }
+
     public IReadOnlyList<ValidatorOutcomeSnapshotView> Validators { get; set; } = [];
 }
 

@@ -63,6 +63,9 @@ public sealed class MetricsController : Controller
         if (detail == null)
             return NotFound();
 
+        if (detail.PreviousRunId is Guid previous)
+            detail.PreviousRunHref = Url.Action("Details", "Metrics", new { id = previous });
+
         return View(detail);
     }
 

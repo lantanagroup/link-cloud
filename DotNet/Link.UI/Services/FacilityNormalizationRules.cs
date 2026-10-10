@@ -56,6 +56,14 @@ public static class FacilityNormalizationRules
             ? string.Empty
             : System.Text.RegularExpressions.Regex.Replace(operationType.Trim(), "([a-z0-9])([A-Z])", "$1 $2");
 
+    public static string? Description(string? operationType) => CanonicalType(operationType) switch
+    {
+        "CopyLocation" => CopyLocationDescription,
+        "CopyLocationAliasToTypeIteratively" => CopyAliasDescription,
+        "HSLOCMap" => HslocDescription,
+        _ => null
+    };
+
     public static string? CanonicalType(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))

@@ -16,6 +16,7 @@
     }
     var summaryAbort = null;
     var pageAbort = null;
+    var filterTimer = 0;
     var state = null;
 
     function patient() {
@@ -78,6 +79,50 @@
         if (window.luLabeledId) cell.innerHTML = window.luLabeledId(label, value || "");
         else cell.textContent = value || "—";
         return cell;
+    }
+
+    function highlightText(value, query) {
+        var span = document.createElement("span");
+        var text = value || "";
+        if (!query) {
+            span.textContent = text;
+            return span;
+        }
+        var at = text.toLowerCase().indexOf(query.toLowerCase());
+        if (at < 0) {
+            span.textContent = text;
+            return span;
+        }
+        span.appendChild(document.createTextNode(text.slice(0, at)));
+        var mark = document.createElement("mark");
+        mark.className = "lu-match";
+        mark.textContent = text.slice(at, at + query.length);
+        span.appendChild(mark);
+        span.appendChild(document.createTextNode(text.slice(at + query.length)));
+        return span;
+    }
+
+    function paintMatch(root, query) {
+        if (!query || !root) return;
+        var code = root.querySelector("code");
+        if (!code) return;
+        var value = code.textContent || "";
+        var at = value.toLowerCase().indexOf(query.toLowerCase());
+        if (at < 0) return;
+        var mark = document.createElement("mark");
+        mark.className = "lu-match";
+        mark.textContent = value.slice(at, at + query.length);
+        code.replaceChildren(
+            document.createTextNode(value.slice(0, at)),
+            mark,
+            document.createTextNode(value.slice(at + query.length)));
+    }
+
+    function countsFrom(list) {
+        if (!list) return null;
+        var map = {};
+        list.forEach(function (item) { map[item.name] = Number(item.count || 0); });
+        return map;
     }
 
     window.luResourceExplorer = {
@@ -289,6 +334,7 @@
     function abort() {
         if (summaryAbort) summaryAbort.abort();
         if (pageAbort) pageAbort.abort();
+        window.clearTimeout(filterTimer);
         summaryAbort = null;
         pageAbort = null;
     }
@@ -340,6 +386,9 @@
                     }),
                     selected: null,
                     page: null,
+                    query: "",
+                    matchCounts: null,
+                    showing: "",
                     node: null,
                     panX: 0,
                     panY: 0,
@@ -506,7 +555,8 @@
         var center = layout(width, height);
         state.center = center;
         state.types.forEach(function (type) {
-            var quiet = state.selected && state.selected.name !== type.name;
+            var unmatched = state.matchCounts && (state.matchCounts[type.name] || 0) === 0;
+            var quiet = unmatched || (state.selected && state.selected.name !== type.name);
             ctx.globalAlpha = quiet ? 0.35 : 1;
             ctx.strokeStyle = fade(hubColor(), ".28");
             ctx.lineWidth = 1;
@@ -527,7 +577,8 @@
         ctx.fillText("Patient", center.cx, center.cy);
         state.types.forEach(function (type) {
             var selected = state.selected && state.selected.name === type.name;
-            var quiet = state.selected && !selected;
+            var unmatched = state.matchCounts && (state.matchCounts[type.name] || 0) === 0;
+            var quiet = unmatched || (state.selected && !selected);
             ctx.globalAlpha = quiet ? 0.4 : 1;
             ctx.beginPath();
             ctx.fillStyle = type.color;
@@ -599,14 +650,19 @@
         if (pageAbort) pageAbort.abort();
         pageAbort = new AbortController();
         var signal = pageAbort.signal;
-        fetch(endpoint({ part: "page", type: name, page: page, pageSize: 25 }), { signal: signal })
-            .then(function (response) { return response.json(); })
+        var query = state.query || "";
+        fetch(endpoint({ part: "page", type: name, q: query, page: page, pageSize: 25 }), { signal: signal })
+            .then(function (response) { return response.ok ? response.json() : response.json().then(function (body) { throw new Error(body.detail || "The list was refused."); }); })
             .then(function (body) {
                 if (!state || signal.aborted) return;
                 state.page = body.records || [];
                 state.pageMeta = body.metadata || {};
+                state.matchCounts = query ? countsFrom(body.matchedTypes || []) : null;
                 draw();
-                showPage(name);
+                if (state.showing === name && document.getElementById("manifest-graph-filter"))
+                    fillPage(name);
+                else
+                    showPage(name);
             })
             .catch(function (error) {
                 if (error.name === "AbortError") return;
@@ -617,6 +673,7 @@
     function showPage(name) {
         var aside = document.getElementById("manifest-graph-aside");
         if (!aside || !state) return;
+        state.showing = name;
         aside.replaceChildren();
         var back = document.createElement("button");
         back.type = "button";
@@ -628,9 +685,14 @@
         icon.setAttribute("aria-hidden", "true");
         back.appendChild(icon);
         back.addEventListener("click", function () {
+            window.clearTimeout(filterTimer);
+            if (pageAbort) pageAbort.abort();
             state.selected = null;
             state.page = null;
             state.node = null;
+            state.query = "";
+            state.matchCounts = null;
+            state.showing = "";
             draw();
             showTypes();
         });
@@ -642,17 +704,62 @@
         head.appendChild(back);
         head.appendChild(title);
         aside.appendChild(head);
+        var filter = document.createElement("input");
+        filter.type = "search";
+        filter.id = "manifest-graph-filter";
+        filter.className = "form-control form-control-sm lu-graph-filter";
+        filter.placeholder = "Filter this list";
+        filter.setAttribute("aria-label", "Filter resources");
+        filter.autocomplete = "off";
+        filter.value = state.query || "";
+        filter.addEventListener("input", function () {
+            var value = filter.value.trim();
+            window.clearTimeout(filterTimer);
+            filterTimer = window.setTimeout(function () {
+                if (!state || state.showing !== name) return;
+                state.query = value;
+                chooseType(name, 1);
+            }, 1000);
+        });
+        aside.appendChild(filter);
+        var list = document.createElement("div");
+        list.id = "manifest-graph-list";
+        aside.appendChild(list);
+        fillPage(name);
+    }
+
+    function fillPage(name) {
+        var list = document.getElementById("manifest-graph-list");
+        if (!list || !state) return;
+        list.replaceChildren();
         var meta = state.pageMeta || {};
         var pages = Number(meta.totalPages || 1);
+        var total = Number(meta.totalCount || 0);
+        if (state.query) {
+            var matches = document.createElement("p");
+            matches.className = "small text-muted mb-2";
+            matches.textContent = number(total) + (total === 1 ? " match" : " matches");
+            list.appendChild(matches);
+        }
         if (pages > 1) {
-            pager(aside, Number(meta.pageNumber || 1), pages, Number(meta.totalCount || 0), function (next) {
+            pager(list, Number(meta.pageNumber || 1), pages, total, function (next) {
                 chooseType(name, next);
             });
         }
+        if (!(state.page || []).length)
+            note(list, state.query ? "No resources match." : "No identifiers are on this list.");
         (state.page || []).forEach(function (node) {
             var row = document.createElement("div");
             row.className = "lu-type-row";
-            row.appendChild(idCell("Resource", node.id));
+            var cell = idCell("Resource", node.id);
+            paintMatch(cell, state.query);
+            if (node.snippet) {
+                var snip = document.createElement("p");
+                snip.className = "small text-muted mb-0";
+                snip.appendChild(highlightText(node.snippet, state.query));
+                cell.appendChild(snip);
+            }
+            row.appendChild(cell);
             var open = document.createElement("button");
             open.type = "button";
             open.className = "btn btn-sm lu-icon-btn lu-icon-quiet";
@@ -664,7 +771,7 @@
             open.appendChild(eye);
             open.addEventListener("click", function () { chooseNode(node); });
             row.appendChild(open);
-            aside.appendChild(row);
+            list.appendChild(row);
         });
     }
 
