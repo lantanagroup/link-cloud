@@ -6,7 +6,6 @@
 <div class="lu-kafka">
 <partial name="_BackButton" model="@(new BackLink("/Operations", "Operations"))" />
 <h1 class="h3 mt-3">Kafka</h1>
-<p class="text-muted">Cluster health, consumer replicas, and brokers. Messages reads an allow-listed topic and does not commit offsets. Adding partitions is a separate, permanent action.</p>
 <partial name="_Nav" />
 
 <div id="kafkaResults" data-au-refresh="8000" data-au-page-url="@query.Href()" class="lu-kafka">
