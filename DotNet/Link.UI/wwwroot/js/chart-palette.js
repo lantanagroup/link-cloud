@@ -1,53 +1,54 @@
-/* One chart palette. The success green is the shared token; other series keep their chart colors. */
+/* Category charts share one colour list. Status donuts keep green, red, and yellow. */
 (function () {
     var success = getComputedStyle(document.documentElement).getPropertyValue("--au-success").trim();
-    var resourceMix = ["#343a40", success, "#6f42c1", "#545c64", "#fd7e14", "#6c757d"];
-    var fallback = ["#343a40", "#6f42c1", "#ffc107", "#dc3545", success, "#6c757d"];
-    var manifest = [
-        "#343a40", success, "#ffc107", "#dc3545", "#6f42c1", "#111", "#fd7e14",
-        "#545c64", "#e83e8c", "#6c757d", "#1a1a1a", "#adb5bd", "#343a40", "#868e96"
+    var category = [
+        "#3b82c4", "#2aa89a", "#e0a045", "#d16a8a", "#7b6ad6",
+        "#e07a3d", "#4aa3c7", "#6a9a4a", "#c46bb5", "#5c7cfa"
     ];
-    var dashboardStatus = [success, "#dc3545", "#ffc107", "#343a40", "#6c757d"];
+    var resourceMix = category.slice(0, 6);
+    var fallback = category.slice();
+    var manifest = category.slice();
+    var dashboardStatus = [success, "#dc3545", "#ffc107", "#3b82c4", "#7b6ad6"];
 
     window.luChartPalette = {
         resourceMix: resourceMix,
         fallback: fallback,
         manifest: manifest,
         dashboardStatus: dashboardStatus,
-        normalizationLine: "#6f42c1",
-        dataAcquisitionLine: "#343a40",
-        measureLine: "#343a40",
+        normalizationLine: "#7b6ad6",
+        dataAcquisitionLine: "#3b82c4",
+        measureLine: "#2aa89a",
         validationLine: success,
         succeeded: success,
         failed: "#dc3545",
         cancelled: "#ffc107",
-        other: "#6c757d",
-        accent: "#343a40",
-        orange: "#fd7e14",
-        muted: "#545c64",
-        gray: "#6c757d",
+        other: "#4aa3c7",
+        accent: "#3b82c4",
+        orange: "#e07a3d",
+        muted: "#4aa3c7",
+        gray: "#9aa8b5",
         entryStatus: {
             submitted: success,
-            submitting: "#343a40",
-            noteligable: "#ffc107",
+            submitting: "#3b82c4",
+            noteligable: "#e0a045",
             failedsubmission: "#dc3545",
-            pendingvalidation: "#6c757d",
-            unknown: "#545c64"
+            pendingvalidation: "#ffc107",
+            unknown: "#4aa3c7"
         },
         dataAcqStatus: {
             completed: success,
-            processing: "#343a40",
+            processing: "#3b82c4",
             failed: "#dc3545",
             pending: "#ffc107",
-            unknown: "#6c757d"
+            unknown: "#4aa3c7"
         },
         measureFunnel: {
-            "no measure report": "#6c757d",
+            "no measure report": "#4aa3c7",
             notreportable: "#ffc107",
             readyforvalidation: success
         },
         validationFunnel: {
-            notvalidated: "#6c757d",
+            notvalidated: "#4aa3c7",
             failedvalidation: "#dc3545",
             passedvalidation: success
         }

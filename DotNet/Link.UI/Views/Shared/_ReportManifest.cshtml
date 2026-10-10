@@ -58,13 +58,7 @@
         _ => ReportManifestRules.PopulationLabel(Model.Query.Stage)
     };
     string Count(int value) => value.ToString("N0");
-    string ValidationColor(string name) => name switch
-    {
-        "Passed validation" => "var(--au-success)",
-        "Failed validation" => "var(--au-danger)",
-        "Pending validation" => "var(--au-warning)",
-        _ => "#545c64"
-    };
+    string ValidationColor(string name) => ReportManifestRules.ValidationSliceColor(name);
     var graphUrl = "";
     if (string.Equals(Model.Path, "/Reports/Manifest", StringComparison.Ordinal)
         && Model.Route.TryGetValue("facilityId", out var graphFacility)

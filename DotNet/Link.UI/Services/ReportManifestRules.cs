@@ -15,11 +15,21 @@ public static partial class ReportManifestRules
 {
     public const string SampleFacilityId = "fixture";
     public static readonly Guid SampleId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    // Category slices only. Status donuts use green, red, and yellow instead of this list.
     public static readonly string[] DonutColors =
     [
-        "#343a40", "#28a745", "#ffc107", "#dc3545", "#6f42c1", "#111111", "#fd7e14", "#545c64"
+        "#3b82c4", "#2aa89a", "#e0a045", "#d16a8a", "#7b6ad6",
+        "#e07a3d", "#4aa3c7", "#6a9a4a", "#c46bb5", "#5c7cfa"
     ];
     public const string DonutOtherColor = "#adb5bd";
+
+    public static string ValidationSliceColor(string? name) => name switch
+    {
+        "Passed validation" => "var(--au-success)",
+        "Failed validation" => "var(--au-danger)",
+        "Pending validation" => "var(--au-warning)",
+        _ => "#4aa3c7"
+    };
 
     public static string DonutGradient(IReadOnlyList<int> totals, IReadOnlyList<string> colors)
     {

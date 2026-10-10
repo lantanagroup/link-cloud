@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using LantanaGroup.Automation.Generation;
 using Link.UI.Models;
@@ -15,6 +17,59 @@ public class ReportManifestRulesTests
             .Should().Be("#111111 0% 50%, #28a745 50% 100%");
         ReportManifestRules.DonutGradient([], ["#111111"]).Should().Be("#e6e6e6");
         ReportManifestRules.DonutGradient([0], ["#111111"]).Should().Be("#e6e6e6");
+    }
+
+    [Fact]
+    public void Donut_colors_stay_chromatic_and_status_slices_keep_their_meaning()
+    {
+        ReportManifestRules.DonutColors.Should().OnlyHaveUniqueItems();
+        ReportManifestRules.DonutColors.Length.Should().BeGreaterThanOrEqualTo(8);
+        foreach (var color in ReportManifestRules.DonutColors.Append(ReportManifestRules.DonutOtherColor))
+            IsDarkGrey(color).Should().BeFalse("slice " + color + " reads as black or dark grey");
+
+        ReportManifestRules.ValidationSliceColor("Passed validation").Should().Be("var(--au-success)");
+        ReportManifestRules.ValidationSliceColor("Failed validation").Should().Be("var(--au-danger)");
+        ReportManifestRules.ValidationSliceColor("Pending validation").Should().Be("var(--au-warning)");
+        IsDarkGrey(ReportManifestRules.ValidationSliceColor("Anything else")).Should().BeFalse();
+
+        var palette = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "js", "chart-palette.js"));
+        var category = Regex.Match(palette, @"var category = \[([\s\S]*?)\];");
+        category.Success.Should().BeTrue();
+        Regex.Matches(category.Groups[1].Value, @"#[0-9a-fA-F]{6}")
+            .Select(match => match.Value)
+            .Should().Equal(ReportManifestRules.DonutColors);
+        foreach (Match hex in Regex.Matches(palette, @"#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b"))
+            IsDarkGrey(hex.Value).Should().BeFalse(hex.Value);
+
+        palette.Should().Contain("\"#dc3545\"");
+        palette.Should().Contain("\"#ffc107\"");
+        palette.Should().Contain("pendingvalidation: \"#ffc107\"");
+        palette.Should().Contain("pending: \"#ffc107\"");
+        palette.Should().Contain("failedsubmission: \"#dc3545\"");
+        palette.Should().Contain("passedvalidation: success");
+        palette.Should().Contain("dashboardStatus = [success, \"#dc3545\", \"#ffc107\"");
+        palette.Should().NotContain("#343a40");
+        palette.Should().NotContain("#111");
+        palette.Should().NotContain("#545c64");
+        palette.Should().NotContain("#1a1a1a");
+
+        var graph = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "js", "resource-graph.js"));
+        graph.Should().Contain("luChartPalette.manifest");
+        var fallback = Regex.Match(graph, @"\|\| \[([\s\S]*?)\];");
+        fallback.Success.Should().BeTrue();
+        Regex.Matches(fallback.Groups[1].Value, @"#[0-9a-fA-F]{6}")
+            .Select(match => match.Value)
+            .Should().Equal(ReportManifestRules.DonutColors);
+        graph.Should().NotContain("#343a40");
+        graph.Should().NotContain("#111111");
+        graph.Should().NotContain("\"#111\"");
+        graph.Should().Contain("fillStyle = \"#3b82c4\"");
+
+        var view = File.ReadAllText(Path.Combine(ProjectRoot(), "Views", "Shared", "_ReportManifest.cshtml"));
+        view.Should().Contain("ValidationSliceColor");
+        view.Should().NotContain("#545c64");
+        view.Should().NotContain("#343a40");
+        view.Should().NotContain("#111111");
     }
 
     [Fact]
@@ -337,7 +392,7 @@ public class ReportManifestRulesTests
         view.Should().Contain("id = item.Id");
         view.Should().Contain("lu-donut-legend");
         view.Should().Contain("lu-donut-ring");
-        view.Should().Contain("Passed validation");
+        view.Should().Contain("ValidationSliceColor");
         view.Should().Contain("id=\"manifest-validation\"");
         view.Should().Contain("lu-size-chip");
         view.Should().Contain("lu-measure-tiles");
@@ -461,6 +516,30 @@ public class ReportManifestRulesTests
 
     private static ReportManifestQuery Stage(string stage, string? measure = null, int page = 1, string sort = "status") =>
         ReportManifestRules.Normalize(null, null, null, null, null, 1, 25, 1, 25, 1, 25, 1, sort, stage, measure, page, "populations");
+
+    private static bool IsDarkGrey(string color)
+    {
+        var hex = color.Trim();
+        if (hex.StartsWith("var(", StringComparison.Ordinal))
+            return false;
+        if (!hex.StartsWith('#'))
+            return true;
+        hex = hex[1..];
+        if (hex.Length == 3)
+            hex = string.Concat(hex.Select(character => $"{character}{character}"));
+        if (hex.Length != 6 || !int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var packed))
+            return true;
+
+        var red = (packed >> 16) & 255;
+        var green = (packed >> 8) & 255;
+        var blue = packed & 255;
+        var max = Math.Max(red, Math.Max(green, blue));
+        var min = Math.Min(red, Math.Min(green, blue));
+        var average = (red + green + blue) / 3.0;
+        if (average < 55)
+            return true;
+        return max - min < 18 && average < 140;
+    }
 
     private static string ProjectRoot()
     {
