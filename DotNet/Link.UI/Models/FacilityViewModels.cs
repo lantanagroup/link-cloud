@@ -142,7 +142,7 @@ public sealed class FacilityViewModel
 {
     public string? FacilityId { get; set; }
     public string? FacilityName { get; set; }
-    public string? AutomationRunId { get; set; }
+    public bool IsTest { get; set; }
     public bool NotFound { get; set; }
     public bool DmrpEnabled { get; set; }
     public string? LoadError { get; set; }
@@ -170,7 +170,7 @@ public sealed class ReportDetailModel
 {
     public string? FacilityId { get; set; }
     public string? FacilityName { get; set; }
-    public string? AutomationRunId { get; set; }
+    public bool IsTest { get; set; }
     public bool FacilityMissing { get; set; }
     public bool NotFound { get; set; }
     public string? LoadError { get; set; }
@@ -225,7 +225,7 @@ public sealed class FacilityReportRow
     public bool CanCleanUp { get; init; }
     public bool CanRestore { get; init; }
     public bool CanDownload { get; init; }
-    public string? AutomationRunId { get; set; }
+    public bool IsTest { get; set; }
 }
 
 public sealed class LocationRow

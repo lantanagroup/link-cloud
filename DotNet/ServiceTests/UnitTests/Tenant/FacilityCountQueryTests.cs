@@ -23,15 +23,16 @@ public class FacilityCountQueryTests : IDisposable
     {
         await using var context = CreateContext();
         context.Facilities.AddRange(
-            Facility("f1"),
+            Facility("f1", isTest: true),
             Facility("f2"),
             Facility("f3"),
-            Facility("f4", deleted: true));
+            Facility("f4", deleted: true, isTest: true));
         await context.SaveChangesAsync();
 
         var open = await FacilityCountQuery.ExecuteAsync(context.Facilities.AsNoTracking(), null, CancellationToken.None);
         open.Total.Should().Be(3);
         open.Matched.Should().BeNull();
+        open.Test.Should().Be(1);
 
         var matched = await FacilityCountQuery.ExecuteAsync(
             context.Facilities.AsNoTracking(),
@@ -57,6 +58,7 @@ public class FacilityCountQueryTests : IDisposable
 
         counts.Total.Should().Be(2000);
         counts.Matched.Should().Be(50);
+        counts.Test.Should().Be(0);
     }
 
     private TenantDbContext CreateContext()
@@ -67,12 +69,13 @@ public class FacilityCountQueryTests : IDisposable
         return context;
     }
 
-    private static Facility Facility(string id, bool deleted = false) => new()
+    private static Facility Facility(string id, bool deleted = false, bool isTest = false) => new()
     {
         FacilityId = id,
         FacilityName = $"Facility {id}",
         TimeZone = "America/New_York",
         IsDeleted = deleted,
+        IsTest = isTest,
         ScheduledReports = new ScheduledReportModel { Daily = [], Weekly = [], Monthly = [] }
     };
 }

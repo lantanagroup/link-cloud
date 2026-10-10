@@ -49,6 +49,7 @@ public class FacilityConfigurationServiceTests
         Assert.Equal("Unify Page", posted!.FacilityName);
         Assert.Equal("America/New_York", posted.TimeZone);
         Assert.Equal(["DailyMeasure"], posted.ScheduledReports.Daily);
+        Assert.False(posted.IsTest);
         Assert.Null(posted.Vendor);
         facilities.Verify(f => f.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -68,6 +69,42 @@ public class FacilityConfigurationServiceTests
         Assert.False(result.Success);
         Assert.Equal(409, result.StatusCode);
         Assert.Equal("already exists", result.RawBody);
+    }
+
+    [Fact]
+    public async Task Empty_dmrp_facility_create_posts_is_test()
+    {
+        var reads = 0;
+        FacilityModel? posted = null;
+        var facilities = new Mock<IFacilityServiceClient>(MockBehavior.Strict);
+        facilities.Setup(f => f.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                reads++;
+                return reads == 1
+                    ? new LinkApiResponse<FacilityModel> { StatusCode = 404 }
+                    : new LinkApiResponse<FacilityModel>
+                    {
+                        StatusCode = 200,
+                        Body = new FacilityModel { FacilityId = "temp-1" }
+                    };
+            });
+        facilities.Setup(f => f.CreateAsync(It.IsAny<FacilityModel>(), It.IsAny<CancellationToken>()))
+            .Callback<FacilityModel, CancellationToken>((model, _) => posted = model)
+            .ReturnsAsync(new LinkApiResponse<FacilityModel> { StatusCode = 201, Body = new FacilityModel { FacilityId = "temp-1", IsTest = true } });
+
+        var created = await FacilityConfigurationService.EnsureEmptyDmrpFacilityAsync(
+            facilities.Object,
+            _output.Object,
+            "temp-1",
+            CancellationToken.None,
+            vendorName: null,
+            vendorExplicit: true);
+
+        Assert.True(created);
+        Assert.NotNull(posted);
+        Assert.True(posted!.IsTest);
+        Assert.Equal("temp-1", posted.FacilityId);
     }
 
     [Fact]

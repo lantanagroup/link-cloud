@@ -14,11 +14,11 @@
 </div>
 <h1 class="h3 mb-3">@heading</h1>
 
-@if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model.AutomationRunId))
+@if (Model.IsTest)
 {
     <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
-        <span>This is an automation facility. Edits here change a throwaway facility.</span>
-        <partial name="_AutomationBadge" model="Model.AutomationRunId" />
+        <span>This is a test facility. Edits here change a throwaway facility.</span>
+        <span class="badge au-badge-warning">Test facility</span>
     </div>
 }
 

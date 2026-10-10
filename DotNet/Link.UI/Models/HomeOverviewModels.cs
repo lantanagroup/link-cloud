@@ -59,7 +59,7 @@ public sealed class HomeReportLine
     public string Status { get; init; } = "";
     public string Badge { get; init; } = "";
     public string When { get; init; } = "";
-    public string? AutomationRunId { get; init; }
+    public bool IsTest { get; init; }
 }
 
 public sealed class HealthCard
@@ -119,7 +119,7 @@ public sealed class HomeLogLine
     public string Status { get; init; } = "";
     public string Badge { get; init; } = "";
     public string When { get; init; } = "";
-    public string? AutomationRunId { get; init; }
+    public bool IsTest { get; init; }
 }
 
 /// <summary>Status totals and a seven-day created series. Counts only.</summary>

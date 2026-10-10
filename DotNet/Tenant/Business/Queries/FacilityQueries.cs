@@ -27,6 +27,10 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
             int pageNumber = 1, bool includeDeleted = false, CancellationToken cancellationToken = default);
 
         Task<FacilityCounts> CountAsync(IReadOnlyCollection<string>? facilityIds, CancellationToken cancellationToken = default);
+
+        Task<List<FacilitySummary>> SummariesAsync(string? search, bool includeDeleted, CancellationToken cancellationToken = default);
+
+        Task<List<FacilityFlag>> FlagsAsync(IReadOnlyCollection<string> facilityIds, CancellationToken cancellationToken = default);
     }
 
     public class FacilityQueries : IFacilityQueries
@@ -103,6 +107,11 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 query = query.Where(f => f.Id == model.Id);
             }
 
+            if (model.IsTest is bool isTest)
+            {
+                query = query.Where(f => f.IsTest == isTest);
+            }
+
             var total = await query.CountAsync(cancellationToken);
 
             query = sortOrder switch
@@ -122,6 +131,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     FacilityName = f.FacilityName,
                     TimeZone = f.TimeZone,
                     IsDeleted = f.IsDeleted,
+                    IsTest = f.IsTest,
                     VendorVersionId = f.VendorVersion!.Id,
                     Vendor = new VendorModel()
                     {
@@ -154,6 +164,45 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
             IReadOnlyCollection<string>? facilityIds,
             CancellationToken cancellationToken = default) =>
             FacilityCountQuery.ExecuteAsync(_context.Facilities.AsNoTracking(), facilityIds, cancellationToken);
+
+        public async Task<List<FacilitySummary>> SummariesAsync(
+            string? search,
+            bool includeDeleted,
+            CancellationToken cancellationToken = default)
+        {
+            var query = _context.Facilities.AsNoTracking().Where(facility => includeDeleted || !facility.IsDeleted);
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(facility => facility.FacilityName != null && facility.FacilityName.Contains(search));
+            }
+
+            return await query
+                .Select(facility => new FacilitySummary
+                {
+                    FacilityId = facility.FacilityId,
+                    FacilityName = facility.FacilityName,
+                    IsTest = facility.IsTest,
+                    IsDeleted = facility.IsDeleted
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<FacilityFlag>> FlagsAsync(
+            IReadOnlyCollection<string> facilityIds,
+            CancellationToken cancellationToken = default)
+        {
+            if (facilityIds.Count == 0)
+                return [];
+
+            return await _context.Facilities.AsNoTracking()
+                .Where(facility => facilityIds.Contains(facility.FacilityId))
+                .Select(facility => new FacilityFlag
+                {
+                    FacilityId = facility.FacilityId,
+                    IsTest = facility.IsTest
+                })
+                .ToListAsync(cancellationToken);
+        }
 
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {

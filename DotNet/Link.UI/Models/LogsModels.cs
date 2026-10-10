@@ -176,7 +176,7 @@ public sealed class AcquisitionListRow
     public string ResourceId { get; init; } = string.Empty;
     public bool Deleted { get; init; }
     public bool CanProcess { get; init; }
-    public string? AutomationRunId { get; set; }
+    public bool IsTest { get; set; }
 }
 
 public sealed class StatusCountRow
@@ -330,7 +330,7 @@ public sealed class SftpLogRow
     public int RetryAttempts { get; init; }
     public int FileCount { get; init; }
     public bool CanReset { get; init; }
-    public string? AutomationRunId { get; set; }
+    public bool IsTest { get; set; }
 }
 
 public sealed class SftpDetailPage
@@ -469,7 +469,7 @@ public sealed class AuditEventRow
     public string User { get; init; } = string.Empty;
     public string When { get; init; } = string.Empty;
     public string Resource { get; init; } = string.Empty;
-    public string? AutomationRunId { get; set; }
+    public bool IsTest { get; set; }
 }
 
 public sealed class AuditDetailPage

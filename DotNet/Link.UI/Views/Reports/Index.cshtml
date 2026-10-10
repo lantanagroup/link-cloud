@@ -151,7 +151,7 @@
                             </td>
                             <td>
                                 <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("View", "Tenants", new { id = report.FacilityId }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
-                                <partial name="_AutomationBadge" model="report.AutomationRunId" />
+                                <partial name="_AutomationBadge" model="report.IsTest" />
                             </td>
                             <td class="text-nowrap">
                                 <div>Start @report.PeriodStart</div>

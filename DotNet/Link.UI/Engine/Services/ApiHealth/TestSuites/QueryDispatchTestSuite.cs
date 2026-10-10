@@ -281,6 +281,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = "America/Chicago",
+            IsTest = true,
             Vendor = new VendorModel
             {
                 Name = "Epic"

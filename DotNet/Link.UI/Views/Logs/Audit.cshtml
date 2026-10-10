@@ -148,7 +148,7 @@ else
                                 </td>
                                 <td>
                                     <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
-                                    <partial name="_AutomationBadge" model="row.AutomationRunId" />
+                                    <partial name="_AutomationBadge" model="row.IsTest" />
                                 </td>
                                 <td>@(string.IsNullOrWhiteSpace(row.Service) ? "—" : row.Service)</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.Action) ? "—" : row.Action)</td>

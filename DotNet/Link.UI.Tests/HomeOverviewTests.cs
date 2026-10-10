@@ -389,7 +389,9 @@ public class HomeOverviewTests
         var service = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/HomeOverviewService.cs"));
         service.Should().Contain("_features.Value.AutomationEnabled");
         service.Should().Contain("CacheKey + \":off\"");
-        service.Should().Contain("AutomationOwnershipLookup");
+        service.Should().Contain("FacilityTestLookup");
+        service.Should().Contain("body.Test");
+        service.Should().NotContain("AutomationOwnershipLookup");
         var options = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/LinkUiFeatureOptions.cs"));
         options.Should().Contain("bool AutomationEnabled");
     }

@@ -193,6 +193,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
                 FacilityId = facilityId,
                 FacilityName = facilityId,
                 TimeZone = "America/Chicago",
+                IsTest = true,
                 Vendor = new VendorModel
                 {
                     Name = "Epic"

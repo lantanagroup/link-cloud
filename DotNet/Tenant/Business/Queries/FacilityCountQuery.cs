@@ -13,6 +13,7 @@ public static class FacilityCountQuery
     {
         var active = facilities.Where(facility => !facility.IsDeleted);
         var total = await active.CountAsync(cancellationToken);
+        var test = await active.CountAsync(facility => facility.IsTest, cancellationToken);
         int? matched = null;
         if (facilityIds is not null)
         {
@@ -24,7 +25,8 @@ public static class FacilityCountQuery
         return new FacilityCounts
         {
             Total = total,
-            Matched = matched
+            Matched = matched,
+            Test = test
         };
     }
 }
