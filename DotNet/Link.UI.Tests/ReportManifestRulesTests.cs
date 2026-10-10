@@ -338,6 +338,12 @@ public class ReportManifestRulesTests
         view.Should().Contain("lu-donut-legend");
         view.Should().Contain("lu-donut-ring");
         view.Should().Contain("Passed validation");
+        view.Should().Contain("id=\"manifest-validation\"");
+        view.Should().Contain("lu-size-chip");
+        view.Should().Contain("lu-measure-tiles");
+        view.Should().Contain("Predicted to qualify");
+        view.Should().NotContain("lu-measure-list");
+        view.Should().NotContain("lu-nav-current");
         view.Should().Contain("mountDonut");
         view.Should().Contain("Interactive mode");
         view.Should().Contain("resource-graph.js");
@@ -350,6 +356,23 @@ public class ReportManifestRulesTests
         view.Should().NotContain("maintainAspectRatio: true");
         view.IndexOf("lu-section-nav", StringComparison.Ordinal).Should().BeLessThan(view.IndexOf("id=\"manifest-overview\"", StringComparison.Ordinal));
         view.Should().Contain("id=\"manifest-populations\"");
+
+        var automation = ReportManifestRules.SampleAutomation(Query(), "/Automation/manifest", null);
+        automation.Populations.Should().BeEmpty();
+        automation.Prediction.Should().NotBeNull();
+        automation.Prediction!.Measure.Should().Be("NHSN Acute Care Hospital Monthly");
+        automation.Prediction.Predicted.Should().Be(20);
+        automation.Prediction.NotPredicted.Should().Be(20);
+
+        var css = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "css", "site.css"));
+        var marker = css.IndexOf("/* lu-row-action-fill-end */", StringComparison.Ordinal);
+        marker.Should().BeGreaterThan(-1);
+        var quiet = css[(marker + "/* lu-row-action-fill-end */".Length)..];
+        quiet.Should().Contain(".btn.lu-copy");
+        quiet.Should().Contain("background-color: transparent");
+        var graph = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "js", "resource-graph.js"));
+        graph.Should().Contain("lu-icon-quiet");
+        graph.Should().Contain("pageSize: 25");
     }
 
     [Fact]

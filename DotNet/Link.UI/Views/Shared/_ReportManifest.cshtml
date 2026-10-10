@@ -58,6 +58,13 @@
         _ => ReportManifestRules.PopulationLabel(Model.Query.Stage)
     };
     string Count(int value) => value.ToString("N0");
+    string ValidationColor(string name) => name switch
+    {
+        "Passed validation" => "var(--au-success)",
+        "Failed validation" => "var(--au-danger)",
+        "Pending validation" => "var(--au-warning)",
+        _ => "#545c64"
+    };
     var graphUrl = "";
     if (string.Equals(Model.Path, "/Reports/Manifest", StringComparison.Ordinal)
         && Model.Route.TryGetValue("facilityId", out var graphFacility)
@@ -88,21 +95,29 @@
         {
             <div class="alert alert-warning">This run used generation templates v@(Model.TemplateVersion). The latest for this scenario is v@(Model.LatestTemplateVersion). A download replays the templates stored for this run.</div>
         }
-        @if (populationCards.Count == 0 && Model.Measures.Count > 0)
+        @if (populationCards.Count == 0 && Model.Prediction is ManifestPrediction overviewPrediction)
         {
-            <section class="card au-card">
-                <h3 class="card-header h6 mb-0">Measures</h3>
+            var predictionTiles = new (string Name, int? Count)[]
+            {
+                ("Predicted to qualify", overviewPrediction.Predicted),
+                ("Not predicted to qualify", overviewPrediction.NotPredicted),
+                ("In the ABS upload", overviewPrediction.InActual),
+                ("Predicted, missing from ABS", overviewPrediction.MissingFromActual)
+            };
+            <section class="card au-card lu-measure-card">
+                <h3 class="card-header h6 mb-0"><a class="text-white" href="@Model.Href(tab: "populations", clearStage: true)">@overviewPrediction.Measure</a></h3>
                 <div class="card-body">
-                    <ul class="lu-measure-list mb-0">
-                        @foreach (var measure in Model.Measures.Take(ReportManifestModel.ChartCap))
+                    <div class="lu-measure-tiles">
+                        @foreach (var tile in predictionTiles)
                         {
-                            <li>@measure</li>
+                            if (tile.Count is not int tileCount)
+                                continue;
+                            <div class="au-stat-tile">
+                                <div class="au-stat-value">@Count(tileCount)</div>
+                                <div class="au-stat-label">@tile.Name @if (ReportManifestRules.PredictionHelp(tile.Name) is string tileHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + tile.Name, Text = tileHelp })" /> }</div>
+                            </div>
                         }
-                    </ul>
-                    @if (Model.MeasureCount > ReportManifestModel.ChartCap)
-                    {
-                        <p class="small text-muted mb-0 mt-2">@ReportManifestModel.ChartCap of @Model.MeasureCount shown.</p>
-                    }
+                    </div>
                 </div>
             </section>
         }
@@ -111,42 +126,42 @@
             <div class="row g-3 mb-3">
                 @foreach (var highlight in populationCards)
                 {
-                    <div class="col-lg-6">
-                        <section class="card au-card mb-0 h-100">
+                    <div class="@(populationCards.Count == 1 ? "col-12" : "col-lg-6")">
+                        <section class="card au-card mb-0 h-100 lu-measure-card">
                             <h3 class="card-header h6 mb-0"><a class="text-white" href="@Model.Href(tab: "populations", clearStage: true)">@highlight.Measure</a></h3>
                             <div class="card-body">
-                                <div class="row g-2">
+                                <div class="lu-measure-tiles">
                                     @if (highlight.InitialPopulation is int initialPopulation)
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(initialPopulation)</div><div class="au-stat-label">Initial Population <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Initial Population")" aria-label="About Initial Population"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(initialPopulation)</div><div class="au-stat-label">Initial Population <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Initial Population")" aria-label="About Initial Population"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
                                     }
                                     @if (highlight.Denominator is int denominator)
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominator)</div><div class="au-stat-label">Denominator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator")" aria-label="About Denominator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(denominator)</div><div class="au-stat-label">Denominator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator")" aria-label="About Denominator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
                                     }
                                     @if (highlight.DenominatorExclusion is int denominatorExclusion)
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorExclusion)</div><div class="au-stat-label">Denominator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exclusion")" aria-label="About Denominator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorExclusion)</div><div class="au-stat-label">Denominator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exclusion")" aria-label="About Denominator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
                                     }
                                     @if (highlight.DenominatorException is int denominatorException)
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorException)</div><div class="au-stat-label">Denominator Exception <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exception")" aria-label="About Denominator Exception"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorException)</div><div class="au-stat-label">Denominator Exception <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exception")" aria-label="About Denominator Exception"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
                                     }
                                     @if (highlight.Numerator is int numerator)
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numerator)</div><div class="au-stat-label">Numerator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator")" aria-label="About Numerator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(numerator)</div><div class="au-stat-label">Numerator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator")" aria-label="About Numerator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
                                     }
                                     @if (highlight.NumeratorExclusion is int numeratorExclusion)
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(numeratorExclusion)</div><div class="au-stat-label">Numerator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator Exclusion")" aria-label="About Numerator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(numeratorExclusion)</div><div class="au-stat-label">Numerator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator Exclusion")" aria-label="About Numerator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(highlight.Rate))
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@highlight.Rate</div><div class="au-stat-label">Rate <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Rate")" aria-label="About Rate"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@highlight.Rate</div><div class="au-stat-label">Rate <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Rate")" aria-label="About Rate"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
                                     }
                                     @foreach (var other in highlight.Other)
                                     {
-                                        <div class="col-6 col-md-4"><div class="au-stat-tile"><div class="au-stat-value">@Count(other.Total)</div><div class="au-stat-label">@other.Name</div></div></div>
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(other.Total)</div><div class="au-stat-label">@other.Name</div></div>
                                     }
                                 </div>
                             </div>
@@ -189,15 +204,49 @@
         }
         @if (Model.ShowValidation)
         {
-            <section class="card au-card">
-                <h3 class="card-header h6 mb-0">Validation</h3>
+            var validationRows = Model.StatusChart.ToList();
+            var validationTotal = validationRows.Sum(row => row.Total);
+            var validationColors = validationRows.Select(row => ValidationColor(row.Name)).ToList();
+            var validationGradient = ReportManifestRules.DonutGradient(validationRows.Select(row => row.Total).ToList(), validationColors);
+            var validationHole = validationTotal > 0 ? validationTotal : Model.PatientCount;
+            <section class="card au-card" id="manifest-validation">
+                <h3 class="card-header h6 mb-0 d-flex justify-content-between align-items-center">
+                    <span>Validation</span>
+                    <span>@Count(validationHole)</span>
+                </h3>
                 <div class="card-body">
-                    <div class="lu-manifest-kpis">
-                        <div><span class="lu-kpi-value">@Count(Model.PatientCount)</span><span class="lu-kpi-label">Patients</span></div>
-                        <div><span class="lu-kpi-value">@Count(Model.PassedValidation ?? 0)</span><span class="lu-kpi-label">Passed validation</span></div>
-                        <div><span class="lu-kpi-value">@Count(Model.FailedValidation ?? 0)</span><span class="lu-kpi-label">Failed validation</span></div>
-                        <div><span class="lu-kpi-value">@Count(Model.PendingValidation ?? 0)</span><span class="lu-kpi-label">Pending validation</span></div>
-                    </div>
+                    @if (validationRows.Count == 0)
+                    {
+                        <p class="mb-0">No validation counts were stored.</p>
+                    }
+                    else
+                    {
+                        <div class="lu-donut-layout">
+                            <div class="lu-donut-chart">
+                                <div class="lu-donut-ring" style="background: conic-gradient(@validationGradient)" role="img" aria-label="Validation">
+                                    <div class="lu-donut-hole">
+                                        <span class="lu-donut-total">@Count(validationHole)</span>
+                                        <span class="lu-donut-total-label">patients</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <ul class="lu-donut-legend">
+                                @for (var slice = 0; slice < validationRows.Count; slice++)
+                                {
+                                    var sliceTotal = validationRows[slice].Total;
+                                    var slicePercent = validationTotal <= 0
+                                        ? "0%"
+                                        : (sliceTotal * 100.0 / validationTotal).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+                                    <li>
+                                        <span class="lu-donut-swatch" style="background:@validationColors[slice]"></span>
+                                        <span class="lu-donut-name">@validationRows[slice].Name</span>
+                                        <span class="lu-donut-count">@Count(sliceTotal)</span>
+                                        <span class="lu-donut-pct">@slicePercent</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
                 </div>
             </section>
         }
@@ -280,10 +329,13 @@
                 <span class="small text-muted">Page @Model.TypePaging.Page of @(Model.TypePaging.TotalPages == 0 ? 1 : Model.TypePaging.TotalPages) (@Model.TypePaging.TotalCount)</span>
                 <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(typePage: Model.TypePaging.Page + 1), Enabled = Model.TypePaging.HasNext })" />
                 <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(typePage: (int)Model.TypePaging.TotalPages), Enabled = Model.TypePaging.HasNext })" />
-                @foreach (var size in ReportManifestQuery.PageSizes)
-                {
-                    <a class="btn btn-sm @(size == Model.Query.TypeSize ? "lu-nav-current" : "btn-au-link")" href="@Model.Href(typeSize: size)">@size</a>
-                }
+                <span class="lu-size-chips">
+                    <span class="visually-hidden">Rows per page</span>
+                    @foreach (var size in ReportManifestQuery.PageSizes)
+                    {
+                        <a class="lu-size-chip @(size == Model.Query.TypeSize ? "is-current" : null)" href="@Model.Href(typeSize: size)" aria-current="@(size == Model.Query.TypeSize ? "page" : "false")">@size</a>
+                    }
+                </span>
             </div>
         </section>
     </div>
@@ -436,16 +488,19 @@
                     </table>
                 }
             </div>
-            <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
+            <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
                 <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(page: 1), Enabled = Model.PatientPaging.Page > 1 })" />
                 <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(page: Model.PatientPaging.Page - 1), Enabled = Model.PatientPaging.HasPrevious })" />
                 <span class="small text-muted">Page @Model.PatientPaging.Page of @(Model.PatientPaging.TotalPages == 0 ? 1 : Model.PatientPaging.TotalPages) (@Model.PatientPaging.TotalCount)</span>
                 <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(page: Model.PatientPaging.Page + 1), Enabled = Model.PatientPaging.HasNext })" />
                 <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(page: (int)Model.PatientPaging.TotalPages), Enabled = Model.PatientPaging.HasNext })" />
-                @foreach (var size in ReportManifestQuery.PageSizes)
-                {
-                    <a class="btn btn-sm @(size == Model.Query.PageSize ? "lu-nav-current" : "btn-au-link")" href="@Model.Href(pageSize: size)">@size</a>
-                }
+                <span class="lu-size-chips">
+                    <span class="visually-hidden">Rows per page</span>
+                    @foreach (var size in ReportManifestQuery.PageSizes)
+                    {
+                        <a class="lu-size-chip @(size == Model.Query.PageSize ? "is-current" : null)" href="@Model.Href(pageSize: size)" aria-current="@(size == Model.Query.PageSize ? "page" : "false")">@size</a>
+                    }
+                </span>
             </div>
         </div>
     </div>
@@ -588,7 +643,7 @@
                         </table>
                     }
                 </div>
-                <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
+                <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
                     <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(populationPage: 1, tab: "populations"), Enabled = Model.PopulationPaging.Page > 1 })" />
                     <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(populationPage: Model.PopulationPaging.Page - 1, tab: "populations"), Enabled = Model.PopulationPaging.HasPrevious })" />
                     <span class="small text-muted">Page @Model.PopulationPaging.Page of @(Model.PopulationPaging.TotalPages == 0 ? 1 : Model.PopulationPaging.TotalPages) (@Model.PopulationPaging.TotalCount)</span>

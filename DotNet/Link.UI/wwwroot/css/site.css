@@ -1354,14 +1354,19 @@ a.au-scenario-card:hover {
   padding: 0;
   display: grid;
   grid-template-columns: max-content max-content;
-  gap: .4rem 2rem;
+  justify-content: start;
+  justify-items: start;
+  gap: .35rem 1.25rem;
   width: max-content;
   max-width: 100%;
 }
 .lu-donut-legend li {
   display: flex;
   align-items: baseline;
-  gap: .45rem;
+  justify-content: flex-start;
+  gap: .35rem;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
 }
 .lu-donut-swatch {
@@ -1369,6 +1374,7 @@ a.au-scenario-card:hover {
   height: .75rem;
   border-radius: 2px;
   align-self: center;
+  flex: 0 0 auto;
 }
 .lu-donut-name {
   min-width: 0;
@@ -1376,10 +1382,58 @@ a.au-scenario-card:hover {
 }
 .lu-donut-count,
 .lu-donut-pct {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: var(--au-muted);
 }
 .lu-donut-count { font-weight: 650; color: var(--au-text); }
+.lu-measure-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.6rem, 1fr));
+  gap: .55rem;
+}
+.lu-measure-tiles .au-stat-tile {
+  height: 100%;
+  min-height: 4.35rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.lu-size-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  margin-left: .35rem;
+}
+.lu-size-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.05rem;
+  height: 1.65rem;
+  padding: 0 .4rem;
+  border: 1px solid #d5d8dc;
+  border-radius: .35rem;
+  background: #fff;
+  color: #343a40;
+  font-size: .78rem;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+}
+.lu-size-chip:hover,
+.lu-size-chip:focus {
+  background: #f7f7f8;
+  color: #111;
+  border-color: #b8bec4;
+}
+.lu-size-chip.is-current {
+  background: #fff;
+  color: #111;
+  border-color: #111;
+  box-shadow: inset 0 -2px 0 #ffc107;
+}
 .lu-patient-modal { max-width: min(1080px, 96vw); }
 .lu-patient-modal .lu-facility-id,
 .lu-patient-modal .lu-clip { max-width: none; }
@@ -2929,6 +2983,72 @@ a.lu-clip {
   box-shadow: var(--au-focus);
 }
 /* lu-row-action-fill-end */
+/* Copy and quiet open icons stay unfilled. Pager, dismiss, and these are the exception to solid fills. */
+.btn.lu-copy,
+.btn.btn-au-link.lu-icon-btn.lu-copy,
+.btn.lu-icon-quiet,
+.btn.lu-icon-btn.lu-icon-quiet,
+.btn.lu-copy:hover,
+.btn.lu-copy:focus,
+.btn.lu-copy:active,
+.btn.btn-au-link.lu-icon-btn.lu-copy:hover,
+.btn.btn-au-link.lu-icon-btn.lu-copy:focus,
+.btn.btn-au-link.lu-icon-btn.lu-copy:active,
+.btn.lu-icon-quiet:hover,
+.btn.lu-icon-quiet:focus,
+.btn.lu-icon-quiet:active,
+.btn.lu-icon-btn.lu-icon-quiet:hover,
+.btn.lu-icon-btn.lu-icon-quiet:focus,
+.btn.lu-icon-btn.lu-icon-quiet:active,
+.btn.lu-copy:disabled,
+.btn.lu-copy.disabled,
+.btn.lu-icon-quiet:disabled,
+.btn.lu-icon-quiet.disabled {
+  width: 1.7rem;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  background: transparent;
+  background-color: transparent;
+  border: 1px solid #d0d5da;
+  color: #495057;
+  box-shadow: none;
+}
+.btn.lu-copy:hover,
+.btn.lu-copy:focus,
+.btn.btn-au-link.lu-icon-btn.lu-copy:hover,
+.btn.btn-au-link.lu-icon-btn.lu-copy:focus,
+.btn.lu-icon-quiet:hover,
+.btn.lu-icon-quiet:focus,
+.btn.lu-icon-btn.lu-icon-quiet:hover,
+.btn.lu-icon-btn.lu-icon-quiet:focus {
+  background: #f3f4f6;
+  background-color: #f3f4f6;
+  border-color: #adb5bd;
+  color: #111;
+}
+.lu-kafka .lu-msg-raw .btn.lu-copy,
+.lu-kafka .lu-msg-raw .btn.btn-au-link.lu-icon-btn.lu-copy,
+.lu-kafka .lu-msg-raw .btn.lu-copy:hover,
+.lu-kafka .lu-msg-raw .btn.lu-copy:focus,
+.au-card .card-header .btn.lu-copy,
+.au-card .card-header .btn.btn-au-link.lu-icon-btn.lu-copy,
+.au-card .card-header .btn.lu-copy:hover,
+.au-card .card-header .btn.lu-copy:focus {
+  background: transparent;
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, .5);
+  color: #fff;
+}
+.lu-kafka .lu-msg-raw .btn.lu-copy:hover,
+.lu-kafka .lu-msg-raw .btn.lu-copy:focus,
+.au-card .card-header .btn.lu-copy:hover,
+.au-card .card-header .btn.lu-copy:focus {
+  background: rgba(255, 255, 255, .1);
+  background-color: rgba(255, 255, 255, .1);
+  border-color: #fff;
+  color: #fff;
+}
 @media (max-width: 575.98px) {
   .lu-row-actions {
     flex-wrap: wrap;
