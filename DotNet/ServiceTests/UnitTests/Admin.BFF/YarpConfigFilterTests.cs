@@ -33,6 +33,7 @@ namespace UnitTests.Admin.BFF
                 ReportServiceUrl = "http://report-service",
                 SubmissionServiceUrl = "http://submission-service",
                 ValidationServiceUrl = "http://validation-service",
+                TerminologyServiceUrl = "http://terminology-service",
                 TenantService = new TenantServiceRegistration()
                 {
                     TenantServiceUrl = "http://tenant-service"
@@ -170,6 +171,24 @@ namespace UnitTests.Admin.BFF
             // Assert
             Assert.Equal(origCluster, result);
             Assert.Equal("http://placeholder", result.Destinations["destination1"].Address);
+        }
+    
+        [Fact]
+        public async Task ConfigureClusterAsync_TerminologyService_ReturnsCorrectEndpoint()
+        {
+            var filter = new YarpConfigFilter(_mockLogger.Object, _mockServiceRegistry.Object);
+            var origCluster = new ClusterConfig
+            {
+                ClusterId = "TerminologyService",
+                Destinations = new Dictionary<string, DestinationConfig>
+                {
+                    { "destination1", new DestinationConfig { Address = string.Empty } }
+                }
+            };
+
+            var result = await filter.ConfigureClusterAsync(origCluster, CancellationToken.None);
+
+            Assert.Equal("http://terminology-service", result.Destinations!["destination1"].Address);
         }
     }
 }

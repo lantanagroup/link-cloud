@@ -1,5 +1,4 @@
 ﻿using Flurl.Http;
-using Flurl.Http;
 using Flurl.Http.Configuration;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -15,6 +14,7 @@ public abstract class LinkApiClientBase : IDisposable
     private readonly IFlurlClient _client;
     private readonly ICreateSystemToken? _tokenService;
     private readonly string? _signingKey;
+    private readonly ILinkCallCredentialSource? _bffCredentials;
     private bool _disposed;
 
     protected LinkApiClientBase(
@@ -44,9 +44,35 @@ public abstract class LinkApiClientBase : IDisposable
         }
     }
 
+    /// <summary>
+    /// Routes this client through Admin.BFF. Relative paths are unchanged; authentication follows
+    /// <see cref="AdminBffRoute.Credentials"/> per call instead of always minting the system token.
+    /// </summary>
+    protected LinkApiClientBase(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken? tokenService)
+        : this((route ?? throw new ArgumentNullException(nameof(route))).BaseUrl, bearerOptions, tokenServiceSettings, tokenService)
+    {
+        _bffCredentials = route.Credentials;
+    }
+
+    /// <summary>True when this client sends its calls through Admin.BFF.</summary>
+    protected bool RoutedThroughAdminBff => _bffCredentials != null;
+
     protected IFlurlRequest Request(string relativePath)
     {
         var request = _client.Request(relativePath);
+
+        if (_bffCredentials != null)
+        {
+            // One hook decides the identity for the whole call, so a forwarded user session and the
+            // system token can never travel together.
+            var credentials = _bffCredentials;
+            request.BeforeCall(async call => await ApplyBffCredentialAsync(call.Request, credentials.Resolve()));
+            return request;
+        }
 
         if (_tokenService != null && _signingKey != null)
         {
@@ -59,6 +85,45 @@ public abstract class LinkApiClientBase : IDisposable
         }
 
         return request;
+    }
+
+    private async Task ApplyBffCredentialAsync(IFlurlRequest request, LinkCallCredential credential)
+    {
+        request.Headers.Remove("Authorization");
+        request.Headers.Remove("Cookie");
+        request.Headers.Remove(LinkAuditHeaders.InitiatedBy);
+        request.Headers.Remove(LinkAuditHeaders.InitiatedByName);
+
+        switch (credential.Kind)
+        {
+            case LinkCallCredentialKind.ForwardUser:
+                if (credential.Cookie != null)
+                    request.WithHeader("Cookie", credential.Cookie);
+                if (credential.Authorization != null)
+                    request.WithHeader("Authorization", credential.Authorization);
+                break;
+
+            case LinkCallCredentialKind.SystemOnBehalfOf:
+                if (_tokenService != null && _signingKey != null)
+                {
+                    var token = await _tokenService.ExecuteAsync(_signingKey, 5);
+                    if (!string.IsNullOrWhiteSpace(token))
+                        request.WithHeader("Authorization", $"Bearer {token}");
+                }
+                request.WithHeader(LinkAuditHeaders.InitiatedBy, Uri.EscapeDataString(AuditValue(credential.InitiatedById)));
+                var name = AuditValue(credential.InitiatedByName);
+                if (name.Length > 0)
+                    request.WithHeader(LinkAuditHeaders.InitiatedByName, Uri.EscapeDataString(name));
+                break;
+        }
+    }
+
+    internal static string AuditValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+        var chars = value.Where(c => !char.IsControl(c)).Take(LinkAuditHeaders.MaxValueLength).ToArray();
+        return new string(chars).Trim();
     }
 
     /// <summary>

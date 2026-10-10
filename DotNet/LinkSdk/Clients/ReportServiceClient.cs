@@ -25,6 +25,15 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public ReportServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
+
     public Task<LinkApiResponse<ReportScheduleApiModel>> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default, bool includeDeleted = false) =>
         SendAsync<ReportScheduleApiModel>(() => Request($"/schedules/{reportId}")
             .SetQueryParam("includeDeleted", includeDeleted ? "true" : null)
