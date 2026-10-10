@@ -1,15 +1,8 @@
 /* Patient resource explorer and the on-demand type graph. Clusters only; identifiers stay paged. */
 (function () {
     var graphUrl = "";
-    function cssColor(name, fallback) {
-        try {
-            var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-            return value || fallback;
-        } catch (ignore) {
-            return fallback;
-        }
-    }
-    var colors = ["#343a40", cssColor("--au-success", "#1e7e34"), "#ffc107", "#dc3545", "#6f42c1", "#111111", "#fd7e14", "#545c64", "#adb5bd"];
+    var colors = (window.luChartPalette && window.luChartPalette.manifest && window.luChartPalette.manifest.slice())
+        || ["#3b82c4", "#2aa89a", "#e0a045", "#d16a8a", "#7b6ad6", "#e07a3d", "#4aa3c7", "#6a9a4a", "#c46bb5", "#5c7cfa"];
     var summaryAbort = null;
     var pageAbort = null;
     var state = null;
@@ -504,7 +497,7 @@
         state.types.forEach(function (type) {
             var quiet = state.selected && state.selected.name !== type.name;
             ctx.globalAlpha = quiet ? 0.35 : 1;
-            ctx.strokeStyle = "rgba(17,17,17,.16)";
+            ctx.strokeStyle = "rgba(59,130,196,.28)";
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(center.cx, center.cy);
@@ -513,7 +506,7 @@
             ctx.globalAlpha = 1;
         });
         ctx.beginPath();
-        ctx.fillStyle = "#111";
+        ctx.fillStyle = "#3b82c4";
         ctx.arc(center.cx, center.cy, 28, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = "#fff";
@@ -530,7 +523,7 @@
             ctx.arc(type.x, type.y, type.r, 0, Math.PI * 2);
             ctx.fill();
             ctx.lineWidth = selected ? 3 : 1.5;
-            ctx.strokeStyle = selected ? "#111" : "rgba(255,255,255,.85)";
+            ctx.strokeStyle = selected ? "#245f96" : "rgba(255,255,255,.85)";
             ctx.stroke();
             ctx.globalAlpha = 1;
         });
