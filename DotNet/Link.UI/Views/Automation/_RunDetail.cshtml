@@ -84,7 +84,7 @@
         <div id="advancedPerformanceHost">
             @if (ViewBag.Performance is MetricsRunDetailViewModel performance)
             {
-                @await Html.PartialAsync("~/Views/Automation/_AdvancedPerformance.cshtml", performance)
+                @await Html.PartialAsync("~/Views/Shared/_AdvancedPerformance.cshtml", performance)
             }
             else
             {
@@ -407,7 +407,13 @@
             </div>
 
             <div class="au-card">
-                <div class="card-header"><i class="bi bi-shield-check me-2"></i>Validation <span class="badge au-badge-active ms-2" id="validationOngoingBadge" style="display:none;">In progress</span></div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-shield-check me-2"></i>Validation <span class="badge au-badge-active ms-2" id="validationOngoingBadge" style="display:none;">In progress</span></span>
+                    @if (!string.IsNullOrWhiteSpace(Model.ReportId))
+                    {
+                        <a class="btn btn-sm btn-au-link" asp-controller="Reports" asp-action="Validation" asp-route-reportId="@Model.ReportId">Validation results</a>
+                    }
+                </div>
                 <div class="card-body">
                     <div class="row g-3 mb-3">
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Patients</div><div class="fs-4 fw-semibold" id="validationPatientCount">0</div></div></div>

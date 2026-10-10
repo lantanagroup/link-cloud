@@ -127,7 +127,30 @@ public class SubmissionPatientBlobTests
         index.Page("Observation", null, 1, 25).Records.Should().HaveCount(25);
         index.Page("Observation", null, 360, 25).Metadata.TotalPages.Should().Be(600);
         watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+        stream.Position = 0;
+        var missWatch = Stopwatch.StartNew();
+        var missed = await ResourceGraphRules.PageNdjsonAsync(stream, "p", "Observation", "ZZ-NOT-HERE", 1, 25, CancellationToken.None);
+        missWatch.Stop();
+        missed.Metadata.TotalCount.Should().Be(0);
+        missed.Records.Should().BeEmpty();
+        missWatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
         _output.WriteLine("15k submission lines parsed in " + watch.ElapsedMilliseconds + " ms");
+    }
+
+    [Fact]
+    public async Task A_submission_line_matches_text_inside_the_resource()
+    {
+        var ndjson = """
+            {"resourceType":"Patient","id":"p"}
+            {"resourceType":"Observation","id":"o1","code":{"text":"ZZ-NEEDLE-9"}}
+            {"resourceType":"Observation","id":"o2","code":{"text":"other"}}
+            """;
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(ndjson));
+        var page = await ResourceGraphRules.PageNdjsonAsync(stream, "p", "Observation", "ZZ-NEEDLE-9", 1, 25, CancellationToken.None);
+        page.Metadata.TotalCount.Should().Be(1);
+        page.Records.Should().ContainSingle(row => row.Id == "o1");
+        page.Records[0].Snippet.Should().Contain("ZZ-NEEDLE-9");
+        page.MatchedTypes.Should().ContainSingle(type => type.Name == "Observation" && type.Count == 1);
     }
 
     [Fact]

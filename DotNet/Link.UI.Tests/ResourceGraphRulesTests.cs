@@ -61,6 +61,20 @@ public class ResourceGraphRulesTests
         raw.Json.Should().Contain("o1");
         index.Raw("Patient", "p1").Should().BeNull();
 
+        var coded = """
+            {"resourceType":"Bundle","entry":[
+              {"resource":{"resourceType":"Observation","id":"o1","code":{"text":"ZZ-NEEDLE-9"},"subject":{"reference":"Patient/p1"}}},
+              {"resource":{"resourceType":"Observation","id":"o2","subject":{"reference":"Patient/p1"}}}
+            ]}
+            """;
+        var codedIndex = ResourceGraphRules.ReadBundle(coded, "p1", CancellationToken.None);
+        var hit = codedIndex.Page("Observation", "ZZ-NEEDLE-9", 1, 25);
+        hit.Metadata.TotalCount.Should().Be(1);
+        hit.Records.Should().ContainSingle(row => row.Id == "o1");
+        hit.Records[0].Snippet.Should().Contain("ZZ-NEEDLE-9");
+        hit.MatchedTypes.Should().ContainSingle(type => type.Name == "Observation" && type.Count == 1);
+        codedIndex.Page("Observation", "not-in-the-bundle", 1, 25).Metadata.TotalCount.Should().Be(0);
+
         ResourceGraphRules.ReadBundle("{", "p1", CancellationToken.None).Error.Should().Be("The bundle could not be read.");
         ResourceGraphRules.ReadBundle(new string('x', 5), "p1", CancellationToken.None, 2).Total.Should().Be(0);
 
@@ -87,6 +101,21 @@ public class ResourceGraphRulesTests
         graph.Page("Observation", null, 1, 500).Records.Should().HaveCount(ResourceGraphRules.MaxPageSize);
         graph.Page("Observation", null, 40, 25).Metadata.PageNumber.Should().Be(40);
         graphWatch.ElapsedMilliseconds.Should().BeLessThan(1_000);
+
+        var filterWatch = Stopwatch.StartNew();
+        var filtered = graph.Page("Observation", "final", 1, 25);
+        filterWatch.Stop();
+        filtered.Metadata.TotalCount.Should().Be(9_000);
+        filtered.Metadata.PageNumber.Should().Be(1);
+        filtered.Records.Should().HaveCount(25);
+        filtered.Records.Should().OnlyContain(row => row.Snippet != null && row.Snippet.Contains("final", StringComparison.OrdinalIgnoreCase));
+        filtered.MatchedTypes.Should().NotBeNull();
+        filtered.MatchedTypes!.Sum(type => type.Count).Should().Be(15_000);
+        filterWatch.ElapsedMilliseconds.Should().BeLessThan(1_000);
+        var known = graph.Page("Observation", null, 360, 25).Records[0];
+        var one = graph.Page("Observation", known.Id, 1, 25);
+        one.Metadata.TotalCount.Should().Be(1);
+        one.Records.Should().ContainSingle(row => row.Id == known.Id);
 
         var bundle = new StringBuilder();
         bundle.Append("{\"resourceType\":\"Bundle\",\"entry\":[");
