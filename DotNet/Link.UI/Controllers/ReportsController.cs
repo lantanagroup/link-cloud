@@ -312,7 +312,17 @@ public sealed class ReportsController : Controller
         var query = Bound(q, 80);
         var resourceId = Bound(id, 80);
         if (which == "page")
-            return Json(index.Page(typeName, query, page, pageSize));
+        {
+            if (query.Length > 0 && index.Address is not null && !index.HasSearchableBodies)
+            {
+                var streamed = await _submission.PageAsync(
+                    index.Address, index.PatientId, typeName, query, page, pageSize, cancellationToken);
+                if (streamed is not null)
+                    return Json(streamed);
+            }
+
+            return Json(index.Page(typeName, query, page, pageSize, cancellationToken));
+        }
         if (which == "raw")
         {
             var raw = index.Raw(typeName, resourceId);

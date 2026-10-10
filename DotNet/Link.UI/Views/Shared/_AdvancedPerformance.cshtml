@@ -1,5 +1,4 @@
 @model MetricsRunDetailViewModel
-@using Automation.UI.Models.Metrics
 @{
     var stageOrder = new[] { "acquisition", "normalization", "measureeval", "validation", "submission" };
     string DisplayName(string key) => key switch
@@ -325,9 +324,9 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
             <div class="col-md-4">
                 <div class="au-summary-item">
                     <span class="au-label">Previous successful run</span>
-                    @if (Model.PreviousRunId is Guid previous)
+                    @if (!string.IsNullOrWhiteSpace(Model.PreviousRunHref))
                     {
-                        <a asp-controller="Automation" asp-action="Run" asp-route-id="@previous">View previous run</a>
+                        <a href="@Model.PreviousRunHref">View previous run</a>
                     }
                     else
                     {
