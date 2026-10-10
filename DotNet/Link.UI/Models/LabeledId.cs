@@ -1,8 +1,9 @@
 namespace Link.UI.Models;
 
 /// <summary>
-/// A displayed identifier: a label, an optional name, the value, and a copy button.
+/// A displayed identifier: a label, an optional name, and the value.
 /// Compact keeps the label for assistive tech when a column header already names the cell.
+/// Table cells copy from the value. This partial does not render its own copy button.
 /// </summary>
 public sealed class LabeledId
 {

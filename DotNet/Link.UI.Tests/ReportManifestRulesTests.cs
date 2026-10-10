@@ -512,6 +512,39 @@ public class ReportManifestRulesTests
         page.Note.Should().Contain("not every patient");
     }
 
+    [Theory]
+    [InlineData("Submitted", "au-badge-success")]
+    [InlineData("FailedSubmission", "au-badge-danger")]
+    [InlineData("Failed Submission", "au-badge-danger")]
+    [InlineData("Error", "au-badge-danger")]
+    [InlineData("Pending", "au-badge-warning")]
+    [InlineData("Pending Validation", "au-badge-warning")]
+    [InlineData("Not Submitted", "au-badge-warning")]
+    [InlineData("NotSubmitted", "au-badge-warning")]
+    [InlineData("In progress", "au-badge-warning")]
+    [InlineData("Submitting", "au-badge-warning")]
+    [InlineData("Not Eligable", "au-badge-muted")]
+    [InlineData("", "au-badge-muted")]
+    [InlineData(null, "au-badge-muted")]
+    public void Submission_badges_use_the_shared_status_colors(string? status, string expected)
+    {
+        var tone = ReportManifestRules.SubmissionBadgeClass(status);
+        tone.Should().Be(expected);
+        tone.Should().BeOneOf("au-badge-success", "au-badge-danger", "au-badge-warning", "au-badge-muted");
+    }
+
+    [Fact]
+    public void Patients_tab_drops_resource_types_and_colors_submission()
+    {
+        var view = File.ReadAllText(Path.Combine(ProjectRoot(), "Views", "Shared", "_ReportManifest.cshtml"));
+        var patients = view.Split("id=\"manifest-patients\"", 2)[1].Split("id=\"manifest-populations\"", 2)[0];
+        patients.Should().NotContain("Resource types");
+        patients.Should().Contain("SubmissionBadgeClass");
+        patients.Should().Contain("data-nocopy");
+        patients.Should().Contain("class=\"text-end\"");
+        patients.Should().Contain(">Resources<");
+    }
+
     private static ReportManifestQuery Stage(string stage, string? measure = null, int page = 1, string sort = "status") =>
         ReportManifestRules.Normalize(null, null, null, null, null, 1, 25, 1, 25, 1, 25, 1, sort, stage, measure, page, "populations");
 

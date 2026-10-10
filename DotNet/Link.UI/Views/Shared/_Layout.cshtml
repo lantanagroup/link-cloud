@@ -35,15 +35,10 @@
             var trimmed = raw.trim();
             if (!trimmed || trimmed === "—" || trimmed === "-") return '<span class="text-muted">—</span>';
             var safe = trimmed.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-            var name = String(label || "Id").toLowerCase().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
             var shown = String(label || "Id").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-            var denied = { seed: 1, date: 1, time: 1, count: 1, name: 1, measures: 1, package: 1 };
-            var guid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(trimmed.replace(/^\{|\}$/g, ""));
-            var copy = denied[name] || !guid ? "" : '<button type="button" class="btn btn-sm btn-au-link lu-icon-btn lu-copy" data-lu-copy="' + safe
-                + '" title="Copy ' + name + '" aria-label="Copy ' + name + '"><i class="bi bi-copy" aria-hidden="true"></i><span class="visually-hidden">Copy</span></button>';
             return '<span class="lu-labeled-id lu-labeled-id-compact"><span class="lu-id-label visually-hidden">' + shown
-                + '</span><span class="lu-id-value"><code class="lu-facility-id" title="' + safe + '">' + safe
-                + '</code>' + copy + '</span></span>';
+                + '</span><span class="lu-id-value"><code class="lu-facility-id" title="' + safe + '" data-copy="' + safe + '">' + safe
+                + '</code></span></span>';
         };
     </script>
 </head>
@@ -124,6 +119,7 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/section-validity.js" asp-append-version="true"></script>
     <script src="~/js/live-region.js" asp-append-version="true"></script>
+    <script src="~/js/cell-copy.js" asp-append-version="true"></script>
     <script>
         (function () {
             var button = document.querySelector(".lu-nav-toggle");
