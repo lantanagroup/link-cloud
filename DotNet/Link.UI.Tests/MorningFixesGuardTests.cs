@@ -180,7 +180,7 @@ public class MorningFixesGuardTests
                     continue;
                 if (window.Contains("lu-icon-btn", StringComparison.Ordinal) || window.Contains("lu-copy", StringComparison.Ordinal) || window.Contains("data-lu-copy", StringComparison.Ordinal))
                     continue;
-                if (window.Contains("au-info-toggle", StringComparison.Ordinal) || window.Contains("lu-nav", StringComparison.Ordinal))
+                if (window.Contains("au-info-toggle", StringComparison.Ordinal) || window.Contains("lu-nav", StringComparison.Ordinal) || window.Contains("lu-header-tool", StringComparison.Ordinal))
                     continue;
                 hits.Add(Rel(file) + ":" + (i + 1));
             }

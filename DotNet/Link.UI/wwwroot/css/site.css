@@ -4550,11 +4550,80 @@ fieldset {
 }
 fieldset > legend {
   float: none;
-  width: auto;
+  width: 100%;
   padding: 0;
   margin: 0 0 .5rem;
   position: static;
   font-size: .95rem;
+}
+.lu-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 1.85rem;
+  padding: 0 .75rem;
+  border: 1px solid #d5d8dc;
+  border-radius: 999px;
+  background: #fff;
+  color: #333;
+  font-size: .8rem;
+  line-height: 1;
+  text-decoration: none;
+}
+.lu-chip:hover,
+.lu-chip:focus {
+  background: rgba(17, 17, 17, .05);
+  border-color: #9aa1a8;
+  color: #111;
+  text-decoration: none;
+}
+.btn-check + .lu-chip {
+  cursor: pointer;
+}
+.btn-check:checked + .lu-chip {
+  border-color: #222;
+  box-shadow: inset 0 -2px 0 var(--au-warning);
+  font-weight: 650;
+}
+.btn-check:focus-visible + .lu-chip {
+  outline: 2px solid #222;
+  outline-offset: 2px;
+}
+.au-card .card-header h2,
+.au-card .card-header h3 {
+  color: inherit;
+  margin: 0;
+}
+.au-card .card-header .lu-header-actions {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin-left: auto;
+}
+.lu-header-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 1px solid rgba(255, 255, 255, .55);
+  border-radius: .35rem;
+  background: transparent;
+  color: #fff;
+  text-decoration: none;
+}
+.lu-header-tool:hover,
+.lu-header-tool:focus {
+  background: rgba(255, 255, 255, .12);
+  border-color: #fff;
+  color: #fff;
+}
+.au-card > .card-footer {
+  background: #fff;
+  border-top: 1px solid var(--au-border);
+}
+.au-card > .card-footer .lu-pager {
+  margin-top: 0;
+  justify-content: flex-end;
 }
 .lu-page-go {
   display: inline-flex;
