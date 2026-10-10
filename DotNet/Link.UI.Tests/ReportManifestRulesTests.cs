@@ -55,15 +55,13 @@ public class ReportManifestRulesTests
 
         var graph = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "js", "resource-graph.js"));
         graph.Should().Contain("luChartPalette.manifest");
-        var fallback = Regex.Match(graph, @"\|\| \[([\s\S]*?)\];");
-        fallback.Success.Should().BeTrue();
-        Regex.Matches(fallback.Groups[1].Value, @"#[0-9a-fA-F]{6}")
-            .Select(match => match.Value)
-            .Should().Equal(ReportManifestRules.DonutColors);
+        graph.Should().Contain("hubColor()");
+        graph.Should().NotContain("#3b82c4");
+        graph.Should().NotContain("#245f96");
+        graph.Should().NotContain("59,130,196");
         graph.Should().NotContain("#343a40");
         graph.Should().NotContain("#111111");
         graph.Should().NotContain("\"#111\"");
-        graph.Should().Contain("fillStyle = \"#3b82c4\"");
 
         var view = File.ReadAllText(Path.Combine(ProjectRoot(), "Views", "Shared", "_ReportManifest.cshtml"));
         view.Should().Contain("ValidationSliceColor");
