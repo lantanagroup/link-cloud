@@ -192,9 +192,9 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-2">
-                <a class="btn btn-sm btn-au-link" href="@query.AtFrom(clock.AddMinutes(-15).ToUnixTimeMilliseconds()).Href()">Last 15 minutes</a>
-                <a class="btn btn-sm btn-au-link" href="@query.AtFrom(clock.AddHours(-1).ToUnixTimeMilliseconds()).Href()">Last hour</a>
-                <a class="btn btn-sm btn-au-link" href="@query.AtFrom(clock.AddHours(-24).ToUnixTimeMilliseconds()).Href()">Last 24 hours</a>
+                <a class="lu-chip" href="@query.AtFrom(clock.AddMinutes(-15).ToUnixTimeMilliseconds()).Href()">Last 15 minutes</a>
+                <a class="lu-chip" href="@query.AtFrom(clock.AddHours(-1).ToUnixTimeMilliseconds()).Href()">Last hour</a>
+                <a class="lu-chip" href="@query.AtFrom(clock.AddHours(-24).ToUnixTimeMilliseconds()).Href()">Last 24 hours</a>
             </div>
             <details class="lu-advanced mt-3" @(advancedOpen ? "open" : null)>
                 <summary>Advanced</summary>
@@ -217,13 +217,6 @@
             <input type="hidden" name="more" value="@(advancedOpen ? "1" : "")" />
             </div>
         </section>
-        <div class="mt-2 mb-3">
-            @if (browse is not null)
-            {
-                <a class="btn btn-au-link" href="@query.ExportHref()">Export JSON</a>
-            }
-            <a class="btn btn-warning" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear</a>
-        </div>
         <p class="visually-hidden">The read does not commit offsets.</p>
     </form>
 
@@ -271,10 +264,19 @@
         </div>
     }
 
+    <div class="au-card card mt-3">
+        <div class="card-header d-flex align-items-center gap-2">
+            <h3 class="h6 mb-0">Records</h3>
+            <div class="lu-header-actions">
+                @if (browse is not null)
+                {
+                    <a class="lu-header-tool" href="@query.ExportHref()" title="Export JSON" aria-label="Export JSON"><i class="bi bi-download" aria-hidden="true"></i></a>
+                }
+                <a class="btn btn-warning btn-sm" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear</a>
+            </div>
+        </div>
     @if (browse is { Records.Count: > 0 })
     {
-        <h3 class="h6 mt-4">Records</h3>
-        <div class="au-card card">
         <div class="table-responsive">
             <table class="table table-sm align-middle" data-lu-messages data-lu-page-size="@pageSize" data-lu-page="1" data-lu-client="@(clientBatch ? "1" : "0")">
                 <thead>
@@ -337,13 +339,15 @@
                 </tbody>
             </table>
         </div>
+    }
+    else
+    {
+        <div class="card-body">
+            <p class="text-muted mb-0">@(browse is not null || !string.IsNullOrWhiteSpace(error) ? "No records matched this search." : "Search to load a page of messages.")</p>
         </div>
     }
-    else if (browse is not null)
-    {
-        <p class="text-muted mt-3">No records matched this search.</p>
-    }
 
+    <div class="card-footer">
     <nav class="lu-pager" aria-label="Message pages">
         @if (browse is not null)
         {
@@ -421,6 +425,8 @@
         }
         </div>
     </nav>
+    </div>
+    </div>
 
     <partial name="_ProduceMessage" model="Model" />
 }

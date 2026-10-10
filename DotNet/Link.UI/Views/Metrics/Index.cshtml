@@ -121,26 +121,24 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-2" id="useCases">
-        <h3 class="h5 fw-semibold mb-0">Use cases</h3>
-        <div class="d-flex align-items-center gap-2">
+    <section class="au-card card mb-4" id="useCases">
+        <h3 class="card-header h6 mb-0">Use cases</h3>
+        <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <input type="search" id="useCaseSearch" data-lu-query="useCase" class="form-control form-control-sm" style="max-width:16rem;" placeholder="Filter use cases…" aria-label="Filter use cases" />
             <span class="small text-muted">Newer runs sit to the right on the sparkline.</span>
         </div>
-    </div>
 
     @if (Model.ScenarioCards.Count == 0 && Model.Runs.Count == 0)
     {
-        <div class="au-card mb-4">
-            <div class="card-body py-5 text-center">
+            <div class="text-center py-4">
                 <p class="mb-2 fw-semibold">No metrics runs yet</p>
-                <p class="text-muted mb-3">Turn on <strong>Metrics run</strong> in a scenario, save it, then start it from here. After it finishes you’ll see total time, speed, and how long each step took.</p>
+                <p class="text-muted mb-0">Turn on <strong>Metrics run</strong> in a scenario, save it, then start it from here. After it finishes you’ll see total time, speed, and how long each step took.</p>
             </div>
-        </div>
     }
     else if (Model.ScenarioCards.Count > 0)
     {
-        <div class="row g-3 mb-4">
+        <div class="row g-3">
             @foreach (var card in Model.ScenarioCards)
             {
                 <div class="col-md-6 col-xl-4">
@@ -192,6 +190,8 @@
             }
         </div>
     }
+        </div>
+    </section>
 
     <div class="au-card mb-4">
         <div class="card-header"><i class="bi bi-play-fill me-2"></i>Start a metrics run</div>

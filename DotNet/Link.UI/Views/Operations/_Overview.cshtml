@@ -18,8 +18,13 @@
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
 
-<h2 class="h5 mt-3">Cluster overview</h2>
-<p>Read this before changing anything. The counts above the tables are the cluster. A topic or group that is behind, short on replicas, or unknown is listed on its own. The full tables stay folded.</p>
+<section class="card au-card mt-3">
+<h2 class="card-header h6 mb-0">Cluster overview</h2>
+<div class="card-body">
+<p class="mb-2">Read this before changing anything. The counts above the tables are the cluster. A topic or group that is behind, short on replicas, or unknown is listed on its own. The full tables stay folded.</p>
+<p class="text-muted mb-0">Provider @Model.Infra.Provider. @(Model.Infra.Enabled ? "Replica and broker changes are enabled." : Model.Infra.Detail)</p>
+</div>
+</section>
 
 <div class="row g-2 mt-3">
     <div class="col"><div class="au-stat-tile" title="@controllerTile.Title"><div class="au-stat-value">@controllerTile.Value</div><div class="au-stat-label">@controllerTile.Caption</div></div></div>
@@ -28,7 +33,6 @@
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.OfflinePartitions</div><div class="au-stat-label">Offline</div></div></div>
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.IsrShrunkPartitions</div><div class="au-stat-label">ISR shrink</div></div></div>
 </div>
-<p class="text-muted mt-2 mb-0">Provider @Model.Infra.Provider. @(Model.Infra.Enabled ? "Replica and broker changes are enabled." : Model.Infra.Detail)</p>
 
 @if (topicProblems.Count > 0)
 {
@@ -74,7 +78,7 @@
 }
 else if (Model.TopicRows.Count > 0)
 {
-    <p class="mt-3 mb-0">No topic on this page needs attention.</p>
+    <div class="alert alert-secondary mt-3 mb-0" role="status">No topic on this page needs attention.</div>
 }
 
 <details class="lu-kafka-fold">
@@ -134,14 +138,14 @@ else if (Model.TopicRows.Count > 0)
     {
         <p class="text-muted mb-0 mt-2">No topics match this search.</p>
     }
+    <div class="lu-kafka-pager">
+        <span>@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.</span>
+        <span class="d-flex gap-2">
+            <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
+            <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.TopicPages })" />
+        </span>
+    </div>
 </details>
-<div class="lu-kafka-pager">
-    <span>@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.</span>
-    <span class="d-flex gap-2">
-        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
-        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.TopicPages })" />
-    </span>
-</div>
 
 @if (groupProblems.Count > 0)
 {
@@ -183,7 +187,7 @@ else if (Model.TopicRows.Count > 0)
 }
 else if (groupWindow.Total > 0)
 {
-    <p class="mt-3 mb-0">No group needs attention.</p>
+    <div class="alert alert-secondary mt-3 mb-0" role="status">No group needs attention.</div>
 }
 
 <details class="lu-kafka-fold">
@@ -219,10 +223,14 @@ else if (groupWindow.Total > 0)
     <p class="mt-2 mb-0"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, page: 1)">Open the group list</a></p>
 </details>
 
-<h2 class="h5 mt-4">Produce rate and lag</h2>
+<section class="card au-card mt-3">
+<h2 class="card-header h6 mb-0">Produce rate and lag</h2>
+<div class="card-body">
 <p class="text-muted">The charts follow the topics on this page. A flat rate with rising lag is the group to open.</p>
 <div class="lu-chart"><canvas id="kafkaRateChart"></canvas></div>
 <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
+</div>
+</section>
 
 <details class="lu-kafka-fold">
     <summary>Broker rights (@Model.Capabilities.Topics.Count topics@(rightsDenied > 0 ? ", " + rightsDenied + " cannot alter partitions" : ""))</summary>
