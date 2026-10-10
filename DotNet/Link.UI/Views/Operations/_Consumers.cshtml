@@ -124,18 +124,18 @@ else if (Model.GroupRows.Count > 0)
     {
         <p class="text-muted mb-0 mt-2">No groups match this search.</p>
     }
+    <div class="lu-kafka-pager">
+        <span>@Model.GroupCount groups. Page @query.Page of @Model.GroupPages.</span>
+        <span class="d-flex gap-2">
+            <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
+            <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.GroupPages })" />
+        </span>
+    </div>
 </details>
-<div class="lu-kafka-pager">
-    <span>@Model.GroupCount groups. Page @query.Page of @Model.GroupPages.</span>
-    <span class="d-flex gap-2">
-        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
-        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.GroupPages })" />
-    </span>
-</div>
 
 @if (selected is null)
 {
-    <p class="text-muted mt-3">Select a group to add or remove replicas. A replica above the partition count sits idle and is refused. maxReplicas cannot exceed the partition count.</p>
+    <div class="alert alert-secondary mt-3 mb-0" role="status">Select a group to add or remove replicas. A replica above the partition count sits idle and is refused. maxReplicas cannot exceed the partition count.</div>
 }
 else
 {
@@ -277,18 +277,26 @@ else
         }
     </details>
 
-    <h2 class="h5 mt-4">Partition lag</h2>
-    <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
+    <section class="card au-card mt-3">
+    <h2 class="card-header h6 mb-0">Partition lag</h2>
+    <div class="card-body">
+    <div class="lu-chart mb-0"><canvas id="kafkaLagChart"></canvas></div>
+    </div>
+    </section>
 
     @if (!selected.Catalogued)
     {
-        <p class="text-muted mt-3">Replica changes are hidden for an unknown group.</p>
+        <div class="alert alert-secondary mt-3" role="status">Replica changes are hidden for an unknown group.</div>
     }
     else
     {
         var scaleTone = Model.ScalePlan is null ? "alert-secondary" : Model.ScalePlan.Accepted ? "alert-success" : "alert-danger";
-        <h2 class="h5 mt-4">Change replicas</h2>
-        <p>The preview shows the new member count against the partition ceiling @Model.ReplicaCeiling. Counts above that ceiling are refused.</p>
+        <section class="card au-card mt-3 mb-3">
+        <h2 class="card-header h6 mb-0">Change replicas</h2>
+        <div class="card-body">
+        <p class="mb-0">The preview shows the new member count against the partition ceiling @Model.ReplicaCeiling. Counts above that ceiling are refused.</p>
+        </div>
+        </section>
         <form method="post" action="/Operations/Kafka/groups/replicas/plan" data-kafka-busy="Dry run is running.">
             @Html.AntiForgeryToken()
             <partial name="_QueryFields" model="@(query with { Group = selected.GroupId })" />
