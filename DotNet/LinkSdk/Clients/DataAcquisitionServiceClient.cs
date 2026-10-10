@@ -23,6 +23,15 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public DataAcquisitionServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
+
     public Task<LinkApiResponse> GetFhirQueryConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>

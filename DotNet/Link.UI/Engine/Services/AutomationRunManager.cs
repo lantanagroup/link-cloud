@@ -95,7 +95,10 @@ public class AutomationRunManager : IAutomationRunManager
             cancellationToken);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
-        var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
+        var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson)
+        {
+            Initiator = await ResolveInitiatorAsync(cancellationToken)
+        };
         await RefuseIfProduceHeldAsync(cancellationToken);
         _runs[runId] = state;
 
@@ -104,6 +107,9 @@ public class AutomationRunManager : IAutomationRunManager
 
         state.ExecutionTask = Task.Run(async () =>
         {
+            // The run outlives this request: every service call it makes uses the system token and
+            // names the user who started it, never the request's cookie.
+            using var callScope = BackgroundServiceCallScope.Begin(state.Initiator);
             try
             {
                 var output = new RunAutomationOutput(message => WriteLog(state, message));
@@ -136,6 +142,22 @@ public class AutomationRunManager : IAutomationRunManager
         }, CancellationToken.None);
 
         return runId;
+    }
+
+    private async Task<AutomationRunInitiator> ResolveInitiatorAsync(CancellationToken cancellationToken)
+    {
+        var userService = _hostServices.GetService<IAdminBffUserService>();
+        if (userService is null)
+            return AutomationRunInitiator.System;
+        try
+        {
+            return AutomationRunInitiator.FromUser(await userService.GetCurrentUserAsync(cancellationToken));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "The signed-in user could not be read. The run is recorded as started by the system.");
+            return AutomationRunInitiator.System;
+        }
     }
 
     private async Task RefuseIfProduceHeldAsync(CancellationToken cancellationToken)
@@ -299,8 +321,13 @@ public class AutomationRunManager : IAutomationRunManager
         Task? executionTask,
         Action<string>? writeLog)
     {
-        _ = Task.Run(() => CleanupCancelledRunInBackgroundAsync(
-            runId, facilityId, automationCreatedFacility, reportId, fhirDataLoader, executionTask, writeLog));
+        var initiator = _runs.TryGetValue(runId, out var run) ? run.Initiator : AutomationRunInitiator.System;
+        _ = Task.Run(async () =>
+        {
+            using var callScope = BackgroundServiceCallScope.Begin(initiator);
+            await CleanupCancelledRunInBackgroundAsync(
+                runId, facilityId, automationCreatedFacility, reportId, fhirDataLoader, executionTask, writeLog);
+        });
     }
 
     private async Task CleanupCancelledRunInBackgroundAsync(
@@ -868,6 +895,8 @@ public class AutomationRunManager : IAutomationRunManager
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
                 RetentionNotice = state.RetentionNotice,
+                InitiatedById = state.Initiator.Id,
+                InitiatedByName = state.Initiator.Name,
                 FacilityId = state.FacilityId,
                 AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,

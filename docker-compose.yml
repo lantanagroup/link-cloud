@@ -492,6 +492,7 @@ services:
       Authentication__Schemas__Jwt__Enabled: ${LOCAL_AUTH_ENABLE_JWT:-false}
       LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
       LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
+      ServiceRegistry__TerminologyServiceUrl: http://terminology:8076
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Redis__Password: ${REDIS_PASS}
@@ -779,6 +780,7 @@ services:
       Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
       Redis__Password: ${REDIS_PASS}
       LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-false}
+      Automation__RouteServiceCallsThroughAdminBff: ${LINK_UI_ROUTE_SERVICE_CALLS_THROUGH_ADMIN_BFF:-true}
     ports:
       - "5258:5258"
     build:

@@ -68,6 +68,8 @@ var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:
 var requireBffSession = builder.Configuration.GetValue<bool>("Authentication:RequireBffSession");
 
 builder.Services.AddLinkSdk();
+if (builder.Configuration.GetValue(AdminBffServiceCallRegistration.ConfigKey, true))
+    builder.Services.AddServiceCallsThroughAdminBff();
 
 builder.Services.AddHttpContextAccessor();
 
