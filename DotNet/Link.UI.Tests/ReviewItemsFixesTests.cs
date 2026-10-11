@@ -69,4 +69,12 @@ public class ReviewItemsFixesTests
         Assert.Contains("cleanup-open-report\" data-report-id=\"@report.Id\" title=\"View\"", Read("Views", "Cleanup", "Index.cshtml"));
         Assert.Contains("bi-eye", Read("Views", "Cleanup", "Index.cshtml"));
     }
+
+    [Fact]
+    public void Topic_picker_button_says_load()
+    {
+        var picker = Read("Views", "Operations", "_TopicPicker.cshtml");
+        Assert.Contains("<button class=\"btn btn-au-link\" type=\"submit\">Load</button>", picker);
+        Assert.DoesNotContain(">Open</button>", picker);
+    }
 }
