@@ -59,12 +59,32 @@
     function wireConfirm() {
         var input = document.getElementById("plan-confirm");
         var button = document.getElementById("plan-submit");
-        if (!input || !button) return;
+        if (!input || !button || input.getAttribute("data-confirm-wired") === "1") return;
+        input.setAttribute("data-confirm-wired", "1");
         var expected = input.getAttribute("data-topic") || "";
         function sync() {
-            button.disabled = input.value !== expected;
+            var ok = input.value === expected;
+            button.disabled = !ok;
+            document.querySelectorAll("[data-topic-confirm]").forEach(function (el) { el.disabled = !ok; });
         }
         input.addEventListener("input", sync);
+        sync();
+    }
+
+    function wirePartitionChoice() {
+        var card = document.getElementById("kafka-change-partitions");
+        if (!card || card.getAttribute("data-choice-wired") === "1") return;
+        var form = card.querySelector("form");
+        if (!form) return;
+        card.setAttribute("data-choice-wired", "1");
+        function sync() {
+            var choice = card.querySelector("input[name='partitionChoice']:checked");
+            var action = choice && choice.getAttribute("data-preview");
+            if (action) form.setAttribute("action", action);
+        }
+        card.querySelectorAll("input[name='partitionChoice']").forEach(function (el) {
+            el.addEventListener("change", sync);
+        });
         sync();
     }
 
@@ -78,6 +98,7 @@
         var root = document.getElementById("kafkaResults") || document;
         tips(root);
         wireConfirm();
+        wirePartitionChoice();
         wireTopicPick();
         bindBusy(root);
         wireResults(root);

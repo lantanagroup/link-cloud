@@ -3949,6 +3949,24 @@ kbd {
 tr.lu-kafka-problem > td:first-child {
   box-shadow: inset 3px 0 0 #b42318;
 }
+#kafka-change-partitions [data-partition-pane],
+#kafka-change-partitions [data-partition-btn] {
+  display: none;
+}
+#kafka-change-partitions:has(#choice-add:checked) [data-partition-pane="add"] {
+  display: block;
+}
+#kafka-change-partitions:has(#choice-migrate:checked) [data-partition-pane="migrate"] {
+  display: block;
+}
+#kafka-change-partitions:has(#choice-family:checked) [data-partition-pane="family"] {
+  display: block;
+}
+#kafka-change-partitions:has(#choice-add:checked) [data-partition-btn="add"],
+#kafka-change-partitions:has(#choice-migrate:checked) [data-partition-btn="migrate"],
+#kafka-change-partitions:has(#choice-family:checked) [data-partition-btn="family"] {
+  display: inline-block;
+}
 
 .list-group-item-info,
 .list-group-item-primary,

@@ -246,6 +246,8 @@ public class ReplicationFactorRulesTests
         form.Should().NotContain("lu-kafka-steps");
         form.Should().Contain("lu-kafka-summary");
         form.Should().Contain("Filter the preview");
+        form.Should().NotContain("form-text");
+        IndexOf(form, "id=\"kafka-replication-result\"").Should().BeLessThan(IndexOf(form, "Filter the preview"));
         request.Should().Contain("ReplicationFactor");
         request.Should().Contain("id=\"kafka-replication-steps\"");
         request.Should().Contain("lu-rf-track");

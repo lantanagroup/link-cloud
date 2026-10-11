@@ -71,9 +71,14 @@ public class KafkaPageFlowGuardTests
         migrate.Should().Contain("KafkaIncreaseEligibility.MigrationLine");
         migrate.Should().Contain("id=\"kafka-partition-result\"");
         migrate.Should().Contain("id=\"kafka-dry-run-result\"");
-        migrate.Should().Contain(">Dry run</button>");
-        migrate.Should().Contain(">Preview increase</span>");
+        migrate.Should().Contain("formaction=\"/Operations/Kafka/migrations/plan\"");
+        migrate.Should().Contain("formaction=\"/Operations/Kafka/plan\"");
+        migrate.Should().Contain("aria-label=\"Preview increase\"");
         migrate.Should().NotContain("Slice1Eligible");
+        Count(migrate, "id=\"kafka-change-partitions\"").Should().Be(1);
+        migrate.Should().NotContain("KafkaWindows.Facts");
+        migrate.Should().NotContain("<h2 class=\"card-header h6 mb-0\">Add partitions");
+        migrate.Should().NotContain("<h2 class=\"card-header h6 mb-0\">Migrate");
     }
 
     [Fact]

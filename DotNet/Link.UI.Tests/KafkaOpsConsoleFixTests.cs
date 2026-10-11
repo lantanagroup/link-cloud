@@ -210,7 +210,8 @@ public class KafkaOpsConsoleFixTests
         migrate.Should().Contain("Preview family");
         migrate.Should().Contain("class=\"btn btn-sm btn-au-execute lu-icon-btn\"");
         migrate.Should().Contain("data-kafka-busy=\"Dry run is running.\"");
-        migrate.Should().Contain("class=\"btn btn-au-execute\" type=\"submit\" formaction=\"/Operations/Kafka/migrations/plan\">Dry run");
+        migrate.Should().Contain("formaction=\"/Operations/Kafka/migrations/plan\"");
+        migrate.Should().Contain("id=\"kafka-change-partitions\"");
         migrate.Should().Contain("class=\"btn btn-success\"");
         migrate.Should().Contain("class=\"btn btn-warning\"");
         migrate.Should().Contain("plan.Errors");
