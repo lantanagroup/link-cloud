@@ -13,11 +13,18 @@ public sealed class KafkaOpsWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var sampledAt = DateTimeOffset.MinValue;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await _service.TrackAsync(stoppingToken);
+                // One topic read every 30 seconds feeds the bounded overview history ring.
+                if (DateTimeOffset.UtcNow - sampledAt >= TimeSpan.FromSeconds(30))
+                {
+                    sampledAt = DateTimeOffset.UtcNow;
+                    await _service.GetTopicsAsync(stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

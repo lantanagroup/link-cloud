@@ -52,6 +52,15 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendAsync<ClusterSnapshot>(HttpMethod.Get, "api/ops/kafka/cluster", null, cancellationToken);
     }
 
+    /// <summary>Bounded throughput and lag history for the overview sparklines. Top N topics only.</summary>
+    public Task<KafkaOpsCall<KafkaHistoryResponse>> GetHistoryAsync(int top, CancellationToken cancellationToken)
+    {
+        top = Math.Clamp(top, 1, 20);
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.History(top));
+        return SendAsync<KafkaHistoryResponse>(HttpMethod.Get, "api/ops/kafka/history?top=" + top, null, cancellationToken);
+    }
+
     public Task<KafkaOpsCall<InfraStatus>> GetInfraAsync(CancellationToken cancellationToken)
     {
         if (_fixture.Active)

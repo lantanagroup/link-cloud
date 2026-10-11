@@ -4922,3 +4922,45 @@ h1 .lu-provider-badge + .au-info-icon { font-size: .8rem; vertical-align: middle
 
 /* A variant that is not on the broker stays readable on the dark section nav. */
 .lu-section-nav .is-dimmed { color: #9aa0a6; padding: .35rem .75rem; cursor: not-allowed; }
+
+/* ---- Kafka overview widgets (shared by the Kafka Overview and the landing dashboard) ---- */
+.lu-pipeline { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: .5rem; counter-reset: lu-step; }
+.lu-pipeline > li { display: flex; min-width: 0; counter-increment: lu-step; }
+.lu-pipeline > li > .lu-pipeline-step { flex: 1 1 auto; min-width: 0; }
+.lu-pipeline-name::before { content: counter(lu-step) ". "; color: var(--au-muted); font-weight: 600; }
+.lu-pipeline-step { display: flex; flex-direction: column; padding: .4rem .65rem; border-radius: .4rem; border: 1px solid transparent; border-left-width: 4px; text-decoration: none; color: var(--au-text); background: #fff; }
+.lu-pipeline-step:hover, .lu-pipeline-step:focus-visible { text-decoration: none; outline: 2px solid var(--au-link); outline-offset: 1px; }
+.lu-pipeline-name { font-weight: 600; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lu-pipeline-lag { font-size: .72rem; color: var(--au-muted); white-space: nowrap; }
+.lu-tone-ok { background: #e9f7ee; border-color: #b9e3c6; border-left-color: var(--au-success); }
+.lu-tone-warn { background: #fff6db; border-color: #f1dc9c; border-left-color: #e0a045; }
+.lu-tone-bad { background: #fdecee; border-color: #f3c0c6; border-left-color: #dc3545; }
+.lu-tone-unknown { background: var(--au-accent-soft); border-color: var(--au-border); border-left-color: #9a9a9a; }
+.lu-pipeline-compact { gap: .35rem; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); }
+.lu-pipeline-compact .lu-pipeline-step { min-width: 0; padding: .25rem .5rem; }
+
+.lu-broker-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem; }
+.lu-broker-card { display: flex; flex-direction: column; gap: .3rem; padding: .7rem .85rem; border: 1px solid var(--au-border); border-radius: .5rem; background: #fff; color: var(--au-text); text-decoration: none; min-width: 0; }
+.lu-broker-card:hover, .lu-broker-card:focus-visible { text-decoration: none; border-color: var(--au-link); }
+.lu-broker-card.lu-kafka-attention { border-left: 4px solid #dc3545; }
+.lu-broker-title { font-weight: 700; }
+.lu-broker-host { font-size: .8rem; color: var(--au-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lu-broker-state { display: flex; gap: .35rem; flex-wrap: wrap; }
+.lu-broker-stats { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .8rem; color: var(--au-muted); }
+.lu-broker-stats strong { color: var(--au-text); font-size: .95rem; }
+
+.lu-spark-row { display: flex; align-items: center; gap: 1.25rem; }
+.lu-spark-figure { display: flex; flex-direction: column; min-width: 5.5rem; }
+.lu-spark-value { font-size: 1.35rem; font-weight: 700; line-height: 1.1; white-space: nowrap; }
+.lu-spark-label { font-size: .75rem; color: var(--au-muted); display: flex; align-items: center; gap: .3rem; }
+.lu-spark-key { display: inline-block; width: .7rem; height: .2rem; border-radius: 1px; }
+.lu-spark { flex: 1 1 auto; min-width: 8rem; height: 3.25rem; overflow: visible; }
+.lu-spark polyline { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.lu-spark .lu-spark-in, .lu-spark-key.lu-spark-in { stroke: var(--lu-spark-in); background: var(--lu-spark-in); }
+.lu-spark .lu-spark-out, .lu-spark-key.lu-spark-out { stroke: var(--lu-spark-out); background: var(--lu-spark-out); }
+.lu-spark .lu-spark-lag, .lu-spark-key.lu-spark-lag { stroke: var(--lu-spark-lag); background: var(--lu-spark-lag); }
+.lu-kind-badge { font-size: .68rem; font-weight: 600; vertical-align: middle; margin-left: .4rem; }
+#kafka-widget-leaders .lu-donut-layout { flex-wrap: nowrap; gap: 1.5rem; justify-content: center; }
+#kafka-widget-leaders .lu-donut-chart, #kafka-widget-leaders .lu-donut-ring { width: 160px; height: 160px; margin-inline: 0; flex: 0 0 auto; }
+#kafka-widget-leaders .lu-donut-legend { margin: 0; grid-template-columns: max-content; }
+.lu-kafka-widget-grid > [class*="col"] > .lu-kafka-widget > .card { margin-top: 0 !important; }

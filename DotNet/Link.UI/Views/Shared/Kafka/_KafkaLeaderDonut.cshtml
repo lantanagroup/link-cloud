@@ -1,0 +1,36 @@
+@model KafkaDashboard
+<div id="kafka-widget-leaders" class="lu-kafka-widget h-100">
+<section class="card au-card mt-3 h-100">
+    <h2 class="card-header h6 mb-0">Partition leaders <partial name="_TermInfo" model="@(new TermInfo { Label = "About partition balance", Text = "Leader partitions per broker. An even ring means produce and fetch load is spread evenly. A broker with a much larger slice is a rebalance candidate." })" /></h2>
+    <div class="card-body">
+        @if (Model.LeaderTotal == 0)
+        {
+            <p class="text-muted mb-0">No leader counts are in the cluster metadata.</p>
+        }
+        else
+        {
+            <div class="lu-donut-layout">
+                <div class="lu-donut-chart">
+                    <div class="lu-donut-ring" style="background: conic-gradient(@Model.LeaderGradient)" role="img" aria-label="Partition leaders per broker">
+                        <div class="lu-donut-hole">
+                            <span class="lu-donut-total">@Model.LeaderTotal.ToString("N0")</span>
+                            <span class="lu-donut-total-label">leaders</span>
+                        </div>
+                    </div>
+                </div>
+                <ul class="lu-donut-legend">
+                    @foreach (var slice in Model.Leaders)
+                    {
+                        <li>
+                            <span class="lu-donut-swatch" style="background:@slice.Color"></span>
+                            <span class="lu-donut-name">@slice.Name</span>
+                            <span class="lu-donut-count">@slice.Value.ToString("N0")</span>
+                            <span class="lu-donut-pct">@((slice.Value * 100.0 / Model.LeaderTotal).ToString("0"))%</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</section>
+</div>
