@@ -27,5 +27,7 @@
     <!-- Engine calls AutomationRules, which lives outside Engine with its models. -->
     <Compile Include="..\Link.UI\Services\AutomationRules.cs" Link="LinkServices\AutomationRules.cs" />
     <Compile Include="..\Link.UI\Models\AutomationModels.cs" Link="LinkModels\AutomationModels.cs" />
+    <Compile Include="..\Link.UI\Models\AdminBffUser.cs" Link="LinkModels\AdminBffUser.cs" />
+    <Compile Include="..\Link.UI\Services\AdminBffUserService.cs" Link="LinkServices\AdminBffUserService.cs" />
   </ItemGroup>
 </Project>
