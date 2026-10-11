@@ -39,7 +39,7 @@
             {
                 <span class="badge au-badge-danger">Exception</span>
             }
-            <button type="button" class="btn btn-sm btn-au-link" data-restage="@restageId" data-stage="@recordId" data-topic="@Model.Topic">Re-stage</button>
+            <a class="btn btn-sm btn-au-link" data-restage="@restageId" data-stage="@recordId" data-topic="@Model.Topic" href="@Model.ProduceHref">Re-stage in Produce</a>
         </div>
     </header>
     <script type="application/json" id="@restageId">@Html.Raw(clipboard)</script>
@@ -94,7 +94,7 @@
                         <thead>
                             <tr>
                                 <th>Header</th>
-                                <th>Value</th>
+                                <th class="lu-flex">Value</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -102,7 +102,7 @@
                         {
                             <tr>
                                 <td>@header.Name</td>
-                                <td>
+                                <td class="lu-flex">
                                     <partial name="_LabeledId" model="@(new LabeledId { Label = header.Name, Value = header.Value, Compact = true, CopyLabel = "Copy " + header.Name })" />
                                 </td>
                             </tr>

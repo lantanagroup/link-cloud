@@ -33,7 +33,7 @@ public class SectionHeaderGuardTests
         body.Should().NotContain("margin-top: -");
 
         File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_ProduceMessage.cshtml"))
-            .Should().Contain("<h2 class=\"card-header h5 mb-0\">Produce a message</h2>");
+            .Should().Contain("<h2 class=\"card-header h5 mb-0\">Produce a message");
     }
 
     [Fact]

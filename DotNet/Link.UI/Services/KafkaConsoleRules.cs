@@ -366,6 +366,15 @@ public static class KafkaBrowseText
         }
     }
 
+    public static string VariantTab(KafkaNamedTopic member)
+    {
+        var name = MemberLabel(member);
+        if (!member.Exists)
+            return name;
+        var lag = member.LagKnown ? member.Lag.ToString() : "unread";
+        return name + " · " + member.Partitions + "p · lag " + lag;
+    }
+
     public static string MemberLabel(KafkaNamedTopic member)
     {
         if (member.Kind == KafkaBrowseAllowList.KindMain)
