@@ -4987,3 +4987,14 @@ table > tbody > tr > td .btn.btn-sm.lu-row-icon {
 }
 table > tbody > tr > td .btn.btn-sm.lu-row-icon > :not(i.bi) { display: none; }
 table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }
+
+/* Kafka topic combo box: content-width input, caret toggle, overlay list. */
+.lu-combo { position: relative; width: 30rem; max-width: 100%; }
+.lu-combo > .form-control { padding-right: 2.25rem; }
+.lu-combo-toggle { position: absolute; top: 0; right: 0; height: 100%; width: 2.25rem; border: 0; background: transparent; color: #495057; }
+.lu-combo-list { position: absolute; top: calc(100% + .25rem); left: 0; right: 0; z-index: 1050; max-height: 20rem; overflow-y: auto; margin: 0; padding: .25rem 0; list-style: none; background: #fff; border: 1px solid #d0d5da; border-radius: .375rem; box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15); }
+.lu-combo-option { display: flex; justify-content: space-between; gap: .75rem; padding: .4rem .75rem; cursor: pointer; }
+.lu-combo-option:hover, .lu-combo-option.active { background: var(--au-link); color: #fff; }
+.lu-combo-option:hover .lu-combo-meta, .lu-combo-option.active .lu-combo-meta { color: #fff; }
+.lu-combo-meta { font-size: .8rem; color: #495057; white-space: nowrap; }
+.lu-combo-empty { padding: .4rem .75rem; color: #495057; }
