@@ -89,7 +89,10 @@ public class KafkaBrowsePageTests
         var shell = File.ReadAllText(Path.Combine(root, "Views", "Operations", "Kafka.cshtml"));
         page.Should().Contain("does not commit offsets");
         page.Should().Contain("Topic family");
-        page.Should().Contain("<h3 class=\"h6\">Search</h3>");
+        page.Should().NotContain("<h3 class=\"h6\">Search</h3>");
+        page.Should().Contain("KafkaBrowseText.VariantTab");
+        page.Should().Contain("aria-disabled=\"true\"");
+        page.Should().Contain("id=\"kafka-open-record\"");
         page.Should().Contain("id=\"kafka-records\"");
         page.Should().NotContain("<legend");
         page.Should().NotContain("Where to read");
@@ -259,7 +262,9 @@ public class KafkaBrowsePageTests
         detail.Should().Contain("Copy value");
         detail.Should().Contain("Copy all");
         detail.Should().Contain("data-restage=");
-        detail.Should().Contain(">Re-stage</button>");
+        detail.Should().Contain("Re-stage in Produce");
+        detail.Should().NotContain(">Re-stage</button>");
+        detail.Should().Contain("<th class=\"lu-flex\">Value</th>");
         detail.Should().Contain("btn btn-sm btn-au-link");
         detail.Should().Contain("ValuePretty");
 
@@ -268,17 +273,19 @@ public class KafkaBrowsePageTests
         produce.Should().Contain("Paste message");
         produce.Should().Contain("btn btn-au-link");
         produce.Should().Contain("id=\"produce-submit\"");
-        produce.Should().Contain("btn btn-au-execute");
+        produce.Should().Contain("btn btn-success");
         produce.Should().Contain(">Produce</button>");
         produce.Should().Contain("btn btn-warning");
         produce.Should().Contain(">Cancel</a>");
         produce.Should().Contain("Nothing is sent until you type the topic name.");
+        produce.Should().NotContain("<h3 class=\"card-header h6 mb-0\">Message</h3>");
+        produce.Should().NotContain("<h3 class=\"card-header h6 mb-0\">Review</h3>");
         produce.Should().NotContain("btn-primary");
         produce.Should().NotContain("btn-outline-");
-        produce.Should().NotContain("btn-success");
 
         var page = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Messages.cshtml"));
-        page.Should().Contain("name=\"_ProduceMessage\"");
+        page.Should().NotContain("name=\"_ProduceMessage\"");
+        File.ReadAllText(Path.Combine(root, "Views", "Operations", "Kafka.cshtml")).Should().Contain("name=\"_ProduceMessage\"");
 
         var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
         script.Should().Contain("data-restage");
@@ -332,6 +339,7 @@ public class KafkaBrowsePageTests
         staged.Href().Should().Contain("stage=0%3A120");
         staged.Href(closeStage: true).Should().NotContain("stage=");
         staged.Href(view: ThroughputKafkaPageQuery.Overview, page: 1).Should().NotContain("stage=");
+        staged.Href(view: ThroughputKafkaPageQuery.Produce, stage: "0:120").Should().Contain("stage=0%3A120");
         staged.WithSeek("from-offset", 10).Href().Should().NotContain("stage=");
 
         var fixture = Fixture();
