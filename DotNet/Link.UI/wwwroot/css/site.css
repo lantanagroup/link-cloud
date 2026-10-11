@@ -4769,15 +4769,15 @@ table.au-table > :is(thead, tbody, tfoot) > tr > :is(th, td) {
   width: 1%;
   white-space: nowrap;
 }
-table.table > :is(thead, tbody, tfoot) > tr > td:first-child:not(:has(input)):not(:has(.btn)),
+table.table > :is(thead, tbody, tfoot) > tr > td:first-child:not(:has(input)):not(:has(.btn:not(.lu-cell-copy))),
 table.table > :is(thead, tbody, tfoot) > tr > th:first-child:not(:has(input)),
-table.table td:has(.lu-labeled-id):not(:has(.btn)),
+table.table td:has(.lu-labeled-id):not(:has(.btn:not(.lu-cell-copy))),
 table.table th:has(.lu-labeled-id),
-table.table td:has(.lu-clip):not(:has(.btn)),
-table.table td:has(code):not(:has(.btn)),
-table.au-table td:first-child:not(:has(input)):not(:has(.btn)),
-table.au-table td:has(.lu-labeled-id):not(:has(.btn)),
-table.au-table td:has(code):not(:has(.btn)) {
+table.table td:has(.lu-clip):not(:has(.btn:not(.lu-cell-copy))),
+table.table td:has(code):not(:has(.btn:not(.lu-cell-copy))),
+table.au-table td:first-child:not(:has(input)):not(:has(.btn:not(.lu-cell-copy))),
+table.au-table td:has(.lu-labeled-id):not(:has(.btn:not(.lu-cell-copy))),
+table.au-table td:has(code):not(:has(.btn:not(.lu-cell-copy))) {
   width: auto;
   max-width: 0;
   overflow: hidden;
@@ -4791,12 +4791,30 @@ table.au-table td.lu-wrap {
   max-width: none;
   overflow: visible;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   text-overflow: clip;
 }
-table.table td:has(.btn),
-table.table th:has(.btn),
-table.au-table td:has(.btn) {
+/* A named flexible column takes the space that is left and is cut only when the value is longer than that space. */
+table.table td.lu-flex,
+table.table th.lu-flex,
+table.au-table td.lu-flex {
+  width: auto;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A short leading cell (a partition or broker number) shrinks to its value. */
+table.table > :is(thead, tbody, tfoot) > tr > .lu-shrink:is(th, td):not(.lu-wrap):not(.lu-flex):not(.lu-none),
+table.au-table > :is(thead, tbody, tfoot) > tr > .lu-shrink:is(th, td):not(.lu-wrap):not(.lu-flex):not(.lu-none) {
+  width: 1%;
+  max-width: none;
+  overflow: visible;
+  white-space: nowrap;
+}
+table.table td:has(.btn:not(.lu-cell-copy)),
+table.table th:has(.btn:not(.lu-cell-copy)),
+table.au-table td:has(.btn:not(.lu-cell-copy)) {
   width: 1%;
   max-width: none;
   overflow: visible;

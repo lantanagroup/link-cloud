@@ -7,7 +7,7 @@
 }
 
 <section class="card au-card mt-3" id="kafka-groups">
-    <h2 class="card-header h6 mb-0">Groups <partial name="_TermInfo" model="@(new TermInfo { Label = "About groups", Text = "Add or remove members only after a preview. A count above the partition ceiling is refused, because the extra member would sit idle. Groups that are behind, unowned, or not stable are listed first. Time since the last rebalance is not reported by the client." })" /></h2>
+    <h2 class="card-header h6 mb-0">Groups <partial name="_TermInfo" model="@(new TermInfo { Label = "About groups", Text = "Open a group to add or remove replicas. Add or remove members only after a preview. A count above the partition ceiling is refused, because the extra member would sit idle. Groups that are behind, unowned, or not stable are listed first. Time since the last rebalance is not reported by the client." })" /></h2>
     <div class="card-body">
         @if (!Model.Infra.Enabled)
         {
@@ -92,11 +92,7 @@
             </span>
         </div>
 
-        @if (selected is null)
-        {
-            <div class="alert alert-secondary mt-3 mb-0" role="status">Select a group to add or remove replicas. A replica above the partition count sits idle and is refused. maxReplicas cannot exceed the partition count.</div>
-        }
-        else
+        @if (selected is not null)
         {
             var committed = KafkaWindows.Committed(selected.Partitions, query.PartPage, query.PageSize);
             var shownMembers = selected.Members.Take(query.PageSize).ToList();
