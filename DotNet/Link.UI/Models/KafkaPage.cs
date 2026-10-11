@@ -238,7 +238,7 @@ public sealed record ThroughputKafkaPageQuery
             var open = closeRecord ? "" : record ?? OpenRecord;
             if (open.Length > 0)
                 values["record"] = open;
-            var staged = closeStage || changed ? "" : stage ?? StageRecord;
+            var staged = closeStage ? "" : stage ?? (changed ? "" : StageRecord);
             if (staged.Length > 0)
                 values["stage"] = staged;
         }
@@ -456,4 +456,5 @@ public sealed class KafkaMessageOpen
     public string Topic { get; init; } = "";
     public KafkaBrowseRecord Record { get; init; } = new();
     public string ReturnHref { get; init; } = "";
+    public string ProduceHref { get; init; } = "";
 }
