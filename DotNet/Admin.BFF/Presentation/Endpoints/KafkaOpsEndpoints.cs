@@ -539,7 +539,14 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         if (!TryTopic(topic, out var name, out var invalid))
             return Problem(invalid, StatusCodes.Status400BadRequest);
         var compared = string.IsNullOrWhiteSpace(diff) ? "" : diff.Sanitize();
-        return Results.Ok(await migrations.ConfigsAsync(name, compared, cancellationToken));
+        try
+        {
+            return Results.Ok(await migrations.ConfigsAsync(name, compared, cancellationToken));
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
     }
 
     private async Task<IResult> PlanMigration(ClaimsPrincipal user, string topic, MigrationRequestBody body, CancellationToken cancellationToken)

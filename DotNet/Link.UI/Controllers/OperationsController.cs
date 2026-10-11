@@ -683,10 +683,6 @@ public sealed class OperationsController : Controller
             var detailCall = await _kafka.GetDetailAsync(query.TopicName, cancellationToken);
             detail = detailCall.Value;
             error ??= detailCall.Error;
-            var diff = Request.Query["diff"].ToString();
-            var configCall = await _kafka.GetConfigsAsync(query.TopicName, diff, cancellationToken);
-            configs = configCall.Value;
-            error ??= configCall.Error;
         }
 
         if (Guid.TryParse(Request.Query["migration"], out var migrationId) && migrationId != Guid.Empty)

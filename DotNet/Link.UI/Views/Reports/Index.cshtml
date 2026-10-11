@@ -130,7 +130,7 @@
                             <th><a asp-all-route-data="@SortRoute("FacilityId")">Facility</a></th>
                             <th><a asp-all-route-data="@SortRoute("ReportStartDate")">Reporting period</a></th>
                             <th><a asp-all-route-data="@SortRoute("CreateDate")">Created</a></th>
-                            <th class="lu-measures-col">Measures</th>
+                            <th class="lu-measures-col lu-flex">Measures</th>
                             <th><a asp-all-route-data="@SortRoute("Frequency")">Cadence</a></th>
                             <th class="text-end">Census</th>
                             <th class="text-end">IP</th>
@@ -158,7 +158,7 @@
                                 <div>End @report.PeriodEnd</div>
                             </td>
                             <td class="text-nowrap">@report.Created</td>
-                            <td>
+                            <td class="lu-flex">
                                 <span class="lu-measures">
                                     <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
                                 </span>
