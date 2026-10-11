@@ -205,6 +205,124 @@ public static class KafkaAttention
             : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
 }
 
+public sealed record KafkaAttentionItem(int Rank, long Weight, string What, string Kind, string Why, string Href, string Action);
+
+public static class KafkaNeedsAttention
+{
+    public const string Healthy = "Everything else is healthy.";
+
+    public static IReadOnlyList<KafkaAttentionItem> Rank(
+        IEnumerable<KafkaTopicRow>? topics,
+        IEnumerable<KafkaGroupRow>? groups,
+        IEnumerable<PartitionPlacement>? placements,
+        int offlinePartitions = 0,
+        int underReplicatedPartitions = 0)
+    {
+        var items = new List<KafkaAttentionItem>();
+        var topicRows = topics?.Where(row => !string.IsNullOrWhiteSpace(row.Topic)).ToList() ?? [];
+        var groupRows = groups?.Where(row => !string.IsNullOrWhiteSpace(row.GroupId)).ToList() ?? [];
+        var placementRows = placements?.Where(row => !string.IsNullOrWhiteSpace(row.Topic)).ToList() ?? [];
+        var seenTopics = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var group in placementRows.GroupBy(row => row.Topic, StringComparer.Ordinal))
+        {
+            seenTopics.Add(group.Key);
+            var offline = group.Count(row => row.Leader < 0);
+            var shortIsr = group.Count(row => row.Leader >= 0 && row.Replicas.Count > row.Isr.Count);
+            if (offline > 0)
+                items.Add(Item(0, offline, group.Key, "Partition", "Offline: " + Units(offline, "partition") + ".", KafkaConsoleRoutes.Topics(group.Key, KafkaConsoleRoutes.Summary), "Topic › Summary"));
+            else if (shortIsr > 0)
+                items.Add(Item(1, shortIsr, group.Key, "Partition", "Under-replicated: ISR short on " + Units(shortIsr, "partition") + ".", KafkaConsoleRoutes.Topics(group.Key, KafkaConsoleRoutes.Summary), "Topic › Summary"));
+        }
+
+        if (placementRows.Count == 0 && offlinePartitions > 0)
+            items.Add(Item(0, offlinePartitions, "Cluster", "Partition", "Offline: " + Units(offlinePartitions, "partition") + ".", KafkaConsoleRoutes.Broker(null), "Open brokers"));
+        else if (placementRows.Count == 0 && underReplicatedPartitions > 0)
+            items.Add(Item(1, underReplicatedPartitions, "Cluster", "Partition", "Under-replicated: " + Units(underReplicatedPartitions, "partition") + ".", KafkaConsoleRoutes.Broker(null), "Open brokers"));
+
+        foreach (var row in groupRows)
+        {
+            var unowned = row.UnownedPartitions.Count;
+            var lag = row.TotalLag;
+            var stable = string.Equals(row.State?.Trim(), "Stable", StringComparison.OrdinalIgnoreCase);
+            string why;
+            int rank;
+            long weight;
+            if (row.Members.Count == 0)
+            {
+                rank = 2;
+                weight = lag + unowned;
+                why = unowned > 0
+                    ? "No members; " + Units(unowned, "partition") + " unowned."
+                    : lag > 0 ? "No members; lag is " + lag + "." : "No members.";
+            }
+            else if (unowned > 0)
+            {
+                rank = 3;
+                weight = unowned;
+                why = Units(unowned, "partition") + " are unowned.";
+            }
+            else if (!stable)
+            {
+                rank = 4;
+                weight = lag;
+                why = string.IsNullOrWhiteSpace(row.State) ? "State is not reported." : "State is " + row.State.Trim() + ".";
+            }
+            else if (lag > 0)
+            {
+                rank = 5;
+                weight = lag;
+                why = "Lag is " + lag + ".";
+            }
+            else
+            {
+                continue;
+            }
+
+            if (!row.Catalogued)
+                why = "Unknown. " + why;
+            items.Add(Item(rank, weight, row.GroupId, "Group", why, KafkaConsoleRoutes.Group(row.GroupId), "Open group"));
+        }
+
+        var groupLagTopics = new HashSet<string>(
+            groupRows.SelectMany(row => row.Partitions).Where(row => row.Lag > 0).Select(row => row.Topic),
+            StringComparer.Ordinal);
+        foreach (var row in topicRows)
+        {
+            if (IsErrorOrRetry(row.Topic) && row.ProduceRateKnown && row.ProduceRatePerSecond > 0)
+            {
+                var kind = row.Topic.Contains(".Error", StringComparison.OrdinalIgnoreCase) ? "Error topic" : "Retry topic";
+                items.Add(Item(6, RateWeight(row.ProduceRatePerSecond), row.Topic, kind, "Arriving at " + KafkaProduceRate.Text(true, row.ProduceRatePerSecond) + " msgs/s.", KafkaConsoleRoutes.Topics(row.Topic, KafkaConsoleRoutes.Messages), "Topic › Messages"));
+                continue;
+            }
+
+            if (row.LagKnown && row.TotalLag > 0 && !groupLagTopics.Contains(row.Topic) && !seenTopics.Contains(row.Topic))
+                items.Add(Item(5, row.TotalLag, row.Topic, "Topic", "Lag is " + row.TotalLag + ".", KafkaConsoleRoutes.Topics(row.Topic, KafkaConsoleRoutes.Summary), "Topic › Summary"));
+        }
+
+        return items
+            .OrderBy(item => item.Rank)
+            .ThenByDescending(item => item.Weight)
+            .ThenBy(item => item.What, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static KafkaAttentionItem Item(int rank, long weight, string what, string kind, string why, string href, string action) =>
+        new(rank, weight, what, kind, why, href, action);
+
+    private static bool IsErrorOrRetry(string topic) =>
+        topic.EndsWith(".Error", StringComparison.OrdinalIgnoreCase)
+        || topic.EndsWith(".Retry", StringComparison.OrdinalIgnoreCase)
+        || topic.Contains(".Error.", StringComparison.OrdinalIgnoreCase)
+        || topic.Contains(".Retry.", StringComparison.OrdinalIgnoreCase);
+
+    private static long RateWeight(double perSecond) =>
+        perSecond <= 0 ? 0 : (long)Math.Round(perSecond * 1000);
+
+    private static string Units(int count, string singular) =>
+        count + " " + singular + (count == 1 ? "" : "s");
+}
+
 public sealed record BrokerMoveTopicLine(string Topic, int Partitions, bool Internal);
 
 public static class BrokerMovePreview
