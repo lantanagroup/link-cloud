@@ -31,7 +31,7 @@
                         <td class="lu-flex">@name</td>
                         <td>@(string.IsNullOrWhiteSpace(group?.State) ? "—" : group!.State)</td>
                         <td>@(group is null ? "—" : group.TotalLag.ToString("N0"))</td>
-                        <td class="text-end"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: name, page: 1)">Open</a></td>
+                        <td class="text-end"><a class="btn btn-sm btn-au-link lu-icon-btn" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: name, page: 1)" title="Open group" aria-label="Open group @name"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a></td>
                     </tr>
                 }
                 </tbody>

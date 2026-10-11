@@ -59,4 +59,14 @@ public class ReviewItemsFixesTests
             Assert.Contains("onsubmit=\"return confirm(", view);
         }
     }
+
+    [Fact]
+    public void Navigating_row_actions_use_the_go_to_page_icon_and_modal_actions_keep_the_eye()
+    {
+        Assert.Contains("bi-box-arrow-up-right\" aria-hidden=\"true\"></i><span class=\"ms-1\">View</span></a>", Read("Views", "Tenants", "Facility.cshtml"));
+        Assert.Contains("title=\"Open record\"", Read("Views", "Operations", "_Messages.cshtml"));
+        Assert.Contains("title=\"Open group\"", Read("Views", "Operations", "_TopicConsumers.cshtml"));
+        Assert.Contains("cleanup-open-report\" data-report-id=\"@report.Id\" title=\"View\"", Read("Views", "Cleanup", "Index.cshtml"));
+        Assert.Contains("bi-eye", Read("Views", "Cleanup", "Index.cshtml"));
+    }
 }
