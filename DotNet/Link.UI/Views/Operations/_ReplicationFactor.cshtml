@@ -70,14 +70,14 @@
                             </div>
                             <div>
                                 <div class="lu-kafka-summary-value">@ReplicationFactorRules.ThrottleText(plan.ThrottleBytesPerSecond)</div>
-                                <div class="lu-kafka-summary-label">Throttle, @plan.ThrottleBytesPerSecond bytes/s</div>
+                                <div class="lu-kafka-summary-label">Throttle, @Counts.Of(plan.ThrottleBytesPerSecond, "byte")/s</div>
                             </div>
                             <div class="lu-kafka-summary-wide">
                                 <div class="lu-kafka-summary-value lu-kafka-summary-text">@plan.Skew</div>
                                 <div class="lu-kafka-summary-label">Skew</div>
                             </div>
                         </div>
-                        <p class="text-muted mt-2 mb-2">min.insync.replicas <partial name="_TermInfo" model="@(new TermInfo { Label = "About min.insync.replicas", Text = "The fewest copies that must be in sync before a write is accepted. A replication factor cannot sit below this." })" /> @plan.MinInSyncReplicas. @plan.OnlineBrokers brokers online. @racks</p>
+                        <p class="text-muted mt-2 mb-2">min.insync.replicas <partial name="_TermInfo" model="@(new TermInfo { Label = "About min.insync.replicas", Text = "The fewest copies that must be in sync before a write is accepted. A replication factor cannot sit below this." })" /> @plan.MinInSyncReplicas. @Counts.Of(plan.OnlineBrokers, "broker") online. @racks</p>
                         @if (plan.Errors.Count > 0)
                         {
                             <p class="mb-1">Blocking reasons</p>
@@ -119,7 +119,7 @@
                             </div>
                             @if (plan.BrokerCount > plan.Hottest.Count)
                             {
-                                <p class="text-muted">@plan.Hottest.Count of @plan.BrokerCount brokers, busiest first.</p>
+                                <p class="text-muted">@plan.Hottest.Count of @Counts.Of(plan.BrokerCount, "broker"), busiest first.</p>
                             }
                         }
                         @if (plan.Rows.Count == 0)
@@ -128,7 +128,7 @@
                         }
                         else
                         {
-                            <p class="text-muted mb-1">@plan.Rows.Count of @plan.MatchCount partitions on this page. Worst first.</p>
+                            <p class="text-muted mb-1">@plan.Rows.Count of @Counts.Of(plan.MatchCount, "partition") on this page. Worst first.</p>
                             <div class="table-responsive">
                                 <table class="table table-sm mb-2">
                                     <thead>

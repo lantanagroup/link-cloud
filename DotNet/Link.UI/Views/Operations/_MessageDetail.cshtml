@@ -19,7 +19,7 @@
                 <li><span>Partition</span><strong>@record.Partition</strong></li>
                 <li><span>Offset</span><strong>@record.Offset</strong></li>
                 <li><span>Time</span><strong>@KafkaBrowseText.When(record.TimestampUnixMs)</strong></li>
-                <li><span>Size</span><strong>@record.ByteSize bytes</strong></li>
+                <li><span>Size</span><strong>@Counts.Of(record.ByteSize, "byte")</strong></li>
             </ul>
         </div>
         <div class="lu-msg-badges">
@@ -112,7 +112,7 @@
                 </div>
                 @if (record.Headers.Count > KafkaProduceRules.MaxHeaders)
                 {
-                    <p class="text-muted mb-0">@KafkaProduceRules.MaxHeaders of @record.Headers.Count headers shown.</p>
+                    <p class="text-muted mb-0">@KafkaProduceRules.MaxHeaders of @Counts.Of(record.Headers.Count, "header") shown.</p>
                 }
             }
         </section>

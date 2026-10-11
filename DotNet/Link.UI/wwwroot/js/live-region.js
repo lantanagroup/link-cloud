@@ -543,6 +543,12 @@
         minute: "2-digit"
     });
 
+    // Compact cells ("Oct 11, 8:46 AM") drop the year in the current year; the full timestamp stays on hover.
+    var compactFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+    function compactText(date) {
+        return date.getFullYear() === new Date().getFullYear() ? compactFormat.format(date) : localFormat.format(date);
+    }
     function utcTitle(date) {
         function part(value) { return String(value).padStart(2, "0"); }
         return date.getUTCFullYear() + "-" + part(date.getUTCMonth() + 1) + "-" + part(date.getUTCDate())
@@ -577,19 +583,23 @@
             instantPattern.lastIndex = 0;
             if (!instantPattern.test(text)) return;
             var titles = [];
+            var compact = !!(node.parentElement && node.parentElement.closest("[data-lu-time-compact]"));
+            var full = [];
             instantPattern.lastIndex = 0;
             var next = text.replace(instantPattern, function (token) {
                 var date = parseInstant(token);
                 if (isNaN(date.getTime())) return token;
                 titles.push(utcTitle(date));
-                return localFormat.format(date);
+                full.push(localFormat.format(date));
+                return compact ? compactText(date) : localFormat.format(date);
             });
             if (next === text || !titles.length) return;
             node.nodeValue = next;
             var parent = node.parentElement;
             if (!parent) return;
             var title = parent.getAttribute("title") || "";
-            if (!title || utcTitlePattern.test(title)) parent.setAttribute("title", titles.join("; "));
+            if (compact) parent.setAttribute("title", full.join("; ") + " (" + titles.join("; ") + ")");
+            else if (!title || utcTitlePattern.test(title)) parent.setAttribute("title", titles.join("; "));
         });
     }
 

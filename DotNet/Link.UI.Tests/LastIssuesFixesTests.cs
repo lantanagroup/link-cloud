@@ -85,8 +85,8 @@ public class LastIssuesFixesTests
             if (body.Contains("display: none") || body.Contains("display:none"))
                 Assert.False(System.Text.RegularExpressions.Regex.IsMatch(selector, @"\b(th|td)(:nth-child|:nth-of-type|\.)"), "Column-hiding rule: " + selector.Trim());
         }
-        Assert.Contains("<td class=\"lu-created\">@report.Created</td>", Dot("Link.UI", "Views", "Reports", "Index.cshtml"));
-        Assert.Contains("<td class=\"lu-created\">@report.Created</td>", Dot("Link.UI", "Views", "Tenants", "_ViewReports.cshtml"));
+        Assert.Contains("<td class=\"lu-created\" data-lu-time-compact>@report.Created</td>", Dot("Link.UI", "Views", "Reports", "Index.cshtml"));
+        Assert.Contains("<td class=\"lu-created\" data-lu-time-compact>@report.Created</td>", Dot("Link.UI", "Views", "Tenants", "_ViewReports.cshtml"));
     }
 
     [Fact]
