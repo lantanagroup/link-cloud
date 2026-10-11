@@ -3134,12 +3134,12 @@ a.lu-clip {
   margin: 0;
   transform: translateY(-50%);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition: opacity .12s ease;
 }
 td.lu-copy-host {
   position: relative;
-  padding-right: 2.2rem;
 }
 .btn.lu-cell-copy,
 .btn.lu-icon-btn.lu-cell-copy,
@@ -3163,6 +3163,7 @@ td.lu-copy-host > .btn.lu-cell-copy:active {
     border-color: #d0d5da;
     color: #495057;
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
   }
 }
