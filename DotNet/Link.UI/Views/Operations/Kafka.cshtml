@@ -5,17 +5,23 @@
 
 <div class="lu-kafka">
 <partial name="_BackButton" model="@(new BackLink("/Operations", "Operations"))" />
-<h1 class="h3 mt-3">Kafka <span class="lu-live-label">Live</span></h1>
-<partial name="_Nav" />
+<h1 class="h3 mt-3">Kafka <span class="lu-live-label">Live</span>
+    @if (!Model.Infra.Enabled)
+    {
+        <span class="badge au-badge-warning ms-2">Provider disabled</span>
+        <partial name="_TermInfo" model="@(new TermInfo { Label = "Provider disabled", Text = string.IsNullOrWhiteSpace(Model.Infra.Detail) ? "Broker and replica changes are disabled until an infrastructure provider is enabled." : Model.Infra.Detail })" />
+    }
+</h1>
 
 <div id="kafkaResults" data-au-refresh="8000" data-au-page-url="@query.Href()" class="lu-kafka">
+    @{
+        var topicsTab = query.View is ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce or ThroughputKafkaPageQuery.Migrate;
+    }
     <nav class="lu-section-nav mt-3" aria-label="Kafka">
         <a class="@(query.View == ThroughputKafkaPageQuery.Overview ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Overview, page: 1)">Overview</a>
-        <a class="@(query.View == ThroughputKafkaPageQuery.Topic ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, page: 1)">Topic</a>
-        <a class="@(query.View == ThroughputKafkaPageQuery.Consumers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, page: 1)">Consumers</a>
-        <a class="@(query.View == ThroughputKafkaPageQuery.Brokers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Brokers, page: 1)">Brokers</a>
-        <a class="@(query.View == ThroughputKafkaPageQuery.Messages ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, page: 1)">Messages</a>
-        <a class="@(query.View == ThroughputKafkaPageQuery.Migrate ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, page: 1)">Migrate</a>
+        <a class="@(topicsTab ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: query.TopicName, page: 1)">Topics</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Consumers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: query.Group, page: 1)">Consumer groups</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Brokers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Brokers, broker: query.Broker, page: 1)">Brokers</a>
     </nav>
 
     @if (!string.IsNullOrWhiteSpace(Model.Error))
@@ -39,7 +45,7 @@
     {
         <partial name="_Consumers" model="Model" />
     }
-    else if (query.View == ThroughputKafkaPageQuery.Messages)
+    else if (query.View is ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce)
     {
         <partial name="_Messages" model="Model" />
     }

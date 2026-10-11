@@ -13,6 +13,7 @@ public sealed record ThroughputKafkaPageQuery
     public const string Consumers = "consumers";
     public const string Brokers = "brokers";
     public const string Messages = "messages";
+    public const string Produce = "produce";
     public const string Migrate = "migrate";
 
     public string Q { get; init; } = "";
@@ -24,6 +25,7 @@ public sealed record ThroughputKafkaPageQuery
     public string Family { get; init; } = "";
     public string KeyClass { get; init; } = "";
     public string View { get; init; } = Overview;
+    public string Subtab { get; init; } = "";
     public string Group { get; init; } = "";
     public string TopicName { get; init; } = "";
     public string Broker { get; init; } = "";
@@ -74,7 +76,7 @@ public sealed record ThroughputKafkaPageQuery
             sort = "topic";
         if (dir is not ("asc" or "desc"))
             dir = "asc";
-        if (view is not (Overview or Topic or Consumers or Brokers or Messages or Migrate))
+        if (view is not (Overview or Topic or Consumers or Brokers or Messages or Produce or Migrate))
             view = Overview;
 
         var q = One(query, "q");
@@ -169,6 +171,10 @@ public sealed record ThroughputKafkaPageQuery
     public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false, bool? hot = null)
     {
         var chosenView = view ?? View;
+        var chosenTopic = topic ?? TopicName;
+        var chosenGroup = group ?? Group;
+        var chosenBroker = broker ?? Broker;
+        var chosenSubtab = view is null || string.Equals(view, View, StringComparison.Ordinal) ? Subtab : "";
         var partPage = part ?? PartPage;
         var changed = (view is not null && !string.Equals(view, View, StringComparison.Ordinal))
             || (group is not null && !string.Equals(group, Group, StringComparison.Ordinal))
@@ -185,10 +191,6 @@ public sealed record ThroughputKafkaPageQuery
             ["pageSize"] = (pageSize is 10 or 25 or 50 ? pageSize.Value : PageSize).ToString(),
             ["family"] = family ?? Family,
             ["keyClass"] = keyClass ?? KeyClass,
-            ["view"] = chosenView,
-            ["group"] = group ?? Group,
-            ["topic"] = topic ?? TopicName,
-            ["broker"] = broker ?? Broker,
             ["tests"] = (tests ?? Tests) ? "1" : "",
             ["hot"] = (hot ?? Hot) ? "1" : "",
             ["advanced"] = (advanced ?? Advanced) ? "1" : "",
@@ -197,7 +199,7 @@ public sealed record ThroughputKafkaPageQuery
         if (partPage > 1)
             values["part"] = partPage.ToString();
         var rf = changed ? 0 : Rf;
-        if (rf > 0 && chosenView == Topic)
+        if (rf > 0 && (chosenView == Topic || string.Equals(chosenSubtab, KafkaConsoleRoutes.Replication, StringComparison.Ordinal)))
         {
             values["rf"] = rf.ToString();
             if (RfPage > 1)
@@ -209,7 +211,7 @@ public sealed record ThroughputKafkaPageQuery
             if (RfThrottle > 0)
                 values["rfThrottle"] = RfThrottle.ToString();
         }
-        if (chosenView == Messages)
+        if (chosenView is Messages or Produce)
         {
             var messagePage = changed ? 1 : msgPage ?? MsgPage;
             if (messagePage > 1)
@@ -244,8 +246,9 @@ public sealed record ThroughputKafkaPageQuery
         var pairs = values
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
             .Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value!));
-        var href = "/Operations/Kafka?" + string.Join("&", pairs);
-        return href;
+        var path = KafkaConsoleRoutes.PathFor(chosenView, chosenTopic, chosenGroup, chosenBroker, chosenSubtab);
+        var queryText = string.Join("&", pairs);
+        return queryText.Length == 0 ? path : path + "?" + queryText;
     }
 
     private static long? When(string raw)
@@ -272,7 +275,8 @@ public sealed record ThroughputKafkaPageQuery
     public string ExportHref()
     {
         var href = Href(view: Messages, closeRecord: true);
-        return "/Operations/Kafka/messages/export" + href["/Operations/Kafka".Length..];
+        var mark = href.IndexOf('?', StringComparison.Ordinal);
+        return "/Operations/Kafka/messages/export" + (mark < 0 ? "" : href[mark..]);
     }
 
     private static string One(IQueryCollection query, string name) =>
