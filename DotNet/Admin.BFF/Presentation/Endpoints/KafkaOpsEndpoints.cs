@@ -20,6 +20,8 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
 
         group.MapGet("/topics", GetTopics)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapGet("/history", GetHistory)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapGet("/groups", GetGroups)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapGet("/capabilities", GetCapabilities)
@@ -173,6 +175,13 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         {
             return StatusFor(ex);
         }
+    }
+
+    private IResult GetHistory(ClaimsPrincipal user, int? top)
+    {
+        if (!kafkaOps.CanView(user))
+            return Results.Forbid();
+        return Results.Ok(kafkaOps.GetHistory(Math.Clamp(top ?? 5, 1, 20)));
     }
 
     private async Task<IResult> GetTopics(ClaimsPrincipal user, CancellationToken cancellationToken)
