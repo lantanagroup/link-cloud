@@ -77,4 +77,28 @@ public class ReviewItemsFixesTests
         Assert.Contains("<button class=\"btn btn-au-link\" type=\"submit\">Load</button>", picker);
         Assert.DoesNotContain(">Open</button>", picker);
     }
+
+    [Fact]
+    public void Topic_picker_is_a_client_side_combo_box()
+    {
+        var picker = Read("Views", "Operations", "_TopicPicker.cshtml");
+        Assert.Contains("role=\"combobox\"", picker);
+        Assert.Contains("role=\"listbox\"", picker);
+        Assert.Contains("id=\"topic-pick-toggle\"", picker);
+        Assert.Contains("id=\"topic-pick-data\"", picker);
+        Assert.Contains("OrderBy(row => row.link ? 0 : 1)", picker);
+        Assert.DoesNotContain("col-lg-8", picker);
+        var js = Read("wwwroot", "js", "kafka-ops.js");
+        Assert.Contains("aria-activedescendant", js);
+        Assert.DoesNotContain("searchTopics", js);
+        Assert.Contains(".lu-combo-list { position: absolute;", Read("wwwroot", "css", "site.css"));
+    }
+
+    [Fact]
+    public void Replica_review_summary_is_one_valid_string()
+    {
+        var js = Read("wwwroot", "js", "kafka-ops.js");
+        Assert.Contains("(lines.length === 1 ? \" header.\" : \" headers.\") + \" Nothing is produced until you type the topic name.\";", js);
+        Assert.DoesNotContain("\" headers.\") Nothing", js);
+    }
 }

@@ -4,6 +4,11 @@
     var name = Model.SelectedTopic?.Topic ?? query.TopicName;
     var tab = KafkaConsoleRoutes.TabFor(query.View, query.Subtab);
     var count = Model.Topics.Topics.Count;
+    // Tens of topics: the full list ships with the page and is filtered in the browser. Link pipeline topics first, then A-Z.
+    var options = Model.Topics.Topics
+        .Select(row => new { topic = row.Topic, family = row.Family, keyClass = row.KeyClass, link = LantanaGroup.Link.Shared.Application.Models.Kafka.KafkaBrowseAllowList.Admit(row.Topic, null).Allowed, href = KafkaConsoleRoutes.Topics(row.Topic, tab) })
+        .OrderBy(row => row.link ? 0 : 1).ThenBy(row => row.topic, StringComparer.OrdinalIgnoreCase)
+        .ToList();
 }
 
 <section class="card au-card mt-3" id="kafka-topic-picker">
@@ -16,17 +21,17 @@
         <partial name="_TermInfo" model="@(new TermInfo { Label = "About the topic picker", Text = "Type a topic name, family, or key class. The same topic stays selected on Summary, Messages, Produce, Partitions, Replication, and Consumers." })" />
     </h2>
     <div class="card-body">
-        <form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka/Topics/open" role="search">
+        <form class="d-flex flex-wrap align-items-center gap-2 mb-0" method="get" action="/Operations/Kafka/Topics/open" role="search">
             <input type="hidden" name="subtab" value="@tab" />
             <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
-            <div class="col-12 col-lg-8">
+            <div class="lu-combo" id="topic-combo">
                 <label class="visually-hidden" for="topic-pick">Topic</label>
-                <input class="form-control" id="topic-pick" name="topic" value="@name" placeholder="@Counts.Of(count, "topic") · type to search name, family or key class" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="topic-results" data-topic-search="/Operations/Kafka/Topics/search" data-topic-subtab="@tab" />
+                <input class="form-control" id="topic-pick" name="topic" value="@name" placeholder="@Counts.Of(count, "topic") · type to filter" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="topic-results" aria-haspopup="listbox" />
+                <button type="button" class="lu-combo-toggle" id="topic-pick-toggle" tabindex="-1" aria-label="Show topics" aria-controls="topic-results" aria-expanded="false"><i class="bi bi-chevron-down" aria-hidden="true"></i></button>
+                <ul id="topic-results" class="lu-combo-list" role="listbox" aria-label="Topics" hidden></ul>
             </div>
-            <div class="col-auto">
-                <button class="btn btn-au-link" type="submit">Load</button>
-            </div>
+            <button class="btn btn-au-link" type="submit">Load</button>
         </form>
-        <div id="topic-results" class="list-group mt-2" hidden></div>
+        <script type="application/json" id="topic-pick-data">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(options).Replace("<", "\\u003c"))</script>
     </div>
 </section>
