@@ -5,9 +5,6 @@
     var controllerTile = KafkaControllerTile.Display(cluster.ControllerId, cluster.ControllerUnavailableReason);
     var origin = ReturnUrlRules.Here(Context.Request);
     var groupWindow = KafkaWindows.Groups(Model.Groups.Groups, query.PartPage, query.PageSize);
-    var rightsDenied = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions == false);
-    var rightsUnknown = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions is null);
-    var rightsWindow = KafkaWindows.DeniedRights(Model.Capabilities.Topics, query.PartPage, query.PageSize);
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
 
@@ -212,54 +209,3 @@
     </div>
 </section>
 
-<details class="lu-kafka-fold">
-    <summary>Broker rights (@Model.Capabilities.Topics.Count topics@(rightsDenied > 0 ? ", " + rightsDenied + " cannot alter partitions" : "")) <partial name="_TermInfo" model="@(new TermInfo { Label = "About broker rights", Text = "Alter is what an in-place partition increase needs. Unknown means the client did not report the right. This list is only the topics that cannot alter partitions." })" /></summary>
-    <div class="mt-3">
-        @if (!string.IsNullOrWhiteSpace(Model.Capabilities.Error))
-        {
-            <p class="text-muted">@Model.Capabilities.Error</p>
-        }
-        @if (Model.Capabilities.Topics.Count == 0)
-        {
-            <p class="mb-0">No topic rights were reported.</p>
-        }
-        else if (rightsWindow.Total == 0)
-        {
-            <p class="mb-0">Every reported topic can alter partitions.</p>
-        }
-        else if (rightsWindow.Rows.Count == 0)
-        {
-            <p class="mb-0">No denied topic on this page.</p>
-        }
-        else
-        {
-            <p>Showing @rightsWindow.Rows.Count of @rightsDenied that cannot alter partitions.</p>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Topic</th>
-                            <th>Can alter partitions</th>
-                            <th>Authorized operations</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var right in rightsWindow.Rows)
-                    {
-                        <tr class="lu-kafka-problem">
-                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = right.Topic, Compact = true, CopyLabel = "Copy topic" })" /></td>
-                            <td>No</td>
-                            <td>@(right.AuthorizedOperations.Count == 0 ? (right.Error ?? "None reported") : string.Join(", ", right.AuthorizedOperations.Take(8)))</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-            <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(rightsWindow.Page, rightsWindow.Pages, "Alphabetical.", rightsWindow.Page > 1 ? query.Href(part: rightsWindow.Page - 1) : "", rightsWindow.Page < rightsWindow.Pages ? query.Href(part: rightsWindow.Page + 1) : ""))" />
-        }
-        @if (rightsUnknown > 0)
-        {
-            <p class="text-muted mb-0">@rightsUnknown topics did not report the alter right. They stay off this list.</p>
-        }
-    </div>
-</details>
