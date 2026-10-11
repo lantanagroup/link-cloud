@@ -66,7 +66,7 @@ public sealed class ReportsController : Controller
             report.CanResubmit = FacilityViewRules.CanResubmit(
                 report.Status,
                 report.Deleted,
-                !flags.Reachable || flags.IsTest(report.FacilityId));
+                !flags.Reachable || flags.IsTest(report.FacilityId) || flags.IsMissing(report.FacilityId));
         }
 
         ViewData["Title"] = "Reports";
