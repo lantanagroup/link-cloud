@@ -85,14 +85,45 @@ public class KafkaPageFlowGuardTests
     }
 
     [Fact]
+    public void Overview_lists_what_needs_attention_and_cards_put_actions_first()
+    {
+        var root = RepoRoot();
+        var overview = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Overview.cshtml"));
+        overview.Should().Contain("id=\"kafka-attention\"");
+        overview.Should().Contain("Needs attention");
+        overview.Should().Contain("KafkaNeedsAttention.Healthy");
+        overview.Should().Contain("lu-kafka-attention");
+        overview.Should().NotContain("id=\"kafka-topic-table\"");
+        overview.Should().NotContain("id=\"kafka-overview-groups\"");
+        overview.Should().NotContain(">Migrate</a>");
+        overview.Should().NotContain("form-text");
+        overview.Should().NotContain("Provider @");
+        overview.Should().NotContain("kafkaRateChart");
+
+        var consumers = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Consumers.cshtml"));
+        IndexOf(consumers, ">Preview</span>").Should().BeLessThan(IndexOf(consumers, "Committed partitions"));
+        var brokers = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Brokers.cshtml"));
+        IndexOf(brokers, ">Preview decommission</span>").Should().BeLessThan(IndexOf(brokers, "Partitions on this broker"));
+
+        foreach (var name in new[]
+        {
+            "Kafka.cshtml", "_Overview.cshtml", "_Topic.cshtml", "_Consumers.cshtml", "_Brokers.cshtml",
+            "_Messages.cshtml", "_Migrate.cshtml", "_ReplicationFactor.cshtml", "_ProduceMessage.cshtml",
+            "_TopicPicker.cshtml", "_TopicTabs.cshtml", "_TopicConsumers.cshtml"
+        })
+        {
+            File.ReadAllText(Path.Combine(root, "Views", "Operations", name)).Should().NotContain("form-text", name);
+        }
+    }
+
+    [Fact]
     public void Search_sits_on_the_table_it_filters()
     {
         var root = RepoRoot();
         var overview = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Overview.cshtml"));
-        var overviewStart = IndexOf(overview, "id=\"kafka-topics\"");
-        var overviewEnd = overview.IndexOf("</section>", overviewStart, StringComparison.Ordinal);
-        var topics = overview[overviewStart..overviewEnd];
-        IndexOf(topics, "name=\"q\"").Should().BeLessThan(IndexOf(topics, "id=\"kafka-topic-table\""));
+        overview.Should().Contain("id=\"kafka-attention\"");
+        overview.Should().NotContain("id=\"kafka-topic-table\"");
+        overview.Should().NotContain("name=\"q\"");
 
         var messages = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Messages.cshtml"));
         var messageStart = IndexOf(messages, "id=\"kafka-records\"");

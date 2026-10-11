@@ -253,8 +253,10 @@ public class KafkaOpsConsoleFixTests
         brokers.Should().Contain("id=\"kafka-broker-result\"");
         brokers.Should().Contain("BrokerMovePreview.MoveSummary(plan.Accepted, plan.AlreadyEmpty, plan.Moves.Count)");
 
-        overview.Should().Contain("KafkaProduceRate.Text");
+        overview.Should().Contain("KafkaNeedsAttention.Rank");
         overview.Should().Contain("KafkaControllerTile.Display");
+        File.ReadAllText(Path.Combine(dir!.FullName, "DotNet", "Link.UI", "Services", "KafkaConsoleRules.cs"))
+            .Should().Contain("KafkaProduceRate.Text");
         File.ReadAllText(Path.Combine(dir!.FullName, "DotNet", "Link.UI", "Controllers", "OperationsController.cs"))
             .Should().Contain("KafkaPlanBanner.BesidePlan");
         overview.Should().NotContain("?? \"—\"");
