@@ -274,16 +274,17 @@ public class MorningFixesGuardTests
 
         var kafka = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Kafka.cshtml"));
         kafka.Should().NotContain("btn btn-au-execute\" type=\"submit\">Search");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml")).Should().NotContain("btn btn-au-execute\" type=\"submit\">Search");
         File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Consumers.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
         File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Brokers.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
         File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Messages.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
 
         var overview = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml"));
-        overview.Should().Contain("bi-hdd-network");
-        overview.Should().Contain(">Open</span>");
-        overview.Should().Contain(">Migrate</a>");
+        overview.Should().Contain("btn btn-sm btn-au-link");
+        overview.Should().Contain("@item.Action");
+        overview.Should().NotContain(">Migrate</a>");
         overview.Should().NotContain("btn-au-neutral");
+        File.ReadAllText(Path.Combine(Root(), "Services", "KafkaConsoleRules.cs")).Should().Contain("Open group");
 
         var topic = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Topic.cshtml"));
         topic.Should().Contain("btn-au-link");
