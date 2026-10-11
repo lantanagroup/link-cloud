@@ -381,6 +381,7 @@
                     patientId: row.id,
                     total: Number(done.total || 0),
                     truncated: !!done.truncated,
+                    source: done.source || "",
                     types: (done.types || []).map(function (type, index) {
                         return { name: type.name, count: Number(type.count || 0), color: colors[index % colors.length] };
                     }),
@@ -398,6 +399,8 @@
                 if (body) body.hidden = false;
                 var line = number(state.total) + " resources";
                 if (state.truncated) line = "Stopped at " + number(state.total);
+                // Without the submitted file the graph shows every acquired resource, which can exceed the report totals.
+                if (state.source === "bundle") line += " acquired (not the submitted bundle)";
                 setStatus(line, 100, "settled");
                 bindCanvas();
                 draw();
