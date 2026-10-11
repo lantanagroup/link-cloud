@@ -108,80 +108,97 @@
         watchRequest();
     }
 
+    // Topic combo box: the page carries the full topic list; typing filters it here.
     function wireTopicPick() {
-        if (document.documentElement.getAttribute("data-topic-pick-wired") === "1")
-            return;
-        document.documentElement.setAttribute("data-topic-pick-wired", "1");
-        var timer;
-        document.addEventListener("input", function (event) {
-            var input = event.target;
-            if (!input || input.id !== "topic-pick")
-                return;
-            window.clearTimeout(timer);
-            timer = window.setTimeout(function () { searchTopics(input); }, 200);
-        });
-        document.addEventListener("focusin", function (event) {
-            var input = event.target;
-            if (!input || input.id !== "topic-pick")
-                return;
-            searchTopics(input);
-        });
-        document.addEventListener("click", function (event) {
-            var item = event.target && event.target.closest ? event.target.closest("[data-topic-href]") : null;
-            if (!item)
-                return;
-            var href = item.getAttribute("data-topic-href");
-            if (!href)
-                return;
-            event.preventDefault();
-            window.location.assign(href);
-        });
-    }
-
-    function searchTopics(input) {
-        var url = input.getAttribute("data-topic-search");
+        var input = document.getElementById("topic-pick");
+        if (!input || input.getAttribute("data-combo-wired") === "1") return;
+        input.setAttribute("data-combo-wired", "1");
         var list = document.getElementById("topic-results");
-        if (!url || !list)
-            return;
-        var subtab = input.getAttribute("data-topic-subtab") || "Summary";
-        var request = url + "?q=" + encodeURIComponent(input.value || "") + "&subtab=" + encodeURIComponent(subtab) + "&pageSize=20";
-        fetch(request, { headers: { "Accept": "application/json" } })
-            .then(function (response) { return response.ok ? response.json() : null; })
-            .then(function (payload) { renderTopics(input, list, payload); })
-            .catch(function () { /* Open still submits the typed name. */ });
-    }
+        var toggle = document.getElementById("topic-pick-toggle");
+        var data = document.getElementById("topic-pick-data");
+        var topics = [];
+        try { topics = JSON.parse((data && data.textContent) || "[]"); } catch (e) { topics = []; }
+        var shown = [];
+        var active = -1;
+        var timer;
 
-    function renderTopics(input, list, payload) {
-        var records = payload && payload.records ? payload.records : [];
-        list.replaceChildren();
-        if (records.length === 0) {
-            var empty = document.createElement("div");
-            empty.className = "list-group-item text-muted";
-            empty.textContent = "No topics match.";
-            list.appendChild(empty);
-        } else {
-            records.forEach(function (row) {
-                var link = document.createElement("a");
-                link.className = "list-group-item list-group-item-action";
-                link.href = row.href || "#";
-                link.setAttribute("data-topic-href", row.href || "");
-                var title = document.createElement("span");
-                title.textContent = row.topic || "";
-                link.appendChild(title);
-                var meta = document.createElement("span");
-                meta.className = "text-muted ms-2";
-                var bits = [];
-                if (row.family) bits.push(row.family);
-                if (row.keyClass) bits.push(row.keyClass);
-                meta.textContent = bits.join(" · ");
-                link.appendChild(meta);
-                list.appendChild(link);
-            });
+        function setOpen(open) {
+            list.hidden = !open;
+            input.setAttribute("aria-expanded", open ? "true" : "false");
+            if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+            if (!open) { active = -1; input.removeAttribute("aria-activedescendant"); }
         }
-        list.hidden = false;
-        input.setAttribute("aria-expanded", "true");
-    }
 
+        function render(filter) {
+            var term = (filter || "").trim().toLowerCase();
+            shown = topics.filter(function (row) {
+                return !term || [row.topic, row.family, row.keyClass].some(function (v) { return (v || "").toLowerCase().indexOf(term) >= 0; });
+            });
+            list.replaceChildren();
+            if (!shown.length) {
+                var empty = document.createElement("li");
+                empty.className = "lu-combo-empty";
+                empty.textContent = "No topics match. Load still opens a typed name.";
+                list.appendChild(empty);
+            }
+            shown.forEach(function (row, i) {
+                var li = document.createElement("li");
+                li.id = "topic-opt-" + i;
+                li.className = "lu-combo-option";
+                li.setAttribute("role", "option");
+                li.setAttribute("aria-selected", "false");
+                var name = document.createElement("span");
+                name.textContent = row.topic;
+                li.appendChild(name);
+                var meta = [row.family && row.family !== row.topic ? row.family : "", row.keyClass].filter(Boolean).join(" · ");
+                if (meta) {
+                    var m = document.createElement("span");
+                    m.className = "lu-combo-meta";
+                    m.textContent = meta;
+                    li.appendChild(m);
+                }
+                li.addEventListener("mousedown", function (ev) { ev.preventDefault(); choose(i); });
+                list.appendChild(li);
+            });
+            active = -1;
+            setOpen(true);
+        }
+
+        function highlight(i) {
+            var items = list.querySelectorAll(".lu-combo-option");
+            if (!items.length) return;
+            active = (i + items.length) % items.length;
+            items.forEach(function (el, k) { el.classList.toggle("active", k === active); el.setAttribute("aria-selected", k === active ? "true" : "false"); });
+            input.setAttribute("aria-activedescendant", items[active].id);
+            items[active].scrollIntoView({ block: "nearest" });
+        }
+
+        function choose(i) {
+            var row = shown[i];
+            if (!row) return;
+            input.value = row.topic;
+            setOpen(false);
+            window.location.assign(row.href);
+        }
+
+        input.addEventListener("focus", function () { render(""); });
+        input.addEventListener("click", function () { if (list.hidden) render(""); });
+        input.addEventListener("input", function () {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(function () { render(input.value); }, 120);
+        });
+        input.addEventListener("keydown", function (ev) {
+            if (ev.key === "ArrowDown") { ev.preventDefault(); if (list.hidden) render(input.value); highlight(active + 1); }
+            else if (ev.key === "ArrowUp") { ev.preventDefault(); if (list.hidden) render(input.value); highlight(active - 1); }
+            else if (ev.key === "Enter" && !list.hidden && active >= 0) { ev.preventDefault(); choose(active); }
+            else if (ev.key === "Escape" && !list.hidden) { ev.preventDefault(); setOpen(false); }
+        });
+        input.addEventListener("blur", function () { window.setTimeout(function () { setOpen(false); }, 120); });
+        if (toggle) toggle.addEventListener("mousedown", function (ev) {
+            ev.preventDefault();
+            if (list.hidden) { input.focus(); render(""); } else setOpen(false);
+        });
+    }
     function wireProduce() {
         if (document.documentElement.getAttribute("data-produce-wired") === "1") {
             syncProduce();
@@ -296,7 +313,7 @@
         if (valueBox) valueBox.value = payload.value == null ? "" : String(payload.value);
         form.setAttribute("data-produce-dirty", "1");
         var summary = document.getElementById("kafka-produce-summary");
-        if (summary) summary.textContent = "Review this replica. " + lines.length + (lines.length === 1 ? " header." : " headers.") Nothing is produced until you type the topic name.";
+        if (summary) summary.textContent = "Review this replica. " + lines.length + (lines.length === 1 ? " header." : " headers.") + " Nothing is produced until you type the topic name.";
     }
 
     function headerLines(headers) {

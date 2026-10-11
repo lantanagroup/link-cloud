@@ -94,7 +94,7 @@ public class KafkaConsoleRouteTests
 
         var picker = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_TopicPicker.cshtml"));
         picker.Should().Contain("Copy topic");
-        picker.Should().Contain("/Operations/Kafka/Topics/search");
+        picker.Should().Contain("id=\"topic-pick-data\"", "the full topic list ships with the page and is filtered in the browser");
         picker.Should().Contain("/Operations/Kafka/Topics/open");
 
         var controller = File.ReadAllText(Path.Combine(root, "Controllers", "OperationsController.cs"));
@@ -106,8 +106,8 @@ public class KafkaConsoleRouteTests
         topic.Should().BeGreaterThan(open);
 
         var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
-        script.Should().Contain("data-topic-search");
-        script.Should().Contain("function searchTopics");
+        script.Should().Contain("topic-pick-data");
+        script.Should().Contain("aria-activedescendant");
     }
 
     [Fact]
