@@ -4,289 +4,221 @@
     var origin = ReturnUrlRules.Here(Context.Request);
     var selected = Model.SelectedBroker;
     var showLogDirs = KafkaLogDirs.Show(Model.Cluster);
-    var brokerHot = Model.BrokerRows.Where(KafkaAttention.Broker).OrderBy(row => row.Id).ToList();
-    var brokerProblems = brokerHot.Take(KafkaWindows.HottestCap).ToList();
-    var brokerStep = 1;
-    if (Model.MovePlan is not null && Model.MovePlan.Accepted)
-        brokerStep = 4;
-    else if (Model.MovePlan is not null)
-        brokerStep = 3;
-    else if (selected is not null)
-        brokerStep = 2;
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
     string Size(long bytes) => bytes < 0 ? "Not available" : bytes.ToString("N0");
 }
 
-<section class="card au-card mt-3 mb-3">
-<h2 class="card-header h6 mb-0">Brokers</h2>
-<div class="card-body">
-<p class="mb-2">Add a broker, or open one to preview a move. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions.</p>
-<ol class="lu-kafka-steps mb-2">
-    <li>Choose a broker, or register a new one. A rebalance onto a new broker is a separate request.</li>
-    <li>Preview a decommission or a rebalance.</li>
-    <li>Review the result. A refusal lists each reason. If no moves were planned, the result says so.</li>
-    <li>Submit the change. A second approver is required before it runs.</li>
-</ol>
-<p class="mb-0">
-    <span class="badge @StatusPills.ForWizardStep(brokerStep, 1)">1 Choose a broker</span>
-    <span class="badge @StatusPills.ForWizardStep(brokerStep, 2)">2 Preview</span>
-    <span class="badge @StatusPills.ForWizardStep(brokerStep, 3)">3 Review</span>
-    <span class="badge @StatusPills.ForWizardStep(brokerStep, 4)">4 Submit</span>
-</p>
-</div>
-</section>
-
-@if (!Model.Infra.Enabled)
-{
-    <div class="alert alert-secondary mt-3" role="status">@Model.Infra.Detail</div>
-}
-@if (!string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail))
-{
-    <div class="alert alert-secondary mt-3 mb-0" role="status">@Model.Cluster.LogDirDetail</div>
-}
-
-@if (brokerProblems.Count > 0)
-{
-    <div class="au-card card mt-3">
-        <div class="card-header">Brokers that need attention (@brokerHot.Count)</div>
-        <div class="card-body">
-            <p>A broker is listed here when it is not up.</p>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Id</th>
-                            <th>Host</th>
-                            <th>State</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var row in brokerProblems)
-                    {
-                        <tr class="lu-kafka-problem">
-                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy broker id", ReturnUrl = origin, LinkHref = query.Href(broker: row.Id.ToString(), page: 1) })" /></td>
-                            <td>@row.Host:@row.Port</td>
-                            <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
-                            <td>
-                                <a class="btn btn-sm btn-au-link" href="@query.Href(broker: row.Id.ToString(), page: 1)" title="Open broker @row.Id" aria-label="Open broker @row.Id"><i class="bi bi-hdd" aria-hidden="true"></i><span class="ms-1">Open</span></a>
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-            @if (brokerHot.Count > brokerProblems.Count)
-            {
-                <p class="text-muted mt-2 mb-0">@brokerProblems.Count of @brokerHot.Count shown. The rest are in the broker table on this page.</p>
-            }
-        </div>
-    </div>
-}
-else if (Model.BrokerRows.Count > 0)
-{
-    <div class="alert alert-secondary mt-3 mb-0" role="status">Every broker on this page is up.</div>
-}
-
-<details class="lu-kafka-fold" open>
-    <summary>Brokers (@Model.BrokerRows.Count)</summary>
-    <div class="table-responsive mt-3">
-        <table class="table table-sm mb-0">
-            <thead>
-                <tr>
-                    <th>Id</th>
-                    <th>Host</th>
-                    <th>Rack</th>
-                    <th>State</th>
-                    <th><a href="@query.Href(sort: "partitions", dir: SortDir("partitions"), page: 1)">Partitions</a></th>
-                    <th><a href="@query.Href(sort: "leaders", dir: SortDir("leaders"), page: 1)">Leaders</a></th>
-                    @if (showLogDirs)
-                    {
-                        <th>Log dir</th>
-                    }
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var row in Model.BrokerRows)
-            {
-                <tr class="@(KafkaAttention.Broker(row) ? "lu-kafka-problem" : null)">
-                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy broker id", ReturnUrl = origin, LinkHref = query.Href(broker: row.Id.ToString(), page: 1) })" /></td>
-                    <td>@row.Host:@row.Port</td>
-                    <td>@(string.IsNullOrWhiteSpace(row.Rack) ? "—" : row.Rack)</td>
-                    <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
-                    <td>@row.PartitionCount</td>
-                    <td>@row.LeaderCount</td>
-                    @if (showLogDirs)
-                    {
-                        <td>@Size(row.LogDirBytes)</td>
-                    }
-                    <td>
-                        <a class="btn btn-sm btn-au-link" href="@query.Href(broker: row.Id.ToString(), page: 1)" title="Open broker @row.Id" aria-label="Open broker @row.Id"><i class="bi bi-hdd" aria-hidden="true"></i><span class="ms-1">Open</span></a>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-    @if (Model.BrokerRows.Count == 0)
-    {
-        <p class="text-muted mb-0 mt-2">No brokers match this search.</p>
-    }
-    <div class="lu-kafka-pager">
-        <span>@Model.BrokerCount brokers. Page @query.Page of @Model.BrokerPages.</span>
-        <span class="d-flex gap-2">
-            <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
-            <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.BrokerPages })" />
-        </span>
-    </div>
-</details>
-
-<div class="au-card card mt-3">
-    <div class="card-header">Add a broker</div>
+<section class="card au-card mt-3" id="kafka-brokers">
+    <h2 class="card-header h6 mb-0">Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = "A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions. A broker that is not up is listed first." })" /></h2>
     <div class="card-body">
-        <p>The new broker is registered first. A rebalance onto it is a separate request. Nothing moves until that request is approved and executed.</p>
-        <form method="post" action="/Operations/Kafka/brokers">
+        @if (!Model.Infra.Enabled)
+        {
+            <div class="alert alert-secondary" role="status">@Model.Infra.Detail</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail))
+        {
+            <div class="alert alert-secondary" role="status">@Model.Cluster.LogDirDetail</div>
+        }
+        <form class="row g-2 align-items-end mb-3" method="get" action="/Operations/Kafka">
+            <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Brokers" />
+            <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+            <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="sort" value="@query.Sort" />
+            <input type="hidden" name="dir" value="@query.Dir" />
+            <input type="hidden" name="pageSize" value="@query.PageSize" />
+            <input type="hidden" name="family" value="@query.Family" />
+            <input type="hidden" name="keyClass" value="@query.KeyClass" />
+            <input type="hidden" name="group" value="@query.Group" />
+            <input type="hidden" name="topic" value="@query.TopicName" />
+            <input type="hidden" name="broker" value="@query.Broker" />
+            <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="kafka-q">Search</label>
+                <input class="form-control" id="kafka-q" name="q" value="@query.Q" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-au-execute" type="submit">Search</button>
+            </div>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0" id="kafka-broker-table">
+                <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Host</th>
+                        <th>Rack</th>
+                        <th>State</th>
+                        <th><a href="@query.Href(sort: "partitions", dir: SortDir("partitions"), page: 1)">Partitions</a></th>
+                        <th><a href="@query.Href(sort: "leaders", dir: SortDir("leaders"), page: 1)">Leaders</a></th>
+                        @if (showLogDirs)
+                        {
+                            <th>Log dir</th>
+                        }
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model.BrokerRows)
+                {
+                    <tr class="@(KafkaAttention.Broker(row) ? "lu-kafka-problem" : null)">
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy broker id", ReturnUrl = origin, LinkHref = query.Href(broker: row.Id.ToString(), page: 1) })" /></td>
+                        <td>@row.Host:@row.Port</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.Rack) ? "—" : row.Rack)</td>
+                        <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
+                        <td>@row.PartitionCount</td>
+                        <td>@row.LeaderCount</td>
+                        @if (showLogDirs)
+                        {
+                            <td>@Size(row.LogDirBytes)</td>
+                        }
+                        <td>
+                            <a class="btn btn-sm btn-au-link" href="@query.Href(broker: row.Id.ToString(), page: 1)" title="Open broker @row.Id" aria-label="Open broker @row.Id"><i class="bi bi-hdd" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.BrokerRows.Count == 0)
+        {
+            <p class="text-muted mb-0 mt-2">No brokers match this search.</p>
+        }
+        <div class="lu-kafka-pager">
+            <span>@Model.BrokerCount brokers. Page @query.Page of @Model.BrokerPages.@(query.Sort is "partitions" or "brokers" or "leaders" ? "" : " Worst first.")</span>
+            <span class="d-flex gap-2">
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.BrokerPages })" />
+            </span>
+        </div>
+
+        <form class="border-top mt-3 pt-3" method="post" action="/Operations/Kafka/brokers">
             @Html.AntiForgeryToken()
             <partial name="_QueryFields" model="query" />
-            <section class="card au-card mb-0">
-            <h3 class="card-header h6 mb-0">Register</h3>
-            <div class="card-body">
-                <p class="form-text">This request does not move partitions. Open the new broker afterwards to preview a rebalance onto it.</p>
-                <div class="row g-2 align-items-end">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="add-broker-reason">Reason</label>
-                        <input class="form-control" id="add-broker-reason" name="addBrokerReason" value="@Model.DraftAddBrokerReason" />
-                    </div>
-                    <div class="col-auto">
-                        <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
-                    </div>
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="add-broker-reason">Reason <partial name="_TermInfo" model="@(new TermInfo { Label = "About adding a broker", Text = "The new broker is registered first. This request does not move partitions. Open the new broker afterwards to preview a rebalance onto it. Nothing moves until that request is approved and executed." })" /></label>
+                    <input class="form-control" id="add-broker-reason" name="addBrokerReason" value="@Model.DraftAddBrokerReason" />
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
                 </div>
             </div>
-        </section>
         </form>
-    </div>
-</div>
 
-@if (selected is null)
-{
-    <p class="text-muted mt-3">Select a broker to preview a decommission or a rebalance. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions.</p>
-}
-else
-{
-    <div class="au-card card mt-3">
-        <div class="card-header">Broker @selected.Id</div>
-        <div class="card-body">
-            <p>
-                <partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = selected.Id.ToString(), CopyLabel = "Copy broker id" })" />
-            </p>
-            <p>@selected.Host:@selected.Port. Rack @(string.IsNullOrWhiteSpace(selected.Rack) ? "—" : selected.Rack). <span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Partitions @selected.PartitionCount. Leaders @selected.LeaderCount.@if (showLogDirs) { <text> Log dir @Size(selected.LogDirBytes).</text> }</p>
-            <form method="post" action="/Operations/Kafka/brokers/decommission/plan" data-kafka-busy="Dry run is running.">
-                @Html.AntiForgeryToken()
-                <partial name="_QueryFields" model="@(query with { Broker = selected.Id.ToString() })" />
-                <input type="hidden" name="brokerId" value="@selected.Id" />
-                <section class="card au-card mb-3">
-            <h3 class="card-header h6 mb-0">Request only</h3>
-            <div class="card-body">
-                    <p class="form-text">A preview does not read the reason. Decommission and Rebalance do. Preview decommission plans moves off this broker. Preview rebalance plans moves onto it.</p>
+        @if (selected is null)
+        {
+            <div class="alert alert-secondary mt-3 mb-0" role="status">Select a broker to preview a decommission or a rebalance.</div>
+        }
+        else
+        {
+            <div class="border-top mt-3 pt-3">
+                <h3 class="h6">Broker @selected.Id</h3>
+                <p>
+                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = selected.Id.ToString(), CopyLabel = "Copy broker id" })" />
+                </p>
+                <p>@selected.Host:@selected.Port. Rack @(string.IsNullOrWhiteSpace(selected.Rack) ? "—" : selected.Rack). <span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Partitions @selected.PartitionCount. Leaders @selected.LeaderCount.@if (showLogDirs) { <text> Log dir @Size(selected.LogDirBytes).</text> }</p>
+                <form method="post" action="/Operations/Kafka/brokers/decommission/plan" data-kafka-busy="Dry run is running.">
+                    @Html.AntiForgeryToken()
+                    <partial name="_QueryFields" model="@(query with { Broker = selected.Id.ToString() })" />
+                    <input type="hidden" name="brokerId" value="@selected.Id" />
                     <div class="col-12 col-md-6">
                         <label class="form-label" for="broker-reason">Reason</label>
                         <input class="form-control" id="broker-reason" name="reason" value="@Model.DraftReason" />
+                        <p class="form-text">A preview does not read the reason. Decommission and Rebalance do. Preview decommission plans moves off this broker. Preview rebalance plans moves onto it.</p>
                     </div>
-            </div>
-        </section>
-                @if (Model.MovePlan is not null)
-                {
-                    var plan = Model.MovePlan;
-                    var moveLines = BrokerMovePreview.Lines(plan.Moves);
-                    var shownMoves = moveLines.Take(BrokerMovePreview.FoldAfter).ToList();
-                    var restMoves = moveLines.Skip(BrokerMovePreview.FoldAfter).ToList();
-                    var shownErrors = plan.Errors.Take(BrokerMovePreview.FoldAfter).ToList();
-                    var restErrors = plan.Errors.Skip(BrokerMovePreview.FoldAfter).ToList();
-                    var moveTone = plan.Accepted ? "alert-success" : "alert-danger";
-                    <div id="kafka-broker-result" class="alert @moveTone mt-3 lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-broker" data-result-key="@(plan.Accepted)-@plan.BrokerId-@plan.Moves.Count-@plan.Errors.Count">
-                        <details class="lu-result-details">
-                            <summary>
-                                <span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span>
-                                <span class="lu-result-text">@(plan.Accepted ? "Dry run accepted. Nothing has moved yet." : "This broker change cannot run yet.")</span>
-                                <button type="button" class="lu-dismiss lu-result-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
-                            </summary>
-                            <div class="lu-result-body">
-                        <dl class="row mb-2">
-                            <dt class="col-sm-4">Broker</dt>
-                            <dd class="col-sm-8">@plan.BrokerId</dd>
-                            <dt class="col-sm-4">Partitions</dt>
-                            <dd class="col-sm-8">@BrokerMovePreview.MoveSummary(plan.Accepted, plan.AlreadyEmpty, plan.Moves.Count)</dd>
-                            <dt class="col-sm-4">Approval</dt>
-                            <dd class="col-sm-8">@(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
-                        </dl>
-                        @if (shownErrors.Count > 0)
-                        {
-                            <p class="mb-1">Blocking reasons</p>
-                            <ul class="mb-2">
-                            @foreach (var planError in shownErrors)
-                            {
-                                <li>@planError</li>
-                            }
-                            </ul>
-                            @if (restErrors.Count > 0)
-                            {
-                                <details>
-                                    <summary>Show the rest</summary>
-                                    <ul class="mb-2">
-                                    @foreach (var planError in restErrors)
+                    @if (Model.MovePlan is not null)
+                    {
+                        var plan = Model.MovePlan;
+                        var moveLines = BrokerMovePreview.Lines(plan.Moves);
+                        var shownMoves = moveLines.Take(BrokerMovePreview.FoldAfter).ToList();
+                        var restMoves = moveLines.Skip(BrokerMovePreview.FoldAfter).ToList();
+                        var shownErrors = plan.Errors.Take(BrokerMovePreview.FoldAfter).ToList();
+                        var restErrors = plan.Errors.Skip(BrokerMovePreview.FoldAfter).ToList();
+                        var moveTone = plan.Accepted ? "alert-success" : "alert-danger";
+                        <div id="kafka-broker-result" class="alert @moveTone mt-3 lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-broker" data-result-key="@(plan.Accepted)-@plan.BrokerId-@plan.Moves.Count-@plan.Errors.Count">
+                            <details class="lu-result-details">
+                                <summary>
+                                    <span class="badge @StatusPills.ForKafka(plan.Accepted ? "Approved" : "Rejected")">@(plan.Accepted ? "Accepted" : "Refused")</span>
+                                    <span class="lu-result-text">@(plan.Accepted ? "Dry run accepted. Nothing has moved yet." : "This broker change cannot run yet.")</span>
+                                    <button type="button" class="lu-dismiss lu-result-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
+                                </summary>
+                                <div class="lu-result-body">
+                                    <dl class="row mb-2">
+                                        <dt class="col-sm-4">Broker</dt>
+                                        <dd class="col-sm-8">@plan.BrokerId</dd>
+                                        <dt class="col-sm-4">Partitions</dt>
+                                        <dd class="col-sm-8">@BrokerMovePreview.MoveSummary(plan.Accepted, plan.AlreadyEmpty, plan.Moves.Count)</dd>
+                                        <dt class="col-sm-4">Approval</dt>
+                                        <dd class="col-sm-8">@(plan.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
+                                    </dl>
+                                    @if (shownErrors.Count > 0)
                                     {
-                                        <li>@planError</li>
+                                        <p class="mb-1">Blocking reasons</p>
+                                        <ul class="mb-2">
+                                        @foreach (var planError in shownErrors)
+                                        {
+                                            <li>@planError</li>
+                                        }
+                                        </ul>
+                                        @if (restErrors.Count > 0)
+                                        {
+                                            <details>
+                                                <summary>Show the rest</summary>
+                                                <ul class="mb-2">
+                                                @foreach (var planError in restErrors)
+                                                {
+                                                    <li>@planError</li>
+                                                }
+                                                </ul>
+                                            </details>
+                                        }
                                     }
-                                    </ul>
-                                </details>
-                            }
-                        }
-                        @if (shownMoves.Count > 0)
-                        {
-                            <p class="mb-1">Topics</p>
-                            <ul class="mb-2">
-                            @foreach (var line in shownMoves)
-                            {
-                                <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
-                            }
-                            </ul>
-                            @if (restMoves.Count > 0)
-                            {
-                                <details>
-                                    <summary>Show the rest</summary>
-                                    <ul class="mb-2">
-                                    @foreach (var line in restMoves)
+                                    @if (shownMoves.Count > 0)
                                     {
-                                        <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
+                                        <p class="mb-1">Topics</p>
+                                        <ul class="mb-2">
+                                        @foreach (var line in shownMoves)
+                                        {
+                                            <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
+                                        }
+                                        </ul>
+                                        @if (restMoves.Count > 0)
+                                        {
+                                            <details>
+                                                <summary>Show the rest</summary>
+                                                <ul class="mb-2">
+                                                @foreach (var line in restMoves)
+                                                {
+                                                    <li>@line.Topic — @line.Partitions partition@(line.Partitions == 1 ? "" : "s")@(line.Internal ? " (internal)" : "")</li>
+                                                }
+                                                </ul>
+                                            </details>
+                                        }
                                     }
-                                    </ul>
-                                </details>
-                            }
-                        }
-                        <p class="mb-2">@(plan.Accepted ? "Ready. Submit the decommission or the rebalance when the reason is filled in." : "Fix the items above, then preview again.")</p>
-                        @if (plan.Notes.Count > 0)
-                        {
-                            <details>
-                                <summary>Details</summary>
-                                @foreach (var note in plan.Notes)
-                                {
-                                    <p class="mb-1">@note</p>
-                                }
+                                    <p class="mb-2">@(plan.Accepted ? "Ready. Submit the decommission or the rebalance when the reason is filled in." : "Fix the items above, then preview again.")</p>
+                                    @if (plan.Notes.Count > 0)
+                                    {
+                                        <details>
+                                            <summary>Details</summary>
+                                            @foreach (var note in plan.Notes)
+                                            {
+                                                <p class="mb-1">@note</p>
+                                            }
+                                        </details>
+                                    }
+                                </div>
                             </details>
-                        }
-                            </div>
-                        </details>
+                        </div>
+                    }
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview decommission</span></button>
+                        <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission" title="Decommission broker" aria-label="Decommission broker"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="ms-1">Decommission</span></button>
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview rebalance</span></button>
+                        <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance" title="Rebalance onto this broker" aria-label="Rebalance onto this broker"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span class="ms-1">Rebalance</span></button>
                     </div>
-                }
-                <div class="d-flex flex-wrap gap-2 mt-3">
-                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview decommission</span></button>
-                    <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission" title="Decommission broker" aria-label="Decommission broker"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="ms-1">Decommission</span></button>
-                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview rebalance</span></button>
-                    <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
-                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance" title="Rebalance onto this broker" aria-label="Rebalance onto this broker"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span class="ms-1">Rebalance</span></button>
-                </div>
-            </form>
-        </div>
+                </form>
+            </div>
+        }
     </div>
-}
+</section>

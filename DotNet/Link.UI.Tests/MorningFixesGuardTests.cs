@@ -266,7 +266,11 @@ public class MorningFixesGuardTests
         index.Should().Contain("Open Kafka");
 
         var kafka = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Kafka.cshtml"));
-        kafka.Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
+        kafka.Should().NotContain("btn btn-au-execute\" type=\"submit\">Search");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Consumers.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Brokers.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Messages.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
 
         var overview = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml"));
         overview.Should().Contain("bi-hdd-network");
