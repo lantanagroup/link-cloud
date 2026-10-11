@@ -1,0 +1,33 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+    var name = Model.SelectedTopic?.Topic ?? query.TopicName;
+    var tab = KafkaConsoleRoutes.TabFor(query.View, query.Subtab);
+    var count = Model.Topics.Topics.Count;
+}
+
+<section class="card au-card mt-3" id="kafka-topic-picker">
+    <h2 class="card-header h6 mb-0 d-flex align-items-center gap-2">
+        <span>@(string.IsNullOrWhiteSpace(name) ? "Topic" : name)</span>
+        @if (!string.IsNullOrWhiteSpace(name))
+        {
+            <partial name="_CopyButton" model="@(new CopyTarget { Value = name, Label = "Copy topic" })" />
+        }
+        <partial name="_TermInfo" model="@(new TermInfo { Label = "About the topic picker", Text = "Type a topic name, family, or key class. The same topic stays selected on Summary, Messages, Produce, Partitions, Replication, and Consumers." })" />
+    </h2>
+    <div class="card-body">
+        <form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka/Topics/open" role="search">
+            <input type="hidden" name="subtab" value="@tab" />
+            <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+            <div class="col-12 col-lg-8">
+                <label class="form-label" for="topic-pick">Topic</label>
+                <input class="form-control" id="topic-pick" name="topic" value="@name" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="topic-results" data-topic-search="/Operations/Kafka/Topics/search" data-topic-subtab="@tab" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-au-link" type="submit">Open</button>
+            </div>
+        </form>
+        <div id="topic-results" class="list-group mt-2" hidden></div>
+        <p class="text-muted mb-0 mt-2">@count topics.</p>
+    </div>
+</section>

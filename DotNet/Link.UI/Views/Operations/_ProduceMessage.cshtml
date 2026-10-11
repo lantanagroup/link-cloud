@@ -15,7 +15,7 @@
     <h2 class="card-header h5 mb-0">Produce a message</h2>
     <div class="card-body">
     @Html.AntiForgeryToken()
-    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
+    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Produce" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
     <input type="hidden" name="q" value="@query.Q" />
     <input type="hidden" name="sort" value="@query.Sort" />

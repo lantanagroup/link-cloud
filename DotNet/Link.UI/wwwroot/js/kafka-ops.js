@@ -78,12 +78,87 @@
         var root = document.getElementById("kafkaResults") || document;
         tips(root);
         wireConfirm();
+        wireTopicPick();
         bindBusy(root);
         wireResults(root);
         wireProduce();
         wireMessageKeyword();
         focusResult(root);
         watchRequest();
+    }
+
+    function wireTopicPick() {
+        if (document.documentElement.getAttribute("data-topic-pick-wired") === "1")
+            return;
+        document.documentElement.setAttribute("data-topic-pick-wired", "1");
+        var timer;
+        document.addEventListener("input", function (event) {
+            var input = event.target;
+            if (!input || input.id !== "topic-pick")
+                return;
+            window.clearTimeout(timer);
+            timer = window.setTimeout(function () { searchTopics(input); }, 200);
+        });
+        document.addEventListener("focusin", function (event) {
+            var input = event.target;
+            if (!input || input.id !== "topic-pick")
+                return;
+            searchTopics(input);
+        });
+        document.addEventListener("click", function (event) {
+            var item = event.target && event.target.closest ? event.target.closest("[data-topic-href]") : null;
+            if (!item)
+                return;
+            var href = item.getAttribute("data-topic-href");
+            if (!href)
+                return;
+            event.preventDefault();
+            window.location.assign(href);
+        });
+    }
+
+    function searchTopics(input) {
+        var url = input.getAttribute("data-topic-search");
+        var list = document.getElementById("topic-results");
+        if (!url || !list)
+            return;
+        var subtab = input.getAttribute("data-topic-subtab") || "Summary";
+        var request = url + "?q=" + encodeURIComponent(input.value || "") + "&subtab=" + encodeURIComponent(subtab) + "&pageSize=20";
+        fetch(request, { headers: { "Accept": "application/json" } })
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (payload) { renderTopics(input, list, payload); })
+            .catch(function () { /* Open still submits the typed name. */ });
+    }
+
+    function renderTopics(input, list, payload) {
+        var records = payload && payload.records ? payload.records : [];
+        list.replaceChildren();
+        if (records.length === 0) {
+            var empty = document.createElement("div");
+            empty.className = "list-group-item text-muted";
+            empty.textContent = "No topics match.";
+            list.appendChild(empty);
+        } else {
+            records.forEach(function (row) {
+                var link = document.createElement("a");
+                link.className = "list-group-item list-group-item-action";
+                link.href = row.href || "#";
+                link.setAttribute("data-topic-href", row.href || "");
+                var title = document.createElement("span");
+                title.textContent = row.topic || "";
+                link.appendChild(title);
+                var meta = document.createElement("span");
+                meta.className = "text-muted ms-2";
+                var bits = [];
+                if (row.family) bits.push(row.family);
+                if (row.keyClass) bits.push(row.keyClass);
+                meta.textContent = bits.join(" · ");
+                link.appendChild(meta);
+                list.appendChild(link);
+            });
+        }
+        list.hidden = false;
+        input.setAttribute("aria-expanded", "true");
     }
 
     function wireProduce() {
