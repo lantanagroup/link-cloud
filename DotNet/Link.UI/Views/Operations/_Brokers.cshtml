@@ -45,8 +45,8 @@
             <input type="hidden" name="broker" value="@query.Broker" />
             <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
             <div class="col-12 col-md-4">
-                <label class="form-label" for="kafka-q">Search</label>
-                <input class="form-control" id="kafka-q" name="q" value="@query.Q" />
+                <label class="visually-hidden" for="kafka-q">Search</label>
+                <input class="form-control" id="kafka-q" placeholder="Search brokers by id or host" name="q" value="@query.Q" />
             </div>
             <div class="col-auto">
                 <button class="btn btn-au-execute" type="submit">Search</button>
