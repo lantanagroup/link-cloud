@@ -28,6 +28,7 @@ public sealed record ThroughputKafkaPageQuery
     public string TopicName { get; init; } = "";
     public string Broker { get; init; } = "";
     public bool Tests { get; init; }
+    public bool Hot { get; init; }
     public bool Advanced { get; init; }
     public string? ReturnUrl { get; init; }
     public string BrowseMode { get; init; } = "newest";
@@ -124,6 +125,7 @@ public sealed record ThroughputKafkaPageQuery
             TopicName = One(query, "topic"),
             Broker = One(query, "broker"),
             Tests = tests is "1" or "true",
+            Hot = One(query, "hot") is "1" or "true",
             Advanced = advanced is "1" or "true",
             ReturnUrl = returnUrl,
             BrowseMode = mode,
@@ -164,7 +166,7 @@ public sealed record ThroughputKafkaPageQuery
     public ThroughputKafkaPageQuery AtFrom(long from) =>
         this with { MessageFrom = from, MessageTo = null, Resume = "", MsgPage = 1, OpenRecord = "", StageRecord = "" };
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false)
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false, bool? hot = null)
     {
         var chosenView = view ?? View;
         var partPage = part ?? PartPage;
@@ -188,6 +190,7 @@ public sealed record ThroughputKafkaPageQuery
             ["topic"] = topic ?? TopicName,
             ["broker"] = broker ?? Broker,
             ["tests"] = (tests ?? Tests) ? "1" : "",
+            ["hot"] = (hot ?? Hot) ? "1" : "",
             ["advanced"] = (advanced ?? Advanced) ? "1" : "",
             ["returnUrl"] = ReturnUrl
         };
