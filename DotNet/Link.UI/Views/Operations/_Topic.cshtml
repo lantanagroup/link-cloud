@@ -4,29 +4,24 @@
     var topic = Model.SelectedTopic;
 }
 
-<section class="card au-card mt-3" id="kafka-topic">
-    <h2 class="card-header h6 mb-0">Summary <partial name="_TermInfo" model="@(new TermInfo { Label = "About this topic", Text = "Placement and lag for one topic. Partition changes are on Partitions. An in-place add remaps keys. A migration recreates the topic empty and keeps the backup. Key class details sit behind the key class (i)." })" />
-        @if (topic is not null)
-        {
-            <partial name="_TermInfo" model="@(new TermInfo { Label = "Key class " + topic.KeyClass, Text = topic.OrderSensitive ? "This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero." + (topic.KeyClass == "Facility" ? " One facility can never use more than one partition." : "") : "This key is not order-sensitive." })" />
-        }
-    </h2>
-    <div class="card-body">
-        @if (topic is null)
-        {
-            <p class="text-muted mb-0">This topic is not in the cluster metadata.</p>
-        }
-        else
-        {
-            <p class="mb-3">Key @topic.KeyClass <span class="text-muted">@topic.KeyShape</span>. Partitions @topic.Partitions. Retry @topic.RetryPartitions. Error @topic.ErrorPartitions. RF @topic.ReplicationFactor. Replica ceiling @topic.MaxReplicas.</p>
-            @if (topic.HardBlocked)
-            {
-                <div class="alert alert-secondary" role="status">Partition changes for this topic are blocked.</div>
-            }
-            <a class="btn btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topic.Topic, page: 1)">Change partitions</a>
-        }
+@if (topic is null)
+{
+    <section class="card au-card mt-3" id="kafka-topic">
+        <div class="card-body"><p class="text-muted mb-0">This topic is not in the cluster metadata.</p></div>
+    </section>
+}
+else
+{
+    var keyHelp = topic.KeyShape + ". " + (topic.OrderSensitive ? "This key is order-sensitive. An increase waits until every subscribed group has zero lag and the produce rate is zero." + (topic.KeyClass == "Facility" ? " One facility can never use more than one partition." : "") : "This key is not order-sensitive.") + (topic.HardBlocked ? " Partition changes for this topic are blocked." : "");
+    <div class="row g-2 mt-3" id="kafka-topic">
+        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@topic.Partitions</div><div class="au-stat-label">Partitions</div></div></div>
+        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@topic.ReplicationFactor</div><div class="au-stat-label">Replication factor</div></div></div>
+        <div class="col"><div class="au-stat-tile @(topic.FullIsr ? null : "lu-kafka-attention")"><div class="au-stat-value">@(topic.FullIsr ? "Full" : "Short")</div><div class="au-stat-label">ISR</div></div></div>
+        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@topic.KeyClass</div><div class="au-stat-label">Key class <partial name="_TermInfo" model="@(new TermInfo { Label = "Key class " + topic.KeyClass, Text = keyHelp })" /></div></div></div>
+        <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@(topic.ProduceRateKnown ? topic.ProduceRatePerSecond.ToString("0.#") + "/s" : "—")</div><div class="au-stat-label">Produce rate</div></div></div>
+        <div class="col"><div class="au-stat-tile @(topic.LagKnown && topic.TotalLag > 0 ? "lu-kafka-attention" : null)"><div class="au-stat-value">@(topic.LagKnown ? topic.TotalLag.ToString("N0") : "—")</div><div class="au-stat-label">Total lag</div></div></div>
     </div>
-</section>
+}
 
 @if (topic is not null)
 {
@@ -41,8 +36,11 @@
     else
     {
         var placement = KafkaWindows.Topic(Model.Partitions, query.PartPage, query.PageSize);
-        <partial name="_KafkaSummary" model="@(new KafkaSummaryStrip(placement.Total, "Partitions", placement.Hot, "Hottest lag", placement.Hottest.ToString("N0"), placement.Skew))" />
-        <div class="au-card card mt-3">
+        var byGroup = Model.Partitions.SelectMany(row => row.Lag).GroupBy(item => item.GroupId, StringComparer.Ordinal)
+            .Select(g => new { Group = g.Key, Lag = g.Sum(item => item.Lag) }).OrderByDescending(item => item.Lag).ThenBy(item => item.Group, StringComparer.Ordinal).ToList();
+        <div class="row g-3 mt-0">
+        <div class="col-12 col-xl-7">
+        <div class="au-card card mt-3 h-100">
             <div class="card-header">Partition placement <partial name="_TermInfo" model="@(new TermInfo { Label = "About partition placement", Text = "One page, worst first. Offline leaders, a short ISR, and group lag come before partitions that are caught up." })" /></div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -53,8 +51,7 @@
                                 <th>Leader</th>
                                 <th>Replicas</th>
                                 <th>ISR</th>
-                                <th>High watermark</th>
-                                <th class="lu-wrap">Lag by group</th>
+                                <th class="lu-wrap">End offset</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -65,17 +62,7 @@
                                 <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
                                 <td>@row.Replicas</td>
                                 <td>@row.InSync</td>
-                                <td>@(row.HighWatermark < 0 ? "—" : row.HighWatermark.ToString())</td>
-                                <td class="lu-wrap">
-                                    @if (row.Lag.Count == 0)
-                                    {
-                                        <span class="text-muted">No group lag</span>
-                                    }
-                                    else
-                                    {
-                                        @KafkaWindows.LagByGroup(row.Lag)
-                                    }
-                                </td>
+                                <td class="lu-wrap">@(row.HighWatermark < 0 ? "—" : row.HighWatermark.ToString())</td>
                             </tr>
                         }
                         </tbody>
@@ -83,6 +70,37 @@
                 </div>
                 <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(placement.Page, placement.Pages, "Worst first.", placement.Page > 1 ? query.Href(part: placement.Page - 1) : "", placement.Page < placement.Pages ? query.Href(part: placement.Page + 1) : ""))" />
             </div>
+        </div>
+        </div>
+        <div class="col-12 col-xl-5">
+        <div class="au-card card mt-3 h-100" id="kafka-lag-by-group">
+            <div class="card-header">Lag by group <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag by group", Text = "Each group's lag on this topic, summed across partitions, largest first. Open goes to the group." })" /></div>
+            <div class="card-body">
+                @if (byGroup.Count == 0)
+                {
+                    <p class="text-muted mb-0">No group commits offsets on this topic.</p>
+                }
+                else
+                {
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th class="lu-flex">Group</th><th>State</th><th>Lag</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var item in byGroup.Take(KafkaWindows.Size(query.PageSize)))
+                        {
+                            var g = Model.Groups.Groups.FirstOrDefault(row => string.Equals(row.GroupId, item.Group, StringComparison.Ordinal));
+                            <tr class="@(item.Lag > 0 ? "lu-kafka-problem" : null)">
+                                <td class="lu-flex" title="@item.Group">@item.Group</td>
+                                <td>@(string.IsNullOrWhiteSpace(g?.State) ? "—" : g!.State)</td>
+                                <td>@item.Lag.ToString("N0")</td>
+                                <td class="text-end"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: item.Group, page: 1)">Open</a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+        </div>
         </div>
     }
 
@@ -113,11 +131,6 @@
         }
     </details>
 
-    <section class="card au-card mt-3">
-        <h2 class="card-header h6 mb-0">Partition lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag", Text = "How far a consumer is behind the latest message on this topic. A larger number is further behind." })" /></h2>
-        <div class="card-body">
-            <div class="lu-chart mb-0"><canvas id="kafkaLagChart"></canvas></div>
-        </div>
-    </section>
+
 
     }

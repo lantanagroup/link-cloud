@@ -79,7 +79,7 @@ public class TableLayoutGuardTests
         File.ReadAllText(Path.Combine(ops, "_Messages.cshtml")).Should().Contain("<th class=\"lu-shrink\">Partition</th>");
         File.ReadAllText(Path.Combine(ops, "_Messages.cshtml")).Should().Contain("<th class=\"lu-flex\">Summary</th>");
         File.ReadAllText(Path.Combine(ops, "_Brokers.cshtml")).Should().Contain("<th class=\"lu-flex\">Host</th>");
-        File.ReadAllText(Path.Combine(ops, "_Topic.cshtml")).Should().Contain("<th class=\"lu-wrap\">Lag by group</th>");
+        File.ReadAllText(Path.Combine(ops, "_Topic.cshtml")).Should().Contain("<th class=\"lu-wrap\">End offset</th>");
     }
 
     [Fact]
