@@ -1141,7 +1141,8 @@ a.au-kpi-link:hover {
 }
 .home-trend-bar {
   width: 70%;
-  background: var(--au-accent-fill);
+  /* Data bars use the shared status palette, never black or dark grey. */
+  background: var(--au-success);
   border-radius: .2rem .2rem 0 0;
 }
 .home-trend-count { font-weight: 700; }
@@ -2589,23 +2590,7 @@ a.lu-clip {
   white-space: nowrap;
   overflow-wrap: normal;
 }
-/* Reports and the facility report tab. At 1280 the sidebar leaves about 970px.
-   Created is a low-value timestamp and was the nowrap column that forced
-   about 90px of horizontal scroll. Below the sidebar breakpoint the table
-   scrolls inside the card, same as the other dense tables. */
-@media (min-width: 768px) and (max-width: 1399.98px) {
-  #reportResults th:nth-child(4),
-  #reportResults td:nth-child(4),
-  #facilityReportResults th:nth-child(3),
-  #facilityReportResults td:nth-child(3) {
-    display: none;
-  }
-  #reportResults td:nth-child(5),
-  #facilityReportResults td:nth-child(4) {
-    overflow-wrap: anywhere;
-    max-width: none;
-  }
-}
+/* Every column stays visible at laptop width (1366). Tables fit by content sizing and truncation, never by hiding columns. */
 
 #scenarioTable .badge {
   white-space: normal;
@@ -3118,6 +3103,14 @@ a.lu-clip {
 td.lu-copy-host {
   position: relative;
 }
+/* The copy icon gets its own space at the end of the cell, reserved before hover, so it never covers a short value
+   and showing it does not change any width. */
+@media (hover: hover) and (pointer: fine) {
+  table.table > tbody > tr > td.lu-copy-host,
+  table.au-table > tbody > tr > td.lu-copy-host {
+    padding-right: 2.1rem;
+  }
+}
 .btn.lu-cell-copy,
 .btn.lu-icon-btn.lu-cell-copy,
 .btn.lu-copy.lu-cell-copy,
@@ -3231,7 +3224,9 @@ td.lu-copy-host > .btn.lu-cell-copy:active {
 .lu-reports-table td.lu-flex > .lu-measures .lu-clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lu-reports-table > :is(thead, tbody) > tr > :is(th, td).lu-flex { min-width: 9rem; }
 .lu-reports-table > :is(thead, tbody) > tr > :is(th, td):nth-child(1) { min-width: 5.5rem; }
-.lu-reports-table > :is(thead, tbody) > tr > :is(th, td):nth-child(2) { min-width: 7.5rem; }
+.lu-reports-table > :is(thead, tbody) > tr > :is(th, td):nth-child(2) { min-width: 12rem; }
+/* Created wraps between date and time instead of forcing a wide nowrap column. */
+.lu-reports-table td.lu-created { min-width: 6.5rem; white-space: normal; }
 .lu-issue-filters .form-select,
 .lu-issue-filters .form-control { width: 100%; min-width: 0; }
 
@@ -4970,3 +4965,6 @@ h1 .lu-provider-badge + .au-info-icon { font-size: .8rem; vertical-align: middle
 #kafka-widget-leaders .lu-donut-chart, #kafka-widget-leaders .lu-donut-ring { width: 160px; height: 160px; margin-inline: 0; flex: 0 0 auto; }
 #kafka-widget-leaders .lu-donut-legend { margin: 0; grid-template-columns: max-content; }
 .lu-kafka-widget-grid > [class*="col"] > .lu-kafka-widget > .card { margin-top: 0 !important; }
+
+/* Facility names are readable values, not GUIDs: show them in full in the reports tables. */
+.lu-reports-table > tbody > tr > td:nth-child(2) .lu-clip { max-width: none; }

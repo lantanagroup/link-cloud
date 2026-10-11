@@ -77,7 +77,7 @@ public class TableLayoutGuardTests
         css.Should().NotContain("td:has(.btn),");
         var ops = Path.Combine(root, "Views", "Operations");
         File.ReadAllText(Path.Combine(ops, "_Messages.cshtml")).Should().Contain("<th class=\"lu-shrink\">Partition</th>");
-        File.ReadAllText(Path.Combine(ops, "_Messages.cshtml")).Should().Contain("<th class=\"lu-flex\">Summary</th>");
+        File.ReadAllText(Path.Combine(ops, "_Messages.cshtml")).Should().Contain("<th class=\"lu-wrap lu-key\">Key</th>");
         File.ReadAllText(Path.Combine(ops, "_Brokers.cshtml")).Should().Contain("<th class=\"lu-flex\">Host</th>");
         File.ReadAllText(Path.Combine(ops, "_Topic.cshtml")).Should().Contain("<th class=\"lu-wrap\">End offset</th>");
     }
