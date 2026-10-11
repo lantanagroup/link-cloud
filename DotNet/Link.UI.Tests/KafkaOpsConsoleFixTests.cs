@@ -204,18 +204,25 @@ public class KafkaOpsConsoleFixTests
         migrate.Should().Contain("name=\"hasDryRunSnapshot\"");
         migrate.Should().Contain("id=\"kafka-dry-run-result\"");
         migrate.Should().Contain("KafkaIncreaseEligibility.MigrationLine");
+        migrate.Should().Contain("KafkaIncreaseEligibility.Line");
+        migrate.Should().Contain("id=\"kafka-partition-result\"");
+        migrate.Should().Contain("Preview increase");
+        migrate.Should().Contain("Preview family");
+        migrate.Should().Contain("class=\"btn btn-sm btn-au-execute lu-icon-btn\"");
         migrate.Should().Contain("data-kafka-busy=\"Dry run is running.\"");
         migrate.Should().Contain("class=\"btn btn-au-execute\" type=\"submit\" formaction=\"/Operations/Kafka/migrations/plan\">Dry run");
         migrate.Should().Contain("class=\"btn btn-success\"");
         migrate.Should().Contain("class=\"btn btn-warning\"");
         migrate.Should().Contain("plan.Errors");
 
-        topic.Should().Contain("KafkaIncreaseEligibility.Line");
-        topic.Should().Contain("KafkaIncreaseEligibility.MigrationLine(topic.MigrationEligibility, null)");
-        topic.Should().Contain("id=\"kafka-partition-result\"");
-        topic.Should().Contain("Preview increase");
-        topic.Should().Contain("Preview family");
-        topic.Should().Contain("class=\"btn btn-sm btn-au-execute lu-icon-btn\"");
+        topic.Should().NotContain("KafkaIncreaseEligibility.Line");
+        topic.Should().NotContain("KafkaIncreaseEligibility.MigrationLine");
+        topic.Should().NotContain("id=\"kafka-partition-result\"");
+        topic.Should().NotContain("Preview increase");
+        topic.Should().NotContain("Preview family");
+        topic.Should().NotContain("Migrate instead");
+        topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
+        topic.Should().Contain("topic: topic.Topic");
         topic.Should().NotContain("btn-au-link lu-icon-btn");
 
         consumers.Should().Contain("This group has no members.");
