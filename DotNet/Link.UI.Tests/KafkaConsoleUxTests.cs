@@ -51,6 +51,41 @@ public class KafkaConsoleUxTests
     }
 
     [Fact]
+    public void Needs_attention_ranks_offline_before_lag_and_stays_quiet_when_healthy()
+    {
+        var quiet = KafkaNeedsAttention.Rank(
+            [new KafkaTopicRow { Topic = "Quiet", FullIsr = true, LagKnown = true }],
+            [new KafkaGroupRow { GroupId = "steady", State = "Stable", Members = [new KafkaMemberRow { ClientId = "c" }] }],
+            [new PartitionPlacement { Topic = "Quiet", Partition = 0, Leader = 0, Replicas = [0, 1], Isr = [0, 1] }]);
+        quiet.Should().BeEmpty();
+
+        var ranked = KafkaNeedsAttention.Rank(
+            [
+                new KafkaTopicRow { Topic = "ResourcesAcquired.Error", ProduceRateKnown = true, ProduceRatePerSecond = 3 },
+                new KafkaTopicRow { Topic = "Quiet", LagKnown = true, FullIsr = true }
+            ],
+            [
+                new KafkaGroupRow { GroupId = "Normalization", State = "Stable", TotalLag = 12, Members = [new KafkaMemberRow { ClientId = "c" }] },
+                new KafkaGroupRow { GroupId = "ReportWorker", State = "Empty", Members = [], UnownedPartitions = ["0", "1"] }
+            ],
+            [
+                new PartitionPlacement { Topic = "DataAcquisitionRequested", Partition = 2, Leader = 0, Replicas = [0, 1, 2], Isr = [0, 1] },
+                new PartitionPlacement { Topic = "DataAcquisitionRequested", Partition = 0, Leader = -1, Replicas = [0, 1], Isr = [] }
+            ]);
+
+        ranked.Select(item => item.What).Should().ContainInOrder("DataAcquisitionRequested", "ReportWorker", "Normalization", "ResourcesAcquired.Error");
+        ranked[0].Kind.Should().Be("Partition");
+        ranked[0].Why.Should().StartWith("Offline:");
+        ranked[0].Action.Should().Be("Topic › Summary");
+        ranked[0].Href.Should().Be("/Operations/Kafka/Topics/DataAcquisitionRequested/Summary");
+        ranked.Single(item => item.What == "ResourcesAcquired.Error").Kind.Should().Be("Error topic");
+        ranked.Single(item => item.What == "ResourcesAcquired.Error").Action.Should().Be("Topic › Messages");
+        ranked.Single(item => item.What == "ResourcesAcquired.Error").Href.Should().Be("/Operations/Kafka/Topics/ResourcesAcquired.Error/Messages");
+        ranked.Should().OnlyContain(item => item.What != "Quiet");
+        KafkaNeedsAttention.Healthy.Should().Be("Everything else is healthy.");
+    }
+
+    [Fact]
     public void Kafka_tabs_lead_with_an_explanation_and_keep_previews_beside_the_buttons()
     {
         var root = RepoRoot();
@@ -63,9 +98,12 @@ public class KafkaConsoleUxTests
         overview.Should().NotContain("Read this before changing anything.");
         overview.Should().NotContain("Topics that need attention");
         overview.Should().NotContain("Full topic table");
-        overview.Should().Contain("id=\"kafka-topic-table\"");
-        overview.Should().Contain("name=\"q\"");
-        overview.Should().Contain("KafkaAttention.Topic");
+        overview.Should().NotContain("id=\"kafka-topic-table\"");
+        overview.Should().NotContain("id=\"kafka-overview-groups\"");
+        overview.Should().Contain("id=\"kafka-attention\"");
+        overview.Should().Contain("KafkaNeedsAttention.Rank");
+        overview.Should().Contain("KafkaNeedsAttention.Healthy");
+        overview.Should().Contain("KafkaAttention.Broker");
         overview.Should().NotContain("Broker rights");
         brokers.Should().Contain("class=\"lu-kafka-fold\"");
 
@@ -181,9 +219,10 @@ public class KafkaConsoleUxTests
         migrate.Should().Contain("id=\"kafka-change-partitions\"");
         topic.Should().Contain("KafkaWindows.Topic");
         migrate.Should().NotContain("foreach (var row in detail.PartitionsDetail)");
-        overview.Should().Contain("KafkaWindows.Groups");
+        overview.Should().NotContain("KafkaWindows.Groups");
         overview.Should().NotContain("foreach (var row in Model.Groups.Groups");
-        overview.Should().Contain("id=\"kafka-topic-table\"");
+        overview.Should().NotContain("id=\"kafka-topic-table\"");
+        overview.Should().Contain("id=\"kafka-attention\"");
         overview.Should().NotContain("Full topic table");
         messages.Should().Contain("aria-label=\"Message pages\"");
         messages.Should().Contain("Direction = \"first\"");
