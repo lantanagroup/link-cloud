@@ -1,0 +1,16 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+    var topic = query.TopicName;
+    var current = KafkaConsoleRoutes.TabFor(query.View, query.Subtab);
+    string Mark(string tab) => string.Equals(current, tab, StringComparison.Ordinal) ? "lu-nav-current" : "";
+}
+
+<nav class="lu-section-nav mt-3" aria-label="Topic">
+    <a class="@Mark(KafkaConsoleRoutes.Summary)" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: topic, subtab: KafkaConsoleRoutes.Summary)">Summary</a>
+    <a class="@Mark(KafkaConsoleRoutes.Messages)" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: topic)">Messages</a>
+    <a class="@Mark(KafkaConsoleRoutes.Produce)" href="@query.Href(view: ThroughputKafkaPageQuery.Produce, topic: topic)">Produce</a>
+    <a class="@Mark(KafkaConsoleRoutes.Partitions)" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topic)">Partitions</a>
+    <a class="@Mark(KafkaConsoleRoutes.Replication)" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: topic, subtab: KafkaConsoleRoutes.Replication)">Replication</a>
+    <a class="@Mark(KafkaConsoleRoutes.Consumers)" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: topic, subtab: KafkaConsoleRoutes.Consumers)">Consumers</a>
+</nav>

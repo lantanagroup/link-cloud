@@ -44,7 +44,7 @@ public class KafkaPageFlowGuardTests
         topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
         topic.Should().Contain("topic: topic.Topic");
         topic.Should().Contain("btn btn-au-link");
-        topic.Should().Contain("id=\"topic-pick\"");
+        File.ReadAllText(Path.Combine(RepoRoot(), "Views", "Operations", "_TopicPicker.cshtml")).Should().Contain("id=\"topic-pick\"");
     }
 
     [Fact]

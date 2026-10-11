@@ -16,6 +16,7 @@
 <div id="kafkaResults" data-au-refresh="8000" data-au-page-url="@query.Href()" class="lu-kafka">
     @{
         var topicsTab = query.View is ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce or ThroughputKafkaPageQuery.Migrate;
+        var topicTab = KafkaConsoleRoutes.TabFor(query.View, query.Subtab);
     }
     <nav class="lu-section-nav mt-3" aria-label="Kafka">
         <a class="@(query.View == ThroughputKafkaPageQuery.Overview ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Overview, page: 1)">Overview</a>
@@ -37,25 +38,45 @@
     {
         <partial name="_Overview" model="Model" />
     }
-    else if (query.View == ThroughputKafkaPageQuery.Topic)
-    {
-        <partial name="_Topic" model="Model" />
-    }
     else if (query.View == ThroughputKafkaPageQuery.Consumers)
     {
         <partial name="_Consumers" model="Model" />
     }
-    else if (query.View is ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce)
+    else if (query.View == ThroughputKafkaPageQuery.Brokers)
     {
-        <partial name="_Messages" model="Model" />
-    }
-    else if (query.View == ThroughputKafkaPageQuery.Migrate)
-    {
-        <partial name="_Migrate" model="Model" />
+        <partial name="_Brokers" model="Model" />
     }
     else
     {
-        <partial name="_Brokers" model="Model" />
+        <partial name="_TopicPicker" model="Model" />
+        @if (!string.IsNullOrWhiteSpace(query.TopicName))
+        {
+            <partial name="_TopicTabs" model="Model" />
+            @if (topicTab == KafkaConsoleRoutes.Messages)
+            {
+                <partial name="_Messages" model="Model" />
+            }
+            else if (topicTab == KafkaConsoleRoutes.Produce)
+            {
+                <partial name="_ProduceMessage" model="Model" />
+            }
+            else if (topicTab == KafkaConsoleRoutes.Partitions)
+            {
+                <partial name="_Migrate" model="Model" />
+            }
+            else if (topicTab == KafkaConsoleRoutes.Replication)
+            {
+                <partial name="_ReplicationFactor" model="Model" />
+            }
+            else if (topicTab == KafkaConsoleRoutes.Consumers)
+            {
+                <partial name="_TopicConsumers" model="Model" />
+            }
+            else
+            {
+                <partial name="_Topic" model="Model" />
+            }
+        }
     }
 
     <partial name="_ChangeRequest" model="Model" />

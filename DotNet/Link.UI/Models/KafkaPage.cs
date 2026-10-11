@@ -168,13 +168,13 @@ public sealed record ThroughputKafkaPageQuery
     public ThroughputKafkaPageQuery AtFrom(long from) =>
         this with { MessageFrom = from, MessageTo = null, Resume = "", MsgPage = 1, OpenRecord = "", StageRecord = "" };
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false, bool? hot = null)
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false, bool? hot = null, string? subtab = null)
     {
         var chosenView = view ?? View;
         var chosenTopic = topic ?? TopicName;
         var chosenGroup = group ?? Group;
         var chosenBroker = broker ?? Broker;
-        var chosenSubtab = view is null || string.Equals(view, View, StringComparison.Ordinal) ? Subtab : "";
+        var chosenSubtab = subtab ?? (view is null || string.Equals(view, View, StringComparison.Ordinal) ? Subtab : "");
         var partPage = part ?? PartPage;
         var changed = (view is not null && !string.Equals(view, View, StringComparison.Ordinal))
             || (group is not null && !string.Equals(group, Group, StringComparison.Ordinal))

@@ -230,10 +230,10 @@ public class ReplicationFactorRulesTests
     [Fact]
     public void Topic_page_offers_a_guarded_replication_factor_preview()
     {
-        var topic = File.ReadAllText(Path.Combine(RepoRoot(), "Views", "Operations", "_Topic.cshtml"));
+        var shell = File.ReadAllText(Path.Combine(RepoRoot(), "Views", "Operations", "Kafka.cshtml"));
         var form = File.ReadAllText(Path.Combine(RepoRoot(), "Views", "Operations", "_ReplicationFactor.cshtml"));
         var request = File.ReadAllText(Path.Combine(RepoRoot(), "Views", "Operations", "_ChangeRequest.cshtml"));
-        topic.Should().Contain("partial name=\"_ReplicationFactor\"");
+        shell.Should().Contain("partial name=\"_ReplicationFactor\"");
         form.Should().Contain("Change replication factor");
         form.Should().Contain("id=\"kafka-replication-result\"");
         form.Should().Contain("data-lu-result=\"kafka-replication\"");

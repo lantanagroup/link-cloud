@@ -75,6 +75,42 @@ public class KafkaConsoleRouteTests
     }
 
     [Fact]
+    public void Topic_picker_is_singular_and_sub_tabs_keep_the_topic()
+    {
+        var root = RepoRoot();
+        var views = Directory.EnumerateFiles(Path.Combine(root, "Views", "Operations"), "*.cshtml")
+            .Select(File.ReadAllText)
+            .ToList();
+        views.Sum(text => Count(text, "id=\"topic-pick\"")).Should().Be(1);
+        views.Sum(text => Count(text, "id=\"browse-topic\"")).Should().Be(0);
+        views.Sum(text => Count(text, "id=\"migrate-topic\"")).Should().Be(0);
+        views.Sum(text => Count(text, "for=\"kafka-family-topic\"")).Should().Be(0);
+
+        var tabs = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_TopicTabs.cshtml"));
+        foreach (var name in new[] { "Summary", "Messages", "Produce", "Partitions", "Replication", "Consumers" })
+            tabs.Should().Contain(">" + name + "</a>");
+        tabs.Should().Contain("topic: topic");
+        tabs.Should().NotContain("Schema");
+
+        var picker = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_TopicPicker.cshtml"));
+        picker.Should().Contain("Copy topic");
+        picker.Should().Contain("/Operations/Kafka/Topics/search");
+        picker.Should().Contain("/Operations/Kafka/Topics/open");
+
+        var controller = File.ReadAllText(Path.Combine(root, "Controllers", "OperationsController.cs"));
+        var search = controller.IndexOf("Kafka/Topics/search", StringComparison.Ordinal);
+        var open = controller.IndexOf("Kafka/Topics/open", StringComparison.Ordinal);
+        var topic = controller.IndexOf("Kafka/Topics/{topic}", StringComparison.Ordinal);
+        search.Should().BeGreaterThan(0);
+        open.Should().BeGreaterThan(search);
+        topic.Should().BeGreaterThan(open);
+
+        var script = File.ReadAllText(Path.Combine(root, "wwwroot", "js", "kafka-ops.js"));
+        script.Should().Contain("data-topic-search");
+        script.Should().Contain("function searchTopics");
+    }
+
+    [Fact]
     public void Kafka_page_has_one_tab_strip_and_the_new_routes()
     {
         var root = RepoRoot();

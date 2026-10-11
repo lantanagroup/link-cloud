@@ -148,6 +148,56 @@ public sealed class OperationsController : Controller
         return ShowAsync(requestId, null, cancellationToken);
     }
 
+    [HttpGet("Kafka/Topics/search")]
+    public async Task<IActionResult> SearchTopics(string? q, string? subtab, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        var term = (q ?? "").SanitizeAndRemove().Trim();
+        if (term.Length > 80)
+            term = term[..80];
+        if (page < 1)
+            page = 1;
+        if (pageSize is not (10 or 20 or 25 or 50))
+            pageSize = 20;
+        var topics = await _kafka.GetTopicsAsync(cancellationToken);
+        var matched = topics.Value?.Topics ?? [];
+        if (term.Length > 0)
+        {
+            matched = matched.Where(row =>
+                row.Topic.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || row.Family.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || row.KeyClass.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        var ordered = matched.OrderBy(row => row.Topic, StringComparer.OrdinalIgnoreCase).ToList();
+        var pages = Math.Max(1, (int)Math.Ceiling(ordered.Count / (double)pageSize));
+        if (page > pages)
+            page = pages;
+        var tab = KafkaConsoleRoutes.CanonicalSubtab(subtab) ?? KafkaConsoleRoutes.Summary;
+        var records = ordered.Skip((page - 1) * pageSize).Take(pageSize).Select(row => new
+        {
+            topic = row.Topic,
+            family = row.Family,
+            keyClass = row.KeyClass,
+            partitions = row.Partitions,
+            href = KafkaConsoleRoutes.Topics(row.Topic, tab)
+        });
+        return Json(new
+        {
+            records,
+            metadata = new { pageSize, pageNumber = page, totalCount = ordered.Count, totalPages = pages }
+        });
+    }
+
+    [HttpGet("Kafka/Topics/open")]
+    public IActionResult OpenTopic(string? topic, string? subtab, string? returnUrl)
+    {
+        var href = KafkaConsoleRoutes.Topics(topic, subtab);
+        var back = ReturnUrlRules.Sanitize(returnUrl);
+        if (!string.IsNullOrWhiteSpace(back))
+            href = KafkaConsoleRoutes.With(href, "returnUrl", back);
+        return Redirect(href);
+    }
+
     [HttpGet("Kafka/Topics/{topic}/{subtab}")]
     public Task<IActionResult> KafkaTopic(string topic, string subtab, Guid? requestId, CancellationToken cancellationToken)
     {
@@ -943,7 +993,7 @@ public sealed class OperationsController : Controller
     {
         var values = new Dictionary<string, StringValues>
         {
-            ["view"] = ThroughputKafkaPageQuery.Messages,
+            ["view"] = form.View == ThroughputKafkaPageQuery.Produce ? ThroughputKafkaPageQuery.Produce : ThroughputKafkaPageQuery.Messages,
             ["topic"] = form.Topic ?? "",
             ["key"] = form.Key ?? "",
             ["mq"] = form.MessageText ?? "",
@@ -984,6 +1034,7 @@ public sealed class OperationsController : Controller
         return query with
         {
             View = ThroughputKafkaPageQuery.Topic,
+            Subtab = KafkaConsoleRoutes.Replication,
             TopicName = string.IsNullOrWhiteSpace(form.Topic) ? query.TopicName : form.Topic.Trim(),
             Advanced = true,
             Rf = form.ReplicationFactor is < 0 or > 64 ? 0 : form.ReplicationFactor,

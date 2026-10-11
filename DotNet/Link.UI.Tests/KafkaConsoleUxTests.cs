@@ -68,7 +68,7 @@ public class KafkaConsoleUxTests
         overview.Should().Contain("KafkaAttention.Topic");
         overview.Should().Contain("class=\"lu-kafka-fold\"");
 
-        topic.Should().Contain("id=\"topic-pick\"");
+        File.ReadAllText(Path.Combine(root, "Views", "Operations", "_TopicPicker.cshtml")).Should().Contain("id=\"topic-pick\"");
         topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
         topic.Should().Contain("topic: topic.Topic");
         topic.Should().NotContain("Preview it first.");

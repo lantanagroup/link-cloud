@@ -10,12 +10,6 @@
         ? (IReadOnlyList<KafkaNamedTopic>)Model.Family.Members
         : KafkaBrowseAllowList.MembersOf(topicName);
     var familyChecked = Model.Family is not null;
-    var topics = Model.Topics.Topics;
-    var topicKnown = topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal))
-        || Model.Topics.Topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal));
-    var families = topics
-        .GroupBy(row => string.IsNullOrWhiteSpace(row.Family) ? "Other" : row.Family, StringComparer.Ordinal)
-        .OrderBy(group => group.Key, StringComparer.Ordinal);
     var pageSize = KafkaWindows.Size(query.PageSize);
     var messageLogEnd = members.FirstOrDefault(member => string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase))?.HighWatermarkSum ?? 0;
     var messagePages = KafkaMessageWindow.Pages(browse?.Metadata.Total ?? 0, pageSize, messageLogEnd);
@@ -56,58 +50,12 @@
             {
                 <a class="lu-header-tool" href="@query.ExportHref()" title="Export JSON" aria-label="Export JSON"><i class="bi bi-download" aria-hidden="true"></i></a>
             }
-            <a class="btn btn-warning btn-sm" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear</a>
+            <a class="btn btn-au-link btn-sm" href="@query.Href(view: ThroughputKafkaPageQuery.Produce, topic: topicName)">Produce a message</a>
+            <a class="btn btn-warning btn-sm" href="@KafkaConsoleRoutes.Topics(topicName, KafkaConsoleRoutes.Messages)">Clear</a>
         </div>
     }
 </div>
 <div class="card-body">
-<form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka">
-    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
-    <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
-    <input type="hidden" name="q" value="@query.Q" />
-    <input type="hidden" name="family" value="@query.Family" />
-    <input type="hidden" name="keyClass" value="@query.KeyClass" />
-    <input type="hidden" name="pageSize" value="@pageSize" />
-    <input type="hidden" name="mq" value="@query.MessageText" />
-    <input type="hidden" name="key" value="@query.BrowseKey" />
-    <input type="hidden" name="hq" value="@query.HeaderContains" />
-    <input type="hidden" name="vq" value="@query.ValueContains" />
-    <input type="hidden" name="mtype" value="@query.MessageKind" />
-    <input type="hidden" name="mfrom" value="@TimeValue(query.MessageFrom)" />
-    <input type="hidden" name="mto" value="@TimeValue(query.MessageTo)" />
-    <input type="hidden" name="msgPage" value="1" />
-    <input type="hidden" name="more" value="@(query.More ? "1" : "")" />
-    <div class="col-12 col-md-6">
-        <label class="form-label" for="browse-topic">Topic</label>
-        <select class="form-select" id="browse-topic" name="topic">
-            @if (!string.IsNullOrWhiteSpace(topicName) && !topicKnown)
-            {
-                <option value="@topicName" selected>@topicName</option>
-            }
-            @foreach (var family in families)
-            {
-                <optgroup label="@family.Key">
-                    @foreach (var row in family.OrderBy(row => row.Topic, StringComparer.Ordinal))
-                    {
-                        if (row.Topic == topicName)
-                        {
-                            <option value="@row.Topic" selected>@row.Topic</option>
-                        }
-                        else
-                        {
-                            <option value="@row.Topic">@row.Topic</option>
-                        }
-                    }
-                </optgroup>
-            }
-        </select>
-        <p class="form-text mb-0">Topics are grouped by family. Open keeps this search and starts at the first page.</p>
-    </div>
-    <div class="col-auto">
-        <button class="btn btn-au-link" type="submit">Open</button>
-    </div>
-</form>
-
 @if (!string.IsNullOrWhiteSpace(topicName) && members.Count > 0)
 {
     <nav class="lu-section-nav mt-3" aria-label="Topic family">
