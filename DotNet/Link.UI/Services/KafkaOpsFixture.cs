@@ -42,6 +42,35 @@ public sealed class KafkaOpsFixture
 
     public KafkaOpsCall<KafkaTopicsResponse> Topics() => Ok(_document.Topics);
 
+    /// <summary>
+    /// A recorded hour of one-minute samples run through the same bounded ring the BFF uses.
+    /// The retry and error siblings of two topics receive a few messages.
+    /// </summary>
+    public KafkaOpsCall<KafkaHistoryResponse> History(int top)
+    {
+        var ring = new KafkaThroughputHistory(capacity: 61, minSpacing: TimeSpan.FromSeconds(30));
+        var end = DateTimeOffset.UtcNow;
+        var topics = _document.Topics.Topics;
+        var sums = topics.ToDictionary(row => row.Topic, _ => 0L, StringComparer.Ordinal);
+        for (var minute = 60; minute >= 0; minute--)
+        {
+            var step = 60 - minute;
+            var frame = new List<KafkaTopicSample>();
+            for (var i = 0; i < topics.Count; i++)
+            {
+                var row = topics[i];
+                var wave = 1 + 0.45 * Math.Sin((step + i * 7) / 6.0);
+                sums[row.Topic] += (long)Math.Round(Math.Max(0.2, row.ProduceRatePerSecond) * 60 * wave);
+                var lag = row.TotalLag <= 0 ? 0 : (long)Math.Round(row.TotalLag * (0.4 + 0.6 * Math.Abs(Math.Sin((step + i) / 9.0))));
+                var retry = i == 1 ? step / 6 : 0;
+                var error = i == 1 ? step / 20 : i == 0 ? step / 30 : 0;
+                frame.Add(new KafkaTopicSample(row.Topic, sums[row.Topic], retry, error, minute == 0 ? row.TotalLag : lag));
+            }
+            ring.Record(end.AddMinutes(-minute), frame);
+        }
+        return Ok(ring.Snapshot(top));
+    }
+
     public KafkaOpsCall<KafkaGroupsResponse> Groups(bool includeTestGroups)
     {
         var response = new KafkaGroupsResponse

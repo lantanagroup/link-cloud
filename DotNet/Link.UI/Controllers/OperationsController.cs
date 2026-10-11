@@ -727,8 +727,16 @@ public sealed class OperationsController : Controller
             error = KafkaPlanBanner.BesidePlan(error ?? replication.Error, replicationPlan?.Summary, replicationPlan is not null);
         }
 
+        KafkaDashboard? dashboard = null;
+        if (query.View == ThroughputKafkaPageQuery.Overview)
+        {
+            var historyCall = await _kafka.GetHistoryAsync(KafkaDashboard.TopN, cancellationToken);
+            dashboard = KafkaDashboardRules.Build(topics, groups, cluster, historyCall.Value ?? new KafkaHistoryResponse { Error = historyCall.Error });
+        }
+
         return new ThroughputKafkaPage
         {
+            Dashboard = dashboard,
             Query = query,
             Topics = topics,
             Groups = groups,

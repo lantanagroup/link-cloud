@@ -329,6 +329,9 @@ public sealed record ThroughputKafkaPageQuery
 
 public sealed record ThroughputKafkaPage
 {
+    /// <summary>Overview widgets. Built only on the Overview tab.</summary>
+    public KafkaDashboard? Dashboard { get; init; }
+
     public ThroughputKafkaPageQuery Query { get; init; } = new();
     public KafkaTopicsResponse Topics { get; init; } = new();
     public KafkaGroupsResponse Groups { get; init; } = new();
