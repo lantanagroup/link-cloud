@@ -92,7 +92,7 @@ else
                                 <td class="lu-flex" title="@item.Group">@item.Group</td>
                                 <td>@(string.IsNullOrWhiteSpace(g?.State) ? "—" : g!.State)</td>
                                 <td>@item.Lag.ToString("N0")</td>
-                                <td class="text-end"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: item.Group, page: 1)">Open</a></td>
+                                <td class="text-end"><a class="btn btn-sm btn-au-link lu-icon-btn" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: item.Group, page: 1)" title="Open group" aria-label="Open group @item.Group"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a></td>
                             </tr>
                         }
                         </tbody>
