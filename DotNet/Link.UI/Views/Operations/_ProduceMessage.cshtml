@@ -8,12 +8,16 @@
     var value = draft?.Value ?? "";
     var summary = draft?.Summary ?? "";
     var hold = draft is { FromStage: false };
-    // The server refuses topics outside the catalog. Disable the form up front; the page notice already says why.
+    // The server refuses topics outside the catalog. Say so once and disable the form up front.
     var refused = !string.IsNullOrWhiteSpace(topicName) && !LantanaGroup.Link.Shared.Application.Models.Kafka.KafkaBrowseAllowList.Admit(topicName, null).Allowed;
 }
 <form id="kafka-produce" class="card au-card mt-4@(hold ? " lu-produce-hold" : null)" method="post" action="/Operations/Kafka/messages">
     <h2 class="card-header h5 mb-0">Produce a message <partial name="_TermInfo" model="@(new TermInfo { Label = "About producing a message", Text = "Review the topic, headers, key, and value. Produce sends one new record. Nothing is sent until you type the topic name." })" /></h2>
     <div class="card-body">
+    @if (refused)
+    {
+        <div class="alert alert-warning" role="status" id="kafka-produce-refused">Messages can't be produced to @topicName because it isn't a catalogued Link topic.</div>
+    }
     @Html.AntiForgeryToken()
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Produce" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
