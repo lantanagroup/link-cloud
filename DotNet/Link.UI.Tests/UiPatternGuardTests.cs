@@ -19,7 +19,8 @@ public class UiPatternGuardTests
         css.Should().Contain(".lu-chart");
         css.Should().Contain(".lu-chart-donut");
         css.Should().Contain(".lu-logs-table");
-        css.Should().Contain("min-width: 72rem");
+        css.Should().NotContain("min-width: 72rem");
+        css.Should().Contain("table-layout: auto");
         css.Should().Contain(".lu-reports-table");
         css.Should().Contain(".btn-check:checked + .btn-au-neutral");
         css.Should().Contain("--lu-chart-compact-height: 140px;");
