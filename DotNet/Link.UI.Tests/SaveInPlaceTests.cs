@@ -101,7 +101,7 @@ public class SaveInPlaceTests
     }
 
     [Fact]
-    public void Resubmit_is_a_solid_warning_button()
+    public void Resubmit_is_a_solid_execute_button()
     {
         foreach (var relative in new[]
         {
@@ -110,7 +110,7 @@ public class SaveInPlaceTests
         })
         {
             var text = File.ReadAllText(RepoFile(relative));
-            text.Should().Contain("btn btn-sm btn-warning\">Resubmit");
+            text.Should().Contain("btn btn-sm btn-au-execute\"><i class=\"bi bi-arrow-repeat me-1\" aria-hidden=\"true\"></i>Resubmit");
             text.Should().NotContain("btn-outline-primary\">Resubmit");
             text.Should().Contain("id=\"resubmitDialog\"");
             text.Should().Contain("id=\"resubmitForm\"");

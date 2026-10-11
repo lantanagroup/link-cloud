@@ -296,7 +296,7 @@
         if (valueBox) valueBox.value = payload.value == null ? "" : String(payload.value);
         form.setAttribute("data-produce-dirty", "1");
         var summary = document.getElementById("kafka-produce-summary");
-        if (summary) summary.textContent = "Review this replica. " + lines.length + " headers. Nothing is produced until you type the topic name.";
+        if (summary) summary.textContent = "Review this replica. " + lines.length + (lines.length === 1 ? " header." : " headers.") Nothing is produced until you type the topic name.";
     }
 
     function headerLines(headers) {
@@ -598,7 +598,7 @@
                 if (body && body.more && body.resume) link.href = replaceQuery(href, "resume", body.resume);
                 else link.hidden = true;
                 var scan = document.querySelector("[data-lu-scan]");
-                if (scan && body && body.scanned) scan.textContent = "Searched the latest " + body.scanned + " messages.";
+                if (scan && body && body.scanned) scan.textContent = "Searched the latest " + body.scanned + (body.scanned === 1 ? " message." : " messages.");
                 applyMessageKeyword();
             })
             .catch(function () {

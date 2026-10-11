@@ -228,7 +228,7 @@ else
                         <button type="submit" class="btn btn-sm btn-au-execute" data-au-bulk="process" disabled>Process selected</button>
                         <button type="submit" class="btn btn-sm btn-warning" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save data-au-bulk="cancel" disabled>Cancel selected</button>
                     </div>
-                    <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @search.MinAgeHours hours, and logs in a terminal status.</p>
+                    <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @Counts.Of(search.MinAgeHours, "hour"), and logs in a terminal status.</p>
                 </form>
                 <partial name="_BottomPager" model="@(new BottomPager { Label = "Log pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = search.PageSize, Sizes = LogsRules.PageSizes, Path = Model.Embedded ? "/Logs/Acquisition/panel" : "/Logs/Acquisition", Panel = Model.Embedded, Route = (page, size) => Route(page, pageSize: size) })" />
             }

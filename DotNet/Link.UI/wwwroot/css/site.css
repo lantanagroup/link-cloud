@@ -3230,7 +3230,7 @@ td.lu-copy-host > .btn.lu-cell-copy:active {
 .lu-reports-table > :is(thead, tbody) > tr > :is(th, td):nth-child(1) { min-width: 5.5rem; }
 .lu-reports-table > :is(thead, tbody) > tr > :is(th, td):nth-child(2) { min-width: 12rem; }
 /* Created wraps between date and time instead of forcing a wide nowrap column. */
-.lu-reports-table td.lu-created { min-width: 6.5rem; white-space: normal; }
+.lu-reports-table td.lu-created { white-space: nowrap; }
 .lu-issue-filters .form-select,
 .lu-issue-filters .form-control { width: 100%; min-width: 0; }
 
@@ -4972,3 +4972,18 @@ h1 .lu-provider-badge + .au-info-icon { font-size: .8rem; vertical-align: middle
 
 /* Facility names are readable values, not GUIDs: show them in full in the reports tables. */
 .lu-reports-table > tbody > tr > td:nth-child(2) .lu-clip { max-width: none; }
+
+/* Small axis label under the dashboard trend bars. */
+.home-trend-axis { margin: .35rem 0 0; font-size: .72rem; color: var(--bs-secondary-color); text-align: center; }
+
+/* Table row actions: solid square icon buttons; the label is the tooltip and aria-label (row-icons.js). */
+table > tbody > tr > td .btn.btn-sm.lu-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+table > tbody > tr > td .btn.btn-sm.lu-row-icon > :not(i.bi) { display: none; }
+table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }

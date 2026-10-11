@@ -127,7 +127,7 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
                     </div>
                     @if (!stage.Unavailable && stage.ErrorCount > 0)
                     {
-                        <span class="badge au-badge-danger">@stage.ErrorCount errors</span>
+                        <span class="badge au-badge-danger">@Counts.Of(stage.ErrorCount, "error")</span>
                     }
                 </div>
                 @if (stage.Unavailable)
@@ -142,7 +142,7 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
                     <div class="small text-muted mt-1">
                         Typical @FormatMs(stage.P50Ms)
                         · Slowest @FormatMs(stage.P99Ms)
-                        · @stage.Count operations
+                        · @Counts.Of(stage.Count, "operation")
                     </div>
                 }
             </div>
@@ -237,7 +237,7 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
                         <div class="small text-muted mt-1">
                             Typical @FormatMs(api.P50Ms)
                             · Slowest @FormatMs(api.P99Ms)
-                            · @api.Count calls
+                            · @Counts.Of(api.Count, "call")
                         </div>
                     }
                 </div>

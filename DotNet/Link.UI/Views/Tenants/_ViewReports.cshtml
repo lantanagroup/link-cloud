@@ -125,14 +125,14 @@
                                 <div>Start @report.PeriodStart</div>
                                 <div>End @report.PeriodEnd</div>
                             </td>
-                            <td class="lu-created">@report.Created</td>
+                            <td class="lu-created" data-lu-time-compact>@report.Created</td>
                             <td>@report.Frequency</td>
                             <td class="text-end text-nowrap">@(report.CensusCount?.ToString() ?? "—") / @(report.InitialPopulationCount?.ToString() ?? "—")</td>
                             <td>
                                 <span class="badge @StatusPills.ForSchedule(report.Status)">@report.StatusLabel</span>
                                 @if (!string.IsNullOrWhiteSpace(report.Submitted))
                                 {
-                                    <div class="small text-muted">@report.Submitted</div>
+                                    <div class="small text-muted text-nowrap" data-lu-time-compact>@report.Submitted</div>
                                 }
                             </td>
                             <td>
@@ -144,7 +144,7 @@
                                             <partial name="_ViewReturnFields" model="Model.Query" />
                                             <input type="hidden" name="targetId" value="@report.Id" />
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@Model.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Resubmit" aria-label="Resubmit"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span class="ms-1">Resubmit</span></button>
+                                        <button type="button" class="btn btn-sm btn-au-execute lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@Model.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Resubmit" aria-label="Resubmit"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span class="ms-1">Resubmit</span></button>
                                     </div>
                                 }
                                 @if (report.CanAbort)
@@ -160,7 +160,7 @@
                                     <form method="post" data-au-save asp-action="CleanUpReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Clean up" aria-label="Clean up"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Clean up</span></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete report @report.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 }
                                 @if (report.CanRestore)
@@ -197,8 +197,8 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-warning" name="bypassSubmission" value="true">Regenerate without submitting</button>
-                <button type="submit" class="btn btn-sm btn-warning">Resubmit</button>
+                <button type="submit" class="btn btn-au-execute" name="bypassSubmission" value="true">Regenerate without submitting</button>
+                <button type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Resubmit</button>
             </div>
         </form>
     </div>
