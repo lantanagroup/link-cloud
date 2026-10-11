@@ -182,7 +182,7 @@ else
                                     <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = patientHref })" />
                                 </td>
                                 <td>@row.ReportingStatus</td>
-                                <td>@(string.IsNullOrWhiteSpace(row.SubmissionStatus) ? "—" : row.SubmissionStatus)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.SubmissionStatus) ? "—" : Link.UI.Services.ReportsRules.SubmissionLabel(row.SubmissionStatus))</td>
                                 <td>@row.LocationOrg</td>
                                 <td>@row.EncounterMapping</td>
                                 <td>@row.Hsloc</td>
