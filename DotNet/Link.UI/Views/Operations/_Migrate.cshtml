@@ -31,7 +31,7 @@
 }
 else
 {
-    <p class="mb-3">@topicName has @currentPartitions partitions. <a class="btn btn-au-link" href="@query.Href(ThroughputKafkaPageQuery.Topic, subtab: KafkaConsoleRoutes.Summary)">Topic summary</a></p>
+    <p class="mb-3">@topicName has @currentPartitions partitions.</p>
     <form method="post" action="@previewAction" data-kafka-busy="Dry run is running.">
         @Html.AntiForgeryToken()
         <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true, View = ThroughputKafkaPageQuery.Migrate })" />

@@ -4919,3 +4919,6 @@ table .lu-facility-id {
 /* The provider state is a small badge beside the Kafka title, not a heading-sized block. */
 h1 .lu-provider-badge { font-size: .75rem; font-weight: 600; vertical-align: middle; padding: .3em .6em; }
 h1 .lu-provider-badge + .au-info-icon { font-size: .8rem; vertical-align: middle; }
+
+/* A variant that is not on the broker stays readable on the dark section nav. */
+.lu-section-nav .is-dimmed { color: #9aa0a6; padding: .35rem .75rem; cursor: not-allowed; }

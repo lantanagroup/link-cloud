@@ -23,8 +23,8 @@
             <input type="hidden" name="advanced" value="@(query.Advanced ? "1" : "")" />
             <input type="hidden" name="hot" value="@(query.Hot ? "1" : "")" />
             <div class="col-12 col-md-4">
-                <label class="form-label" for="kafka-q">Search</label>
-                <input class="form-control" id="kafka-q" name="q" value="@query.Q" />
+                <label class="visually-hidden" for="kafka-q">Search</label>
+                <input class="form-control" id="kafka-q" placeholder="Search groups by name, client or host" name="q" value="@query.Q" />
             </div>
             <div class="col-auto">
                 <a class="lu-chip @(query.Hot ? "is-current" : null)" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, hot: !query.Hot, page: 1)">Needs attention</a>
