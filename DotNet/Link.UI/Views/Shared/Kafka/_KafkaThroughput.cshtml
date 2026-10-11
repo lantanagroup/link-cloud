@@ -1,0 +1,58 @@
+@model KafkaDashboard
+@{
+    var points = Model.History.Points;
+    var inLine = KafkaDashboardRules.Spark(points.Select(p => p.InPerSecond).ToList());
+    var outLine = KafkaDashboardRules.Spark(points.Select(p => p.OutPerSecond).ToList());
+    var lagLine = KafkaDashboardRules.Spark(points.Select(p => (double)p.TotalLag).ToList());
+    var last = points.Count > 0 ? points[^1] : null;
+    var palette = ReportManifestRules.DonutColors;
+}
+<div id="kafka-widget-throughput" class="lu-kafka-widget h-100">
+<section class="card au-card mt-3 h-100" style="--lu-spark-in:@palette[0];--lu-spark-out:@palette[1];--lu-spark-lag:@palette[5]">
+    <h2 class="card-header h6 mb-0">Throughput <partial name="_TermInfo" model="@(new TermInfo { Label = "About throughput", Text = "Messages per second in (produced to main topics) and out (consumed by subscribed groups), and total consumer lag, over the last " + Model.History.WindowMinutes + " minutes. Sampled about every 30 seconds into a small in-memory buffer, so the lines start again after a restart." })" /></h2>
+    <div class="card-body">
+        <div class="row g-3">
+            @if (Model.HasHistory)
+            {
+                <div class="col-12 col-xxl-7">
+                    <div class="lu-spark-row">
+                        <div class="lu-spark-figure"><span class="lu-spark-value">@KafkaDashboardRules.Rate(last!.InPerSecond)</span><span class="lu-spark-label"><span class="lu-spark-key lu-spark-in"></span>In</span></div>
+                        <div class="lu-spark-figure"><span class="lu-spark-value">@KafkaDashboardRules.Rate(last.OutPerSecond)</span><span class="lu-spark-label"><span class="lu-spark-key lu-spark-out"></span>Out</span></div>
+                        <svg class="lu-spark" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Messages per second in and out, last hour">
+                            <polyline class="lu-spark-in" points="@inLine" />
+                            <polyline class="lu-spark-out" points="@outLine" />
+                        </svg>
+                    </div>
+                    <div class="lu-spark-row mt-3">
+                        <div class="lu-spark-figure"><span class="lu-spark-value">@last.TotalLag.ToString("N0")</span><span class="lu-spark-label"><span class="lu-spark-key lu-spark-lag"></span>Total lag</span></div>
+                        <svg class="lu-spark" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Total lag, last hour">
+                            <polyline class="lu-spark-lag" points="@lagLine" />
+                        </svg>
+                    </div>
+                </div>
+            }
+            <div class="col-12 @(Model.HasHistory ? "col-xxl-5" : null)">
+                <h3 class="h6 mb-2">Busiest topics</h3>
+                @if (Model.History.Busiest.Count == 0)
+                {
+                    <p class="text-muted mb-0">@(Model.HasHistory ? "No topic received messages in the last sample." : "Not enough history yet. Rates appear after two samples.")</p>
+                }
+                else
+                {
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                        @foreach (var row in Model.History.Busiest)
+                        {
+                            <tr>
+                                <td class="lu-flex"><a href="@KafkaConsoleRoutes.Topics(row.Topic, KafkaConsoleRoutes.Summary)" title="@row.Topic">@row.Topic</a></td>
+                                <td class="text-end">@KafkaDashboardRules.Rate(row.PerSecond)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+</div>
