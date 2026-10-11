@@ -163,6 +163,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, SubmitPayloadValue>, KafkaProducerFactory<string, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PayloadSubmittedValue>, KafkaProducerFactory<string, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
