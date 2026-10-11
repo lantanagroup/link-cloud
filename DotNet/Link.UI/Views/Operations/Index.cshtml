@@ -6,18 +6,10 @@
 <div class="lu-kafka">
 <partial name="_BackButton" model="@(new BackLink("/Home", "Dashboard"))" />
 <h1 class="h3 mt-3">Throughput and scaling</h1>
-<p>Kafka health, and the changes that start as a preview. Nothing moves until a later request is approved and executed.</p>
 <partial name="_Nav" />
 <div class="au-card card mt-3">
-    <div class="card-header">Kafka</div>
+    <div class="card-header">Kafka <partial name="_TermInfo" model="@(new TermInfo { Label = "About Kafka", Text = "Kafka health, and the changes that start as a preview. Nothing moves until a later request is approved and executed. Start with Overview when something looks wrong. Messages reads one allow-listed topic and does not commit offsets. Partition changes are on Migrate. Consumers changes replicas. Brokers previews a decommission or a rebalance." })" /></div>
     <div class="card-body">
-        <p>Start with Overview when something looks wrong. Messages reads one allow-listed topic and does not commit offsets. Use Topic, Consumers, or Brokers when you already know what you want to change.</p>
-        <ol class="lu-kafka-steps">
-            <li>Overview lists topics and groups that need attention. Healthy tables stay folded.</li>
-            <li>Messages shows a page of records. Export writes an audit of that read.</li>
-            <li>Topic previews an in-place partition increase. Migrate is the other path, and it recreates the topic empty.</li>
-            <li>Consumers previews adding or removing replicas. Brokers previews a decommission or a rebalance.</li>
-        </ol>
         <a class="btn btn-au-link" asp-action="Kafka">Open Kafka</a>
     </div>
 </div>
