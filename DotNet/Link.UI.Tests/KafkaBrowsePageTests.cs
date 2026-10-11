@@ -51,7 +51,8 @@ public class KafkaBrowsePageTests
         query.StageRecord.Should().Be("0:88");
 
         var href = query.Href();
-        href.Should().Contain("view=messages");
+        href.Should().Contain("/Operations/Kafka/Topics/ResourcesAcquired/Messages");
+        href.Should().NotContain("view=");
         href.Should().Contain("mq=fac");
         href.Should().Contain("key=fac-1pat");
         href.Should().Contain("hq=corr");
@@ -71,7 +72,9 @@ public class KafkaBrowsePageTests
         query.ExportHref().Should().NotContain("record=");
 
         var overview = query.Href(view: ThroughputKafkaPageQuery.Overview, page: 1);
-        overview.Should().Contain("view=overview");
+        overview.Should().StartWith("/Operations/Kafka?");
+        overview.Should().NotContain("view=");
+        overview.Should().NotContain("/Topics/");
         overview.Should().NotContain("mq=");
         overview.Should().NotContain("msgPage=");
         overview.Should().NotContain("record=");
@@ -129,7 +132,8 @@ public class KafkaBrowsePageTests
         IndexOf(page, "id=\"kafka-browse-result\"").Should().BeLessThan(IndexOf(page, "<table"));
         IndexOf(page, "<table").Should().BeLessThan(IndexOf(page, "aria-label=\"Message pages\""));
         shell.Should().Contain("ThroughputKafkaPageQuery.Messages");
-        shell.Should().Contain(">Messages</a>");
+        shell.Should().Contain(">Topics</a>");
+        shell.Should().NotContain(">Messages</a>");
     }
 
     [Fact]
