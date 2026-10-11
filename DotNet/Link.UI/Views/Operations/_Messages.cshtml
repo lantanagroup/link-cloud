@@ -260,11 +260,11 @@
             <table class="table table-sm align-middle" data-lu-messages data-lu-page-size="@pageSize" data-lu-page="1" data-lu-client="@(clientBatch ? "1" : "0")">
                 <thead>
                     <tr>
-                        <th>Partition</th>
+                        <th class="lu-shrink">Partition</th>
                         <th>Offset</th>
                         <th>Time</th>
                         <th>Key</th>
-                        <th>Summary</th>
+                        <th class="lu-flex">Summary</th>
                         <th>Status</th>
                         <th></th>
                     </tr>
@@ -276,11 +276,11 @@
                     var open = string.Equals(query.OpenRecord, recordId, StringComparison.Ordinal);
                     var hasException = !string.IsNullOrWhiteSpace(record.Link.ExceptionMessage) || record.Link.ExceptionHeaders.Count > 0;
                     <tr data-lu-id="@recordId" data-lu-text="@KafkaBrowseText.FilterText(record)">
-                        <td>@record.Partition</td>
+                        <td class="lu-shrink">@record.Partition</td>
                         <td>@record.Offset</td>
                         <td>@KafkaBrowseText.When(record.TimestampUnixMs)</td>
                         <td><code class="small">@record.Key</code></td>
-                        <td>@record.ValueSummary</td>
+                        <td class="lu-flex" title="@record.ValueSummary">@record.ValueSummary</td>
                         <td>
                             @if (record.Truncated)
                             {

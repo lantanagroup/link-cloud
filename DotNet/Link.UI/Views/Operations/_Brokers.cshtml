@@ -9,15 +9,11 @@
 }
 
 <section class="card au-card mt-3" id="kafka-brokers">
-    <h2 class="card-header h6 mb-0">Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = "A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions. A broker that is not up is listed first." })" /></h2>
+    <h2 class="card-header h6 mb-0">Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = "Open a broker to preview a decommission or a rebalance. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions. A broker that is not up is listed first." + (string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail) ? "" : " " + Model.Cluster.LogDirDetail) })" /></h2>
     <div class="card-body">
         @if (!Model.Infra.Enabled)
         {
             <div class="alert alert-secondary" role="status">@Model.Infra.Detail</div>
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail))
-        {
-            <div class="alert alert-secondary" role="status">@Model.Cluster.LogDirDetail</div>
         }
         <form class="row g-2 align-items-end mb-3" method="get" action="/Operations/Kafka">
             <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Brokers" />
@@ -44,8 +40,8 @@
             <table class="table table-sm mb-0" id="kafka-broker-table">
                 <thead>
                     <tr>
-                        <th>Id</th>
-                        <th>Host</th>
+                        <th class="lu-shrink">Id</th>
+                        <th class="lu-flex">Host</th>
                         <th>Rack</th>
                         <th>State</th>
                         <th><a href="@query.Href(sort: "partitions", dir: SortDir("partitions"), page: 1)">Partitions</a></th>
@@ -61,8 +57,8 @@
                 @foreach (var row in Model.BrokerRows)
                 {
                     <tr class="@(KafkaAttention.Broker(row) ? "lu-kafka-problem" : null)">
-                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy broker id", ReturnUrl = origin, LinkHref = query.Href(broker: row.Id.ToString(), page: 1) })" /></td>
-                        <td>@row.Host:@row.Port</td>
+                        <td class="lu-shrink"><partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy broker id", ReturnUrl = origin, LinkHref = query.Href(broker: row.Id.ToString(), page: 1) })" /></td>
+                        <td class="lu-flex" title="@row.Host:@row.Port">@row.Host:@row.Port</td>
                         <td>@(string.IsNullOrWhiteSpace(row.Rack) ? "—" : row.Rack)</td>
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
                         <td>@row.PartitionCount</td>
@@ -105,11 +101,7 @@
             </div>
         </form>
 
-        @if (selected is null)
-        {
-            <div class="alert alert-secondary mt-3 mb-0" role="status">Select a broker to preview a decommission or a rebalance.</div>
-        }
-        else
+        @if (selected is not null)
         {
             <div class="border-top mt-3 pt-3">
                 <h3 class="h6">Broker @selected.Id</h3>
