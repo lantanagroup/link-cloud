@@ -724,11 +724,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             IQueryable<ReportEntry> entityQuery = _dbContext.ReportEntry.Where(predicate);
 
-            if (!string.IsNullOrWhiteSpace(sortBy))
+            // Callers send sort names in any case (for example "reportingstatus"). EF.Property is
+            // case-sensitive, so map to the real property name and ignore names that do not exist.
+            var sortProperty = string.IsNullOrWhiteSpace(sortBy)
+                ? null
+                : _dbContext.Model.FindEntityType(typeof(ReportEntry))?.GetProperties()
+                    .FirstOrDefault(p => string.Equals(p.Name, sortBy.Trim(), StringComparison.OrdinalIgnoreCase))?.Name;
+
+            if (sortProperty != null)
             {
                 entityQuery = sortOrder == SortOrder.Descending
-                    ? entityQuery.OrderByDescending(x => EF.Property<object>(x, sortBy))
-                    : entityQuery.OrderBy(x => EF.Property<object>(x, sortBy));
+                    ? entityQuery.OrderByDescending(x => EF.Property<object>(x, sortProperty))
+                    : entityQuery.OrderBy(x => EF.Property<object>(x, sortProperty));
             }
             else
             {
