@@ -37,7 +37,7 @@ else
                 <dt class="col-sm-3">Validation status</dt>
                 <dd class="col-sm-9">@Model.ReportingStatus</dd>
                 <dt class="col-sm-3">Submission status</dt>
-                <dd class="col-sm-9">@Model.SubmissionStatus</dd>
+                <dd class="col-sm-9">@Link.UI.Services.ReportsRules.SubmissionLabel(Model.SubmissionStatus)</dd>
             </dl>
             @if (Model.CanDownloadJson)
             {
