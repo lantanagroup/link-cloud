@@ -86,7 +86,7 @@ public class ReviewItemsFixesTests
         Assert.Contains("role=\"listbox\"", picker);
         Assert.Contains("id=\"topic-pick-toggle\"", picker);
         Assert.Contains("id=\"topic-pick-data\"", picker);
-        Assert.Contains("OrderBy(row => row.link ? 0 : 1)", picker);
+        Assert.Contains("OrderBy(row => row.link ? 0 : 1)", picker); Assert.Contains("KafkaTopicCatalog.PipelineStep(row.topic)", picker);
         Assert.DoesNotContain("col-lg-8", picker);
         var js = Read("wwwroot", "js", "kafka-ops.js");
         Assert.Contains("aria-activedescendant", js);
@@ -100,5 +100,15 @@ public class ReviewItemsFixesTests
         var js = Read("wwwroot", "js", "kafka-ops.js");
         Assert.Contains("(lines.length === 1 ? \" header.\" : \" headers.\") + \" Nothing is produced until you type the topic name.\";", js);
         Assert.DoesNotContain("\" headers.\") Nothing", js);
+    }
+
+    [Fact]
+    public void Combo_keeps_the_selected_topic_and_restage_follows_its_link_without_a_form()
+    {
+        var js = Read("wwwroot", "js", "kafka-ops.js");
+        Assert.Contains("input.select(); render(input.value);", js);
+        Assert.Contains("if (term && current && term === current.toLowerCase()) term = \"\";", js);
+        Assert.Contains("li.classList.add(\"is-current\")", js);
+        Assert.Contains("if (document.getElementById(\"kafka-produce\")) {", js);
     }
 }

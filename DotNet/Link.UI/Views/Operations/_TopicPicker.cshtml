@@ -4,10 +4,15 @@
     var name = Model.SelectedTopic?.Topic ?? query.TopicName;
     var tab = KafkaConsoleRoutes.TabFor(query.View, query.Subtab);
     var count = Model.Topics.Topics.Count;
-    // Tens of topics: the full list ships with the page and is filtered in the browser. Link pipeline topics first, then A-Z.
+    // Tens of topics: the full list ships with the page and is filtered in the browser.
+    // Order: the Link pipeline chain in the order a report moves through it (each main topic before its retry/error
+    // variants), then other Link topics A-Z, then anything uncatalogued A-Z.
     var options = Model.Topics.Topics
         .Select(row => new { topic = row.Topic, family = row.Family, keyClass = row.KeyClass, link = LantanaGroup.Link.Shared.Application.Models.Kafka.KafkaBrowseAllowList.Admit(row.Topic, null).Allowed, href = KafkaConsoleRoutes.Topics(row.Topic, tab) })
-        .OrderBy(row => row.link ? 0 : 1).ThenBy(row => row.topic, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(row => row.link ? 0 : 1)
+        .ThenBy(row => { var step = LantanaGroup.Link.Shared.Application.Models.Kafka.KafkaTopicCatalog.PipelineStep(row.topic); return step < 0 ? int.MaxValue : step; })
+        .ThenBy(row => row.topic.Length)
+        .ThenBy(row => row.topic, StringComparer.OrdinalIgnoreCase)
         .ToList();
 }
 

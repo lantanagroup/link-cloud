@@ -121,6 +121,7 @@
         var shown = [];
         var active = -1;
         var timer;
+        var current = input.value;
 
         function setOpen(open) {
             list.hidden = !open;
@@ -131,6 +132,8 @@
 
         function render(filter) {
             var term = (filter || "").trim().toLowerCase();
+            // While the box still shows the selected topic, list every topic; typing filters.
+            if (term && current && term === current.toLowerCase()) term = "";
             shown = topics.filter(function (row) {
                 return !term || [row.topic, row.family, row.keyClass].some(function (v) { return (v || "").toLowerCase().indexOf(term) >= 0; });
             });
@@ -146,7 +149,9 @@
                 li.id = "topic-opt-" + i;
                 li.className = "lu-combo-option";
                 li.setAttribute("role", "option");
-                li.setAttribute("aria-selected", "false");
+                var isCurrent = !!current && row.topic === current;
+                li.setAttribute("aria-selected", isCurrent ? "true" : "false");
+                if (isCurrent) li.classList.add("is-current");
                 var name = document.createElement("span");
                 name.textContent = row.topic;
                 li.appendChild(name);
@@ -162,6 +167,13 @@
             });
             active = -1;
             setOpen(true);
+            var mark = list.querySelector(".lu-combo-option.is-current");
+            if (mark) {
+                active = Array.prototype.indexOf.call(list.querySelectorAll(".lu-combo-option"), mark);
+                mark.classList.add("active");
+                input.setAttribute("aria-activedescendant", mark.id);
+                mark.scrollIntoView({ block: "nearest" });
+            }
         }
 
         function highlight(i) {
@@ -181,8 +193,8 @@
             window.location.assign(row.href);
         }
 
-        input.addEventListener("focus", function () { render(""); });
-        input.addEventListener("click", function () { if (list.hidden) render(""); });
+        input.addEventListener("focus", function () { input.select(); render(input.value); });
+        input.addEventListener("click", function () { if (list.hidden) render(input.value); });
         input.addEventListener("input", function () {
             window.clearTimeout(timer);
             timer = window.setTimeout(function () { render(input.value); }, 120);
@@ -196,7 +208,7 @@
         input.addEventListener("blur", function () { window.setTimeout(function () { setOpen(false); }, 120); });
         if (toggle) toggle.addEventListener("mousedown", function (ev) {
             ev.preventDefault();
-            if (list.hidden) { input.focus(); render(""); } else setOpen(false);
+            if (list.hidden) { input.focus(); render(input.value); } else setOpen(false);
         });
     }
     function wireProduce() {
@@ -213,8 +225,11 @@
             }
             var restage = event.target && event.target.closest ? event.target.closest("[data-restage]") : null;
             if (restage) {
-                event.preventDefault();
-                applyRestage(restage);
+                // On a page with the Produce form, fill it in place; otherwise follow the link to Produce.
+                if (document.getElementById("kafka-produce")) {
+                    event.preventDefault();
+                    applyRestage(restage);
+                }
                 return;
             }
             var paste = event.target && event.target.closest ? event.target.closest("#kafka-paste-message") : null;

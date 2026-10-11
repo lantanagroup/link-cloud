@@ -4998,3 +4998,6 @@ table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }
 .lu-combo-option:hover .lu-combo-meta, .lu-combo-option.active .lu-combo-meta { color: #fff; }
 .lu-combo-meta { font-size: .8rem; color: #495057; white-space: nowrap; }
 .lu-combo-empty { padding: .4rem .75rem; color: #495057; }
+
+.lu-combo-option.is-current > span:first-child::before { content: '\2713'; display: inline-block; width: 1.1rem; font-weight: 700; }
+.lu-combo-option:not(.is-current) > span:first-child { padding-left: 1.1rem; }
