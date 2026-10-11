@@ -179,7 +179,7 @@ else
                         @foreach (var row in Model.Operations)
                         {
                             <tr>
-                                <td>@row.Name</td>
+                                <td class="lu-wrap">@row.Name</td>
                                 <td>@FacilityNormalizationRules.Label(row.OperationType)</td>
                                 <td>
                                     @if (string.IsNullOrWhiteSpace(row.FacilityId))

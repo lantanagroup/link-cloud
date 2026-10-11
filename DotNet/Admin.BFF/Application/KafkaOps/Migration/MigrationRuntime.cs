@@ -79,6 +79,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
     private readonly bool _anonymous;
     private readonly IHostEnvironment _environment;
     private readonly KafkaOpsOptions _options;
+    private string? _reconcileFailure;
     private readonly IMigrationStore _store;
     private readonly IKafkaOpsLease _lease;
     private readonly IKafkaMigrationAdmin _admin;
@@ -436,10 +437,18 @@ public sealed class MigrationRuntime : IMigrationRuntime
             var known = new HashSet<string>(byId.Values.Select(record => record.BackupTopic).Append(KafkaTopicCatalog.JournalTopicName), StringComparer.Ordinal);
             HasOrphanBlock = names.Any(name => !known.Contains(name));
             Interlocked.Exchange(ref _reconciled, 1);
+            if (Interlocked.Exchange(ref _reconcileFailure, null) is not null)
+                _logger.LogInformation("Migration reconcile finished after earlier failures.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Migration reconcile did not finish. New migrations stay closed until the cluster can be read.");
+            // The open tick retries every few seconds. Log a failure once (for example when the Kafka provider is
+            // disabled) and keep identical repeats at debug level, so the log is not flooded.
+            var reason = ex.GetType().FullName + ": " + ex.Message;
+            if (Interlocked.Exchange(ref _reconcileFailure, reason) != reason)
+                _logger.LogWarning(ex, "Migration reconcile did not finish. New migrations stay closed until the cluster can be read. Repeats of this failure are logged at debug level.");
+            else
+                _logger.LogDebug("Migration reconcile still not finished: {Reason}", ex.Message);
         }
     }
 

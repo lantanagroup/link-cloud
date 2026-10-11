@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Automation.UI.Models;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
@@ -110,23 +110,17 @@ public sealed class MongoNormalizationStore : INormalizationStore
 
     public async Task SetDefaultSuiteAsync(Guid id, CancellationToken ct = default)
     {
+        // WithTransactionAsync retries transient errors such as WriteConflict when instances set the default together.
         using var session = await _suites.Database.Client.StartSessionAsync(cancellationToken: ct);
-        session.StartTransaction();
-        try
+        await session.WithTransactionAsync(async (s, token) =>
         {
             var clearUpdate = Builders<NormalizationSuiteDocument>.Update.Set(d => d.IsDefault, false);
-            await _suites.UpdateManyAsync(session, _ => true, clearUpdate, cancellationToken: ct);
+            await _suites.UpdateManyAsync(s, _ => true, clearUpdate, cancellationToken: token);
 
             var setUpdate = Builders<NormalizationSuiteDocument>.Update.Set(d => d.IsDefault, true);
-            await _suites.UpdateOneAsync(session, d => d.Id == id, setUpdate, cancellationToken: ct);
-
-            await session.CommitTransactionAsync(ct);
-        }
-        catch
-        {
-            await session.AbortTransactionAsync(ct);
-            throw;
-        }
+            await _suites.UpdateOneAsync(s, d => d.Id == id, setUpdate, cancellationToken: token);
+            return true;
+        }, cancellationToken: ct);
     }
 
     public async Task DeleteSuiteAsync(Guid id, CancellationToken ct = default)

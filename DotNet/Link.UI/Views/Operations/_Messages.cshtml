@@ -213,7 +213,6 @@
                         <th>Offset</th>
                         <th>Time</th>
                         <th class="lu-wrap lu-key">Key</th>
-                        <th class="lu-flex">Summary</th>
                         <th>Status</th>
                         <th></th>
                     </tr>
@@ -229,7 +228,6 @@
                         <td>@record.Offset</td>
                         <td>@KafkaBrowseText.When(record.TimestampUnixMs)</td>
                         <td class="lu-wrap lu-key"><code class="small">@record.Key</code></td>
-                        <td class="lu-flex" title="@record.ValueSummary">@record.ValueSummary</td>
                         <td>
                             @if (record.Truncated)
                             {

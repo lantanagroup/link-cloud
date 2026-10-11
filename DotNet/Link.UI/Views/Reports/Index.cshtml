@@ -130,10 +130,8 @@
                             <th><a asp-all-route-data="@SortRoute("FacilityId")">Facility</a></th>
                             <th><a asp-all-route-data="@SortRoute("ReportStartDate")">Reporting period</a></th>
                             <th><a asp-all-route-data="@SortRoute("CreateDate")">Created</a></th>
-                            <th class="lu-measures-col lu-flex">Measures</th>
                             <th><a asp-all-route-data="@SortRoute("Frequency")">Cadence</a></th>
-                            <th class="text-end">Census</th>
-                            <th class="text-end">IP</th>
+                            <th class="text-end text-nowrap">Census / IP</th>
                             <th><a asp-all-route-data="@SortRoute("Status")">Status</a></th>
                             <th class="lu-col-action">Action</th>
                         </tr>
@@ -157,15 +155,9 @@
                                 <div>Start @report.PeriodStart</div>
                                 <div>End @report.PeriodEnd</div>
                             </td>
-                            <td class="text-nowrap">@report.Created</td>
-                            <td class="lu-flex">
-                                <span class="lu-measures">
-                                    <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
-                                </span>
-                            </td>
+                            <td class="lu-created">@report.Created</td>
                             <td>@report.Frequency</td>
-                            <td class="text-end" data-census="@report.Id">—</td>
-                            <td class="text-end" data-population="@report.Id">—</td>
+                            <td class="text-end text-nowrap"><span data-census="@report.Id">—</span> / <span data-population="@report.Id">—</span></td>
                             <td>
                                 <span class="badge @StatusPills.ForSchedule(report.Status)">@report.StatusLabel</span>
                                 @if (!string.IsNullOrWhiteSpace(report.Submitted))

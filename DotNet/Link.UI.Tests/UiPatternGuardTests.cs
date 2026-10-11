@@ -99,7 +99,7 @@ public class UiPatternGuardTests
         File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Index.cshtml"))
             .Should().Contain("lu-reports-table");
         File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Index.cshtml"))
-            .Should().Contain("lu-measures");
+            .Should().Contain("Census / IP");
         File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Validation.cshtml"))
             .Should().Contain("lu-issue-filters");
         File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Validation.cshtml"))
