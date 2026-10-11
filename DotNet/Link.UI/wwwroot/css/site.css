@@ -1,4 +1,4 @@
-﻿/* ===================================================================
+/* ===================================================================
    Link.UI / Automation.UI — Design System (--au-* tokens)
    =================================================================== */
 
@@ -3226,6 +3226,12 @@ td.lu-copy-host > .btn.lu-cell-copy:active {
   white-space: nowrap;
 }
 .lu-measures .lu-clip { min-width: 0; }
+/* The measure list must not set the column width: it fills the cell it is given and is cut with an ellipsis. */
+.lu-reports-table td.lu-flex > .lu-measures { display: flex; width: 0; min-width: 100%; overflow: hidden; }
+.lu-reports-table td.lu-flex > .lu-measures .lu-clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lu-reports-table > :is(thead, tbody) > tr > :is(th, td).lu-flex { min-width: 9rem; }
+.lu-reports-table > :is(thead, tbody) > tr > :is(th, td):nth-child(1) { min-width: 5.5rem; }
+.lu-reports-table > :is(thead, tbody) > tr > :is(th, td):nth-child(2) { min-width: 7.5rem; }
 .lu-issue-filters .form-select,
 .lu-issue-filters .form-control { width: 100%; min-width: 0; }
 
