@@ -164,7 +164,7 @@
                                 <tr>
                                     <th>Client</th>
                                     <th>Host</th>
-                                    <th>Assignment</th>
+                                    <th class="lu-wrap">Assignment</th>
                                     <th>Config</th>
                                 </tr>
                             </thead>
@@ -174,7 +174,7 @@
                                 <tr class="@(!member.AdvertisesExpectedConfig ? "lu-kafka-problem" : null)">
                                     <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Client", Value = member.ClientId, Compact = true, CopyLabel = "Copy client id" })" /></td>
                                     <td>@member.Host</td>
-                                    <td>@KafkaWindows.AssignmentText(member.Assignment)</td>
+                                    <td class="lu-wrap">@KafkaWindows.AssignmentText(member.Assignment)</td>
                                     <td>@(member.AdvertisesExpectedConfig ? "Expected" : "Not advertised")</td>
                                 </tr>
                             }
