@@ -584,15 +584,13 @@ details.au-facility-actions > summary::-webkit-details-marker {
 .au-table-wrap {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: clip;
 }
 
-.au-cohort-table {
-  min-width: 1080px;
-}
-
+.au-cohort-table,
 .au-imported-table {
-  min-width: 860px;
+  width: 100%;
+  min-width: 0;
 }
 
 .au-cohort-table td .form-control,
@@ -1782,7 +1780,9 @@ mark.lu-match { background: #fff3bf; color: inherit; padding: 0 .1rem; }
 .au-table-shell,
 .au-card .table-responsive {
   max-height: min(70vh, 740px);
-  overflow: auto;
+  max-width: 100%;
+  overflow-x: clip;
+  overflow-y: auto;
 }
 #recentRunsCard .table-responsive {
   max-height: none;
@@ -2573,33 +2573,10 @@ a.lu-clip {
 .lu-row-actions form { margin-bottom: .35rem; }
 .lu-row-actions form:last-child { margin-bottom: 0; }
 
-/* The scenario grid matches Automation.UI. The sidebar leaves less room, so these widths keep every column readable without a horizontal scrollbar. */
-@media (min-width: 768px) {
-  #scenarioTable {
-    table-layout: fixed;
-    width: 100%;
-  }
-  .au-card .table-responsive:has(#scenarioTable) {
-    overflow-x: hidden;
-  }
-  #scenarioTable th:nth-child(1),
-  #scenarioTable td:nth-child(1) { width: 16% !important; }
-  #scenarioTable th:nth-child(2),
-  #scenarioTable td:nth-child(2) { width: 12% !important; }
-  #scenarioTable th:nth-child(3),
-  #scenarioTable td:nth-child(3) { width: 13% !important; }
-  #scenarioTable th:nth-child(4),
-  #scenarioTable td:nth-child(4) { width: 9% !important; }
-  #scenarioTable th:nth-child(5),
-  #scenarioTable td:nth-child(5) { width: 10% !important; }
-  #scenarioTable th:nth-child(6),
-  #scenarioTable td:nth-child(6) { width: 9% !important; }
-  #scenarioTable th:nth-child(7),
-  #scenarioTable td:nth-child(7) { width: 7% !important; }
-  #scenarioTable th:nth-child(8),
-  #scenarioTable td:nth-child(8) { width: 10% !important; }
-  #scenarioTable th:nth-child(9),
-  #scenarioTable td:nth-child(9) { width: 14% !important; }
+#scenarioTable {
+  table-layout: auto;
+  width: 100%;
+  min-width: 0;
 }
 #scenarioTable th,
 #scenarioTable td {
@@ -2626,7 +2603,7 @@ a.lu-clip {
   #reportResults td:nth-child(5),
   #facilityReportResults td:nth-child(4) {
     overflow-wrap: anywhere;
-    max-width: 18rem;
+    max-width: none;
   }
 }
 
@@ -2698,7 +2675,7 @@ a.lu-clip {
   font-size: .8rem;
 }
 
-.lu-wide-table { min-width: 48rem; }
+.lu-wide-table { width: 100%; min-width: 0; }
 
 /* Admin pages use Automation's green save and a solid red destructive button.
    Bootstrap 5.1 has no text-bg-* utilities, so those badges were white on white. */
@@ -3223,28 +3200,14 @@ td.lu-copy-host > .btn.lu-cell-copy:active {
 }
 .lu-id-strip { align-items: center; }
 .lu-id-strip .badge { align-self: center; white-space: nowrap; }
-.lu-logs-table { table-layout: fixed; width: 100%; min-width: 72rem; }
+.lu-logs-table { table-layout: auto; width: 100%; min-width: 0; }
 .lu-logs-table th,
-.lu-logs-table td {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-}
-.lu-logs-table th:first-child,
-.lu-logs-table td:first-child { width: 2.5rem; overflow: visible; }
+.lu-logs-table td { vertical-align: middle; }
 .lu-logs-table .lu-labeled-id-compact { flex-wrap: nowrap; }
 .lu-logs-table .lu-clip { max-width: 100%; min-width: 0; }
-.lu-logs-table .lu-col-created { width: 11rem; white-space: nowrap; }
-.lu-logs-table .lu-col-action { width: 4.25rem; overflow: visible; white-space: nowrap; }
-#validationIssues .table { table-layout: fixed; width: 100%; min-width: 48rem; }
-#validationIssues .table th,
-#validationIssues .table td {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-}
+.lu-logs-table .lu-col-created,
+.lu-logs-table .lu-col-action { white-space: nowrap; }
+#validationIssues .table { table-layout: auto; width: 100%; min-width: 0; }
 #validationIssues .lu-labeled-id-compact { flex-wrap: nowrap; }
 #validationIssues .lu-clip { max-width: 100%; min-width: 0; }
 .lu-issue-filters .col-category { flex: 1 1 14rem; max-width: none; min-width: 12rem; }
@@ -3252,11 +3215,8 @@ td.lu-copy-host > .btn.lu-cell-copy:active {
 .text-danger { color: var(--au-danger) !important; }
 .badge.bg-success,
 .badge.text-bg-success { background-color: var(--au-success-soft) !important; color: #146c2e !important; }
-.lu-reports-table { table-layout: fixed; width: 100%; }
-.lu-reports-table th,
-.lu-reports-table td { overflow: hidden; }
-.lu-reports-table .lu-col-action { width: 8.5rem; overflow: visible; white-space: nowrap; }
-.lu-reports-table .lu-measures-col { width: 14%; }
+.lu-reports-table { table-layout: auto; width: 100%; min-width: 0; }
+.lu-reports-table .lu-col-action { white-space: nowrap; }
 .lu-measures {
   display: inline-flex;
   align-items: center;
@@ -4782,6 +4742,71 @@ button.btn-au-action.disabled,
 }
 .lu-kafka .lu-msg-raw .text-muted {
   color: #d0d0d0;
+}
+
+/* Short columns shrink to their text. max-width: 0 on a flexible column only
+   drops the content minimum so the column can use the space that is left.
+   The text is cut only when that space is smaller than the value. */
+.table-responsive,
+.au-table-shell,
+.au-table-wrap,
+.au-card .table-responsive {
+  max-width: 100%;
+  overflow-x: clip;
+  contain: inline-size;
+}
+table.table,
+table.au-table,
+table.au-cohort-summary-table,
+table.au-cohort-table,
+table.au-imported-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+table.table > :is(thead, tbody, tfoot) > tr > :is(th, td),
+table.au-table > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+  width: 1%;
+  white-space: nowrap;
+}
+table.table > :is(thead, tbody, tfoot) > tr > td:first-child:not(:has(input)):not(:has(.btn)),
+table.table > :is(thead, tbody, tfoot) > tr > th:first-child:not(:has(input)),
+table.table td:has(.lu-labeled-id):not(:has(.btn)),
+table.table th:has(.lu-labeled-id),
+table.table td:has(.lu-clip):not(:has(.btn)),
+table.table td:has(code):not(:has(.btn)),
+table.au-table td:first-child:not(:has(input)):not(:has(.btn)),
+table.au-table td:has(.lu-labeled-id):not(:has(.btn)),
+table.au-table td:has(code):not(:has(.btn)) {
+  width: auto;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+table.table td.lu-wrap,
+table.table th.lu-wrap,
+table.au-table td.lu-wrap {
+  width: auto;
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+table.table td:has(.btn),
+table.table th:has(.btn),
+table.au-table td:has(.btn) {
+  width: 1%;
+  max-width: none;
+  overflow: visible;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+table .lu-clip,
+table .lu-clip-text,
+table .lu-facility-id {
+  max-width: 100%;
 }
 .lu-json-bool,
 .lu-json-null { color: #ffb4bc; }

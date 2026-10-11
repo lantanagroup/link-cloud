@@ -34,6 +34,29 @@ public class TableLayoutGuardTests
         shownRule.Should().NotContain("padding");
     }
 
+    [Fact]
+    public void Tables_use_auto_layout_and_do_not_scroll_sideways()
+    {
+        var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
+        css.Should().Contain("table-layout: auto");
+        css.Should().NotContain("table-layout: fixed");
+        css.Should().Contain("overflow-x: clip");
+        css.Should().Contain("text-overflow: ellipsis");
+        css.Should().Contain("width: 1%");
+        css.Should().Contain("white-space: nowrap");
+        css.Should().NotContain("min-width: 72rem");
+        css.Should().NotContain("min-width: 48rem");
+        css.Should().Contain("#recentRunsCard .table-responsive");
+        css.Should().Contain("table .lu-clip");
+        css.Should().Contain("max-width: 100%");
+        var flex = Regex.Match(css, @"td:has\(\.lu-labeled-id\):not\(:has\(\.btn\)\)[\s\S]*?\{(?<body>[^}]*)\}");
+        flex.Success.Should().BeTrue();
+        flex.Groups["body"].Value.Should().Contain("max-width: 0");
+        flex.Groups["body"].Value.Should().Contain("text-overflow: ellipsis");
+        flex.Groups["body"].Value.Should().NotContain("12rem");
+        flex.Groups["body"].Value.Should().NotContain("20ch");
+    }
+
     private static string Root()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
