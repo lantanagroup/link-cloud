@@ -20,8 +20,6 @@
 ## census: 8064
 ## dataacq: 8065
 ## dataacq-worker: 8078
-## admin-ui: 8066
-## automation-ui: 5256
 ## link-ui: 5258
 ## measureeval: 8067
 ## normalization: 8068
@@ -173,9 +171,11 @@ services:
     ports:
       - 1433:1433
     container_name: sql-server
+    mem_limit: 3g
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=${LINK_DB_PASS}
+      - MSSQL_MEMORY_LIMIT_MB=2816
     volumes:
       - mssql_data:/var/opt/mssql
     restart: always
@@ -677,80 +677,6 @@ services:
        interval: 3s
        retries: 10
   
-  admin-ui:
-    image: link-admin-ui
-    container_name: link-admin-ui
-    ports:
-      - "8066:80"
-    build:
-      context: Web/Admin.UI
-    environment:
-      LINK_AUTH_REQUIRED: ${LOCAL_ADMIN_UI_AUTH_REQUIRED:-false}
-      LINK_BASE_API_URL: http://localhost:8063/api
-      GRAFANA_URL: http://localhost:3000
-      KAFKA_URL: http://localhost:9095
-      # DMRP system feature switch, on by default in this stack to match DMRP:Enabled in the tenant
-      # service's appsettings.Docker.json. Override with LINK_DMRP_ENABLED in the shell or .env. The
-      # two must stay in step: a change to the tenant side needs a tenant image rebuild - appsettings
-      # is baked into it, so recreating the container on its own keeps the value the image was built
-      # with. UI on while the services are off makes the facility form quietly create facilities
-      # that report nothing; the other way round fails loudly.
-      LINK_DMRP_ENABLED: ${LINK_DMRP_ENABLED:-true}
-    networks:
-      - link-nw
-    depends_on:
-      - admin-bff
-
-  automation-ui:
-    image: link-automation-ui
-    container_name: link-automation-ui
-    environment:
-      ASPNETCORE_ENVIRONMENT: Docker
-      Automation__LokiBaseUrl: http://loki:3100
-      ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
-      InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
-      InternalBlobStorage__BlobContainerName: link-automation-ui
-      ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
-      KafkaConnection__BootstrapServers__0: kafka_b:9092
-      KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
-      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      Authentication__UseBearerForServiceCalls: ${LOCAL_AUTOMATION_UI_USE_BEARER_FOR_SERVICE_CALLS:-false}
-      LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
-      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
-      PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
-      pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
-      InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
-      Telemetry__EnableTelemetry: true
-      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-      Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
-      Redis__Password: ${REDIS_PASS}
-      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-false}
-    volumes:
-      - automation_ui_keys:/keys/dataprotection
-    ports:
-      - "5256:5257"
-    build:
-      context: .
-      dockerfile: DotNet/Automation.UI/Dockerfile
-      args:
-        BUILD_CONFIGURATION: Debug
-      secrets:
-        - feed_accesstoken
-    networks:
-      - link-nw
-    depends_on:
-      azurite_init:
-        condition: service_completed_successfully
-      mongo:
-        condition: service_healthy
-      admin-bff:
-        condition: service_healthy
-      redis_cache:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5257/"]
-
   link-ui:
     image: link-ui
     container_name: link-ui
@@ -1186,6 +1112,4 @@ volumes:
   terminology_data:
     driver: local
   sftp_data:
-    driver: local
-  automation_ui_keys:
     driver: local
