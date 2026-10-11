@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -436,6 +436,11 @@ public sealed class TenantsController : Controller
         ReportPageQuery query,
         CancellationToken cancellationToken)
     {
+        // Old patient deep links on this screen now open the manifest Patients tab on that patient.
+        var deepLink = FacilityViewRules.Clean(query.Patient) ?? FacilityViewRules.Clean(query.PatientId);
+        if (deepLink is not null && !string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(reportId))
+            return Redirect(Url.Action("Manifest", "Reports", new { facilityId = id.Trim(), reportId = reportId.Trim(), tab = "patients", q = deepLink })!);
+
         var page = await _view.LoadReportAsync(id, reportId, query, cancellationToken);
         ViewData["Title"] = page.ReportId.Length == 0 ? "Report" : page.ReportId;
         return View(page);

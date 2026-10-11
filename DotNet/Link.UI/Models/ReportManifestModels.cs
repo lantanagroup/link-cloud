@@ -52,6 +52,20 @@ public sealed class ManifestPatientRow
     public IReadOnlyList<ManifestLink> Links { get; init; } = [];
     public IReadOnlyList<ManifestResourceRef> ResourceRefs { get; init; } = [];
     public IReadOnlyList<ManifestMembership> Membership { get; init; } = [];
+    public ManifestMapping? Mapping { get; init; }
+    public string? LogHref { get; init; }
+    public string? DiagnosticsHref { get; init; }
+}
+
+/// <summary>Location org, encounter mapping and HSLOC for one patient, merged into one badge.</summary>
+public sealed class ManifestMapping
+{
+    public string Label { get; init; } = string.Empty;
+    public string BadgeClass { get; init; } = "au-badge-muted";
+    public string LocationOrg { get; init; } = string.Empty;
+    public string EncounterMapping { get; init; } = string.Empty;
+    public string Hsloc { get; init; } = string.Empty;
+    public string Title => "Location org: " + LocationOrg + ". Encounter mapping: " + EncounterMapping + ". HSLOC: " + Hsloc + ".";
 }
 
 /// <summary>One population a patient belongs to. The measure name is the one the report stored.</summary>

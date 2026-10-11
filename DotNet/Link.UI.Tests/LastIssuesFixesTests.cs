@@ -31,10 +31,10 @@ public class LastIssuesFixesTests
     }
 
     [Fact]
-    public void Copy_icon_floats_outside_the_text_without_layout_space()
+    public void Copy_icon_sits_inside_the_cell_without_layout_space()
     {
         var css = Dot("Link.UI", "wwwroot", "css", "site.css");
-        Assert.Contains("transform: translateY(-55%);", css); Assert.DoesNotContain("td.lu-copy-host {\n    padding-right", css.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("transform: translateY(-55%);", css); Assert.Contains("lu-copy-after", css); Assert.Contains("lu-copy-after", Dot("Link.UI", "wwwroot", "js", "cell-copy.js")); Assert.DoesNotContain("td.lu-copy-host {\n    padding-right", css.Replace("\r\n", "\n"));
         Assert.Contains("@media (hover: hover) and (pointer: fine) {", css);
     }
 

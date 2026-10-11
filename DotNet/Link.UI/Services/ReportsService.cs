@@ -830,7 +830,10 @@ public sealed class ReportsService
                         ReportManifestRules.ResourceCounts(counts.Select(row => new KeyValuePair<string, int>(row.Name, row.Count))),
                         events,
                         PatientLinks(entry.PatientId, patientHref(entry.PatientId), page.FacilityId, page.ReportId),
-                        membership: ReportManifestRules.MembershipFor(reportIds, slots));
+                        membership: ReportManifestRules.MembershipFor(reportIds, slots),
+                        mapping: ReportPatientDiagnostics.Mapping(entry.LocationOrgStatus, entry.EncounterMappingStatus, entry.HslocMappingStatus),
+                        logHref: PatientScopedHref("/Reports/Acquisition", page.FacilityId, page.ReportId, entry.PatientId),
+                        diagnosticsHref: PatientScopedHref("/Reports/PatientDiagnostics", page.FacilityId, page.ReportId, entry.PatientId));
                 }).ToList();
                 var metadata = entries.Body.Metadata;
                 patientBar = new PageBar
@@ -1093,6 +1096,16 @@ public sealed class ReportsService
         var text = ReportManifestRules.When(when);
         if (text is not null)
             events.Add(new ManifestTimelineEvent { Label = label, When = text });
+    }
+
+    /// <summary>A report- and patient-scoped page link, or null when the report or facility is unknown.</summary>
+    private static string? PatientScopedHref(string path, string? facilityId, string? reportId, string patientId)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(reportId) || string.IsNullOrWhiteSpace(patientId))
+            return null;
+        return path + "?facilityId=" + Uri.EscapeDataString(facilityId.Trim())
+            + "&reportId=" + Uri.EscapeDataString(reportId.Trim())
+            + "&patientId=" + Uri.EscapeDataString(patientId.Trim());
     }
 
     private static List<ManifestLink> PatientLinks(string patientId, string? measureHref, string? facilityId, string? reportId)

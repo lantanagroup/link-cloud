@@ -34,7 +34,7 @@ public class MissingFacilityReportTests
         page.Report.Status.Should().Be(ScheduleStatus.Submitted);
         page.Report.CensusCount.Should().Be(4);
         page.Report.InitialPopulationCount.Should().Be(7);
-        page.Patients.Should().BeEmpty();
+        page.PatientCount.GetValueOrDefault().Should().Be(0);
     }
 
     [Fact]

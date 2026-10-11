@@ -202,14 +202,13 @@ public sealed class FacilityViewService
             page.Report = ToReportRow(schedule.Body, counts.Census, counts.Population);
             StampResubmit(page.Report, page.IsTest);
 
-            var pageSize = FacilityViewRules.ClampPageSize(query.PageSize);
-            var pageNumber = FacilityViewRules.ClampPage(query.Page);
+            // Count only: the patient list itself lives on the shared manifest Patients tab.
             var patients = await _reports.SearchEntriesAsync(
                 page.FacilityId,
-                FacilityViewRules.Clean(query.PatientId),
+                null,
                 page.ReportId,
-                pageSize: pageSize,
-                pageNumber: pageNumber,
+                pageSize: 1,
+                pageNumber: 1,
                 cancellationToken: cancellationToken);
 
             if (!patients.IsSuccessStatusCode || patients.Body is null)
@@ -218,12 +217,7 @@ public sealed class FacilityViewService
                 return page;
             }
 
-            page.Paging = Bar(patients.Body.Metadata, pageNumber, pageSize, patients.Body.Records.Count);
-            page.Patients = patients.Body.Records.Select(ToPatient).ToList();
-
-            var selected = FacilityViewRules.Clean(query.Patient);
-            if (selected is not null)
-                page.Patient = await LoadPatientAsync(page.ReportId, selected, cancellationToken);
+            page.PatientCount = patients.Body.Metadata?.TotalCount ?? patients.Body.Records.Count;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -542,43 +536,6 @@ public sealed class FacilityViewService
         page.Paging = paging;
     }
 
-    private async Task<ReportPatientDetail> LoadPatientAsync(string reportId, string patientId, CancellationToken cancellationToken)
-    {
-        var response = await _reports!.GetEntryByScheduleAndPatientAsync(reportId, patientId, cancellationToken);
-        if (response.StatusCode == StatusCodes.Status404NotFound || response.Body is null)
-            return new ReportPatientDetail { PatientId = patientId, Error = "That patient is not on this report." };
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return new ReportPatientDetail
-            {
-                PatientId = patientId,
-                Error = FacilityFormRules.ServiceMessage("Report", response.StatusCode, response.RawBody)
-            };
-        }
-
-        var entry = response.Body;
-        var acquisition = entry.Acquisition?.LocationOrg;
-        var maps = entry.Normalization?.CodeMaps ?? [];
-        return new ReportPatientDetail
-        {
-            PatientId = entry.PatientId,
-            AcquisitionMissing = entry.Acquisition is null,
-            EncounterCount = acquisition?.EncounterCount ?? 0,
-            OrgEncounterCount = acquisition?.OrgEncounterCount ?? 0,
-            AssumedOrgEncounterCount = acquisition?.AssumedOrgEncounterCount ?? 0,
-            Locations = acquisition?.Matches
-                .Select(match => string.IsNullOrWhiteSpace(match.LocationName) ? match.LocationId : $"{match.LocationName} ({match.LocationId})")
-                .ToList() ?? [],
-            NormalizationMissing = entry.Normalization is null,
-            CodeMaps = maps.Select(map =>
-            {
-                var unmapped = map.UnmappedCodes.Count == 0 ? "" : " Unmapped codes: " + string.Join(", ", map.UnmappedCodes) + ".";
-                return $"{map.SourceSystem} to {map.TargetSystem}: {map.MappedCount} mapped, {map.UnmappedCount} unmapped, {map.FailureCount} failed.{unmapped}";
-            }).ToList()
-        };
-    }
-
     private async Task<FacilityViewAction> ChangeReportAsync(
         string? facilityId,
         string? reportId,
@@ -727,16 +684,6 @@ public sealed class FacilityViewService
             LocationId = location.LocationId,
             MappingId = location.OrganizationLocationMappingId
         }).ToList()
-    };
-
-    private static ReportPatientRow ToPatient(ReportEntryApiModel row) => new()
-    {
-        PatientId = row.PatientId,
-        ReportingStatus = row.ReportingStatus.ToString(),
-        SubmissionStatus = row.SubmissionStatus?.ToString() ?? "",
-        LocationOrg = row.LocationOrgStatus.ToString(),
-        EncounterMapping = row.EncounterMappingStatus.ToString(),
-        Hsloc = row.HslocMappingStatus.ToString()
     };
 
     private static void StampResubmit(FacilityReportRow? row, bool isTest)

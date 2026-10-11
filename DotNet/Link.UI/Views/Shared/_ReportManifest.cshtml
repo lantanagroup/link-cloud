@@ -35,11 +35,14 @@
         resources = row.Resources.Select(item => new { name = item.Name, count = item.Count }),
         events = row.Events.Select(item => new { label = item.Label, when = item.When }),
         links = row.Links.Select(item => new { label = item.Label, href = item.Href }),
-        refs = row.ResourceRefs.Select(item => new { type = item.Type, id = item.Id })
+        refs = row.ResourceRefs.Select(item => new { type = item.Type, id = item.Id }),
+        mapping = row.Mapping is null ? null : new { label = row.Mapping.Label, locationOrg = row.Mapping.LocationOrg, encounterMapping = row.Mapping.EncounterMapping, hsloc = row.Mapping.Hsloc },
+        diagnostics = row.DiagnosticsHref
     }), jsonOptions);
     var showMeasures = Model.Patients.Any(row => row.Measures.Count > 0);
     var showSubmission = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Submission));
     var showUpdated = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Updated));
+    var showMapping = Model.Patients.Any(row => row.Mapping is not null);
     var countHeader = Model.ContentsAreStatus || Model.TypeHeading == "Populations" ? "Patients" : "Total";
     var nameHeader = Model.TypeHeading == "Populations" ? "Population" : "Name";
     var populationCards = Model.Populations.Take(ReportManifestModel.ChartCap).ToList();
@@ -385,6 +388,10 @@
                                 {
                                     <th>Submission</th>
                                 }
+                                @if (showMapping)
+                                {
+                                    <th>Mapping <span class="au-info-icon" data-bs-toggle="tooltip" title="Location org, encounter mapping and HSLOC for this patient. The badge shows the weakest of the three; hover it for each one." aria-label="About the mapping badge"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
+                                }
                                 @if (showMeasures)
                                 {
                                     <th>Measures <span class="au-info-icon" data-bs-toggle="tooltip" title="Green means the patient is in the Numerator when this report has one. Red means they are not. A cohort measure with only an Initial Population uses that instead. A run shows a prediction, not a scored Numerator. A badge is left off when the data does not say." aria-label="About measure badges"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
@@ -439,6 +446,19 @@
                                         }
                                     </td>
                                 }
+                                @if (showMapping)
+                                {
+                                    <td data-nocopy class="text-nowrap">
+                                        @if (row.Mapping is { } mapping)
+                                        {
+                                            <span class="badge @mapping.BadgeClass" data-bs-toggle="tooltip" tabindex="0" title="@mapping.Title" aria-label="Mapping @mapping.Label. @mapping.Title">@mapping.Label</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">&mdash;</span>
+                                        }
+                                    </td>
+                                }
                                 @if (showMeasures)
                                 {
                                     <td data-nocopy>
@@ -475,7 +495,16 @@
                                         }
                                     </td>
                                 }
-                                <td class="text-end" data-nocopy><button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@index" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
+                                <td class="text-end text-nowrap" data-nocopy>
+                                    @if (!string.IsNullOrWhiteSpace(row.Href) && !string.IsNullOrWhiteSpace(row.LogHref))
+                                    {
+                                        <a class="btn btn-sm btn-au-link" href="@row.Href" title="Measure" aria-label="Measure for @row.PatientId"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Measure</a>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(row.LogHref))
+                                    {
+                                        <a class="btn btn-sm btn-au-link" href="@row.LogHref" title="Log" aria-label="Acquisition log for @row.PatientId"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Log</a>
+                                    }
+                                    <button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@index" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
                             </tr>
                         }
                         </tbody>
@@ -808,6 +837,10 @@
                     <h3 class="card-header h6 mb-0">Identity</h3>
                     <div class="card-body" id="manifest-patient-identity"></div>
                 </section>
+                <section class="card au-card mb-3" id="manifest-patient-diagnostics-card" hidden>
+                    <h3 class="card-header h6 mb-0">Diagnostics</h3>
+                    <div class="card-body" id="manifest-patient-diagnostics" aria-live="polite"></div>
+                </section>
                 <section class="card au-card mb-3">
                     <h3 class="card-header h6 mb-0">Measures</h3>
                     <div class="card-body" id="manifest-patient-measures"></div>
@@ -1068,6 +1101,21 @@
         host.appendChild(bar);
     }
 
+    var diagnosticsTicket = 0;
+    function loadDiagnostics(row) {
+        var card = document.getElementById("manifest-patient-diagnostics-card");
+        var host = document.getElementById("manifest-patient-diagnostics");
+        var ticket = ++diagnosticsTicket;
+        host.replaceChildren();
+        card.hidden = !row.diagnostics;
+        if (!row.diagnostics) return;
+        note(host, "Loading diagnostics...");
+        fetch(row.diagnostics, { headers: { "X-Requested-With": "XMLHttpRequest" }, credentials: "same-origin" })
+            .then(function (response) { if (!response.ok) throw new Error(String(response.status)); return response.text(); })
+            .then(function (html) { if (ticket === diagnosticsTicket) host.innerHTML = html; })
+            .catch(function () { if (ticket !== diagnosticsTicket) return; host.replaceChildren(); note(host, "Diagnostics could not be loaded. Try again."); });
+    }
+
     function fill(index) {
         openRow = details[index];
         if (!openRow) return;
@@ -1082,6 +1130,13 @@
         line(identity, "Status", openRow.status);
         line(identity, "Submission", openRow.submission);
         line(identity, "Updated", openRow.updated);
+        if (openRow.mapping) {
+            line(identity, "Mapping", openRow.mapping.label);
+            line(identity, "Location org", openRow.mapping.locationOrg);
+            line(identity, "Encounter mapping", openRow.mapping.encounterMapping);
+            line(identity, "HSLOC", openRow.mapping.hsloc);
+        }
+        loadDiagnostics(openRow);
 
         var measures = document.getElementById("manifest-patient-measures");
         measures.replaceChildren();
