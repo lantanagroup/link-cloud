@@ -77,8 +77,8 @@ public class KafkaConsoleUxTests
         migrate.Should().Contain("data-lu-result=\"kafka-partition\"");
         migrate.Should().Contain("id=\"kafka-dry-run-result\"");
         migrate.Should().Contain("KafkaIncreaseEligibility.MigrationLine");
-        IndexOf(migrate, "id=\"kafka-partition-result\"").Should().BeLessThan(IndexOf(migrate, ">Preview increase</span>"));
-        IndexOf(migrate, "id=\"kafka-dry-run-result\"").Should().BeLessThan(IndexOf(migrate, ">Dry run</button>"));
+        IndexOf(migrate, "id=\"kafka-partition-result\"").Should().BeLessThan(IndexOf(migrate, "formaction=\"/Operations/Kafka/plan\""));
+        IndexOf(migrate, "id=\"kafka-dry-run-result\"").Should().BeLessThan(IndexOf(migrate, "formaction=\"/Operations/Kafka/migrations/plan\""));
         consumers.Should().Contain("data-lu-result=\"kafka-replica\"");
         brokers.Should().Contain("data-lu-result=\"kafka-broker\"");
 
@@ -175,7 +175,10 @@ public class KafkaConsoleUxTests
         consumers.Should().Contain("KafkaWindows.Committed");
         consumers.Should().Contain("This group has no committed partitions.");
         consumers.Should().NotContain("foreach (var row in selected.Partitions");
-        migrate.Should().Contain("KafkaWindows.Facts");
+        migrate.Should().NotContain("KafkaWindows.Facts");
+        migrate.Should().NotContain("Partition placement");
+        migrate.Should().Contain("id=\"kafka-change-partitions\"");
+        topic.Should().Contain("KafkaWindows.Topic");
         migrate.Should().NotContain("foreach (var row in detail.PartitionsDetail)");
         overview.Should().Contain("KafkaWindows.Groups");
         overview.Should().NotContain("foreach (var row in Model.Groups.Groups");

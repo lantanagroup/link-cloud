@@ -297,8 +297,9 @@ public class MorningFixesGuardTests
         brokers.Should().Contain(">Rebalance</span>");
 
         var migrate = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Migrate.cshtml"));
-        migrate.Should().Contain(">Preview increase</span>");
-        migrate.Should().Contain("btn-au-execute\" type=\"submit\" formaction=\"/Operations/Kafka/migrations/plan\">Dry run");
+        migrate.Should().Contain("aria-label=\"Preview increase\"");
+        migrate.Should().Contain("btn-au-execute lu-icon-btn\" type=\"submit\" data-partition-btn=\"migrate\" formaction=\"/Operations/Kafka/migrations/plan\"");
+        migrate.Should().Contain("btn-warning\" href=");
         migrate.Should().Contain("btn-au-execute\" type=\"submit\" aria-label=\"Execute migration\">Execute");
         migrate.Should().Contain("btn-au-execute\" type=\"submit\">Go");
         migrate.Should().Contain("btn-au-execute\" type=\"submit\" name=\"action\" value=\"forward\">Continue forward");
