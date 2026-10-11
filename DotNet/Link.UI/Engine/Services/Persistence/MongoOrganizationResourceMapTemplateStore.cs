@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using MongoDB.Driver;
 using System.Text.Json;
 
@@ -43,25 +43,20 @@ public sealed class MongoOrganizationResourceMapTemplateStore : IOrganizationRes
 
     public async Task SetDefaultAsync(Guid id, CancellationToken ct = default)
     {
+        // WithTransactionAsync retries transient errors such as WriteConflict, which happen when
+        // several Link.UI instances seed the same default at startup.
         using var session = await _collection.Database.Client.StartSessionAsync(cancellationToken: ct);
-        session.StartTransaction();
-        try
+        await session.WithTransactionAsync(async (s, token) =>
         {
-            await _collection.UpdateManyAsync(session, _ => true,
+            await _collection.UpdateManyAsync(s, _ => true,
                 Builders<OrganizationResourceMapTemplateDocument>.Update.Set(d => d.IsDefault, false),
-                cancellationToken: ct);
+                cancellationToken: token);
 
-            await _collection.UpdateOneAsync(session, d => d.Id == id,
+            await _collection.UpdateOneAsync(s, d => d.Id == id,
                 Builders<OrganizationResourceMapTemplateDocument>.Update.Set(d => d.IsDefault, true),
-                cancellationToken: ct);
-
-            await session.CommitTransactionAsync(ct);
-        }
-        catch
-        {
-            await session.AbortTransactionAsync(ct);
-            throw;
-        }
+                cancellationToken: token);
+            return true;
+        }, cancellationToken: ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
