@@ -186,13 +186,15 @@ public sealed class FacilityTestIndex
     public static FacilityTestIndex Unreachable { get; } = new(false, [], false);
 
     private readonly HashSet<string> _testIds;
+    private readonly HashSet<string>? _knownIds;
 
-    private FacilityTestIndex(bool reachable, IReadOnlyList<string> ids, bool truncated)
+    private FacilityTestIndex(bool reachable, IReadOnlyList<string> ids, bool truncated, IEnumerable<string>? knownIds = null)
     {
         Reachable = reachable;
         Ids = ids;
         Truncated = truncated;
         _testIds = new HashSet<string>(ids, StringComparer.OrdinalIgnoreCase);
+        _knownIds = knownIds is null ? null : new HashSet<string>(knownIds, StringComparer.OrdinalIgnoreCase);
     }
 
     public bool Reachable { get; }
@@ -204,6 +206,13 @@ public sealed class FacilityTestIndex
     public bool IsTest(string? facilityId) =>
         !string.IsNullOrWhiteSpace(facilityId) && _testIds.Contains(facilityId.Trim());
 
+    /// <summary>
+    /// True when Tenant answered a flag read and did not list this facility, for example after an
+    /// automation run removed its facility. Such a row cannot be resubmitted.
+    /// </summary>
+    public bool IsMissing(string? facilityId) =>
+        _knownIds is not null && !string.IsNullOrWhiteSpace(facilityId) && !_knownIds.Contains(facilityId.Trim());
+
     public static FacilityTestIndex FromFlags(IEnumerable<FacilityFlag> flags)
     {
         var ids = flags
@@ -211,7 +220,10 @@ public sealed class FacilityTestIndex
             .Select(flag => flag.FacilityId.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        return new FacilityTestIndex(true, ids, false);
+        var known = flags
+            .Where(flag => !string.IsNullOrWhiteSpace(flag.FacilityId))
+            .Select(flag => flag.FacilityId.Trim());
+        return new FacilityTestIndex(true, ids, false, known);
     }
 
     public static FacilityTestIndex FromIds(IReadOnlyList<string> ids, bool truncated) =>

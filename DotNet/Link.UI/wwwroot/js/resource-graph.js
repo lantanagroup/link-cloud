@@ -23,6 +23,13 @@
         return window.luManifestPatient || null;
     }
 
+    function storedCounts(row) {
+        return ((row && row.resources) || [])
+            .map(function (item) { return { name: String(item.name || ""), count: Number(item.count || item.total || 0) }; })
+            .filter(function (item) { return item.name && item.count > 0; })
+            .sort(function (left, right) { return right.count - left.count || left.name.localeCompare(right.name); });
+    }
+
     function number(value) {
         return Number(value || 0).toLocaleString();
     }
@@ -377,12 +384,15 @@
                     setStatus("", 0, "idle");
                     return;
                 }
+                // Totals and per-type counts are the Report service's stored counts for this patient,
+                // the same numbers as the donut. The stream only supplies the resources to browse.
+                var stored = storedCounts(row);
                 state = {
                     patientId: row.id,
-                    total: Number(done.total || 0),
+                    total: stored.reduce(function (sum, type) { return sum + type.count; }, 0),
                     truncated: !!done.truncated,
-                    types: (done.types || []).map(function (type, index) {
-                        return { name: type.name, count: Number(type.count || 0), color: colors[index % colors.length] };
+                    types: stored.map(function (type, index) {
+                        return { name: type.name, count: type.count, color: colors[index % colors.length] };
                     }),
                     selected: null,
                     page: null,
@@ -396,8 +406,7 @@
                 };
                 var body = document.getElementById("manifest-graph-body");
                 if (body) body.hidden = false;
-                var line = number(state.total) + " resources";
-                if (state.truncated) line = "Stopped at " + number(state.total);
+                var line = state.types.length ? number(state.total) + " resources" : "No resource counts were recorded.";
                 setStatus(line, 100, "settled");
                 bindCanvas();
                 draw();
