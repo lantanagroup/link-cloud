@@ -1,0 +1,26 @@
+@model KafkaDashboard
+<div id="kafka-widget-pipeline" class="lu-kafka-widget">
+<section class="card au-card mt-3">
+    <h2 class="card-header h6 mb-0">Pipeline <partial name="_TermInfo" model="@(new TermInfo { Label = "About the pipeline", Text = "Link's main topics in the order a report moves through them. Each step is coloured by its consumer lag: green is caught up, amber is behind, red is " + KafkaDashboardRules.BadLag.ToString("N0") + " or more behind, grey is unknown. Open a step for its topic summary." })" /></h2>
+    <div class="card-body">
+        @if (Model.Pipeline.Count == 0)
+        {
+            <p class="text-muted mb-0">No pipeline topic is in the cluster metadata.</p>
+        }
+        else
+        {
+            <ol class="lu-pipeline" aria-label="Pipeline topics in order">
+                @foreach (var step in Model.Pipeline)
+                {
+                    <li>
+                        <a class="lu-pipeline-step lu-tone-@step.Tone" href="@step.Href" title="@step.Topic: lag @(step.LagKnown ? step.Lag.ToString("N0") : "unknown")">
+                            <span class="lu-pipeline-name">@step.Topic</span>
+                            <span class="lu-pipeline-lag">@(step.LagKnown ? "lag " + step.Lag.ToString("N0") : "lag —")</span>
+                        </a>
+                    </li>
+                }
+            </ol>
+        }
+    </div>
+</section>
+</div>

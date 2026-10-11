@@ -29,8 +29,13 @@
     <div class="col"><div class="au-stat-tile @(cluster.OfflinePartitions > 0 ? "lu-kafka-attention" : null)"><div class="au-stat-value">@cluster.OfflinePartitions</div><div class="au-stat-label">Offline</div></div></div>
     <div class="col"><div class="au-stat-tile @(cluster.IsrShrunkPartitions > 0 ? "lu-kafka-attention" : null)"><div class="au-stat-value">@cluster.IsrShrunkPartitions</div><div class="au-stat-label">ISR shrink</div></div></div>
     <div class="col"><div class="au-stat-tile @(groupAttention ? "lu-kafka-attention" : null)"><div class="au-stat-value">@Model.Groups.Groups.Count</div><div class="au-stat-label">Groups</div></div></div>
-    <div class="col"><div class="au-stat-tile @(maxLag > 0 ? "lu-kafka-attention" : null)"><div class="au-stat-value">@maxLag</div><div class="au-stat-label">Max lag</div></div></div>
+    <div class="col"><div class="au-stat-tile @(maxLag > 0 ? "lu-kafka-attention" : null)"><div class="au-stat-value">@maxLag.ToString("N0")</div><div class="au-stat-label">Max lag</div></div></div>
 </div>
+
+@if (Model.Dashboard is not null)
+{
+    <partial name="Kafka/_KafkaPipeline" model="Model.Dashboard" />
+}
 
 <section class="card au-card mt-3" id="kafka-attention">
     <h2 class="card-header h6 mb-0">Needs attention <partial name="_TermInfo" model="@(new TermInfo { Label = "About needs attention", Text = "Only problems are listed, worst first. Offline partitions come before a short ISR, then empty, unowned, or not-stable groups, then lag, then an error or retry topic that is still receiving messages. Unknown groups are included when they are empty, unowned, or behind. One blue button opens the place to act. A quiet topic stays off this list." })" /></h2>
@@ -45,8 +50,7 @@
                 <table class="table table-sm mb-0">
                     <thead>
                         <tr>
-                            <th class="lu-flex">What</th>
-                            <th>Kind</th>
+                            <th class="lu-flex">Item</th>
                             <th class="lu-wrap">Why</th>
                             <th></th>
                         </tr>
@@ -55,8 +59,7 @@
                     @foreach (var item in rows)
                     {
                         <tr class="lu-kafka-problem">
-                            <td class="lu-flex">@item.What</td>
-                            <td>@item.Kind</td>
+                            <td class="lu-flex"><span title="@item.What">@item.What</span><span class="badge au-badge-muted lu-kind-badge">@item.Kind</span></td>
                             <td class="lu-wrap">@item.Why</td>
                             <td><a class="btn btn-sm btn-au-link" href="@item.Href">@item.Action</a></td>
                         </tr>
@@ -72,3 +75,13 @@
         }
     </div>
 </section>
+
+@if (Model.Dashboard is not null)
+{
+    <div class="row g-3 lu-kafka-widget-grid">
+        <div class="col-12 col-xxl-8"><partial name="Kafka/_KafkaBrokerHealth" model="Model.Dashboard" /></div>
+        <div class="col-12 col-xxl-4"><partial name="Kafka/_KafkaLeaderDonut" model="Model.Dashboard" /></div>
+        <div class="col-12 col-xxl-8"><partial name="Kafka/_KafkaThroughput" model="Model.Dashboard" /></div>
+        <div class="col-12 col-xxl-4"><partial name="Kafka/_KafkaErrorRetry" model="Model.Dashboard" /></div>
+    </div>
+}

@@ -1,0 +1,34 @@
+@model KafkaDashboard
+@using LantanaGroup.Link.Shared.Application.Models.Kafka
+<div id="kafka-widget-errors" class="lu-kafka-widget h-100">
+<section class="card au-card mt-3 h-100">
+    <h2 class="card-header h6 mb-0">Error and retry topics <partial name="_TermInfo" model="@(new TermInfo { Label = "About error and retry topics", Text = "Messages that landed on a retry or error topic in the last " + Model.History.WindowMinutes + " minutes, most errors first, top " + KafkaDashboard.TopN + ". Open goes to that topic's messages." })" /></h2>
+    <div class="card-body">
+        @if (!Model.History.LandedKnown)
+        {
+            <p class="text-muted mb-0">Not enough history yet. Counts appear after two samples.</p>
+        }
+        else if (Model.History.Landed.Count == 0)
+        {
+            <p class="mb-0">Nothing landed on a retry or error topic in the last @Model.History.WindowMinutes minutes.</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead><tr><th class="lu-flex">Topic</th><th>Retry</th><th>Error</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var row in Model.History.Landed)
+                {
+                    <tr class="@(row.Error > 0 ? "lu-kafka-problem" : null)">
+                        <td class="lu-flex" title="@row.Topic">@row.Topic</td>
+                        <td>@row.Retry.ToString("N0")</td>
+                        <td>@row.Error.ToString("N0")</td>
+                        <td class="text-end"><a class="btn btn-sm btn-au-link" href="@KafkaConsoleRoutes.Topics(row.Error > 0 ? KafkaTopicCatalog.ErrorName(row.Topic) : KafkaTopicCatalog.RetryName(row.Topic), KafkaConsoleRoutes.Messages)">Messages</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</section>
+</div>

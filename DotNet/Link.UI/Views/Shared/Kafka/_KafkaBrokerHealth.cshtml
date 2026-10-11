@@ -1,0 +1,42 @@
+@model KafkaDashboard
+<div id="kafka-widget-brokers" class="lu-kafka-widget h-100">
+<section class="card au-card mt-3 h-100">
+    <h2 class="card-header h6 mb-0">Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About broker health", Text = "One card per broker, problems first. In sync means every replica the broker hosts is in the ISR. Disk is the log directory size when the cluster reports it. Open a broker for its partitions and actions." })" /></h2>
+    <div class="card-body">
+        @if (Model.Brokers.Count == 0)
+        {
+            <p class="text-muted mb-0">No broker is in the cluster metadata.</p>
+        }
+        else
+        {
+            <div class="lu-broker-cards">
+                @foreach (var broker in Model.Brokers)
+                {
+                    var bad = !broker.Online || !broker.InSync;
+                    <a class="lu-broker-card @(bad ? "lu-kafka-attention" : null)" href="@broker.Href">
+                        <span class="lu-broker-title">Broker @broker.Id</span>
+                        <span class="lu-broker-host" title="@broker.Host">@broker.Host</span>
+                        <span class="lu-broker-state">
+                            @{ var online = broker.Online ? "Online" : "Offline"; var sync = broker.InSync ? "In sync" : "ISR short"; }
+                            <span class="badge @StatusPills.ForKafkaHealth(online)">@online</span>
+                            <span class="badge @StatusPills.ForKafkaHealth(sync)">@sync</span>
+                        </span>
+                        <span class="lu-broker-stats">
+                            <span><strong>@broker.Partitions</strong> partitions</span>
+                            <span><strong>@broker.Leaders</strong> leaders</span>
+                            @if (broker.Disk.Length > 0)
+                            {
+                                <span><strong>@broker.Disk</strong> disk</span>
+                            }
+                        </span>
+                    </a>
+                }
+            </div>
+            @if (Model.BrokerTotal > Model.Brokers.Count)
+            {
+                <a class="btn btn-sm btn-au-link mt-2" href="@KafkaConsoleRoutes.Broker(null)">All @Model.BrokerTotal brokers</a>
+            }
+        }
+    </div>
+</section>
+</div>

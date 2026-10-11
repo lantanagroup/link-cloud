@@ -16,11 +16,17 @@
         "retryPartitions": 3,
         "errorPartitions": 3,
         "replicationFactor": 3,
-        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
         "produceRatePerSecond": 0,
         "totalLag": 0,
         "maxReplicas": 3,
-        "groups": ["DataAcquisition"]
+        "groups": [
+          "DataAcquisition"
+        ]
       },
       {
         "topic": "ResourcesAcquired",
@@ -33,11 +39,17 @@
         "retryPartitions": 3,
         "errorPartitions": 3,
         "replicationFactor": 3,
-        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
         "produceRatePerSecond": 4.5,
         "totalLag": 12,
         "maxReplicas": 3,
-        "groups": ["Normalization"]
+        "groups": [
+          "Normalization"
+        ]
       },
       {
         "topic": "ReadyToAcquire",
@@ -50,11 +62,17 @@
         "retryPartitions": 3,
         "errorPartitions": 3,
         "replicationFactor": 3,
-        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
         "produceRatePerSecond": 0,
         "totalLag": 0,
         "maxReplicas": 3,
-        "groups": ["DataAcquisitionWorker"]
+        "groups": [
+          "DataAcquisitionWorker"
+        ]
       },
       {
         "topic": "ReportScheduled",
@@ -67,11 +85,268 @@
         "retryPartitions": 3,
         "errorPartitions": 3,
         "replicationFactor": 3,
-        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
         "produceRatePerSecond": 0,
         "totalLag": 0,
         "maxReplicas": 3,
-        "groups": ["QueryDispatch", "Report"]
+        "groups": [
+          "QueryDispatch",
+          "Report"
+        ]
+      },
+      {
+        "topic": "PatientCensusScheduled",
+        "family": "PatientCensusScheduled",
+        "keyClass": "Facility",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 0.3,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "DataAcquisition"
+        ]
+      },
+      {
+        "topic": "PatientListsAcquired",
+        "family": "PatientListsAcquired",
+        "keyClass": "Facility",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 0.3,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "Census"
+        ]
+      },
+      {
+        "topic": "PatientEvent",
+        "family": "PatientEvent",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 6.2,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "QueryDispatch"
+        ]
+      },
+      {
+        "topic": "ResourcesNormalized",
+        "family": "ResourcesNormalized",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 18.4,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "measureeval"
+        ]
+      },
+      {
+        "topic": "EvaluationRequested",
+        "family": "EvaluationRequested",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 9.1,
+        "totalLag": 1480,
+        "maxReplicas": 3,
+        "groups": [
+          "measureeval"
+        ]
+      },
+      {
+        "topic": "MeasureReportGenerated",
+        "family": "MeasureReportGenerated",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 8.7,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "Report"
+        ]
+      },
+      {
+        "topic": "ReadyForValidation",
+        "family": "ReadyForValidation",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 3.2,
+        "totalLag": 40,
+        "maxReplicas": 3,
+        "groups": [
+          "validation"
+        ]
+      },
+      {
+        "topic": "ValidationComplete",
+        "family": "ValidationComplete",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 3.1,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "Report"
+        ]
+      },
+      {
+        "topic": "SubmitPayload",
+        "family": "SubmitPayload",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 1.4,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "Submission"
+        ]
+      },
+      {
+        "topic": "PayloadSubmitted",
+        "family": "PayloadSubmitted",
+        "keyClass": "Patient",
+        "keyShape": "{\"facilityId\":\"...\",\"patientId\":\"...\"}",
+        "hardBlocked": false,
+        "slice1Eligible": true,
+        "migrationEligibility": "Not checked yet. Dry run a migration to confirm it is eligible.",
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": {
+          "retention.ms": "604800000",
+          "cleanup.policy": "delete",
+          "min.insync.replicas": "2"
+        },
+        "produceRatePerSecond": 1.2,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": [
+          "Report"
+        ]
       }
     ]
   },
@@ -87,14 +362,39 @@
           {
             "clientId": "normalization-host-a-c1",
             "host": "normalization-0",
-            "assignment": ["ResourcesAcquired-0", "ResourcesAcquired-1", "ResourcesAcquired-2"],
+            "assignment": [
+              "ResourcesAcquired-0",
+              "ResourcesAcquired-1",
+              "ResourcesAcquired-2"
+            ],
             "advertisesExpectedConfig": true
           }
         ],
         "partitions": [
-          { "topic": "ResourcesAcquired", "partition": 0, "highWatermark": 40, "committed": 36, "lag": 4, "owned": true },
-          { "topic": "ResourcesAcquired", "partition": 1, "highWatermark": 40, "committed": 34, "lag": 6, "owned": true },
-          { "topic": "ResourcesAcquired", "partition": 2, "highWatermark": 40, "committed": 38, "lag": 2, "owned": true }
+          {
+            "topic": "ResourcesAcquired",
+            "partition": 0,
+            "highWatermark": 40,
+            "committed": 36,
+            "lag": 4,
+            "owned": true
+          },
+          {
+            "topic": "ResourcesAcquired",
+            "partition": 1,
+            "highWatermark": 40,
+            "committed": 34,
+            "lag": 6,
+            "owned": true
+          },
+          {
+            "topic": "ResourcesAcquired",
+            "partition": 2,
+            "highWatermark": 40,
+            "committed": 38,
+            "lag": 2,
+            "owned": true
+          }
         ]
       },
       {
@@ -107,14 +407,39 @@
           {
             "clientId": "report-host-a-c1",
             "host": "report-0",
-            "assignment": ["ReportScheduled-0", "ReportScheduled-1", "ReportScheduled-2"],
+            "assignment": [
+              "ReportScheduled-0",
+              "ReportScheduled-1",
+              "ReportScheduled-2"
+            ],
             "advertisesExpectedConfig": true
           }
         ],
         "partitions": [
-          { "topic": "ReportScheduled", "partition": 0, "highWatermark": 8, "committed": 8, "lag": 0, "owned": true },
-          { "topic": "ReportScheduled", "partition": 1, "highWatermark": 8, "committed": 8, "lag": 0, "owned": true },
-          { "topic": "ReportScheduled", "partition": 2, "highWatermark": 8, "committed": 8, "lag": 0, "owned": true }
+          {
+            "topic": "ReportScheduled",
+            "partition": 0,
+            "highWatermark": 8,
+            "committed": 8,
+            "lag": 0,
+            "owned": true
+          },
+          {
+            "topic": "ReportScheduled",
+            "partition": 1,
+            "highWatermark": 8,
+            "committed": 8,
+            "lag": 0,
+            "owned": true
+          },
+          {
+            "topic": "ReportScheduled",
+            "partition": 2,
+            "highWatermark": 8,
+            "committed": 8,
+            "lag": 0,
+            "owned": true
+          }
         ]
       },
       {
@@ -127,24 +452,80 @@
           {
             "clientId": "dataacquisition-host-a-c1",
             "host": "dataacquisition-0",
-            "assignment": ["ReadyToAcquire-0", "ReadyToAcquire-1", "ReadyToAcquire-2"],
+            "assignment": [
+              "ReadyToAcquire-0",
+              "ReadyToAcquire-1",
+              "ReadyToAcquire-2"
+            ],
             "advertisesExpectedConfig": true
           }
         ],
         "partitions": [
-          { "topic": "ReadyToAcquire", "partition": 0, "highWatermark": 3, "committed": 3, "lag": 0, "owned": true },
-          { "topic": "ReadyToAcquire", "partition": 1, "highWatermark": 3, "committed": 3, "lag": 0, "owned": true },
-          { "topic": "ReadyToAcquire", "partition": 2, "highWatermark": 3, "committed": 3, "lag": 0, "owned": true }
+          {
+            "topic": "ReadyToAcquire",
+            "partition": 0,
+            "highWatermark": 3,
+            "committed": 3,
+            "lag": 0,
+            "owned": true
+          },
+          {
+            "topic": "ReadyToAcquire",
+            "partition": 1,
+            "highWatermark": 3,
+            "committed": 3,
+            "lag": 0,
+            "owned": true
+          },
+          {
+            "topic": "ReadyToAcquire",
+            "partition": 2,
+            "highWatermark": 3,
+            "committed": 3,
+            "lag": 0,
+            "owned": true
+          }
         ]
       }
     ]
   },
   "capabilities": {
     "topics": [
-      { "topic": "DataAcquisitionRequested", "authorizedOperations": ["Describe", "Read"], "canAlterPartitions": false },
-      { "topic": "ResourcesAcquired", "authorizedOperations": ["Describe", "Read", "Alter"], "canAlterPartitions": true },
-      { "topic": "ReadyToAcquire", "authorizedOperations": ["Describe", "Read", "Alter"], "canAlterPartitions": true },
-      { "topic": "ReportScheduled", "authorizedOperations": ["Describe", "Read", "Alter"], "canAlterPartitions": true }
+      {
+        "topic": "DataAcquisitionRequested",
+        "authorizedOperations": [
+          "Describe",
+          "Read"
+        ],
+        "canAlterPartitions": false
+      },
+      {
+        "topic": "ResourcesAcquired",
+        "authorizedOperations": [
+          "Describe",
+          "Read",
+          "Alter"
+        ],
+        "canAlterPartitions": true
+      },
+      {
+        "topic": "ReadyToAcquire",
+        "authorizedOperations": [
+          "Describe",
+          "Read",
+          "Alter"
+        ],
+        "canAlterPartitions": true
+      },
+      {
+        "topic": "ReportScheduled",
+        "authorizedOperations": [
+          "Describe",
+          "Read",
+          "Alter"
+        ],
+        "canAlterPartitions": true
+      }
     ]
   },
   "cluster": {
@@ -157,23 +538,218 @@
     "logDirsAvailable": false,
     "logDirDetail": "Log directory sizes are not available from this client. Emptiness is checked from replica and leader metadata.",
     "brokers": [
-      { "id": 0, "host": "broker-0", "port": 9092, "rack": "a", "state": "up", "partitionCount": 4, "leaderCount": 2, "logDirBytes": -1 },
-      { "id": 1, "host": "broker-1", "port": 9092, "rack": "b", "state": "up", "partitionCount": 4, "leaderCount": 1, "logDirBytes": -1 },
-      { "id": 2, "host": "broker-2", "port": 9092, "rack": "c", "state": "up", "partitionCount": 4, "leaderCount": 1, "logDirBytes": -1 }
+      {
+        "id": 0,
+        "host": "broker-0",
+        "port": 9092,
+        "rack": "a",
+        "state": "up",
+        "partitionCount": 4,
+        "leaderCount": 2,
+        "logDirBytes": 412000000000
+      },
+      {
+        "id": 1,
+        "host": "broker-1",
+        "port": 9092,
+        "rack": "b",
+        "state": "up",
+        "partitionCount": 4,
+        "leaderCount": 1,
+        "logDirBytes": 398500000000
+      },
+      {
+        "id": 2,
+        "host": "broker-2",
+        "port": 9092,
+        "rack": "c",
+        "state": "up",
+        "partitionCount": 4,
+        "leaderCount": 1,
+        "logDirBytes": 405200000000
+      }
     ],
     "placements": [
-      { "topic": "ResourcesAcquired", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
-      { "topic": "ResourcesAcquired", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
-      { "topic": "ResourcesAcquired", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] },
-      { "topic": "ReadyToAcquire", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
-      { "topic": "ReadyToAcquire", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
-      { "topic": "ReadyToAcquire", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] },
-      { "topic": "ReportScheduled", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
-      { "topic": "ReportScheduled", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
-      { "topic": "ReportScheduled", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] },
-      { "topic": "DataAcquisitionRequested", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
-      { "topic": "DataAcquisitionRequested", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
-      { "topic": "DataAcquisitionRequested", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] }
+      {
+        "topic": "ResourcesAcquired",
+        "partition": 0,
+        "leader": 0,
+        "replicas": [
+          0,
+          1,
+          2
+        ],
+        "isr": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "topic": "ResourcesAcquired",
+        "partition": 1,
+        "leader": 1,
+        "replicas": [
+          1,
+          2,
+          0
+        ],
+        "isr": [
+          1,
+          2,
+          0
+        ]
+      },
+      {
+        "topic": "ResourcesAcquired",
+        "partition": 2,
+        "leader": 2,
+        "replicas": [
+          2,
+          0,
+          1
+        ],
+        "isr": [
+          2,
+          0,
+          1
+        ]
+      },
+      {
+        "topic": "ReadyToAcquire",
+        "partition": 0,
+        "leader": 0,
+        "replicas": [
+          0,
+          1,
+          2
+        ],
+        "isr": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "topic": "ReadyToAcquire",
+        "partition": 1,
+        "leader": 1,
+        "replicas": [
+          1,
+          2,
+          0
+        ],
+        "isr": [
+          1,
+          2,
+          0
+        ]
+      },
+      {
+        "topic": "ReadyToAcquire",
+        "partition": 2,
+        "leader": 2,
+        "replicas": [
+          2,
+          0,
+          1
+        ],
+        "isr": [
+          2,
+          0,
+          1
+        ]
+      },
+      {
+        "topic": "ReportScheduled",
+        "partition": 0,
+        "leader": 0,
+        "replicas": [
+          0,
+          1,
+          2
+        ],
+        "isr": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "topic": "ReportScheduled",
+        "partition": 1,
+        "leader": 1,
+        "replicas": [
+          1,
+          2,
+          0
+        ],
+        "isr": [
+          1,
+          2,
+          0
+        ]
+      },
+      {
+        "topic": "ReportScheduled",
+        "partition": 2,
+        "leader": 2,
+        "replicas": [
+          2,
+          0,
+          1
+        ],
+        "isr": [
+          2,
+          0,
+          1
+        ]
+      },
+      {
+        "topic": "DataAcquisitionRequested",
+        "partition": 0,
+        "leader": 0,
+        "replicas": [
+          0,
+          1,
+          2
+        ],
+        "isr": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "topic": "DataAcquisitionRequested",
+        "partition": 1,
+        "leader": 1,
+        "replicas": [
+          1,
+          2,
+          0
+        ],
+        "isr": [
+          1,
+          2,
+          0
+        ]
+      },
+      {
+        "topic": "DataAcquisitionRequested",
+        "partition": 2,
+        "leader": 2,
+        "replicas": [
+          2,
+          0,
+          1
+        ],
+        "isr": [
+          2,
+          0,
+          1
+        ]
+      }
     ]
   },
   "infra": {
@@ -202,7 +778,12 @@
       "createdUtc": "2026-10-08T15:00:00Z",
       "approvedUtc": "2026-10-08T15:00:00Z",
       "groups": [
-        { "groupId": "DataAcquisitionWorker", "assignedPartitions": 3, "expectedPartitions": 6, "complete": false }
+        {
+          "groupId": "DataAcquisitionWorker",
+          "assignedPartitions": 3,
+          "expectedPartitions": 6,
+          "complete": false
+        }
       ]
     },
     {
@@ -222,7 +803,12 @@
       "approvedUtc": "2026-10-08T15:05:00Z",
       "executedUtc": "2026-10-08T15:06:00Z",
       "groups": [
-        { "groupId": "Normalization", "assignedPartitions": 3, "expectedPartitions": 3, "complete": true }
+        {
+          "groupId": "Normalization",
+          "assignedPartitions": 3,
+          "expectedPartitions": 3,
+          "complete": true
+        }
       ]
     },
     {
