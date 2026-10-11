@@ -3949,6 +3949,12 @@ kbd {
 tr.lu-kafka-problem > td:first-child {
   box-shadow: inset 3px 0 0 #b42318;
 }
+.btn.is-dimmed {
+  opacity: .45;
+}
+.lu-kafka-attention {
+  box-shadow: inset 3px 0 0 #b42318;
+}
 #kafka-change-partitions [data-partition-pane],
 #kafka-change-partitions [data-partition-btn] {
   display: none;
