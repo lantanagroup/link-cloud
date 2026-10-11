@@ -3103,16 +3103,31 @@ a.lu-clip {
 td.lu-copy-host {
   position: relative;
 }
-/* The copy icon floats as a chip over the top edge of the cell, outside the text, so it never covers a short value
-   and showing it takes no layout space (no width shift). */
+/* The copy icon is part of the cell: small, at the right edge, vertically centred, on the row-hover tone. cell-copy.js
+   moves it just after the text (.lu-copy-after) when a short value leaves no room at the edge. It is absolutely
+   positioned, so showing it never changes a cell's width. */
 @media (hover: hover) and (pointer: fine) {
   table.table > tbody > tr > td.lu-copy-host > .lu-cell-copy,
   table.au-table > tbody > tr > td.lu-copy-host > .lu-cell-copy {
-    top: 0;
+    top: 50%;
     right: .25rem;
-    transform: translateY(-55%);
-    z-index: 3;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 1.3rem;
+    min-width: 1.3rem;
+    height: 1.3rem;
+    padding: 0;
+    font-size: .7rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: .25rem;
+  }
+  table.table > tbody > tr > td.lu-copy-host > .lu-cell-copy.lu-copy-after,
+  table.au-table > tbody > tr > td.lu-copy-host > .lu-cell-copy.lu-copy-after {
+    right: auto;
+    left: var(--lu-copy-left, auto);
   }
 }
 .btn.lu-cell-copy,
@@ -3122,9 +3137,9 @@ td.lu-copy-host > .btn.lu-cell-copy,
 td.lu-copy-host > .btn.lu-cell-copy:hover,
 td.lu-copy-host > .btn.lu-cell-copy:focus,
 td.lu-copy-host > .btn.lu-cell-copy:active {
-  background: #f3f3f3;
-  background-color: #f3f3f3;
-  border: 1px solid #d0d5da;
+  background: #ececec;
+  background-color: #ececec;
+  border: 1px solid transparent;
   color: #495057;
   box-shadow: none;
 }
@@ -3132,9 +3147,9 @@ td.lu-copy-host > .btn.lu-cell-copy:active {
   td.lu-copy-host > .btn.lu-copy.lu-cell-copy,
   td.lu-copy-host > .btn.lu-copy.lu-cell-copy:hover,
   td.lu-copy-host > .btn.lu-copy.lu-cell-copy:focus {
-    background: #f3f3f3;
-    background-color: #f3f3f3;
-    border-color: #d0d5da;
+    background: #ececec;
+    background-color: #ececec;
+    border-color: transparent;
     color: #495057;
     opacity: 1;
     visibility: visible;

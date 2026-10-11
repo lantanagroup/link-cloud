@@ -1,0 +1,43 @@
+﻿@model ReportPatientDetail
+@* One patient's pipeline diagnostics: acquisition encounters and locations, normalization code maps. *@
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <p class="mb-0">@Model.Error</p>
+}
+else
+{
+    <dl class="row mb-2 lu-diagnostics">
+        @if (Model.AcquisitionMissing)
+        {
+            <dd class="col-12 mb-1">Data acquisition has not reported for this patient.</dd>
+        }
+        else
+        {
+            <dt class="col-sm-5">Encounters</dt><dd class="col-sm-7">@Model.EncounterCount</dd>
+            <dt class="col-sm-5">In the organization</dt><dd class="col-sm-7">@Model.OrgEncounterCount</dd>
+            <dt class="col-sm-5">Assumed in the organization</dt><dd class="col-sm-7">@Model.AssumedOrgEncounterCount</dd>
+            @if (Model.Locations.Count > 0)
+            {
+                <dt class="col-sm-5">Locations</dt><dd class="col-sm-7">@string.Join(", ", Model.Locations)</dd>
+            }
+        }
+    </dl>
+    <h4 class="h6">Code maps</h4>
+    @if (Model.NormalizationMissing)
+    {
+        <p class="mb-0">Normalization has not reported code maps for this patient.</p>
+    }
+    else if (Model.CodeMaps.Count == 0)
+    {
+        <p class="mb-0">No code map totals.</p>
+    }
+    else
+    {
+        <ul class="mb-0">
+            @foreach (var map in Model.CodeMaps)
+            {
+                <li>@map</li>
+            }
+        </ul>
+    }
+}
