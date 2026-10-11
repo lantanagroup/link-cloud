@@ -7,50 +7,92 @@
     var migration = Model.Migration;
     var topicName = topic?.Topic ?? query.TopicName;
     var targetPartitions = Model.DraftPartitions > 0 ? Model.DraftPartitions : (topic?.Partitions ?? 3) + 1;
-    var migrateStep = 1;
-    if (migration is not null)
-        migrateStep = 5;
-    else if (plan is not null && plan.Accepted)
-        migrateStep = 4;
-    else if (plan is not null)
-        migrateStep = 3;
-    else if (!string.IsNullOrWhiteSpace(topicName))
-        migrateStep = 2;
     var resultTone = plan is null ? "alert-secondary" : !plan.Accepted ? "alert-danger" : plan.Warnings.Count > 0 ? "alert-warning" : "alert-success";
     var currentPartitions = topic?.Partitions ?? detail?.Partitions ?? 0;
+    var partitionTone = Model.Plan is null ? "alert-secondary" : Model.Plan.Accepted ? "alert-success" : "alert-danger";
+    var increaseLine = topic is null ? null : KafkaIncreaseEligibility.Line(topic.PartitionAddReason, Model.Plan, topic.Topic);
+    var migrationLine = KafkaIncreaseEligibility.MigrationLine(topic?.MigrationEligibility ?? detail?.Eligibility, plan);
+    bool Matches(KafkaTopicRow row)
+    {
+        if (query.Family.Length > 0 && !string.Equals(row.Family, query.Family, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (query.KeyClass.Length > 0 && !string.Equals(row.KeyClass, query.KeyClass, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (query.Q.Length > 0
+            && !row.Topic.Contains(query.Q, StringComparison.OrdinalIgnoreCase)
+            && !row.KeyClass.Contains(query.Q, StringComparison.OrdinalIgnoreCase)
+            && !row.Groups.Any(group => group.Contains(query.Q, StringComparison.OrdinalIgnoreCase)))
+            return false;
+        return true;
+    }
+    var choices = Model.Topics.Topics.Where(Matches).OrderBy(row => row.Topic, StringComparer.OrdinalIgnoreCase).ToList();
+    if (!string.IsNullOrWhiteSpace(topicName) && choices.All(row => !string.Equals(row.Topic, topicName, StringComparison.Ordinal)))
+    {
+        var current = Model.Topics.Topics.FirstOrDefault(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal));
+        if (current is not null)
+            choices.Insert(0, current);
+    }
 }
 
-<section class="card au-card mt-3 mb-3">
-<h2 class="card-header h6 mb-0">Migrate a topic</h2>
-<div class="card-body">
-<p class="mb-2">Migrating makes room for more partitions when an in-place increase is not the right tool. It stops the workloads that use the topic, copies the log to a backup, deletes the topic, and creates it empty at the new partition count. Consumer groups start at offset 0. Nothing is copied back onto the new topic. The backup stays until a person deletes it or retention expires.</p>
-<ol class="lu-kafka-steps mb-2">
-    <li>Choose the topic and the target partition count.</li>
-    <li>Dry run checks the plan and changes nothing.</li>
-    <li>Review the result. A refusal lists each reason that blocks it.</li>
-    <li>Request submits the real migration for approval. Type the topic name first.</li>
-    <li>Track approval, execution, and recovery on this page.</li>
-</ol>
-<p class="mb-0">
-    <span class="badge @StatusPills.ForWizardStep(migrateStep, 1)">1 Choose a topic</span>
-    <span class="badge @StatusPills.ForWizardStep(migrateStep, 2)">2 Dry run</span>
-    <span class="badge @StatusPills.ForWizardStep(migrateStep, 3)">3 Review</span>
-    <span class="badge @StatusPills.ForWizardStep(migrateStep, 4)">4 Request</span>
-    <span class="badge @StatusPills.ForWizardStep(migrateStep, 5)">5 Track</span>
-</p>
-</div>
-</section>
-
-<section class="card au-card mb-3">
-<h2 class="card-header h6 mb-0">Topic</h2>
+<section class="card au-card mt-3 mb-3" id="kafka-migrate-topic">
+<h2 class="card-header h6 mb-0">Topic <partial name="_TermInfo" model="@(new TermInfo { Label = "About partition changes", Text = "An in-place add keeps the topic and remaps keys. A migration stops the workloads, copies the log to a backup, and recreates the topic empty. Consumer groups start at offset 0. Nothing is copied back. The backup stays until a person deletes it or retention expires." })" /></h2>
 <div class="card-body">
 <form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Migrate" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+    <input type="hidden" name="page" value="1" />
+    <input type="hidden" name="sort" value="@query.Sort" />
+    <input type="hidden" name="dir" value="@query.Dir" />
+    <input type="hidden" name="pageSize" value="@query.PageSize" />
+    <input type="hidden" name="group" value="@query.Group" />
+    <input type="hidden" name="broker" value="@query.Broker" />
+    <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
+    <div class="col-12 col-md-4">
+        <label class="form-label" for="kafka-q-migrate">Search</label>
+        <input class="form-control" id="kafka-q-migrate" name="q" value="@query.Q" />
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label" for="kafka-family-migrate">Family</label>
+        <select class="form-select" id="kafka-family-migrate" name="family">
+            <option value="">All families</option>
+            @foreach (var family in Model.Families)
+            {
+                if (family == query.Family)
+                {
+                    <option value="@family" selected>@family</option>
+                }
+                else
+                {
+                    <option value="@family">@family</option>
+                }
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label" for="kafka-key-migrate">Key class</label>
+        <select class="form-select" id="kafka-key-migrate" name="keyClass">
+            <option value="">All key classes</option>
+            @foreach (var keyClass in Model.KeyClasses)
+            {
+                if (keyClass == query.KeyClass)
+                {
+                    <option value="@keyClass" selected>@keyClass</option>
+                }
+                else
+                {
+                    <option value="@keyClass">@keyClass</option>
+                }
+            }
+        </select>
+    </div>
     <div class="col-12 col-md-6">
         <label class="form-label" for="migrate-topic">Topic</label>
         <select class="form-select" id="migrate-topic" name="topic">
-            @foreach (var row in Model.Topics.Topics.Where(row => row.Slice1Eligible))
+            @if (choices.Count == 0)
+            {
+                <option value="">No topics match</option>
+            }
+            @foreach (var row in choices)
             {
                 if (row.Topic == topicName)
                 {
@@ -67,6 +109,14 @@
         <button class="btn btn-au-link" type="submit">Open</button>
     </div>
 </form>
+@if (!string.IsNullOrWhiteSpace(increaseLine))
+{
+    <p class="mt-3 mb-1">@increaseLine</p>
+}
+@if (!string.IsNullOrWhiteSpace(migrationLine))
+{
+    <p class="@(string.IsNullOrWhiteSpace(increaseLine) ? "mt-3" : "") mb-0">@migrationLine</p>
+}
 </div>
 </section>
 
@@ -77,9 +127,8 @@
     {
         <partial name="_KafkaSummary" model="@(new KafkaSummaryStrip(facts.Total, "Partitions", facts.Hot, "Largest log", facts.Hottest.ToString("N0"), facts.Skew))" />
         <div class="au-card card mt-3">
-            <div class="card-header">Partition placement</div>
+            <div class="card-header">Partition placement <partial name="_TermInfo" model="@(new TermInfo { Label = "About partition placement", Text = "One page, worst first. A short ISR, a missing preferred leader, or an offline leader comes first." })" /></div>
             <div class="card-body">
-                <p class="text-muted">One page, worst first. A short ISR, a missing preferred leader, or an offline leader comes first.</p>
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead>
@@ -165,6 +214,136 @@
     </details>
 }
 
+@if (topic is not null)
+{
+    <form class="mt-3" method="post" action="/Operations/Kafka/plan" data-kafka-busy="Dry run is running.">
+        @Html.AntiForgeryToken()
+        <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true, View = ThroughputKafkaPageQuery.Migrate })" />
+        <section class="card au-card mb-3">
+            <h2 class="card-header h6 mb-0">Add partitions <partial name="_TermInfo" model="@(new TermInfo { Label = "About adding partitions", Text = "Adding partitions is permanent and cannot be reversed. Existing keys are remapped. The main topic, its retry topic, and its error topic increase together. None of them can shrink. When the family is uneven, the family action raises only the siblings that are behind. Preview and Submit both use this count. A preview does not read the reason. Submit does." })" /></h2>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="plan-partitions">Target partitions</label>
+                        <input class="form-control" id="plan-partitions" name="partitions" type="number" min="1" max="@Model.Topics.Cap" value="@(Model.DraftPartitions > 0 ? Model.DraftPartitions : topic.Partitions + 1)" />
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="form-label" for="plan-reason">Reason</label>
+                        <input class="form-control" id="plan-reason" name="reason" value="@Model.DraftReason" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="plan-confirm">Type the topic name</label>
+                        <input class="form-control" id="plan-confirm" name="confirmation" value="@Model.DraftConfirmation" data-topic="@topicName" autocomplete="off" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-check-label" for="plan-override">
+                            <input class="form-check-input" id="plan-override" type="checkbox" name="overrideQuietWindow" value="true" @(Model.DraftOverride ? "checked" : null) />
+                            Override the quiet window. A second approver and a reason are required.
+                        </label>
+                    </div>
+                    <div class="col-12 col-md-6" data-lu-when="plan-override">
+                        <label class="form-label" for="plan-override-reason">Override reason</label>
+                        <input class="form-control" id="plan-override-reason" name="overrideReason" value="@Model.DraftOverrideReason" />
+                    </div>
+                </div>
+                @if (topic.KeyClass == "Facility")
+                {
+                    <p class="form-text mb-0 mt-2">One facility can never use more than one partition.</p>
+                }
+                @if (Model.Plan is not null)
+                {
+                    var increase = Model.Plan;
+                    <div id="kafka-partition-result" class="alert @partitionTone mt-3 lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-partition" data-result-key="@(increase.Accepted)-@increase.Topic-@increase.RequestedPartitions-@increase.Errors.Count">
+                        <details class="lu-result-details">
+                            <summary>
+                                <span class="badge @StatusPills.ForKafka(increase.Accepted ? "Approved" : "Rejected")">@(increase.Accepted ? "Accepted" : "Refused")</span>
+                                <span class="lu-result-text">@(increase.Accepted ? "Dry run accepted. Nothing has changed yet." : "This increase cannot run yet.")</span>
+                                <button type="button" class="lu-dismiss lu-result-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
+                            </summary>
+                            <div class="lu-result-body">
+                                <dl class="row mb-2">
+                                    <dt class="col-sm-4">Partitions</dt>
+                                    <dd class="col-sm-8">@increase.CurrentPartitions to @increase.RequestedPartitions</dd>
+                                    <dt class="col-sm-4">Family</dt>
+                                    <dd class="col-sm-8">@increase.Family. Key @increase.KeyClass @increase.KeyShape. Replica ceiling @increase.MaxReplicas.</dd>
+                                    <dt class="col-sm-4">Related topics</dt>
+                                    <dd class="col-sm-8">@(increase.FamilyCompletion ? "The main topic stays at " + increase.CurrentPartitions + ". Siblings raised: " + (increase.TopicsToRaise.Count == 0 ? "none" : string.Join(", ", increase.TopicsToRaise)) + "." : "Retry " + increase.RetryTopic + " and error " + increase.ErrorTopic + " increase with the main topic.")</dd>
+                                    <dt class="col-sm-4">Quiet window</dt>
+                                    <dd class="col-sm-8">@(increase.QuietWindowRequired ? (increase.QuietWindowMet ? "Met." : "Not met.") : "Not required.")</dd>
+                                    <dt class="col-sm-4">Approval</dt>
+                                    <dd class="col-sm-8">@(increase.SecondApproverRequired ? "A second approver is required." : "A second approver is not required.")</dd>
+                                    <dt class="col-sm-4">Groups</dt>
+                                    <dd class="col-sm-8">@(increase.AffectedGroups.Count == 0 ? "none" : string.Join(", ", increase.AffectedGroups))</dd>
+                                </dl>
+                                @if (increase.Errors.Count > 0)
+                                {
+                                    <p class="mb-1">Blocking reasons</p>
+                                    <ul>
+                                    @foreach (var planError in increase.Errors)
+                                    {
+                                        <li>@planError</li>
+                                    }
+                                    </ul>
+                                }
+                                <p class="mb-2">@(increase.Accepted ? "Ready. Type the topic name and submit the increase." : "Fix the items above, then preview again.")</p>
+                                @if (increase.Notes.Count > 0)
+                                {
+                                    <details>
+                                        <summary>Details</summary>
+                                        @foreach (var note in increase.Notes)
+                                        {
+                                            <p class="mb-1">@note</p>
+                                        }
+                                    </details>
+                                }
+                            </div>
+                        </details>
+                    </div>
+                }
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview increase</span></button>
+                    <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
+                    @if (!Model.Topics.ReadOnly)
+                    {
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
+                    }
+                </div>
+            </div>
+        </section>
+    </form>
+    @if (topic.RetryPartitions > 0 && topic.RetryPartitions < topic.Partitions || topic.ErrorPartitions > 0 && topic.ErrorPartitions < topic.Partitions)
+    {
+        <form method="post" action="/Operations/Kafka/family/plan" data-kafka-busy="Dry run is running.">
+            @Html.AntiForgeryToken()
+            <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true, View = ThroughputKafkaPageQuery.Migrate })" />
+            <input type="hidden" name="topic" value="@topicName" />
+            <section class="card au-card mb-3">
+                <h2 class="card-header h6 mb-0">Complete the family <partial name="_TermInfo" model="@(new TermInfo { Label = "About family completion", Text = "The family is uneven. This raises only the retry and error topics up to the main topic. The main topic stays as it is. Preview and Submit both use that count. A preview does not read the reason. Submit does." })" /></h2>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="family-reason">Reason</label>
+                            <input class="form-control" id="family-reason" name="reason" value="@Model.DraftReason" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="family-confirm">Type the topic name</label>
+                            <input class="form-control" id="family-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" />
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/family/plan" title="Preview family completion" aria-label="Preview family completion"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview family</span></button>
+                        <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
+                        @if (!Model.Topics.ReadOnly)
+                        {
+                            <button class="btn btn-sm btn-au-execute" type="submit" formaction="/Operations/Kafka/family" title="Submit family completion" aria-label="Submit family completion"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Submit</span></button>
+                        }
+                    </div>
+                </div>
+            </section>
+        </form>
+    }
+}
+
 @if (!string.IsNullOrWhiteSpace(topicName))
 {
     <form class="mt-3" method="post" action="/Operations/Kafka/migrations" data-kafka-busy="Dry run is running.">
@@ -179,48 +358,13 @@
         <input type="hidden" name="dryRunAcknowledgedGroups" value="@string.Join(",", MigrationGroupList.Parse(Model.DryRunAcknowledgedGroups))" />
 
         <section class="card au-card mb-3">
-            <h3 class="card-header h6 mb-0">What to change</h3>
+            <h2 class="card-header h6 mb-0">Migrate <partial name="_TermInfo" model="@(new TermInfo { Label = "About migration", Text = "Dry run checks the plan and changes nothing. Request submits the migration for approval. Type the topic name first. Dry run and Request both use the target count, the backup choice, and the group list. A dry run does not read the reason. Request does." })" /></h2>
             <div class="card-body">
-            <p class="form-text">Dry run and Request both use this count.</p>
-            <div class="col-6 col-md-3">
-                <label class="form-label" for="migrate-partitions">Target partitions</label>
-                <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@targetPartitions" />
-            </div>
-            </div>
-        </section>
-
-        <section class="card au-card mb-3">
-            <h3 class="card-header h6 mb-0">Safety options</h3>
-            <div class="card-body">
-            <p class="form-text">Dry run and Request both use these. Leave them off unless you accept the risk.</p>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" @(Model.DraftBackupSkip ? "checked" : null) />
-                <label class="form-check-label" for="migrate-skip">Skip backup</label>
-                <p class="form-text">No copy is made. The recreated topic starts empty and the old log is not kept.</p>
-            </div>
-            <div class="form-check" data-lu-when="migrate-skip">
-                <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" @(Model.DraftBackupSkipAcknowledged ? "checked" : null) />
-                <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged</label>
-                <p class="form-text">Required when the backup is skipped. The requester and the approver both accept that there is no backup.</p>
-            </div>
-            </div>
-        </section>
-
-        <section class="card au-card mb-3">
-            <h3 class="card-header h6 mb-0">Groups to drop offsets for</h3>
-            <div class="card-body">
-            <p class="form-text">Use this when a dry run says a group is inactive and still has lag. Type that group's exact name, then dry run again. The migration drops that group's offsets on this topic. An active group cannot be cleared here. Dry run and Request both send this list.</p>
-            <label class="form-label" for="migrate-groups">Group names</label>
-            <textarea class="form-control" id="migrate-groups" name="acknowledgedGroups" rows="2">@Model.DraftAcknowledgedGroups</textarea>
-            <p class="form-text mb-0">Separate names with commas or new lines.</p>
-            </div>
-        </section>
-
-        <section class="card au-card mb-3">
-            <h3 class="card-header h6 mb-0">Request only</h3>
-            <div class="card-body">
-            <p class="form-text">A dry run does not read these. Request does.</p>
             <div class="row g-2">
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="migrate-partitions">Target partitions</label>
+                    <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@targetPartitions" />
+                </div>
                 <div class="col-12 col-md-4">
                     <label class="form-label" for="migrate-reason">Reason</label>
                     <input class="form-control" id="migrate-reason" name="reason" value="@Model.DraftReason" />
@@ -230,8 +374,18 @@
                     <input class="form-control" id="migrate-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
                 </div>
             </div>
+            <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" @(Model.DraftBackupSkip ? "checked" : null) />
+                <label class="form-check-label" for="migrate-skip">Skip backup <partial name="_TermInfo" model="@(new TermInfo { Label = "About skipping the backup", Text = "No copy is made. The recreated topic starts empty and the old log is not kept. Leave this off unless you accept the risk." })" /></label>
             </div>
-        </section>
+            <div class="form-check" data-lu-when="migrate-skip">
+                <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" @(Model.DraftBackupSkipAcknowledged ? "checked" : null) />
+                <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged <partial name="_TermInfo" model="@(new TermInfo { Label = "About acknowledging a skipped backup", Text = "Required when the backup is skipped. The requester and the approver both accept that there is no backup." })" /></label>
+            </div>
+            <div class="mt-3">
+                <label class="form-label" for="migrate-groups">Groups to drop offsets for <partial name="_TermInfo" model="@(new TermInfo { Label = "About groups to drop", Text = "Use this when a dry run says a group is inactive and still has lag. Type that group's exact name, then dry run again. The migration drops that group's offsets on this topic. An active group cannot be cleared here. Separate names with commas or new lines." })" /></label>
+                <textarea class="form-control" id="migrate-groups" name="acknowledgedGroups" rows="2">@Model.DraftAcknowledgedGroups</textarea>
+            </div>
 
         @if (plan is not null)
         {
@@ -295,6 +449,8 @@
             <button class="btn btn-au-execute" type="submit">Request</button>
             <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
         </div>
+            </div>
+        </section>
     </form>
 }
 
