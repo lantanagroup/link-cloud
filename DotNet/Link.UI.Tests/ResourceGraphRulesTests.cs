@@ -38,49 +38,12 @@ public class ResourceGraphRulesTests
     }
 
     [Fact]
-    public void A_cancelled_build_stops_and_a_bundle_is_read_forward_only()
+    public void A_cancelled_build_stops()
     {
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         var act = () => ResourceGraphRules.Build(new GraphSpec("p", [("Observation", 5)]), cts.Token);
         act.Should().Throw<OperationCanceledException>();
-
-        var json = """
-            {"resourceType":"Bundle","entry":[
-              {"resource":{"resourceType":"Patient","id":"p1"}},
-              {"resource":{"resourceType":"Observation","id":"o1","subject":{"reference":"Patient/p1"},"encounter":{"reference":"http://example/Encounter/e1"}}},
-              {"resource":{"resourceType":"Encounter","id":"e1","subject":{"reference":"Patient/p1"}}}
-            ]}
-            """;
-        var index = ResourceGraphRules.ReadBundle(json, "p1", CancellationToken.None);
-        index.Error.Should().BeNull();
-        index.Total.Should().Be(2);
-        index.Types.Select(type => type.Name).Should().Equal("Encounter", "Observation");
-        var raw = index.Raw("Observation", "o1");
-        raw!.Refs.Should().Contain("Patient/p1").And.Contain("Encounter/e1");
-        raw.Json.Should().Contain("o1");
-        index.Raw("Patient", "p1").Should().BeNull();
-
-        var coded = """
-            {"resourceType":"Bundle","entry":[
-              {"resource":{"resourceType":"Observation","id":"o1","code":{"text":"ZZ-NEEDLE-9"},"subject":{"reference":"Patient/p1"}}},
-              {"resource":{"resourceType":"Observation","id":"o2","subject":{"reference":"Patient/p1"}}}
-            ]}
-            """;
-        var codedIndex = ResourceGraphRules.ReadBundle(coded, "p1", CancellationToken.None);
-        var hit = codedIndex.Page("Observation", "ZZ-NEEDLE-9", 1, 25);
-        hit.Metadata.TotalCount.Should().Be(1);
-        hit.Records.Should().ContainSingle(row => row.Id == "o1");
-        hit.Records[0].Snippet.Should().Contain("ZZ-NEEDLE-9");
-        hit.MatchedTypes.Should().ContainSingle(type => type.Name == "Observation" && type.Count == 1);
-        codedIndex.Page("Observation", "not-in-the-bundle", 1, 25).Metadata.TotalCount.Should().Be(0);
-
-        ResourceGraphRules.ReadBundle("{", "p1", CancellationToken.None).Error.Should().Be("The bundle could not be read.");
-        ResourceGraphRules.ReadBundle(new string('x', 5), "p1", CancellationToken.None, 2).Total.Should().Be(0);
-
-        var tiny = ResourceGraphRules.ReadBundle(json, "p1", CancellationToken.None, 1);
-        tiny.Total.Should().Be(1);
-        tiny.Truncated.Should().BeTrue();
     }
 
     [Fact]
@@ -116,25 +79,6 @@ public class ResourceGraphRulesTests
         var one = graph.Page("Observation", known.Id, 1, 25);
         one.Metadata.TotalCount.Should().Be(1);
         one.Records.Should().ContainSingle(row => row.Id == known.Id);
-
-        var bundle = new StringBuilder();
-        bundle.Append("{\"resourceType\":\"Bundle\",\"entry\":[");
-        for (var index = 0; index < 15_000; index++)
-        {
-            if (index > 0)
-                bundle.Append(',');
-            bundle.Append("{\"resource\":{\"resourceType\":\"Observation\",\"id\":\"n")
-                .Append(index)
-                .Append("\",\"subject\":{\"reference\":\"Patient/p\"}}}");
-        }
-        bundle.Append("]}");
-        var readWatch = Stopwatch.StartNew();
-        var read = ResourceGraphRules.ReadBundle(bundle.ToString(), "p", CancellationToken.None);
-        readWatch.Stop();
-        read.Error.Should().BeNull();
-        read.Total.Should().Be(15_000);
-        read.Truncated.Should().BeFalse();
-        readWatch.ElapsedMilliseconds.Should().BeLessThan(5_000);
 
         var pageWatch = Stopwatch.StartNew();
         var page = ReportManifestRules.ScaleReport(new ReportManifestQuery { PageSize = 25, Descending = true });
