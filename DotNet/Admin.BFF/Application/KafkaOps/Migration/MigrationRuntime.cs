@@ -448,7 +448,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
             if (Interlocked.Exchange(ref _reconcileFailure, reason) != reason)
                 _logger.LogWarning(ex, "Migration reconcile did not finish. New migrations stay closed until the cluster can be read. Repeats of this failure are logged at debug level.");
             else
-                _logger.LogDebug("Migration reconcile still not finished: {Reason}", ex.Message);
+                _logger.LogTrace("Migration reconcile still not finished: {Reason}", ex.Message);
         }
     }
 
