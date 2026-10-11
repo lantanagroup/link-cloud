@@ -66,12 +66,17 @@ public class KafkaConsoleUxTests
         overview.Should().Contain("class=\"lu-kafka-fold\"");
         overview.Should().Contain("Full topic table");
 
-        topic.Should().Contain("Preview it first.");
-        topic.Should().Contain("<h3 class=\"card-header h6 mb-0\">What to change</h3>");
-        topic.Should().Contain("<h3 class=\"card-header h6 mb-0\">Request only</h3>");
-        topic.Should().Contain("A preview does not read these. Submit does.");
-        IndexOf(topic, "id=\"kafka-partition-result\"").Should().BeLessThan(IndexOf(topic, ">Preview increase</span>"));
-        topic.Should().Contain("data-lu-result=\"kafka-partition\"");
+        topic.Should().Contain("id=\"topic-pick\"");
+        topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
+        topic.Should().Contain("topic: topic.Topic");
+        topic.Should().NotContain("Preview it first.");
+        topic.Should().NotContain("Migrate instead");
+        var migrate = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Migrate.cshtml"));
+        migrate.Should().Contain("data-lu-result=\"kafka-partition\"");
+        migrate.Should().Contain("id=\"kafka-dry-run-result\"");
+        migrate.Should().Contain("KafkaIncreaseEligibility.MigrationLine");
+        IndexOf(migrate, "id=\"kafka-partition-result\"").Should().BeLessThan(IndexOf(migrate, ">Preview increase</span>"));
+        IndexOf(migrate, "id=\"kafka-dry-run-result\"").Should().BeLessThan(IndexOf(migrate, ">Dry run</button>"));
         consumers.Should().Contain("data-lu-result=\"kafka-replica\"");
         brokers.Should().Contain("data-lu-result=\"kafka-broker\"");
 

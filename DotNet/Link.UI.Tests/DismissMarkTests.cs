@@ -15,7 +15,7 @@ public class DismissMarkTests
         var solidDismiss = views.Where(path => File.ReadAllText(path).Contains("btn-warning lu-result-dismiss", StringComparison.Ordinal)).ToList();
         solidDismiss.Should().BeEmpty();
 
-        foreach (var name in new[] { "_Messages.cshtml", "_Migrate.cshtml", "_Consumers.cshtml", "_ReplicationFactor.cshtml", "_Topic.cshtml", "_Brokers.cshtml" })
+        foreach (var name in new[] { "_Messages.cshtml", "_Migrate.cshtml", "_Consumers.cshtml", "_ReplicationFactor.cshtml", "_Brokers.cshtml" })
         {
             var text = File.ReadAllText(Directory.GetFiles(Path.Combine(root, "Views"), name, SearchOption.AllDirectories).Single());
             text.Should().Contain("class=\"lu-dismiss lu-result-dismiss\" aria-label=\"Dismiss\"");

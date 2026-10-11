@@ -231,7 +231,7 @@ public sealed class OperationsController : Controller
     {
         var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
         var plan = await _kafka.PlanAsync(form.Topic ?? "", form.Partitions, form.OverrideQuietWindow, form.OverrideReason, cancellationToken);
-        return View("Kafka", page with { Plan = plan.Value, Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null), Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
+        return View("Kafka", page with { Plan = plan.Value, Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null), Query = page.Query with { View = ThroughputKafkaPageQuery.Migrate, Advanced = true } });
     }
 
     [HttpPost("Kafka/family/plan")]
@@ -240,7 +240,7 @@ public sealed class OperationsController : Controller
     {
         var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
         var plan = await _kafka.PlanFamilyAsync(form.Topic ?? "", form.OverrideQuietWindow, form.OverrideReason, cancellationToken);
-        return View("Kafka", page with { Plan = plan.Value, Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null), Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
+        return View("Kafka", page with { Plan = plan.Value, Error = KafkaPlanBanner.BesidePlan(plan.Error ?? page.Error, plan.Value?.Summary, plan.Value is not null), Query = page.Query with { View = ThroughputKafkaPageQuery.Migrate, Advanced = true } });
     }
 
     [HttpPost("Kafka/family")]
@@ -248,7 +248,7 @@ public sealed class OperationsController : Controller
     public async Task<IActionResult> CreateFamily(KafkaChangeForm form, CancellationToken cancellationToken)
     {
         var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
-        page = page with { Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } };
+        page = page with { Query = page.Query with { View = ThroughputKafkaPageQuery.Migrate, Advanced = true } };
         if (string.IsNullOrWhiteSpace(form.Reason))
             return View("Kafka", page with { Error = "A reason is required." });
         if (!string.Equals((form.Confirmation ?? "").Trim(), form.Topic ?? "", StringComparison.Ordinal))
@@ -305,7 +305,7 @@ public sealed class OperationsController : Controller
     public async Task<IActionResult> Create(KafkaChangeForm form, CancellationToken cancellationToken)
     {
         var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
-        page = page with { Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } };
+        page = page with { Query = page.Query with { View = ThroughputKafkaPageQuery.Migrate, Advanced = true } };
         if (string.IsNullOrWhiteSpace(form.Reason))
             return View("Kafka", page with { Error = "A reason is required." });
         if (!string.Equals((form.Confirmation ?? "").Trim(), form.Topic ?? "", StringComparison.Ordinal))
@@ -927,7 +927,7 @@ public sealed class OperationsController : Controller
     private static ThroughputKafkaPageQuery QueryFrom(KafkaChangeForm form)
     {
         var view = form.View;
-        if (view is not (ThroughputKafkaPageQuery.Overview or ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Consumers or ThroughputKafkaPageQuery.Brokers))
+        if (view is not (ThroughputKafkaPageQuery.Overview or ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Consumers or ThroughputKafkaPageQuery.Brokers or ThroughputKafkaPageQuery.Migrate))
             view = ThroughputKafkaPageQuery.Overview;
         return new ThroughputKafkaPageQuery
         {

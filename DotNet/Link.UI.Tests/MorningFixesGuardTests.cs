@@ -276,8 +276,10 @@ public class MorningFixesGuardTests
 
         var topic = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Topic.cshtml"));
         topic.Should().Contain("btn-au-link");
-        topic.Should().Contain("Migrate instead");
-        topic.Should().Contain(">Preview increase</span>");
+        topic.Should().Contain("Change partitions");
+        topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
+        topic.Should().NotContain("Migrate instead");
+        topic.Should().NotContain(">Preview increase</span>");
 
         var consumers = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Consumers.cshtml"));
         consumers.Should().Contain(">Open</span>");
@@ -286,6 +288,7 @@ public class MorningFixesGuardTests
         brokers.Should().Contain(">Rebalance</span>");
 
         var migrate = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Migrate.cshtml"));
+        migrate.Should().Contain(">Preview increase</span>");
         migrate.Should().Contain("btn-au-execute\" type=\"submit\" formaction=\"/Operations/Kafka/migrations/plan\">Dry run");
         migrate.Should().Contain("btn-au-execute\" type=\"submit\" aria-label=\"Execute migration\">Execute");
         migrate.Should().Contain("btn-au-execute\" type=\"submit\">Go");
