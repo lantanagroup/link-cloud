@@ -103,7 +103,7 @@ else
                                 <td class="text-nowrap"><partial name="_LabeledId" model="@(new LabeledId { Label = "Code", Value = row.Code, Compact = true, CopyLabel = "Copy code" })" /></td>
                                 <td>@row.CdcCode</td>
                                 <td>@row.ShortDescription</td>
-                                <td>@row.LongDescription</td>
+                                <td class="lu-wrap">@row.LongDescription</td>
                                 <td>@row.Version</td>
                                 <td>@(row.Active ? "Yes" : "No")</td>
                                 <td>

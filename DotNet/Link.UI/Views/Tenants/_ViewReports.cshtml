@@ -98,16 +98,14 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+                <table class="table table-sm align-middle mb-0 lu-reports-table">
                     <thead>
                         <tr>
                             <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortId">Report ID</a></th>
                             <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortPeriod">Reporting period</a></th>
                             <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortCreated">Created</a></th>
-                            <th>Measures</th>
                             <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortFrequency">Cadence</a></th>
-                            <th class="text-end">Census</th>
-                            <th class="text-end">IP</th>
+                            <th class="text-end text-nowrap">Census / IP</th>
                             <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortStatus">Status</a></th>
                             <th>Action</th>
                         </tr>
@@ -127,13 +125,9 @@
                                 <div>Start @report.PeriodStart</div>
                                 <div>End @report.PeriodEnd</div>
                             </td>
-                            <td class="text-nowrap">@report.Created</td>
-                            <td>
-                                <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
-                            </td>
+                            <td class="lu-created">@report.Created</td>
                             <td>@report.Frequency</td>
-                            <td class="text-end">@(report.CensusCount?.ToString() ?? "—")</td>
-                            <td class="text-end">@(report.InitialPopulationCount?.ToString() ?? "—")</td>
+                            <td class="text-end text-nowrap">@(report.CensusCount?.ToString() ?? "—") / @(report.InitialPopulationCount?.ToString() ?? "—")</td>
                             <td>
                                 <span class="badge @StatusPills.ForSchedule(report.Status)">@report.StatusLabel</span>
                                 @if (!string.IsNullOrWhiteSpace(report.Submitted))

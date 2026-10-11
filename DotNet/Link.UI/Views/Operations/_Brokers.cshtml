@@ -73,7 +73,7 @@
                 @foreach (var row in Model.BrokerRows)
                 {
                     <tr class="@(KafkaAttention.Broker(row) ? "lu-kafka-problem" : null)">
-                        <td class="lu-shrink"><partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy broker id", ReturnUrl = origin, LinkHref = query.Href(broker: row.Id.ToString(), page: 1) })" /></td>
+                        <td class="lu-shrink"><a href="@query.Href(broker: row.Id.ToString(), page: 1)" title="Open broker @row.Id">@row.Id</a></td>
                         <td class="lu-flex" title="@row.Host:@row.Port">@row.Host:@row.Port</td>
                         <td>@(string.IsNullOrWhiteSpace(row.Rack) ? "—" : row.Rack)</td>
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>

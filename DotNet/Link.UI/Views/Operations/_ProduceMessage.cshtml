@@ -8,6 +8,8 @@
     var value = draft?.Value ?? "";
     var summary = draft?.Summary ?? "";
     var hold = draft is { FromStage: false };
+    // The server refuses topics outside the catalog. Disable the form up front; the page notice already says why.
+    var refused = !string.IsNullOrWhiteSpace(topicName) && !LantanaGroup.Link.Shared.Application.Models.Kafka.KafkaBrowseAllowList.Admit(topicName, null).Allowed;
 }
 <form id="kafka-produce" class="card au-card mt-4@(hold ? " lu-produce-hold" : null)" method="post" action="/Operations/Kafka/messages">
     <h2 class="card-header h5 mb-0">Produce a message <partial name="_TermInfo" model="@(new TermInfo { Label = "About producing a message", Text = "Review the topic, headers, key, and value. Produce sends one new record. Nothing is sent until you type the topic name." })" /></h2>
@@ -36,6 +38,7 @@
     <input type="hidden" name="more" value="@(query.More ? "true" : "false")" />
     <input type="hidden" name="record" value="@query.OpenRecord" />
     <input type="hidden" name="stage" value="@query.StageRecord" />
+    <fieldset id="produce-fields" disabled="@refused">
     <div class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="produce-topic">Topic</label>
@@ -57,7 +60,10 @@
         <div class="mt-3">
             <button class="btn btn-au-link" id="kafka-paste-message" type="button">Paste message</button>
         </div>
-        <p class="lu-produce-summary mt-3" id="kafka-produce-summary">@summary</p>
+        @if (!refused)
+        {
+            <p class="lu-produce-summary mt-3" id="kafka-produce-summary">@summary</p>
+        }
         <div class="row g-2">
             <div class="col-12 col-md-6">
                 <label class="form-label" for="produce-reason">Reason</label>
@@ -72,5 +78,6 @@
             <button class="btn btn-success" id="produce-submit" type="submit">Produce</button>
             <a class="btn btn-warning" href="@query.Href(closeStage: true)">Cancel</a>
         </div>
+    </fieldset>
     </div>
 </form>

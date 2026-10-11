@@ -15,15 +15,15 @@ public class FinalRetestFixesTests
     }
 
     [Fact]
-    public void Reports_measures_column_flexes_so_the_table_fits_at_1366()
+    public void Reports_table_moves_measures_to_the_report_page_and_merges_census_and_ip()
     {
         var view = File.ReadAllText(Path.Combine(Root(), "Link.UI", "Views", "Reports", "Index.cshtml"));
-        var css = File.ReadAllText(Path.Combine(Root(), "Link.UI", "wwwroot", "css", "site.css"));
-        Assert.Contains("<th class=\"lu-measures-col lu-flex\">", view);
-        Assert.Contains("<td class=\"lu-flex\">", view);
-        Assert.Contains(".lu-reports-table td.lu-flex > .lu-measures { display: flex; width: 0; min-width: 100%; overflow: hidden; }", css);
+        var detail = File.ReadAllText(Path.Combine(Root(), "Link.UI", "Views", "Tenants", "Report.cshtml"));
+        Assert.DoesNotContain(">Measures</th>", view);
+        Assert.Contains("<th class=\"text-end text-nowrap\">Census / IP</th>", view);
+        Assert.Contains("<span data-census=\"@report.Id\">", view);
+        Assert.Contains("<dt class=\"col-sm-3\">Measures</dt>", detail);
     }
-
     [Fact]
     public void Partitions_tab_does_not_fetch_topic_configs_it_never_shows()
     {

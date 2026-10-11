@@ -54,8 +54,8 @@ public class SaveInPlaceTests
 
         var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));
         css.Should().Contain(".lu-main:has(.lu-content h2.fw-bold) .lu-topbar");
-        css.Should().Contain("#reportResults th:nth-child(4)");
-        css.Should().Contain("#facilityReportResults th:nth-child(3)");
+        css.Should().NotContain("#reportResults th:nth-child(4)");
+        css.Should().NotContain("#facilityReportResults th:nth-child(3)");
     }
 
     [Fact]
