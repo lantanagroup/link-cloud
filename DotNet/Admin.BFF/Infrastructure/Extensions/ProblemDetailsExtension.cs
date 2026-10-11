@@ -31,11 +31,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                     // For 500 errors, replace detail with a generic message unless explicitly user-facing
                     if (ctx.ProblemDetails.Status == StatusCodes.Status500InternalServerError && !isUserFacing)
                     {
-                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistance.";
+                        ctx.ProblemDetails.Detail = "An error occurred in our API. Please use the trace id when requesting assistance.";
                     }
                     else if (string.IsNullOrEmpty(ctx.ProblemDetails.Detail))
                     {
-                        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistance.";
+                        ctx.ProblemDetails.Detail = "An error occurred in our API. Please use the trace id when requesting assistance.";
                     }
 
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
