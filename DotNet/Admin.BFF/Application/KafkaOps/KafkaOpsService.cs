@@ -27,6 +27,7 @@ public static class KafkaTopicEligibility
 public interface IKafkaOpsService
 {
     Task<KafkaTopicsResponse> GetTopicsAsync(CancellationToken cancellationToken);
+    KafkaHistoryResponse GetHistory(int top) => KafkaThroughputHistory.Shared.Snapshot(top);
     Task<KafkaGroupsResponse> GetGroupsAsync(bool includeTestGroups, CancellationToken cancellationToken);
     Task<KafkaCapabilitiesResponse> GetCapabilitiesAsync(CancellationToken cancellationToken);
     Task<PartitionPlan> PlanAsync(string topic, int requestedPartitions, bool overrideQuietWindow, string? overrideReason, CancellationToken cancellationToken);
@@ -213,6 +214,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             var groupsKnown = groups is not null;
             if (!groupsKnown)
                 response.GroupsError = "Subscribed groups could not be read, so lag is unknown.";
+            var samples = new List<KafkaTopicSample>();
             foreach (var entry in KafkaTopicCatalog.Topics)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -234,6 +236,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     ? groups!.Where(group => entry.Groups.Contains(group.GroupId, StringComparer.Ordinal))
                         .Sum(group => group.Partitions.Where(partition => partition.Topic == entry.Topic).Sum(partition => partition.Lag))
                     : 0;
+                samples.Add(new KafkaTopicSample(entry.Topic, main?.HighWatermarks.Sum() ?? 0, retry?.HighWatermarks.Sum() ?? 0, error?.HighWatermarks.Sum() ?? 0, lag));
                 response.Topics.Add(new KafkaTopicRow
                 {
                     Topic = entry.Topic,
@@ -273,6 +276,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     PartitionAddReason = KafkaTopicEligibility.PartitionAddReason(entry.HardBlocked, entry.BlockReason)
                 });
             }
+            if (groupsKnown)
+                KafkaThroughputHistory.Shared.Record(DateTimeOffset.UtcNow, samples);
         }
         catch (Exception ex)
         {
@@ -285,6 +290,9 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             await _cache.SetAsync(cacheKey, response, TimeSpan.FromSeconds(Math.Clamp(_options.Value.CacheSeconds, 5, 10)), ExpirationType.Absolute, cancellationToken);
         return response;
     }
+
+    /// <summary>The bounded in-memory throughput and lag history behind the overview sparklines.</summary>
+    public KafkaHistoryResponse GetHistory(int top) => KafkaThroughputHistory.Shared.Snapshot(top);
 
     public async Task<KafkaGroupsResponse> GetGroupsAsync(bool includeTestGroups, CancellationToken cancellationToken)
     {
