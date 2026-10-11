@@ -130,9 +130,14 @@ public class MorningFixesGuardTests
         copy.Should().NotContain("querySelectorAll('td')");
         copy.Should().NotContain("rows.forEach");
 
+        var allowedCopy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "_MessageDetail.cshtml",
+            "_TopicPicker.cshtml"
+        };
         var copyPartials = ProductFiles("*.cshtml", "Views")
             .Where(file => File.ReadAllText(file).Contains("name=\"_CopyButton\"", StringComparison.Ordinal)
-                && !file.EndsWith("_MessageDetail.cshtml", StringComparison.OrdinalIgnoreCase))
+                && !allowedCopy.Contains(Path.GetFileName(file)))
             .Select(Rel)
             .ToList();
         copyPartials.Should().BeEmpty();

@@ -1,0 +1,41 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+    var topic = Model.SelectedTopic;
+    var names = topic?.Groups ?? [];
+}
+
+<section class="card au-card mt-3" id="kafka-topic-consumers">
+    <h2 class="card-header h6 mb-0">Groups reading this topic <partial name="_TermInfo" model="@(new TermInfo { Label = "About topic consumers", Text = "Groups that commit offsets on this topic. Open a group to change its replicas." })" /></h2>
+    <div class="card-body">
+        @if (names.Count == 0)
+        {
+            <p class="text-muted mb-0">No group commits offsets on this topic.</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th class="lu-flex">Group</th>
+                        <th>State</th>
+                        <th>Lag</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var name in names.OrderBy(item => item, StringComparer.OrdinalIgnoreCase))
+                {
+                    var group = Model.Groups.Groups.FirstOrDefault(row => string.Equals(row.GroupId, name, StringComparison.Ordinal));
+                    <tr class="@(group is not null && KafkaAttention.Group(group) ? "lu-kafka-problem" : null)">
+                        <td class="lu-flex">@name</td>
+                        <td>@(string.IsNullOrWhiteSpace(group?.State) ? "—" : group!.State)</td>
+                        <td>@(group is null ? "—" : group.TotalLag.ToString("N0"))</td>
+                        <td class="text-end"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: name, page: 1)">Open</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</section>

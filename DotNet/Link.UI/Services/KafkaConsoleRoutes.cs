@@ -52,6 +52,17 @@ public static class KafkaConsoleRoutes
         return "/Operations/Kafka/Brokers/" + Esc(id.Trim());
     }
 
+    public static string TabFor(string view, string? subtab)
+    {
+        if (view == ThroughputKafkaPageQuery.Messages)
+            return Messages;
+        if (view == ThroughputKafkaPageQuery.Produce)
+            return Produce;
+        if (view == ThroughputKafkaPageQuery.Migrate)
+            return Partitions;
+        return CanonicalSubtab(subtab) ?? Summary;
+    }
+
     public static string PathFor(string view, string? topic, string? group, string? broker, string? subtab)
     {
         if (view == ThroughputKafkaPageQuery.Consumers)

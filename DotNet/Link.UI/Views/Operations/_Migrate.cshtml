@@ -12,103 +12,11 @@
     var partitionTone = Model.Plan is null ? "alert-secondary" : Model.Plan.Accepted ? "alert-success" : "alert-danger";
     var increaseLine = topic is null ? null : KafkaIncreaseEligibility.Line(topic.PartitionAddReason, Model.Plan, topic.Topic);
     var migrationLine = KafkaIncreaseEligibility.MigrationLine(topic?.MigrationEligibility ?? detail?.Eligibility, plan);
-    bool Matches(KafkaTopicRow row)
-    {
-        if (query.Family.Length > 0 && !string.Equals(row.Family, query.Family, StringComparison.OrdinalIgnoreCase))
-            return false;
-        if (query.KeyClass.Length > 0 && !string.Equals(row.KeyClass, query.KeyClass, StringComparison.OrdinalIgnoreCase))
-            return false;
-        if (query.Q.Length > 0
-            && !row.Topic.Contains(query.Q, StringComparison.OrdinalIgnoreCase)
-            && !row.KeyClass.Contains(query.Q, StringComparison.OrdinalIgnoreCase)
-            && !row.Groups.Any(group => group.Contains(query.Q, StringComparison.OrdinalIgnoreCase)))
-            return false;
-        return true;
-    }
-    var choices = Model.Topics.Topics.Where(Matches).OrderBy(row => row.Topic, StringComparer.OrdinalIgnoreCase).ToList();
-    if (!string.IsNullOrWhiteSpace(topicName) && choices.All(row => !string.Equals(row.Topic, topicName, StringComparison.Ordinal)))
-    {
-        var current = Model.Topics.Topics.FirstOrDefault(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal));
-        if (current is not null)
-            choices.Insert(0, current);
-    }
 }
 
 <section class="card au-card mt-3 mb-3" id="kafka-migrate-topic">
 <h2 class="card-header h6 mb-0">Topic <partial name="_TermInfo" model="@(new TermInfo { Label = "About partition changes", Text = "An in-place add keeps the topic and remaps keys. A migration stops the workloads, copies the log to a backup, and recreates the topic empty. Consumer groups start at offset 0. Nothing is copied back. The backup stays until a person deletes it or retention expires." })" /></h2>
 <div class="card-body">
-<form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka">
-    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Migrate" />
-    <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
-    <input type="hidden" name="page" value="1" />
-    <input type="hidden" name="sort" value="@query.Sort" />
-    <input type="hidden" name="dir" value="@query.Dir" />
-    <input type="hidden" name="pageSize" value="@query.PageSize" />
-    <input type="hidden" name="group" value="@query.Group" />
-    <input type="hidden" name="broker" value="@query.Broker" />
-    <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
-    <div class="col-12 col-md-4">
-        <label class="form-label" for="kafka-q-migrate">Search</label>
-        <input class="form-control" id="kafka-q-migrate" name="q" value="@query.Q" />
-    </div>
-    <div class="col-6 col-md-3">
-        <label class="form-label" for="kafka-family-migrate">Family</label>
-        <select class="form-select" id="kafka-family-migrate" name="family">
-            <option value="">All families</option>
-            @foreach (var family in Model.Families)
-            {
-                if (family == query.Family)
-                {
-                    <option value="@family" selected>@family</option>
-                }
-                else
-                {
-                    <option value="@family">@family</option>
-                }
-            }
-        </select>
-    </div>
-    <div class="col-6 col-md-3">
-        <label class="form-label" for="kafka-key-migrate">Key class</label>
-        <select class="form-select" id="kafka-key-migrate" name="keyClass">
-            <option value="">All key classes</option>
-            @foreach (var keyClass in Model.KeyClasses)
-            {
-                if (keyClass == query.KeyClass)
-                {
-                    <option value="@keyClass" selected>@keyClass</option>
-                }
-                else
-                {
-                    <option value="@keyClass">@keyClass</option>
-                }
-            }
-        </select>
-    </div>
-    <div class="col-12 col-md-6">
-        <label class="form-label" for="migrate-topic">Topic</label>
-        <select class="form-select" id="migrate-topic" name="topic">
-            @if (choices.Count == 0)
-            {
-                <option value="">No topics match</option>
-            }
-            @foreach (var row in choices)
-            {
-                if (row.Topic == topicName)
-                {
-                    <option value="@row.Topic" selected>@row.Topic (@row.Partitions)</option>
-                }
-                else
-                {
-                    <option value="@row.Topic">@row.Topic (@row.Partitions)</option>
-                }
-            }
-        </select>
-    </div>
-    <div class="col-auto">
-        <button class="btn btn-au-link" type="submit">Open</button>
-    </div>
-</form>
 @if (!string.IsNullOrWhiteSpace(increaseLine))
 {
     <p class="mt-3 mb-1">@increaseLine</p>
