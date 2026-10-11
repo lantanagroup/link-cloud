@@ -178,9 +178,8 @@ public sealed class ReportDetailModel
     public ReportPageQuery Query { get; set; } = new();
     public FacilityReportRow? Report { get; set; }
     public string? SectionError { get; set; }
-    public PageBar Paging { get; set; } = new();
-    public IReadOnlyList<ReportPatientRow> Patients { get; set; } = [];
-    public ReportPatientDetail? Patient { get; set; }
+    /// <summary>Patients on the report; the list itself is the manifest Patients tab.</summary>
+    public long? PatientCount { get; set; }
 }
 
 public sealed class EnrolledCadence
@@ -299,16 +298,6 @@ public sealed class PlanRow
     public string Period { get; init; } = string.Empty;
     public bool IsReporting { get; init; }
     public string Updated { get; init; } = string.Empty;
-}
-
-public sealed class ReportPatientRow
-{
-    public string PatientId { get; init; } = string.Empty;
-    public string ReportingStatus { get; init; } = string.Empty;
-    public string SubmissionStatus { get; init; } = string.Empty;
-    public string LocationOrg { get; init; } = string.Empty;
-    public string EncounterMapping { get; init; } = string.Empty;
-    public string Hsloc { get; init; } = string.Empty;
 }
 
 public sealed class ReportPatientDetail

@@ -106,6 +106,37 @@
         if (!host.hasAttribute("title") && (host.scrollWidth > host.clientWidth || textOverflows(host)))
             host.setAttribute("title", next);
         host.appendChild(button);
+        place(host);
+    }
+
+    // The icon sits at the cell's right edge, inside the cell. When a short value fills a narrow cell and leaves no
+    // room there, it sits just after the text instead, so it never covers the value. Either way it takes no layout space.
+    function place(td) {
+        button.classList.remove("lu-copy-after");
+        button.style.removeProperty("--lu-copy-left");
+        if (td.scrollWidth > td.clientWidth || textOverflows(td)) return;
+        var icon = button.getBoundingClientRect();
+        var right = 0;
+        var walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                var parent = node.parentElement;
+                if (!parent || parent.closest(".lu-cell-copy, .visually-hidden, [hidden]")) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        var range = document.createRange();
+        for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+            range.selectNodeContents(node);
+            Array.prototype.forEach.call(range.getClientRects(), function (rect) {
+                if (rect.width > 0) right = Math.max(right, rect.right);
+            });
+        }
+        if (!right) return;
+        var cell = td.getBoundingClientRect();
+        if (icon.left - right >= 3) return;
+        button.classList.add("lu-copy-after");
+        button.style.setProperty("--lu-copy-left", Math.round(right - cell.left + 4) + "px");
     }
 
     function copyText() {

@@ -162,7 +162,10 @@ public static partial class ReportManifestRules
         IReadOnlyList<ManifestTimelineEvent>? events = null,
         IReadOnlyList<ManifestLink>? links = null,
         IReadOnlyList<ManifestResourceRef>? resourceRefs = null,
-        IReadOnlyList<ManifestMembership>? membership = null)
+        IReadOnlyList<ManifestMembership>? membership = null,
+        ManifestMapping? mapping = null,
+        string? logHref = null,
+        string? diagnosticsHref = null)
     {
         var status = Words(reportingStatus);
         if (status.Length == 0)
@@ -190,7 +193,10 @@ public static partial class ReportManifestRules
             Events = events ?? [],
             Links = links ?? [],
             ResourceRefs = resourceRefs ?? [],
-            Membership = membership ?? []
+            Membership = membership ?? [],
+            Mapping = mapping,
+            LogHref = logHref,
+            DiagnosticsHref = diagnosticsHref
         };
     }
 

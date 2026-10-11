@@ -195,6 +195,19 @@ public sealed class ReportsController : Controller
         return File(Encoding.UTF8.GetBytes(read.Body), "application/fhir+json", "measure-eval-input.json");
     }
 
+    /// <summary>One patient's pipeline diagnostics for the manifest patient modal, read when the modal opens.</summary>
+    [HttpGet]
+    public async Task<IActionResult> PatientDiagnostics(
+        string? facilityId,
+        string? reportId,
+        string? patientId,
+        [FromServices] ReportPatientDiagnostics diagnostics,
+        CancellationToken cancellationToken)
+    {
+        var detail = await diagnostics.LoadAsync(facilityId, reportId, patientId, cancellationToken);
+        return PartialView("_PatientDiagnostics", detail);
+    }
+
     [HttpGet]
     public async Task<IActionResult> Acquisition(
         string? facilityId,

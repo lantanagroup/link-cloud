@@ -1,10 +1,6 @@
 @model ReportDetailModel
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.ReportId) ? "Report" : Model.ReportId;
-    var bar = Model.Paging;
-    var origin = ReturnUrlRules.FromQuery(Context.Request);
-    Dictionary<string, string> PageRoute(int page, int pageSize) =>
-        Model.Query.ToRoute(Model.ReportId, page, pageSize: pageSize).WithOrigin(origin);
 }
 
 @{
@@ -87,116 +83,7 @@ else
             {
                 <div class="alert alert-warning">@Model.SectionError</div>
             }
-            <form method="get" asp-action="Report" asp-route-id="@Model.FacilityId" class="mb-3 lu-search">
-                <input type="hidden" name="reportId" value="@Model.ReportId" />
-                <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
-                <partial name="_ReturnField" />
-                <div class="row g-2 align-items-end">
-                <div class="col-12 col-md-6">
-                    <label class="form-label" for="patientId">Patient ID</label>
-                    <input id="patientId" name="patientId" value="@Model.Query.PatientId" class="form-control" />
-                </div>
-                <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
-                    <a class="btn btn-warning" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-returnUrl="@origin">Clear</a>
-                </div>
-                </div>
-            </form>
-
-            @if (Model.Patient is { } patient)
-            {
-                <div class="alert alert-light border">
-                    <div class="d-flex justify-content-between gap-2">
-                        <strong>Patient @patient.PatientId</strong>
-                        <a asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.Query.PatientId" asp-route-returnUrl="@origin">Close</a>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(patient.Error))
-                    {
-                        <p class="mb-0 mt-2">@patient.Error</p>
-                    }
-                    else
-                    {
-                        @if (patient.AcquisitionMissing)
-                        {
-                            <p class="mb-1 mt-2">Data acquisition has not reported for this patient.</p>
-                        }
-                        else
-                        {
-                            <p class="mb-1 mt-2">Encounters @patient.EncounterCount, in the organization @patient.OrgEncounterCount, assumed @patient.AssumedOrgEncounterCount.</p>
-                            @if (patient.Locations.Count > 0)
-                            {
-                                <p class="mb-1">Locations: @string.Join(", ", patient.Locations)</p>
-                            }
-                        }
-                        @if (patient.NormalizationMissing)
-                        {
-                            <p class="mb-0">Normalization has not reported code maps for this patient.</p>
-                        }
-                        else if (patient.CodeMaps.Count == 0)
-                        {
-                            <p class="mb-0">No code map totals.</p>
-                        }
-                        else
-                        {
-                            <ul class="mb-0">
-                                @foreach (var map in patient.CodeMaps)
-                                {
-                                    <li>@map</li>
-                                }
-                            </ul>
-                        }
-                    }
-                </div>
-            }
-
-            @if (Model.Patients.Count == 0)
-            {
-                <p class="mb-0">No patients found.</p>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Patient</th>
-                                <th>Reporting</th>
-                                <th>Submission</th>
-                                <th>Location org</th>
-                                <th>Encounter mapping</th>
-                                <th>HSLOC</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        @foreach (var row in Model.Patients)
-                        {
-                            <tr>
-                                <td>
-                                    @{
-                                        var patientRoute = Model.Query.ToRoute(Model.ReportId, patient: row.PatientId).WithOrigin(origin);
-                                        var patientHref = Url.Action("Report", new { id = Model.FacilityId });
-                                        if (patientRoute.Count > 0)
-                                            patientHref += "?" + string.Join("&", patientRoute.Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
-                                    }
-                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = patientHref })" />
-                                </td>
-                                <td>@row.ReportingStatus</td>
-                                <td>@(string.IsNullOrWhiteSpace(row.SubmissionStatus) ? "—" : Link.UI.Services.ReportsRules.SubmissionLabel(row.SubmissionStatus))</td>
-                                <td>@row.LocationOrg</td>
-                                <td>@row.EncounterMapping</td>
-                                <td>@row.Hsloc</td>
-                                <td>
-                                    <a asp-controller="Reports" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Measure</a>
-                                    <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId" asp-route-returnUrl="@origin">Log</a>
-                                </td>
-                            </tr>
-                        }
-                        </tbody>
-                    </table>
-                </div>
-            }
-            <partial name="_BottomPager" model="@(new BottomPager { Label = "Patient pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = Model.Query.PageSize, Sizes = FacilityViewRules.PageSizes, Route = PageRoute })" />
+            <a class="btn btn-au-link" id="report-patients-link" href="@Url.Action("Manifest", "Reports", new { facilityId = Model.FacilityId, reportId = Model.ReportId, tab = "patients" })"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Patients (@(Model.PatientCount?.ToString("N0") ?? "-"))</a>
         </div>
     </div>
 }
