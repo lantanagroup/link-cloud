@@ -228,9 +228,13 @@ public class KafkaOpsConsoleFixTests
 
         consumers.Should().Contain("This group has no members.");
         consumers.Should().Contain("This group has no committed partitions.");
-        consumers.Should().Contain("Preview add");
-        consumers.Should().Contain("Preview remove");
-        consumers.Should().Contain("class=\"btn btn-sm btn-au-execute lu-icon-btn\"");
+        consumers.Should().Contain("id=\"kafka-group-card\"");
+        consumers.Should().Contain("name=\"replicas\"");
+        consumers.Should().Contain(">Preview</span>");
+        consumers.Should().NotContain("Preview add");
+        consumers.Should().NotContain("Preview remove");
+        consumers.Should().Contain("btn btn-sm btn-au-execute lu-icon-btn");
+        consumers.Should().Contain("is-dimmed");
         consumers.Should().NotContain("btn-au-link lu-icon-btn");
         consumers.Should().Contain("Unknown");
         consumers.Should().Contain("selected.Catalogued");
@@ -243,7 +247,8 @@ public class KafkaOpsConsoleFixTests
         brokers.Should().Contain("name=\"addBrokerReason\"");
         brokers.Should().Contain("Preview decommission");
         brokers.Should().Contain("Preview rebalance");
-        brokers.Should().Contain("class=\"btn btn-sm btn-au-execute lu-icon-btn\"");
+        brokers.Should().Contain("btn btn-sm btn-au-execute lu-icon-btn");
+        brokers.Should().Contain("is-dimmed");
         brokers.Should().NotContain("btn-au-link lu-icon-btn");
         brokers.Should().Contain("id=\"kafka-broker-result\"");
         brokers.Should().Contain("BrokerMovePreview.MoveSummary(plan.Accepted, plan.AlreadyEmpty, plan.Moves.Count)");

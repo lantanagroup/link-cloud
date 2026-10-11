@@ -4,19 +4,35 @@
     var origin = ReturnUrlRules.Here(Context.Request);
     var selected = Model.SelectedBroker;
     var showLogDirs = KafkaLogDirs.Show(Model.Cluster);
+    var rightsDenied = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions == false);
+    var rightsUnknown = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions is null);
+    var rightsWindow = KafkaWindows.DeniedRights(Model.Capabilities.Topics, query.PartPage, query.PageSize);
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
     string Size(long bytes) => bytes < 0 ? "Not available" : bytes.ToString("N0");
 }
 
 <section class="card au-card mt-3" id="kafka-brokers">
-    <h2 class="card-header h6 mb-0">Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = "Open a broker to preview a decommission or a rebalance. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions. A broker that is not up is listed first." + (string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail) ? "" : " " + Model.Cluster.LogDirDetail) })" /></h2>
+    <h2 class="card-header h6 mb-0 d-flex justify-content-between align-items-center">
+        <span>Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = "Open a broker to preview a decommission or a rebalance. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions. A broker that is not up is listed first. Alter is what an in-place partition increase needs. Topics that cannot alter partitions are listed under Broker rights." + (string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail) ? "" : " " + Model.Cluster.LogDirDetail) + (Model.Infra.Enabled ? "" : " " + Model.Infra.Detail) })" /></span>
+        <button class="btn btn-sm btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#kafka-add-broker" aria-expanded="false" aria-controls="kafka-add-broker">Add broker</button>
+    </h2>
     <div class="card-body">
-        @if (!Model.Infra.Enabled)
-        {
-            <div class="alert alert-secondary" role="status">@Model.Infra.Detail</div>
-        }
-        <form class="row g-2 align-items-end mb-3" method="get" action="/Operations/Kafka">
-            <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Brokers" />
+        <div class="collapse mb-3" id="kafka-add-broker">
+            <form method="post" action="/Operations/Kafka/brokers">
+                @Html.AntiForgeryToken()
+                <partial name="_QueryFields" model="query" />
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="add-broker-reason">Reason <partial name="_TermInfo" model="@(new TermInfo { Label = "About adding a broker", Text = "The new broker is registered first. This request does not move partitions. Open the new broker afterwards to preview a rebalance onto it. Nothing moves until that request is approved and executed." })" /></label>
+                        <input class="form-control" id="add-broker-reason" name="addBrokerReason" value="@Model.DraftAddBrokerReason" />
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <form class="row g-2 align-items-end mb-3" method="get" action="@(string.IsNullOrWhiteSpace(query.Broker) ? "/Operations/Kafka/Brokers" : KafkaConsoleRoutes.Broker(query.Broker))">
             <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
             <input type="hidden" name="page" value="1" />
             <input type="hidden" name="sort" value="@query.Sort" />
@@ -87,36 +103,24 @@
             </span>
         </div>
 
-        <form class="border-top mt-3 pt-3" method="post" action="/Operations/Kafka/brokers">
-            @Html.AntiForgeryToken()
-            <partial name="_QueryFields" model="query" />
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-md-6">
-                    <label class="form-label" for="add-broker-reason">Reason <partial name="_TermInfo" model="@(new TermInfo { Label = "About adding a broker", Text = "The new broker is registered first. This request does not move partitions. Open the new broker afterwards to preview a rebalance onto it. Nothing moves until that request is approved and executed." })" /></label>
-                    <input class="form-control" id="add-broker-reason" name="addBrokerReason" value="@Model.DraftAddBrokerReason" />
-                </div>
-                <div class="col-auto">
-                    <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
-                </div>
-            </div>
-        </form>
+        </div>
+</section>
 
-        @if (selected is not null)
-        {
-            <div class="border-top mt-3 pt-3">
-                <h3 class="h6">Broker @selected.Id</h3>
-                <p>
-                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Broker", Value = selected.Id.ToString(), CopyLabel = "Copy broker id" })" />
-                </p>
-                <p>@selected.Host:@selected.Port. Rack @(string.IsNullOrWhiteSpace(selected.Rack) ? "—" : selected.Rack). <span class="badge @StatusPills.ForKafka(selected.State)">@selected.State</span> Partitions @selected.PartitionCount. Leaders @selected.LeaderCount.@if (showLogDirs) { <text> Log dir @Size(selected.LogDirBytes).</text> }</p>
-                <form method="post" action="/Operations/Kafka/brokers/decommission/plan" data-kafka-busy="Dry run is running.">
+@if (selected is not null)
+{
+    var onBroker = Model.Cluster.Placements.Where(row => row.Leader == selected.Id || row.Replicas.Contains(selected.Id)).OrderByDescending(row => row.Leader < 0 || row.Isr.Count < row.Replicas.Count).ThenBy(row => row.Topic, StringComparer.OrdinalIgnoreCase).ThenBy(row => row.Partition).ToList();
+    var shownPlacements = onBroker.Take(query.PageSize).ToList();
+    var brokerBlocked = !Model.Infra.Enabled;
+    <section class="card au-card mt-3 @(KafkaAttention.Broker(selected) ? "lu-kafka-attention" : null)" id="kafka-broker-card">
+        <h2 class="card-header h6 mb-0">Broker @selected.Id <partial name="_CopyButton" model="@(new CopyTarget { Value = selected.Id.ToString(), Label = "Copy broker id" })" /></h2>
+        <div class="card-body">
+            <form method="post" action="/Operations/Kafka/brokers/decommission/plan" data-kafka-busy="Dry run is running.">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="@(query with { Broker = selected.Id.ToString() })" />
                     <input type="hidden" name="brokerId" value="@selected.Id" />
                     <div class="col-12 col-md-6">
-                        <label class="form-label" for="broker-reason">Reason</label>
+                        <label class="form-label" for="broker-reason">Reason <partial name="_TermInfo" model="@(new TermInfo { Label = "About the broker request", Text = "A preview does not read the reason. Decommission and Rebalance do. Preview decommission plans moves off this broker. Preview rebalance plans moves onto it." + (Model.Infra.Enabled ? "" : " " + Model.Infra.Detail) })" /></label>
                         <input class="form-control" id="broker-reason" name="reason" value="@Model.DraftReason" />
-                        <p class="form-text">A preview does not read the reason. Decommission and Rebalance do. Preview decommission plans moves off this broker. Preview rebalance plans moves onto it.</p>
                     </div>
                     @if (Model.MovePlan is not null)
                     {
@@ -203,14 +207,110 @@
                         </div>
                     }
                     <div class="d-flex flex-wrap gap-2 mt-3">
-                        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview decommission</span></button>
-                        <button class="btn btn-sm btn-danger lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/decommission" title="Decommission broker" aria-label="Decommission broker"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="ms-1">Decommission</span></button>
-                        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview rebalance</span></button>
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn @(brokerBlocked ? "is-dimmed" : null)" type="submit" formaction="/Operations/Kafka/brokers/decommission/plan" title="Preview decommission" aria-label="Preview decommission" @(brokerBlocked ? "disabled" : null)><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview decommission</span></button>
+                        <button class="btn btn-sm btn-danger lu-icon-btn @(brokerBlocked ? "is-dimmed" : null)" type="submit" formaction="/Operations/Kafka/brokers/decommission" title="Decommission broker" aria-label="Decommission broker" @(brokerBlocked ? "disabled" : null)><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="ms-1">Decommission</span></button>
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn @(brokerBlocked ? "is-dimmed" : null)" type="submit" formaction="/Operations/Kafka/brokers/rebalance/plan" title="Preview rebalance" aria-label="Preview rebalance" @(brokerBlocked ? "disabled" : null)><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview rebalance</span></button>
                         <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
-                        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/brokers/rebalance" title="Rebalance onto this broker" aria-label="Rebalance onto this broker"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span class="ms-1">Rebalance</span></button>
+                        <button class="btn btn-sm btn-au-execute lu-icon-btn @(brokerBlocked ? "is-dimmed" : null)" type="submit" formaction="/Operations/Kafka/brokers/rebalance" title="Rebalance onto this broker" aria-label="Rebalance onto this broker" @(brokerBlocked ? "disabled" : null)><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span class="ms-1">Rebalance</span></button>
                     </div>
                 </form>
+            <div class="row g-2 mt-3">
+                <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@selected.Host:@selected.Port</div><div class="au-stat-label">Host</div></div></div>
+                <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@(string.IsNullOrWhiteSpace(selected.Rack) ? "—" : selected.Rack)</div><div class="au-stat-label">Rack</div></div></div>
+                <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@selected.State</div><div class="au-stat-label">State</div></div></div>
+                <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@selected.PartitionCount</div><div class="au-stat-label">Partitions</div></div></div>
+                <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@selected.LeaderCount</div><div class="au-stat-label">Leaders</div></div></div>
+                @if (showLogDirs)
+                {
+                    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Size(selected.LogDirBytes)</div><div class="au-stat-label">Log dir</div></div></div>
+                }
             </div>
+            <h3 class="h6 mt-3">Partitions on this broker</h3>
+            @if (shownPlacements.Count == 0)
+            {
+                <p class="text-muted mb-0">This broker has no partitions.</p>
+            }
+            else
+            {
+                <p class="text-muted">Showing @shownPlacements.Count of @onBroker.Count. Worst first.</p>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Topic</th>
+                                <th>Partition</th>
+                                <th>Leader</th>
+                                <th>Replicas</th>
+                                <th>ISR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in shownPlacements)
+                        {
+                            <tr class="@(row.Leader < 0 || row.Isr.Count < row.Replicas.Count ? "lu-kafka-problem" : null)">
+                                <td><a class="btn btn-sm btn-au-link" href="@KafkaConsoleRoutes.Topics(row.Topic, KafkaConsoleRoutes.Summary)">@row.Topic</a></td>
+                                <td>@row.Partition</td>
+                                <td>@row.Leader</td>
+                                <td>@string.Join(", ", row.Replicas)</td>
+                                <td>@string.Join(", ", row.Isr)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+<details class="lu-kafka-fold">
+    <summary>Broker rights (@Model.Capabilities.Topics.Count topics@(rightsDenied > 0 ? ", " + rightsDenied + " cannot alter partitions" : "")) <partial name="_TermInfo" model="@(new TermInfo { Label = "About broker rights", Text = "Alter is what an in-place partition increase needs. Unknown means the client did not report the right. This list is only the topics that cannot alter partitions." })" /></summary>
+    <div class="mt-3">
+        @if (!string.IsNullOrWhiteSpace(Model.Capabilities.Error))
+        {
+            <p class="text-muted">@Model.Capabilities.Error</p>
+        }
+        @if (Model.Capabilities.Topics.Count == 0)
+        {
+            <p class="mb-0">No topic rights were reported.</p>
+        }
+        else if (rightsWindow.Total == 0)
+        {
+            <p class="mb-0">Every reported topic can alter partitions.</p>
+        }
+        else if (rightsWindow.Rows.Count == 0)
+        {
+            <p class="mb-0">No denied topic on this page.</p>
+        }
+        else
+        {
+            <p>Showing @rightsWindow.Rows.Count of @rightsDenied that cannot alter partitions.</p>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Topic</th>
+                            <th>Can alter partitions</th>
+                            <th>Authorized operations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var right in rightsWindow.Rows)
+                    {
+                        <tr class="lu-kafka-problem">
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = right.Topic, Compact = true, CopyLabel = "Copy topic" })" /></td>
+                            <td>No</td>
+                            <td>@(right.AuthorizedOperations.Count == 0 ? (right.Error ?? "None reported") : string.Join(", ", right.AuthorizedOperations.Take(8)))</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(rightsWindow.Page, rightsWindow.Pages, "Alphabetical.", rightsWindow.Page > 1 ? query.Href(part: rightsWindow.Page - 1) : "", rightsWindow.Page < rightsWindow.Pages ? query.Href(part: rightsWindow.Page + 1) : ""))" />
+        }
+        @if (rightsUnknown > 0)
+        {
+            <p class="text-muted mb-0">@rightsUnknown topics did not report the alter right. They stay off this list.</p>
         }
     </div>
-</section>
+</details>
