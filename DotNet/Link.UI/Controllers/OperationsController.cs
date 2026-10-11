@@ -136,13 +136,67 @@ public sealed class OperationsController : Controller
     }
 
     [HttpGet("Kafka")]
-    public async Task<IActionResult> Kafka(Guid? requestId, CancellationToken cancellationToken)
+    public Task<IActionResult> Kafka(Guid? requestId, CancellationToken cancellationToken)
     {
-        var page = await LoadAsync(requestId, null, null, null, null, null, cancellationToken);
-        if (page.Query.View == ThroughputKafkaPageQuery.Messages
+        if (Request.Query.ContainsKey("view"))
+        {
+            var target = KafkaConsoleRoutes.LegacyRedirect(Request.Query);
+            if (!string.IsNullOrWhiteSpace(target))
+                return Task.FromResult<IActionResult>(Redirect(target));
+        }
+
+        return ShowAsync(requestId, null, cancellationToken);
+    }
+
+    [HttpGet("Kafka/Topics/{topic}/{subtab}")]
+    public Task<IActionResult> KafkaTopic(string topic, string subtab, Guid? requestId, CancellationToken cancellationToken)
+    {
+        var canonical = KafkaConsoleRoutes.CanonicalSubtab(subtab);
+        if (canonical is null)
+            return Task.FromResult<IActionResult>(Redirect(KafkaConsoleRoutes.Topics(topic, KafkaConsoleRoutes.Summary)));
+
+        var view = canonical switch
+        {
+            KafkaConsoleRoutes.Messages => ThroughputKafkaPageQuery.Messages,
+            KafkaConsoleRoutes.Produce => ThroughputKafkaPageQuery.Produce,
+            KafkaConsoleRoutes.Partitions => ThroughputKafkaPageQuery.Migrate,
+            _ => ThroughputKafkaPageQuery.Topic
+        };
+        var query = KafkaConsoleRoutes.Bind(Request.Query, ReturnUrlRules.FromQuery(Request), view, topic, null, null, canonical);
+        return ShowAsync(requestId, query, cancellationToken);
+    }
+
+    [HttpGet("Kafka/Topics/{topic}")]
+    public Task<IActionResult> KafkaTopicDefault(string topic, Guid? requestId, CancellationToken cancellationToken) =>
+        ShowAsync(requestId, KafkaConsoleRoutes.Bind(Request.Query, ReturnUrlRules.FromQuery(Request), ThroughputKafkaPageQuery.Topic, topic, null, null, KafkaConsoleRoutes.Summary), cancellationToken);
+
+    [HttpGet("Kafka/Topics")]
+    public Task<IActionResult> KafkaTopics(Guid? requestId, CancellationToken cancellationToken) =>
+        ShowAsync(requestId, KafkaConsoleRoutes.Bind(Request.Query, ReturnUrlRules.FromQuery(Request), ThroughputKafkaPageQuery.Topic, "", null, null, KafkaConsoleRoutes.Summary), cancellationToken);
+
+    [HttpGet("Kafka/ConsumerGroups/{group}")]
+    public Task<IActionResult> KafkaGroup(string group, Guid? requestId, CancellationToken cancellationToken) =>
+        ShowAsync(requestId, KafkaConsoleRoutes.Bind(Request.Query, ReturnUrlRules.FromQuery(Request), ThroughputKafkaPageQuery.Consumers, null, group, null, ""), cancellationToken);
+
+    [HttpGet("Kafka/ConsumerGroups")]
+    public Task<IActionResult> KafkaGroups(Guid? requestId, CancellationToken cancellationToken) =>
+        ShowAsync(requestId, KafkaConsoleRoutes.Bind(Request.Query, ReturnUrlRules.FromQuery(Request), ThroughputKafkaPageQuery.Consumers, null, "", null, ""), cancellationToken);
+
+    [HttpGet("Kafka/Brokers/{id}")]
+    public Task<IActionResult> KafkaBroker(string id, Guid? requestId, CancellationToken cancellationToken) =>
+        ShowAsync(requestId, KafkaConsoleRoutes.Bind(Request.Query, ReturnUrlRules.FromQuery(Request), ThroughputKafkaPageQuery.Brokers, null, null, id, ""), cancellationToken);
+
+    [HttpGet("Kafka/Brokers")]
+    public Task<IActionResult> KafkaBrokers(Guid? requestId, CancellationToken cancellationToken) =>
+        ShowAsync(requestId, KafkaConsoleRoutes.Bind(Request.Query, ReturnUrlRules.FromQuery(Request), ThroughputKafkaPageQuery.Brokers, null, null, "", ""), cancellationToken);
+
+    private async Task<IActionResult> ShowAsync(Guid? requestId, ThroughputKafkaPageQuery? query, CancellationToken cancellationToken)
+    {
+        var page = await LoadAsync(requestId, null, null, null, null, query, cancellationToken);
+        if (page.Query.View is ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce
             && string.Equals(Request.Query["batch"], "1", StringComparison.Ordinal))
             return Json(KafkaBrowseText.Batch(page));
-        return View(page);
+        return View("Kafka", page);
     }
 
     [HttpGet("Kafka/messages/export")]
@@ -213,7 +267,7 @@ public sealed class OperationsController : Controller
             return View("Kafka", page with { Error = created.Error, ProduceDraft = draft with { Summary = review.Summary } });
 
         var done = query with { StageRecord = "" };
-        return Redirect(done.Href() + "&requestId=" + created.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(done.Href(), "requestId", created.Value.Id.ToString("D")));
     }
 
     [HttpGet("Kafka/requests/{id:guid}")]
@@ -264,7 +318,7 @@ public sealed class OperationsController : Controller
             cancellationToken);
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error });
-        return Redirect(page.Query.Href(topic: form.Topic) + "&requestId=" + created.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(page.Query.Href(topic: form.Topic), "requestId", created.Value.Id.ToString("D")));
     }
 
     [HttpPost("Kafka/replication-factor/plan")]
@@ -297,7 +351,7 @@ public sealed class OperationsController : Controller
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error });
         var done = query with { Rf = 0, RfQ = "", RfThrottle = 0 };
-        return Redirect(done.Href() + "&requestId=" + created.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(done.Href(), "requestId", created.Value.Id.ToString("D")));
     }
 
     [HttpPost("Kafka/requests")]
@@ -322,7 +376,7 @@ public sealed class OperationsController : Controller
             cancellationToken);
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error });
-        return Redirect(page.Query.Href(topic: form.Topic) + "&requestId=" + created.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(page.Query.Href(topic: form.Topic), "requestId", created.Value.Id.ToString("D")));
     }
 
     [HttpPost("Kafka/groups/replicas/plan")]
@@ -353,7 +407,7 @@ public sealed class OperationsController : Controller
         var created = await _kafka.CreateScaleAsync(form.Group ?? "", desired, form.Reason, Guid.NewGuid().ToString("N"), cancellationToken);
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error, DraftReplicas = desired });
-        return Redirect(page.Query.Href() + "&requestId=" + created.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(page.Query.Href(), "requestId", created.Value.Id.ToString("D")));
     }
 
     [HttpPost("Kafka/brokers/decommission/plan")]
@@ -387,7 +441,7 @@ public sealed class OperationsController : Controller
         var created = await _kafka.CreateAddBrokerAsync(form.AddBrokerReason, Guid.NewGuid().ToString("N"), cancellationToken);
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error });
-        return Redirect(page.Query.Href() + "&requestId=" + created.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(page.Query.Href(), "requestId", created.Value.Id.ToString("D")));
     }
 
     [HttpPost("Kafka/requests/{id:guid}/approve")]
@@ -417,7 +471,7 @@ public sealed class OperationsController : Controller
             return View("Kafka", page);
         }
 
-        return Redirect(query.Href() + "&requestId=" + call.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(query.Href(), "requestId", call.Value.Id.ToString("D")));
     }
 
     private async Task<IActionResult> BrokerPlan(KafkaChangeForm form, Func<int, CancellationToken, Task<KafkaOpsCall<BrokerMovePlan>>> action, CancellationToken cancellationToken)
@@ -444,7 +498,7 @@ public sealed class OperationsController : Controller
         var created = await action(brokerId, form.Reason, Guid.NewGuid().ToString("N"), cancellationToken);
         if (created.Value is null)
             return View("Kafka", page with { Error = created.Error, DraftBrokerId = brokerId });
-        return Redirect(page.Query.Href(broker: brokerId.ToString()) + "&requestId=" + created.Value.Id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(page.Query.Href(broker: brokerId.ToString()), "requestId", created.Value.Id.ToString("D")));
     }
 
     private async Task<IActionResult> Mutate(Guid id, KafkaChangeForm form, Func<Task<KafkaOpsCall<ChangeRequestRecord>>> action, CancellationToken cancellationToken)
@@ -457,7 +511,7 @@ public sealed class OperationsController : Controller
             return View("Kafka", page);
         }
 
-        return Redirect(query.Href() + "&requestId=" + id.ToString("D"));
+        return Redirect(KafkaConsoleRoutes.With(query.Href(), "requestId", id.ToString("D")));
     }
 
     private async Task<ThroughputKafkaPage> LoadAsync(Guid? requestId, PartitionPlan? plan, ReplicaScalePlan? scalePlan, BrokerMovePlan? movePlan, string? error, ThroughputKafkaPageQuery? queryOverride, CancellationToken cancellationToken)
@@ -533,7 +587,7 @@ public sealed class OperationsController : Controller
         KafkaBrowsePage? messages = null;
         KafkaFamilyView? family = null;
         string? browseError = null;
-        if (query.View == ThroughputKafkaPageQuery.Messages && !string.IsNullOrWhiteSpace(query.TopicName))
+        if (query.View is ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce && !string.IsNullOrWhiteSpace(query.TopicName))
         {
             var familyCall = await _kafka.GetFamilyAsync(query.TopicName, cancellationToken);
             family = familyCall.Value;
@@ -565,7 +619,7 @@ public sealed class OperationsController : Controller
         }
 
         KafkaProduceDraft? produceDraft = null;
-        if (query.View == ThroughputKafkaPageQuery.Messages && query.StageRecord.Length > 0 && messages is not null)
+        if (query.View is ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce && query.StageRecord.Length > 0 && messages is not null)
         {
             var staged = messages.Records.FirstOrDefault(record =>
                 string.Equals(KafkaBrowseText.RecordId(record.Partition, record.Offset), query.StageRecord, StringComparison.Ordinal));
@@ -833,7 +887,7 @@ public sealed class OperationsController : Controller
         new() { View = ThroughputKafkaPageQuery.Migrate, TopicName = topic ?? "" };
 
     private static string MigrateHref(string? topic, Guid id) =>
-        "/Operations/Kafka?view=migrate&topic=" + Uri.EscapeDataString(topic ?? "") + "&migration=" + id.ToString("D");
+        KafkaConsoleRoutes.With(KafkaConsoleRoutes.Topics(topic, KafkaConsoleRoutes.Partitions), "migration", id.ToString("D"));
 
     private static ThroughputKafkaPage WithMigrationDraft(ThroughputKafkaPage page, KafkaMigrationForm form)
     {
@@ -943,7 +997,7 @@ public sealed class OperationsController : Controller
     private static ThroughputKafkaPageQuery QueryFrom(KafkaChangeForm form)
     {
         var view = form.View;
-        if (view is not (ThroughputKafkaPageQuery.Overview or ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Consumers or ThroughputKafkaPageQuery.Brokers or ThroughputKafkaPageQuery.Migrate))
+        if (view is not (ThroughputKafkaPageQuery.Overview or ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Consumers or ThroughputKafkaPageQuery.Brokers or ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce or ThroughputKafkaPageQuery.Migrate))
             view = ThroughputKafkaPageQuery.Overview;
         return new ThroughputKafkaPageQuery
         {

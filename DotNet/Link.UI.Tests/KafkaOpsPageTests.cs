@@ -20,7 +20,9 @@ public class KafkaOpsPageTests
         });
         var query = ThroughputKafkaPageQuery.From(unknown, "/Operations");
         query.View.Should().Be(ThroughputKafkaPageQuery.Overview);
-        query.Href().Should().Contain("view=overview");
+        query.Href().Should().StartWith("/Operations/Kafka");
+        query.Href().Should().NotContain("view=");
+        query.Href().Should().NotContain("/Topics/");
         query.ReturnUrl.Should().Be("/Operations");
     }
 
@@ -44,12 +46,13 @@ public class KafkaOpsPageTests
         query.Advanced.Should().BeTrue();
         query.PageSize.Should().Be(10);
         var href = query.Href();
-        href.Should().Contain("view=consumers");
-        href.Should().Contain("group=Report");
-        href.Should().Contain("topic=ReportScheduled");
-        href.Should().Contain("broker=2");
+        href.Should().StartWith("/Operations/Kafka/ConsumerGroups/Report");
+        href.Should().NotContain("view=");
+        href.Should().NotContain("group=");
         href.Should().Contain("tests=1");
         href.Should().Contain("keyClass=Patient");
+        query.TopicName.Should().Be("ReportScheduled");
+        query.Broker.Should().Be("2");
     }
 
     [Fact]
