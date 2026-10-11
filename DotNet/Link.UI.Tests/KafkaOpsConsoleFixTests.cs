@@ -223,7 +223,7 @@ public class KafkaOpsConsoleFixTests
         topic.Should().NotContain("Preview family");
         topic.Should().NotContain("Migrate instead");
         topic.Should().NotContain("ThroughputKafkaPageQuery.Migrate", "partition changes are reached from the Partitions sub-tab");
-        topic.Should().NotContain("btn-au-link lu-icon-btn");
+        topic.Should().Contain("btn btn-sm btn-au-link lu-icon-btn");
 
         consumers.Should().Contain("This group has no members.");
         consumers.Should().Contain("This group has no committed partitions.");
