@@ -6,13 +6,11 @@
     var headers = draft?.Headers ?? "";
     var key = draft?.Key ?? "";
     var value = draft?.Value ?? "";
-    var summary = draft is { Summary.Length: > 0 }
-        ? draft.Summary
-        : "Review the topic, headers, key, and value. Produce sends one new record. Nothing is sent until you type the topic name.";
+    var summary = draft?.Summary ?? "";
     var hold = draft is { FromStage: false };
 }
 <form id="kafka-produce" class="card au-card mt-4@(hold ? " lu-produce-hold" : null)" method="post" action="/Operations/Kafka/messages">
-    <h2 class="card-header h5 mb-0">Produce a message</h2>
+    <h2 class="card-header h5 mb-0">Produce a message <partial name="_TermInfo" model="@(new TermInfo { Label = "About producing a message", Text = "Review the topic, headers, key, and value. Produce sends one new record. Nothing is sent until you type the topic name." })" /></h2>
     <div class="card-body">
     @Html.AntiForgeryToken()
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Produce" />
@@ -38,10 +36,7 @@
     <input type="hidden" name="more" value="@(query.More ? "true" : "false")" />
     <input type="hidden" name="record" value="@query.OpenRecord" />
     <input type="hidden" name="stage" value="@query.StageRecord" />
-    <section class="card au-card mb-3">
-            <h3 class="card-header h6 mb-0">Message</h3>
-            <div class="card-body">
-        <div class="row g-2">
+    <div class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="produce-topic">Topic</label>
                 <input class="form-control" id="produce-topic" name="topic" value="@topicName" autocomplete="off" />
@@ -62,12 +57,7 @@
         <div class="mt-3">
             <button class="btn btn-au-link" id="kafka-paste-message" type="button">Paste message</button>
         </div>
-            </div>
-        </section>
-    <section class="card au-card mb-0">
-            <h3 class="card-header h6 mb-0">Review</h3>
-            <div class="card-body">
-        <p class="lu-produce-summary" id="kafka-produce-summary">@summary</p>
+        <p class="lu-produce-summary mt-3" id="kafka-produce-summary">@summary</p>
         <div class="row g-2">
             <div class="col-12 col-md-6">
                 <label class="form-label" for="produce-reason">Reason</label>
@@ -79,10 +69,8 @@
             </div>
         </div>
         <div class="mt-3">
-            <button class="btn btn-au-execute" id="produce-submit" type="submit">Produce</button>
+            <button class="btn btn-success" id="produce-submit" type="submit">Produce</button>
             <a class="btn btn-warning" href="@query.Href(closeStage: true)">Cancel</a>
         </div>
-            </div>
-        </section>
     </div>
 </form>

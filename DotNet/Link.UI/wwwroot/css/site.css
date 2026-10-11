@@ -3949,7 +3949,7 @@ kbd {
 tr.lu-kafka-problem > td:first-child {
   box-shadow: inset 3px 0 0 #b42318;
 }
-.btn.is-dimmed {
+.is-dimmed {
   opacity: .45;
 }
 .lu-kafka-attention {
@@ -4827,10 +4827,14 @@ table.table td.lu-flex,
 table.table th.lu-flex,
 table.au-table td.lu-flex {
   width: auto;
+  min-width: 14rem;
   max-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+#kafka-records :is(th, td).lu-key {
+  min-width: 9rem;
 }
 /* A short leading cell (a partition or broker number) shrinks to its value. */
 table.table > :is(thead, tbody, tfoot) > tr > .lu-shrink:is(th, td):not(.lu-wrap):not(.lu-flex):not(.lu-none),

@@ -43,7 +43,7 @@
             <table class="table table-sm mb-0" id="kafka-group-table">
                 <thead>
                     <tr>
-                        <th><a href="@query.Href(sort: "group", dir: SortDir("group"), page: 1)">Group</a></th>
+                        <th class="lu-flex"><a href="@query.Href(sort: "group", dir: SortDir("group"), page: 1)">Group</a></th>
                         <th><a href="@query.Href(sort: "state", dir: SortDir("state"), page: 1)">State</a></th>
                         <th>Members</th>
                         <th>Client</th>
@@ -59,7 +59,7 @@
                 {
                     var member = row.Members.FirstOrDefault();
                     <tr class="@(KafkaAttention.Group(row) ? "lu-kafka-problem" : null)">
-                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
+                        <td class="lu-flex"><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
                         <td>@row.Members.Count</td>
                         <td>@(member is null ? "—" : member.ClientId)</td>
