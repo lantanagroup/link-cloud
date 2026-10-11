@@ -487,7 +487,12 @@ public sealed class OperationsController : Controller
             query = query with { Page = topicPage };
         var pagedTopics = topicRows.Skip((topicPage - 1) * query.PageSize).Take(query.PageSize).ToList();
 
-        var groupRows = SortGroups(FilterGroups(groups.Groups, query).ToList(), query);
+        var groupRows = FilterGroups(groups.Groups, query).ToList();
+        if (query.View == ThroughputKafkaPageQuery.Consumers && query.Hot)
+            groupRows = groupRows.Where(KafkaAttention.Group).ToList();
+        groupRows = query.View == ThroughputKafkaPageQuery.Consumers && query.Sort is not ("group" or "state" or "lag")
+            ? groupRows.OrderByDescending(KafkaAttention.Group).ThenByDescending(row => row.TotalLag).ThenBy(row => row.GroupId, StringComparer.OrdinalIgnoreCase).ToList()
+            : SortGroups(groupRows, query);
         var groupCount = groupRows.Count;
         var groupPages = Math.Max(1, (int)Math.Ceiling(groupCount / (double)query.PageSize));
         var groupPage = Math.Min(query.Page, groupPages);
@@ -943,6 +948,7 @@ public sealed class OperationsController : Controller
             TopicName = form.Topic ?? "",
             Broker = form.Broker ?? "",
             Tests = form.Tests,
+            Hot = form.Hot,
             Advanced = form.Advanced,
             ReturnUrl = ReturnUrlRules.Sanitize(form.ReturnUrl)
         };
@@ -978,6 +984,7 @@ public sealed class KafkaChangeForm
     public int RfSize { get; set; } = 25;
     public string? RfQ { get; set; }
     public bool Tests { get; set; }
+    public bool Hot { get; set; }
     public bool Advanced { get; set; }
     public string? ReturnUrl { get; set; }
     public string? Mode { get; set; }
