@@ -83,6 +83,14 @@
         }, 30);
     }
 
+    function textOverflows(td) {
+        var nodes = td.querySelectorAll(".lu-clip, .lu-labeled-id, code");
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].scrollWidth > nodes[i].clientWidth) return true;
+        }
+        return false;
+    }
+
     function show(td) {
         if (td === host) return;
         var next = valueOf(td);
@@ -95,6 +103,8 @@
         copied = next;
         resetIcon();
         host.classList.add("lu-copy-host");
+        if (!host.hasAttribute("title") && (host.scrollWidth > host.clientWidth || textOverflows(host)))
+            host.setAttribute("title", next);
         host.appendChild(button);
     }
 
