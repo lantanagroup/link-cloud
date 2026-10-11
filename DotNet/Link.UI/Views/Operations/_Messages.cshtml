@@ -5,11 +5,9 @@
     var topicName = Model.SelectedTopic?.Topic ?? query.TopicName;
     var browse = Model.Messages;
     var error = Model.BrowseError;
-    var fetched = browse is not null || !string.IsNullOrWhiteSpace(error);
     var members = Model.Family is { Members.Count: > 0 }
         ? (IReadOnlyList<KafkaNamedTopic>)Model.Family.Members
         : KafkaBrowseAllowList.MembersOf(topicName);
-    var familyChecked = Model.Family is not null;
     var pageSize = KafkaWindows.Size(query.PageSize);
     var messageLogEnd = members.FirstOrDefault(member => string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase))?.HighWatermarkSum ?? 0;
     var messagePages = KafkaMessageWindow.Pages(browse?.Metadata.Total ?? 0, pageSize, messageLogEnd);
@@ -56,19 +54,6 @@
     }
 </div>
 <div class="card-body">
-@if (!string.IsNullOrWhiteSpace(topicName) && members.Count > 0)
-{
-    <nav class="lu-section-nav mt-3" aria-label="Topic family">
-        @foreach (var member in members)
-        {
-            <a class="@(string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase) ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: member.Topic, closeRecord: true)">@KafkaBrowseText.MemberLabel(member)</a>
-        }
-    </nav>
-    @if (familyChecked)
-    {
-        <p class="lu-kafka-stat mb-0">@KafkaBrowseText.FamilyStat(members)</p>
-    }
-}
 @if (string.IsNullOrWhiteSpace(topicName))
 {
     <p class="text-muted mb-0 mt-2">Choose a topic to read. Internal topics and names outside the catalog are refused.</p>
@@ -95,7 +80,23 @@
         <input type="hidden" name="vq" id="browse-vq" value="@query.ValueContains" />
 
         <div class="lu-search mt-3">
-            <h3 class="h6">Search</h3>
+            @if (members.Count > 0)
+            {
+                <nav class="lu-section-nav mb-3" aria-label="Topic family">
+                    @foreach (var member in members)
+                    {
+                        var current = string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase);
+                        if (member.Exists)
+                        {
+                            <a class="@(current ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: member.Topic, closeRecord: true)">@KafkaBrowseText.VariantTab(member)</a>
+                        }
+                        else
+                        {
+                            <span class="is-dimmed" aria-disabled="true" title="Not on the broker">@KafkaBrowseText.VariantTab(member)</span>
+                        }
+                    }
+                </nav>
+            }
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-lg-5">
                     <label class="form-label" for="browse-q">Search</label>
@@ -158,7 +159,7 @@
         <p class="visually-hidden">The read does not commit offsets.</p>
     </form>
 
-    @if (fetched)
+    @if (!string.IsNullOrWhiteSpace(error) || browse?.Metadata.CapHit == true)
     {
         <div id="kafka-browse-result" class="alert @KafkaBrowseText.Tone(browse, error) lu-result" role="status" tabindex="-1" data-kafka-result data-lu-result="kafka-browse" data-result-key="@(browse?.Metadata.Returned)-@(browse?.Metadata.CapHit)-@error">
             <details class="lu-result-details">
@@ -211,7 +212,7 @@
                         <th class="lu-shrink">Partition</th>
                         <th>Offset</th>
                         <th>Time</th>
-                        <th>Key</th>
+                        <th class="lu-wrap lu-key">Key</th>
                         <th class="lu-flex">Summary</th>
                         <th>Status</th>
                         <th></th>
@@ -227,7 +228,7 @@
                         <td class="lu-shrink">@record.Partition</td>
                         <td>@record.Offset</td>
                         <td>@KafkaBrowseText.When(record.TimestampUnixMs)</td>
-                        <td><code class="small">@record.Key</code></td>
+                        <td class="lu-wrap lu-key"><code class="small">@record.Key</code></td>
                         <td class="lu-flex" title="@record.ValueSummary">@record.ValueSummary</td>
                         <td>
                             @if (record.Truncated)
@@ -254,14 +255,7 @@
                             }
                         </td>
                     </tr>
-                    @if (open)
-                    {
-                        <tr class="lu-msg-row">
-                            <td colspan="7">
-                                <partial name="_MessageDetail" model="@(new KafkaMessageOpen { Topic = topicName, Record = record, ReturnHref = query.Href() })" />
-                            </td>
-                        </tr>
-                    }
+                    
                 }
                 </tbody>
             </table>
@@ -291,11 +285,7 @@
         }
         <div data-lu-client-pager></div>
         <div data-lu-server-pager @(clientBatch ? "hidden" : null)>
-        @if (matchLabel.Length > 0)
-        {
-            <span class="small text-muted">@matchLabel</span>
-        }
-        <span class="small text-muted">Page @messagePage of @messagePages</span>
+        <span class="small text-muted">@(matchLabel.Length > 0 ? matchLabel + ", page " : "Page ")@messagePage of @messagePages</span>
         <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = query.Href(msgPage: 1), Enabled = messagePage > 1 })" />
         <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(msgPage: messagePage - 1), Enabled = messagePage > 1 })" />
         @for (var number = windowStart; number <= windowEnd; number++)
@@ -354,7 +344,18 @@
     </nav>
     </div>
 
-    <partial name="_ProduceMessage" model="Model" />
+    @if (browse is { Records.Count: > 0 })
+    {
+        var opened = browse.Records.FirstOrDefault(record => string.Equals(KafkaBrowseText.RecordId(record.Partition, record.Offset), query.OpenRecord, StringComparison.Ordinal));
+        if (opened is not null)
+        {
+            <section class="card au-card mt-3" id="kafka-open-record">
+                <div class="card-body">
+                    <partial name="_MessageDetail" model="@(new KafkaMessageOpen { Topic = topicName, Record = opened, ReturnHref = query.Href(), ProduceHref = query.Href(view: ThroughputKafkaPageQuery.Produce, topic: topicName, stage: query.OpenRecord) })" />
+                </div>
+            </section>
+        }
+    }
 }
 </div>
 </section>

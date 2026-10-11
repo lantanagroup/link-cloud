@@ -92,16 +92,16 @@
             <table class="table table-sm mb-0">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Value</th>
+                        <th class="lu-wrap">Name</th>
+                        <th class="lu-flex">Value</th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach (var config in topic.Configs.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase).Take(query.PageSize))
                 {
                     <tr>
-                        <td>@config.Key</td>
-                        <td>@config.Value</td>
+                        <td class="lu-wrap">@config.Key</td>
+                        <td class="lu-flex">@config.Value</td>
                     </tr>
                 }
                 </tbody>
