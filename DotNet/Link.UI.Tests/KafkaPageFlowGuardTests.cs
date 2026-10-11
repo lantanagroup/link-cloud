@@ -41,9 +41,9 @@ public class KafkaPageFlowGuardTests
         topic.Should().NotContain("Not checked yet");
         topic.Should().NotContain("Dry run a migration");
         topic.Should().NotContain("KafkaIncreaseEligibility");
-        topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
-        topic.Should().Contain("topic: topic.Topic");
-        topic.Should().Contain("btn btn-au-link");
+        topic.Should().NotContain("ThroughputKafkaPageQuery.Migrate", "partition changes are reached from the Partitions sub-tab");
+        topic.Should().Contain("btn-au-link");
+        File.ReadAllText(Path.Combine(RepoRoot(), "Views", "Operations", "_TopicTabs.cshtml")).Should().Contain("view: ThroughputKafkaPageQuery.Migrate, topic: topic)\">Partitions</a>");
         File.ReadAllText(Path.Combine(RepoRoot(), "Views", "Operations", "_TopicPicker.cshtml")).Should().Contain("id=\"topic-pick\"");
     }
 

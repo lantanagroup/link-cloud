@@ -108,8 +108,7 @@ public class KafkaConsoleUxTests
         brokers.Should().Contain("class=\"lu-kafka-fold\"");
 
         File.ReadAllText(Path.Combine(root, "Views", "Operations", "_TopicPicker.cshtml")).Should().Contain("id=\"topic-pick\"");
-        topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
-        topic.Should().Contain("topic: topic.Topic");
+        topic.Should().NotContain("ThroughputKafkaPageQuery.Migrate", "partition changes are reached from the Partitions sub-tab");
         topic.Should().NotContain("Preview it first.");
         topic.Should().NotContain("Migrate instead");
         var migrate = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Migrate.cshtml"));

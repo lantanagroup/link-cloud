@@ -8,7 +8,7 @@
 <h1 class="h3 mt-3">Kafka <span class="lu-live-label">Live</span>
     @if (!Model.Infra.Enabled)
     {
-        <span class="badge au-badge-warning ms-2">Provider disabled</span>
+        <span class="badge au-badge-warning lu-provider-badge ms-2">Provider disabled</span>
         <partial name="_TermInfo" model="@(new TermInfo { Label = "Provider disabled", Text = string.IsNullOrWhiteSpace(Model.Infra.Detail) ? "Broker and replica changes are disabled until an infrastructure provider is enabled." : Model.Infra.Detail })" />
     }
 </h1>
