@@ -144,19 +144,19 @@
                     <table class="table table-sm mb-0" id="kafka-placement-table">
                         <thead>
                             <tr>
-                                <th>Partition</th>
+                                <th class="lu-shrink">Partition</th>
                                 <th>Leader</th>
                                 <th>Replicas</th>
                                 <th>ISR</th>
                                 <th>High watermark</th>
-                                <th>Lag by group</th>
+                                <th class="lu-wrap">Lag by group</th>
                             </tr>
                         </thead>
                         <tbody>
                         @foreach (var row in placement.Rows)
                         {
                             <tr class="@(KafkaAttention.Partition(row.Leader, row.Replicas, row.InSync, row.Lag.Select(item => item.Lag)) ? "lu-kafka-problem" : null)">
-                                <td>@row.Partition</td>
+                                <td class="lu-shrink">@row.Partition</td>
                                 <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
                                 <td>@row.Replicas</td>
                                 <td>@row.InSync</td>

@@ -132,14 +132,14 @@
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead>
-                            <tr><th>Partition</th><th>Leader</th><th>Replicas</th><th>ISR</th><th>Preferred</th><th>Start</th><th>End</th></tr>
+                            <tr><th class="lu-shrink">Partition</th><th>Leader</th><th>Replicas</th><th>ISR</th><th>Preferred</th><th>Start</th><th>End</th></tr>
                         </thead>
                         <tbody>
                         @foreach (var row in facts.Rows)
                         {
                             var hot = !row.PreferredLeader || row.Isr.Count < row.Replicas.Count || row.Leader < 0;
                             <tr class="@(hot ? "lu-kafka-problem" : null)">
-                                <td>@row.Partition</td>
+                                <td class="lu-shrink">@row.Partition</td>
                                 <td>@(row.Leader < 0 ? "offline" : row.Leader.ToString())</td>
                                 <td>@string.Join(", ", row.Replicas.Take(8))@(row.Replicas.Count > 8 ? ", …" : "")</td>
                                 <td>@string.Join(", ", row.Isr.Take(8))@(row.Isr.Count > 8 ? ", …" : "")</td>
