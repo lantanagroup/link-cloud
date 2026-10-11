@@ -34,7 +34,7 @@
             </div>
             @if (Model.BrokerTotal > Model.Brokers.Count)
             {
-                <a class="btn btn-sm btn-au-link mt-2" href="@KafkaConsoleRoutes.Broker(null)">All @Model.BrokerTotal brokers</a>
+                <a class="btn btn-sm btn-au-link mt-2" href="@KafkaConsoleRoutes.Broker(null)">All @Counts.Of(Model.BrokerTotal, "broker")</a>
             }
         }
     </div>

@@ -565,7 +565,7 @@
                     </table>
                     @if (Model.PopulationMeasureCount > Model.PopulationComparison.Count)
                     {
-                        <p class="small text-muted mb-0 mt-2">@Model.PopulationComparison.Count of @Model.PopulationMeasureCount measures shown.</p>
+                        <p class="small text-muted mb-0 mt-2">@Model.PopulationComparison.Count of @Counts.Of(Model.PopulationMeasureCount, "measure") shown.</p>
                     }
                 </div>
             </section>
@@ -595,7 +595,7 @@
         }
         @if (Model.PopulationMeasureCount > Model.Funnels.Count)
         {
-            <p class="small text-muted">@Model.Funnels.Count of @Model.PopulationMeasureCount measures shown.</p>
+            <p class="small text-muted">@Model.Funnels.Count of @Counts.Of(Model.PopulationMeasureCount, "measure") shown.</p>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Query.Stage))
         {
@@ -669,7 +669,7 @@
                             <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@comparison.Delta.ToString("+0;-0;0")</div><div class="au-stat-label">Prediction difference</div></div></div>
                             <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(comparison.Filtered)</div><div class="au-stat-label">Filtered out</div></div></div>
                         </div>
-                        <p class="small text-muted">@comparison.MismatchedTypes mismatched types. @comparison.MissingPatients patients missing from ABS. This is one page of each list.</p>
+                        <p class="small text-muted">@Counts.Of(comparison.MismatchedTypes, "mismatched type"). @Counts.Of(comparison.MissingPatients, "patient") missing from ABS. This is one page of each list.</p>
                         <form method="get" action="@Model.Path" class="d-flex gap-2 mb-3">
                             @foreach (var pair in Model.Route)
                             {

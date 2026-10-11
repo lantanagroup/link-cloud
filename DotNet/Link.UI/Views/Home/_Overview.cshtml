@@ -83,7 +83,7 @@
                         {
                             <p class="text-muted">No reports were created in the last seven days.</p>
                         }
-                        <p class="small text-muted mb-2">UTC days</p>
+                        
                         <div class="home-trend">
                             @foreach (var day in activity.Trend)
                             {
@@ -96,7 +96,7 @@
                                     <span class="home-trend-day">@day.Day</span>
                                 </a>
                             }
-                        </div>
+                        </div><p class="home-trend-axis">Day (UTC)</p>
                     }
                 </div>
             </div>
@@ -147,7 +147,7 @@
                         {
                             <p class="text-muted">No acquisition logs in the last seven UTC days.</p>
                         }
-                        <p class="small text-muted mb-2">UTC days</p>
+                        
                         <div class="home-trend">
                             @foreach (var day in logs.Trend)
                             {
@@ -160,7 +160,7 @@
                                     <span class="home-trend-day">@day.Day</span>
                                 </a>
                             }
-                        </div>
+                        </div><p class="home-trend-axis">Day (UTC)</p>
                     }
                 </div>
             </div>

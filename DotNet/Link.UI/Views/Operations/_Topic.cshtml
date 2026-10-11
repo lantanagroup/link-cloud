@@ -105,7 +105,7 @@ else
     }
 
     <details class="lu-kafka-fold">
-        <summary>Topic configuration (@topic.Configs.Count settings)</summary>
+        <summary>Topic configuration (@Counts.Of(topic.Configs.Count, "setting"))</summary>
         <div class="table-responsive mt-3">
             <table class="table table-sm mb-0">
                 <thead>
@@ -127,7 +127,7 @@ else
         </div>
         @if (topic.Configs.Count > query.PageSize)
         {
-            <p class="text-muted mt-2 mb-0">Showing @query.PageSize of @topic.Configs.Count settings.</p>
+            <p class="text-muted mt-2 mb-0">Showing @query.PageSize of @Counts.Of(topic.Configs.Count, "setting").</p>
         }
     </details>
 

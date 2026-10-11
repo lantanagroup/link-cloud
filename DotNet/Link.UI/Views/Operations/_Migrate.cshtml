@@ -31,7 +31,7 @@
 }
 else
 {
-    <p class="mb-3">@topicName has @currentPartitions partitions.</p>
+    <p class="mb-3">@topicName has @Counts.Of(currentPartitions, "partition").</p>
     <form method="post" action="@previewAction" data-kafka-busy="Dry run is running.">
         @Html.AntiForgeryToken()
         <partial name="_QueryFields" model="@(query with { TopicName = topicName, Advanced = true, View = ThroughputKafkaPageQuery.Migrate })" />
@@ -308,7 +308,7 @@ else
                     <input class="form-control" id="migrate-recover" name="confirmation" autocomplete="off" aria-label="Type the topic name to recover the original count" />
                 </div>
                 <div class="col-auto mt-4 d-flex flex-wrap gap-2">
-                    <button class="btn btn-warning" type="submit" name="action" value="original">Recover original</button>
+                    <button class="btn btn-au-execute" type="submit" name="action" value="original">Recover original</button>
                     <button class="btn btn-au-execute" type="submit" name="action" value="forward">Continue forward</button>
                     <button class="btn btn-danger" type="submit" name="action" value="deleteForeign">Delete empty foreign topic</button>
                 </div>

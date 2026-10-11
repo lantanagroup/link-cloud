@@ -308,7 +308,7 @@ public class MorningFixesGuardTests
         migrate.Should().Contain("btn-au-execute\" type=\"submit\">Go");
         migrate.Should().Contain("btn-au-execute\" type=\"submit\" name=\"action\" value=\"forward\">Continue forward");
         migrate.Should().Contain("btn-warning\" type=\"submit\" aria-label=\"Abort migration\">Abort");
-        migrate.Should().Contain("btn-warning\" type=\"submit\" name=\"action\" value=\"original\">Recover original");
+        migrate.Should().Contain("btn-au-execute\" type=\"submit\" name=\"action\" value=\"original\">Recover original");
         migrate.Should().Contain("btn-danger\" type=\"submit\">Delete backup");
         migrate.Should().Contain("btn-danger\" type=\"submit\" name=\"action\" value=\"deleteForeign\">Delete empty foreign topic");
 

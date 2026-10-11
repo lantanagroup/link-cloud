@@ -53,7 +53,7 @@
                             </td>
                             <td>
                                 <small class="text-muted" title="@string.Join(", ", acquiredTypes.OrderBy(x => x))">
-                                    @acquiredTypes.Count types
+                                    @Counts.Of(acquiredTypes.Count, "type")
                                 </small>
                             </td>
                             <td><small>@t.EhrDescription</small></td>

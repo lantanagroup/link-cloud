@@ -27,7 +27,7 @@
             }
             else if (request.Kind == "ScaleReplicas")
             {
-                <p>Group @request.GroupId from @request.BeforeReplicas to @request.DesiredReplicas members.</p>
+                <p>Group @request.GroupId from @request.BeforeReplicas to @Counts.Of(request.DesiredReplicas, "member").</p>
             }
             else if (request.Kind == "ReplicationFactor")
             {

@@ -234,7 +234,7 @@ public class KafkaOpsConsoleFixTests
         consumers.Should().NotContain("Preview remove");
         consumers.Should().Contain("btn btn-sm btn-au-execute lu-icon-btn");
         consumers.Should().Contain("is-dimmed");
-        consumers.Should().NotContain("btn-au-link lu-icon-btn");
+        consumers.Should().Contain("btn btn-sm btn-au-link lu-icon-btn");
         consumers.Should().Contain("Unknown");
         consumers.Should().Contain("selected.Catalogued");
         consumers.Should().Contain("Replica changes are hidden for an unknown group.");
@@ -248,7 +248,7 @@ public class KafkaOpsConsoleFixTests
         brokers.Should().Contain("Preview rebalance");
         brokers.Should().Contain("btn btn-sm btn-au-execute lu-icon-btn");
         brokers.Should().Contain("is-dimmed");
-        brokers.Should().NotContain("btn-au-link lu-icon-btn");
+        brokers.Should().Contain("btn btn-sm btn-au-link lu-icon-btn");
         brokers.Should().Contain("id=\"kafka-broker-result\"");
         brokers.Should().Contain("BrokerMovePreview.MoveSummary(plan.Accepted, plan.AlreadyEmpty, plan.Moves.Count)");
 
