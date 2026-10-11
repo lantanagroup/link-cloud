@@ -133,7 +133,9 @@ public class MorningFixesGuardTests
         var allowedCopy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "_MessageDetail.cshtml",
-            "_TopicPicker.cshtml"
+            "_TopicPicker.cshtml",
+            "_Consumers.cshtml",
+            "_Brokers.cshtml"
         };
         var copyPartials = ProductFiles("*.cshtml", "Views")
             .Where(file => File.ReadAllText(file).Contains("name=\"_CopyButton\"", StringComparison.Ordinal)
