@@ -59,8 +59,11 @@ public class KafkaPageFlowGuardTests
         end.Should().BeGreaterThan(start);
         var slice = consumers[start..end];
         IndexOf(slice, "name=\"q\"").Should().BeLessThan(IndexOf(slice, "id=\"kafka-group-table\""));
-        IndexOf(slice, "id=\"kafka-group-table\"").Should().BeLessThan(IndexOf(slice, ">Preview add</span>"));
+        slice.Should().NotContain(">Preview");
         slice.Should().Contain("Needs attention");
+        consumers.Should().Contain("id=\"kafka-group-card\"");
+        IndexOf(consumers, "name=\"replicas\"").Should().BeLessThan(IndexOf(consumers, "Committed partitions"));
+        IndexOf(consumers, ">Preview</span>").Should().BeLessThan(IndexOf(consumers, "Committed partitions"));
     }
 
     [Fact]

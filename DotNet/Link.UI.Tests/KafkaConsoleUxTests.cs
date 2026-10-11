@@ -66,7 +66,8 @@ public class KafkaConsoleUxTests
         overview.Should().Contain("id=\"kafka-topic-table\"");
         overview.Should().Contain("name=\"q\"");
         overview.Should().Contain("KafkaAttention.Topic");
-        overview.Should().Contain("class=\"lu-kafka-fold\"");
+        overview.Should().NotContain("Broker rights");
+        brokers.Should().Contain("class=\"lu-kafka-fold\"");
 
         File.ReadAllText(Path.Combine(root, "Views", "Operations", "_TopicPicker.cshtml")).Should().Contain("id=\"topic-pick\"");
         topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
@@ -84,8 +85,8 @@ public class KafkaConsoleUxTests
 
         consumers.Should().Contain("Add or remove members only after a preview.");
         consumers.Should().Contain("id=\"kafka-replica-result\"");
-        consumers.Should().Contain("A preview does not read this. Add and Remove do.");
-        IndexOf(consumers, "id=\"kafka-replica-result\"").Should().BeLessThan(IndexOf(consumers, ">Preview add</span>"));
+        consumers.Should().Contain("A preview does not read the reason. Apply does.");
+        IndexOf(consumers, "id=\"kafka-replica-result\"").Should().BeLessThan(IndexOf(consumers, ">Preview</span>"));
 
         brokers.Should().Contain("A preview plans the partitions and changes nothing.");
         brokers.Should().NotContain("Request only");
