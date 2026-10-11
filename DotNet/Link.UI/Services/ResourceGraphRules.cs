@@ -101,43 +101,6 @@ public static class ResourceGraphRules
         return index;
     }
 
-    public static ResourceGraphIndex ReadBundle(string? json, string patientId, CancellationToken cancellationToken, int cap = MaxEntries)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        cap = Math.Clamp(cap, 1, MaxEntries);
-        var started = Stopwatch.GetTimestamp();
-        if (string.IsNullOrWhiteSpace(json))
-            return Finish(patientId, [], null, false, false, false, "The bundle was empty.", started);
-
-        if (json.Length > MaxBundleChars)
-            return Finish(patientId, [], null, false, true, false, "The bundle is larger than 32 MB, so the graph was not built.", started);
-
-        var nodes = new List<GraphNode>(256);
-        Dictionary<string, string>? slices = [];
-        var stored = 0;
-        var truncated = false;
-        var dropped = false;
-        string? error = null;
-        try
-        {
-            var bytes = Encoding.UTF8.GetBytes(json);
-            var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip, MaxDepth = 64 });
-            Walk(reader, bytes, patientId, cap, nodes, slices, ref stored, ref truncated, ref dropped, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (JsonException)
-        {
-            error = "The bundle could not be read.";
-            nodes.Clear();
-            slices = null;
-        }
-
-        return Finish(patientId, nodes, slices, dropped, truncated, false, error, started);
-    }
-
     /// <summary>
     /// One FHIR resource per line. Bodies are not kept. Each node records the byte span so one resource can be read later.
     /// </summary>
@@ -635,138 +598,6 @@ public static class ResourceGraphRules
         }
     }
 
-    private static void Walk(
-        Utf8JsonReader reader,
-        byte[] bytes,
-        string patientId,
-        int cap,
-        List<GraphNode> nodes,
-        Dictionary<string, string> slices,
-        ref int stored,
-        ref bool truncated,
-        ref bool dropped,
-        CancellationToken cancellationToken)
-    {
-        var depth = 0;
-        var inResource = false;
-        var resourceDepth = -1;
-        var expectResource = false;
-        var resourceStart = 0L;
-        string? property = null;
-        string? type = null;
-        string? id = null;
-        var refs = new List<string>(4);
-        var nextIsType = false;
-        var nextIsId = false;
-
-        while (reader.Read())
-        {
-            switch (reader.TokenType)
-            {
-                case JsonTokenType.StartObject:
-                    depth++;
-                    if (expectResource && !inResource)
-                    {
-                        inResource = true;
-                        resourceDepth = depth;
-                        resourceStart = reader.TokenStartIndex;
-                        type = null;
-                        id = null;
-                        refs.Clear();
-                    }
-
-                    expectResource = false;
-                    break;
-
-                case JsonTokenType.EndObject:
-                    if (inResource && depth == resourceDepth)
-                    {
-                        var isCenter = string.Equals(type, "Patient", StringComparison.Ordinal)
-                            && string.Equals(id, patientId, StringComparison.Ordinal);
-                        if (!isCenter && !string.IsNullOrEmpty(type) && !string.IsNullOrEmpty(id))
-                        {
-                            if (nodes.Count >= cap)
-                            {
-                                truncated = true;
-                                return;
-                            }
-
-                            var kept = refs.Distinct(StringComparer.Ordinal).Take(MaxRefsOnNode).ToArray();
-                            var node = new GraphNode(type, id, kept);
-                            nodes.Add(node);
-                            StoreSlice(bytes, resourceStart, reader.BytesConsumed, node, slices, ref stored, ref dropped);
-                            if ((nodes.Count & 1023) == 0)
-                                cancellationToken.ThrowIfCancellationRequested();
-                        }
-
-                        inResource = false;
-                    }
-
-                    depth--;
-                    expectResource = false;
-                    nextIsType = false;
-                    nextIsId = false;
-                    break;
-
-                case JsonTokenType.PropertyName:
-                    property = reader.GetString();
-                    expectResource = !inResource && string.Equals(property, "resource", StringComparison.Ordinal);
-                    nextIsType = inResource && depth == resourceDepth && string.Equals(property, "resourceType", StringComparison.Ordinal);
-                    nextIsId = inResource && depth == resourceDepth && string.Equals(property, "id", StringComparison.Ordinal);
-                    break;
-
-                case JsonTokenType.String:
-                    if (nextIsType)
-                        type = reader.GetString();
-                    else if (nextIsId)
-                        id = reader.GetString();
-                    else if (inResource && string.Equals(property, "reference", StringComparison.Ordinal))
-                    {
-                        var normalized = NormalizeRef(reader.GetString());
-                        if (normalized is not null)
-                            refs.Add(normalized);
-                    }
-
-                    nextIsType = false;
-                    nextIsId = false;
-                    expectResource = false;
-                    break;
-
-                default:
-                    nextIsType = false;
-                    nextIsId = false;
-                    if (reader.TokenType is not JsonTokenType.StartObject and not JsonTokenType.StartArray)
-                        expectResource = false;
-                    break;
-            }
-        }
-    }
-
-    private static void StoreSlice(
-        byte[] bytes,
-        long start,
-        long consumed,
-        GraphNode node,
-        Dictionary<string, string> slices,
-        ref int stored,
-        ref bool dropped)
-    {
-        if (dropped || start < 0 || consumed <= start || consumed > bytes.Length)
-            return;
-
-        var length = (int)(consumed - start);
-        if (stored + length > MaxStoredBodyChars)
-        {
-            dropped = true;
-            slices.Clear();
-            stored = 0;
-            return;
-        }
-
-        slices[node.Type + "/" + node.Id] = Encoding.UTF8.GetString(bytes, (int)start, length);
-        stored += length;
-    }
-
     private static string? NormalizeRef(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -891,7 +722,7 @@ public sealed class ResourceGraphIndex
     }
 
     public string PatientId { get; }
-    public string Origin { get; internal set; } = "bundle";
+    public string Origin { get; internal set; } = "";
     public SubmissionBlobAddress? Address { get; internal set; }
     public bool HasSearchableBodies => _synthetic || _slices is { Count: > 0 };
     public int Total => _nodes.Count;

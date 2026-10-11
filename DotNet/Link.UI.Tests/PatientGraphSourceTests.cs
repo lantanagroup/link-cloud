@@ -16,14 +16,33 @@ public class PatientGraphSourceTests
     }
 
     [Fact]
-    public void Graph_marks_counts_that_come_from_acquired_data_instead_of_the_submitted_bundle()
+    public void Graph_totals_come_only_from_the_stored_report_counts()
     {
         var script = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/resource-graph.js"));
-        script.Should().Contain("source: done.source");
-        script.Should().Contain("state.source === \"bundle\"");
-        script.Should().Contain("not the submitted bundle");
+        script.Should().Contain("var stored = storedCounts(row);");
+        script.Should().Contain("row.resources");
+        script.Should().NotContain("done.types");
+        script.Should().NotContain("done.source");
+        script.Should().NotContain("not the submitted bundle");
+        script.Should().Contain("No resource counts were recorded.");
     }
 
+    [Fact]
+    public void Patient_graph_has_no_measure_eval_fallback()
+    {
+        var controller = File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/ReportsController.cs"));
+        var start = controller.IndexOf("public async Task<IActionResult> PatientGraph(", StringComparison.Ordinal);
+        start.Should().BeGreaterThan(0);
+        var end = controller.IndexOf("private async Task<(bool Handled", start, StringComparison.Ordinal);
+        var action = controller[start..end];
+        action.Should().NotContain("ReadPatientBundleAsync");
+        controller.Should().NotContain("LoadGraphAsync");
+        action.Should().Contain("The submitted file for this patient is not available.");
+
+        var rules = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/ResourceGraphRules.cs"));
+        rules.Should().NotContain("ReadBundle(");
+        rules.Should().NotContain("= \"bundle\"");
+    }
     private static string RepoFile(string relative)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

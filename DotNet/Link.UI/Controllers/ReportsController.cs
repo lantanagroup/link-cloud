@@ -299,14 +299,17 @@ public sealed class ReportsController : Controller
             index = streamed.Index;
         }
 
-        if (index is null)
+        if (index is null && sample)
         {
-            var loaded = await LoadGraphAsync(facility, report, patient, scale, cancellationToken);
-            if (loaded.Problem is not null)
-                return loaded.Problem;
-            index = loaded.Index!;
+            if (!ResourceGraphRules.TryFixture(patient, scale, out var spec))
+                return Problem(detail: "That patient is not on this report.", statusCode: StatusCodes.Status404NotFound);
+            index = ResourceGraphRules.Build(spec, cancellationToken);
             ResourceGraphRules.Remember(key, index);
         }
+
+        // Resources load only from the submitted patient file. There is no MeasureEval fallback.
+        if (index is null)
+            return Problem(detail: "The submitted file for this patient is not available.", statusCode: StatusCodes.Status404NotFound);
 
         if (!string.IsNullOrWhiteSpace(index.Error) && index.Total == 0)
             return Problem(detail: index.Error, statusCode: StatusCodes.Status400BadRequest);
@@ -433,49 +436,6 @@ public sealed class ReportsController : Controller
             }
 
             return (true, new EmptyResult(), null);
-        }
-    }
-
-    private async Task<(ResourceGraphIndex? Index, IActionResult? Problem)> LoadGraphAsync(
-        string facilityId,
-        string reportId,
-        string patientId,
-        bool scale,
-        CancellationToken cancellationToken)
-    {
-        if (_fixture.Active && ReportManifestRules.IsSample(facilityId, reportId))
-        {
-            if (!ResourceGraphRules.TryFixture(patientId, scale, out var spec))
-                return (null, Problem(detail: "That patient is not on this report.", statusCode: StatusCodes.Status404NotFound));
-            return (ResourceGraphRules.Build(spec, cancellationToken), null);
-        }
-
-        try
-        {
-            var read = await _reports.ReadPatientBundleAsync(facilityId, reportId, patientId, cancellationToken);
-            if (!read.Action.Succeeded || string.IsNullOrWhiteSpace(read.Body))
-            {
-                var message = (read.Action.Message ?? string.Empty).Sanitize().Trim();
-                var status = message.Contains("not on this report", StringComparison.OrdinalIgnoreCase)
-                    ? StatusCodes.Status404NotFound
-                    : message.Contains("not configured", StringComparison.OrdinalIgnoreCase)
-                        ? StatusCodes.Status503ServiceUnavailable
-                        : StatusCodes.Status502BadGateway;
-                if (message.Length == 0)
-                    message = "The bundle could not be read.";
-                return (null, Problem(detail: message, statusCode: status));
-            }
-
-            var index = ResourceGraphRules.ReadBundle(read.Body, read.PatientId ?? patientId, cancellationToken);
-            return (index, null);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            return (null, Problem(detail: "MeasureEval could not be read.", statusCode: StatusCodes.Status502BadGateway));
         }
     }
 
