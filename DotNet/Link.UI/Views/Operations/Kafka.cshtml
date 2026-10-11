@@ -27,7 +27,7 @@
         <div class="alert alert-secondary" role="status">This environment is read-only. Kafka changes are refused.</div>
     }
 
-    @if (query.View is not (ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Migrate))
+    @if (query.View is not (ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Migrate or ThroughputKafkaPageQuery.Consumers))
     {
     <section class="card au-card mt-3">
     <h2 class="card-header h6 mb-0">Search</h2>
