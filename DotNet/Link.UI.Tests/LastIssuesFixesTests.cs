@@ -31,10 +31,10 @@ public class LastIssuesFixesTests
     }
 
     [Fact]
-    public void Copy_icon_space_is_reserved_before_hover()
+    public void Copy_icon_floats_outside_the_text_without_layout_space()
     {
         var css = Dot("Link.UI", "wwwroot", "css", "site.css");
-        Assert.Contains("td.lu-copy-host {\n    padding-right: 2.1rem;".Replace("\n", css.Contains("\r\n") ? "\r\n" : "\n"), css);
+        Assert.Contains("transform: translateY(-55%);", css); Assert.DoesNotContain("td.lu-copy-host {\n    padding-right", css.Replace("\r\n", "\n"));
         Assert.Contains("@media (hover: hover) and (pointer: fine) {", css);
     }
 
@@ -51,7 +51,7 @@ public class LastIssuesFixesTests
     {
         var view = Dot("Link.UI", "Views", "Operations", "_ProduceMessage.cshtml");
         Assert.Contains("KafkaBrowseAllowList.Admit(topicName, null).Allowed", view);
-        Assert.Contains("<fieldset id=\"produce-fields\" disabled=\"@refused\">", view);
+        Assert.Contains("<fieldset id=\"produce-fields\" disabled=\"@refused\">", view); Assert.Contains("id=\"kafka-produce-refused\"", view);
         Assert.False(KafkaBrowseAllowList.Admit("loadtest-scratch", null).Allowed);
         Assert.True(KafkaBrowseAllowList.Admit("ResourcesAcquired", null).Allowed);
     }
@@ -71,7 +71,7 @@ public class LastIssuesFixesTests
     {
         var source = Dot("Admin.BFF", "Application", "KafkaOps", "Migration", "MigrationRuntime.cs");
         Assert.Contains("Interlocked.Exchange(ref _reconcileFailure, reason) != reason", source);
-        Assert.Contains("_logger.LogDebug(\"Migration reconcile still not finished", source);
+        Assert.Contains("_logger.LogTrace(\"Migration reconcile still not finished", source);
     }
 
     [Fact]

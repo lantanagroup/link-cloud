@@ -3103,12 +3103,16 @@ a.lu-clip {
 td.lu-copy-host {
   position: relative;
 }
-/* The copy icon gets its own space at the end of the cell, reserved before hover, so it never covers a short value
-   and showing it does not change any width. */
+/* The copy icon floats as a chip over the top edge of the cell, outside the text, so it never covers a short value
+   and showing it takes no layout space (no width shift). */
 @media (hover: hover) and (pointer: fine) {
-  table.table > tbody > tr > td.lu-copy-host,
-  table.au-table > tbody > tr > td.lu-copy-host {
-    padding-right: 2.1rem;
+  table.table > tbody > tr > td.lu-copy-host > .lu-cell-copy,
+  table.au-table > tbody > tr > td.lu-copy-host > .lu-cell-copy {
+    top: 0;
+    right: .25rem;
+    transform: translateY(-55%);
+    z-index: 3;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
   }
 }
 .btn.lu-cell-copy,
