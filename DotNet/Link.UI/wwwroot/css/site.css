@@ -4915,3 +4915,7 @@ table .lu-facility-id {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* The provider state is a small badge beside the Kafka title, not a heading-sized block. */
+h1 .lu-provider-badge { font-size: .75rem; font-weight: 600; vertical-align: middle; padding: .3em .6em; }
+h1 .lu-provider-badge + .au-info-icon { font-size: .8rem; vertical-align: middle; }

@@ -288,8 +288,9 @@ public class MorningFixesGuardTests
 
         var topic = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Topic.cshtml"));
         topic.Should().Contain("btn-au-link");
-        topic.Should().Contain("Change partitions");
-        topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
+        topic.Should().Contain("id=\"kafka-lag-by-group\"");
+        topic.Should().NotContain("kafkaLagChart");
+        topic.Should().NotContain("Retry @topic.RetryPartitions. Error");
         topic.Should().NotContain("Migrate instead");
         topic.Should().NotContain(">Preview increase</span>");
 
