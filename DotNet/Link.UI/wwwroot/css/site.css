@@ -4245,36 +4245,6 @@ tr.lu-kafka-problem > td:first-child {
   margin-top: .75rem;
   font-variant-numeric: tabular-nums;
 }
-.lu-kafka-steps {
-  list-style: none;
-  counter-reset: kafka-step;
-  display: grid;
-  gap: .45rem;
-  padding: 0;
-  margin: 0 0 1rem;
-}
-.lu-kafka-steps li {
-  position: relative;
-  background: var(--au-bg);
-  border-radius: var(--au-radius);
-  padding: .6rem .85rem .6rem 2.5rem;
-}
-.lu-kafka-steps li::before {
-  counter-increment: kafka-step;
-  content: counter(kafka-step);
-  position: absolute;
-  left: .65rem;
-  top: .55rem;
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 999px;
-  background: var(--au-dark);
-  color: #fff;
-  font-size: .75rem;
-  font-weight: 700;
-  line-height: 1.35rem;
-  text-align: center;
-}
 .lu-kafka tr.lu-msg-row > td {
   background: var(--au-bg);
   padding: .75rem;

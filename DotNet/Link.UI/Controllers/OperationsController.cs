@@ -478,7 +478,15 @@ public sealed class OperationsController : Controller
         var families = topics.Topics.Select(row => row.Family).Where(family => family.Length > 0).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
         var keyClasses = topics.Topics.Select(row => row.KeyClass).Where(item => item.Length > 0).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
 
-        var topicRows = SortTopics(FilterTopics(topics.Topics, query).ToList(), query);
+        var topicRows = FilterTopics(topics.Topics, query).ToList();
+        if (query.View == ThroughputKafkaPageQuery.Overview && query.Sort == "topic" && query.Dir == "asc")
+            topicRows = topicRows
+                .OrderByDescending(KafkaAttention.Topic)
+                .ThenByDescending(row => row.LagKnown ? row.TotalLag : long.MaxValue)
+                .ThenBy(row => row.Topic, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        else
+            topicRows = SortTopics(topicRows, query);
         var topicCount = topicRows.Count;
         var topicPages = Math.Max(1, (int)Math.Ceiling(topicCount / (double)query.PageSize));
         var chartTopics = topicRows.Take(12).ToList();
@@ -500,7 +508,10 @@ public sealed class OperationsController : Controller
             query = query with { Page = groupPage };
         var pagedGroups = groupRows.Skip((groupPage - 1) * query.PageSize).Take(query.PageSize).ToList();
 
-        var brokerRows = SortBrokers(FilterBrokers(cluster.Brokers, query).ToList(), query);
+        var brokerRows = FilterBrokers(cluster.Brokers, query).ToList();
+        brokerRows = query.View == ThroughputKafkaPageQuery.Brokers && query.Sort is not ("partitions" or "brokers" or "leaders")
+            ? brokerRows.OrderByDescending(KafkaAttention.Broker).ThenBy(row => row.Id).ToList()
+            : SortBrokers(brokerRows, query);
         var brokerCount = brokerRows.Count;
         var brokerPages = Math.Max(1, (int)Math.Ceiling(brokerCount / (double)query.PageSize));
         var brokerPage = Math.Min(query.Page, brokerPages);

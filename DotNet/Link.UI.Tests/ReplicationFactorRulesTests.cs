@@ -243,7 +243,7 @@ public class ReplicationFactorRulesTests
         form.Should().Contain("btn-au-execute lu-icon-btn\" type=\"submit\" formaction=\"/Operations/Kafka/replication-factor\"");
         form.Should().NotContain("btn-success");
         form.Should().NotContain("btn-outline-");
-        form.Should().Contain("lu-kafka-steps");
+        form.Should().NotContain("lu-kafka-steps");
         form.Should().Contain("lu-kafka-summary");
         form.Should().Contain("Filter the preview");
         request.Should().Contain("ReplicationFactor");

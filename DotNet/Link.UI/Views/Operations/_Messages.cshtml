@@ -6,12 +6,11 @@
     var browse = Model.Messages;
     var error = Model.BrowseError;
     var fetched = browse is not null || !string.IsNullOrWhiteSpace(error);
-    var step = string.IsNullOrWhiteSpace(topicName) ? 1 : fetched ? 3 : 2;
     var members = Model.Family is { Members.Count: > 0 }
         ? (IReadOnlyList<KafkaNamedTopic>)Model.Family.Members
         : KafkaBrowseAllowList.MembersOf(topicName);
     var familyChecked = Model.Family is not null;
-    var topics = Model.TopicRows;
+    var topics = Model.Topics.Topics;
     var topicKnown = topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal))
         || Model.Topics.Topics.Any(row => string.Equals(row.Topic, topicName, StringComparison.Ordinal));
     var families = topics
@@ -47,32 +46,27 @@
     var clock = DateTimeOffset.UtcNow;
 }
 
-<section class="card au-card mt-3 mb-3">
-<h2 class="card-header h6 mb-0">Read messages</h2>
-<div class="card-body">
-<p class="mb-2">This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Time, message type, and an exact facility and patient key narrow what is read. A keyword filters the messages already loaded and does not read again. Search further reads the next batch. An unfiltered topic is paged one page at a time. Export reads that same page again and writes an audit of the rows it returns.</p>
-<ol class="lu-kafka-steps mb-2">
-    <li>Choose the topic. The family tabs move between the main topic and its error, retry, and redrive topics.</li>
-    <li>Search. Time, type, and an exact facility and patient key narrow the read. A keyword filters the loaded messages on this page.</li>
-    <li>Open a row for the payload and the facility or report it belongs to.</li>
-    <li>Export JSON when you need a copy of this page. That second read is audited.</li>
-</ol>
-<p class="mb-0">
-    <span class="badge @StatusPills.ForWizardStep(step, 1)">1 Choose a topic</span>
-    <span class="badge @StatusPills.ForWizardStep(step, 2)">2 Search</span>
-    <span class="badge @StatusPills.ForWizardStep(step, 3)">3 Review</span>
-    <span class="badge @StatusPills.ForWizardStep(step, 4)">4 Export</span>
-</p>
+<section class="card au-card mt-3" id="kafka-records">
+<div class="card-header d-flex align-items-center gap-2">
+    <h2 class="h6 mb-0">Records <partial name="_TermInfo" model="@(new TermInfo { Label = "About message reads", Text = "This reads one allow-listed topic: the main topic, its error topic, a retry topic, or a redrive topic. The read does not commit offsets, so the consumer groups stay where they are. Time, message type, and an exact facility and patient key narrow what is read. A keyword filters the messages already loaded and does not read again. Search further reads the next batch. An unfiltered topic is paged one page at a time. Export reads that same page again and writes an audit of the rows it returns." })" /></h2>
+    @if (!string.IsNullOrWhiteSpace(topicName))
+    {
+        <div class="lu-header-actions">
+            @if (browse is not null)
+            {
+                <a class="lu-header-tool" href="@query.ExportHref()" title="Export JSON" aria-label="Export JSON"><i class="bi bi-download" aria-hidden="true"></i></a>
+            }
+            <a class="btn btn-warning btn-sm" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear</a>
+        </div>
+    }
 </div>
-</section>
-
-<section class="card au-card mb-3">
-<h2 class="card-header h6 mb-0">Topic</h2>
 <div class="card-body">
 <form class="row g-2 align-items-end mb-0" method="get" action="/Operations/Kafka">
     <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Messages" />
     <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
     <input type="hidden" name="q" value="@query.Q" />
+    <input type="hidden" name="family" value="@query.Family" />
+    <input type="hidden" name="keyClass" value="@query.KeyClass" />
     <input type="hidden" name="pageSize" value="@pageSize" />
     <input type="hidden" name="mq" value="@query.MessageText" />
     <input type="hidden" name="key" value="@query.BrowseKey" />
@@ -131,8 +125,6 @@
 {
     <p class="text-muted mb-0 mt-2">Choose a topic to read. Internal topics and names outside the catalog are refused.</p>
 }
-</div>
-</section>
 
 @if (!string.IsNullOrWhiteSpace(topicName))
 {
@@ -154,9 +146,8 @@
         <input type="hidden" name="hq" id="browse-hq" value="@query.HeaderContains" />
         <input type="hidden" name="vq" id="browse-vq" value="@query.ValueContains" />
 
-        <section class="card au-card mb-0 lu-search">
-            <h3 class="card-header h6 mb-0">Search</h3>
-            <div class="card-body">
+        <div class="lu-search mt-3">
+            <h3 class="h6">Search</h3>
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-lg-5">
                     <label class="form-label" for="browse-q">Search</label>
@@ -215,8 +206,7 @@
             </details>
             <input type="hidden" name="msgPage" value="1" />
             <input type="hidden" name="more" value="@(advancedOpen ? "1" : "")" />
-            </div>
-        </section>
+        </div>
         <p class="visually-hidden">The read does not commit offsets.</p>
     </form>
 
@@ -264,17 +254,6 @@
         </div>
     }
 
-    <div class="au-card card mt-3">
-        <div class="card-header d-flex align-items-center gap-2">
-            <h3 class="h6 mb-0">Records</h3>
-            <div class="lu-header-actions">
-                @if (browse is not null)
-                {
-                    <a class="lu-header-tool" href="@query.ExportHref()" title="Export JSON" aria-label="Export JSON"><i class="bi bi-download" aria-hidden="true"></i></a>
-                }
-                <a class="btn btn-warning btn-sm" href="/Operations/Kafka?view=messages&amp;topic=@Uri.EscapeDataString(topicName)">Clear</a>
-            </div>
-        </div>
     @if (browse is { Records.Count: > 0 })
     {
         <div class="table-responsive">
@@ -426,7 +405,8 @@
         </div>
     </nav>
     </div>
-    </div>
 
     <partial name="_ProduceMessage" model="Model" />
 }
+</div>
+</section>

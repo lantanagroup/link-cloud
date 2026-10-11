@@ -60,11 +60,13 @@ public class KafkaConsoleUxTests
         var brokers = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Brokers.cshtml"));
         var home = File.ReadAllText(Path.Combine(root, "Views", "Operations", "Index.cshtml"));
 
-        overview.Should().Contain("Read this before changing anything.");
-        overview.Should().Contain("Topics that need attention");
+        overview.Should().NotContain("Read this before changing anything.");
+        overview.Should().NotContain("Topics that need attention");
+        overview.Should().NotContain("Full topic table");
+        overview.Should().Contain("id=\"kafka-topic-table\"");
+        overview.Should().Contain("name=\"q\"");
         overview.Should().Contain("KafkaAttention.Topic");
         overview.Should().Contain("class=\"lu-kafka-fold\"");
-        overview.Should().Contain("Full topic table");
 
         topic.Should().Contain("id=\"topic-pick\"");
         topic.Should().Contain("ThroughputKafkaPageQuery.Migrate");
@@ -86,7 +88,9 @@ public class KafkaConsoleUxTests
         IndexOf(consumers, "id=\"kafka-replica-result\"").Should().BeLessThan(IndexOf(consumers, ">Preview add</span>"));
 
         brokers.Should().Contain("A preview plans the partitions and changes nothing.");
-        brokers.Should().Contain("<h3 class=\"card-header h6 mb-0\">Request only</h3>");
+        brokers.Should().NotContain("Request only");
+        brokers.Should().Contain("id=\"kafka-broker-table\"");
+        IndexOf(brokers, "id=\"kafka-q\"").Should().BeLessThan(IndexOf(brokers, "id=\"kafka-broker-table\""));
         IndexOf(brokers, "id=\"kafka-broker-result\"").Should().BeLessThan(IndexOf(brokers, ">Preview decommission</span>"));
 
         home.Should().Contain("changes that start as a preview");
@@ -175,7 +179,8 @@ public class KafkaConsoleUxTests
         migrate.Should().NotContain("foreach (var row in detail.PartitionsDetail)");
         overview.Should().Contain("KafkaWindows.Groups");
         overview.Should().NotContain("foreach (var row in Model.Groups.Groups");
-        overview.Should().Contain("Full topic table");
+        overview.Should().Contain("id=\"kafka-topic-table\"");
+        overview.Should().NotContain("Full topic table");
         messages.Should().Contain("aria-label=\"Message pages\"");
         messages.Should().Contain("Direction = \"first\"");
         messages.Should().Contain("Direction = \"last\"");

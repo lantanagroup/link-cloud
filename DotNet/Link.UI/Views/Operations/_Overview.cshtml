@@ -4,27 +4,12 @@
     var cluster = Model.Cluster;
     var controllerTile = KafkaControllerTile.Display(cluster.ControllerId, cluster.ControllerUnavailableReason);
     var origin = ReturnUrlRules.Here(Context.Request);
-    var topicHot = Model.TopicRows
-        .Where(KafkaAttention.Topic)
-        .OrderByDescending(row => row.LagKnown ? row.TotalLag : long.MaxValue)
-        .ThenBy(row => row.Topic, StringComparer.OrdinalIgnoreCase)
-        .ToList();
-    var topicProblems = topicHot.Take(KafkaWindows.HottestCap).ToList();
     var groupWindow = KafkaWindows.Groups(Model.Groups.Groups, query.PartPage, query.PageSize);
-    var groupProblems = groupWindow.HottestRows;
     var rightsDenied = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions == false);
     var rightsUnknown = Model.Capabilities.Topics.Count(right => right.CanAlterPartitions is null);
     var rightsWindow = KafkaWindows.DeniedRights(Model.Capabilities.Topics, query.PartPage, query.PageSize);
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
-
-<section class="card au-card mt-3">
-<h2 class="card-header h6 mb-0">Cluster overview</h2>
-<div class="card-body">
-<p class="mb-2">Read this before changing anything. The counts above the tables are the cluster. A topic or group that is behind, short on replicas, or unknown is listed on its own. The full tables stay folded.</p>
-<p class="text-muted mb-0">Provider @Model.Infra.Provider. @(Model.Infra.Enabled ? "Replica and broker changes are enabled." : Model.Infra.Detail)</p>
-</div>
-</section>
 
 <div class="row g-2 mt-3">
     <div class="col"><div class="au-stat-tile" title="@controllerTile.Title"><div class="au-stat-value">@controllerTile.Value</div><div class="au-stat-label">@controllerTile.Caption</div></div></div>
@@ -34,212 +19,206 @@
     <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.IsrShrunkPartitions</div><div class="au-stat-label">ISR shrink</div></div></div>
 </div>
 
-@if (topicProblems.Count > 0)
-{
-    <div class="au-card card mt-3">
-        <div class="card-header">Topics that need attention (@topicHot.Count)</div>
-        <div class="card-body">
-            <p>These topics on this page are behind, uneven, or blocked. Open one to see placement, or migrate when an in-place increase is the wrong tool.</p>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Topic</th>
-                            <th>Why</th>
-                            <th>Lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag", Text = "How far a consumer is behind the latest message on that topic. A larger number is further behind." })" /></th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var row in topicProblems)
-                    {
-                        <tr class="lu-kafka-problem">
-                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = row.Topic, Compact = true, CopyLabel = "Copy topic", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1) })" /></td>
-                            <td>@KafkaAttention.Join(KafkaAttention.TopicReasons(row))</td>
-                            <td>@(row.LagKnown ? row.TotalLag.ToString() : "unknown")</td>
-                            <td>
-                                <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i><span class="ms-1">Open</span></a>
-                                @if (row.Slice1Eligible)
-                                {
-                                    <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: row.Topic, page: 1)" aria-label="Migrate @row.Topic">Migrate</a>
-                                }
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
+<section class="card au-card mt-3" id="kafka-topics">
+    <h2 class="card-header h6 mb-0">Topics <partial name="_TermInfo" model="@(new TermInfo { Label = "About topics", Text = "The counts above are the cluster. Topics that are behind, short on replicas, or blocked are listed first. Open one for placement. Partition changes are on Migrate." })" /></h2>
+    <div class="card-body">
+        <p class="text-muted">Provider @Model.Infra.Provider. @(Model.Infra.Enabled ? "Replica and broker changes are enabled." : Model.Infra.Detail)</p>
+        <form class="row g-2 align-items-end mb-3" method="get" action="/Operations/Kafka">
+            <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Overview" />
+            <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+            <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="sort" value="@query.Sort" />
+            <input type="hidden" name="dir" value="@query.Dir" />
+            <input type="hidden" name="pageSize" value="@query.PageSize" />
+            <input type="hidden" name="group" value="@query.Group" />
+            <input type="hidden" name="topic" value="@query.TopicName" />
+            <input type="hidden" name="broker" value="@query.Broker" />
+            <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
+            <input type="hidden" name="advanced" value="@(query.Advanced ? "1" : "")" />
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="kafka-q">Search</label>
+                <input class="form-control" id="kafka-q" name="q" value="@query.Q" />
             </div>
-            @if (topicHot.Count > topicProblems.Count)
-            {
-                <p class="text-muted mt-2 mb-0">@topicProblems.Count of @topicHot.Count shown. The rest are in the topic table on this page.</p>
-            }
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="kafka-family">Family</label>
+                <select class="form-select" id="kafka-family" name="family">
+                    <option value="">All families</option>
+                    @foreach (var family in Model.Families)
+                    {
+                        if (family == query.Family)
+                        {
+                            <option value="@family" selected>@family</option>
+                        }
+                        else
+                        {
+                            <option value="@family">@family</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="kafka-key">Key class</label>
+                <select class="form-select" id="kafka-key" name="keyClass">
+                    <option value="">All key classes</option>
+                    @foreach (var keyClass in Model.KeyClasses)
+                    {
+                        if (keyClass == query.KeyClass)
+                        {
+                            <option value="@keyClass" selected>@keyClass</option>
+                        }
+                        else
+                        {
+                            <option value="@keyClass">@keyClass</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-au-execute" type="submit">Search</button>
+            </div>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0" id="kafka-topic-table">
+                <thead>
+                    <tr>
+                        <th><a href="@query.Href(sort: "topic", dir: SortDir("topic"), page: 1)">Topic</a></th>
+                        <th><a href="@query.Href(sort: "key", dir: SortDir("key"), page: 1)">Key</a></th>
+                        <th><a href="@query.Href(sort: "partitions", dir: SortDir("partitions"), page: 1)">Partitions</a></th>
+                        <th>RF</th>
+                        <th>ISR</th>
+                        <th>Size</th>
+                        <th><a href="@query.Href(sort: "lag", dir: SortDir("lag"), page: 1)">Lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag", Text = "How far a consumer is behind the latest message on that topic. A larger number is further behind." })" /></a></th>
+                        <th><a href="@query.Href(sort: "rate", dir: SortDir("rate"), page: 1)">Produce rate</a></th>
+                        <th>Ceiling</th>
+                        <th class="lu-wrap">Why</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model.TopicRows)
+                {
+                    <tr class="@(KafkaAttention.Topic(row) ? "lu-kafka-problem" : null)">
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = row.Topic, Compact = true, CopyLabel = "Copy topic", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1) })" /></td>
+                        <td>@row.KeyClass <span class="text-muted">@row.KeyShape</span></td>
+                        <td>
+                            @row.Partitions
+                            @if (row.PartitionDrift)
+                            {
+                                <span class="text-muted">file @row.TopicsFilePartitions</span>
+                            }
+                            @if (row.ServiceRetryBehind || row.ServiceRedriveBehind || row.PinnedSiblingBehind || row.RetryBehind || row.ErrorBehind)
+                            {
+                                <span class="text-muted">family behind</span>
+                            }
+                        </td>
+                        <td>@row.ReplicationFactor</td>
+                        <td>@(row.FullIsr ? "full" : "short")@(row.LeadersSkewed ? ", skewed" : "")</td>
+                        <td>@row.SizeClass</td>
+                        <td>@(row.LagKnown ? row.TotalLag.ToString() : "unknown")</td>
+                        <td>@KafkaProduceRate.Text(row.ProduceRateKnown, row.ProduceRatePerSecond)</td>
+                        <td>@row.MaxReplicas</td>
+                        <td class="lu-wrap">@KafkaAttention.Join(KafkaAttention.TopicReasons(row))</td>
+                        <td>
+                            <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                            @if (row.Slice1Eligible)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: row.Topic, page: 1)" aria-label="Migrate @row.Topic">Migrate</a>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TopicRows.Count == 0)
+        {
+            <p class="text-muted mb-0 mt-2">No topics match this search.</p>
+        }
+        <div class="lu-kafka-pager">
+            <span>@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.@(query.Sort == "topic" && query.Dir == "asc" ? " Worst first." : "")</span>
+            <span class="d-flex gap-2">
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.TopicPages })" />
+            </span>
         </div>
     </div>
-}
-else if (Model.TopicRows.Count > 0)
-{
-    <div class="alert alert-secondary mt-3 mb-0" role="status">No topic on this page needs attention.</div>
-}
+</section>
 
-<details class="lu-kafka-fold">
-    <summary>Full topic table (@Model.TopicRows.Count on this page)</summary>
-    <div class="table-responsive mt-3">
-        <table class="table table-sm mb-0">
-            <thead>
-                <tr>
-                    <th><a href="@query.Href(sort: "topic", dir: SortDir("topic"), page: 1)">Topic</a></th>
-                    <th><a href="@query.Href(sort: "key", dir: SortDir("key"), page: 1)">Key</a></th>
-                    <th><a href="@query.Href(sort: "partitions", dir: SortDir("partitions"), page: 1)">Partitions</a></th>
-                    <th>RF</th>
-                    <th>ISR</th>
-                    <th>Size</th>
-                    <th><a href="@query.Href(sort: "lag", dir: SortDir("lag"), page: 1)">Lag</a></th>
-                    <th><a href="@query.Href(sort: "rate", dir: SortDir("rate"), page: 1)">Produce rate</a></th>
-                    <th>Ceiling</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var row in Model.TopicRows)
-            {
-                <tr class="@(KafkaAttention.Topic(row) ? "lu-kafka-problem" : null)">
-                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = row.Topic, Compact = true, CopyLabel = "Copy topic", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1) })" /></td>
-                    <td>@row.KeyClass <span class="text-muted">@row.KeyShape</span></td>
-                    <td>
-                        @row.Partitions
-                        @if (row.PartitionDrift)
-                        {
-                            <span class="text-muted">file @row.TopicsFilePartitions</span>
-                        }
-                        @if (row.ServiceRetryBehind || row.ServiceRedriveBehind || row.PinnedSiblingBehind || row.RetryBehind || row.ErrorBehind)
-                        {
-                            <span class="text-muted">family behind</span>
-                        }
-                    </td>
-                    <td>@row.ReplicationFactor</td>
-                    <td>@(row.FullIsr ? "full" : "short")@(row.LeadersSkewed ? ", skewed" : "")</td>
-                    <td>@row.SizeClass</td>
-                    <td>@(row.LagKnown ? row.TotalLag.ToString() : "unknown")</td>
-                    <td>@KafkaProduceRate.Text(row.ProduceRateKnown, row.ProduceRatePerSecond)</td>
-                    <td>@row.MaxReplicas</td>
-                    <td>
-                        <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i><span class="ms-1">Open</span></a>
-                        @if (row.Slice1Eligible)
-                        {
-                            <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: row.Topic, page: 1)" aria-label="Migrate @row.Topic">Migrate</a>
-                        }
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-    @if (Model.TopicRows.Count == 0)
-    {
-        <p class="text-muted mb-0 mt-2">No topics match this search.</p>
-    }
-    <div class="lu-kafka-pager">
-        <span>@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.</span>
-        <span class="d-flex gap-2">
-            <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = query.Href(page: query.Page - 1), Enabled = query.Page > 1 })" />
-            <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = query.Href(page: query.Page + 1), Enabled = query.Page < Model.TopicPages })" />
-        </span>
-    </div>
-</details>
-
-@if (groupProblems.Count > 0)
-{
-    <div class="au-card card mt-3">
-        <div class="card-header">Groups that need attention (@groupWindow.Hot)</div>
-        <div class="card-body">
-            <p>Open a group to preview a replica change. The preview changes nothing.</p>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Group</th>
-                            <th>State</th>
-                            <th>Why</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var row in groupProblems)
-                    {
-                        <tr class="lu-kafka-problem">
-                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
-                            <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
-                            <td>@KafkaAttention.Join(KafkaAttention.GroupReasons(row))</td>
-                            <td>
-                                <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
+<section class="card au-card mt-3" id="kafka-overview-groups">
+    <h2 class="card-header h6 mb-0">Groups <partial name="_TermInfo" model="@(new TermInfo { Label = "About groups", Text = "Open a group to preview a replica change. The preview changes nothing. Groups that are behind or unowned are listed first." })" /></h2>
+    <div class="card-body">
+        <form class="row g-2 align-items-end mb-3" method="get" action="/Operations/Kafka">
+            <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Overview" />
+            <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+            <input type="hidden" name="page" value="@query.Page" />
+            <input type="hidden" name="sort" value="@query.Sort" />
+            <input type="hidden" name="dir" value="@query.Dir" />
+            <input type="hidden" name="pageSize" value="@query.PageSize" />
+            <input type="hidden" name="q" value="@query.Q" />
+            <input type="hidden" name="family" value="@query.Family" />
+            <input type="hidden" name="keyClass" value="@query.KeyClass" />
+            <input type="hidden" name="group" value="@query.Group" />
+            <input type="hidden" name="topic" value="@query.TopicName" />
+            <input type="hidden" name="broker" value="@query.Broker" />
+            <div class="col-auto">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="kafka-tests" name="tests" value="1" @(query.Tests ? "checked" : null) />
+                    <label class="form-check-label" for="kafka-tests">Include test groups <partial name="_TermInfo" model="@(new TermInfo { Label = "About test groups", Text = "Groups named e2e-diag-* and Dynamic:* stay hidden unless Include test groups is checked." })" /></label>
+                </div>
             </div>
-            @if (groupWindow.CapNote.Length > 0)
-            {
-                <p class="text-muted mt-2 mb-0">@groupWindow.CapNote</p>
-            }
+            <div class="col-auto">
+                <button class="btn btn-au-execute" type="submit">Search</button>
+            </div>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Group</th>
+                        <th>State</th>
+                        <th>Members</th>
+                        <th>Lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag", Text = "How far a consumer is behind the latest message on that topic. A larger number is further behind." })" /></th>
+                        <th class="lu-wrap">Why</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in groupWindow.Rows)
+                {
+                    <tr class="@(KafkaAttention.Group(row) ? "lu-kafka-problem" : null)">
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
+                        <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
+                        <td>@row.Members.Count</td>
+                        <td>@row.TotalLag</td>
+                        <td class="lu-wrap">@KafkaAttention.Join(KafkaAttention.GroupReasons(row))</td>
+                        <td>
+                            <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
         </div>
+        <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(groupWindow.Page, groupWindow.Pages, "Worst first.", groupWindow.Page > 1 ? query.Href(part: groupWindow.Page - 1) : "", groupWindow.Page < groupWindow.Pages ? query.Href(part: groupWindow.Page + 1) : ""))" />
+        <p class="mt-2 mb-0"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, page: 1)">Open the group list</a></p>
     </div>
-}
-else if (groupWindow.Total > 0)
-{
-    <div class="alert alert-secondary mt-3 mb-0" role="status">No group needs attention.</div>
-}
-
-<details class="lu-kafka-fold">
-    <summary>Groups (@groupWindow.Rows.Count of @groupWindow.Total, worst first)</summary>
-    <div class="table-responsive mt-3">
-        <table class="table table-sm mb-0">
-            <thead>
-                <tr>
-                    <th>Group</th>
-                    <th>State</th>
-                    <th>Members</th>
-                    <th>Lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About lag", Text = "How far a consumer is behind the latest message on that topic. A larger number is further behind." })" /></th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var row in groupWindow.Rows)
-            {
-                <tr class="@(KafkaAttention.Group(row) ? "lu-kafka-problem" : null)">
-                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
-                    <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
-                    <td>@row.Members.Count</td>
-                    <td>@row.TotalLag</td>
-                    <td>
-                        <a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i><span class="ms-1">Open</span></a>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-    <partial name="_KafkaWindowPager" model="@(new KafkaWindowPager(groupWindow.Page, groupWindow.Pages, "Worst first.", groupWindow.Page > 1 ? query.Href(part: groupWindow.Page - 1) : "", groupWindow.Page < groupWindow.Pages ? query.Href(part: groupWindow.Page + 1) : ""))" />
-    <p class="mt-2 mb-0"><a class="btn btn-sm btn-au-link" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, page: 1)">Open the group list</a></p>
-</details>
+</section>
 
 <section class="card au-card mt-3">
-<h2 class="card-header h6 mb-0">Produce rate and lag</h2>
-<div class="card-body">
-<p class="text-muted">The charts follow the topics on this page. A flat rate with rising lag is the group to open.</p>
-<div class="lu-chart"><canvas id="kafkaRateChart"></canvas></div>
-<div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
-</div>
+    <h2 class="card-header h6 mb-0">Produce rate and lag <partial name="_TermInfo" model="@(new TermInfo { Label = "About the charts", Text = "The charts follow the topics on this page. A flat rate with rising lag is the group to open." })" /></h2>
+    <div class="card-body">
+        <div class="lu-chart"><canvas id="kafkaRateChart"></canvas></div>
+        <div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
+    </div>
 </section>
 
 <details class="lu-kafka-fold">
-    <summary>Broker rights (@Model.Capabilities.Topics.Count topics@(rightsDenied > 0 ? ", " + rightsDenied + " cannot alter partitions" : ""))</summary>
+    <summary>Broker rights (@Model.Capabilities.Topics.Count topics@(rightsDenied > 0 ? ", " + rightsDenied + " cannot alter partitions" : "")) <partial name="_TermInfo" model="@(new TermInfo { Label = "About broker rights", Text = "Alter is what an in-place partition increase needs. Unknown means the client did not report the right. This list is only the topics that cannot alter partitions." })" /></summary>
     <div class="mt-3">
         @if (!string.IsNullOrWhiteSpace(Model.Capabilities.Error))
         {
             <p class="text-muted">@Model.Capabilities.Error</p>
         }
-        <p>Alter is what an in-place partition increase needs. Unknown means the client did not report the right. This list is only the topics that cannot alter partitions.</p>
         @if (Model.Capabilities.Topics.Count == 0)
         {
             <p class="mb-0">No topic rights were reported.</p>

@@ -5,7 +5,7 @@
 
 <div class="lu-kafka">
 <partial name="_BackButton" model="@(new BackLink("/Operations", "Operations"))" />
-<h1 class="h3 mt-3">Kafka</h1>
+<h1 class="h3 mt-3">Kafka <span class="lu-live-label">Live</span></h1>
 <partial name="_Nav" />
 
 <div id="kafkaResults" data-au-refresh="8000" data-au-page-url="@query.Href()" class="lu-kafka">
@@ -25,89 +25,6 @@
     @if (Model.Topics.ReadOnly)
     {
         <div class="alert alert-secondary" role="status">This environment is read-only. Kafka changes are refused.</div>
-    }
-
-    @if (query.View is not (ThroughputKafkaPageQuery.Topic or ThroughputKafkaPageQuery.Migrate or ThroughputKafkaPageQuery.Consumers))
-    {
-    <section class="card au-card mt-3">
-    <h2 class="card-header h6 mb-0">Search</h2>
-    <div class="card-body">
-    <form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
-        <div class="col-12 col-md-4">
-            <label class="form-label" for="kafka-q">Search</label>
-            <input class="form-control" id="kafka-q" name="q" value="@query.Q" />
-        </div>
-        <div class="col-6 col-md-2">
-            <label class="form-label" for="kafka-family">Family</label>
-            <select class="form-select" id="kafka-family" name="family">
-                <option value="">All families</option>
-                @foreach (var family in Model.Families)
-                {
-                    if (family == query.Family)
-                    {
-                        <option value="@family" selected>@family</option>
-                    }
-                    else
-                    {
-                        <option value="@family">@family</option>
-                    }
-                }
-            </select>
-        </div>
-        <div class="col-6 col-md-2">
-            <label class="form-label" for="kafka-key">Key class</label>
-            <select class="form-select" id="kafka-key" name="keyClass">
-                <option value="">All key classes</option>
-                @foreach (var keyClass in Model.KeyClasses)
-                {
-                    if (keyClass == query.KeyClass)
-                    {
-                        <option value="@keyClass" selected>@keyClass</option>
-                    }
-                    else
-                    {
-                        <option value="@keyClass">@keyClass</option>
-                    }
-                }
-            </select>
-        </div>
-        <div class="col-auto">
-            <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="kafka-tests" name="tests" value="1" @(query.Tests ? "checked" : null) />
-                <label class="form-check-label" for="kafka-tests">Include test groups</label>
-            </div>
-        </div>
-        <input type="hidden" name="sort" value="@query.Sort" />
-        <input type="hidden" name="dir" value="@query.Dir" />
-        <input type="hidden" name="pageSize" value="@query.PageSize" />
-        <input type="hidden" name="view" value="@query.View" />
-        <input type="hidden" name="group" value="@query.Group" />
-        <input type="hidden" name="topic" value="@query.TopicName" />
-        <input type="hidden" name="broker" value="@query.Broker" />
-        <input type="hidden" name="advanced" value="@(query.Advanced ? "1" : "")" />
-        @if (query.View == ThroughputKafkaPageQuery.Messages)
-        {
-            <input type="hidden" name="mq" value="@query.MessageText" />
-            <input type="hidden" name="key" value="@query.BrowseKey" />
-            <input type="hidden" name="hq" value="@query.HeaderContains" />
-            <input type="hidden" name="vq" value="@query.ValueContains" />
-            <input type="hidden" name="mtype" value="@query.MessageKind" />
-            <input type="hidden" name="mfrom" value="@(query.MessageFrom?.ToString() ?? "")" />
-            <input type="hidden" name="mto" value="@(query.MessageTo?.ToString() ?? "")" />
-            <input type="hidden" name="msgPage" value="@(query.MsgPage > 1 ? query.MsgPage.ToString() : "")" />
-            <input type="hidden" name="more" value="@(query.More ? "1" : "")" />
-            <input type="hidden" name="record" value="@query.OpenRecord" />
-            <input type="hidden" name="stage" value="@query.StageRecord" />
-        }
-        <input type="hidden" name="page" value="1" />
-        <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
-        <div class="col-auto">
-            <button class="btn btn-au-execute" type="submit">Search</button>
-        </div>
-    </form>
-    <p class="text-muted mb-0 mt-2">Groups named e2e-diag-* and Dynamic:* stay hidden unless Include test groups is checked. <span class="lu-live-label">Live</span></p>
-    </div>
-    </section>
     }
 
     @if (query.View == ThroughputKafkaPageQuery.Overview)
