@@ -53,6 +53,21 @@ public static class KafkaTopicCatalog
         "NotificationRequested"
     ];
 
+    /// <summary>
+    /// Link's main topic chain in the order a report moves through it: the schedule, census and
+    /// acquisition, normalization, evaluation, validation, then submission and notification.
+    /// </summary>
+    public static IReadOnlyList<string> PipelineOrder { get; } = ["ReportScheduled", .. Slice1Topics];
+
+    public static int PipelineStep(string? topic)
+    {
+        var main = MainName(topic);
+        for (var i = 0; i < PipelineOrder.Count; i++)
+            if (string.Equals(PipelineOrder[i], main, StringComparison.OrdinalIgnoreCase))
+                return i;
+        return -1;
+    }
+
     public static IReadOnlyList<KafkaTopicCatalogEntry> Topics { get; } =
     [
         Entry("AuditableEventOccurred", KafkaTopicKeyClass.Patient, orderSensitive: true, hardBlocked: false, AuditShape, "", "Audit"),

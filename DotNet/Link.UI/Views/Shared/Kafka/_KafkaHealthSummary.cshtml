@@ -1,0 +1,29 @@
+@model KafkaDashboard
+@{
+    var attention = Model.Attention.Count;
+}
+<div id="kafka-widget-summary" class="lu-kafka-widget">
+<section class="card au-card">
+    <h2 class="card-header h6 mb-0 d-flex align-items-center gap-2">
+        <span>Kafka</span>
+        @if (Model.Error is not null)
+        {
+            <span class="badge au-badge-muted">Not reachable</span>
+        }
+        else
+        {
+            var word = attention == 0 ? "Healthy" : "Needs attention";
+            <span class="badge @StatusPills.ForKafkaHealth(word)">@(attention == 0 ? word : attention + " need attention")</span>
+        }
+        <a class="btn btn-sm btn-au-link ms-auto" href="@KafkaConsoleRoutes.Overview()">Open Kafka</a>
+    </h2>
+    <div class="card-body">
+        <ol class="lu-pipeline lu-pipeline-compact" aria-label="Pipeline topics in order">
+            @foreach (var step in Model.Pipeline)
+            {
+                <li><a class="lu-pipeline-step lu-tone-@step.Tone" href="@step.Href" title="@step.Topic: lag @(step.LagKnown ? step.Lag.ToString("N0") : "unknown")"><span class="lu-pipeline-name">@step.Topic</span></a></li>
+            }
+        </ol>
+    </div>
+</section>
+</div>
