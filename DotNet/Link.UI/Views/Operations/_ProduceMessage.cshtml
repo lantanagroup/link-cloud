@@ -66,12 +66,10 @@
     <input type="hidden" name="more" value="@(query.More ? "true" : "false")" />
     <input type="hidden" name="record" value="@query.OpenRecord" />
     <input type="hidden" name="stage" value="@query.StageRecord" />
+    @* The topic comes from the page-level picker; the sub-tab never asks for it again. *@
+    <input type="hidden" id="produce-topic" name="topic" value="@topicName" />
     <fieldset id="produce-fields" disabled="@refused">
     <div class="row g-2">
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="produce-topic">Topic</label>
-                <input class="form-control" id="produce-topic" name="topic" value="@topicName" autocomplete="off" />
-            </div>
             <div class="col-12">
                 <label class="form-label" for="produce-headers">Headers</label>
                 <textarea class="form-control" id="produce-headers" name="messageHeaders" rows="4" autocomplete="off">@headers</textarea>

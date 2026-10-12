@@ -55,6 +55,21 @@ public class KafkaRetestFixesGuardTests
     }
 
     [Fact]
+    public void Topic_sub_tabs_never_ask_for_the_topic_group_or_broker_again()
+    {
+        var produce = Ops("_ProduceMessage.cshtml");
+        produce.Should().Contain("<input type=\"hidden\" id=\"produce-topic\" name=\"topic\" value=\"@topicName\" />");
+        produce.Should().NotContain("for=\"produce-topic\"");
+        foreach (var file in new[] { "_Topic.cshtml", "_Messages.cshtml", "_MessageDetail.cshtml", "_ProduceMessage.cshtml", "_Migrate.cshtml", "_ReplicationFactor.cshtml", "_TopicConsumers.cshtml", "_Consumers.cshtml", "_Brokers.cshtml" })
+        {
+            var visible = System.Text.RegularExpressions.Regex.Matches(Ops(file), "<(input|select|textarea)\\b[^>]*>")
+                .Select(match => match.Value)
+                .Where(tag => !tag.Contains("type=\"hidden\""));
+            visible.Should().NotContain(tag => tag.Contains("name=\"topic\"") || tag.Contains("name=\"group\"") || tag.Contains("name=\"groupId\"") || tag.Contains("name=\"broker\"") || tag.Contains("name=\"brokerId\""), file);
+        }
+    }
+
+    [Fact]
     public void Partition_actions_sit_beside_the_inputs()
     {
         var migrate = Ops("_Migrate.cshtml");
