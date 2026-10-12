@@ -108,10 +108,7 @@ else
                 <label class="form-label" for="plan-reason">Reason</label>
                 <input class="form-control" id="plan-reason" name="reason" value="@Model.DraftReason" />
             </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="plan-confirm">Type the topic name</label>
-                <input class="form-control" id="plan-confirm" name="confirmation" value="@Model.DraftConfirmation" data-topic="@topicName" autocomplete="off" />
-            </div>
+            <input type="hidden" name="confirmation" value="" data-hold-target />
         </div>
         @if (Model.Plan is not null)
         {
@@ -148,7 +145,7 @@ else
                             }
                             </ul>
                         }
-                        <p class="mb-2">@(increase.Accepted ? "Ready. Type the topic name and apply the increase." : "Fix the items above, then preview again.")</p>
+                        <p class="mb-2">@(increase.Accepted ? "Ready. Press Apply and hold to confirm the increase." : "Fix the items above, then preview again.")</p>
                         @if (increase.Notes.Count > 0)
                         {
                             <details>
@@ -209,7 +206,7 @@ else
                             }
                             </ul>
                         }
-                        <p class="mb-2">@(plan.Accepted ? "Ready. Type the topic name and press Apply." : "Fix the items above, then preview again.")</p>
+                        <p class="mb-2">@(plan.Accepted ? "Ready. Press Apply and hold to confirm." : "Fix the items above, then preview again.")</p>
                         <details>
                             <summary>Details</summary>
                             <p>Plan hash @plan.PlanHash.</p>
@@ -222,17 +219,17 @@ else
         <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="add" formaction="/Operations/Kafka/plan" title="Preview increase" aria-label="Preview increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
         @if (!Model.Topics.ReadOnly)
         {
-            <button class="btn btn-sm btn-au-execute lu-icon-btn" id="plan-submit" type="submit" data-partition-btn="add" formaction="/Operations/Kafka/requests" title="Apply partition increase" aria-label="Apply partition increase"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
+            <button class="btn btn-sm btn-au-execute lu-icon-btn" id="plan-submit" type="submit" data-hold="@Hold.Of("Add partitions in place", "Add partitions to " + topicName + " in place.", new[] { Hold.Pair("Topic", topicName), Hold.Pair("Partitions now", currentPartitions) }, new[] { new[] { "partitions", "Target partitions" }, new[] { "reason", "Reason" } }, new[] { "Keys are remapped: a key can move to another partition, so per-key ordering is not kept across the change.", "Partitions cannot be removed later.", "The retry and error topics are raised with it." }, topicName, "Hold to add partitions")" data-partition-btn="add" formaction="/Operations/Kafka/requests" title="Apply partition increase" aria-label="Apply partition increase"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
         }
         <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="migrate" formaction="/Operations/Kafka/migrations/plan" title="Dry run" aria-label="Dry run"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
         @if (!Model.Topics.ReadOnly)
         {
-            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="migrate" formaction="/Operations/Kafka/migrations" data-topic-confirm title="Apply migration" aria-label="Apply migration"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
+            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="migrate" formaction="/Operations/Kafka/migrations" data-hold="@Hold.Of("Migrate the topic", "Migrate " + topicName + " to a new partition count.", new[] { Hold.Pair("Topic", topicName), Hold.Pair("Partitions now", currentPartitions) }, new[] { new[] { "partitions", "Target partitions" }, new[] { "reason", "Reason" } }, new[] { "The workloads on this topic are stopped while it is copied to a backup and recreated empty.", "Consumer groups that had commits restart at offset 0.", "History stays only on the backup topic, or is lost if the backup is skipped." }, topicName, "Hold to migrate")" title="Apply migration" aria-label="Apply migration"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
         }
         <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="family" formaction="/Operations/Kafka/family/plan" title="Preview family" aria-label="Preview family"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
         @if (!Model.Topics.ReadOnly)
         {
-            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="family" formaction="/Operations/Kafka/family" data-topic-confirm title="Apply family completion" aria-label="Apply family completion"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
+            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="family" formaction="/Operations/Kafka/family" data-hold="@Hold.Of("Complete the family", "Raise the retry and error topics of " + topicName + " to its partition count.", new[] { Hold.Pair("Topic", topicName), Hold.Pair("Partitions now", currentPartitions) }, new[] { new[] { "reason", "Reason" } }, new[] { "Retry and error topics gain partitions, which cannot be removed later.", "Keys on those topics are remapped." }, topicName, "Hold to complete")" title="Apply family completion" aria-label="Apply family completion"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
         }
         <a class="btn btn-warning" href="@query.Href(ThroughputKafkaPageQuery.Migrate)">Cancel</a>
         <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
@@ -278,7 +275,7 @@ else
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="migrationId" value="@migration.Id" />
                     <input type="hidden" name="topic" value="@migration.Topic" />
-                    <button class="btn btn-au-execute" type="submit" aria-label="Execute migration">Execute</button>
+                    <button data-hold="@Hold.Of("Execute the migration", "Execute the approved migration of " + migration.Topic + ".", new[] { Hold.Pair("Topic", migration.Topic), Hold.Pair("Migration", migration.Id) }, Array.Empty<string[]>(), new[] { "Workloads on the topic stop and the topic is copied to its backup.", "Nothing can be produced to the topic until the migration finishes." }, "", "Hold to execute")" class="btn btn-au-execute" type="submit" aria-label="Execute migration">Execute</button>
                 </form>
                 <form method="post" action="/Operations/Kafka/migrations/abort">
                     @Html.AntiForgeryToken()
@@ -291,26 +288,20 @@ else
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="migrationId" value="@migration.Id" />
                 <input type="hidden" name="topic" value="@migration.Topic" />
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="migrate-go">Type the topic name</label>
-                    <input class="form-control" id="migrate-go" name="confirmation" autocomplete="off" aria-label="Type the topic name before go" />
-                </div>
-                <div class="col-auto mt-4">
-                    <button class="btn btn-au-execute" type="submit">Go</button>
+                <input type="hidden" name="confirmation" value="" data-hold-target />
+                <div class="col-auto">
+                    <button data-hold="@Hold.Of("Go", "Recreate " + migration.Topic + " at the new partition count and restart the workloads.", new[] { Hold.Pair("Topic", migration.Topic), Hold.Pair("Migration", migration.Id) }, Array.Empty<string[]>(), new[] { "The topic is recreated empty.", "Consumer groups that had commits restart at offset 0." }, migration.Topic, "Hold to go")" class="btn btn-au-execute" type="submit">Go</button>
                 </div>
             </form>
             <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations/recover">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="migrationId" value="@migration.Id" />
                 <input type="hidden" name="topic" value="@migration.Topic" />
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="migrate-recover">Type the topic name</label>
-                    <input class="form-control" id="migrate-recover" name="confirmation" autocomplete="off" aria-label="Type the topic name to recover the original count" />
-                </div>
-                <div class="col-auto mt-4 d-flex flex-wrap gap-2">
-                    <button class="btn btn-au-execute" type="submit" name="action" value="original">Recover original</button>
-                    <button class="btn btn-au-execute" type="submit" name="action" value="forward">Continue forward</button>
-                    <button class="btn btn-danger" type="submit" name="action" value="deleteForeign">Delete empty foreign topic</button>
+                <input type="hidden" name="confirmation" value="" data-hold-target />
+                <div class="col-auto d-flex flex-wrap gap-2">
+                    <button data-hold="@Hold.Of("Recover the original", "Recreate " + migration.Topic + " at its original partition count.", new[] { Hold.Pair("Topic", migration.Topic), Hold.Pair("Migration", migration.Id) }, Array.Empty<string[]>(), new[] { "The topic is recreated and the migration is abandoned.", "Consumer groups may restart at offset 0." }, migration.Topic, "Hold to recover")" class="btn btn-au-execute" type="submit" name="action" value="original">Recover original</button>
+                    <button data-hold="@Hold.Of("Continue forward", "Continue the migration of " + migration.Topic + " from where it stopped.", new[] { Hold.Pair("Topic", migration.Topic), Hold.Pair("Migration", migration.Id) }, Array.Empty<string[]>(), new[] { "The topic is recreated empty at the new partition count.", "Consumer groups that had commits restart at offset 0." }, migration.Topic, "Hold to continue")" class="btn btn-au-execute" type="submit" name="action" value="forward">Continue forward</button>
+                    <button data-hold="@Hold.Of("Delete the empty foreign topic", "Delete the empty foreign topic left by the migration of " + migration.Topic + ".", new[] { Hold.Pair("Topic", migration.Topic), Hold.Pair("Migration", migration.Id) }, Array.Empty<string[]>(), new[] { "The topic is deleted permanently." }, migration.Topic, "Hold to delete")" class="btn btn-danger" type="submit" name="action" value="deleteForeign">Delete empty foreign topic</button>
                 </div>
             </form>
             @if (migration.ManualChecklist)
@@ -345,12 +336,9 @@ else
             <input type="hidden" name="migrationId" value="@migration.Id" />
             <input type="hidden" name="topic" value="@migration.Topic" />
             <input type="hidden" name="backupName" value="@migration.BackupTopic" />
-            <div class="col-12 col-md-6">
-                <label class="form-label" for="migrate-backup">Type the backup topic name</label>
-                <input class="form-control" id="migrate-backup" name="confirmation" autocomplete="off" aria-label="Type the backup topic name to delete it" />
-            </div>
-            <div class="col-auto mt-4">
-                <button class="btn btn-danger" type="submit">Delete backup</button>
+            <input type="hidden" name="confirmation" value="" data-hold-target />
+            <div class="col-auto">
+                <button data-hold="@Hold.Of("Delete the backup", "Delete the backup topic " + migration.BackupTopic + ".", new[] { Hold.Pair("Topic", migration.Topic), Hold.Pair("Backup", migration.BackupTopic) }, Array.Empty<string[]>(), new[] { "The backup and the history it holds are deleted permanently.", "Replay from the backup is no longer possible." }, migration.BackupTopic, "Hold to delete")" class="btn btn-danger" type="submit">Delete backup</button>
             </div>
         </form>
     }

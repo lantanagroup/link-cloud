@@ -35,13 +35,10 @@
             </div>
             <div class="row g-2 mt-1">
                 <div class="col-12 col-md-5">
-                    <label class="form-label" for="rf-reason">Reason <partial name="_TermInfo" model="@(new TermInfo { Label = "About the request", Text = "A preview does not read the reason or the topic name. The request does." })" /></label>
+                    <label class="form-label" for="rf-reason">Reason <partial name="_TermInfo" model="@(new TermInfo { Label = "About the request", Text = "A preview does not read the reason. The request does, after you hold to confirm." })" /></label>
                     <input class="form-control" id="rf-reason" name="reason" value="@Model.DraftReason" />
                 </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="rf-confirm">Type the topic name</label>
-                    <input class="form-control" id="rf-confirm" name="confirmation" value="@Model.DraftConfirmation" autocomplete="off" />
-                </div>
+                <input type="hidden" name="confirmation" value="" data-hold-target />
             </div>
         @if (plan is not null)
         {
@@ -88,7 +85,7 @@
                             }
                             </ul>
                         }
-                        <p class="mb-2">@(plan.Accepted ? "Ready. Type the topic name and request the change. The request sets the throttle, submits the reassignment, waits for the ISR, and then clears the throttle." : "Fix the items above, then preview again. Nothing has moved.")</p>
+                        <p class="mb-2">@(plan.Accepted ? "Ready. Press Request and hold to confirm. The request sets the throttle, submits the reassignment, waits for the ISR, and then clears the throttle." : "Fix the items above, then preview again. Nothing has moved.")</p>
                         @if (plan.Hottest.Count > 0)
                         {
                             <p class="mb-1">Busiest brokers</p>
@@ -193,7 +190,7 @@
             <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
             @if (!Model.Topics.ReadOnly)
             {
-                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/replication-factor" title="Request replication factor change" aria-label="Request replication factor change"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span class="ms-1">Request</span></button>
+                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" formaction="/Operations/Kafka/replication-factor" data-hold="@Hold.Of("Change the replication factor", "Change the replication factor of " + topicName + ".", new[] { Hold.Pair("Topic", topicName), Hold.Pair("Replication factor now", topic.ReplicationFactor), Hold.Pair("min.insync.replicas", minIsr) }, new[] { new[] { "replicationFactor", "Target replication factor" }, new[] { "throttle", "Throttle (bytes/s)" }, new[] { "reason", "Reason" } }, new[] { "Replicas are copied between brokers, adding network and disk load until every replica is in the ISR.", "A low throttle makes this slow. A high throttle can slow producers and consumers.", "Lowering the factor reduces how many broker failures the topic survives." }, topicName, "Hold to request")" title="Request replication factor change" aria-label="Request replication factor change"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span class="ms-1">Request</span></button>
             }
         </div>
             </div>

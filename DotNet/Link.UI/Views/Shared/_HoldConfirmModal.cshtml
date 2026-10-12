@@ -1,0 +1,28 @@
+@* Shared hold-to-confirm modal, ported from Automation.UI's Purge + Replace FHIR hold. Opened by any submit button with data-hold (see hold-confirm.js). *@
+<div class="modal fade" id="lu-hold-modal" tabindex="-1" aria-labelledby="lu-hold-title" aria-hidden="true" data-hold-ms="@Hold.DurationMs">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="lu-hold-title">Confirm</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="fw-semibold mb-2" id="lu-hold-action"></p>
+                <dl class="row mb-2 lu-hold-details" id="lu-hold-details"></dl>
+                <div class="alert alert-warning py-2 mb-3" id="lu-hold-risk-box">
+                    <div class="fw-semibold mb-1">Risks</div>
+                    <ul class="mb-0" id="lu-hold-risks"></ul>
+                </div>
+                <p class="fw-semibold mb-2">Are you sure?</p>
+                <div id="lu-hold-hint" class="small text-muted mb-2" aria-live="polite">Press and hold the button for 1 second to confirm.</div>
+                <div class="progress lu-hold-progress mb-2">
+                    <div id="lu-hold-fill" class="progress-bar bg-danger lu-hold-fill" role="progressbar" aria-label="Hold progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-warning btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger btn-sm lu-hold-button" id="lu-hold-confirm" aria-describedby="lu-hold-hint"><i class="bi bi-hand-index-thumb me-1" aria-hidden="true"></i><span id="lu-hold-label">Hold to confirm</span></button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -5048,3 +5048,8 @@ table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }
 }
 .lu-donut-bars .lu-donut-count,
 .lu-donut-bars .lu-donut-pct { text-align: right; }
+/* Shared hold-to-confirm modal (hold-confirm.js) */
+.lu-hold-progress { height: 8px; }
+.lu-hold-fill { width: 0; transition: none; }
+.lu-hold-button { touch-action: none; user-select: none; -webkit-user-select: none; }
+.lu-hold-details dt { font-weight: 600; }
