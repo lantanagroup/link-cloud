@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -854,6 +854,17 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     }
                 }
             }
+
+            // Report-wide resource types from the stored per-measure-report counts, grouped in the database.
+            var typeCounts = await _dbContext.ReportEntry
+                .Where(x => x.ReportScheduleId == reportScheduleId)
+                .SelectMany(e => e.MeasureReports)
+                .SelectMany(m => m.ResourceCounts)
+                .GroupBy(rc => rc.ResourceType)
+                .Select(g => new { ResourceType = g.Key, Total = g.Sum(rc => rc.ResourceCount) })
+                .ToListAsync(cancellationToken);
+            foreach (var row in typeCounts.Where(row => !string.IsNullOrWhiteSpace(row.ResourceType) && row.Total > 0))
+                summary.ResourceTypeCounts[row.ResourceType] = row.Total;
 
             return summary;
         }

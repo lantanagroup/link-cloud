@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text.Json.Serialization;
 
@@ -208,6 +208,7 @@ public class ReportEntrySummaryApiModel
     public Dictionary<string, int> ReportTypeCounts { get; set; } = [];
     public Dictionary<string, int> ReportingStatusCounts { get; set; } = [];
     public Dictionary<string, int> SubmissionStatusCounts { get; set; } = [];
+    public Dictionary<string, int> ResourceTypeCounts { get; set; } = [];
 }
 
 public enum ReportingStatus

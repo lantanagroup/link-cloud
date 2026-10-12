@@ -484,6 +484,46 @@ public class ReportManifestRulesTests
     }
 
     [Fact]
+    public void A_real_report_overview_is_the_resource_types_donut_from_stored_counts()
+    {
+        var stored = ReportManifestRules.StoredResourceTypes(new Dictionary<string, int> { ["Observation"] = 260, ["Encounter"] = 20, ["Condition"] = 40 });
+        var model = ReportManifestRules.FromReport(
+            new ReportManifestFacts
+            {
+                ResourceTypes = stored,
+                Contents = [new ManifestCountRow { Name = "Initial Population", Primary = 20, Total = 20 }],
+                ContentsHeading = "Populations",
+                ContentTotal = 20
+            },
+            Query(),
+            "/Reports/Manifest",
+            new Dictionary<string, string>());
+
+        model.TypeHeading.Should().Be("Resource types");
+        model.ChartTypes.Select(row => row.Name).Should().Equal("Observation", "Condition", "Encounter");
+        model.TotalResourceCount.Should().Be(320, "the donut total is the resource total, so no Other remainder appears");
+    }
+
+    [Fact]
+    public void Without_stored_counts_the_card_charts_its_own_rows_instead_of_one_Other_slice()
+    {
+        var model = ReportManifestRules.FromReport(
+            new ReportManifestFacts
+            {
+                Contents = [new ManifestCountRow { Name = "Initial Population", Primary = 20, Total = 20 }],
+                ContentsHeading = "Populations",
+                ContentTotal = 20
+            },
+            Query(),
+            "/Reports/Manifest",
+            new Dictionary<string, string>());
+
+        model.TypeHeading.Should().Be("Populations");
+        model.ChartTypes.Select(row => row.Name).Should().Equal("Initial Population");
+        model.TotalResourceCount.Should().Be(20);
+    }
+
+    [Fact]
     public void A_run_shows_predicted_patients_against_the_upload()
     {
         var model = ReportManifestRules.SampleAutomation(Query(), "/Automation/manifest", bundlePath: null);
