@@ -371,8 +371,15 @@ public static class KafkaBrowseText
         var name = MemberLabel(member);
         if (!member.Exists)
             return name;
-        var lag = member.LagKnown ? member.Lag.ToString() : "unread";
-        return name + " · " + member.Partitions + "p · lag " + lag;
+        return name;
+    }
+
+    public static string VariantTitle(KafkaNamedTopic member)
+    {
+        if (!member.Exists)
+            return "Not on the broker";
+        var lag = member.LagKnown ? member.Lag.ToString("N0") : "unread";
+        return member.Topic + ". " + member.Partitions + " partitions. Lag " + lag + ".";
     }
 
     public static string MemberLabel(KafkaNamedTopic member)

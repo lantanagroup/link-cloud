@@ -11,6 +11,12 @@
     string Size(long bytes) => bytes < 0 ? "Not available" : bytes.ToString("N0");
 }
 
+@if (!string.IsNullOrWhiteSpace(query.Broker) && selected is null)
+{
+    <partial name="_KafkaNotFound" model="@(new KafkaNotFound("Broker", query.Broker, "/Operations/Kafka/Brokers", "All brokers"))" />
+}
+@if (string.IsNullOrWhiteSpace(query.Broker))
+{
 <section class="card au-card mt-3" id="kafka-brokers">
     <h2 class="card-header h6 mb-0 d-flex justify-content-between align-items-center">
         <span>Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = "Open a broker to preview a decommission or a rebalance. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions. A broker that is not up is listed first. Alter is what an in-place partition increase needs. Topics that cannot alter partitions are listed under Broker rights." + (string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail) ? "" : " " + Model.Cluster.LogDirDetail) + (Model.Infra.Enabled ? "" : " " + Model.Infra.Detail) })" /></span>
@@ -45,8 +51,7 @@
             <input type="hidden" name="broker" value="@query.Broker" />
             <input type="hidden" name="tests" value="@(query.Tests ? "1" : "")" />
             <div class="col-12 col-md-4">
-                <label class="visually-hidden" for="kafka-q">Search</label>
-                <input class="form-control" id="kafka-q" placeholder="Search brokers by id or host" name="q" value="@query.Q" />
+                <input class="form-control" id="kafka-q" aria-label="Search brokers" placeholder="Search brokers by id or host" name="q" value="@query.Q" />
             </div>
             <div class="col-auto">
                 <button class="btn btn-au-execute" type="submit">Search</button>
@@ -105,6 +110,7 @@
 
         </div>
 </section>
+}
 
 @if (selected is not null)
 {
@@ -242,17 +248,19 @@
                                 <th>Leader</th>
                                 <th>Replicas</th>
                                 <th>ISR</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                         @foreach (var row in shownPlacements)
                         {
                             <tr class="@(row.Leader < 0 || row.Isr.Count < row.Replicas.Count ? "lu-kafka-problem" : null)">
-                                <td><a class="btn btn-sm btn-au-link" href="@KafkaConsoleRoutes.Topics(row.Topic, KafkaConsoleRoutes.Summary)">@row.Topic</a></td>
+                                <td class="lu-flex">@row.Topic</td>
                                 <td>@row.Partition</td>
                                 <td>@row.Leader</td>
                                 <td>@string.Join(", ", row.Replicas)</td>
                                 <td>@string.Join(", ", row.Isr)</td>
+                                <td><a class="btn btn-sm btn-au-link lu-icon-btn" href="@KafkaConsoleRoutes.Topics(row.Topic, KafkaConsoleRoutes.Summary)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a></td>
                             </tr>
                         }
                         </tbody>
@@ -263,6 +271,8 @@
     </section>
 }
 
+@if (rightsDenied > 0 || !string.IsNullOrWhiteSpace(Model.Capabilities.Error))
+{
 <details class="lu-kafka-fold">
     <summary>Broker rights (@Counts.Of(Model.Capabilities.Topics.Count, "topic")@(rightsDenied > 0 ? ", " + rightsDenied + " cannot alter partitions" : "")) <partial name="_TermInfo" model="@(new TermInfo { Label = "About broker rights", Text = "Alter is what an in-place partition increase needs. Unknown means the client did not report the right. This list is only the topics that cannot alter partitions." })" /></summary>
     <div class="mt-3">
@@ -314,3 +324,4 @@
         }
     </div>
 </details>
+}

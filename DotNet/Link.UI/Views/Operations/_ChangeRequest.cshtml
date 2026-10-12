@@ -5,14 +5,17 @@
 }
 @if (request is not null)
 {
+    var terminal = request.Status is "Done" or "Rejected" or "Failed" or "Cancelled" or "Aborted" or "TimedOut";
+    static bool Named(string? who) => !string.IsNullOrWhiteSpace(who) && !string.Equals(who, "anonymous", StringComparison.OrdinalIgnoreCase);
     var cancellable = request.Kind is "DecommissionBroker" or "Rebalance" && request.Status is "Executing" or "Converging" or "TimedOut";
     <div class="au-card card mt-3" id="kafka-request-progress" data-status-url="/Operations/Kafka/requests/@request.Id.ToString("D")">
         <div class="card-header">Change request</div>
         <div class="card-body">
-            <p><partial name="_LabeledId" model="@(new LabeledId { Label = "Request", Value = request.Id.ToString("D"), CopyLabel = "Copy request id" })" /></p>
-            <p><partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = request.CorrelationId, CopyLabel = "Copy correlation id" })" /></p>
             <p>@request.Kind <span class="badge @StatusPills.ForKafka(request.Status)" id="kafka-request-status">@request.Status</span></p>
-            <p>Requester @request.Requester. Approver @(string.IsNullOrWhiteSpace(request.Approver) ? "—" : request.Approver).</p>
+            @if (Named(request.Requester) || Named(request.Approver))
+            {
+                <p>@(Named(request.Requester) ? "Requested by " + request.Requester + "." : "") @(Named(request.Approver) ? "Approved by " + request.Approver + "." : "")</p>
+            }
             @if (request.Kind == "PartitionIncrease")
             {
                 <p>@request.Topic from @request.BeforePartitions to @request.RequestedPartitions. Replica ceiling @request.MaxReplicas. Retry @request.RetryTopic increases with it, and so does the error topic.</p>
@@ -112,7 +115,18 @@
                     </tbody>
                 </table>
             }
-            <div class="d-flex gap-2">
+            <details class="mt-2">
+                <summary>Details</summary>
+                <dl class="row mb-0 mt-2">
+                    <dt class="col-sm-3">Request</dt>
+                    <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Request", Value = request.Id.ToString("D"), Compact = true, CopyLabel = "Copy request id" })" /></dd>
+                    <dt class="col-sm-3">Correlation</dt>
+                    <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = request.CorrelationId, Compact = true, CopyLabel = "Copy correlation id" })" /></dd>
+                </dl>
+            </details>
+            @if (!terminal)
+            {
+            <div class="d-flex gap-2 mt-2">
                 <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/approve">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="query" />
@@ -139,6 +153,7 @@
                     <button class="btn btn-sm btn-warning lu-icon-btn" type="submit" title="Reject change" aria-label="Reject change"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Reject</span></button>
                 </form>
             </div>
+            }
         </div>
     </div>
 }

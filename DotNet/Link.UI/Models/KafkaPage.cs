@@ -276,7 +276,9 @@ public sealed record ThroughputKafkaPageQuery
     {
         var href = Href(view: Messages, closeRecord: true);
         var mark = href.IndexOf('?', StringComparison.Ordinal);
-        return "/Operations/Kafka/messages/export" + (mark < 0 ? "" : href[mark..]);
+        var export = "/Operations/Kafka/messages/export" + (mark < 0 ? "" : href[mark..]);
+        // Path-style hrefs carry the topic in the path, so the export query must name it.
+        return export.Contains("topic=", StringComparison.Ordinal) ? export : KafkaConsoleRoutes.With(export, "topic", TopicName);
     }
 
     private static string One(IQueryCollection query, string name) =>
@@ -461,3 +463,5 @@ public sealed class KafkaMessageOpen
     public string ReturnHref { get; init; } = "";
     public string ProduceHref { get; init; } = "";
 }
+
+public sealed record KafkaNotFound(string Kind, string Name, string BackHref, string BackLabel);

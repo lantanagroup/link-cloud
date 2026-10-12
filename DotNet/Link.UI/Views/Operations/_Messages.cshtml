@@ -88,7 +88,7 @@
                         var current = string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase);
                         if (member.Exists)
                         {
-                            <a class="@(current ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: member.Topic, closeRecord: true)">@KafkaBrowseText.VariantTab(member)</a>
+                            <a class="@(current ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Messages, topic: member.Topic, closeRecord: true)" title="@KafkaBrowseText.VariantTitle(member)">@KafkaBrowseText.VariantTab(member)</a>
                         }
                         else
                         {
@@ -99,8 +99,7 @@
             }
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-lg-5">
-                    <label class="visually-hidden" for="browse-q">Search</label>
-                    <input class="form-control" id="browse-q" placeholder="Search keys and values" value="@query.MessageText" autocomplete="off" />
+                    <input class="form-control" id="browse-q" aria-label="Search keys and values" placeholder="Search keys and values" value="@query.MessageText" autocomplete="off" />
                 </div>
                 <div class="col-6 col-md-3 col-lg-2">
                     <label class="form-label" for="browse-kind">Message type</label>
@@ -245,11 +244,11 @@
                         <td>
                             @if (open)
                             {
-                                <a class="btn btn-sm btn-warning" href="@query.Href(closeRecord: true)">Close</a>
+                                <a class="btn btn-sm btn-au-link lu-icon-btn" href="@query.Href(closeRecord: true)" title="Close record" aria-label="Close record @recordId" aria-expanded="true"><i class="bi bi-chevron-up" aria-hidden="true"></i><span class="ms-1">Close</span></a>
                             }
                             else
                             {
-                                <a class="btn btn-sm btn-au-link lu-icon-btn" href="@query.Href(record: recordId)" title="Open record" aria-label="Open record @recordId"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                                <a class="btn btn-sm btn-au-link lu-icon-btn" href="@query.Href(record: recordId)" title="Open record" aria-label="Open record @recordId" aria-expanded="false"><i class="bi bi-chevron-down" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                             }
                         </td>
                     </tr>

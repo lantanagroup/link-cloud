@@ -59,7 +59,7 @@
                     @foreach (var item in rows)
                     {
                         <tr class="lu-kafka-problem">
-                            <td class="lu-flex"><span title="@item.What">@item.What</span><span class="badge au-badge-muted lu-kind-badge">@item.Kind</span></td>
+                            <td class="lu-flex"><span title="@item.What">@item.What</span> <span class="badge ms-1 au-badge-muted lu-kind-badge">@item.Kind</span></td>
                             <td class="lu-wrap">@item.Why</td>
                             <td><a class="btn btn-sm btn-au-link lu-icon-btn" href="@item.Href" title="@item.Action" aria-label="@item.Action"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">@item.Action</span></a></td>
                         </tr>

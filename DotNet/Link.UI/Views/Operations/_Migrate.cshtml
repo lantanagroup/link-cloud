@@ -41,20 +41,6 @@ else
         <input type="hidden" name="dryRunBackupSkip" value="@(Model.DryRunBackupSkip ? "true" : "false")" />
         <input type="hidden" name="dryRunBackupSkipAcknowledged" value="@(Model.DryRunBackupSkipAcknowledged ? "true" : "false")" />
         <input type="hidden" name="dryRunAcknowledgedGroups" value="@string.Join(",", MigrationGroupList.Parse(Model.DryRunAcknowledgedGroups))" />
-        <div class="row g-2">
-            <div class="col-12 col-md-3">
-                <label class="form-label" for="plan-partitions">Target partitions</label>
-                <input class="form-control" id="plan-partitions" name="partitions" type="number" min="1" max="@Model.Topics.Cap" value="@targetPartitions" />
-            </div>
-            <div class="col-12 col-md-5">
-                <label class="form-label" for="plan-reason">Reason</label>
-                <input class="form-control" id="plan-reason" name="reason" value="@Model.DraftReason" />
-            </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="plan-confirm">Type the topic name</label>
-                <input class="form-control" id="plan-confirm" name="confirmation" value="@Model.DraftConfirmation" data-topic="@topicName" autocomplete="off" />
-            </div>
-        </div>
         <div class="d-flex flex-column gap-2 my-3">
             @if (topic is not null)
             {
@@ -111,6 +97,20 @@ else
             <div class="mt-3">
                 <label class="form-label" for="migrate-groups">Groups to drop offsets for <partial name="_TermInfo" model="@(new TermInfo { Label = "About groups to drop", Text = "Use this when a dry run says a group is inactive and still has lag. Type that group's exact name, then preview again. The migration drops that group's offsets on this topic. An active group cannot be cleared here. Separate names with commas or new lines." })" /></label>
                 <textarea class="form-control" id="migrate-groups" name="acknowledgedGroups" rows="2">@Model.DraftAcknowledgedGroups</textarea>
+            </div>
+        </div>
+        <div class="row g-2 align-items-end mt-2">
+            <div class="col-12 col-md-2">
+                <label class="form-label" for="plan-partitions">Target partitions</label>
+                <input class="form-control" id="plan-partitions" name="partitions" type="number" min="1" max="@Model.Topics.Cap" value="@targetPartitions" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="plan-reason">Reason</label>
+                <input class="form-control" id="plan-reason" name="reason" value="@Model.DraftReason" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="plan-confirm">Type the topic name</label>
+                <input class="form-control" id="plan-confirm" name="confirmation" value="@Model.DraftConfirmation" data-topic="@topicName" autocomplete="off" />
             </div>
         </div>
         @if (Model.Plan is not null)
@@ -219,23 +219,23 @@ else
             </div>
         }
         <div class="d-flex flex-wrap gap-2 mt-3">
-            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="add" formaction="/Operations/Kafka/plan" title="Preview increase" aria-label="Preview increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
-            @if (!Model.Topics.ReadOnly)
-            {
-                <button class="btn btn-sm btn-au-execute lu-icon-btn" id="plan-submit" type="submit" data-partition-btn="add" formaction="/Operations/Kafka/requests" title="Apply partition increase" aria-label="Apply partition increase"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
-            }
-            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="migrate" formaction="/Operations/Kafka/migrations/plan" title="Dry run" aria-label="Dry run"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
-            @if (!Model.Topics.ReadOnly)
-            {
-                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="migrate" formaction="/Operations/Kafka/migrations" data-topic-confirm title="Apply migration" aria-label="Apply migration"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
-            }
-            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="family" formaction="/Operations/Kafka/family/plan" title="Preview family" aria-label="Preview family"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
-            @if (!Model.Topics.ReadOnly)
-            {
-                <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="family" formaction="/Operations/Kafka/family" data-topic-confirm title="Apply family completion" aria-label="Apply family completion"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
-            }
-            <a class="btn btn-warning" href="@query.Href(ThroughputKafkaPageQuery.Migrate)">Cancel</a>
-            <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
+        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="add" formaction="/Operations/Kafka/plan" title="Preview increase" aria-label="Preview increase"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+        @if (!Model.Topics.ReadOnly)
+        {
+            <button class="btn btn-sm btn-au-execute lu-icon-btn" id="plan-submit" type="submit" data-partition-btn="add" formaction="/Operations/Kafka/requests" title="Apply partition increase" aria-label="Apply partition increase"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
+        }
+        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="migrate" formaction="/Operations/Kafka/migrations/plan" title="Dry run" aria-label="Dry run"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+        @if (!Model.Topics.ReadOnly)
+        {
+            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="migrate" formaction="/Operations/Kafka/migrations" data-topic-confirm title="Apply migration" aria-label="Apply migration"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
+        }
+        <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="family" formaction="/Operations/Kafka/family/plan" title="Preview family" aria-label="Preview family"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Preview</span></button>
+        @if (!Model.Topics.ReadOnly)
+        {
+            <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-partition-btn="family" formaction="/Operations/Kafka/family" data-topic-confirm title="Apply family completion" aria-label="Apply family completion"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Apply</span></button>
+        }
+        <a class="btn btn-warning" href="@query.Href(ThroughputKafkaPageQuery.Migrate)">Cancel</a>
+        <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
         </div>
     </form>
 }

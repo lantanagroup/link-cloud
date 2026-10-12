@@ -5,13 +5,7 @@
 
 <div class="lu-kafka">
 <partial name="_BackButton" model="@(new BackLink("/Operations", "Operations"))" />
-<h1 class="h3 mt-3">Kafka <span class="lu-live-label">Live</span>
-    @if (!Model.Infra.Enabled)
-    {
-        <span class="badge au-badge-warning lu-provider-badge ms-2">Provider disabled</span>
-        <partial name="_TermInfo" model="@(new TermInfo { Label = "Provider disabled", Text = string.IsNullOrWhiteSpace(Model.Infra.Detail) ? "Broker and replica changes are disabled until an infrastructure provider is enabled." : Model.Infra.Detail })" />
-    }
-</h1>
+<h1 class="h3 mt-3">Kafka <span class="lu-live-label">Live</span></h1>
 
 <div id="kafkaResults" data-au-refresh="8000" data-au-page-url="@query.Href()" class="lu-kafka">
     @{
@@ -21,8 +15,8 @@
     <nav class="lu-section-nav mt-3" aria-label="Kafka">
         <a class="@(query.View == ThroughputKafkaPageQuery.Overview ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Overview, page: 1)">Overview</a>
         <a class="@(topicsTab ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: query.TopicName, page: 1)">Topics</a>
-        <a class="@(query.View == ThroughputKafkaPageQuery.Consumers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: query.Group, page: 1)">Consumer groups</a>
-        <a class="@(query.View == ThroughputKafkaPageQuery.Brokers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Brokers, broker: query.Broker, page: 1)">Brokers</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Consumers ? "lu-nav-current" : "")" href="/Operations/Kafka/ConsumerGroups">Consumer groups</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Brokers ? "lu-nav-current" : "")" href="/Operations/Kafka/Brokers">Brokers</a>
     </nav>
 
     @if (!string.IsNullOrWhiteSpace(Model.Error))
@@ -49,7 +43,11 @@
     else
     {
         <partial name="_TopicPicker" model="Model" />
-        @if (!string.IsNullOrWhiteSpace(query.TopicName))
+        @if (!string.IsNullOrWhiteSpace(query.TopicName) && Model.SelectedTopic is null && Model.Topics.Topics.Count > 0 && string.IsNullOrWhiteSpace(Model.Error))
+        {
+            <partial name="_KafkaNotFound" model="@(new KafkaNotFound("Topic", query.TopicName, "/Operations/Kafka/Topics", "All topics"))" />
+        }
+        else if (!string.IsNullOrWhiteSpace(query.TopicName))
         {
             <partial name="_TopicTabs" model="Model" />
             @if (topicTab == KafkaConsoleRoutes.Messages)
@@ -79,7 +77,10 @@
         }
     }
 
-    <partial name="_ChangeRequest" model="Model" />
+    @if (!(Model.Request is { Kind: "Produce" } && topicTab == KafkaConsoleRoutes.Produce))
+    {
+        <partial name="_ChangeRequest" model="Model" />
+    }
     <div id="kafka-ops-chart-data" hidden>@Html.Raw(Model.ChartJson)</div>
 </div>
 </div>

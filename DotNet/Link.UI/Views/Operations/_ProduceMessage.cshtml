@@ -14,6 +14,30 @@
 <form id="kafka-produce" class="card au-card mt-4@(hold ? " lu-produce-hold" : null)" method="post" action="/Operations/Kafka/messages">
     <h2 class="card-header h5 mb-0">Produce a message <partial name="_TermInfo" model="@(new TermInfo { Label = "About producing a message", Text = "Review the topic, headers, key, and value. Produce sends one new record. Nothing is sent until you type the topic name." })" /></h2>
     <div class="card-body">
+    @if (Model.Request is { Kind: "Produce" } produced)
+    {
+        var producedOk = produced.Status == "Done";
+        <div id="kafka-produce-result" class="alert @(producedOk ? "alert-success" : string.IsNullOrWhiteSpace(produced.Failure) ? "alert-secondary" : "alert-danger") lu-result" role="status" tabindex="-1">
+            <details class="lu-result-details">
+                <summary>
+                    <span class="badge @StatusPills.ForKafka(produced.Status)">@produced.Status</span>
+                    <span class="lu-result-text">@(producedOk ? "One message was produced on " + produced.Topic + "." : string.IsNullOrWhiteSpace(produced.Failure) ? produced.Progress : produced.Failure)</span>
+                </summary>
+                <div class="lu-result-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Message</dt>
+                        <dd class="col-sm-9">@produced.DryRunSummary</dd>
+                        <dt class="col-sm-3">Produced</dt>
+                        <dd class="col-sm-9">@LinkUiTime.Display(produced.ExecutedUtc ?? produced.CreatedUtc)</dd>
+                        <dt class="col-sm-3">Request</dt>
+                        <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Request", Value = produced.Id.ToString("D"), Compact = true, CopyLabel = "Copy request id" })" /></dd>
+                        <dt class="col-sm-3">Correlation</dt>
+                        <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = produced.CorrelationId, Compact = true, CopyLabel = "Copy correlation id" })" /></dd>
+                    </dl>
+                </div>
+            </details>
+        </div>
+    }
     @if (refused)
     {
         <div class="alert alert-warning" role="status" id="kafka-produce-refused">Messages can't be produced to @topicName because it isn't a catalogued Link topic.</div>
