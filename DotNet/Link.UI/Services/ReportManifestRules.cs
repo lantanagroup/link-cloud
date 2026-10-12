@@ -469,6 +469,15 @@ public static partial class ReportManifestRules
         return badges;
     }
 
+    /// <summary>Report-wide resource types from the Report service's stored counts, biggest first.</summary>
+    public static IReadOnlyList<ManifestCountRow> StoredResourceTypes(IReadOnlyDictionary<string, int>? counts) =>
+        (counts ?? new Dictionary<string, int>())
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && pair.Value > 0)
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(pair => new ManifestCountRow { Name = pair.Key.Trim(), Primary = pair.Value, Total = pair.Value })
+            .ToList();
+
     public static IReadOnlyList<ManifestResourceCount> ResourceCounts(IEnumerable<KeyValuePair<string, int>>? counts)
     {
         if (counts is null)
@@ -524,7 +533,8 @@ public static partial class ReportManifestRules
             ShowSplit = false,
             ShowTotals = facts.Patients.Any(row => row.Total > 0),
             PatientCount = facts.PatientCount,
-            TotalResourceCount = facts.ContentTotal,
+            // Resource types carry their own total; the population total would leave a bogus "Other" remainder.
+            TotalResourceCount = useResources ? typeRows.Sum(row => row.Total) : facts.ContentTotal,
             PatientResourceCount = facts.InitialPopulation,
             TypeCount = types.Sorted.Count,
             HottestName = hottest?.Name,
@@ -538,9 +548,8 @@ public static partial class ReportManifestRules
             MeasureCount = facts.Measures.Count,
             Types = types.Page,
             TypePaging = types.Bar,
-            ChartTypes = contentsAreStatus || useResources
-                ? types.Sorted.Take(ReportManifestModel.ChartCap).ToList()
-                : [],
+            // Whatever the card shows is charted from its own rows, never collapsed into one "Other" slice.
+            ChartTypes = types.Sorted.Take(ReportManifestModel.ChartCap).ToList(),
             StatusChart = status,
             Populations = facts.Populations,
             PopulationMeasureCount = facts.Populations.Count,

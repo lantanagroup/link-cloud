@@ -874,6 +874,23 @@ public sealed class ReportsService
             }
         }
 
+        // Resource types come only from the Report service's stored per-type counts (no ABS, no MeasureEval).
+        IReadOnlyList<ManifestCountRow> resourceTypes = [];
+        try
+        {
+            var summary = await _reports.GetEntrySummaryByScheduleAsync(scheduleId.ToString(), cancellationToken);
+            if (summary.IsSuccessStatusCode && summary.Body?.ResourceTypeCounts is { Count: > 0 } byType)
+                resourceTypes = ReportManifestRules.StoredResourceTypes(byType);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Report resource type counts failed. ReportId={ReportId}", page.ReportId.Sanitize());
+        }
+
         var measures = opened.Schedule.ReportTypes ?? [];
         var highlights = ReportManifestRules.Highlights(populationRows);
         var members = ReportManifestRules.PopulationPage(
@@ -891,6 +908,7 @@ public sealed class ReportsService
                 ContentTotal = contents.Sum(row => row.Total),
                 Measures = measures,
                 Contents = contents,
+                ResourceTypes = resourceTypes,
                 ContentsHeading = heading,
                 TotalLabel = totalLabel,
                 Populations = highlights,
