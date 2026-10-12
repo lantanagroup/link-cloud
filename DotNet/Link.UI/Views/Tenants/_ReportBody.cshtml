@@ -194,7 +194,8 @@
                                 <thead>
                                     <tr>
                                         <th>Measure</th>
-                                        <th class="text-end">Evaluated <partial name="_TermInfo" model="@(new TermInfo { Label = "About evaluated", Text = "Patients on this report that have been evaluated for the measure." })" /></th>
+                                        <th class="text-end">Patients <partial name="_TermInfo" model="@(new TermInfo { Label = "About patients", Text = "Patients on this report for the measure, evaluated or still waiting." })" /></th>
+                                        <th class="text-end">Evaluated <partial name="_TermInfo" model="@(new TermInfo { Label = "About evaluated", Text = "Patients evaluated for the measure so far. Shown once it can be told apart from other measures on the report." })" /></th>
                                         <th class="text-end">In IP <partial name="_TermInfo" model="@(new TermInfo { Label = "About in IP", Text = "Patients in the measure's initial population. Same count as the manifest Populations tab." })" /></th>
                                         <th class="text-end"><span class="visually-hidden">Actions</span></th>
                                     </tr>
@@ -204,6 +205,7 @@
                                     {
                                         <tr>
                                             <td class="lu-wrap">@measure.Measure</td>
+                                            <td class="text-end">@(measure.Patients?.ToString("N0") ?? "\u2014")</td>
                                             <td class="text-end">@(measure.Evaluated?.ToString("N0") ?? "\u2014")</td>
                                             <td class="text-end">@(measure.InitialPopulation?.ToString("N0") ?? "\u2014")</td>
                                             <td class="text-end"><a class="btn btn-sm btn-au-link" href="@Url.Action("Manifest", "Reports", new { facilityId, reportId, tab = "populations" })" title="Open populations" aria-label="Open populations for @measure.Measure"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open populations</a></td>

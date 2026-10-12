@@ -75,7 +75,8 @@ public class ReportProgressTests
         Assert.True(progress.TimeToSubmitRunning);
         Assert.Equal(TimeSpan.FromMinutes(30), progress.TimeToSubmit);
         var measure = Assert.Single(progress.Measures);
-        Assert.Equal(20, measure.Evaluated);
+        Assert.Equal(20, measure.Patients);
+        Assert.Equal(13, measure.Evaluated);
         Assert.Equal(10, measure.InitialPopulation);
     }
 
@@ -144,6 +145,18 @@ public class ReportProgressTests
         Assert.False(ReportProgressService.ValidationSettled(Row(ScheduleStatus.Submitted, Now.AddMinutes(-1)), Now));
         Assert.True(ReportProgressService.ValidationSettled(Row(ScheduleStatus.Submitted, Now.AddMinutes(-4)), Now));
         Assert.True(ReportProgressService.ValidationSettled(null, Now));
+    }
+
+    [Fact]
+    public void Per_measure_evaluated_is_blank_mid_run_when_several_measures_share_the_report()
+    {
+        var schedule = Schedule(ScheduleStatus.EndOfPeriod);
+        schedule.ReportTypes = [Ip, "OtherMeasure"];
+        var entries = Entries(identified: 4, pending: 0, passed: 6, submitted: 0);
+        entries.ReportTypeCounts["OtherMeasure"] = 10;
+        var progress = ReportProgressService.Build(schedule, entries, null, null, null, null, Now);
+        Assert.All(progress.Measures, m => Assert.Equal(10, m.Patients));
+        Assert.All(progress.Measures, m => Assert.Null(m.Evaluated));
     }
 
     private static string Root()
