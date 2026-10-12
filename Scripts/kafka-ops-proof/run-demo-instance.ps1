@@ -1,4 +1,4 @@
-﻿# Local Kafka console demo on DESKTOP-5NA82VF: the 3-broker kafka-ops-proof cluster (plus broker-3 on demand),
+# Local Kafka console demo on DESKTOP-5NA82VF: the 3-broker kafka-ops-proof cluster (plus broker-3 on demand),
 # a host-run Admin.BFF with Docker access on 127.0.0.1:8163 (KafkaOps:InfraProvider=LocalCompose) and a Link.UI on 127.0.0.1:5290.
 # Instances A (5280) and B (5281) and the dev compose stack are not touched.
 #   .\run-demo-instance.ps1        start (publishes to %LOCALAPPDATA%\kafka-ops-proof-run)
@@ -30,7 +30,7 @@ $bff = @{
     KafkaOps__Connection__BootstrapServers = "localhost:19094"; KafkaOps__Connection__SaslProtocolEnabled = "false"
     KafkaOps__InfraProvider = "LocalCompose"; KafkaOps__ComposeProject = $project; KafkaOps__ComposeFile = $compose
     KafkaOps__BrokerService = "broker-0"; KafkaOps__BrokerServicePrefix = "broker-"; KafkaOps__ExtraBrokerProfile = "extra-broker"; KafkaOps__ExtraBrokerService = "broker-3,host-proxy-3"
-    KafkaOps__KafkaToolsPath = "/opt/kafka/bin"; KafkaOps__BrokerInternalPort = "9092"; KafkaOps__ConsumerDeployments = "ops-proof-consumers=consumer"; KafkaOps__AllowTopicMigration = "true"
+    KafkaOps__KafkaToolsPath = "/opt/kafka/bin"; KafkaOps__BrokerInternalPort = "9092"; KafkaOps__ConsumerDeployments = "ops-proof-consumers=consumer"; KafkaOps__AllowTopicMigration = "true"; KafkaOps__RequireDifferentApprover = "false"
 }
 $key = (& docker inspect link-admin-bff --format '{{range .Config.Env}}{{println .}}{{end}}' 2>$null | Where-Object { $_ -like "LinkTokenService__SigningKey=*" }) -replace '^[^=]+=', ''
 if ($key) { $bff.LinkTokenService__SigningKey = $key }

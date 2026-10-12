@@ -106,13 +106,13 @@ public sealed class OffsetCheckpoint
 
 public static class ChangeRequestWorkflow
 {
-    public static string? Approve(ChangeRequestRecord request, string user, DateTimeOffset now)
+    public static string? Approve(ChangeRequestRecord request, string user, DateTimeOffset now, bool requireDifferentApprover = true)
     {
         if (request.Status != KafkaChangeStatus.Pending)
             return "Only a pending request can be approved.";
         if (!request.SecondApproverRequired)
             return "This request does not need a separate approver.";
-        if (SameUser(request.Requester, user))
+        if (requireDifferentApprover && SameUser(request.Requester, user))
             return "The requester cannot approve their own request.";
         if (string.IsNullOrWhiteSpace(user))
             return "An approver identity is required.";
@@ -137,13 +137,13 @@ public static class ChangeRequestWorkflow
         return null;
     }
 
-    public static string? MarkExecuting(ChangeRequestRecord request, string user, DateTimeOffset now)
+    public static string? MarkExecuting(ChangeRequestRecord request, string user, DateTimeOffset now, bool requireDifferentApprover = true)
     {
         if (request.SecondApproverRequired)
         {
             if (request.Status != KafkaChangeStatus.Approved)
                 return "This request must be approved by someone else before it can run.";
-            if (SameUser(request.Requester, user))
+            if (requireDifferentApprover && SameUser(request.Requester, user))
                 return "The requester cannot execute their own request.";
         }
         else if (request.Status is not (KafkaChangeStatus.Pending or KafkaChangeStatus.Approved))

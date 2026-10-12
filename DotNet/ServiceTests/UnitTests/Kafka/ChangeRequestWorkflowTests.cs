@@ -20,6 +20,16 @@ public class ChangeRequestWorkflowTests
     }
 
     [Fact]
+    public void SelfApproval_IsAllowed_OnlyWhenADifferentApproverIsNotRequired()
+    {
+        var request = Pending();
+        Assert.Equal("The requester cannot approve their own request.", ChangeRequestWorkflow.Approve(request, "ada", DateTimeOffset.UnixEpoch, requireDifferentApprover: true));
+        Assert.Null(ChangeRequestWorkflow.Approve(request, "ada", DateTimeOffset.UnixEpoch, requireDifferentApprover: false));
+        Assert.Null(ChangeRequestWorkflow.MarkExecuting(request, "ada", DateTimeOffset.UnixEpoch, requireDifferentApprover: false));
+        Assert.True(new KafkaOpsOptions().RequireDifferentApprover);
+    }
+
+    [Fact]
     public void DifferentApprover_ThenExecutor_Advances()
     {
         var request = Pending();

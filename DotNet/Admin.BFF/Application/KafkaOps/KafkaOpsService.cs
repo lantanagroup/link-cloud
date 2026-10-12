@@ -456,7 +456,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         EnsureActor(user, record.Kind);
         if (record.Kind is not (KafkaChangeKind.CancelReassignment or KafkaChangeKind.ScaleReplicas))
             await EnsureNoReassignmentAsync(record.Id, cancellationToken);
-        var error = ChangeRequestWorkflow.Approve(record, UserName(user), DateTimeOffset.UtcNow);
+        var error = ChangeRequestWorkflow.Approve(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
         await SaveAsync(record, cancellationToken);
@@ -490,7 +490,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
 
         EnsureActor(user, record.Kind);
         await EnsureNoReassignmentAsync(record.Id, cancellationToken);
-        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow);
+        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
 
@@ -965,18 +965,23 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         {
             var headers = new Headers();
             headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(record.CorrelationId));
+            // A missing audit topic or a slow broker must not hold the request: give the audit write a short budget.
+            using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            budget.CancelAfter(AuditTimeout);
             await _audit.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
                 Key = record.Family,
                 Value = message,
                 Headers = headers
-            }, cancellationToken);
+            }, budget.Token);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Kafka change audit event was not produced for {Topic}", record.Topic.SanitizeAndRemove());
         }
     }
+
+    public static readonly TimeSpan AuditTimeout = TimeSpan.FromSeconds(3);
 
     public bool ReadOnly => _readOnly;
 

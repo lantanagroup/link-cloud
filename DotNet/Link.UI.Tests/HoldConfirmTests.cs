@@ -58,4 +58,11 @@ public class HoldConfirmTests
         Read("Views", "Operations", "_ReplicationFactor.cshtml").Should().Contain("replication-factor\" data-hold=");
         Read("wwwroot", "js", "kafka-ops.js").Should().NotContain("plan-confirm").And.NotContain("produce-confirm");
     }
+
+    [Fact]
+    public void Approve_and_execute_only_show_while_they_can_run()
+    {
+        var view = Read("Views", "Operations", "_ChangeRequest.cshtml");
+        view.Should().Contain("@if (request.Status == \"Pending\")").And.Contain("@if (request.Status is \"Pending\" or \"Approved\")");
+    }
 }
