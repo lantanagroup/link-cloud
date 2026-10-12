@@ -5016,3 +5016,35 @@ table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }
 
 .lu-combo-option.is-current > span:first-child::before { content: '\2713'; display: inline-block; width: 1.1rem; font-weight: 700; }
 .lu-combo-option:not(.is-current) > span:first-child { padding-left: 1.1rem; }
+
+/* Resource types: the legend doubles as a bar graph (slice colour, count, share), biggest first.
+   Sits beside the donut and drops under it when the card is too narrow; names wrap, never truncate. */
+.lu-donut-legend.lu-donut-bars {
+  flex: 1 1 24rem;
+  width: auto;
+  min-width: 0;
+  grid-template-columns: 1fr;
+  gap: .45rem;
+}
+.lu-donut-bars li {
+  display: grid;
+  grid-template-columns: .75rem minmax(6.5rem, 11rem) minmax(4rem, 1fr) minmax(3.2rem, max-content) 3.4rem;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+}
+.lu-donut-bar {
+  display: block;
+  height: .65rem;
+  border-radius: 3px;
+  background: var(--au-border);
+  overflow: hidden;
+}
+.lu-donut-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 3px;
+}
+.lu-donut-bars .lu-donut-count,
+.lu-donut-bars .lu-donut-pct { text-align: right; }
