@@ -245,15 +245,24 @@ public sealed class ReportProgressService
         progress.SubmissionAvailable = entries is not null;
 
         // Patients per measure: evaluated from entries, IP from the same populations the Populations tab reads.
-        foreach (var type in (entries?.ReportTypeCounts ?? new Dictionary<string, int>()).Keys
-                     .Concat(schedule.ReportTypes ?? [])
-                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                     .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+        var types = (entries?.ReportTypeCounts ?? new Dictionary<string, int>()).Keys
+            .Concat(schedule.ReportTypes ?? [])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        foreach (var type in types)
         {
+            int? patients = entries is null ? null : Get(entries.ReportTypeCounts, type);
+            // Entry status is per patient, not per measure: exact once nothing waits, or when there is one measure.
+            int? evaluated = patients is not int count ? null
+                : identified == 0 ? count
+                : types.Count == 1 ? Math.Max(0, count - identified)
+                : null;
             progress.Measures.Add(new MeasureProgress
             {
                 Measure = type,
-                Evaluated = entries is null ? null : Get(entries.ReportTypeCounts, type),
+                Patients = patients,
+                Evaluated = evaluated,
                 InitialPopulation = initialPopulation is null ? null : Get(initialPopulation, type)
             });
         }

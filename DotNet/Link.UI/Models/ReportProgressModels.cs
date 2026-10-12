@@ -34,6 +34,7 @@ public sealed record ProgressSlice(string Name, int Count, string Color);
 public sealed class MeasureProgress
 {
     public string Measure { get; init; } = "";
+    public int? Patients { get; init; }
     public int? Evaluated { get; init; }
     public int? InitialPopulation { get; init; }
 }
