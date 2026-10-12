@@ -91,7 +91,7 @@
         {
             <div class="alert alert-warning">This run used generation templates v@(Model.TemplateVersion). The latest for this scenario is v@(Model.LatestTemplateVersion). A download replays the templates stored for this run.</div>
         }
-        @if (populationCards.Count == 0 && Model.Prediction is ManifestPrediction overviewPrediction)
+        @foreach (var overviewPrediction in populationCards.Count == 0 ? Model.Predictions : [])
         {
             var predictionTiles = new (string Name, int? Count)[]
             {

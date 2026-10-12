@@ -8,7 +8,7 @@ namespace Automation.UI.Services;
 /// at 1 (and can mix resource types); runtime sequences are 1..N per type, in
 /// the same flatten order <c>RunExecutor</c> uses when calling the API.
 /// </summary>
-internal static class NormalizationRuntimeSequencePlanner
+public static class NormalizationRuntimeSequencePlanner
 {
     public static List<PlannedRuntimeStep> Plan(NormalizationSuiteResolution resolution)
     {
@@ -51,7 +51,7 @@ internal static class NormalizationRuntimeSequencePlanner
     }
 }
 
-internal sealed record PlannedRuntimeStep(
+public sealed record PlannedRuntimeStep(
     string SequenceName,
     int SuiteSequence,
     int RuntimeSequence,

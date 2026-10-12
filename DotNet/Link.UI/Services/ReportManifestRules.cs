@@ -634,12 +634,18 @@ public static partial class ReportManifestRules
         var eligibilityKnown = eligibility.Count > 0;
         var measureDisplays = (snapshot.MeasureIds ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).ToList();
         var measureAliases = (snapshot.SelectedMeasures ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).ToList();
-        var measureName = measureDisplays.FirstOrDefault() ?? measureAliases.FirstOrDefault() ?? "This run";
         var actualIds = actual?.PatientIds is { } present
             ? new HashSet<string>(present.Where(id => !string.IsNullOrWhiteSpace(id)), StringComparer.Ordinal)
             : null;
-        bool Predicted(string id) =>
-            eligibility.TryGetValue(id, out var list) && list is { Count: > 0 };
+        bool Predicted(string id) => AbsPredictionComparison.Qualifies(eligibility, id);
+        // Display names line up with the run's measure aliases by position (friendly name or id).
+        string Display(string measure)
+        {
+            var index = measureAliases.FindIndex(alias => string.Equals(alias, measure, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0 && index < measureDisplays.Count)
+                return measureDisplays[index];
+            return measureDisplays.FirstOrDefault(display => string.Equals(display, measure, StringComparison.OrdinalIgnoreCase)) ?? measure;
+        }
 
         ManifestPatientRow Build(string id, int total)
         {
@@ -653,14 +659,12 @@ public static partial class ReportManifestRules
             var membership = new List<ManifestMembership>();
             if (recorded && qualifying.Count > 0)
             {
-                membership.Add(new ManifestMembership { Measure = measureName, Key = "predicted" });
-                if (actualIds is not null)
+                // Each patient is a member of the measures they qualify for, not all of the run's measures.
+                foreach (var measure in qualifying.Select(Display).Distinct(StringComparer.OrdinalIgnoreCase))
                 {
-                    membership.Add(new ManifestMembership
-                    {
-                        Measure = measureName,
-                        Key = actualIds.Contains(id) ? "in-actual" : "missing"
-                    });
+                    membership.Add(new ManifestMembership { Measure = measure, Key = "predicted" });
+                    if (actualIds is not null)
+                        membership.Add(new ManifestMembership { Measure = measure, Key = actualIds.Contains(id) ? "in-actual" : "missing" });
                 }
             }
 
@@ -684,17 +688,19 @@ public static partial class ReportManifestRules
         }
 
         var shown = patientPage.Page.Select(row => Build(row.Id, row.Total)).ToList();
-        var predicted = ids.Count(Predicted);
-        ManifestPrediction? prediction = eligibilityKnown
-            ? new ManifestPrediction
-            {
-                Measure = measureName,
-                Predicted = predicted,
-                NotPredicted = Math.Max(0, ids.Count - predicted),
-                InActual = actualIds is null ? null : ids.Count(id => Predicted(id) && actualIds.Contains(id)),
-                MissingFromActual = actualIds is null ? null : predicted - ids.Count(id => Predicted(id) && actualIds.Contains(id))
-            }
-            : null;
+        var predictions = eligibilityKnown
+            ? AbsPredictionComparison.ByMeasure(eligibility, ids, measureAliases.Count > 0 ? measureAliases : measureDisplays, actualIds)
+                .Select(row => new ManifestPrediction
+                {
+                    Measure = Display(row.Measure),
+                    Predicted = row.Predicted,
+                    NotPredicted = row.NotPredicted,
+                    InActual = row.InActual,
+                    MissingFromActual = row.MissingFromActual
+                })
+                .ToList()
+            : new List<ManifestPrediction>();
+        ManifestPrediction? prediction = predictions.FirstOrDefault();
         IReadOnlyList<ManifestPatientRow> populationPatients = [];
         var populationPaging = new PageBar { Page = 1, PageSize = query.PageSize };
         string? populationNote = null;
@@ -702,10 +708,10 @@ public static partial class ReportManifestRules
         {
             var stageIds = ids.Where(id => query.Stage switch
             {
-                "predicted" => Predicted(id),
-                "not-predicted" => !Predicted(id),
-                "missing" => actualIds is not null && Predicted(id) && !actualIds.Contains(id),
-                "in-actual" => actualIds is not null && Predicted(id) && actualIds.Contains(id),
+                "predicted" => AbsPredictionComparison.Qualifies(eligibility, id, query.StageMeasure),
+                "not-predicted" => !AbsPredictionComparison.Qualifies(eligibility, id, query.StageMeasure),
+                "missing" => actualIds is not null && AbsPredictionComparison.Qualifies(eligibility, id, query.StageMeasure) && !actualIds.Contains(id),
+                "in-actual" => actualIds is not null && AbsPredictionComparison.Qualifies(eligibility, id, query.StageMeasure) && actualIds.Contains(id),
                 _ => false
             }).ToList();
             var sliced = Slice(stageIds, query.PopulationPage, query.PageSize);
@@ -769,6 +775,7 @@ public static partial class ReportManifestRules
             PopulationPaging = populationPaging,
             PopulationNote = populationNote,
             Prediction = prediction,
+            Predictions = predictions,
             PopulationsOpen = string.Equals(query.Tab, "populations", StringComparison.OrdinalIgnoreCase)
                 || !string.IsNullOrWhiteSpace(query.Stage),
             Comparison = comparison,
@@ -1049,8 +1056,8 @@ public static partial class ReportManifestRules
                 Delta = delta,
                 Verdict = verdict,
                 BadgeClass = badge,
-                QueryPlan = acquired.Count == 0 || acquired.Contains(name) || key == "patient",
-                Cql = cql.Count == 0 || cql.Contains(name) || key == "patient"
+                QueryPlan = AbsPredictionComparison.QueryPlanAcquires(name, acquired),
+                Cql = AbsPredictionComparison.CqlReferences(name, cql)
             };
         }).ToList();
         var needle = query.CompareQuery;
@@ -1083,28 +1090,8 @@ public static partial class ReportManifestRules
             var predictedTotal = Sum(predictedCounts);
             var actualTotal = Sum(actualPatient);
             var delta = actualTotal - predictedTotal;
-            string verdict;
-            string badge;
-            if (!known)
-            {
-                verdict = "Missing from ABS";
-                badge = "au-badge-danger";
-            }
-            else if (delta == 0)
-            {
-                verdict = "Match";
-                badge = "au-badge-success";
-            }
-            else if (delta < 0)
-            {
-                verdict = "Partial";
-                badge = "au-badge-warning";
-            }
-            else
-            {
-                verdict = "ABS has more";
-                badge = "au-badge-active";
-            }
+            var verdict = AbsPredictionComparison.PatientVerdict(known, predictedTotal, actualTotal);
+            var badge = VerdictBadge(verdict);
 
             return new ManifestComparePatientRow
             {
@@ -1121,7 +1108,7 @@ public static partial class ReportManifestRules
         }).ToList();
         patientRows.Sort((left, right) =>
         {
-            var missing = (left.Verdict == "Missing from ABS" ? 0 : 1).CompareTo(right.Verdict == "Missing from ABS" ? 0 : 1);
+            var missing = (left.Verdict == AbsPredictionComparison.MissingFromAbs ? 0 : 1).CompareTo(right.Verdict == AbsPredictionComparison.MissingFromAbs ? 0 : 1);
             if (missing != 0)
                 return missing;
             var delta = left.Delta.CompareTo(right.Delta);
@@ -1130,7 +1117,7 @@ public static partial class ReportManifestRules
         var patients = Slice(patientRows, query.ComparePage, query.CompareSize);
         var generatedTotalAll = generated.Values.Sum();
         var predictedTotalAll = predicted.Values.Sum();
-        var actualTotalAll = actual.TotalResourceCount > 0 ? actual.TotalResourceCount : actualCounts.Values.Sum();
+        var actualTotalAll = AbsPredictionComparison.ActualTotal(actual.TotalResourceCount, actualCounts);
 
         return new ManifestComparison
         {
@@ -1138,10 +1125,10 @@ public static partial class ReportManifestRules
             Predicted = predictedTotalAll,
             Actual = actualTotalAll,
             Delta = actualTotalAll - predictedTotalAll,
-            Filtered = Math.Max(0, generatedTotalAll - predictedTotalAll),
+            Filtered = AbsPredictionComparison.Filtered(generatedTotalAll, predictedTotalAll),
             HasFilters = hasFilters,
-            MismatchedTypes = typeRows.Count(row => row.Verdict is not "Match"),
-            MissingPatients = patientRows.Count(row => row.Verdict == "Missing from ABS"),
+            MismatchedTypes = typeRows.Count(row => row.Verdict != AbsPredictionComparison.Match),
+            MissingPatients = patientRows.Count(row => row.Verdict == AbsPredictionComparison.MissingFromAbs),
             Types = typePage.Page,
             TypePaging = typePage.Bar,
             Patients = patients.Page,
@@ -1234,28 +1221,28 @@ public static partial class ReportManifestRules
         return extra > 0 ? text + " +" + extra : text;
     }
 
+    // The verdict is Automation's rule; this only styles it.
     private static (string Verdict, string Badge) TypeVerdict(int generated, int predicted, int actual)
     {
-        var delta = actual - predicted;
-        if (delta == 0 && predicted == actual)
-            return ("Match", "au-badge-success");
-        if (predicted > 0 && actual == 0)
-            return ("Missing from ABS", "au-badge-danger");
-        if (actual < predicted)
-            return ("Partial", "au-badge-warning");
-        if (actual > predicted)
-            return ("ABS has more", "au-badge-active");
-        if (generated > 0 && predicted == 0)
-            return ("Filtered out", "au-badge-muted");
-        return ("—", "au-badge-muted");
+        var verdict = AbsPredictionComparison.TypeVerdict(generated, predicted, actual);
+        return (verdict, VerdictBadge(verdict));
     }
+
+    private static string VerdictBadge(string verdict) => verdict switch
+    {
+        AbsPredictionComparison.Match => "au-badge-success",
+        AbsPredictionComparison.MissingFromAbs => "au-badge-danger",
+        AbsPredictionComparison.Partial => "au-badge-warning",
+        AbsPredictionComparison.AbsHasMore => "au-badge-active",
+        _ => "au-badge-muted"
+    };
 
     private static int TypeRank(ManifestCompareTypeRow row) => row.Verdict switch
     {
-        "Missing from ABS" => 0,
-        "Partial" => 1,
-        "ABS has more" => 2,
-        "Filtered out" => 3,
+        AbsPredictionComparison.MissingFromAbs => 0,
+        AbsPredictionComparison.Partial => 1,
+        AbsPredictionComparison.AbsHasMore => 2,
+        AbsPredictionComparison.FilteredOut => 3,
         _ => 4
     };
 
