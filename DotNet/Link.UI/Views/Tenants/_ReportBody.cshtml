@@ -1,0 +1,220 @@
+@model ReportDetailModel
+@* The report page body. Rendered by the page and, while the report is still moving, by the live endpoint every few seconds. *@
+@{
+    var report = Model.Report!;
+    var progress = Model.Progress;
+    var facilityId = Model.FacilityId;
+    var reportId = Model.ReportId;
+    string When(DateTime? value) => value is DateTime v ? LinkUiTime.Display(v) : "\u2014";
+    string Href(string row) => row switch
+    {
+        "acquisition" => Url.Action("Acquisition", "Reports", new { facilityId, reportId })!,
+        "validation" => Url.Action("Validation", "Reports", new { facilityId, reportId })!,
+        "submission" => Url.Action("Manifest", "Reports", new { facilityId, reportId, tab = "patients" })!,
+        _ => Url.Action("Manifest", "Reports", new { facilityId, reportId, tab = "patients" })!
+    };
+    string Tip(string row) => row switch
+    {
+        "acquisition" => "Open the acquisition log",
+        "validation" => "Open validation",
+        "normalization" => "Open the acquisition log",
+        _ => "Open the manifest patients"
+    };
+}
+<div class="row g-3 mb-3">
+    <div class="col-12 col-xl-5">
+        <section class="au-card card h-100" id="report-card">
+            <div class="card-header d-flex justify-content-between flex-wrap gap-2">
+                <span>Report</span>
+                <partial name="_AutomationBadge" model="Model.IsTest" />
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Facility</dt>
+                    <dd class="col-sm-8">
+                        @if (Model.FacilityMissing)
+                        {
+                            <span>The facility record is not available.</span>
+                        }
+                        else
+                        {
+                            <a asp-action="View" asp-route-id="@facilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@(string.IsNullOrWhiteSpace(Model.FacilityName) ? facilityId : Model.FacilityName)</a>
+                        }
+                    </dd>
+                    <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge @StatusPills.ForSchedule(report.Status)" id="report-status">@report.StatusLabel</span></dd>
+                    <dt class="col-sm-4">Cadence</dt><dd class="col-sm-8">@report.Frequency</dd>
+                    <dt class="col-sm-4">Measures</dt><dd class="col-sm-8">@(string.IsNullOrWhiteSpace(report.Measures) ? "\u2014" : report.Measures)</dd>
+                    <dt class="col-sm-4">Reporting period</dt><dd class="col-sm-8">@report.PeriodStart to @report.PeriodEnd</dd>
+                    <dt class="col-sm-4">Patients</dt>
+                    <dd class="col-sm-8">
+                        @if (Model.PatientCount is long patients)
+                        {
+                            <a id="report-patients-link" href="@Url.Action("Manifest", "Reports", new { facilityId, reportId, tab = "patients" })">@Counts.Of(patients, "patient")</a>
+                            <span class="text-muted">&middot; census @(report.CensusCount?.ToString("N0") ?? "\u2014") &middot; IP @(report.InitialPopulationCount?.ToString("N0") ?? "\u2014")</span>
+                        }
+                        else
+                        {
+                            <span>@(Model.SectionError ?? "\u2014")</span>
+                        }
+                    </dd>
+                    @if (progress is not null)
+                    {
+                        <dt class="col-sm-4">Created</dt><dd class="col-sm-8">@When(progress.CreatedUtc)</dd>
+                        <dt class="col-sm-4">Submitted</dt><dd class="col-sm-8" id="report-submitted">@When(progress.SubmittedUtc)</dd>
+                        <dt class="col-sm-4">Time to submit <partial name="_TermInfo" model="@(new TermInfo { Label = "About time to submit", Text = "Measured from the later of the reporting period end and the report's creation, up to submission. While the report is still moving it counts up." })" /></dt>
+                        <dd class="col-sm-8" id="report-time-to-submit">
+                            @if (progress.TimeToSubmit is TimeSpan span)
+                            {
+                                @AutomationRules.FormatWallClock(span)
+                                @if (progress.TimeToSubmitRunning)
+                                {
+                                    <span class="text-muted">so far</span>
+                                }
+                            }
+                            else
+                            {
+                                <span>&mdash;</span>
+                            }
+                        </dd>
+                    }
+                </dl>
+            </div>
+        </section>
+    </div>
+    <div class="col-12 col-xl-7">
+        <section class="au-card card h-100" id="report-pipeline">
+            <div class="card-header d-flex justify-content-between flex-wrap gap-2 align-items-center">
+                <span>Pipeline</span>
+                @if (progress is not null)
+                {
+                    <span class="d-flex flex-wrap gap-2 align-items-center small">
+                        <span class="badge @progress.StageBadge" id="report-stage">@progress.Stage</span>
+                        <span>Last activity <span id="report-last-activity">@When(progress.LastActivityUtc)</span></span>
+                    </span>
+                }
+            </div>
+            <div class="card-body">
+                @if (progress is null)
+                {
+                    <p class="mb-0">Pipeline counts are not available for this report.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" id="report-pipeline-table">
+                            <thead><tr><th>Stage</th><th>State</th><th>Counts</th><th>Last activity</th><th class="text-end"><span class="visually-hidden">Actions</span></th></tr></thead>
+                            <tbody>
+                                @foreach (var row in progress.Pipeline)
+                                {
+                                    <tr data-stage="@row.Key">
+                                        <td class="text-nowrap">@row.Name</td>
+                                        <td><span class="badge @row.StateBadge">@row.StateLabel</span></td>
+                                        <td>
+                                            @if (row.Counts.Count == 0)
+                                            {
+                                                <span>&mdash;</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="d-flex flex-wrap gap-1">
+                                                    @foreach (var count in row.Counts)
+                                                    {
+                                                        <span class="badge @(count.BadgeClass ?? "au-badge-muted")">@count.Label @count.Value.ToString("N0")</span>
+                                                    }
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="text-nowrap" data-lu-time-compact>@(row.LastActivityUtc is DateTime last ? LinkUiTime.Display(last) : "\u2014")</td>
+                                        <td class="text-end"><a class="btn btn-sm btn-au-link" href="@Href(row.Key)" title="@Tip(row.Key)" aria-label="@Tip(row.Key)"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>@Tip(row.Key)</a></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</div>
+@if (progress is not null)
+{
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-5">
+            <section class="au-card card h-100" id="report-submission">
+                <div class="card-header">Submission breakdown</div>
+                <div class="card-body">
+                    @if (!progress.SubmissionAvailable)
+                    {
+                        <p class="mb-0">Submission counts are not available for this report.</p>
+                    }
+                    else if (progress.Submission.Count == 0)
+                    {
+                        <p class="mb-0">No patients are on this report yet.</p>
+                    }
+                    else
+                    {
+                        var total = progress.Submission.Sum(s => s.Count);
+                        <div class="lu-donut-layout">
+                            <div class="lu-donut-chart">
+                                <div class="lu-donut-ring" style="background: conic-gradient(@progress.SubmissionGradient)" role="img" aria-label="Patients by submission status">
+                                    <div class="lu-donut-hole">
+                                        <span class="lu-donut-total">@total.ToString("N0")</span>
+                                        <span class="lu-donut-total-label">@(total == 1 ? "patient" : "patients")</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <ul class="lu-donut-legend">
+                                @foreach (var slice in progress.Submission)
+                                {
+                                    <li>
+                                        <span class="lu-donut-swatch" style="background:@slice.Color"></span>
+                                        <span class="lu-donut-name">@slice.Name</span>
+                                        <span class="lu-donut-count">@slice.Count.ToString("N0")</span>
+                                        <span class="lu-donut-pct">@((slice.Count * 100.0 / total).ToString("0"))%</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </section>
+        </div>
+        <div class="col-12 col-lg-7">
+            <section class="au-card card h-100" id="report-measures">
+                <div class="card-header">Patients per measure</div>
+                <div class="card-body">
+                    @if (!progress.MeasuresAvailable || progress.Measures.Count == 0)
+                    {
+                        <p class="mb-0">Measure counts are not available for this report.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0" id="report-measures-table">
+                                <thead>
+                                    <tr>
+                                        <th>Measure</th>
+                                        <th class="text-end">Evaluated <partial name="_TermInfo" model="@(new TermInfo { Label = "About evaluated", Text = "Patients on this report that have been evaluated for the measure." })" /></th>
+                                        <th class="text-end">In IP <partial name="_TermInfo" model="@(new TermInfo { Label = "About in IP", Text = "Patients in the measure's initial population. Same count as the manifest Populations tab." })" /></th>
+                                        <th class="text-end"><span class="visually-hidden">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var measure in progress.Measures)
+                                    {
+                                        <tr>
+                                            <td class="lu-wrap">@measure.Measure</td>
+                                            <td class="text-end">@(measure.Evaluated?.ToString("N0") ?? "\u2014")</td>
+                                            <td class="text-end">@(measure.InitialPopulation?.ToString("N0") ?? "\u2014")</td>
+                                            <td class="text-end"><a class="btn btn-sm btn-au-link" href="@Url.Action("Manifest", "Reports", new { facilityId, reportId, tab = "populations" })" title="Open populations" aria-label="Open populations for @measure.Measure"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open populations</a></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </section>
+        </div>
+    </div>
+}

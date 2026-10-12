@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 
@@ -235,4 +235,15 @@ public class HslocCodeApiModel
     public string LongDescription { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+}
+
+/// <summary>Resources normalized for one report (one aggregate row from the Normalization service).</summary>
+public class NormalizationReportSummaryApiModel
+{
+    public string ReportId { get; set; } = string.Empty;
+    public int Passes { get; set; }
+    public long ResourcesNormalized { get; set; }
+    public long Failures { get; set; }
+    public DateTime? FirstNormalizedUtc { get; set; }
+    public DateTime? LastNormalizedUtc { get; set; }
 }

@@ -44,6 +44,7 @@ builder.Services.Configure<LinkUiFeatureOptions>(options =>
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped(FacilityHubService.Create);
 builder.Services.AddScoped(FacilityViewService.Create);
+builder.Services.AddScoped(ReportProgressService.Create);
 builder.Services.AddScoped(ReportsService.Create);
 builder.Services.AddScoped(ReportPatientDiagnostics.Create);
 builder.Services.Configure<LogsLinkOptions>(builder.Configuration.GetSection(LogsLinkOptions.SectionName));

@@ -18,11 +18,11 @@ public class FinalRetestFixesTests
     public void Reports_table_moves_measures_to_the_report_page_and_merges_census_and_ip()
     {
         var view = File.ReadAllText(Path.Combine(Root(), "Link.UI", "Views", "Reports", "Index.cshtml"));
-        var detail = File.ReadAllText(Path.Combine(Root(), "Link.UI", "Views", "Tenants", "Report.cshtml"));
+        var detail = File.ReadAllText(Path.Combine(Root(), "Link.UI", "Views", "Tenants", "_ReportBody.cshtml"));
         Assert.DoesNotContain(">Measures</th>", view);
         Assert.Contains("<th class=\"text-end text-nowrap\">Census / IP</th>", view);
         Assert.Contains("<span data-census=\"@report.Id\">", view);
-        Assert.Contains("<dt class=\"col-sm-3\">Measures</dt>", detail);
+        Assert.Contains("<dt class=\"col-sm-4\">Measures</dt>", detail);
     }
     [Fact]
     public void Partitions_tab_does_not_fetch_topic_configs_it_never_shows()

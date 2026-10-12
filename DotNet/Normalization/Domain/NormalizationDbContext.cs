@@ -1,4 +1,4 @@
-﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +24,7 @@ public partial class NormalizationDbContext : DbContext
     public virtual DbSet<FacilityLocationLocalCodeMapping> FacilityLocationLocalCodeMappings { get; set; }
     public virtual DbSet<OperationSequenceCacheRevision> OperationSequenceCacheRevisions { get; set; }
     public virtual DbSet<OperationSequenceWriteLock> OperationSequenceWriteLocks { get; set; }
+    public virtual DbSet<NormalizationReportActivity> NormalizationReportActivities { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -101,6 +102,15 @@ public partial class NormalizationDbContext : DbContext
         modelBuilder.Entity<OperationSequenceWriteLock>(entity =>
         {
             entity.HasKey(e => e.FacilityId);
+            entity.Property(e => e.FacilityId).HasMaxLength(255).IsUnicode(false);
+        });
+
+        modelBuilder.Entity<NormalizationReportActivity>(entity =>
+        {
+            entity.HasKey(e => new { e.ReportTrackingId, e.CorrelationId, e.QueryType });
+            entity.Property(e => e.ReportTrackingId).HasMaxLength(255).IsUnicode(false);
+            entity.Property(e => e.CorrelationId).HasMaxLength(255).IsUnicode(false);
+            entity.Property(e => e.QueryType).HasMaxLength(255).IsUnicode(false);
             entity.Property(e => e.FacilityId).HasMaxLength(255).IsUnicode(false);
         });
 
