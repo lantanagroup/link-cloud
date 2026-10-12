@@ -444,6 +444,7 @@ public sealed class TenantsController : Controller
 
         var page = await _view.LoadReportAsync(id, reportId, query, cancellationToken);
         await AttachProgressAsync(page, progress, cancellationToken);
+        await AttachAutomationRunAsync(page, cancellationToken);
         ViewData["Title"] = page.ReportId.Length == 0 ? "Report" : page.ReportId;
         return View(page);
     }
@@ -475,6 +476,27 @@ public sealed class TenantsController : Controller
             page.LoadError = "That report was not found.";
         Response.Headers.CacheControl = "no-store";
         return PartialView("_ReportLive", page);
+    }
+
+    /// <summary>Automation reports (test facility, Automation on) also show their run on this page.</summary>
+    private async Task AttachAutomationRunAsync(ReportDetailModel page, CancellationToken cancellationToken)
+    {
+        // Real reports never carry a run. A report that is gone may be one an Automation run removed with its test facility.
+        var reportGone = page.Report is null && !string.IsNullOrWhiteSpace(page.ReportId);
+        if (!page.IsTest && !reportGone)
+            return;
+        var services = HttpContext.RequestServices;
+        var features = services.GetService<Microsoft.Extensions.Options.IOptions<LinkUiFeatureOptions>>()?.Value;
+        if (features?.AutomationEnabled != true)
+            return;
+        var reader = services.GetService<AutomationRunReader>();
+        if (reader is null)
+            return;
+        var runId = await reader.FindRunIdByReportAsync(page.ReportId, cancellationToken);
+        if (runId is not Guid id)
+            return;
+        var logger = services.GetRequiredService<ILogger<TenantsController>>();
+        page.AutomationRun = await AutomationRunDetailFiller.LoadAsync(this, services, logger, id, cancellationToken);
     }
 
     private static async Task AttachProgressAsync(ReportDetailModel page, ReportProgressService progress, CancellationToken cancellationToken)

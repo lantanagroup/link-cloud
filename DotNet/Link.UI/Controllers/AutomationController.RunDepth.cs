@@ -445,35 +445,8 @@ public sealed partial class AutomationController
         }
     }
 
-    private async Task FillRunDetailAsync(LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary detail, CancellationToken cancellationToken)
-    {
-        ViewBag.TemplateCacheVersionNumber = detail.GeneratedTemplateCacheVersionNumber;
-        try
-        {
-            var patients = _services.GetService<IPatientConfigurationStore>();
-            if (patients is not null)
-                ViewBag.PatientConfigurations = await patients.GetAllAsync(cancellationToken);
-            if (detail.IsMetricsRun)
-            {
-                var presenter = _services.GetService<MetricsRunPresenter>();
-                if (presenter is not null)
-                {
-                    var captured = await presenter.GetCapturedAsync(detail.RunId, cancellationToken);
-                    if (captured?.PreviousRunId is Guid previous)
-                        captured.PreviousRunHref = Url.Action("Run", "Automation", new { id = previous });
-                    ViewBag.Performance = captured;
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Run detail catalogs could not be loaded for {RunId}.", detail.RunId);
-        }
-    }
+    private Task FillRunDetailAsync(LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary detail, CancellationToken cancellationToken) =>
+        AutomationRunDetailFiller.FillAsync(this, _services, _logger, detail, cancellationToken);
 
     private async Task<int?> LatestTemplateCacheVersionAsync(string? scenarioKey, CancellationToken cancellationToken)
     {

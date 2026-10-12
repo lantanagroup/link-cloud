@@ -77,3 +77,11 @@ public sealed class ReportProgress
         }
     }
 }
+public sealed class RunReportWatch
+{
+    public Guid RunId { get; init; }
+    public string? ReportHref { get; init; }
+    /// <summary>The run ended; no report is coming, so stop watching.</summary>
+    public bool RunEnded { get; init; }
+    public static bool Ended(string? status) => status is "Succeeded" or "Failed" or "Cancelled";
+}
