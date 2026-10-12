@@ -204,7 +204,7 @@
                                     @foreach (var measure in progress.Measures)
                                     {
                                         <tr>
-                                            <td class="lu-wrap">@measure.Measure</td>
+                                            <td class="lu-wrap" style="white-space:normal;overflow:visible;max-width:none;text-overflow:clip;overflow-wrap:anywhere">@measure.Measure</td>
                                             <td class="text-end">@(measure.Patients?.ToString("N0") ?? "\u2014")</td>
                                             <td class="text-end">@(measure.Evaluated?.ToString("N0") ?? "\u2014")</td>
                                             <td class="text-end">@(measure.InitialPopulation?.ToString("N0") ?? "\u2014")</td>
