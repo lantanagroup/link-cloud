@@ -69,4 +69,7 @@ public sealed class GenerationManifestSnapshot
     /// </summary>
     public IReadOnlyDictionary<string, string> TemplateCacheKeyByPatient { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>The saved report manifest. Set on the copy keyed by report id; null on run-keyed copies.</summary>
+    public ReportManifestSection? Report { get; init; }
 }

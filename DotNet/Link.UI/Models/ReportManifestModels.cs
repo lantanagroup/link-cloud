@@ -249,6 +249,9 @@ public sealed class ReportManifestModel
 
     public string Lead { get; init; } = string.Empty;
     public string? Notice { get; init; }
+
+    /// <summary>Why Interactive mode is off (the ABS submission is gone). Null when it can load on demand.</summary>
+    public string? InteractiveBlocked { get; init; }
     public string? PatientNote { get; init; }
     public bool ShowComparison { get; init; }
     public bool ShowGeneration { get; init; }
