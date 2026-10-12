@@ -35,7 +35,8 @@ public class ReportManifestRulesTests
         var palette = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "js", "chart-palette.js"));
         var category = Regex.Match(palette, @"var category = \[([\s\S]*?)\];");
         category.Success.Should().BeTrue();
-        Regex.Matches(category.Groups[1].Value, @"#[0-9a-fA-F]{6}")
+        // The palette's green is the shared success token (it resolves to #28a745).
+        Regex.Matches(category.Groups[1].Value.Replace("success", "#28a745"), @"#[0-9a-fA-F]{6}")
             .Select(match => match.Value)
             .Should().Equal(ReportManifestRules.DonutColors);
         foreach (Match hex in Regex.Matches(palette, @"#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b"))

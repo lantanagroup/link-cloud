@@ -183,12 +183,19 @@
                                 </div>
                             </div>
                         </div>
-                        <ul class="lu-donut-legend">
-                            @for (var index = 0; index < donutRows.Count; index++)
+                        @{
+                            // Bars keep each slice's colour and list the biggest type first.
+                            var barMax = donutRows.Count == 0 ? 0 : donutRows.Max(row => row.Total);
+                            var barOrder = Enumerable.Range(0, donutRows.Count).OrderByDescending(i => donutRows[i].Total).ThenBy(i => i).ToList();
+                        }
+                        <ul class="lu-donut-legend lu-donut-bars" aria-label="@Model.TypeHeading by count">
+                            @foreach (var index in barOrder)
                             {
+                                var barWidth = barMax <= 0 ? 0 : donutRows[index].Total * 100.0 / barMax;
                                 <li>
                                     <span class="lu-donut-swatch" style="background:@SliceColor(index)"></span>
                                     <span class="lu-donut-name">@donutRows[index].Name</span>
+                                    <span class="lu-donut-bar" aria-hidden="true"><span style="width:@barWidth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;background:@SliceColor(index)"></span></span>
                                     <span class="lu-donut-count">@Count(donutRows[index].Total)</span>
                                     <span class="lu-donut-pct">@SlicePercent(donutRows[index].Total)</span>
                                 </li>
@@ -984,8 +991,10 @@
         ring.appendChild(hole);
         chart.appendChild(ring);
         var legend = document.createElement("ul");
-        legend.className = "lu-donut-legend";
-        slices.forEach(function (row) {
+        legend.className = "lu-donut-legend lu-donut-bars";
+        legend.setAttribute("aria-label", "Resources by type, by count");
+        var barMax = slices.reduce(function (max, row) { return Math.max(max, row.total); }, 0);
+        slices.slice().sort(function (left, right) { return right.total - left.total; }).forEach(function (row) {
             var item = document.createElement("li");
             var swatch = document.createElement("span");
             swatch.className = "lu-donut-swatch";
@@ -999,8 +1008,16 @@
             var pct = document.createElement("span");
             pct.className = "lu-donut-pct";
             pct.textContent = (total ? (row.total * 100 / total).toFixed(1) : "0.0") + "%";
+            var bar = document.createElement("span");
+            bar.className = "lu-donut-bar";
+            bar.setAttribute("aria-hidden", "true");
+            var fill = document.createElement("span");
+            fill.style.width = (barMax ? row.total * 100 / barMax : 0).toFixed(2) + "%";
+            fill.style.background = row.color;
+            bar.appendChild(fill);
             item.appendChild(swatch);
             item.appendChild(name);
+            item.appendChild(bar);
             item.appendChild(count);
             item.appendChild(pct);
             legend.appendChild(item);
