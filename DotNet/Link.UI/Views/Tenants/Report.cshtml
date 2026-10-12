@@ -1,16 +1,24 @@
 @model ReportDetailModel
 @{
-    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.ReportId) ? "Report" : Model.ReportId;
-}
-
-@{
+    ViewData["Title"] = Model.RunOnly
+        ? (Model.AutomationRun?.Run?.RunName ?? "Automation run")
+        : string.IsNullOrWhiteSpace(Model.ReportId) ? "Report" : Model.ReportId;
     ViewData["FacilityId"] = Model.FacilityId;
     ViewData["FacilityName"] = Model.FacilityName;
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "report";
+    var run = Model.AutomationRun;
+    var detail = run?.Detail;
 }
 <div class="mb-3 d-flex flex-wrap gap-3">
-    <partial name="_BackButton" model="@(new BackLink(Url.Action("View", new { id = Model.FacilityId, section = "reports" })!, "Back to facility"))" />
+    @if (Model.RunOnly)
+    {
+        <partial name="_BackButton" model="@(new BackLink(Url.Action("Index", "Automation")!, "Back to runs"))" />
+    }
+    else
+    {
+        <partial name="_BackButton" model="@(new BackLink(Url.Action("View", new { id = Model.FacilityId, section = "reports" })!, "Back to facility"))" />
+    }
 </div>
 
 @if (TempData["Message"] is string saved)
@@ -22,31 +30,92 @@
     <div class="alert alert-warning">@actionError</div>
 }
 
-@if (!string.IsNullOrWhiteSpace(Model.ReportId))
+@if (Model.RunOnly)
 {
-    <partial name="_ReportNav" />
     <h1 class="h3">Report</h1>
-    <partial name="_ReportIdentity" />
-}
-@if (!string.IsNullOrWhiteSpace(Model.LoadError))
-{
-    <div class="alert alert-warning">@Model.LoadError</div>
-}
-else if (Model.NotFound || Model.Report is null)
-{
-    <div class="au-card card">
-        <div class="card-header">Report</div>
-        <div class="card-body"><p class="mb-0">That report was not found.</p></div>
+    <div class="au-card card mb-3" id="report-card">
+        <div class="card-header d-flex justify-content-between flex-wrap gap-2">
+            <span>Report</span>
+            <partial name="_AutomationBadge" model="true" />
+        </div>
+        <div class="card-body">
+            @if (run?.Found != true)
+            {
+                <p class="mb-0" id="run-only-empty">@(string.IsNullOrWhiteSpace(run?.Message) ? "That run was not found." : run!.Message)</p>
+            }
+            else
+            {
+                var ended = RunReportWatch.Ended(run.Run?.Status);
+                <p class="mb-0" id="run-only-empty">@(ended ? "This run ended without creating a report." : "This run has not created a report yet. The report opens here as soon as it exists.")</p>
+                <partial name="~/Views/Automation/_RunReportWatch.cshtml" model="@(new RunReportWatch { RunId = run.RequestedId, RunEnded = ended })" />
+            }
+        </div>
     </div>
 }
 else
 {
-    var report = Model.Report;
-    @if (report.CanDownload)
+    @if (!string.IsNullOrWhiteSpace(Model.ReportId))
     {
-        <div class="mb-3">
-            <a class="btn btn-au-link" asp-controller="Reports" asp-action="Download" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Download</a>
+        <partial name="_ReportNav" />
+        <h1 class="h3">Report</h1>
+        <partial name="_ReportIdentity" />
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.LoadError) && run?.Found != true)
+    {
+        <div class="alert alert-warning">@Model.LoadError</div>
+    }
+    else if (Model.NotFound || !string.IsNullOrWhiteSpace(Model.LoadError) || Model.Report is null)
+    {
+        <div class="au-card card">
+            <div class="card-header">Report</div>
+            <div class="card-body"><p class="mb-0" id="report-gone">@(run?.Found == true ? "This report was removed when its Automation run cleaned up the test facility. The run is below." : "That report was not found.")</p></div>
         </div>
     }
-    <partial name="_ReportLive" model="Model" />
+    else
+    {
+        var report = Model.Report;
+        @if (report.CanDownload)
+        {
+            <div class="mb-3">
+                <a class="btn btn-au-link" asp-controller="Reports" asp-action="Download" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Download</a>
+            </div>
+        }
+        <partial name="~/Views/Tenants/_ReportLive.cshtml" model="Model" />
+    }
+}
+
+@if (run is not null && run.Found)
+{
+    <partial name="~/Views/Tenants/_ReportAutomation.cshtml" model="run" />
+}
+
+@section Scripts {
+    @if (run is not null && run.Found)
+    {
+        @if (detail is not null)
+        {
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+        }
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+        @if (detail is not null)
+        {
+            @await Html.PartialAsync("~/Views/Automation/_RunDetailScript.cshtml", detail)
+            @if (!detail.Status.IsTerminal())
+            {
+                <script src="~/js/live-utilization.js" asp-append-version="true"></script>
+            }
+        }
+        <script src="~/js/automation-run.js" asp-append-version="true"></script>
+    }
+    @if (Model.RunOnly)
+    {
+        <script>
+            document.addEventListener("au-refreshed", function (e) {
+                if (!e.detail || e.detail.id !== "run-report-watch") return;
+                var watch = document.getElementById("run-report-watch");
+                var href = watch && watch.getAttribute("data-report-href");
+                if (href) window.location.replace(href);
+            });
+        </script>
+    }
 }

@@ -183,6 +183,9 @@ public sealed class ReportDetailModel
     /// <summary>The schedule as read for this page, so progress does not read it twice.</summary>
     public LantanaGroup.Link.Shared.Application.Models.Integration.Report.ReportScheduleApiModel? Schedule { get; set; }
     public ReportProgress? Progress { get; set; }
+    /// <summary>The Automation run behind this report (test facilities, Automation on), or the run itself when it never created a report.</summary>
+    public AutomationRunPage? AutomationRun { get; set; }
+    public bool RunOnly { get; set; }
 }
 
 public sealed class EnrolledCadence

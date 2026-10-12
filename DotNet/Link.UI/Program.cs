@@ -39,6 +39,7 @@ builder.Services.Configure<LinkUiFeatureOptions>(options =>
     options.DmrpEnabled = builder.Configuration.GetValue<bool>("DMRP:Enabled");
     options.NumericOnlyFacilityId = builder.Configuration.GetValue<bool>("FacilityIdSettings:NumericOnlyFacilityId");
     options.AutomationEnabled = builder.Configuration.GetValue("LinkUi:AutomationEnabled", false);
+    options.LegacyRunPage = builder.Configuration.GetValue("LinkUi:LegacyRunPage", false);
     options.SignInRequired = builder.Configuration.GetValue<bool>("Authentication:RequireBffSession");
 });
 builder.Services.AddMemoryCache();

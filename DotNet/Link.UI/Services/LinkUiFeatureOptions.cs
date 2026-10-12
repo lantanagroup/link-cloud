@@ -17,6 +17,9 @@ public sealed class LinkUiFeatureOptions
     /// </summary>
     public bool AutomationEnabled { get; set; }
 
+    /// <summary>Keeps the old Automation run details page instead of redirecting to the report page. One release only.</summary>
+    public bool LegacyRunPage { get; set; }
+
     /// <summary>
     /// Copied from Authentication:RequireBffSession. When false, Login stays on this host
     /// and does not call the Admin.BFF challenge. When true, Login uses that challenge.

@@ -440,6 +440,29 @@ public sealed class AutomationRunReader
         }
     }
 
+    /// <summary>The newest run that produced this report, or null. Report ids are GUIDs stored in either case.</summary>
+    public async Task<Guid?> FindRunIdByReportAsync(string? reportId, CancellationToken cancellationToken)
+    {
+        if (_runs is null || string.IsNullOrWhiteSpace(reportId))
+            return null;
+        var id = reportId.Trim();
+        var filter = Builders<AutomationRunDocument>.Filter.In(row => row.ReportId, new[] { id, id.ToLowerInvariant(), id.ToUpperInvariant() }.Distinct());
+        try
+        {
+            var rows = await FindRowsAsync(filter, Builders<AutomationRunDocument>.Sort.Descending(row => row.CreatedAt), skip: 0, limit: 1, cancellationToken);
+            return rows.FirstOrDefault()?.RunId;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Run lookup by report failed.");
+            return null;
+        }
+    }
+
     public async Task<AutomationRunRow?> FindLatestNamedRunAsync(string runName, CancellationToken cancellationToken)
     {
         if (_runs is null || string.IsNullOrWhiteSpace(runName))
