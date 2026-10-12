@@ -219,6 +219,76 @@ public class KafkaOpsPlannerTests
     }
 
     [Fact]
+    public async Task LocalCompose_UsesTheConfiguredToolsPath_Port_AndBrokerServiceMap()
+    {
+        var process = new RecordingProcess();
+        var provider = new LocalComposeKafkaInfraProvider(process, new KafkaOpsOptions
+        {
+            ComposeProject = "kafka-ops-proof",
+            BrokerService = "kafka_b",
+            KafkaToolsPath = "/opt/bitnami/kafka/bin/",
+            BrokerInternalPort = 29092,
+            BrokerServices = "1=kafka_b, 7=kafka-extra"
+        });
+
+        await provider.ApplyReassignmentAsync("{}", "link-ops-0123456789abcdef0123456789abcdef", false, CancellationToken.None);
+        Assert.Contains("/opt/bitnami/kafka/bin/kafka-reassign-partitions.sh", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("kafka_b:29092", process.Arguments, StringComparison.Ordinal);
+        Assert.DoesNotContain("/opt/kafka/bin", process.Arguments, StringComparison.Ordinal);
+
+        await provider.RemoveBrokerAsync(7, CancellationToken.None);
+        Assert.EndsWith("stop kafka-extra", process.Arguments, StringComparison.Ordinal);
+
+        await provider.RemoveBrokerAsync(3, CancellationToken.None);
+        Assert.EndsWith("stop broker-3", process.Arguments, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LocalCompose_AddBrokerStartsEveryConfiguredExtraService()
+    {
+        var process = new RecordingProcess();
+        var provider = new LocalComposeKafkaInfraProvider(process, new KafkaOpsOptions { ComposeProject = "kafka-ops-proof", ExtraBrokerService = "broker-3, host-proxy-3" });
+
+        await provider.AddBrokerAsync(CancellationToken.None);
+        Assert.EndsWith("--profile extra-broker up -d broker-3 host-proxy-3", process.Arguments, StringComparison.Ordinal);
+
+        var bad = new LocalComposeKafkaInfraProvider(process, new KafkaOpsOptions { ComposeProject = "kafka-ops-proof", ExtraBrokerService = "broker-3,x;rm" });
+        await Assert.ThrowsAsync<KafkaOpsRejectedException>(() => bad.AddBrokerAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task LocalCompose_DefaultsToTheApacheImageLayout()
+    {
+        var process = new RecordingProcess();
+        var provider = new LocalComposeKafkaInfraProvider(process, new KafkaOpsOptions { ComposeProject = "kafka-ops-proof" });
+
+        await provider.CancelReassignmentAsync("link-ops-0123456789abcdef0123456789abcdef", CancellationToken.None);
+        Assert.Contains("/opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server broker-0:9092", process.Arguments, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("opt/kafka/bin", 9092, "")]
+    [InlineData("/opt/../etc", 9092, "")]
+    [InlineData("/opt/kafka/bin; rm -rf /", 9092, "")]
+    [InlineData("/opt/kafka/bin", 0, "")]
+    [InlineData("/opt/kafka/bin", 9092, "3=broker-3;rm")]
+    public async Task LocalCompose_RefusesUnsafeToolsPathsPortsAndServiceNames(string tools, int port, string map)
+    {
+        var provider = new LocalComposeKafkaInfraProvider(new RecordingProcess(), new KafkaOpsOptions
+        {
+            ComposeProject = "kafka-ops-proof",
+            KafkaToolsPath = tools,
+            BrokerInternalPort = port,
+            BrokerServices = map
+        });
+
+        if (map.Length > 0)
+            await Assert.ThrowsAsync<KafkaOpsRejectedException>(() => provider.RemoveBrokerAsync(3, CancellationToken.None));
+        else
+            await Assert.ThrowsAsync<KafkaOpsRejectedException>(() => provider.CancelReassignmentAsync("link-ops-0123456789abcdef0123456789abcdef", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task LocalCompose_ListsReassignmentsOnTheSameExecChannel()
     {
         var process = new RecordingProcess();

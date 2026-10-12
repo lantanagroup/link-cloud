@@ -46,6 +46,9 @@ public sealed class KafkaOpsOptions
     public string ConsumerDeployments { get; set; } = "";
 
     public string BrokerService { get; set; } = "broker-0";
+    public string KafkaToolsPath { get; set; } = "/opt/kafka/bin";
+    public int BrokerInternalPort { get; set; } = 9092;
+    public string BrokerServices { get; set; } = "";
 
     public string ConsumerService { get; set; } = "consumer";
 
