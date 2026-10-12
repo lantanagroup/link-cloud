@@ -33,7 +33,7 @@
                         <input class="form-control" id="add-broker-reason" name="addBrokerReason" value="@Model.DraftAddBrokerReason" />
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-sm btn-success" type="submit" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
+                        <button class="btn btn-sm btn-success" type="submit" data-hold="@Hold.Of("Add a broker", "Start one more broker and register it with the cluster.", new[] { Hold.Pair("Brokers now", Model.Cluster.Brokers.Count), Hold.Pair("Provider", Model.Infra.Provider) }, new[] { new[] { "addBrokerReason", "Reason" } }, new[] { "A new broker uses host or cluster capacity as soon as it starts.", "No partitions move yet. The broker stays empty until a rebalance onto it is executed." }, "", "Hold to add")" title="Add a broker" aria-label="Add a broker"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Add</span></button>
                     </div>
                 </div>
             </form>

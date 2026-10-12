@@ -54,7 +54,7 @@ public class HoldConfirmTests
         var migrate = Read("Views", "Operations", "_Migrate.cshtml");
         migrate.Should().Contain("id=\"plan-submit\" type=\"submit\" data-hold=").And.Contain("formaction=\"/Operations/Kafka/migrations\" data-hold=").And.Contain("formaction=\"/Operations/Kafka/family\" data-hold=");
         System.Text.RegularExpressions.Regex.Matches(migrate, "data-hold=\"@Hold.Of\\(").Count.Should().BeGreaterThanOrEqualTo(8);
-        Read("Views", "Operations", "_Brokers.cshtml").Should().Contain("brokers/decommission\" data-hold=").And.Contain("brokers/rebalance\" data-hold=");
+        Read("Views", "Operations", "_Brokers.cshtml").Should().Contain("brokers/decommission\" data-hold=").And.Contain("brokers/rebalance\" data-hold=").And.Contain("type=\"submit\" data-hold=\"@Hold.Of(\"Add a broker\"");
         Read("Views", "Operations", "_ReplicationFactor.cshtml").Should().Contain("replication-factor\" data-hold=");
         Read("wwwroot", "js", "kafka-ops.js").Should().NotContain("plan-confirm").And.NotContain("produce-confirm");
     }

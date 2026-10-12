@@ -203,9 +203,24 @@ global:
     defaultValue: "extra-broker"
     consumers: ["AdminBFF"]
   - key: "KafkaOps:ExtraBrokerService"
-    description: "Compose service name started when LocalCompose adds a broker."
+    description: "Compose service name, or a comma-separated list of up to 4, started when LocalCompose adds a broker. List the host proxy too (broker-3,host-proxy-3) when the BFF runs on the host."
     required: false
     defaultValue: "broker-3"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:KafkaToolsPath"
+    description: "Directory of the Kafka CLI scripts inside the LocalCompose broker container. /opt/kafka/bin for apache/kafka, /opt/bitnami/kafka/bin for Bitnami images."
+    required: false
+    defaultValue: "/opt/kafka/bin"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:BrokerInternalPort"
+    description: "Port LocalCompose uses with KafkaOps:BrokerService as the --bootstrap-server for reassignment commands."
+    required: false
+    defaultValue: "9092"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:BrokerServices"
+    description: "Optional comma-separated brokerId=service map. A mapped id is the compose service LocalCompose stops when that broker is removed; unmapped ids use KafkaOps:BrokerServicePrefix plus the id."
+    required: false
+    defaultValue: ""
     consumers: ["AdminBFF"]
   - key: "KafkaOps:BrokerServicePrefix"
     description: "Prefix plus the broker id is the compose service LocalCompose stops when a broker is removed."
