@@ -4,7 +4,7 @@
     var colors = (window.luChartPalette && window.luChartPalette.manifest && window.luChartPalette.manifest.slice()) || [];
 
     function hubColor() {
-        return colors.length ? colors[0] : "#6a9a4a";
+        return colors.length ? colors[0] : "#adb5bd";
     }
 
     function fade(hex, alpha) {
