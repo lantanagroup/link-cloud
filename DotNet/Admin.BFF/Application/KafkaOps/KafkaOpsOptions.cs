@@ -7,6 +7,7 @@ public sealed class KafkaOpsOptions
     public int MaxPartitionsPerTopic { get; set; } = 24;
 
     public bool RequireSecondApprover { get; set; }
+    public bool RequireDifferentApprover { get; set; } = true;
 
     /// <summary>
     /// When the configuration value is absent, the host treats Production as read-only.

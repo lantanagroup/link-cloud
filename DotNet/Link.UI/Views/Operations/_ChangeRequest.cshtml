@@ -127,16 +127,22 @@
             @if (!terminal)
             {
             <div class="d-flex gap-2 mt-2">
+                @if (request.Status == "Pending")
+                {
                 <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/approve">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="query" />
                     <button class="btn btn-sm btn-success lu-icon-btn" type="submit" title="Approve change" aria-label="Approve change"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Approve</span></button>
                 </form>
+                }
+                @if (request.Status is "Pending" or "Approved")
+                {
                 <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/execute">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="query" />
                     <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" title="Execute change" aria-label="Execute change"><i class="bi bi-play-fill" aria-hidden="true"></i><span class="ms-1">Execute</span></button>
                 </form>
+                }
                 @if (cancellable)
                 {
                     <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/cancel">

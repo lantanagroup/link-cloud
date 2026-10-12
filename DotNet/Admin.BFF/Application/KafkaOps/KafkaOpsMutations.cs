@@ -216,7 +216,7 @@ public sealed partial class KafkaOpsService
     private async Task<ChangeRequestRecord> ExecuteCancelAsync(ClaimsPrincipal user, ChangeRequestRecord record, CancellationToken cancellationToken)
     {
         EnsureActor(user, record.Kind);
-        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow);
+        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
 
@@ -286,7 +286,7 @@ public sealed partial class KafkaOpsService
         EnsureActor(user, record.Kind);
         if (record.Kind != KafkaChangeKind.ScaleReplicas)
             await EnsureNoReassignmentAsync(record.Id, cancellationToken);
-        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow);
+        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
 
