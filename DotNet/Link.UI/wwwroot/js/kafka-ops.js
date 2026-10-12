@@ -56,20 +56,8 @@
         });
     }
 
-    function wireConfirm() {
-        var input = document.getElementById("plan-confirm");
-        var button = document.getElementById("plan-submit");
-        if (!input || !button || input.getAttribute("data-confirm-wired") === "1") return;
-        input.setAttribute("data-confirm-wired", "1");
-        var expected = input.getAttribute("data-topic") || "";
-        function sync() {
-            var ok = input.value === expected;
-            button.disabled = !ok;
-            document.querySelectorAll("[data-topic-confirm]").forEach(function (el) { el.disabled = !ok; });
-        }
-        input.addEventListener("input", sync);
-        sync();
-    }
+    // Risky submits are confirmed by the shared hold modal (hold-confirm.js); nothing is gated on typing a name.
+    function wireConfirm() { }
 
     function wirePartitionChoice() {
         var card = document.getElementById("kafka-change-partitions");
@@ -242,10 +230,6 @@
             var form = event.target && event.target.closest ? event.target.closest("#kafka-produce") : null;
             if (!form) return;
             form.setAttribute("data-produce-dirty", "1");
-            if (event.target && event.target.id === "produce-topic") {
-                var confirm = document.getElementById("produce-confirm");
-                if (confirm) confirm.setAttribute("data-topic", event.target.value || "");
-            }
             syncProduce();
         });
         syncProduce();
@@ -274,9 +258,6 @@
         }
         fillProduce(form, payload);
         // The target is always the page's selected topic (hidden #produce-topic); a restaged record does not change it.
-        var topicBox = form.querySelector("[name='topic']");
-        var confirm = document.getElementById("produce-confirm");
-        if (confirm && topicBox) confirm.setAttribute("data-topic", topicBox.value);
         var stage = button.getAttribute("data-stage") || "";
         if (stage && window.history && history.replaceState) {
             try {
@@ -327,7 +308,7 @@
         if (valueBox) valueBox.value = payload.value == null ? "" : String(payload.value);
         form.setAttribute("data-produce-dirty", "1");
         var summary = document.getElementById("kafka-produce-summary");
-        if (summary) summary.textContent = "Review this replica. " + lines.length + (lines.length === 1 ? " header." : " headers.") + " Nothing is produced until you type the topic name.";
+        if (summary) summary.textContent = "Review this replica. " + lines.length + (lines.length === 1 ? " header." : " headers.") + " Nothing is produced until you hold to confirm.";
     }
 
     function headerLines(headers) {
@@ -348,12 +329,9 @@
     }
 
     function syncProduce() {
-        var input = document.getElementById("produce-confirm");
+        // Produce is confirmed by the hold modal; the button only stays off while the fieldset is disabled.
         var button = document.getElementById("produce-submit");
-        var topic = document.getElementById("produce-topic");
-        if (!input || !button) return;
-        var expected = topic ? topic.value : (input.getAttribute("data-topic") || "");
-        button.disabled = input.value !== expected || expected.length === 0;
+        if (!button) return;
     }
 
     function wireResults(root) {

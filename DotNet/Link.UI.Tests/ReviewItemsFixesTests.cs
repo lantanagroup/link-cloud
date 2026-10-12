@@ -98,7 +98,7 @@ public class ReviewItemsFixesTests
     public void Replica_review_summary_is_one_valid_string()
     {
         var js = Read("wwwroot", "js", "kafka-ops.js");
-        Assert.Contains("(lines.length === 1 ? \" header.\" : \" headers.\") + \" Nothing is produced until you type the topic name.\";", js);
+        Assert.Contains("(lines.length === 1 ? \" header.\" : \" headers.\") + \" Nothing is produced until you hold to confirm.\";", js);
         Assert.DoesNotContain("\" headers.\") Nothing", js);
     }
 

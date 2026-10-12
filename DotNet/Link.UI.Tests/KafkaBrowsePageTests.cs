@@ -277,7 +277,7 @@ public class KafkaBrowsePageTests
         produce.Should().Contain(">Produce</button>");
         produce.Should().Contain("btn btn-warning");
         produce.Should().Contain(">Cancel</a>");
-        produce.Should().Contain("Nothing is sent until you type the topic name.");
+        produce.Should().Contain("Nothing is sent until you hold to confirm.");
         produce.Should().NotContain("<h3 class=\"card-header h6 mb-0\">Message</h3>");
         produce.Should().NotContain("<h3 class=\"card-header h6 mb-0\">Review</h3>");
         produce.Should().NotContain("btn-primary");
