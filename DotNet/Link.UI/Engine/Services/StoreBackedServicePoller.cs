@@ -1,4 +1,4 @@
-﻿using Automation.UI.Services.Persistence;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace Automation.UI.Services;
@@ -20,6 +20,10 @@ public sealed class StoreBackedServicePoller
     private readonly ILogger _logger;
     private readonly IAutomationUiMetrics? _metrics;
     private readonly TimeSpan _pollInterval;
+    /// <summary>Per-patient domains (entry list, populations, logs, measure resources) are read this often, not every tick.</summary>
+    public static readonly TimeSpan FullPollInterval = TimeSpan.FromSeconds(30);
+    private DateTime _lastFullPollUtc = DateTime.MinValue;
+    private PipelineDataReader.ReportEntryRollup? _lastRollup;
     private readonly bool _pollAllDomains;
 
     public StoreBackedServicePoller(
@@ -96,16 +100,29 @@ public sealed class StoreBackedServicePoller
         }
     }
 
-    private async Task PollAllDomainsAsync(Guid scheduleId, CancellationToken ct)
+    private async Task PollAllDomainsAsync(Guid scheduleId, CancellationToken ct, bool forceFull = false)
     {
-        await Task.WhenAll(
+        // Every tick reads only per-report aggregates. The per-patient payloads are read on a slower
+        // cadence and once more at the end, so a long run never re-reads every entry every few seconds.
+        var full = forceFull || DateTime.UtcNow - _lastFullPollUtc >= FullPollInterval;
+        if (full)
+            _lastFullPollUtc = DateTime.UtcNow;
+
+        var tasks = new List<Task>
+        {
             PollDomainAsync("schedule", () => PollScheduleAsync(scheduleId, ct)),
-            PollDomainAsync("entries", () => PollEntriesAsync(scheduleId, ct)),
-            PollDomainAsync("populations", () => PollPopulationsAsync(scheduleId, ct)),
+            PollDomainAsync("entries", () => PollEntriesAsync(scheduleId, full, ct)),
             PollDomainAsync("acquisitionSummary", () => PollAcquisitionAsync(ct)),
-            PollDomainAsync("acquisitionLogs", () => PollAcquisitionLogsAsync(ct)),
-            PollDomainAsync("orgLocation", () => PollOrgLocationAsync(ct)),
-            PollDomainAsync("measureResources", () => PollMeasureEvalResourcesAsync(scheduleId, ct)));
+            PollDomainAsync("orgLocation", () => PollOrgLocationAsync(ct))
+        };
+        if (full)
+        {
+            tasks.Add(PollDomainAsync("populations", () => PollPopulationsAsync(scheduleId, ct)));
+            tasks.Add(PollDomainAsync("acquisitionLogs", () => PollAcquisitionLogsAsync(ct)));
+            tasks.Add(PollDomainAsync("measureResources", () => PollMeasureEvalResourcesAsync(scheduleId, ct)));
+        }
+
+        await Task.WhenAll(tasks);
     }
 
     private async Task PollDomainAsync(string domain, Func<Task> action)
@@ -153,7 +170,7 @@ public sealed class StoreBackedServicePoller
 
         try
         {
-            await PollAllDomainsAsync(scheduleId, cancellationToken);
+            await PollAllDomainsAsync(scheduleId, cancellationToken, forceFull: true);
             _logger.LogInformation("[Run {RunId}] Final domain snapshot persisted", _meta.RunId);
         }
         catch (Exception ex)
@@ -179,13 +196,42 @@ public sealed class StoreBackedServicePoller
         await _store.SetDomainAsync(_meta.RunId, "schedule", result, ct);
     }
 
-    private async Task PollEntriesAsync(Guid scheduleId, CancellationToken ct)
+    private async Task PollEntriesAsync(Guid scheduleId, bool full, CancellationToken ct)
     {
         if (!await ReportStillCurrentAsync(ct))
             return;
 
-        var result = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId, ct);
-        await _store.SetDomainAsync(_meta.RunId, "entries", PipelineDataReader.ReportEntryRollup.From(result), ct);
+        if (full || _lastRollup is null)
+        {
+            var result = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId, ct);
+            _lastRollup = PipelineDataReader.ReportEntryRollup.From(result);
+            await _store.SetDomainAsync(_meta.RunId, "entries", _lastRollup, ct);
+            return;
+        }
+
+        var counts = await _reader.GetReportEntryStatusCountsAsync(scheduleId, ct);
+        if (counts is null)
+            return;
+        _lastRollup = MergeCounts(_lastRollup, counts.Value.Reporting, counts.Value.Submission);
+        await _store.SetDomainAsync(_meta.RunId, "entries", _lastRollup, ct);
+    }
+
+    /// <summary>Fresh status counts over the last full rollup; measure-level fields wait for the next full read.</summary>
+    public static PipelineDataReader.ReportEntryRollup MergeCounts(
+        PipelineDataReader.ReportEntryRollup last,
+        IReadOnlyDictionary<string, int> reporting,
+        IReadOnlyDictionary<string, int> submission)
+    {
+        int R(string key) => reporting.Where(p => string.Equals(p.Key, key, StringComparison.OrdinalIgnoreCase)).Sum(p => p.Value);
+        var total = reporting.Values.Sum();
+        return last with
+        {
+            EntryCount = total,
+            ReportingStatuses = reporting.Where(p => p.Value > 0).Select(p => new PipelineDataReader.StatusCountInfo(p.Key, p.Value)).ToList(),
+            SubmissionStatuses = submission.Where(p => p.Value > 0).Select(p => new PipelineDataReader.StatusCountInfo(p.Key, p.Value)).ToList(),
+            ValidatedCount = R("PassedValidation") + R("FailedValidation"),
+            AllReportingTerminal = total > 0 && R("PatientIdentified") + R("PendingValidation") == 0
+        };
     }
 
     private async Task PollPopulationsAsync(Guid scheduleId, CancellationToken ct)

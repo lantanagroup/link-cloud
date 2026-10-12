@@ -141,6 +141,15 @@ public sealed partial class AutomationController : Controller
         ViewData["Title"] = "Automation run";
         ViewData["AutomationSection"] = "runs";
         var page = await _runs.LoadRunAsync(id, cancellationToken);
+        var legacy = _services.GetService<Microsoft.Extensions.Options.IOptions<LinkUiFeatureOptions>>()?.Value.LegacyRunPage == true;
+
+        // The report page is the run page now: a run that produced a report opens it there.
+        if (!legacy && page.Found && page.Run is { } row
+            && !string.IsNullOrWhiteSpace(row.FacilityId) && !string.IsNullOrWhiteSpace(row.ReportId))
+        {
+            return Redirect(Url.Action("Report", "Tenants", new { id = row.FacilityId, reportId = row.ReportId })!);
+        }
+
         if (page.Found && _manager is not null)
         {
             page.Detail = await _manager.GetRunForDisplayAsync(id, cancellationToken);
@@ -148,7 +157,44 @@ public sealed partial class AutomationController : Controller
                 await FillRunDetailAsync(page.Detail, cancellationToken);
         }
 
-        return View(page);
+        if (legacy)
+            return View(page);
+
+        // No report yet (or the run is gone): the same page, run section only, with clean empty states.
+        ViewData["Title"] = page.Run?.RunName ?? "Automation run";
+        return View("~/Views/Tenants/Report.cshtml", new ReportDetailModel
+        {
+            FacilityId = page.Run?.FacilityId,
+            IsTest = true,
+            RunOnly = true,
+            AutomationRun = page
+        });
+    }
+
+    /// <summary>Run-only pages watch for the run's report and move to it once it exists.</summary>
+    [HttpGet("Runs/{id:guid}/report-link")]
+    public async Task<IActionResult> ReportLink(Guid id, CancellationToken cancellationToken)
+    {
+        string? href = null;
+        var ended = false;
+        try
+        {
+            var page = await _runs.LoadRunAsync(id, cancellationToken);
+            ended = !page.Found || RunReportWatch.Ended(page.Run?.Status);
+            if (page.Found && page.Run is { } row && !string.IsNullOrWhiteSpace(row.FacilityId) && !string.IsNullOrWhiteSpace(row.ReportId))
+                href = Url.Action("Report", "Tenants", new { id = row.FacilityId, reportId = row.ReportId });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Report link check failed for run {RunId}.", id);
+        }
+
+        Response.Headers.CacheControl = "no-store";
+        return PartialView("~/Views/Automation/_RunReportWatch.cshtml", new RunReportWatch { RunId = id, ReportHref = href, RunEnded = ended });
     }
 
     [HttpGet("Runs/{id:guid}/status")]
