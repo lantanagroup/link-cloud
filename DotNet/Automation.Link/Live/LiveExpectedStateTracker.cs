@@ -1,6 +1,5 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
-using Microsoft.AspNetCore.Http;
 
 namespace Automation.UI.Services;
 
@@ -163,14 +162,14 @@ public sealed class LiveExpectedStateTracker
         string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(patientId))
-            throw new LiveInjectionException("patientId is required.", StatusCodes.Status400BadRequest);
+            throw new LiveInjectionException("patientId is required.", 400);
 
         lock (_sync)
         {
             EnsureAccepting();
             var id = patientId.Trim();
             if (_pool.ContainsKey(id))
-                throw new LiveInjectionException($"Patient '{id}' is already in the live pool.", StatusCodes.Status409Conflict);
+                throw new LiveInjectionException($"Patient '{id}' is already in the live pool.", 409);
 
             var expected = ResolveExpectedInReport(expectedInReport, pattern);
             _pool[id] = new MutablePoolEntry
@@ -194,7 +193,7 @@ public sealed class LiveExpectedStateTracker
     public PatientStateEvent Admit(string? patientId, string? source, string? notes, DateTimeOffset? timestampUtc = null)
     {
         if (string.IsNullOrWhiteSpace(patientId))
-            throw new LiveInjectionException("patientId is required for admit.", StatusCodes.Status400BadRequest);
+            throw new LiveInjectionException("patientId is required for admit.", 400);
 
         lock (_sync)
         {
@@ -206,7 +205,7 @@ public sealed class LiveExpectedStateTracker
     public PatientStateEvent Discharge(string patientId, string? source, string? notes, DateTimeOffset? timestampUtc = null)
     {
         if (string.IsNullOrWhiteSpace(patientId))
-            throw new LiveInjectionException("patientId is required for discharge.", StatusCodes.Status400BadRequest);
+            throw new LiveInjectionException("patientId is required for discharge.", 400);
 
         lock (_sync)
         {
@@ -296,10 +295,10 @@ public sealed class LiveExpectedStateTracker
     private PatientStateEvent AdmitUnlocked(string id, string? source, string? notes, DateTimeOffset? timestampUtc)
     {
         if (_currentlyAdmitted.Contains(id))
-            throw new LiveInjectionException($"Patient '{id}' is already admitted.", StatusCodes.Status409Conflict);
+            throw new LiveInjectionException($"Patient '{id}' is already admitted.", 409);
 
         if (_pool.Count > 0 && !_pool.ContainsKey(id))
-            throw new LiveInjectionException($"Patient '{id}' is not in the live pool.", StatusCodes.Status409Conflict);
+            throw new LiveInjectionException($"Patient '{id}' is not in the live pool.", 409);
 
         _currentlyAdmitted.Add(id);
         _dischargedDuringWindow.Remove(id);
@@ -315,10 +314,10 @@ public sealed class LiveExpectedStateTracker
     private PatientStateEvent DischargeUnlocked(string id, string? source, string? notes, DateTimeOffset? timestampUtc)
     {
         if (_pool.Count > 0 && !_pool.ContainsKey(id))
-            throw new LiveInjectionException($"Patient '{id}' is not in the live pool.", StatusCodes.Status409Conflict);
+            throw new LiveInjectionException($"Patient '{id}' is not in the live pool.", 409);
 
         if (!_currentlyAdmitted.Remove(id))
-            throw new LiveInjectionException($"Patient '{id}' is not currently admitted.", StatusCodes.Status409Conflict);
+            throw new LiveInjectionException($"Patient '{id}' is not currently admitted.", 409);
 
         _dischargedDuringWindow.Add(id);
         UpdatePoolState(id, LivePatientCensusState.DischargedDuringWindow);
@@ -384,7 +383,7 @@ public sealed class LiveExpectedStateTracker
     private void EnsureAccepting()
     {
         if (!_acceptingInjections)
-            throw new LiveInjectionException("Live window is not accepting injections.", StatusCodes.Status409Conflict);
+            throw new LiveInjectionException("Live window is not accepting injections.", 409);
     }
 
     private static IEnumerable<LivePatientSeed> ToSeeds(IEnumerable<string>? generatedPatientIds)
