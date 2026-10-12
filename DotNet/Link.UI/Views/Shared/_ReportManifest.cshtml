@@ -15,11 +15,14 @@
     var donutColors = new List<string>(ReportManifestRules.DonutColors);
     if (donutOther > 0)
         donutColors.Add(ReportManifestRules.DonutOtherColor);
+    var colorByType = string.Equals(Model.TypeHeading, "Resource types", StringComparison.OrdinalIgnoreCase);
     var donutGradient = ReportManifestRules.DonutGradient(donutRows.Select(row => row.Total).ToList(), donutRows.Select((_, index) => SliceColor(index)).ToList());
     var donutCenter = string.Equals(Model.TypeHeading, "Resource types", StringComparison.OrdinalIgnoreCase) ? "resources" : "patients";
     // The "Other" remainder is always the neutral Other colour, even when it is the only slice.
+    // Resource types keep one colour per type everywhere; other contents (populations, statuses) use the category list.
     string SliceColor(int index) => donutOther > 0 && index == donutRows.Count - 1
         ? ReportManifestRules.DonutOtherColor
+        : colorByType ? ResourceTypeColors.For(donutRows[index].Name)
         : ReportManifestRules.DonutColors[index % ReportManifestRules.DonutColors.Length];
     string SlicePercent(int value) => donutTotal <= 0 ? "0%" : (value * 100.0 / donutTotal).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
     var detailRows = Model.Patients.ToList();
@@ -958,7 +961,7 @@
         }
         clean.sort(function (left, right) { return Number(right.count || right.total || 0) - Number(left.count || left.total || 0); });
         var slices = clean.slice(0, 8).map(function (row, index) {
-            return { name: row.name || "—", total: Number(row.count || row.total || 0), color: donutColors[index % donutColors.length] };
+            return { name: row.name || "—", total: Number(row.count || row.total || 0), color: window.luChartPalette && window.luChartPalette.typeColor ? window.luChartPalette.typeColor(row.name) : donutColors[index % donutColors.length] };
         });
         if (clean.length > 8) {
             var rest = clean.slice(8).reduce(function (sum, row) { return sum + Number(row.count || row.total || 0); }, 0);

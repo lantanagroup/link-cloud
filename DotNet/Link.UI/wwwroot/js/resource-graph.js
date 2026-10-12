@@ -3,8 +3,12 @@
     var graphUrl = "";
     var colors = (window.luChartPalette && window.luChartPalette.manifest && window.luChartPalette.manifest.slice()) || [];
 
+    function typeColorOf(name) {
+        var palette = window.luChartPalette;
+        return palette && palette.typeColor ? palette.typeColor(name) : (colors[0] || "#adb5bd");
+    }
     function hubColor() {
-        return colors.length ? colors[0] : "#adb5bd";
+        return typeColorOf("Patient");
     }
 
     function fade(hex, alpha) {
@@ -206,7 +210,7 @@
                     bar.style.gridColumn = "1 / -1";
                     var fill = document.createElement("span");
                     fill.style.width = Math.max(8, Math.round(Math.sqrt(group.count / max) * 100)) + "%";
-                    fill.style.background = colors[rows.indexOf(group) % colors.length];
+                    fill.style.background = typeColorOf(group.name);
                     bar.appendChild(fill);
                     button.appendChild(bar);
                     button.addEventListener("click", function () {
@@ -392,7 +396,7 @@
                     total: stored.reduce(function (sum, type) { return sum + type.count; }, 0),
                     truncated: !!done.truncated,
                     types: stored.map(function (type, index) {
-                        return { name: type.name, count: type.count, color: colors[index % colors.length] };
+                        return { name: type.name, count: type.count, color: typeColorOf(type.name) };
                     }),
                     selected: null,
                     page: null,

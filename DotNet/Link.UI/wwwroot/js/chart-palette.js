@@ -11,7 +11,26 @@
     var manifest = category.slice();
     var dashboardStatus = [success, "#dc3545", "#ffc107", "#4da3ff", "#6f42c1"];
 
+    // Resource types: one fixed colour each (ResourceTypeColors.cs, emitted as window.luTypeColors); grey only for "Other".
+    var typeColors = {};
+    Object.keys(window.luTypeColors || {}).forEach(function (key) { typeColors[key.toLowerCase()] = window.luTypeColors[key]; });
+    function hslHex(h, s, l) {
+        s /= 100; l /= 100;
+        var a = s * Math.min(l, 1 - l);
+        function f(n) { var k = (n + h / 30) % 12; return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1))); }
+        return "#" + [f(0), f(8), f(4)].map(function (v) { return ("0" + Math.round(v * 255).toString(16)).slice(-2); }).join("");
+    }
+    function typeColor(name) {
+        var key = String(name || "").trim().toLowerCase();
+        if (key === "other") return "#adb5bd";
+        if (typeColors[key]) return typeColors[key];
+        var hash = 2166136261;
+        for (var i = 0; i < key.length; i++) { hash ^= key.charCodeAt(i); hash = Math.imul(hash, 16777619) >>> 0; }
+        return hslHex(hash % 360, 72, 52);
+    }
+
     window.luChartPalette = {
+        typeColor: typeColor,
         resourceMix: resourceMix,
         fallback: fallback,
         manifest: manifest,
