@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
@@ -48,6 +48,7 @@ public interface INormalizationServiceClient
         int pageNumber = 1,
         CancellationToken cancellationToken = default);
 
+    Task<LinkApiResponse<NormalizationReportSummaryApiModel>> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpdateHslocCodesAsync(string oldVersion, string newVersion, Stream csvFile, string fileName = "hsloc.csv", CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteHslocCodeAsync(Guid id, CancellationToken cancellationToken = default);

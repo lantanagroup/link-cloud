@@ -1,4 +1,4 @@
-﻿﻿using Flurl.Http;
+﻿using Flurl.Http;
 using Flurl.Http.Configuration;
 using Flurl.Http.Content;
 using LantanaGroup.Link.Sdk.ApiClient;
@@ -286,6 +286,10 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         return SendAsync<PagedConfigModel<NormalizationOperationApiModel>>(() =>
             request.GetAsync(cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse<NormalizationReportSummaryApiModel>> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default) =>
+        SendAsync<NormalizationReportSummaryApiModel>(() => Request($"normalization/reports/{Uri.EscapeDataString(reportId)}/summary")
+            .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(
         bool includeInactive = false,

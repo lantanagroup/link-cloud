@@ -201,6 +201,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IVendorVersionOperationPresetManager, VendorVersionOperationPresetManager>();
     builder.Services.AddScoped<IOperationQueries, OperationQueries>();
     builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
+    builder.Services.AddScoped<LantanaGroup.Link.Normalization.Application.Services.ReportActivity.INormalizationReportActivityStore, LantanaGroup.Link.Normalization.Application.Services.ReportActivity.NormalizationReportActivityStore>();
     builder.Services.AddScoped<IVendorVersionOperationPresetQueries, VendorVersionOperationPresetQueries>();
     builder.Services.AddScoped<IVendorVersionResolver, VendorVersionResolver>();
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();

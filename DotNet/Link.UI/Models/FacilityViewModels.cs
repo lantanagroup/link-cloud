@@ -180,6 +180,9 @@ public sealed class ReportDetailModel
     public string? SectionError { get; set; }
     /// <summary>Patients on the report; the list itself is the manifest Patients tab.</summary>
     public long? PatientCount { get; set; }
+    /// <summary>The schedule as read for this page, so progress does not read it twice.</summary>
+    public LantanaGroup.Link.Shared.Application.Models.Integration.Report.ReportScheduleApiModel? Schedule { get; set; }
+    public ReportProgress? Progress { get; set; }
 }
 
 public sealed class EnrolledCadence
@@ -206,6 +209,8 @@ public sealed class PageBar
 
 public sealed class FacilityReportRow
 {
+    /// <summary>When the report was submitted (UTC), for timing rules; <see cref="Submitted"/> is the display text.</summary>
+    public DateTime? SubmittedUtc { get; init; }
     public Guid Id { get; init; }
     public string FacilityId { get; init; } = string.Empty;
     public string Frequency { get; init; } = string.Empty;

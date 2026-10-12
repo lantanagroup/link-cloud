@@ -49,6 +49,8 @@ else if (Model.NotFound || Model.Report is null)
 }
 else
 {
+    @* Validation fills in while the report runs: this region refreshes until the report finishes, then stops. *@
+    <div id="validation-live" data-au-refresh="8000" @(ReportProgressService.ValidationSettled(Model.Report, DateTime.UtcNow) ? "data-au-final" : null)>
     <div class="au-card card mb-3">
         <div class="card-header">Summary</div>
         <div class="card-body">
@@ -213,5 +215,6 @@ else
                 <partial name="_BottomPager" model="@(new BottomPager { Label = "Issue pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = query.PageSize, Sizes = ReportsRules.IssuePageSizes, Path = "/Reports/Validation", Route = IssueRoute })" />
             </div>
         </div>
+    </div>
     </div>
 }

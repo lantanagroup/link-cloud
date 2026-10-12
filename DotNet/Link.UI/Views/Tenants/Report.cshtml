@@ -48,42 +48,5 @@ else
             <a class="btn btn-au-link" asp-controller="Reports" asp-action="Download" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Download</a>
         </div>
     }
-    <div class="au-card card mb-3">
-        <div class="card-header d-flex justify-content-between flex-wrap gap-2">
-            <span>Report</span>
-            <partial name="_AutomationBadge" model="Model.IsTest" />
-        </div>
-        <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-3">Facility</dt>
-                <dd class="col-sm-9">
-                    @if (Model.FacilityMissing)
-                    {
-                        <span>The facility record is not available.</span>
-                    }
-                    else
-                    {
-                        <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open facility</a>
-                    }
-                </dd>
-                <dt class="col-sm-3">Cadence</dt><dd class="col-sm-9">@report.Frequency</dd>
-                <dt class="col-sm-3">Measures</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(report.Measures) ? "—" : report.Measures)</dd>
-                <dt class="col-sm-3">Reporting period</dt><dd class="col-sm-9">@report.PeriodStart to @report.PeriodEnd</dd>
-                <dt class="col-sm-3">Status</dt><dd class="col-sm-9"><span class="badge @StatusPills.ForSchedule(report.Status)">@report.StatusLabel</span></dd>
-                <dt class="col-sm-3">Patients in census</dt><dd class="col-sm-9">@(report.CensusCount?.ToString() ?? "—")</dd>
-                <dt class="col-sm-3">Patients in IP</dt><dd class="col-sm-9">@(report.InitialPopulationCount?.ToString() ?? "—")</dd>
-            </dl>
-        </div>
-    </div>
-
-    <div class="au-card card">
-        <div class="card-header">Patients</div>
-        <div class="card-body">
-            @if (!string.IsNullOrWhiteSpace(Model.SectionError))
-            {
-                <div class="alert alert-warning">@Model.SectionError</div>
-            }
-            <a class="btn btn-au-link" id="report-patients-link" href="@Url.Action("Manifest", "Reports", new { facilityId = Model.FacilityId, reportId = Model.ReportId, tab = "patients" })"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Patients (@(Model.PatientCount?.ToString("N0") ?? "-"))</a>
-        </div>
-    </div>
+    <partial name="_ReportLive" model="Model" />
 }
