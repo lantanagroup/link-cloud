@@ -156,12 +156,20 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
     public Task AddBrokerAsync(CancellationToken cancellationToken)
     {
         var profile = TokenOrDefault(_options.ExtraBrokerProfile, "extra-broker", "profile");
-        var service = TokenOrDefault(_options.ExtraBrokerService, "broker-3", "service");
-        return ComposeAsync(cancellationToken, null, "--profile", profile, "up", "-d", service);
+        var services = (string.IsNullOrWhiteSpace(_options.ExtraBrokerService) ? "broker-3" : _options.ExtraBrokerService)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (services.Length is 0 or > 4)
+            throw new KafkaOpsRejectedException("The service name is invalid.");
+        foreach (var service in services)
+            RequireToken(service, "service");
+        return ComposeAsync(cancellationToken, null, ["--profile", profile, "up", "-d", .. services]);
     }
 
     public Task RemoveBrokerAsync(int brokerId, CancellationToken cancellationToken)
     {
+        var mapped = MappedBrokerService(brokerId);
+        if (mapped is not null)
+            return ComposeAsync(cancellationToken, null, "stop", mapped);
         var prefix = TokenOrDefault(_options.BrokerServicePrefix, "broker-", "prefix");
         return ComposeAsync(cancellationToken, null, "stop", prefix + brokerId);
     }
@@ -178,8 +186,8 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
             ? " --throttle " + throttleBytesPerSecond.ToString(System.Globalization.CultureInfo.InvariantCulture)
             : "";
         var file = "/tmp/" + rebalanceName + ".json";
-        var script = "cat > " + file + " && /opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
-                     _options.BrokerService + ":9092 --reassignment-json-file " + file + " --execute" + throttle;
+        var script = "cat > " + file + " && " + Tools() + "/kafka-reassign-partitions.sh --bootstrap-server " +
+                     Bootstrap() + " --reassignment-json-file " + file + " --execute" + throttle;
         return ComposeAsync(cancellationToken, reassignmentJson, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
     }
 
@@ -187,8 +195,8 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
     {
         KafkaRebalanceNames.Require(rebalanceName);
         var file = "/tmp/" + rebalanceName + ".json";
-        var script = "/opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " + _options.BrokerService +
-                     ":9092 --reassignment-json-file " + file + " --cancel";
+        var script = Tools() + "/kafka-reassign-partitions.sh --bootstrap-server " + Bootstrap() +
+                     " --reassignment-json-file " + file + " --cancel";
         return ComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
     }
 
@@ -199,8 +207,8 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
         KafkaRebalanceNames.Require(rebalanceName);
         RequireToken(_options.BrokerService, "service");
         var file = "/tmp/" + rebalanceName + ".json";
-        var script = "if [ -f " + file + " ]; then /opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
-                     _options.BrokerService + ":9092 --reassignment-json-file " + file + " --verify; fi";
+        var script = "if [ -f " + file + " ]; then " + Tools() + "/kafka-reassign-partitions.sh --bootstrap-server " +
+                     Bootstrap() + " --reassignment-json-file " + file + " --verify; fi";
         return ComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
     }
 
@@ -209,8 +217,8 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
         try
         {
             RequireToken(_options.BrokerService, "service");
-            var script = "/opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
-                         _options.BrokerService + ":9092 --list";
+            var script = Tools() + "/kafka-reassign-partitions.sh --bootstrap-server " +
+                         Bootstrap() + " --list";
             var result = await RunComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
             return ReassignmentListText.Read(result);
         }
@@ -235,6 +243,37 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
             arguments.AddRange(["-f", path]);
         arguments.AddRange(args);
         return await _process.RunAsync("docker", arguments, stdin, cancellationToken);
+    }
+
+    private string Tools()
+    {
+        var path = string.IsNullOrWhiteSpace(_options.KafkaToolsPath) ? "/opt/kafka/bin" : _options.KafkaToolsPath.Trim().TrimEnd('/');
+        if (path.Length is 0 or > 120 || path[0] != '/' || path.Contains("..", StringComparison.Ordinal) || !path.All(ch => char.IsLetterOrDigit(ch) || ch is '/' or '-' or '_' or '.'))
+            throw new KafkaOpsRejectedException("The Kafka tools path is invalid.");
+        return path;
+    }
+
+    private string Bootstrap()
+    {
+        RequireToken(_options.BrokerService, "service");
+        if (_options.BrokerInternalPort is < 1 or > 65535)
+            throw new KafkaOpsRejectedException("The broker port is invalid.");
+        return _options.BrokerService + ":" + _options.BrokerInternalPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private string? MappedBrokerService(int brokerId)
+    {
+        foreach (var pair in (_options.BrokerServices ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = pair.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length == 2 && int.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) && id == brokerId)
+            {
+                RequireToken(parts[1], "service");
+                return parts[1];
+            }
+        }
+
+        return null;
     }
 
     private string? DeploymentName(string groupId)
