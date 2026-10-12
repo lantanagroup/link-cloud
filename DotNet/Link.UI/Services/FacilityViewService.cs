@@ -199,6 +199,7 @@ public sealed class FacilityViewService
             }
 
             var counts = await CountsAsync(schedule.Body.Id, cancellationToken);
+            page.Schedule = schedule.Body;
             page.Report = ToReportRow(schedule.Body, counts.Census, counts.Population);
             StampResubmit(page.Report, page.IsTest);
 
@@ -641,6 +642,7 @@ public sealed class FacilityViewService
             PeriodStart = FacilityViewRules.When(schedule.ReportStartDate),
             PeriodEnd = FacilityViewRules.When(schedule.ReportEndDate),
             Created = FacilityViewRules.When(schedule.CreateDate),
+            SubmittedUtc = schedule.SubmitReportDateTime,
             Submitted = string.IsNullOrEmpty(FacilityViewRules.When(schedule.SubmitReportDateTime))
                 ? null
                 : FacilityViewRules.When(schedule.SubmitReportDateTime),

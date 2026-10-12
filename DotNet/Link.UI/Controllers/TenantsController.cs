@@ -434,6 +434,7 @@ public sealed class TenantsController : Controller
         [FromRoute] string? id,
         string? reportId,
         ReportPageQuery query,
+        [FromServices] ReportProgressService progress,
         CancellationToken cancellationToken)
     {
         // Old patient deep links on this screen now open the manifest Patients tab on that patient.
@@ -442,8 +443,57 @@ public sealed class TenantsController : Controller
             return Redirect(Url.Action("Manifest", "Reports", new { facilityId = id.Trim(), reportId = reportId.Trim(), tab = "patients", q = deepLink })!);
 
         var page = await _view.LoadReportAsync(id, reportId, query, cancellationToken);
+        await AttachProgressAsync(page, progress, cancellationToken);
         ViewData["Title"] = page.ReportId.Length == 0 ? "Report" : page.ReportId;
         return View(page);
+    }
+
+    /// <summary>The report page's live region. Never fails the poll: a missing report renders its empty state and stops polling.</summary>
+    [HttpGet]
+    public async Task<IActionResult> ReportLive(
+        [FromRoute] string? id,
+        string? reportId,
+        [FromServices] ReportProgressService progress,
+        CancellationToken cancellationToken)
+    {
+        ReportDetailModel page;
+        try
+        {
+            page = await _view.LoadReportAsync(id, reportId, new ReportPageQuery(), cancellationToken);
+            await AttachProgressAsync(page, progress, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            page = new ReportDetailModel { FacilityId = id, ReportId = reportId ?? "", LoadError = "The report could not be read right now." };
+        }
+
+        if (page.Report is null && string.IsNullOrWhiteSpace(page.LoadError))
+            page.LoadError = "That report was not found.";
+        Response.Headers.CacheControl = "no-store";
+        return PartialView("_ReportLive", page);
+    }
+
+    private static async Task AttachProgressAsync(ReportDetailModel page, ReportProgressService progress, CancellationToken cancellationToken)
+    {
+        if (page.Schedule is null || page.Report is null)
+            return;
+        try
+        {
+            page.Progress = await progress.LoadAsync(page.Schedule, DateTime.UtcNow, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Progress is extra; the report card still renders and the pipeline card shows its empty state.
+            page.Progress = null;
+        }
     }
 
     [HttpPost]

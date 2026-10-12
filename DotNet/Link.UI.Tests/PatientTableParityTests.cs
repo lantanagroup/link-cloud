@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using Link.UI.Services;
 using Xunit;
 
@@ -87,8 +87,10 @@ public class PatientTableParityTests
     {
         var report = Read("Views", "Tenants", "Report.cshtml");
         Assert.DoesNotContain("<table", report);
-        Assert.Contains("id=\"report-patients-link\"", report);
-        Assert.Contains("tab = \"patients\"", report);
+        var body = Read("Views", "Tenants", "_ReportBody.cshtml");
+        Assert.DoesNotContain("manifest-patients", body);
+        Assert.Contains("id=\"report-patients-link\"", body);
+        Assert.Contains("tab = \"patients\"", body);
 
         var view = Read("Services", "FacilityViewService.cs");
         Assert.DoesNotContain("LoadPatientAsync", view);

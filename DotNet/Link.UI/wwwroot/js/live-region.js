@@ -164,6 +164,11 @@
                 var fresh = doc.getElementById(node.id);
                 if (!fresh) return;
                 if (fresh.innerHTML !== node.innerHTML) node.innerHTML = fresh.innerHTML;
+                // A region that reports itself final (finished or missing report) stops polling.
+                if (fresh.hasAttribute("data-au-final")) {
+                    node.setAttribute("data-au-final", "");
+                    clearInterval(node._auTimer);
+                }
                 restoreChecked(node, held);
                 if (push) history.replaceState(null, "", url);
                 document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: node.id } }));
@@ -421,6 +426,7 @@
 
     function watch(node) {
         if (node._auWatch) return;
+        if (node.hasAttribute("data-au-final")) return;
         node._auWatch = true;
         alignPostedPage(node);
         var ms = Number(node.getAttribute("data-au-refresh")) || 12000;
