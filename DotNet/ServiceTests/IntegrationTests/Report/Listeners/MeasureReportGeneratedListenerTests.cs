@@ -1,4 +1,4 @@
-﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -261,14 +261,14 @@ public class MeasureReportGeneratedListenerTests
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForFacility(facilityId) &&
                     m.Value.FacilityId == facilityId &&
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -358,14 +358,14 @@ public class MeasureReportGeneratedListenerTests
         await listener.ProcessMessageAsync(consumeResult, facilityId, CancellationToken.None);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForFacility(facilityId) &&
                     m.Value.FacilityId == facilityId &&
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

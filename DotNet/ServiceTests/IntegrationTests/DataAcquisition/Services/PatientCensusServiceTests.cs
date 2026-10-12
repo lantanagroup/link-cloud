@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
@@ -640,7 +640,7 @@ public class PatientCensusServiceTests
 
         // ── Assertions on Kafka message
         Assert.NotNull(capturedMessage);
-        Assert.Equal(facilityId, capturedMessage!.Key);
+        Assert.Equal(KafkaKeys.ForFacility(facilityId), capturedMessage!.Key);
         Assert.Equal(6, capturedMessage.Value.PatientLists.Count);
         var allPatientIds = capturedMessage.Value.PatientLists.SelectMany(pl => pl.PatientIds).ToList();
         Assert.Equal(18, allPatientIds.Count); // 6 lists × 3 patients

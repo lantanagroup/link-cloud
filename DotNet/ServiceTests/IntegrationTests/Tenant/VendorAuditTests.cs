@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -56,7 +57,10 @@ public class VendorAuditTests : IDisposable
         var audit = Assert.Single(events);
         Assert.Equal(AuditEventType.Create, audit.Value.Action);
         Assert.Equal("Vendor", audit.Value.Resource);
-        Assert.Equal(created.Id.ToString(), audit.Key);
+        // LEGLINK-1440 composite key, built from the event as emitted. Vendor audits currently carry the vendor id
+        // in FacilityId (CreateAuditEventCommand's facilityId argument), so this is a facility-shaped key.
+        Assert.Equal(KafkaKeys.ForAudit(audit.Value.FacilityId, audit.Value.PatientId, TenantConstants.ServiceName), audit.Key);
+        Assert.Equal(created.Id.ToString(), audit.Value.FacilityId);
     }
 
     [Fact]
