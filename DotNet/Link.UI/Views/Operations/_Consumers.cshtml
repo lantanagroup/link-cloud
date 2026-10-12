@@ -6,6 +6,12 @@
     string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
 }
 
+@if (!string.IsNullOrWhiteSpace(query.Group) && selected is null)
+{
+    <partial name="_KafkaNotFound" model="@(new KafkaNotFound("Group", query.Group, "/Operations/Kafka/ConsumerGroups", "All consumer groups"))" />
+}
+@if (string.IsNullOrWhiteSpace(query.Group))
+{
 <section class="card au-card mt-3" id="kafka-groups">
     <h2 class="card-header h6 mb-0">Groups <partial name="_TermInfo" model="@(new TermInfo { Label = "About groups", Text = "Open a group to add or remove replicas. Add or remove members only after a preview. A count above the partition ceiling is refused, because the extra member would sit idle. Groups that are behind, unowned, or not stable are listed first. Time since the last rebalance is not reported by the client." })" /></h2>
     <div class="card-body">
@@ -23,8 +29,7 @@
             <input type="hidden" name="advanced" value="@(query.Advanced ? "1" : "")" />
             <input type="hidden" name="hot" value="@(query.Hot ? "1" : "")" />
             <div class="col-12 col-md-4">
-                <label class="visually-hidden" for="kafka-q">Search</label>
-                <input class="form-control" id="kafka-q" placeholder="Search groups by name, client or host" name="q" value="@query.Q" />
+                <input class="form-control" id="kafka-q" aria-label="Search groups" placeholder="Search groups by name, client or host" name="q" value="@query.Q" />
             </div>
             <div class="col-auto">
                 <a class="lu-chip @(query.Hot ? "is-current" : null)" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, hot: !query.Hot, page: 1)">Needs attention</a>
@@ -57,7 +62,7 @@
                 {
                     var member = row.Members.FirstOrDefault();
                     <tr class="@(KafkaAttention.Group(row) ? "lu-kafka-problem" : null)">
-                        <td class="text-nowrap"><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(group: row.GroupId, page: 1) })" />@if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
+                        <td class="text-nowrap"><a href="@query.Href(group: row.GroupId, page: 1)" title="@row.GroupId">@row.GroupId</a> @if (!row.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</td>
                         <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
                         <td>@row.Members.Count</td>
                         <td>@row.TotalLag</td>
@@ -85,6 +90,7 @@
 
     </div>
 </section>
+}
 
 @if (selected is not null)
 {
