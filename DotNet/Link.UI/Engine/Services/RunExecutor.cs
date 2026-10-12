@@ -39,6 +39,34 @@ namespace Automation.UI.Services;
 /// </summary>
 internal sealed class RunExecutor
 {
+    private async Task SaveReportManifestAsync(
+        MutableRunState state,
+        string? facilityId,
+        string? reportId,
+        IAutomationOutput output,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(reportId))
+            return;
+        try
+        {
+            using var scope = _hostServices.CreateScope();
+            var saver = scope.ServiceProvider.GetService<IReportManifestSaver>();
+            if (saver is null)
+                return;
+            var saved = await saver.SaveAsync(facilityId, reportId, state.RunId, cancellationToken);
+            output.WriteLine(saved ? "Report manifest saved." : "Report manifest was not saved.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine("WARNING: Report manifest save failed: " + ex.Message);
+        }
+    }
+
     private const ScheduledInpatientPattern DefaultScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
 
     private readonly AutomationConfig _automationConfig;
@@ -1325,6 +1353,9 @@ internal sealed class RunExecutor
                 if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
                     throw new OperationCanceledException("Run was cancelled.");
             }
+
+            // Save the report manifest by report id before cleanup removes the service data it reads.
+            await SaveReportManifestAsync(state, facilityId, state.ReportId ?? reportId, output, cancellationToken);
 
             var ownsFacility = FacilityClassification.RunOwns(
                 state.RunId, facilityId, state.AutomationCreatedFacility, facilityId);

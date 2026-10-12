@@ -360,7 +360,25 @@
         showError("");
         setStatus("", 0);
         var button = document.getElementById("manifest-interactive");
-        if (button) button.disabled = false;
+        if (button) button.disabled = !!button.dataset.blocked;
+        if (button && !button.dataset.blocked) setTip("Load this patient's submitted bundle from ABS");
+    }
+
+    function setTip(text) {
+        var wrap = document.getElementById("manifest-interactive-wrap");
+        if (!wrap || !text) return;
+        wrap.setAttribute("title", text);
+        if (window.bootstrap && bootstrap.Tooltip) {
+            var tip = bootstrap.Tooltip.getInstance(wrap);
+            if (tip) tip.dispose();
+            bootstrap.Tooltip.getOrCreateInstance(wrap);
+        }
+    }
+
+    function unavailable(text) {
+        var button = document.getElementById("manifest-interactive");
+        if (button) button.disabled = true;
+        setTip(text);
     }
 
     function open() {
@@ -419,6 +437,12 @@
             .catch(function (error) {
                 if (button) button.disabled = false;
                 if (error.name === "AbortError") return;
+                if (error.status === 404) {
+                    // The submission is gone from ABS: keep the button off and say why.
+                    unavailable(error.message || "The submission for this patient is no longer in ABS.");
+                    if (box) box.hidden = true;
+                    return;
+                }
                 showError(error.message || "The graph was refused.");
                 setStatus("", 0, "idle");
             });
@@ -429,7 +453,9 @@
         if (!response.ok) {
             var problem = {};
             try { problem = await response.json(); } catch (ignore) { problem = {}; }
-            throw new Error(problem.detail || "The graph was refused.");
+            var failure = new Error(problem.detail || "The graph was refused.");
+            failure.status = response.status;
+            throw failure;
         }
         var reader = response.body.getReader();
         var decoder = new TextDecoder();
