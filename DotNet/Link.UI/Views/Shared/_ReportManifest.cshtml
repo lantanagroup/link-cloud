@@ -15,9 +15,12 @@
     var donutColors = new List<string>(ReportManifestRules.DonutColors);
     if (donutOther > 0)
         donutColors.Add(ReportManifestRules.DonutOtherColor);
-    var donutGradient = ReportManifestRules.DonutGradient(donutRows.Select(row => row.Total).ToList(), donutColors);
+    var donutGradient = ReportManifestRules.DonutGradient(donutRows.Select(row => row.Total).ToList(), donutRows.Select((_, index) => SliceColor(index)).ToList());
     var donutCenter = Model.ContentsAreStatus ? "patients" : "resources";
-    string SliceColor(int index) => donutColors[Math.Min(index, Math.Max(0, donutColors.Count - 1))];
+    // The "Other" remainder is always the neutral Other colour, even when it is the only slice.
+    string SliceColor(int index) => donutOther > 0 && index == donutRows.Count - 1
+        ? ReportManifestRules.DonutOtherColor
+        : ReportManifestRules.DonutColors[index % ReportManifestRules.DonutColors.Length];
     string SlicePercent(int value) => donutTotal <= 0 ? "0%" : (value * 100.0 / donutTotal).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
     var detailRows = Model.Patients.ToList();
     foreach (var extra in Model.PopulationPatients)
