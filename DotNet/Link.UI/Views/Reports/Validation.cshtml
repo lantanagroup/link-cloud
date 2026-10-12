@@ -201,11 +201,11 @@ else
                             @foreach (var issue in Model.Issues)
                             {
                                 <tr>
-                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = issue.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
+                                    <td style="min-width:6.5rem"><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = issue.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
                                     <td><span class="badge @StatusPills.ForSeverity(issue.Severity)">@(string.IsNullOrWhiteSpace(issue.Severity) ? "—" : issue.Severity)</span></td>
-                                    <td>@issue.Code</td>
-                                    <td>@issue.Message</td>
-                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = issue.Location, Compact = true, CopyLabel = "Copy location" })" /></td>
+                                    <td style="white-space:normal;overflow:visible;max-width:none;text-overflow:clip;overflow-wrap:anywhere;min-width:7rem">@issue.Code</td>
+                                    <td class="w-100" style="white-space:normal;overflow:visible;max-width:none;text-overflow:clip;overflow-wrap:anywhere"><div class="lu-clamp-3" title="@issue.Message" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">@issue.Message</div></td>
+                                    <td style="white-space:normal;overflow:visible;max-width:none;text-overflow:clip;overflow-wrap:anywhere;min-width:8rem;max-width:16rem"><partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = issue.Location, Compact = true, CopyLabel = "Copy location" })" /></td>
                                 </tr>
                             }
                             </tbody>
