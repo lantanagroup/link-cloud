@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -698,6 +698,32 @@ public class ReportEntryManagerTests
         Assert.Equal(2, summary.SubmissionStatusCounts["Pending"]);
         Assert.Equal(1, summary.SubmissionStatusCounts["NotEligable"]);
         Assert.Equal(2, summary.ReportTypeCounts["type-a"]);
+    }
+
+    [Fact]
+    public async Task GetSummaryByReportScheduleIdAsync_SumsStoredResourceTypeCountsAcrossEntries()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var scheduleId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+        await SeedReportScheduleAsync(context, scheduleId, facilityId);
+
+        var first = CreateEntryModel(facilityId: facilityId, reportScheduleId: scheduleId, patientId: "types-p1");
+        first.MeasureReports.Add(new EntryMeasureReportModel { ReportType = "type-a", ResourceCount = new Dictionary<string, int> { ["Observation"] = 13, ["Encounter"] = 1 } });
+        await SeedAsync(context, first);
+        var second = CreateEntryModel(facilityId: facilityId, reportScheduleId: scheduleId, patientId: "types-p2");
+        second.MeasureReports.Add(new EntryMeasureReportModel { ReportType = "type-a", ResourceCount = new Dictionary<string, int> { ["Observation"] = 7, ["Condition"] = 2 } });
+        await SeedAsync(context, second);
+
+        var summary = await sut.GetSummaryByReportScheduleIdAsync(scheduleId, default);
+
+        Assert.Equal(20, summary.ResourceTypeCounts["Observation"]);
+        Assert.Equal(1, summary.ResourceTypeCounts["Encounter"]);
+        Assert.Equal(2, summary.ResourceTypeCounts["Condition"]);
+        Assert.Equal(3, summary.ResourceTypeCounts.Count);
     }
 
     #endregion

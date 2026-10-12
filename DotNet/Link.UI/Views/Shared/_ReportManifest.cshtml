@@ -16,7 +16,7 @@
     if (donutOther > 0)
         donutColors.Add(ReportManifestRules.DonutOtherColor);
     var donutGradient = ReportManifestRules.DonutGradient(donutRows.Select(row => row.Total).ToList(), donutRows.Select((_, index) => SliceColor(index)).ToList());
-    var donutCenter = Model.ContentsAreStatus ? "patients" : "resources";
+    var donutCenter = string.Equals(Model.TypeHeading, "Resource types", StringComparison.OrdinalIgnoreCase) ? "resources" : "patients";
     // The "Other" remainder is always the neutral Other colour, even when it is the only slice.
     string SliceColor(int index) => donutOther > 0 && index == donutRows.Count - 1
         ? ReportManifestRules.DonutOtherColor
