@@ -273,11 +273,10 @@
             return;
         }
         fillProduce(form, payload);
-        var topic = button.getAttribute("data-topic") || "";
+        // The target is always the page's selected topic (hidden #produce-topic); a restaged record does not change it.
         var topicBox = form.querySelector("[name='topic']");
-        if (topicBox && topic) topicBox.value = topic;
         var confirm = document.getElementById("produce-confirm");
-        if (confirm) confirm.setAttribute("data-topic", topicBox ? topicBox.value : topic);
+        if (confirm && topicBox) confirm.setAttribute("data-topic", topicBox.value);
         var stage = button.getAttribute("data-stage") || "";
         if (stage && window.history && history.replaceState) {
             try {
