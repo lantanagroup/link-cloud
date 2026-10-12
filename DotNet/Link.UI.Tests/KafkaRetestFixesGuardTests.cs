@@ -74,6 +74,6 @@ public class KafkaRetestFixesGuardTests
     {
         var migrate = Ops("_Migrate.cshtml");
         migrate.IndexOf("id=\"choice-add\"", StringComparison.Ordinal).Should().BeLessThan(migrate.IndexOf("id=\"plan-partitions\"", StringComparison.Ordinal));
-        migrate.IndexOf("id=\"plan-confirm\"", StringComparison.Ordinal).Should().BeLessThan(migrate.IndexOf("title=\"Preview increase\"", StringComparison.Ordinal));
+        migrate.IndexOf("id=\"plan-reason\"", StringComparison.Ordinal).Should().BeLessThan(migrate.IndexOf("title=\"Preview increase\"", StringComparison.Ordinal));
     }
 }
