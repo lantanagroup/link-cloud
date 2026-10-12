@@ -292,6 +292,8 @@ public sealed class ReportManifestModel
     public PageBar PopulationPaging { get; init; } = new();
     public string? PopulationNote { get; init; }
     public ManifestPrediction? Prediction { get; init; }
+    /// <summary>One prediction per measure; a multi-measure run shows each measure's own counts.</summary>
+    public IReadOnlyList<ManifestPrediction> Predictions { get; init; } = [];
     public bool PopulationsOpen { get; init; }
     public int? PassedValidation { get; init; }
     public int? FailedValidation { get; init; }
