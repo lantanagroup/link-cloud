@@ -30,6 +30,6 @@ public class KafkaFinalPolishGuardTests
     {
         Ops("_Migrate.cshtml").Should().NotContain(">Topic summary</a>");
         Ops("_TopicPicker.cshtml").Should().NotContain("topics.</p>");
-        Ops("Kafka.cshtml").Should().Contain("lu-provider-badge");
+        Ops("Kafka.cshtml").Should().NotContain("lu-provider-badge");
     }
 }

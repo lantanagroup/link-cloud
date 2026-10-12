@@ -101,7 +101,7 @@
                         @foreach (var header in record.Headers.Take(KafkaProduceRules.MaxHeaders))
                         {
                             <tr>
-                                <td>@header.Name</td>
+                                <td class="lu-shrink">@header.Name</td>
                                 <td class="lu-flex">
                                     <partial name="_LabeledId" model="@(new LabeledId { Label = header.Name, Value = header.Value, Compact = true, CopyLabel = "Copy " + header.Name })" />
                                 </td>
