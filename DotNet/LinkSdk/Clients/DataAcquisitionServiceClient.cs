@@ -232,6 +232,18 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("facilityId", facilityId)
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<List<AcquiredResourceCountByPatientApiModel>>> GetAcquiredResourceCountsByPatientAsync(
+        string? facilityId,
+        string reportId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<AcquiredResourceCountByPatientApiModel>>(() =>
+        {
+            var request = Request($"data/acquisition-logs/report/{reportId}/acquired-resource-counts-by-patient");
+            if (!string.IsNullOrWhiteSpace(facilityId))
+                request = request.SetQueryParam("facilityId", facilityId);
+            return request.GetAsync(cancellationToken: cancellationToken);
+        });
+
     public Task<LinkApiResponse<PagedConfigModel<ReferenceResourceApiModel>>> GetReferenceResourcesForLogAsync(
         long logId,
         int pageSize = 100,

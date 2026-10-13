@@ -10,11 +10,17 @@ public sealed class AcquisitionActivityTracker
     public static readonly TimeSpan ProgressWindow = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan DeadlineExtension = TimeSpan.FromMinutes(5);
     /// <summary>
-    /// Extra wait allowed after the original hard timeout while DA paging or
-    /// Validation is still logging progress. Cancel is how an operator stops a
-    /// run that is legitimately still working.
+    /// Extra wait allowed after the original hard timeout while acquisition is
+    /// still logging progress and validation is not the stage holding the run.
+    /// Validation that is still working is not capped: cancel stops that run.
     /// </summary>
     public static readonly TimeSpan MaxExtraDuration = TimeSpan.FromHours(6);
+
+    public readonly record struct PollDecision(
+        bool Continue,
+        DateTime Deadline,
+        bool HeldForValidation,
+        TimeSpan ExtendedBy);
 
     private int _lastLogCount = -1;
     private int _lastCompleted = -1;
@@ -88,9 +94,40 @@ public sealed class AcquisitionActivityTracker
         => LastProgressUtc != default && utcNow - LastProgressUtc <= window;
 
     /// <summary>
+    /// Decides whether a submission poll that has reached <paramref name="deadline"/>
+    /// keeps waiting. Ongoing validation is not on a clock. Other in-flight work
+    /// can still slide the deadline up to <see cref="MaxExtraDuration"/> past the
+    /// configured hard timeout. An idle pipeline stops.
+    /// </summary>
+    public static PollDecision Decide(
+        DateTime utcNow,
+        DateTime phaseStart,
+        TimeSpan hardTimeout,
+        DateTime deadline,
+        bool validationOngoing,
+        bool hasRecentProgress)
+    {
+        if (hardTimeout <= TimeSpan.Zero || hardTimeout == TimeSpan.MaxValue || utcNow < deadline)
+            return new PollDecision(true, deadline, false, TimeSpan.Zero);
+
+        if (validationOngoing)
+        {
+            var next = utcNow + DeadlineExtension;
+            return new PollDecision(true, next, true, next - utcNow);
+        }
+
+        if (!TryExtendDeadline(utcNow, phaseStart, hardTimeout, hasRecentProgress, ref deadline, out var extendedBy))
+            return new PollDecision(false, deadline, false, TimeSpan.Zero);
+
+        return new PollDecision(true, deadline, false, extendedBy);
+    }
+
+    /// <summary>
     /// When the poll loop would otherwise time out, slide the deadline forward
-    /// if DA or Validation is still logging progress. Caps total wait at
+    /// if acquisition is still logging progress. Caps total wait at
     /// <paramref name="hardTimeout"/> + <see cref="MaxExtraDuration"/>.
+    /// Ongoing validation does not use this cap; <see cref="Decide"/> holds the
+    /// run open instead.
     /// </summary>
     public static bool TryExtendDeadline(
         DateTime utcNow,

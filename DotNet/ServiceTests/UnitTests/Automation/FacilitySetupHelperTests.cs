@@ -418,6 +418,23 @@ public class FacilitySetupHelperTests
     }
 
     [Fact]
+    public async Task Creates_a_query_plan_when_delete_returns_not_found()
+    {
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 404 });
+        dataAcq.Setup(d => d.CreateQueryPlanAsync(FacilityId, It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 201 });
+
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner");
+
+        dataAcq.Verify(
+            d => d.CreateQueryPlanAsync(FacilityId, It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(3));
+    }
+
+    [Fact]
     public async Task Does_not_create_a_query_plan_when_the_old_plan_cannot_be_deleted()
     {
         var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
