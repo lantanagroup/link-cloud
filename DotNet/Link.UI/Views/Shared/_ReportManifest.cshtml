@@ -899,11 +899,11 @@
                     <h3 class="card-header h6 mb-0">Resources</h3>
                     <div class="card-body" id="manifest-patient-refs"></div>
                 </section>
-                <section class="card au-card mb-3">
+                <section class="card au-card mb-3" id="manifest-patient-events-card" hidden>
                     <h3 class="card-header h6 mb-0">Timeline</h3>
                     <div class="card-body" id="manifest-patient-events"></div>
                 </section>
-                <section class="card au-card mb-0">
+                <section class="card au-card mb-0" id="manifest-patient-links-card" hidden>
                     <h3 class="card-header h6 mb-0">Related</h3>
                     <div class="card-body" id="manifest-patient-links"></div>
                 </section>
@@ -1196,14 +1196,15 @@
 
         var events = document.getElementById("manifest-patient-events");
         events.replaceChildren();
-        if (!openRow.events || !openRow.events.length) note(events, "No acquisition or normalization time was recorded.");
-        else openRow.events.forEach(function (item) { line(events, item.label, item.when); });
+        // Cards with nothing to show stay hidden rather than showing placeholder text.
+        document.getElementById("manifest-patient-events-card").hidden = !(openRow.events && openRow.events.length);
+        (openRow.events || []).forEach(function (item) { line(events, item.label, item.when); });
 
         var links = document.getElementById("manifest-patient-links");
         links.replaceChildren();
         var usable = (openRow.links || []).filter(function (item) { return item.href && item.href.charAt(0) === "/"; });
-        if (!usable.length) note(links, "No measure page or log link is available for this patient.");
-        else usable.forEach(function (item) {
+        document.getElementById("manifest-patient-links-card").hidden = !usable.length;
+        usable.forEach(function (item) {
             var anchor = document.createElement("a");
             anchor.className = "btn btn-sm btn-au-link me-2 mb-2";
             anchor.href = item.href;
