@@ -151,6 +151,52 @@ public class JavaServiceHealthTests
                 NullLogger.Instance, abandoned.Token));
     }
 
+    /// <summary>
+    /// Spring times nothing itself, so each indicator reports its own elapsed time and the BFF
+    /// moves it into the entry. With indicators evaluated sequentially that figure is what says
+    /// which backend spent the budget, and it is not wanted in the description as well -- that
+    /// column is for what the backend said.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_ReportsEachComponentsOwnDuration(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "UP",
+              "components": {
+                "Kafka": {
+                  "status": "UP",
+                  "details": { "Kafka": "Available", "durationMs": 1200 }
+                }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload);
+
+        var entry = Assert.Single(report.Entries);
+        Assert.Equal(TimeSpan.FromMilliseconds(1200), entry.Value.Duration);
+        using var description = JsonDocument.Parse(entry.Value.Description!);
+        Assert.Equal("Available", description.RootElement.GetProperty("Kafka").GetString());
+        Assert.False(description.RootElement.TryGetProperty("durationMs", out _),
+            "the duration belongs in the entry, not repeated in the description");
+    }
+
+    /// <summary>
+    /// An indicator this codebase does not own reports no timing. The row still has to render, and
+    /// a zero duration is the honest answer rather than a fabricated one.
+    /// </summary>
+    [Fact]
+    public async Task HealthCheck_LeavesDurationZeroWhenNoneIsReported()
+    {
+        var report = await CheckHealth(true, """
+            { "status": "UP", "components": { "ping": { "status": "UP" } } }
+            """);
+
+        Assert.Equal(TimeSpan.Zero, Assert.Single(report.Entries).Value.Duration);
+    }
     private static async Task<LinkServiceHealthReport> CheckHealth(
         bool measureEval, string payload, HttpStatusCode statusCode = HttpStatusCode.OK)
     {

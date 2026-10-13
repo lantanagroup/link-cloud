@@ -1,11 +1,11 @@
 package com.lantanagroup.link.validation.health;
 
+import com.lantanagroup.link.shared.health.TimedHealthIndicator;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Component("Redis")
 @ConditionalOnProperty(name = "cache.type", havingValue = "redis")
-public class RedisHealthIndicator implements HealthIndicator {
+public class RedisHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(RedisHealthIndicator.class);
 
@@ -58,7 +58,7 @@ public class RedisHealthIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         if (checkRedisConnection()) {
             return Health.up().withDetail("Cache", "Available").build();
         } else {

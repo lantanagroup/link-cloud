@@ -29,6 +29,12 @@ public static class SpringServiceHealth
     public const string ReadEntry = "Health check";
 
     /// <summary>
+    /// The detail each indicator reports its own elapsed time under
+    /// (<c>TimedHealthIndicator.DURATION_DETAIL</c> in Java/shared).
+    /// </summary>
+    private const string DurationDetail = "durationMs";
+
+    /// <summary>
     /// How long to wait for a Spring service to answer <c>/health</c>.
     /// </summary>
     /// <remarks>
@@ -99,14 +105,18 @@ public static class SpringServiceHealth
             {
                 foreach (var component in health.Components)
                 {
+                    var details = component.Value?.Details;
+
                     report.Entries[component.Key] = new LinkServiceHealthReportEntry
                     {
                         Status = component.Value?.Status?.ToUpperInvariant() == HealthUp
                             ? HealthStatus.Healthy
                             : HealthStatus.Unhealthy,
-                        // Spring reports no per-indicator timing, so there is nothing to carry here.
-                        Duration = TimeSpan.Zero,
-                        Description = component.Value?.Details is { Count: > 0 } details
+                        // Spring times nothing itself, so the indicators report their own elapsed
+                        // time as a detail and it is moved here. Zero means an indicator that does
+                        // not report one -- anything Spring contributes rather than this codebase.
+                        Duration = TakeDuration(details),
+                        Description = details is { Count: > 0 }
                             ? JsonSerializer.Serialize(details)
                             : null
                     };
@@ -138,6 +148,26 @@ public static class SpringServiceHealth
 
             return Unread(service, stopwatch.Elapsed, "The service's health could not be read.");
         }
+    }
+
+    /// <summary>
+    /// Removes the indicator's own timing from <paramref name="details"/> and returns it, so the
+    /// figure lands in the entry's duration instead of being repeated in the description beside
+    /// the backend detail the operator is actually reading.
+    /// </summary>
+    private static TimeSpan TakeDuration(Dictionary<string, object>? details)
+    {
+        if (details is null
+            || !details.TryGetValue(DurationDetail, out var reported)
+            || reported is not JsonElement { ValueKind: JsonValueKind.Number } element
+            || !element.TryGetInt64(out var elapsedMs))
+        {
+            return TimeSpan.Zero;
+        }
+
+        details.Remove(DurationDetail);
+
+        return TimeSpan.FromMilliseconds(elapsedMs);
     }
 
     /// <summary>A report for a service whose health could not be read, carrying the reason.</summary>

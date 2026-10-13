@@ -1,13 +1,13 @@
 package com.lantanagroup.link.measureeval.health;
 
 import com.lantanagroup.link.measureeval.services.AbsResourceService;
+import com.lantanagroup.link.shared.health.TimedHealthIndicator;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
@@ -37,7 +37,7 @@ import java.util.concurrent.TimeoutException;
  * still receives a real DOWN rather than timing out to N/A.
  */
 @Component("Resource Cache")
-public class ResourceCacheHealthIndicator implements HealthIndicator {
+public class ResourceCacheHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(ResourceCacheHealthIndicator.class);
     private static final String AVAILABLE = "Available";
@@ -71,7 +71,7 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         CompletableFuture<CacheStatus> probe = null;
         try {
             probe = CompletableFuture.supplyAsync(this::runChecks, executor);

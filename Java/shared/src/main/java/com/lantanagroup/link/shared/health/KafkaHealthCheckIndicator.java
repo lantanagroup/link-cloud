@@ -4,7 +4,6 @@ import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 
 @Component("Kafka")
-public class KafkaHealthCheckIndicator implements HealthIndicator {
+public class KafkaHealthCheckIndicator extends TimedHealthIndicator {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
@@ -41,7 +40,7 @@ public class KafkaHealthCheckIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         // Perform a health check on Kafka
         boolean isKafkaHealthy = checkKafkaConnection();
         if (isKafkaHealthy) {

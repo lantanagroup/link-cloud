@@ -38,7 +38,7 @@ public class MongoHealthIndicatorTest {
 
         // Assert
         assertEquals(Status.UP, health.getStatus());
-        assertEquals("{Database=Available}", health.getDetails().toString());
+        assertEquals("Available", health.getDetails().get("Database"));
     }
 
     /**

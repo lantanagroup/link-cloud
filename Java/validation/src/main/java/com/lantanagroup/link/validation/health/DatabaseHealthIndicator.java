@@ -1,11 +1,11 @@
 package com.lantanagroup.link.validation.health;
 
+import com.lantanagroup.link.shared.health.TimedHealthIndicator;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  * @see RedisHealthIndicator a bounded probe on the same reasoning, for Redis
  */
 @Component("Database")
-public class DatabaseHealthIndicator implements HealthIndicator {
+public class DatabaseHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseHealthIndicator.class);
     private static final String AVAILABLE = "Available";
@@ -64,7 +64,7 @@ public class DatabaseHealthIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         return checkConnection()
                 ? Health.up().withDetail("Database", AVAILABLE).build()
                 : Health.down().withDetail("Database", UNAVAILABLE).build();

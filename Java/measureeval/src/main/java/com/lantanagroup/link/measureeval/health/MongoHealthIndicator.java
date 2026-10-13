@@ -1,5 +1,6 @@
 package com.lantanagroup.link.measureeval.health;
 
+import com.lantanagroup.link.shared.health.TimedHealthIndicator;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import com.mongodb.MongoSecurityException;
 import com.mongodb.MongoTimeoutException;
@@ -7,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 
@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @see ResourceCacheHealthIndicator a bounded probe on the same reasoning, for Redis + ABS
  */
 @Component("MongoDB")
-public class MongoHealthIndicator implements HealthIndicator {
+public class MongoHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(MongoHealthIndicator.class);
     private static final String AVAILABLE = "Available";
@@ -75,7 +75,7 @@ public class MongoHealthIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         try {
             currentPing().get(checkTimeoutMs, TimeUnit.MILLISECONDS);
             return Health.up().withDetail("Database", AVAILABLE).build();
