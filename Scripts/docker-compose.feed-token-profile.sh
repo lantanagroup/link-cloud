@@ -5,6 +5,7 @@
 # docker binary with AZURE_ARTIFACTS_PAT set only for that child process.
 
 link_cloud_missing_message() {
+  printf '%s\n' 'No setup needed: run ./Scripts/compose.ps1 (PowerShell) or bash ./Scripts/compose.sh with the same docker compose arguments.'
   printf '%s\n' 'Azure token missing. Run this one-time setup: powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"'
   printf '%s\n' 'PowerShell profile line: . "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token'
   printf '%s\n' 'Git Bash: bash ./Scripts/docker-compose.feed-token-install.sh'

@@ -382,6 +382,103 @@ else
 fi
 export LINK_CLOUD_SKIP_RELOAD="$saved_skip"
 
+# Scripts/compose.sh wrapper. No profile line is needed.
+compose_root="$repo/compose-root"
+mkdir -p "$compose_root"
+saved_fetch="${LINK_CLOUD_FETCH_SCRIPT:-}"
+saved_override="${LINK_CLOUD_REPO_ROOT_OVERRIDE-unset}"
+export LINK_CLOUD_REPO_ROOT_OVERRIDE="$compose_root"
+export LINK_CLOUD_MOCK_EXIT=0
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700003600' > "$compose_root/.azure-artifacts.env"
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+: > "$log"
+set +e
+bash "$root/compose.sh" build automation-ui "two words" >"$compose_root/out1.txt" 2>"$compose_root/err1.txt"
+wrap_code=$?
+set -e
+if [ "$wrap_code" -eq 0 ] && grep -Fxq 'ARGC:4' "$log" && grep -Fxq 'ARG:compose' "$log" && grep -Fxq 'ARG:build' "$log" && grep -Fxq 'ARG:automation-ui' "$log" && grep -Fxq 'ARG:two words' "$log"; then
+  pass 'compose.sh passes every argument to docker compose'
+else
+  fail 'compose.sh passes every argument to docker compose'
+fi
+if grep -Fxq 'TOKEN:match' "$log"; then
+  pass 'compose.sh gives docker the cached token'
+else
+  fail 'compose.sh gives docker the cached token'
+fi
+if [ -z "${AZURE_ARTIFACTS_PAT:-}" ]; then
+  pass 'compose.sh does not leave the token in the caller'
+else
+  fail 'compose.sh does not leave the token in the caller'
+fi
+printf '%s\n' "AZURE_ARTIFACTS_PAT=stale" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700000300' > "$compose_root/.azure-artifacts.env"
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-ok"
+export LINK_CLOUD_MOCK_EXPIRES=1700003600
+: > "$log"
+set +e
+bash "$root/compose.sh" up -d >"$compose_root/out2.txt" 2>"$compose_root/err2.txt"
+wrap_code=$?
+set -e
+if [ "$wrap_code" -eq 0 ] && grep -Fxq 'TOKEN:match' "$log"; then
+  pass 'compose.sh refreshes a token with under 10 minutes left'
+else
+  fail 'compose.sh refreshes a token with under 10 minutes left'
+fi
+rm -f "$compose_root/.azure-artifacts.env"
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+: > "$log"
+set +e
+bash "$root/compose.sh" build >"$compose_root/out3.txt" 2>"$compose_root/err3.txt"
+wrap_code=$?
+set -e
+if [ "$wrap_code" -ne 0 ] && [ ! -s "$log" ] && grep -Fq 'Azure token missing' "$compose_root/err3.txt"; then
+  pass 'compose.sh stops before docker when the token cannot be fetched'
+else
+  fail 'compose.sh stops before docker when the token cannot be fetched'
+fi
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700003600' > "$compose_root/.azure-artifacts.env"
+export LINK_CLOUD_MOCK_EXIT=5
+set +e
+bash "$root/compose.sh" ps >"$compose_root/out4.txt" 2>"$compose_root/err4.txt"
+wrap_code=$?
+set -e
+export LINK_CLOUD_MOCK_EXIT=0
+if [ "$wrap_code" -eq 5 ]; then
+  pass 'compose.sh returns the docker exit code'
+else
+  fail 'compose.sh returns the docker exit code'
+fi
+if [ -n "$saved_fetch" ]; then export LINK_CLOUD_FETCH_SCRIPT="$saved_fetch"; else unset LINK_CLOUD_FETCH_SCRIPT; fi
+if [ "$saved_override" = unset ]; then unset LINK_CLOUD_REPO_ROOT_OVERRIDE; else export LINK_CLOUD_REPO_ROOT_OVERRIDE="$saved_override"; fi
+
+# The MSBuild step runs the fetch script with sign-in turned off in Visual Studio.
+nologin_home="$repo/nologin"
+mkdir -p "$nologin_home/bin" "$nologin_home/root"
+cp "$mv_home/bin/uname" "$nologin_home/bin/uname"
+cat > "$nologin_home/bin/az" <<EOF
+#!/bin/bash
+if [ "\${1:-}" = login ]; then
+  touch "$nologin_home/login-called"
+  exit 0
+fi
+exit 1
+EOF
+chmod +x "$nologin_home/bin/az"
+set +e
+PATH="$nologin_home/bin:$old_path" LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1 bash "$root/docker-compose.feed-token-fetch.sh" "$nologin_home/root" >"$nologin_home/out.txt" 2>"$nologin_home/err.txt"
+nologin_code=$?
+set -e
+if [ "$nologin_code" -ne 0 ] && [ ! -f "$nologin_home/login-called" ] && [ ! -f "$nologin_home/root/.azure-artifacts.env" ] && grep -Fq 'LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1' "$nologin_home/err.txt"; then
+  pass 'fetch skips device-code sign-in when LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1'
+else
+  fail 'fetch skips device-code sign-in when LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1'
+fi
+if grep -F "$sentinel" "$compose_root"/out*.txt "$compose_root"/err*.txt "$nologin_home/out.txt" "$nologin_home/err.txt" >/dev/null 2>&1; then
+  fail 'compose.sh and no-login output does not contain the token'
+else
+  pass 'compose.sh and no-login output does not contain the token'
+fi
+
 # Output files must not contain the sentinel.
 if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" "$mode_root/out.txt" "$mode_root/err.txt" "$reload_root/out.txt" "$reload_root/err.txt" "$reload_root/out2.txt" "$reload_root/err2.txt" "$reload_root/out3.txt" "$reload_root/err3.txt" >/dev/null 2>&1; then
   fail 'bash test output does not contain the token'

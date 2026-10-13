@@ -18,7 +18,23 @@ Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, adm
 
 Automation, Automation.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` from Azure Artifacts feed `Shared_BOTW_Feed`. Repo `nuget.config` lists that source and does not store a token. Do not write a PAT or access token into `nuget.config`. `packageSourceMapping` keeps every other package on nuget.org.
 
-`docker compose` inside this repo passes a short-lived Azure CLI token to those images only as the BuildKit secret `feed_accesstoken`. One-time setup from the repo root:
+No setup is needed for `dotnet restore` or `dotnet build`. `Directory.Build.targets` imports `Scripts/LinkCloud.FeedToken.targets` into the projects that restore from `Shared_BOTW_Feed` (Automation, Automation.Link, Automation.UI, MockFhirServer, ServiceTests and BackendE2ETests). `Directory.Solution.targets` does the same for a `link-cloud.sln` restore, and `docker-compose.dcproj` imports it for the Visual Studio docker-compose project. Other projects only compare one property. Before NuGet restore, the step reads the gitignored `.azure-artifacts.env`. When the token is missing or has less than 10 minutes left, it runs `Scripts/docker-compose.feed-token.ps1` (Windows) or `Scripts/docker-compose.feed-token-fetch.sh` (elsewhere), which install Azure CLI and start device-code sign-in when needed, as described below. The step hands the token to NuGet as `NuGetPackageSourceCredentials_Shared_BOTW_Feed` and sets `AZURE_ARTIFACTS_PAT` for docker compose, in that build process only. It does not write `nuget.config` and does not print the token. Inside Visual Studio it does not start device-code sign-in, because there is no console; if there is no Azure CLI session, run `az login` once.
+
+The step is skipped when `TF_BUILD`, `GITHUB_ACTIONS` or `CI` is set, inside a container, when `NuGetPackageSourceCredentials_Shared_BOTW_Feed` is already set, and when `LINK_CLOUD_FEED_TOKEN_SKIP=1` (or `/p:LinkCloudFeedTokenEnabled=false`). If `AZURE_ARTIFACTS_PAT` is already set, the step uses it instead of fetching. `LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1` turns off device-code sign-in on the command line too. A failure is a warning (`LINKFEED001` or `LINKFEED002`) that says how to fetch the token by hand, and restore continues with whatever credentials you already have, such as the Azure Artifacts credential provider. If a project starts to depend on Automation, add its name to `Directory.Build.targets`.
+
+For `docker compose`, use the wrapper. It needs no setup. It fetches or refreshes the same token, then runs `docker compose` with every argument passed through and `AZURE_ARTIFACTS_PAT` set only for the docker process:
+
+```powershell
+./Scripts/compose.ps1 build automation-ui
+```
+
+```bash
+bash ./Scripts/compose.sh build automation-ui
+```
+
+A `dotnet restore` of an affected project leaves a fresh token in `.azure-artifacts.env`, and the wrapper reuses it without fetching again.
+
+Optional: to make plain `docker compose` inside this repo do the same, add the profile line once from the repo root:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"

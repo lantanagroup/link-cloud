@@ -581,6 +581,206 @@ exit /b 1
     if (Test-Path Env:AZURE_ARTIFACTS_PAT) { Remove-Item Env:AZURE_ARTIFACTS_PAT }
 }
 
+# MSBuild feed-token step (Scripts/LinkCloud.FeedToken.targets) and Scripts/compose.ps1.
+$targetsPath = Join-Path $PSScriptRoot 'LinkCloud.FeedToken.targets'
+$repoRootReal = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$msRepo = New-TempRepo
+$msOutput = New-Object System.Text.StringBuilder
+$probeVars = @('CI', 'TF_BUILD', 'GITHUB_ACTIONS', 'DOTNET_RUNNING_IN_CONTAINER', 'LINK_CLOUD_FEED_TOKEN_SKIP',
+    'LINK_CLOUD_FEED_TOKEN_NO_LOGIN', 'LINK_CLOUD_FEED_TOKEN_OWNER', 'NuGetPackageSourceCredentials_Shared_BOTW_Feed',
+    'AZURE_ARTIFACTS_PAT', 'LINK_CLOUD_TEST_FETCH_EXIT', 'LINK_CLOUD_TEST_SENTINEL')
+
+function Invoke-FeedTokenProbe {
+    param([hashtable]$Environment = @{}, [string[]]$Extra = @())
+    $saved = @{}
+    foreach ($name in $probeVars) {
+        $saved[$name] = [Environment]::GetEnvironmentVariable($name)
+        [Environment]::SetEnvironmentVariable($name, $null)
+    }
+    [Environment]::SetEnvironmentVariable('LINK_CLOUD_TEST_SENTINEL', $sentinel)
+    foreach ($name in $Environment.Keys) {
+        [Environment]::SetEnvironmentVariable($name, [string]$Environment[$name])
+    }
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $text = (& dotnet msbuild $script:probeProject -nologo -nr:false -v:n -t:Probe "-p:LinkCloudFeedTokenRepoRoot=$msRepo" @Extra 2>&1 | Out-String)
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorAction
+        foreach ($name in $saved.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $saved[$name])
+        }
+    }
+    [void]$msOutput.Append($text)
+    $callFile = Join-Path $msRepo 'fetch-calls.txt'
+    $callText = ''
+    $calls = 0
+    if (Test-Path -LiteralPath $callFile) {
+        $callText = [IO.File]::ReadAllText($callFile)
+        $calls = @(Get-Content -LiteralPath $callFile).Count
+        Remove-Item -LiteralPath $callFile -Force
+    }
+    return [pscustomobject]@{ Text = $text; Code = $code; Calls = $calls; CallText = $callText }
+}
+
+try {
+    New-Item -ItemType Directory -Path (Join-Path $msRepo 'Scripts') | Out-Null
+    $mockFetch = @'
+param([string]$RepoRoot)
+Add-Content -LiteralPath (Join-Path $RepoRoot 'fetch-calls.txt') -Value ("call nologin=" + $env:LINK_CLOUD_FEED_TOKEN_NO_LOGIN)
+if ($env:LINK_CLOUD_TEST_FETCH_EXIT) { Write-Host 'mock fetch failed'; exit [int]$env:LINK_CLOUD_TEST_FETCH_EXIT }
+$exp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 3600
+[IO.File]::WriteAllText((Join-Path $RepoRoot '.azure-artifacts.env'), "AZURE_ARTIFACTS_PAT=$($env:LINK_CLOUD_TEST_SENTINEL)`nAZURE_ARTIFACTS_PAT_EXPIRES_ON=$exp`n")
+exit 0
+'@
+    Set-Content -LiteralPath (Join-Path $msRepo 'Scripts\docker-compose.feed-token.ps1') -Value $mockFetch -Encoding ASCII
+    $script:probeProject = Join-Path $msRepo 'probe.proj'
+    $probe = @'
+<Project>
+  <Import Project="__TARGETS__" />
+  <Target Name="Restore" />
+  <Target Name="Probe" DependsOnTargets="Restore">
+    <PropertyGroup>
+      <_Cred>$([System.Environment]::GetEnvironmentVariable('NuGetPackageSourceCredentials_Shared_BOTW_Feed'))</_Cred>
+      <_Pat>$([System.Environment]::GetEnvironmentVariable('AZURE_ARTIFACTS_PAT'))</_Pat>
+      <_Want>Username=az;Password=$(LINK_CLOUD_TEST_SENTINEL)</_Want>
+    </PropertyGroup>
+    <Message Importance="high" Text="CRED:match" Condition="'$(_Cred)' == '$(_Want)'" />
+    <Message Importance="high" Text="CRED:other" Condition="'$(_Cred)' != '' and '$(_Cred)' != '$(_Want)'" />
+    <Message Importance="high" Text="CRED:absent" Condition="'$(_Cred)' == ''" />
+    <Message Importance="high" Text="PAT:match" Condition="'$(_Pat)' == '$(LINK_CLOUD_TEST_SENTINEL)'" />
+  </Target>
+</Project>
+'@
+    Set-Content -LiteralPath $script:probeProject -Value $probe.Replace('__TARGETS__', $targetsPath) -Encoding ASCII
+    $envPath = Join-Path $msRepo '.azure-artifacts.env'
+    $nowEpoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+
+    $r = Invoke-FeedTokenProbe
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 1 -and $r.Text.Contains('CRED:match') -and $r.Text.Contains('PAT:match')) 'msbuild step fetches a missing token and hands it to NuGet and compose'
+    Write-Result ($r.CallText.Contains('nologin=') -and -not $r.CallText.Contains('nologin=1')) 'msbuild step allows sign-in on the command line'
+
+    Write-TokenFile -Repo $msRepo -Token $sentinel -Expires ($nowEpoch + 3600)
+    $r = Invoke-FeedTokenProbe
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 0 -and $r.Text.Contains('CRED:match')) 'msbuild step reuses a cached token with time left'
+
+    Write-TokenFile -Repo $msRepo -Token 'stale' -Expires ($nowEpoch + 300)
+    $r = Invoke-FeedTokenProbe
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 1 -and $r.Text.Contains('CRED:match')) 'msbuild step refreshes a token with under 10 minutes left'
+
+    foreach ($ciVar in @('CI', 'TF_BUILD', 'GITHUB_ACTIONS')) {
+        Remove-Item -LiteralPath $envPath -Force -ErrorAction SilentlyContinue
+        $r = Invoke-FeedTokenProbe -Environment @{ $ciVar = 'true' }
+        Write-Result ($r.Code -eq 0 -and $r.Calls -eq 0 -and $r.Text.Contains('CRED:absent')) "msbuild step is skipped when $ciVar is set"
+    }
+
+    $r = Invoke-FeedTokenProbe -Environment @{ LINK_CLOUD_FEED_TOKEN_SKIP = '1' }
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 0 -and $r.Text.Contains('CRED:absent')) 'msbuild step is skipped with LINK_CLOUD_FEED_TOKEN_SKIP=1'
+
+    $r = Invoke-FeedTokenProbe -Environment @{ LINK_CLOUD_TEST_FETCH_EXIT = '1' }
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 1 -and $r.Text.Contains('CRED:absent') -and $r.Text.Contains('LINKFEED002') -and $r.Text.Contains('Restore continues')) 'msbuild step fails soft with a warning when the fetch fails'
+
+    $r = Invoke-FeedTokenProbe -Environment @{ NuGetPackageSourceCredentials_Shared_BOTW_Feed = 'Username=someone;Password=existing' }
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 0 -and $r.Text.Contains('CRED:other')) 'msbuild step leaves existing NuGet feed credentials alone'
+
+    $r = Invoke-FeedTokenProbe -Environment @{ AZURE_ARTIFACTS_PAT = $sentinel }
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 0 -and $r.Text.Contains('CRED:match')) 'msbuild step uses an AZURE_ARTIFACTS_PAT that is already set'
+
+    $r = Invoke-FeedTokenProbe -Extra @('-p:BuildingInsideVisualStudio=true')
+    Write-Result ($r.Code -eq 0 -and $r.Calls -eq 1 -and $r.CallText.Contains('nologin=1')) 'msbuild step turns off device-code sign-in inside Visual Studio'
+
+    Write-Result (-not $msOutput.ToString().Contains($sentinel)) 'msbuild step output does not contain the token'
+
+    # Only projects that restore from Shared_BOTW_Feed import the step.
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $importCheck = @{}
+    foreach ($p in @('DotNet\Shared\Shared.csproj', 'DotNet\Automation.UI\Automation.UI.csproj', 'DotNet\MockFhirServer\MockFhirServer.csproj', 'DotNet\Automation\Automation.csproj')) {
+        $importCheck[$p] = (& dotnet msbuild (Join-Path $repoRootReal $p) -nologo -getProperty:LinkCloudFeedTokenImported 2>&1 | Out-String).Trim()
+    }
+    $ErrorActionPreference = $previousErrorAction
+    Write-Result ($importCheck['DotNet\Shared\Shared.csproj'] -eq '') 'projects that do not use the feed do not import the step'
+    Write-Result ($importCheck['DotNet\Automation.UI\Automation.UI.csproj'] -eq 'true' -and $importCheck['DotNet\MockFhirServer\MockFhirServer.csproj'] -eq 'true' -and $importCheck['DotNet\Automation\Automation.csproj'] -eq 'true') 'Automation, Automation.UI and MockFhirServer import the step'
+    $dcproj = Join-Path $repoRootReal 'docker-compose.dcproj'
+    $solutionTargets = Join-Path $repoRootReal 'Directory.Solution.targets'
+    Write-Result ((Test-Path -LiteralPath $dcproj) -and ([IO.File]::ReadAllText($dcproj)).Contains('Scripts\LinkCloud.FeedToken.targets')) 'docker-compose.dcproj imports the step'
+    Write-Result ((Test-Path -LiteralPath $solutionTargets) -and ([IO.File]::ReadAllText($solutionTargets)).Contains('Scripts\LinkCloud.FeedToken.targets')) 'solution restore imports the step'
+    $trackedConfig = [IO.File]::ReadAllText((Join-Path $repoRootReal 'nuget.config'))
+    Write-Result (-not $trackedConfig.Contains('packageSourceCredentials')) 'tracked nuget.config has no credentials'
+
+    # The real fetch script must not start device-code sign-in when it is turned off.
+    $noLoginDir = Join-Path $msRepo 'nologin'
+    New-Item -ItemType Directory -Path $noLoginDir | Out-Null
+    $noLoginMark = Join-Path $noLoginDir 'login-called'
+    $noLoginAz = Join-Path $noLoginDir 'az.cmd'
+    Set-Content -LiteralPath $noLoginAz -Encoding ASCII -Value @(
+        '@echo off'
+        ('if "%1"=="login" (echo called>"' + $noLoginMark + '" & exit /b 0)')
+        'exit /b 1'
+    )
+    $noLoginEnv = Join-Path $noLoginDir 'token.env'
+    $noLoginOut = Join-Path $noLoginDir 'out.txt'
+    $noLoginErr = Join-Path $noLoginDir 'err.txt'
+    $env:LINK_CLOUD_FEED_TOKEN_NO_LOGIN = '1'
+    try {
+        $noLoginArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -RepoRoot "{1}" -EnvFile "{2}" -AzExecutable "{3}" -SkipUserPathUpdate' -f (Join-Path $PSScriptRoot 'docker-compose.feed-token.ps1'), $noLoginDir, $noLoginEnv, $noLoginAz
+        $noLoginProc = Start-Process -FilePath powershell.exe -ArgumentList $noLoginArgs -Wait -PassThru -RedirectStandardOutput $noLoginOut -RedirectStandardError $noLoginErr -WindowStyle Hidden
+    } finally {
+        Remove-Item Env:LINK_CLOUD_FEED_TOKEN_NO_LOGIN -ErrorAction SilentlyContinue
+    }
+    $noLoginText = ''
+    if (Test-Path $noLoginOut) { $noLoginText += [IO.File]::ReadAllText($noLoginOut) }
+    if (Test-Path $noLoginErr) { $noLoginText += [IO.File]::ReadAllText($noLoginErr) }
+    Write-Result ($noLoginProc.ExitCode -ne 0 -and -not (Test-Path -LiteralPath $noLoginMark) -and -not (Test-Path -LiteralPath $noLoginEnv) -and $noLoginText.Contains('LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1')) 'fetch skips device-code sign-in when LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1'
+
+    # Scripts/compose.ps1 needs no profile line.
+    $composeScript = Join-Path $PSScriptRoot 'compose.ps1'
+    $composeRepo = Join-Path $msRepo 'compose'
+    New-Item -ItemType Directory -Path $composeRepo | Out-Null
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = $composeRepo
+    $global:LinkCloudFeedTokenHooks['NowEpoch'] = [int64]1700000000
+    $global:LinkCloudFeedTokenHooks['Fetch'] = {
+        param($Root)
+        $global:LinkCloudFeedTokenHooks['FetchCalls']++
+        $utf8 = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText((Join-Path $Root '.azure-artifacts.env'), "AZURE_ARTIFACTS_PAT=$sentinel`nAZURE_ARTIFACTS_PAT_EXPIRES_ON=1700003600`n", $utf8)
+        return 0
+    }.GetNewClosure()
+    Set-DockerHook
+    Write-TokenFile -Repo $composeRepo -Token $sentinel -Expires 1700003600
+    & $composeScript build automation-ui --progress plain
+    $wrapCode = $LASTEXITCODE
+    $call = @()
+    if ($global:LinkCloudFeedTokenHooks['DockerCalls'].Count -gt 0) { $call = @($global:LinkCloudFeedTokenHooks['DockerCalls'][0]) }
+    Write-Result ($wrapCode -eq 0 -and (($call -join '|') -eq 'compose|build|automation-ui|--progress|plain')) 'compose.ps1 passes every argument to docker compose'
+    Write-Result ($global:LinkCloudFeedTokenHooks['DockerSaw'] -eq 'match' -and $global:LinkCloudFeedTokenHooks['FetchCalls'] -eq 0) 'compose.ps1 gives docker the cached token without a fetch'
+    Write-Result (-not (Test-Path Env:AZURE_ARTIFACTS_PAT)) 'compose.ps1 does not leave the token in the caller'
+
+    Write-TokenFile -Repo $composeRepo -Token 'stale' -Expires 1700000300
+    $global:LinkCloudFeedTokenHooks['DockerCalls'].Clear()
+    & $composeScript up -d
+    Write-Result ($LASTEXITCODE -eq 0 -and $global:LinkCloudFeedTokenHooks['FetchCalls'] -eq 1 -and $global:LinkCloudFeedTokenHooks['DockerSaw'] -eq 'match') 'compose.ps1 refreshes a token with under 10 minutes left'
+
+    Remove-Item -LiteralPath (Join-Path $composeRepo '.azure-artifacts.env') -Force
+    $global:LinkCloudFeedTokenHooks['Fetch'] = { param($Root) return 1 }
+    $global:LinkCloudFeedTokenHooks['DockerCalls'].Clear()
+    & $composeScript build | Out-Null
+    Write-Result ($LASTEXITCODE -ne 0 -and $global:LinkCloudFeedTokenHooks['DockerCalls'].Count -eq 0) 'compose.ps1 stops before docker when the token cannot be fetched'
+
+    Write-TokenFile -Repo $composeRepo -Token $sentinel -Expires 1700003600
+    Set-DockerHook -ExitCode 5
+    & $composeScript ps
+    Write-Result ($LASTEXITCODE -eq 5) 'compose.ps1 returns the docker exit code'
+    $composeMessages = ($global:LinkCloudFeedTokenHooks['Messages'] -join "`n")
+    Write-Result (-not $composeMessages.Contains($sentinel)) 'compose.ps1 messages do not contain the token'
+} finally {
+    Remove-Item -LiteralPath $msRepo -Recurse -Force -ErrorAction SilentlyContinue
+    $global:LinkCloudFeedTokenHooks = $null
+    if (Test-Path Env:AZURE_ARTIFACTS_PAT) { Remove-Item Env:AZURE_ARTIFACTS_PAT }
+}
+
 Write-Output "PASSED=$passed FAILED=$failed TOTAL=$($passed + $failed)"
 if ($failed -gt 0) { exit 1 }
 exit 0
