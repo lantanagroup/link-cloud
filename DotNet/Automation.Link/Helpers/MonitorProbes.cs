@@ -103,7 +103,10 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
 
     public async Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        var critical = await _progressMonitor.CheckProgressAsync(state.CorrelationId1, state.CorrelationId2);
+        var critical = await _progressMonitor.CheckProgressAsync(
+            state.CorrelationId1,
+            state.CorrelationId2,
+            cancellationToken);
 
         var issues = new List<MonitorIssue>();
         if (critical)
@@ -126,6 +129,8 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
                 : _progressMonitor.LastAcquisitionProgressUtc,
             AcquisitionResourcesAcquired = _progressMonitor.LastResourcesAcquired,
             AcquisitionInFlight = _progressMonitor.IsAcquisitionInFlight,
+            ValidationOngoing = _progressMonitor.IsValidationOngoing,
+            PendingValidationCount = _progressMonitor.PendingValidationCount,
             Issues = issues
         };
     }

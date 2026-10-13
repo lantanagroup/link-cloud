@@ -57,6 +57,7 @@ using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -343,6 +344,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<ISftpConnectionTestService, SftpConnectionTestService>();
         services.AddTransient<IFileParserFactory, FileParserFactory>();
         services.AddTransient<ISftpAcquisitionProcessorFactory, SftpAcquisitionProcessorFactory>();
+        services.AddTransient<IFhirAuthenticationConfigurationService, FhirAuthenticationConfigurationService>();
 
         //File Parsers
         services.AddTransient<IFileParser<CernerEncounters>, CernerCclExtractParser>();

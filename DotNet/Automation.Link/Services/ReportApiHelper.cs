@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
@@ -15,7 +14,6 @@ using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Net;
-using System.IO.Compression;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Automation.Link.Services;
@@ -318,11 +316,8 @@ public class ReportApiHelper
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
-                {
-                    if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
-                        break;
-                }
+                if (!AdvanceDeadline(diagnostics, ref milestonePhaseStart, hardTimeout, ref milestoneDeadline))
+                    break;
                 if (diagnostics.HasCriticalFailure)
                 {
                     _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure before submission polling.");
@@ -392,11 +387,8 @@ public class ReportApiHelper
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
-            {
-                if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
-                    break;
-            }
+            if (!AdvanceDeadline(diagnostics, ref submissionPhaseStart, hardTimeout, ref submissionDeadline))
+                break;
             if (diagnostics?.HasCriticalFailure == true)
             {
                 _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure — aborting poll loop.");
@@ -561,87 +553,155 @@ public class ReportApiHelper
             : adaptiveFloor;
     }
 
-    private bool TryKeepAlive(
+    private bool _validationHoldActive;
+
+    /// <summary>
+    /// A drained validation queue starts the configured timeout again.
+    /// A queue that went quiet with patients still pending keeps the deadline it already has.
+    /// </summary>
+    public static bool ShouldRearmTimeoutAfterValidationHold(int pendingValidationCount)
+        => pendingValidationCount == 0;
+
+    /// <summary>
+    /// Keeps the poll alive. Validation that is still working has no timeout.
+    /// When that queue drains, the configured hard timeout starts again for
+    /// whatever work is left. A quiet queue that still has pending patients
+    /// does not get a new full timeout. Other in-flight acquisition can still
+    /// extend a deadline, and that path remains capped.
+    /// </summary>
+    private bool AdvanceDeadline(
         BackgroundDiagnosticsMonitor? diagnostics,
-        DateTime phaseStart,
+        ref DateTime phaseStart,
         TimeSpan hardTimeout,
         ref DateTime deadline)
     {
-        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
-        if (!AcquisitionActivityTracker.TryExtendDeadline(
-                DateTime.UtcNow,
-                phaseStart,
-                hardTimeout,
-                hasProgress,
-                ref deadline,
-                out var extendedBy))
+        var validationProgress = diagnostics?.GetValidationProgress()
+            ?? new LantanaGroup.Automation.Helpers.ValidationProgressSnapshot(false, 0);
+        var validationOngoing = validationProgress.Ongoing;
+        var pendingValidationCount = validationProgress.Pending;
+        if (validationOngoing)
         {
-            return false;
+            _validationHoldActive = true;
         }
-
-        _output.WriteLine(
-            $"[DIAG] Keep-alive: DA paging or Validation still progressing " +
-            $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
-            $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
-        return true;
-    }
-
-    public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)
-    {
-        _output.WriteLine($"Downloading report {reportId}...");
-
-        var response = await _submissionClient.DownloadSubmissionAsync(facilityId, reportId, external);
-
-        AutomationInvariant.Require(response.IsSuccessStatusCode && response.Body != null,
-            $"Download failed with status {response.StatusCode}");
-
-        var bytes = response.Body!;
-
-        var isZipPayload = bytes.Length >= 4
-            && bytes[0] == 0x50
-            && bytes[1] == 0x4B
-            && bytes[2] == 0x03
-            && bytes[3] == 0x04;
-
-        AutomationInvariant.Require(isZipPayload,
-            $"Download payload was not a ZIP (status {response.StatusCode}).");
-
-        var responseDictionary = new Dictionary<string, object>();
-
-        if (!string.IsNullOrEmpty(_automationConfig.DownloadPath) && bytes != null)
+        else if (_validationHoldActive && hardTimeout != TimeSpan.MaxValue && hardTimeout > TimeSpan.Zero)
         {
-            if (!Directory.Exists(_automationConfig.DownloadPath))
-                Directory.CreateDirectory(_automationConfig.DownloadPath);
-
-            var downloadPath = Path.Combine(_automationConfig.DownloadPath, config.DownloadFileName);
-            await File.WriteAllBytesAsync(downloadPath, bytes);
-            _output.WriteLine($"Report downloaded to {downloadPath}");
-        }
-
-        using var zipStream = new MemoryStream(bytes ?? []);
-        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-        var jsonParser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
-
-        foreach (var entry in archive.Entries)
-        {
-            if (entry.Length == 0)
-                continue;
-
-            using var entryStream = entry.Open();
-            using var reader = new StreamReader(entryStream);
-            var fileContent = reader.ReadToEnd();
-
-            if (entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            _validationHoldActive = false;
+            if (ShouldRearmTimeoutAfterValidationHold(pendingValidationCount))
             {
-                var resource = jsonParser.Parse<Resource>(fileContent);
-                responseDictionary[entry.FullName] = resource;
+                phaseStart = DateTime.UtcNow;
+                deadline = phaseStart + hardTimeout;
+                _output.WriteLine("[DIAG] Validation finished. The configured timeout applies to the rest of the run.");
             }
             else
             {
-                responseDictionary[entry.FullName] = fileContent;
+                _output.WriteLine(
+                    $"[DIAG] Validation has been quiet with {pendingValidationCount} patients still pending. The existing deadline applies.");
             }
         }
 
-        return responseDictionary;
+        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
+        var decision = AcquisitionActivityTracker.Decide(
+            DateTime.UtcNow,
+            phaseStart,
+            hardTimeout,
+            deadline,
+            validationOngoing,
+            hasProgress);
+
+        deadline = decision.Deadline;
+        if (decision.HeldForValidation)
+        {
+            _validationHoldActive = true;
+            _output.WriteLine(
+                $"[DIAG] Validation is still working ({pendingValidationCount} patients open). " +
+                "This run will not time out while validation is in progress.");
+            return true;
+        }
+
+        if (decision.ExtendedBy > TimeSpan.Zero)
+        {
+            _output.WriteLine(
+                $"[DIAG] Keep-alive: acquisition still progressing " +
+                $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
+                $"Extending poll deadline by {decision.ExtendedBy.TotalSeconds:F0}s.");
+        }
+
+        return decision.Continue;
+    }
+
+    /// <summary>
+    /// Streams the submission ZIP to a temp file. The returned package reads
+    /// one entry at a time. Dispose it before downloading another package so
+    /// the two censuses are not in memory together.
+    /// </summary>
+    public async Task<ReportPackage> DownloadReportAsync(
+        string facilityId,
+        string reportId,
+        TestScenarioConfig config,
+        bool external = true,
+        CancellationToken cancellationToken = default)
+    {
+        _output.WriteLine($"Downloading report {reportId}...");
+
+        var tempPath = ReportPackage.CreateTempPath();
+        string? savedPath = null;
+        try
+        {
+            int statusCode;
+            await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+            {
+                var result = await _submissionClient.CopySubmissionAsync(
+                    facilityId, reportId, file, external, cancellationToken);
+                statusCode = result.StatusCode;
+                AutomationInvariant.Require(result.IsSuccess, $"Download failed with status {statusCode}");
+            }
+
+            AutomationInvariant.Require(
+                ReportPackage.HasZipHeader(tempPath),
+                $"Download payload was not a ZIP (status {statusCode}).");
+
+            if (!string.IsNullOrEmpty(_automationConfig.DownloadPath))
+            {
+                if (!Directory.Exists(_automationConfig.DownloadPath))
+                    Directory.CreateDirectory(_automationConfig.DownloadPath);
+
+                savedPath = Path.Combine(_automationConfig.DownloadPath, config.DownloadFileName);
+                await using (var source = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous))
+                await using (var destination = new FileStream(savedPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+                {
+                    await source.CopyToAsync(destination, 81920, cancellationToken);
+                }
+
+                _output.WriteLine($"Report downloaded to {savedPath}");
+            }
+
+            return ReportPackage.Open(tempPath, deleteOnDispose: true);
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch (IOException)
+            {
+                // The caller's exception is the one that matters.
+            }
+
+            if (!string.IsNullOrEmpty(savedPath))
+            {
+                try
+                {
+                    if (File.Exists(savedPath))
+                        File.Delete(savedPath);
+                }
+                catch (IOException)
+                {
+                }
+            }
+
+            throw;
+        }
     }
 }
