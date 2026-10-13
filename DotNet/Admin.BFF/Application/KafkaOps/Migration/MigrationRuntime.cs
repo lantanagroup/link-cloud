@@ -85,6 +85,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
     private readonly IKafkaMigrationAdmin _admin;
     private readonly IKafkaWorkloadControl _workloads;
     private readonly IKafkaInfraProvider _infra;
+    private readonly IKafkaBrokerGateway? _broker;
     private readonly IMigrationHoldRegistry _holds;
     private readonly ICacheService _cache;
     private readonly ILogger<MigrationRuntime> _logger;
@@ -103,8 +104,10 @@ public sealed class MigrationRuntime : IMigrationRuntime
         IKafkaInfraProvider infra,
         IMigrationHoldRegistry holds,
         ICacheService cache,
-        ILogger<MigrationRuntime> logger)
+        ILogger<MigrationRuntime> logger,
+        IKafkaBrokerGateway? broker = null)
     {
+        _broker = broker;
         _anonymous = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
         _environment = environment;
         _options = options.Value;
@@ -768,7 +771,9 @@ public sealed class MigrationRuntime : IMigrationRuntime
         }
 
         var openMigration = (await _store.ListAsync(cancellationToken)).Any(record => record.Id != exceptId && record.Step is not (MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected));
-        var reassignment = await _infra.ListInFlightReassignmentsAsync(cancellationToken);
+        var reassignment = _broker is null
+            ? await _infra.ListInFlightReassignmentsAsync(cancellationToken)
+            : await KafkaReassignmentCheck.ListAsync(_broker, _infra, cancellationToken);
         return new MigrationFacts
         {
             Topic = topic,

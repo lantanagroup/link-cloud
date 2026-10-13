@@ -104,6 +104,8 @@
     <section class="card au-card mt-3 @(KafkaAttention.Group(selected) ? "lu-kafka-attention" : null)" id="kafka-group-card">
         <h2 class="card-header h6 mb-0">@selected.GroupId <partial name="_CopyButton" model="@(new CopyTarget { Value = selected.GroupId, Label = "Copy group id" })" /> @if (!selected.Catalogued) { <span class="badge au-badge-muted">Unknown</span> }</h2>
         <div class="card-body">
+            @if (Model.Infra.BrokerLifecycleEnabled)
+            {
             <form method="post" action="/Operations/Kafka/groups/replicas/plan" data-kafka-busy="Dry run is running.">
                 @Html.AntiForgeryToken()
                 <partial name="_QueryFields" model="@(query with { Group = selected.GroupId })" />
@@ -157,6 +159,7 @@
                     <p data-kafka-busy-note hidden class="text-muted mb-0">Dry run is running.</p>
                 </div>
             </form>
+            }
             <div class="row g-2 mt-3">
                 <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@selected.State</div><div class="au-stat-label">State</div></div></div>
                 <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@selected.Members.Count</div><div class="au-stat-label">Members</div></div></div>
