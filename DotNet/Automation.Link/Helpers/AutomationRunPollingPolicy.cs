@@ -15,6 +15,16 @@ public static class AutomationRunPollingPolicy
     public static readonly TimeSpan LightweightDiagnosticsInterval = TimeSpan.FromSeconds(15);
     public static readonly TimeSpan LargeRunDiagnosticsInterval = TimeSpan.FromSeconds(15);
 
+    /// <summary>Pipeline Loki summaries other than validation still run on this stride.</summary>
+    public const int PipelineActivitySampleEvery = 6;
+
+    /// <summary>
+    /// Covers a full slow stride (15s diagnostics, every sixth cycle is 90s) plus one
+    /// extra cycle, so a validation line between samples is still inside the next scrape.
+    /// </summary>
+    public static readonly TimeSpan ValidationActivityLookback =
+        LargeRunDiagnosticsInterval * (PipelineActivitySampleEvery + 1);
+
     public static TimeSpan OrchestratorInterval(bool anyMetricsRun) =>
         anyMetricsRun ? MetricsOrchestratorInterval : LightweightOrchestratorInterval;
 

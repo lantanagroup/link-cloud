@@ -88,7 +88,7 @@ public class PipelineProgressTrackerTests
             Mock.Of<IFacilityServiceClient>())
         { CallBase = false };
 
-        reader.Setup(r => r.GetReportScheduleAsync(It.IsAny<Guid>()))
+        reader.Setup(r => r.GetReportScheduleAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PipelineDataReader.ReportScheduleInfo(
                 FacilityId, scheduleStatus, "Adhoc", "Manual",
                 EnableSubmission: scheduleStatus != "CompletedNotSubmitted",
@@ -110,7 +110,7 @@ public class PipelineProgressTrackerTests
                 ]))
             .ToList();
 
-        reader.Setup(r => r.GetReportEntriesWithMeasureReportsAsync(It.IsAny<Guid>()))
+        reader.Setup(r => r.GetReportEntriesWithMeasureReportsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(entries);
 
         return reader;

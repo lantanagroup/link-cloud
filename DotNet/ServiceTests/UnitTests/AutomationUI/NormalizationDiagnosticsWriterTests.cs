@@ -74,6 +74,7 @@ public class NormalizationDiagnosticsWriterTests
         export.Should().Contain("Sequence=2 CopyLocationAliasToTypeIteratively");
         export.Should().Contain("When class.code Equal IMP");
         export.Should().Contain("Set status = in-progress");
+        export.Should().Contain("Location#1 CopyLocation 'Copy Location Identifiers to Type':");
         export.Should().Contain("Location#2 CopyLocationAliasToTypeIteratively");
         export.Should().Contain("Raw [NormalizationExecutionSummary] lines (1)");
         export.Should().Contain(logs[0]);
