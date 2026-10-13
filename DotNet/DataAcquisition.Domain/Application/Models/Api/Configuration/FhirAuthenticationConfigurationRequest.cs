@@ -1,30 +1,40 @@
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.Serialization;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
 /// <summary>
 /// Generic OAuth client-credentials settings for a facility whose EHR vendor is "Other".
 /// </summary>
+[DataContract]
 public class FhirAuthenticationConfigurationRequest : IValidatableObject
 {
     /// <summary>
     /// The vendor's OAuth token endpoint. Must be an absolute URL.
     /// </summary>
+    [DataMember]
     public string TokenUrl { get; set; } = "";
 
     /// <summary>
     /// The OAuth client identifier.
     /// </summary>
+    [BindRequired]
+    [DataMember]
     public string ClientId { get; set; } = "";
 
     /// <summary>
     /// Plaintext secret. Written to the secret manager, never persisted on the row or returned.
     /// </summary>
+    [DataMember]
+    [DataType(DataType.Password)]
     public string? ClientSecret { get; set; }
 
     /// <summary>
     /// The scope requested when acquiring a token.
     /// </summary>
+    [BindRequired]
+    [DataMember]
     public string Scope { get; set; } = "";
 
     /// <inheritdoc />
