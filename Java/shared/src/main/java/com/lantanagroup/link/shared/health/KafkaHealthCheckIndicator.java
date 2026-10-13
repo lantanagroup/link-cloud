@@ -20,9 +20,24 @@ public class KafkaHealthCheckIndicator implements HealthIndicator {
 
     private final String serviceName;
 
-    public KafkaHealthCheckIndicator(KafkaTemplate<String, String> healthKafkaTemplate, @Value(" ${spring.application.name}") String serviceName) {
+    /**
+     * Backstop deadline for the acknowledgement, configurable via
+     * {@code management.health.kafka.timeout-ms}. Keep it above the health producer's
+     * {@link Properties#MAX_BLOCK_MS_CONFIG} so the producer gives up first and reports why,
+     * and keep the two together well inside the Admin BFF's 5s window -- it is shared with the
+     * other indicators, which Spring runs one after another on this same request thread.
+     */
+    private final long checkTimeoutMs;
+
+    /** Default for {@code management.health.kafka.timeout-ms}; a String so it can sit in the annotation below. */
+    static final String DEFAULT_TIMEOUT_MS = "1500";
+
+    public KafkaHealthCheckIndicator(KafkaTemplate<String, String> healthKafkaTemplate,
+                                     @Value(" ${spring.application.name}") String serviceName,
+                                     @Value("${management.health.kafka.timeout-ms:" + DEFAULT_TIMEOUT_MS + "}") long checkTimeoutMs) {
         this.kafkaTemplate = healthKafkaTemplate;
         this.serviceName = serviceName;
+        this.checkTimeoutMs = checkTimeoutMs;
     }
 
     @Override
@@ -44,9 +59,8 @@ public class KafkaHealthCheckIndicator implements HealthIndicator {
             String message = String.format("Service health check on %s (UTC)", formattedDate);
 
             // the send() call itself is non-blocking so we need a get to force the program to wait till the broker acknowledges the message or throws an exception if Kafka is down or the timeout expires
-            // the timeout on get should be >= MAX_BLOCK_MS_CONFIG configured on the ProducerConfig properties of KafkaTemplate; add another 1000 millis to the configured MAX_BLOCK_MS_CONFIG property
-            long getTimeOut  = Properties.MAX_BLOCK_MS_CONFIG + 1000; // in millis
-            kafkaTemplate.send(Topics.SERVICE_HEALTH_CHECK, serviceName, message).get(getTimeOut, TimeUnit.MILLISECONDS);
+            // the timeout on get stays above MAX_BLOCK_MS_CONFIG configured on the ProducerConfig properties of the health KafkaTemplate, so the producer is the one that gives up first
+            kafkaTemplate.send(Topics.SERVICE_HEALTH_CHECK, serviceName, message).get(checkTimeoutMs, TimeUnit.MILLISECONDS);
             return true;
         } catch (Exception e) {
             return false;
