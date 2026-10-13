@@ -205,7 +205,7 @@ builder.Services.AddSwaggerGen(c =>
 var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, QueryDispatchConstants.ServiceName).GetHealthCheckOptions();
 
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<QueryDispatchDbContext>(HealthCheckType.Database.ToString())
+    .AddCheck<DatabaseHealthCheck<QueryDispatchDbContext>>(HealthCheckType.Database.ToString())
     .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
 // Logging using Serilog

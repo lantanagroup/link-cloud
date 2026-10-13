@@ -56,6 +56,13 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     }
 
     /// <summary>
+    /// Ongoing flag and pending count from the same published snapshot.
+    /// Readers must not sample those two fields separately.
+    /// </summary>
+    public LantanaGroup.Automation.Helpers.ValidationProgressSnapshot GetValidationProgress()
+        => _monitor.State.ValidationProgress;
+
+    /// <summary>
     /// Returns true if the named milestone has been reached.
     /// Milestone names match <see cref="MilestoneValidationOrchestrator.Milestone"/> enum values as strings.
     /// </summary>

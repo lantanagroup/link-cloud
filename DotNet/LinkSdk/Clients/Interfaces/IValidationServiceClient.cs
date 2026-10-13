@@ -11,4 +11,9 @@ public interface IValidationServiceClient
     Task<LinkApiResponse> InitializeCategoriesAsync(CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<string>> GetValidationResultsAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts results at or above <paramref name="severity"/>. The body is a small summary, not the result list.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetValidationResultSummaryAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default);
 }

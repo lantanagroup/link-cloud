@@ -9,6 +9,8 @@ public interface IAdminBffIntegrationClient
 {
     Task<LinkApiResponse<string>> GetHealthAsync(CancellationToken cancellationToken = default);
 
+    Task<LinkApiResponse<string>> GetServiceHealthAsync(string service, CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<FacilityModel>> CreateFacilityAsync(
         FacilityModel request,
         CancellationToken cancellationToken = default);
