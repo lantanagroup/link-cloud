@@ -1089,7 +1089,7 @@ public sealed class ReportsService
             query,
             path,
             route,
-            interactiveBlocked: live ? null : "The submission for this report is no longer in ABS, so Interactive mode is not available.");
+            interactiveBlocked: live ? null : InteractiveAvailability.ReportGone);
     }
 
     private static (IReadOnlyList<ManifestPatientRow> Rows, PageBar Bar) PageOf(
@@ -1185,6 +1185,36 @@ public sealed class ReportsService
         var counts = await CountsAsync(schedule.Body.Id, cancellationToken);
         page.Report = FacilityViewService.ToReportRow(schedule.Body, counts.Census, counts.Population);
         return (page, schedule.Body);
+    }
+
+    /// <summary>
+    /// Whether the report still exists, from one schedule read and nothing else (no facility,
+    /// counts or submission reads). True or false when the Report service answered; null when it
+    /// could not be asked, so the caller can leave the decision to the on-demand load.
+    /// </summary>
+    public async Task<bool?> ReportExistsAsync(string? facilityId, string? reportId, CancellationToken cancellationToken)
+    {
+        if (_reports is null || string.IsNullOrWhiteSpace(facilityId) || !Guid.TryParse(reportId, out var parsed))
+            return null;
+
+        try
+        {
+            var schedule = await _reports.GetScheduleAsync(parsed.ToString(), cancellationToken);
+            if (schedule.StatusCode == StatusCodes.Status404NotFound)
+                return false;
+            if (!schedule.IsSuccessStatusCode || schedule.Body is null)
+                return null;
+            return string.Equals(schedule.Body.FacilityId, facilityId.Trim(), StringComparison.Ordinal);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "The report schedule could not be checked for Interactive mode.");
+            return null;
+        }
     }
 
     public async Task<ReportScheduleApiModel?> TryScheduleAsync(string? facilityId, string? reportId, CancellationToken cancellationToken)

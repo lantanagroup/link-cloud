@@ -43,6 +43,9 @@ public sealed record ThroughputKafkaPageQuery
     public string BrowseHeaderValue { get; init; } = "";
     public string OpenRecord { get; init; } = "";
     public string StageRecord { get; init; } = "";
+
+    /// <summary>The error or retry topic a staged record is redriven from, back to <see cref="TopicName"/>.</summary>
+    public string RedriveFrom { get; init; } = "";
     public string MessageText { get; init; } = "";
     public string HeaderContains { get; init; } = "";
     public string ValueContains { get; init; } = "";
@@ -140,6 +143,7 @@ public sealed record ThroughputKafkaPageQuery
             BrowseHeaderValue = Clip(One(query, "headerValue").SanitizeAndRemove()),
             OpenRecord = Record(One(query, "record")),
             StageRecord = Record(One(query, "stage")),
+            RedriveFrom = Clip(One(query, "redrive").SanitizeAndRemove()),
             MessageText = Clip(One(query, "mq").SanitizeAndRemove()),
             HeaderContains = Clip(One(query, "hq").SanitizeAndRemove()),
             ValueContains = Clip(One(query, "vq").SanitizeAndRemove()),
@@ -168,7 +172,7 @@ public sealed record ThroughputKafkaPageQuery
     public ThroughputKafkaPageQuery AtFrom(long from) =>
         this with { MessageFrom = from, MessageTo = null, Resume = "", MsgPage = 1, OpenRecord = "", StageRecord = "" };
 
-    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false, bool? hot = null, string? subtab = null)
+    public string Href(string? view = null, string? sort = null, string? dir = null, int? page = null, string? family = null, string? group = null, string? q = null, string? topic = null, string? broker = null, string? keyClass = null, bool? tests = null, bool? advanced = null, string? record = null, bool closeRecord = false, int? part = null, string? stage = null, bool closeStage = false, int? msgPage = null, int? pageSize = null, string? resume = null, bool clearResume = false, bool? hot = null, string? subtab = null, string? redrive = null)
     {
         var chosenView = view ?? View;
         var chosenTopic = topic ?? TopicName;
@@ -241,6 +245,9 @@ public sealed record ThroughputKafkaPageQuery
             var staged = closeStage ? "" : stage ?? (changed ? "" : StageRecord);
             if (staged.Length > 0)
                 values["stage"] = staged;
+            var redriving = closeStage ? "" : redrive ?? (changed ? "" : RedriveFrom);
+            if (staged.Length > 0 && redriving.Length > 0)
+                values["redrive"] = redriving;
         }
 
         var pairs = values
@@ -462,6 +469,12 @@ public sealed class KafkaMessageOpen
     public KafkaBrowseRecord Record { get; init; } = new();
     public string ReturnHref { get; init; } = "";
     public string ProduceHref { get; init; } = "";
+
+    /// <summary>Produce on the main topic with this record staged, when the record is on its error or retry topic.</summary>
+    public string RedriveHref { get; init; } = "";
+    public string RedriveTarget { get; init; } = "";
 }
+
 
-public sealed record KafkaNotFound(string Kind, string Name, string BackHref, string BackLabel);
+public sealed record KafkaNotFound(string Kind, string Name, string BackHref, string BackLabel);
+

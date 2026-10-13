@@ -68,7 +68,14 @@
     string Count(int value) => value.ToString("N0");
     string ValidationColor(string name) => ReportManifestRules.ValidationSliceColor(name);
     var graphUrl = "";
-    if (string.Equals(Model.Path, "/Reports/Manifest", StringComparison.Ordinal)
+    if (Model.InteractiveBlocked is null
+        && !string.IsNullOrWhiteSpace(Model.GraphFacilityId)
+        && !string.IsNullOrWhiteSpace(Model.GraphReportId))
+    {
+        graphUrl = "/Reports/PatientGraph?facilityId=" + Uri.EscapeDataString(Model.GraphFacilityId)
+            + "&reportId=" + Uri.EscapeDataString(Model.GraphReportId);
+    }
+    else if (Model.InteractiveBlocked is null && string.Equals(Model.Path, "/Reports/Manifest", StringComparison.Ordinal)
         && Model.Route.TryGetValue("facilityId", out var graphFacility)
         && Model.Route.TryGetValue("reportId", out var graphReport)
         && !string.IsNullOrWhiteSpace(graphFacility)
@@ -869,6 +876,7 @@
                         <div class="d-flex justify-content-end mb-2" id="manifest-interactive-bar">
                             <span class="d-inline-block" id="manifest-interactive-wrap" tabindex="0" data-bs-toggle="tooltip" title="@(Model.InteractiveBlocked ?? "Load this patient's submitted bundle from ABS")"><button type="button" class="btn btn-sm btn-au-execute" id="manifest-interactive" data-manifest-interactive data-blocked="@(Model.InteractiveBlocked is null ? null : "1")" disabled="@(Model.InteractiveBlocked is not null)">Interactive mode</button></span>
                         </div>
+                        <div class="alert alert-secondary lu-alert py-2 small mb-2" id="manifest-interactive-note" role="status" @(Model.InteractiveBlocked is null ? "hidden" : null)>@Model.InteractiveBlocked</div>
                         <div id="manifest-patient-resources"></div>
                     </div>
                 </section>
@@ -942,10 +950,9 @@
     if (window.luResourceGraph) window.luResourceGraph.mount(graphUrl, donutColors.concat([donutOther]));
     var blockedButton = document.querySelector("#manifest-interactive[data-blocked]");
     if (blockedButton) {
-        blockedButton.hidden = false;
         blockedButton.disabled = true;
         var blockedBar = document.getElementById("manifest-interactive-bar");
-        if (blockedBar) blockedBar.hidden = false;
+        if (blockedBar) blockedBar.classList.remove("d-none");
     }
     var palette = (window.luChartPalette && window.luChartPalette.manifest) || [];
     function draw(id, labels, data, kind) {
