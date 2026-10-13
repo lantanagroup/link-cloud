@@ -24,6 +24,16 @@ public class PipelineSummarySnapshotBuilder
         public PipelineDataReader.ReportScheduleInfo? Schedule { get; init; }
         public IReadOnlyList<PipelineDataReader.ReportEntryInfo> Entries { get; init; } = [];
         public IReadOnlyList<PipelineDataReader.ReportPopulationInfo> Populations { get; init; } = [];
+
+        /// <summary>
+        /// Set when the store kept population counts and not the measure-report id lists.
+        /// </summary>
+        public PipelineDataReader.PopulationCountSnapshot? PopulationCounts { get; init; }
+
+        /// <summary>
+        /// Set when the store kept entry chart counts and not per-patient measure rows.
+        /// </summary>
+        public PipelineDataReader.ReportEntryRollup? EntryRollup { get; init; }
         public PipelineDataReader.AcquisitionSummaryInfo? AcquisitionSummary { get; init; }
         public IReadOnlyList<PipelineDataReader.AcquisitionLogInfo> AcquisitionLogs { get; init; } = [];
         public IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> MeasureEvalResourceCounts { get; init; } = [];
@@ -186,6 +196,7 @@ public class PipelineSummarySnapshotBuilder
         var data = await _domainDataProvider(scheduleId, facilityId);
         schedule = data.Schedule;
         entries = data.Entries;
+        var entryRollup = data.EntryRollup ?? PipelineDataReader.ReportEntryRollup.From(entries);
         populations = data.Populations;
         acquisitionSummary = data.AcquisitionSummary;
         acquisitionLogs = data.AcquisitionLogs;
@@ -210,17 +221,32 @@ public class PipelineSummarySnapshotBuilder
 
         snapshot.ValidatorResults = (data.ValidatorResults ?? []).ToList();
 
-        snapshot.Report.EntrySubmissionStatuses = entries
-            .GroupBy(e => string.IsNullOrWhiteSpace(e.SubmissionStatus) ? "Unknown" : e.SubmissionStatus!)
-            .Select(g => new CategoryCountSnapshot { Status = g.Key, Count = g.Count() })
-            .OrderByDescending(x => x.Count)
+        snapshot.Report.EntrySubmissionStatuses = entryRollup.SubmissionStatuses
+            .Select(status => new CategoryCountSnapshot { Status = status.Status, Count = status.Count })
             .ToList();
 
-        var populationGroupCount = populations.Sum(p => p.GroupPopulations.Count);
-        var measureReportPopulationCount = populations.Sum(p => p.GroupPopulations.Sum(g => g.MeasureReportPopulations.Count));
-        snapshot.Report.PopulationSummary = populations.Count == 0
+        int populationReportTypes;
+        int populationGroupCount;
+        int measureReportPopulationCount;
+        if (data.PopulationCounts is { } populationCounts)
+        {
+            populationReportTypes = populationCounts.ReportTypeCount;
+            populationGroupCount = populationCounts.GroupCount;
+            measureReportPopulationCount = populationCounts.MeasureReportPopulationCount;
+        }
+        else
+        {
+            populationReportTypes = populations.Count;
+            populationGroupCount = populations.Sum(p => p.GroupPopulations?.Count ?? 0);
+            measureReportPopulationCount = populations.Sum(p =>
+                (p.GroupPopulations ?? []).Sum(g => g.MeasureReportPopulations?.Count ?? 0));
+        }
+
+        snapshot.Report.PopulationSummary = populationReportTypes == 0
+            && populationGroupCount == 0
+            && measureReportPopulationCount == 0
             ? "No report populations available yet."
-            : $"{populations.Count} report type(s), {populationGroupCount} group population set(s), {measureReportPopulationCount} measure report population reference(s).";
+            : $"{populationReportTypes} report type(s), {populationGroupCount} group population set(s), {measureReportPopulationCount} measure report population reference(s).";
 
         snapshot.DataAcquisition.StatusCounts = (acquisitionSummary?.StatusCounts ?? [])
             .Select(s => new CategoryCountSnapshot { Status = s.Status, Count = s.Count })
@@ -249,10 +275,10 @@ public class PipelineSummarySnapshotBuilder
         // Validation operates in a per-patient context -- its 'resource count' is the
         // number of patients whose validation reached a terminal status. The per-status
         // breakdown is supplied below via FunnelCounts.
-        snapshot.Validation.ResourceCount = entries.Count;
+        snapshot.Validation.ResourceCount = entryRollup.EntryCount;
 
         ApplyAcquisitionWindowRates(snapshot.DataAcquisition, acquisitionLogs, dataAcqResources, snapshot.GeneratedAt);
-        ApplyValidationWindowRates(snapshot.Validation, entries);
+        ApplyStoredValidationWindow(snapshot.Validation, entryRollup);
 
         snapshot.MeasureEval.ResourceTypeCounts = measureEvalResourceCounts
             .GroupBy(x => x.ResourceType)
@@ -261,14 +287,9 @@ public class PipelineSummarySnapshotBuilder
             .Take(15)
             .ToList();
 
-        var measureReadyForValidationCount = entries.Count(e =>
-            e.MeasureReports.Any(mr => string.Equals(mr.Status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase)));
-
-        var measureNotReportableCount = entries.Count(e =>
-            !e.MeasureReports.Any(mr => string.Equals(mr.Status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase))
-            && e.MeasureReports.Any(mr => string.Equals(mr.Status, "NotReportable", StringComparison.OrdinalIgnoreCase)));
-
-        var measureNoReportCount = entries.Count - measureReadyForValidationCount - measureNotReportableCount;
+        var measureReadyForValidationCount = entryRollup.ReadyForValidationCount;
+        var measureNotReportableCount = entryRollup.NotReportableMeasureCount;
+        var measureNoReportCount = entryRollup.NoMeasureReportCount;
 
         snapshot.MeasureEval.FunnelCounts =
         [
@@ -277,11 +298,13 @@ public class PipelineSummarySnapshotBuilder
             new CategoryCountSnapshot { Status = "ReadyForValidation", Count = measureReadyForValidationCount }
         ];
 
-        var validationPassedCount = entries.Count(e =>
-            string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase));
-        var validationFailedCount = entries.Count(e =>
-            string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase));
-        var validationNotValidatedCount = entries.Count - validationPassedCount - validationFailedCount;
+        var validationPassedCount = entryRollup.ReportingStatuses
+            .Where(status => string.Equals(status.Status, "PassedValidation", StringComparison.OrdinalIgnoreCase))
+            .Sum(status => status.Count);
+        var validationFailedCount = entryRollup.ReportingStatuses
+            .Where(status => string.Equals(status.Status, "FailedValidation", StringComparison.OrdinalIgnoreCase))
+            .Sum(status => status.Count);
+        var validationNotValidatedCount = entryRollup.EntryCount - validationPassedCount - validationFailedCount;
 
         snapshot.Validation.FunnelCounts =
         [
@@ -290,10 +313,8 @@ public class PipelineSummarySnapshotBuilder
             new CategoryCountSnapshot { Status = "PassedValidation", Count = validationPassedCount }
         ];
 
-        snapshot.Validation.StatusCounts = entries
-            .GroupBy(e => string.IsNullOrWhiteSpace(e.ReportingStatus) ? "Unknown" : e.ReportingStatus!)
-            .Select(g => new CategoryCountSnapshot { Status = g.Key, Count = g.Count() })
-            .OrderByDescending(x => x.Count)
+        snapshot.Validation.StatusCounts = entryRollup.ReportingStatuses
+            .Select(status => new CategoryCountSnapshot { Status = status.Status, Count = status.Count })
             .ToList();
 
         var scheduleStatus = schedule?.Status ?? string.Empty;
@@ -308,30 +329,23 @@ public class PipelineSummarySnapshotBuilder
         // prior report). In that case, if downstream stages have already progressed
         // (entries with measure reports exist), DA is implicitly complete.
         var dataAcqExplicitlyComplete = dataAcqTotalLogs > 0 && dataAcqTerminalLogs == dataAcqTotalLogs;
-        var dataAcqImplicitlyComplete = dataAcqTotalLogs == 0 && entries.Any(e => e.MeasureReports.Count > 0);
+        var dataAcqImplicitlyComplete = dataAcqTotalLogs == 0 && entryRollup.EntriesWithMeasureReport > 0;
         var dataAcqComplete = dataAcqExplicitlyComplete || dataAcqImplicitlyComplete;
 
         // Normalization has produced output once MeasureEval has resources or measure reports.
         // Require DA complete so the pill cannot light before acquisition finishes.
         var normalizedComplete = dataAcqComplete
-            && (measureResources > 0 || entries.Any(e => e.MeasureReports.Count > 0));
+            && (measureResources > 0 || entryRollup.EntriesWithMeasureReport > 0);
 
         var measureComplete = normalizedComplete
-            && entries.Count > 0
-            && entries.All(e =>
-                e.MeasureReports.Any(mr =>
-                    string.Equals(mr.Status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(mr.Status, "NotReportable", StringComparison.OrdinalIgnoreCase)));
+            && entryRollup.EntryCount > 0
+            && entryRollup.AllMeasureReportsTerminal;
 
         // Validation is complete when report entries exist and every entry has
         // reached a terminal reporting status (PassedValidation, FailedValidation,
         // or NotReportable). This prevents the milestone from completing before
         // the validation service has actually processed all entries.
-        var validationComplete = entries.Count > 0
-            && entries.All(e =>
-                string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(e.ReportingStatus, "NotReportable", StringComparison.OrdinalIgnoreCase));
+        var validationComplete = entryRollup.EntryCount > 0 && entryRollup.AllReportingTerminal;
 
         var submitted = string.Equals(scheduleStatus, "Submitted", StringComparison.OrdinalIgnoreCase);
 
@@ -571,26 +585,27 @@ public class PipelineSummarySnapshotBuilder
         ApplyWindow(target, eventTimes.Count > 0 ? eventTimes.Count : spans.Count, resourceCount, windowStart, windowEnd, eventTimes);
     }
 
-    private static void ApplyValidationWindowRates(
+    private static void ApplyStoredValidationWindow(
         ServiceSnapshot target,
-        IReadOnlyList<PipelineDataReader.ReportEntryInfo> entries)
+        PipelineDataReader.ReportEntryRollup rollup)
     {
-        var validated = entries
-            .Where(e =>
-                string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        var times = validated
-            .Select(e => e.ModifyDate ?? e.CreateDate)
-            .Where(t => t is DateTime dt && IsUsable(dt))
-            .Select(t => AsUtc(t!.Value))
-            .ToList();
-
-        if (times.Count == 0)
+        if (rollup.ValidatedCount == 0
+            || rollup.ValidationWindowStart is not DateTime start
+            || rollup.ValidationWindowEnd is not DateTime end)
             return;
 
-        ApplyWindow(target, validated.Count, validated.Count, times.Min(), times.Max(), times);
+        var startUtc = AsUtc(start);
+        var endUtc = AsUtc(end);
+        var seconds = Math.Max(0, (endUtc - startUtc).TotalSeconds);
+        if (seconds < 0.001)
+            seconds = 0.001;
+
+        target.ActiveDurationSeconds = Math.Round(seconds, 2);
+        target.CompletionRatePerSecond = Math.Round(rollup.ValidatedCount / seconds, 2);
+        target.AverageResourcesPerSecond = Math.Round(rollup.ValidatedCount / seconds, 2);
+        target.ThroughputBuckets = rollup.ValidationBuckets
+            .Select(bucket => new ThroughputBucketSnapshot { Label = bucket.Status, Count = bucket.Count })
+            .ToList();
     }
 
     private static void ApplyWindow(
