@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -579,18 +581,18 @@ Initial --> ReportScheduled : Report Scheduled
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-subgraph nReport_6794871_domain["Domain: Report"]
-    nMeasureEvalService_655B21CF["Service: Measure Evaluation Service"]
-    nNormalizationService_2861AAD1["Service: Normalization Service"]
-    nQueryDispatchService_3D6D505["Service: Query Dispatch Service"]
-    nReportService_417D4454["Service: Report Service"]
-    nSubmissionService_40C7BB9B["Service: Submission Service"]
-    nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
-    nPatientEvent_630CFEC8["Event: Patient Event"]
-    nReportScheduled_4BA62BDB["Event: Report Scheduled"]
-    nSubmitPayload_7A027AAE["Event: Submit Payload"]
-    nPayloadSubmitted_40AD77DB["Event: Payload Submitted"]
-    nGenerateReportRequested_150FD8B0["Command: Generate Report Requested"]
+subgraph nReport_523BC237_domain["Domain: Report"]
+    nMeasureEvalService_5AA5AF95["Service: Measure Evaluation Service"]
+    nNormalizationService_78B0F5BC["Service: Normalization Service"]
+    nQueryDispatchService_2EC3D027["Service: Query Dispatch Service"]
+    nReportService_7E534222["Service: Report Service"]
+    nSubmissionService_30800FFD["Service: Submission Service"]
+    nPatientCensusScheduled_49BC5D3C["Event: Patient Census Scheduled"]
+    nPatientEvent_5A657A5A["Event: Patient Event"]
+    nReportScheduled_4CB82B8["Event: Report Scheduled"]
+    nSubmitPayload_6536AAAF["Event: Submit Payload"]
+    nPayloadSubmitted_1D7D15C7["Event: Payload Submitted"]
+    nGenerateReportRequested_5FF13A3F["Command: Generate Report Requested"]
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

@@ -35,6 +35,7 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Debugging;
@@ -187,9 +188,14 @@ namespace Tenant
             //Add health checks
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
 
-            builder.Services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+            var healthChecks = builder.Services.AddHealthChecks()
+                .AddCheck<DatabaseHealthCheck<TenantDbContext>>(HealthCheckType.Database.ToString())
                 .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
+
+            if (dmrpEnabled)
+            {
+                healthChecks.AddCheck<DmrpHealthCheck>("DMRP", failureStatus: HealthStatus.Degraded);
+            }
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -213,7 +219,7 @@ namespace Tenant
             var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                .Filter.ByExcluding("RequestPath like '/health%'")
+                .Filter.ByExcluding("RequestPath like '/health%' and @l in ['Verbose', 'Debug', 'Information']")
                 .Filter.ByExcluding("RequestPath like '/swagger%'")
                 .Enrich.WithExceptionDetails()
                 .Enrich.FromLogContext()

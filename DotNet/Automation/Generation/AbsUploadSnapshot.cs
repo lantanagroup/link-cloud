@@ -33,6 +33,22 @@ public sealed class AbsUploadSnapshot
     /// </summary>
     public static AbsUploadSnapshot Build(IDictionary<string, object> internalAbsResources)
     {
+        return Build(
+            internalAbsResources.Keys,
+            name => internalAbsResources.TryGetValue(name, out var value) && value is string text ? text : null);
+    }
+
+    /// <summary>
+    /// Builds an <see cref="AbsUploadSnapshot"/> by reading one ZIP entry at a time.
+    /// </summary>
+    public static AbsUploadSnapshot Build(ReportPackage package)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        return Build(package.EntryNames, package.ReadEntryText);
+    }
+
+    private static AbsUploadSnapshot Build(IEnumerable<string> names, Func<string, string?> readText)
+    {
         var patientIds = new List<string>();
         var totalsByType = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var countsByPatient = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
@@ -41,7 +57,8 @@ public sealed class AbsUploadSnapshot
         // Parse manifest.ndjson for manifest-level stats
         var manifestTypes = new List<string>();
         var manifestCount = 0;
-        if (internalAbsResources.TryGetValue("manifest.ndjson", out var manifestObj) && manifestObj is string manifestNdjson)
+        var manifestNdjson = readText("manifest.ndjson");
+        if (manifestNdjson != null)
         {
             foreach (var line in manifestNdjson.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
@@ -57,12 +74,15 @@ public sealed class AbsUploadSnapshot
             }
         }
 
-        // Parse patient-*.ndjson files
-        foreach (var (key, value) in internalAbsResources)
+        // Parse patient-*.ndjson files. One file's text is live at a time.
+        foreach (var key in names)
         {
             if (!key.StartsWith("patient-", StringComparison.OrdinalIgnoreCase) ||
-                !key.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase) ||
-                value is not string ndjson)
+                !key.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var ndjson = readText(key);
+            if (ndjson == null)
                 continue;
 
             // Extract patient ID from filename: patient-{id}.ndjson

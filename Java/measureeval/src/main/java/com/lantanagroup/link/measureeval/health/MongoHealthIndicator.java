@@ -5,7 +5,7 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 
-@Component("database")
+@Component("MongoDB")
 public class MongoHealthIndicator implements HealthIndicator {
 
     private final MongoTemplate mongoTemplate;

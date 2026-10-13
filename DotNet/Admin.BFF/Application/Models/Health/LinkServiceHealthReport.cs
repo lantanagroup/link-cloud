@@ -18,4 +18,5 @@ public class LinkServiceHealthReportEntry
     [JsonConverter(typeof(HealthStatusJsonConverter))]
     public HealthStatus Status { get; set; }
     public TimeSpan Duration { get; set; }
+    public string? Description { get; set; }
 }

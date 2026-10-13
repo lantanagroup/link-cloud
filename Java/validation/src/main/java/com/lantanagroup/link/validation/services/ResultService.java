@@ -4,6 +4,7 @@ import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.models.CategoryIssueModel;
 import com.lantanagroup.link.validation.models.CategorySummaryModel;
+import com.lantanagroup.link.validation.models.ResultSummaryModel;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,17 @@ public class ResultService {
         return resultRepository.findAllByFacilityIdAndReportId(facilityId, reportId).stream()
                 .filter(result -> IssueSeverityUtils.isAsSevere(result.getSeverity(), severity))
                 .toList();
+    }
+
+    /**
+     * Counts results at or above {@code severity} without loading result rows or their messages.
+     */
+    public ResultSummaryModel summarizeReportResults(String facilityId, String reportId, OperationOutcome.IssueSeverity severity) {
+        long count = resultRepository.countByFacilityIdAndReportIdAndSeverityIn(
+                facilityId,
+                reportId,
+                IssueSeverityUtils.atLeastAsSevere(severity));
+        return new ResultSummaryModel(count, severity.name());
     }
 
     /**
