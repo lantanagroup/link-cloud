@@ -471,7 +471,7 @@ internal sealed class RunExecutor
                 output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             var facilityClient = services.GetRequiredService<IFacilityServiceClient>();
@@ -614,7 +614,7 @@ internal sealed class RunExecutor
                         $"Facility '{facilityId}' could not be read after applying the DMRP-derived schedule.");
                 }
 
-                await _snapshotStore.SetDomainAsync(
+                await _orchestrator.WriteDomainAsync(
                     state.RunId,
                     "dmrp",
                     new
@@ -881,7 +881,7 @@ internal sealed class RunExecutor
 
                 // Persist the submitted-patient override before validators run so the
                 // dashboard reflects prediction scope even when a later validator fails.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             // RegenerateReport: the first report is just a prerequisite.
@@ -938,17 +938,51 @@ internal sealed class RunExecutor
                 reportId,
                 BuildNormalizationSuiteSnapshot(normalizationResolution));
 
-            var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
-            var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
+            // External names are checked and that package is released before the
+            // internal ZIP is downloaded. Holding both expanded packages is what
+            // exhausted the process on a large census.
+            await using (var externalPackage = await reportHelper.DownloadReportAsync(
+                facilityId, reportId, scenarioConfig, cancellationToken: cancellationToken))
+            {
+                output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
 
-            output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
+                if (!externalPackage.TryMatchEntry("manifest.ndjson", out var manifestKey))
+                {
+                    if (_suppressExternalManifest)
+                    {
+                        output.WriteLine("manifest.ndjson is not present in external submission package because ExternalBlobStorage:SuppressManifest=true; continuing.");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
+                    }
+                }
+                else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
+                {
+                    output.WriteLine($"Found external manifest using flattened name '{manifestKey}'.");
+                }
+
+                foreach (var patientId in expectedSubmittedPatientIds)
+                {
+                    var expectedPatientFile = $"patient-{patientId}.ndjson";
+                    if (!externalPackage.TryMatchEntry(expectedPatientFile, out var patientFileKey))
+                        throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
+
+                    if (!string.Equals(patientFileKey, expectedPatientFile, StringComparison.Ordinal))
+                        output.WriteLine($"Found external patient file using flattened name '{patientFileKey}'.");
+                }
+            }
+
+            await using var internalPackage = await reportHelper.DownloadReportAsync(
+                facilityId, reportId, scenarioConfig, external: false, cancellationToken: cancellationToken);
+
             output.WriteLine($"[ABS] OperationOutcome writer={(_operationOutcomeExpectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}; expected only for FailedValidation patients ({_operationOutcomeExpectationSource}).");
 
             // Capture a lightweight ABS upload snapshot for the manifest detail page.
             try
             {
-                var absSnapshot = AbsUploadSnapshot.Build(internalAbsResources);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
+                var absSnapshot = AbsUploadSnapshot.Build(internalPackage);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
             }
             catch (Exception absEx)
             {
@@ -961,53 +995,12 @@ internal sealed class RunExecutor
             // Best-effort: a persistence failure must not abort the run.
             try
             {
-                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalAbsResources);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
+                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalPackage);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
                 output.WriteLine($"[WARN] Failed to persist ABS export locator metadata: {absFilesEx.Message}");
-            }
-
-            static bool HasExternalFile(IReadOnlyDictionary<string, object> files, string expectedFileName, out string? matchedKey)
-            {
-                if (files.ContainsKey(expectedFileName))
-                {
-                    matchedKey = expectedFileName;
-                    return true;
-                }
-
-                var suffix = "_" + expectedFileName;
-                matchedKey = files.Keys.FirstOrDefault(k =>
-                    k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
-                return matchedKey != null;
-            }
-
-            if (!HasExternalFile(downloadedResources, "manifest.ndjson", out var manifestKey))
-            {
-                if (_suppressExternalManifest)
-                {
-                    output.WriteLine("manifest.ndjson is not present in external submission package because ExternalBlobStorage:SuppressManifest=true; continuing.");
-                }
-                else
-                {
-                    throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
-                }
-
-            }
-            else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
-            {
-                output.WriteLine($"Found external manifest using flattened name '{manifestKey}'.");
-            }
-
-            foreach (var patientId in expectedSubmittedPatientIds)
-            {
-                var expectedPatientFile = $"patient-{patientId}.ndjson";
-                if (!HasExternalFile(downloadedResources, expectedPatientFile, out var patientFileKey))
-                    throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
-
-                if (!string.Equals(patientFileKey, expectedPatientFile, StringComparison.Ordinal))
-                    output.WriteLine($"Found external patient file using flattened name '{patientFileKey}'.");
             }
 
             // Flush stale cache from diagnostics polling so validators read authoritative data.
@@ -1023,14 +1016,14 @@ internal sealed class RunExecutor
             // localise a discrepancy. Results are persisted after each validator so partial results
             // stay visible in the dashboard even when a later validator fails.
             var validatorRunner = new ValidatorRunner((results, ct) =>
-                _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", results, ct));
+                _orchestrator.WriteDomainAsync(state.RunId, "validatorResults", results, ct));
 
             Task RunValidator(string name, Func<Task> action) =>
                 validatorRunner.RunAsync(name, action, cancellationToken);
 
             await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
                 reportAbsValidator.ValidateAllAsync(
-                    internalAbsResources,
+                    internalPackage,
                     expectedSubmittedPatientIds,
                     measureIds,
                     scenarioConfig.StartDate,
@@ -1050,7 +1043,7 @@ internal sealed class RunExecutor
             // snapshot taken at line ~506.
             if (generationManifest != null)
             {
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             if (isLiveSimulation)
@@ -1112,22 +1105,43 @@ internal sealed class RunExecutor
             var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
             var acquiredResourceTypesForEvidence = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
 
-            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback)
+            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback, CancellationToken queryToken)
             {
                 var logs = new List<string>();
+
+                // Each Loki call stamps its own end time. Refresh coverage here so a
+                // later resource type does not start after the run began.
+                TimeSpan LookbackForThisRequest() =>
+                    LokiEvidenceQuery.LookbackForRequest(
+                        lookback,
+                        LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
+
+                Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
+                    lokiScraper.QueryServiceLogsAsync(
+                        LokiScraper.Components.Normalization,
+                        normalizationSummaryMarker,
+                        LookbackForThisRequest(),
+                        additionalContainsFilters: filters,
+                        limit: limit,
+                        maxPages: maxPages,
+                        cancellationToken: queryToken);
 
                 if (evidenceRequiredResourceTypes.Count > 0)
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
+                        queryToken.ThrowIfCancellationRequested();
                         var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
-                        var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
-                            limit: 5000,
-                            maxPages: 20);
+                        var logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 5000, maxPages: 20);
+
+                        if (logsForResourceType.Count == 0)
+                        {
+                            queryToken.ThrowIfCancellationRequested();
+                            output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
+                            logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 500, maxPages: 40);
+                        }
 
                         output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
                         logs.AddRange(logsForResourceType);
@@ -1136,29 +1150,36 @@ internal sealed class RunExecutor
                     if (logs.Count == 0)
                     {
                         output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
-                        logs = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: runScopeFilters,
-                            limit: 5000,
-                            maxPages: 20);
+                        queryToken.ThrowIfCancellationRequested();
+                        logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                     }
                 }
                 else
                 {
-                    logs = await lokiScraper.QueryServiceLogsAsync(
-                        LokiScraper.Components.Normalization,
-                        normalizationSummaryMarker,
-                        lookback,
-                        additionalContainsFilters: runScopeFilters,
-                        limit: 5000,
-                        maxPages: 20);
+                    queryToken.ThrowIfCancellationRequested();
+                    logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                 }
 
                 return logs
                     .Distinct(StringComparer.Ordinal)
                     .ToList();
+            }
+
+            async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
+            {
+                try
+                {
+                    await _orchestrator.WriteDomainAsync(
+                        state.RunId,
+                        NormalizationEvidenceSnapshot.Domain,
+                        RunHistorySlim.SlimNormalizationEvidence(evidence),
+                        ct);
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
+                    output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                }
             }
 
             var hslocMapEnabled = runtimeNormalizationSequences.Any(s =>
@@ -1173,7 +1194,17 @@ internal sealed class RunExecutor
                     : DateTimeOffset.UtcNow;
                 while (true)
                 {
-                    var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync(scenarioConfig.LokiScrapeWindow);
+                    var normalizationSummaryLogs = await LokiEvidenceQuery.CollectWithRetryAsync(
+                        scenarioConfig.LokiScrapeWindow,
+                        evidenceRequiredResourceTypes,
+                        acquiredResourceTypesForEvidence,
+                        (lookback, queryToken) => QueryNormalizationSummaryLogsAsync(lookback, queryToken),
+                        (delay, ct) => Task.Delay(delay, ct),
+                        output,
+                        cancellationToken,
+                        coverageNow: () => LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
@@ -1181,23 +1212,12 @@ internal sealed class RunExecutor
                         runtimeNormalizationSequences,
                         normalizationSummaryLogs);
                     NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
-                    try
-                    {
-                        await _snapshotStore.SetDomainAsync(
-                            state.RunId,
-                            NormalizationEvidenceSnapshot.Domain,
-                            normalizationEvidence,
-                            cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
-                    }
+                    await PersistNormalizationEvidenceAsync(normalizationEvidence, cancellationToken);
 
                     try
                     {
                         await normalizationSuiteApplicationValidator.ValidateAllAsync(
-                            internalAbsResources, normalizationResolution, normalizationSummaryLogs);
+                            internalPackage, normalizationResolution, normalizationSummaryLogs);
                         return;
                     }
                     catch (InvalidOperationException ex) when (hslocMapEnabled && DateTimeOffset.UtcNow < deadline)
@@ -1230,7 +1250,8 @@ internal sealed class RunExecutor
             }
 
             await RunValidator("VALIDATION RESULTS (API)", () =>
-                validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
+                validationResultsValidator.ValidateAllAsync(
+                    facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow, cancellationToken));
 
             validatorResults = validatorRunner.Results;
 
@@ -1876,7 +1897,8 @@ internal sealed class RunExecutor
                 _snapshotStore,
                 _generatedTemplateCache,
                 liveShape,
-                state.Options.MeasureBundleJsons);
+                state.Options.MeasureBundleJsons,
+                _orchestrator);
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,

@@ -73,4 +73,12 @@ public sealed class ImportedPatientInput
     /// </summary>
     [JsonIgnore]
     public List<Bundle.EntryComponent>? PreLoadedEntries { get; set; }
+
+    /// <summary>
+    /// Transient: location logical ids referenced by this import whose read returned
+    /// 404 or 410. The organization-location hierarchy check does not treat these
+    /// as missing ancestors. Excluded from JSON / Mongo serialization.
+    /// </summary>
+    [JsonIgnore]
+    public HashSet<string> AbsentReferencedLocationIds { get; } = new(StringComparer.Ordinal);
 }

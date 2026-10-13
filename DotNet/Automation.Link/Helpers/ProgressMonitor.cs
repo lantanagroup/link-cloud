@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 /// </summary>
 public class ProgressMonitor
 {
-    private const int ActivityCheckInterval = 6; // ~30s with 5s polling
+    private const int ActivityCheckInterval = AutomationRunPollingPolicy.PipelineActivitySampleEvery;
 
     private readonly IAutomationOutput _output;
     private readonly PipelineProgressTracker? _progressTracker;
@@ -25,6 +25,7 @@ public class ProgressMonitor
     private int _lastCompletedAcqCount;
     private string? _lastAcqBreakdown;
     private readonly AcquisitionActivityTracker _acquisitionActivity = new();
+    private readonly ValidationWorkSignal _validationWork = new();
     private int _progressCheckCount;
     private string? _lastMeasureEvalActivity;
     private string? _lastValidationActivity;
@@ -39,6 +40,15 @@ public class ProgressMonitor
 
     /// <summary>True when at least one DA log is currently Processing.</summary>
     public bool IsAcquisitionInFlight => _acquisitionActivity.InFlight;
+
+    /// <summary>
+    /// True once validation has moved or reported activity and patients are still pending.
+    /// Stays true across quiet samples. Pending patients with no observed work do not count.
+    /// </summary>
+    public bool IsValidationOngoing => _validationWork.IsOngoing;
+
+    /// <summary>Patients whose reporting status is still PendingValidation.</summary>
+    public int PendingValidationCount => _validationWork.PendingValidation;
 
     public bool HasRecentAcquisitionProgress(TimeSpan window, DateTime? utcNow = null)
         => _acquisitionActivity.HasRecentProgress(window, utcNow ?? DateTime.UtcNow);
@@ -77,7 +87,10 @@ public class ProgressMonitor
     /// activity confirmation, and stall detection.
     /// Returns true if a critical failure is detected.
     /// </summary>
-    public async Task<bool> CheckProgressAsync(string facilityId, string reportId)
+    public async Task<bool> CheckProgressAsync(
+        string facilityId,
+        string reportId,
+        CancellationToken cancellationToken = default)
     {
         _progressCheckCount++;
         var hasCriticalFailure = false;
@@ -93,17 +106,37 @@ public class ProgressMonitor
             await _progressTracker.UpdateAsync(facilityId, reportId);
         }
 
-        await CheckPipelineActivityAsync(facilityId, reportId);
+        await CheckPipelineActivityAsync(facilityId, reportId, cancellationToken);
 
         return hasCriticalFailure;
     }
 
-    private async Task CheckPipelineActivityAsync(string facilityId, string reportId)
+    /// <summary>
+    /// The shutdown cycle passes <see cref="CancellationToken.None"/>. Skip the scrape then,
+    /// so stop does not wait out an HTTP timeout. A live monitor token is required.
+    /// </summary>
+    internal static bool ShouldScrapeValidationActivity(CancellationToken cancellationToken)
+        => cancellationToken.CanBeCanceled && !cancellationToken.IsCancellationRequested;
+
+    /// <summary>
+    /// The validation scrape swallows cancellation and returns null. Do not start the
+    /// later Loki calls after that. <see cref="CancellationToken.None"/> is the shutdown
+    /// cycle and still runs them.
+    /// </summary>
+    internal static bool ShouldContinueActivityScrapes(CancellationToken cancellationToken)
+        => !cancellationToken.IsCancellationRequested;
+
+    private async Task CheckPipelineActivityAsync(string facilityId, string reportId, CancellationToken cancellationToken)
     {
         if (_lokiScraper == null)
             return;
 
+        await NoteValidationActivityAsync(facilityId, reportId, cancellationToken);
+
         if (_progressCheckCount % ActivityCheckInterval != 0)
+            return;
+
+        if (!ShouldContinueActivityScrapes(cancellationToken))
             return;
 
         var measureEvalActivity = await _lokiScraper.GetMeasureEvalActivitySummaryAsync(TimeSpan.FromSeconds(60));
@@ -112,6 +145,9 @@ public class ProgressMonitor
             _output.WriteLine($"[DIAG][MeasureEval] Active: {measureEvalActivity}");
             _lastMeasureEvalActivity = measureEvalActivity;
         }
+
+        if (!ShouldContinueActivityScrapes(cancellationToken))
+            return;
 
         var dataAcquisitionActivity = await _lokiScraper.GetDataAcquisitionActivitySummaryAsync(
             TimeSpan.FromSeconds(60),
@@ -128,7 +164,7 @@ public class ProgressMonitor
             }
         }
 
-        if (_scrapeNormalizationResourceTypes)
+        if (_scrapeNormalizationResourceTypes && ShouldContinueActivityScrapes(cancellationToken))
         {
             var normalizationActivity = await _lokiScraper.GetNormalizationActivitySummaryAsync(TimeSpan.FromSeconds(60));
             if (!string.IsNullOrWhiteSpace(normalizationActivity) && !string.Equals(normalizationActivity, _lastNormalizationActivity, StringComparison.Ordinal))
@@ -138,18 +174,28 @@ public class ProgressMonitor
             }
         }
 
-        var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(
-            TimeSpan.FromSeconds(60),
+    }
+
+    private async Task NoteValidationActivityAsync(string facilityId, string reportId, CancellationToken cancellationToken)
+    {
+        if (!ShouldScrapeValidationActivity(cancellationToken))
+            return;
+
+        var validationActivity = await _lokiScraper!.GetValidationActivitySummaryAsync(
+            AutomationRunPollingPolicy.ValidationActivityLookback,
             facilityId,
-            reportId);
-        if (!string.IsNullOrWhiteSpace(validationActivity))
+            reportId,
+            cancellationToken);
+        if (validationActivity != null && !string.IsNullOrWhiteSpace(validationActivity.Summary))
         {
-            _acquisitionActivity.MarkProgress(DateTime.UtcNow);
-            _progressTracker?.NoteActivity();
-            if (!string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
+            // Note the log time. A later scrape of the same line returns false and
+            // does not refresh the quiet hold or the stall tracker.
+            if (_validationWork.NoteActivity(validationActivity.NewestUtc))
+                _progressTracker?.NoteActivity();
+            if (!string.Equals(validationActivity.Summary, _lastValidationActivity, StringComparison.Ordinal))
             {
-                _output.WriteLine($"[DIAG][Validation] Active: {validationActivity}");
-                _lastValidationActivity = validationActivity;
+                _output.WriteLine($"[DIAG][Validation] Active: {validationActivity.Summary}");
+                _lastValidationActivity = validationActivity.Summary;
             }
         }
     }
@@ -180,6 +226,9 @@ public class ProgressMonitor
 
             var entries = await _reader.GetReportEntriesAsync(scheduleId);
 
+            if (ValidationWorkSignal.IsTransientEmptyEntryRead(entries.Count, _lastReportEntryCount))
+                return false;
+
             var total = entries.Count;
             var submitted = entries.Count(e => string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase));
             var pending = entries.Count(e => string.Equals(e.SubmissionStatus, "PendingValidation", StringComparison.OrdinalIgnoreCase));
@@ -196,12 +245,15 @@ public class ProgressMonitor
                             $"Submission: pending={pending}, submitting={submitting}, " +
                             $"submitted={submitted}, failed={failed}";
 
-            if (total != _lastReportEntryCount || breakdown != _lastReportBreakdown)
+            var breakdownChanged = total != _lastReportEntryCount || breakdown != _lastReportBreakdown;
+            if (breakdownChanged)
             {
                 _output.WriteLine($"[DIAG][Report] Entries: {total} total | Reporting: {breakdown}");
                 _lastReportEntryCount = total;
                 _lastReportBreakdown = breakdown;
             }
+
+            _validationWork.ObserveCounts(pendingValidation, passedValidation, failedValidation);
 
             if (failed > 0)
             {
