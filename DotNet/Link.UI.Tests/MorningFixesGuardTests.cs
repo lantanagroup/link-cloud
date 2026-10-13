@@ -268,9 +268,6 @@ public class MorningFixesGuardTests
     [Fact]
     public void Kafka_operations_buttons_use_the_shared_colors()
     {
-        var index = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Index.cshtml"));
-        index.Should().Contain("btn btn-au-link");
-        index.Should().Contain("Open Kafka");
 
         var kafka = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Kafka.cshtml"));
         kafka.Should().NotContain("btn btn-au-execute\" type=\"submit\">Search");

@@ -12,7 +12,6 @@ public class KafkaPageFlowGuardTests
         foreach (var name in new[]
         {
             "Kafka.cshtml",
-            "Index.cshtml",
             "_Overview.cshtml",
             "_Topic.cshtml",
             "_Consumers.cshtml",

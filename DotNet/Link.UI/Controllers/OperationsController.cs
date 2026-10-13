@@ -18,13 +18,9 @@ public sealed class OperationsController : Controller
         _kafka = kafka;
     }
 
+    // Kafka is the only Operations console, so the section opens it directly.
     [HttpGet("")]
-    public IActionResult Index()
-    {
-        ViewData["Title"] = "Operations";
-        ViewData["OperationsSection"] = "home";
-        return View();
-    }
+    public IActionResult Index() => RedirectToAction(nameof(Kafka));
 
     [HttpPost("Kafka/migrations/plan")]
     [ValidateAntiForgeryToken]

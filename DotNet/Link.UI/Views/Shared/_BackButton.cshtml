@@ -2,7 +2,7 @@
 @{
     var origin = ReturnUrlRules.FromQuery(Context.Request);
     var current = Context.Request.Path.Value ?? "/";
-    var show = BackLinkRules.Show(current, Model.FallbackHref, origin);
+    var show = !BackLinkRules.IsTopLevel(current) && BackLinkRules.Show(current, Model.FallbackHref, origin);
     var href = string.IsNullOrWhiteSpace(origin) ? Model.FallbackHref : origin;
     var label = BackLinkRules.LabelFor(origin, Model.FallbackHref, Model.FallbackLabel);
 }
