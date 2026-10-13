@@ -124,6 +124,9 @@ set +e
 "$az_bin" account show --output none
 show_code=$?
 set -e
+if [ "$show_code" -ne 0 ] && [ "${LINK_CLOUD_FEED_TOKEN_NO_LOGIN:-}" = 1 ]; then
+  fail "No Azure CLI session, and sign-in is turned off for this run (LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1). Run 'az login' and then Scripts/docker-compose.feed-token-fetch.sh."
+fi
 if [ "$show_code" -ne 0 ]; then
   printf '%s\n' "No Azure CLI session. Starting device-code sign-in. Complete it in a browser, or cancel and this script will stop." >&2
   set +e

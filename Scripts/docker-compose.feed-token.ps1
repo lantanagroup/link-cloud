@@ -224,6 +224,11 @@ $previousErrorAction = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 & $az account show --output none
 $showCode = $LASTEXITCODE
+if ($showCode -ne 0 -and $env:LINK_CLOUD_FEED_TOKEN_NO_LOGIN -eq '1') {
+    $ErrorActionPreference = $previousErrorAction
+    Write-Host "No Azure CLI session, and sign-in is turned off for this run (LINK_CLOUD_FEED_TOKEN_NO_LOGIN=1). Run 'az login' and then Scripts/docker-compose.feed-token.ps1."
+    exit 1
+}
 if ($showCode -ne 0) {
     Write-Host "No Azure CLI session. Starting device-code sign-in. Complete it in a browser, or cancel and this script will stop."
     & $az login --use-device-code --allow-no-subscriptions | Out-Host
