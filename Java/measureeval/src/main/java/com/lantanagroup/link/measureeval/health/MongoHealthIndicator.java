@@ -1,6 +1,8 @@
 package com.lantanagroup.link.measureeval.health;
 
 import com.lantanagroup.link.shared.utils.LogUtils;
+import com.mongodb.MongoSecurityException;
+import com.mongodb.MongoTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -89,13 +91,13 @@ public class MongoHealthIndicator implements HealthIndicator {
         } catch (ExecutionException e) {
             // The ping itself threw; unwrap to the underlying cause for an accurate reason.
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            String reason = cause instanceof RejectedExecutionException
-                    // A previous ping's thread is still stuck in a call that ignores interruption.
-                    ? "Mongo health check could not be scheduled"
-                    : LogUtils.sanitize(cause.getMessage());
-            // Log it in full; the detail carries only as much as a dashboard cell can show.
-            logger.warn("Mongo health check failed: {}", reason);
-            return down(shorten(reason));
+            // The driver's own message goes to the log, never to the response. GET /health is
+            // permitAll in both authentication modes (SecurityHelper) and is rendered with
+            // show-details: always, so whatever lands in a detail is readable by anyone who can
+            // reach the port -- and the driver describes an unreachable cluster by listing every
+            // server it knows, and a refused credential by naming the user and mechanism.
+            logger.warn("Mongo health check failed: {}", LogUtils.sanitize(cause.getMessage()));
+            return down(describe(cause));
         }
     }
 
@@ -130,14 +132,26 @@ public class MongoHealthIndicator implements HealthIndicator {
     }
 
     /**
-     * The Mongo driver reports an unreachable cluster by dumping its whole client-side view of every
-     * server, which runs past a thousand characters. The detail lands in a table cell on the Admin
-     * dashboard, so keep the leading sentence -- which carries the actual reason -- and drop the rest;
-     * the full message is in the log line above.
+     * A fixed, non-identifying reason for the Admin dashboard's MongoDB row.
+     * <p>
+     * The three cases an operator acts on differently -- unreachable, refused credential, and a
+     * check that could not even be scheduled -- are told apart by type rather than by repeating the
+     * driver's text, which carries server addresses, replica-set topology and credential details.
+     * Anything else is named by its exception class, which is enough to tell "the ping failed" from
+     * "the ping timed out" in a table cell; the message behind it is in the log line above.
      */
-    private static String shorten(String reason) {
-        int limit = 200;
-        return reason == null || reason.length() <= limit ? reason : reason.substring(0, limit) + "...";
+    private static String describe(Throwable cause) {
+        if (cause instanceof RejectedExecutionException) {
+            // A previous ping's thread is still stuck in a call that ignores interruption.
+            return "Mongo health check could not be scheduled";
+        }
+        if (cause instanceof MongoSecurityException) {
+            return "Mongo rejected the service's credentials";
+        }
+        if (cause instanceof MongoTimeoutException) {
+            return "Mongo did not respond within the driver's server selection timeout";
+        }
+        return "Mongo ping failed: " + cause.getClass().getSimpleName();
     }
 
     /**

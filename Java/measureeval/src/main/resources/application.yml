@@ -24,15 +24,18 @@ management:
       timeout-ms: 2000 # backstop deadline for the ping; an unreachable mongod otherwise blocks for
                        # the driver's serverSelectionTimeoutMS (30s by default), which pushes /health
                        # past the BFF's 5s health-check timeout and blanks the dashboard entries.
-                       # Spring runs indicators sequentially, so this has to leave room for the
-                       # resource-cache check below: 2s + 2s (its Redis command timeout) stays under 5s
-                       # even with both backends unreachable at once.
+                       # Spring runs indicators sequentially on the request thread, so the budgets
+                       # add up: 2s here, 3s for the resource-cache backstop below, and up to 4s for
+                       # the Kafka indicator (max.block.ms 3000 plus 1000 on its get). No single
+                       # failing backend can reach the 5s deadline, which is what keeps the dashboard
+                       # populated; all three failing at once still exceeds it, and bounding the
+                       # Kafka check is follow-up work.
     redis:
       enabled: false     # auto Redis indicator disabled; ResourceCacheHealthIndicator checks Redis + ABS
     resource-cache:
-      timeout-ms: 3000   # backstop deadline for the combined Redis+ABS check; the 2s Redis command
-                         # timeout (spring.data.redis.timeout) reports DOWN sooner in the common case,
-                         # and this stays below the BFF's 5s health-check timeout
+      timeout-ms: 3000   # backstop deadline for the combined Redis+ABS check. The 2s Redis command
+                         # timeout (spring.data.redis.timeout) reports DOWN sooner in the common case
+                         # but does not bound the ABS half, so this is what the budget above counts.
     kafka:
       enabled: true  # Ensures Kafka health is checked
 

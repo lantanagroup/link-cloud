@@ -1,4 +1,6 @@
 package com.lantanagroup.link.measureeval.health;
+import com.mongodb.MongoCredential;
+import com.mongodb.MongoSecurityException;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,11 +41,17 @@ public class MongoHealthIndicatorTest {
         assertEquals("{Database=Available}", health.getDetails().toString());
     }
 
+    /**
+     * GET /health is permitAll in both authentication modes and is served with
+     * show-details: always, so the reason reaches anyone who can reach the port. The driver's own
+     * text carries server addresses, replica-set topology and credential details, so the detail
+     * names the failure by type and the message stays in the log.
+     */
     @Test
-    void whenMongoIsDown_thenHealthStatusIsDown() {
-        // Arrange
+    void whenMongoIsDown_thenHealthIsDownWithoutTheDriverMessage() {
+        // Arrange: a driver message of the shape that carries internal addresses.
         when(mongoTemplate.executeCommand("{ ping: 1 }"))
-                .thenThrow(new RuntimeException("Mongo is down"));
+                .thenThrow(new RuntimeException("no server found for mongo-0.internal:27017"));
 
         // Act
         Health health = mongoHealthIndicator.health();
@@ -51,7 +59,34 @@ public class MongoHealthIndicatorTest {
         // Assert
         assertEquals(Status.DOWN, health.getStatus());
         assertEquals("Unavailable", health.getDetails().get("Database"));
-        assertEquals("Mongo is down", health.getDetails().get("error"));
+        String error = health.getDetails().get("error").toString();
+        assertEquals("Mongo ping failed: RuntimeException", error);
+        assertFalse(error.contains("mongo-0.internal"),
+                "the driver's message must not reach the health detail, got: " + error);
+    }
+
+    /**
+     * A refused credential is the one failure an operator acts on differently from an unreachable
+     * cluster, so it is named -- without repeating the driver's text, which identifies the user and
+     * the mechanism it tried.
+     */
+    @Test
+    void whenMongoRefusesCredentials_thenTheReasonSaysSoWithoutNamingTheUser() {
+        // Arrange
+        MongoSecurityException refused = new MongoSecurityException(
+                MongoCredential.createCredential("link", "admin", "secret".toCharArray()),
+                "Exception authenticating MongoCredential{mechanism=SCRAM-SHA-1, userName='link'}",
+                new RuntimeException("auth failed"));
+        when(mongoTemplate.executeCommand("{ ping: 1 }")).thenThrow(refused);
+
+        // Act
+        Health health = mongoHealthIndicator.health();
+
+        // Assert
+        assertEquals(Status.DOWN, health.getStatus());
+        String error = health.getDetails().get("error").toString();
+        assertEquals("Mongo rejected the service's credentials", error);
+        assertFalse(error.contains("link"), "the credential must not reach the health detail");
     }
 
     /**
