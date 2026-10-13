@@ -93,7 +93,7 @@ public class AutomationRunDepthTests
         var manifest = Read("DotNet/Link.UI/Views/Automation/Manifest.cshtml");
         manifest.Should().Contain("_ReportManifest");
         manifest.Should().Contain("\"Automation\"");
-        manifest.Should().Contain("asp-action=\"Run\"");
+        manifest.Should().Contain("<partial name=\"_BackButton\" model=\"@(new BackLink(Url.Action(\"Run\", \"Automation\"");
         var shared = Read("DotNet/Link.UI/Views/Shared/_ReportManifest.cshtml");
         shared.Should().Contain("Generated vs ABS");
         shared.Should().Contain("ShowComparison");

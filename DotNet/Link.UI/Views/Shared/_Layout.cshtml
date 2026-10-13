@@ -5,6 +5,17 @@
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
     bool Ctrl(string name) => string.Equals(currentController, name, StringComparison.OrdinalIgnoreCase);
 
+    // A detail page names the section that owns it. Report pages reached from Automation belong to Automation;
+    // the other report tabs belong to Reports, so every tab of one report highlights the same section.
+    var navSection = ViewData["NavSection"] as string;
+    if (navSection is null && ViewData["ReportSection"] is string)
+    {
+        var reportOrigin = ReturnUrlRules.FromQuery(Context.Request);
+        navSection = reportOrigin is not null && reportOrigin.StartsWith("/Automation", StringComparison.OrdinalIgnoreCase) ? "Automation" : "Reports";
+    }
+    bool Nav(string name) => navSection is null ? Ctrl(name) : string.Equals(navSection, name, StringComparison.OrdinalIgnoreCase);
+    var automationActive = navSection is null ? AutomationSurface.IsAutomationPath(Context.Request.Path) : string.Equals(navSection, "Automation", StringComparison.OrdinalIgnoreCase);
+
     var user = Context.Items[AdminBffUserService.HttpContextItemKey] as AdminBffUser
         ?? await UserService.GetCurrentUserAsync(Context.RequestAborted);
     var adminShell = Ctrl("Tenants") || Ctrl("Reports") || Ctrl("Logs") || Ctrl("Configuration") || Ctrl("System") || Ctrl("Operations");
@@ -57,31 +68,31 @@
             </div>
             <nav class="lu-nav" aria-label="Primary">
                 <div class="lu-nav-section-label">Admin</div>
-                <a class="lu-nav-link @(Ctrl("Home") ? "active" : "")" asp-controller="Home" asp-action="Index">
+                <a class="lu-nav-link @(Nav("Home") ? "active" : "")" asp-controller="Home" asp-action="Index">
                     <i class="bi bi-house-door me-2"></i>Dashboard
                 </a>
-                <a class="lu-nav-link @(Ctrl("Operations") ? "active" : "")" asp-controller="Operations" asp-action="Index">
+                <a class="lu-nav-link @(Nav("Operations") ? "active" : "")" asp-controller="Operations" asp-action="Index">
                     <i class="bi bi-speedometer2 me-2"></i>Operations
                 </a>
-                <a class="lu-nav-link @(Ctrl("Tenants") ? "active" : "")" asp-controller="Tenants" asp-action="Index">
+                <a class="lu-nav-link @(Nav("Tenants") ? "active" : "")" asp-controller="Tenants" asp-action="Index">
                     <i class="bi bi-building me-2"></i>Tenants
                 </a>
-                <a class="lu-nav-link @(Ctrl("Reports") ? "active" : "")" asp-controller="Reports" asp-action="Index">
+                <a class="lu-nav-link @(Nav("Reports") ? "active" : "")" asp-controller="Reports" asp-action="Index">
                     <i class="bi bi-file-earmark-bar-graph me-2"></i>Reports
                 </a>
-                <a class="lu-nav-link @(Ctrl("Configuration") ? "active" : "")" asp-controller="Configuration" asp-action="Index">
+                <a class="lu-nav-link @(Nav("Configuration") ? "active" : "")" asp-controller="Configuration" asp-action="Index">
                     <i class="bi bi-sliders me-2"></i>Configuration
                 </a>
-                <a class="lu-nav-link @(Ctrl("Logs") ? "active" : "")" asp-controller="Logs" asp-action="Index">
+                <a class="lu-nav-link @(Nav("Logs") ? "active" : "")" asp-controller="Logs" asp-action="Index">
                     <i class="bi bi-journal-text me-2"></i>Logs
                 </a>
                 @if (LinkUiFeatures.Value.AutomationEnabled)
                 {
-                    <a class="lu-nav-link @(AutomationSurface.IsAutomationPath(Context.Request.Path) ? "active" : "")" asp-controller="Automation" asp-action="Index">
+                    <a class="lu-nav-link @(automationActive ? "active" : "")" asp-controller="Automation" asp-action="Index">
                         <i class="bi bi-lightning-charge me-2"></i>Automation
                     </a>
                 }
-                <a class="lu-nav-link @(Ctrl("System") ? "active" : "")" asp-controller="System" asp-action="Index">
+                <a class="lu-nav-link @(Nav("System") ? "active" : "")" asp-controller="System" asp-action="Index">
                     <i class="bi bi-gear me-2"></i>System
                 </a>
             </nav>

@@ -147,7 +147,9 @@ public sealed partial class AutomationController : Controller
         if (!legacy && page.Found && page.Run is { } row
             && !string.IsNullOrWhiteSpace(row.FacilityId) && !string.IsNullOrWhiteSpace(row.ReportId))
         {
-            return Redirect(Url.Action("Report", "Tenants", new { id = row.FacilityId, reportId = row.ReportId })!);
+            // Keep where the person came from so the report page highlights Automation and goes back there.
+            var origin = ReturnUrlRules.FromQuery(Request) ?? Url.Action("Index", "Automation");
+            return Redirect(Url.Action("Report", "Tenants", new { id = row.FacilityId, reportId = row.ReportId, returnUrl = origin })!);
         }
 
         if (page.Found && _manager is not null)
