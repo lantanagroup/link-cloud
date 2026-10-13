@@ -33,7 +33,7 @@ import java.util.concurrent.TimeoutException;
  * <p>
  * The combined probe runs on a separate thread bounded by {@link #checkTimeoutMs}, because both the
  * Lettuce reconnect path and the Azure SDK's retry/backoff can otherwise leave /health hanging when
- * a backend is unreachable. The backstop is kept below the BFF's 5s health-check timeout so the BFF
+ * a backend is unreachable. The backstop is kept below the BFF's health-check deadline so the BFF
  * still receives a real DOWN rather than timing out to N/A.
  */
 @Component("Resource Cache")

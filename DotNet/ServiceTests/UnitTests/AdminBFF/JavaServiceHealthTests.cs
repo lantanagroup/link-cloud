@@ -160,12 +160,11 @@ public class JavaServiceHealthTests
             MeasureServiceUrl = "http://localhost/",
             ValidationServiceUrl = "http://localhost/"
         });
-        var healthCheckSettings = Options.Create(new ServiceHealthCheckSettings());
 
         return measureEval
-            ? await new MeasureEvalService(NullLogger<MeasureEvalService>.Instance, client, registry, healthCheckSettings)
+            ? await new MeasureEvalService(NullLogger<MeasureEvalService>.Instance, client, registry)
                 .LinkServiceHealthCheck(CancellationToken.None)
-            : await new ValidationService(NullLogger<ValidationService>.Instance, client, registry, healthCheckSettings)
+            : await new ValidationService(NullLogger<ValidationService>.Instance, client, registry)
                 .LinkServiceHealthCheck(CancellationToken.None);
     }
 

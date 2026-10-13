@@ -16,9 +16,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * The Admin BFF abandons a service's {@code /health} after 5s and then reports it Unhealthy with no
- * entries at all, so every indicator's budget is spent out of one shared window. These cover the
- * Kafka indicator's share of it.
+ * The Admin BFF abandons a service's {@code /health} at its own deadline and reports it Unhealthy
+ * with no entries at all, so every indicator's budget is spent out of one shared window. These
+ * cover the Kafka indicator's share of it.
  */
 class KafkaHealthCheckIndicatorTest {
 
@@ -61,7 +61,7 @@ class KafkaHealthCheckIndicatorTest {
     /**
      * Guards the two halves of the budget against drifting apart: the producer has to give up first,
      * so that a broker outage is reported as one rather than as a timed-out future, and the pair has
-     * to leave the other indicators room inside the BFF's 5s window.
+     * to leave the other indicators room inside the BFF's health-check window.
      */
     @Test
     void theProducerGivesUpBeforeTheIndicatorAndBothFitTheBffWindow() {
@@ -71,7 +71,7 @@ class KafkaHealthCheckIndicatorTest {
                 "the health producer's max.block.ms (" + Properties.MAX_BLOCK_MS_CONFIG
                         + "ms) must stay under the indicator's deadline (" + defaultTimeoutMs + "ms)");
         assertTrue(defaultTimeoutMs <= 2000,
-                "the Kafka check shares the BFF's 5s window with the other indicators; "
+                "the Kafka check shares the BFF's health-check window with the other indicators; "
                         + defaultTimeoutMs + "ms leaves too little for them");
     }
 }

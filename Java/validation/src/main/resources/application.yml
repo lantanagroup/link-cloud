@@ -106,13 +106,13 @@ management:
     db:
       enabled: false     # Custom DatabaseHealthIndicator (bounded probe) is used instead of the auto
                          # one, which is bounded only by HikariCP's connectionTimeout -- 30s by
-                         # default, six times the BFF's health-check window
+                         # default, nearly four times the BFF's health-check deadline
       timeout-ms: 2000   # backstop deadline for the probe
     # Spring evaluates indicators sequentially on the request thread, so the budgets add up: 2s for
     # the database, 3s for Redis, and 1.5s for Kafka (management.health.kafka.timeout-ms, defaulted
-    # in KafkaHealthCheckIndicator). Any two can fail together and still answer inside the BFF's 5s
-    # window, which is what keeps the dashboard's rows populated. All three at once comes to 6.5s;
-    # the BFF then reports the deadline as an entry of its own rather than returning no entries.
+    # in KafkaHealthCheckIndicator) -- 6.5s with all three backends down at once, inside the BFF's
+    # 8s deadline (SpringServiceHealth.Deadline). Keep the sum under it: exceeding it costs
+    # every row for this service, and the rows are what say which backend failed.
 
 logging:
   level:

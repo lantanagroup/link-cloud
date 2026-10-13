@@ -11,16 +11,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly ILogger<MeasureEvalService> _logger;
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
-        private readonly TimeSpan _healthCheckTimeout;
 
         public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient client,
-            IOptions<ServiceRegistry> serviceRegistry, IOptions<ServiceHealthCheckSettings> healthCheckSettings)
+            IOptions<ServiceRegistry> serviceRegistry)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
-            _healthCheckTimeout = (healthCheckSettings ?? throw new ArgumentNullException(nameof(healthCheckSettings)))
-                .Value.Timeout;
 
             InitHttpClient();
         }
@@ -28,7 +25,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(_healthCheckTimeout);
+            timeoutCts.CancelAfter(SpringServiceHealth.Deadline);
 
             // HTTP GET
             HttpResponseMessage response = await _client.GetAsync($"health", timeoutCts.Token);
@@ -37,7 +34,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
 
         public Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken) =>
-            SpringServiceHealth.ReadAsync(_client, "Measure Evaluation", _healthCheckTimeout, _logger, cancellationToken);
+            SpringServiceHealth.ReadAsync(_client, "Measure Evaluation", SpringServiceHealth.Deadline, _logger, cancellationToken);
 
         private void InitHttpClient()
         {

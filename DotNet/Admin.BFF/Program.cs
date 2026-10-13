@@ -18,7 +18,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
@@ -89,7 +88,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.Cache));
-    builder.Services.Configure<ServiceHealthCheckSettings>(builder.Configuration.GetSection(ServiceHealthCheckSettings.ConfigSectionName));
 
     // Determine if anonymous access is allowed
     var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");

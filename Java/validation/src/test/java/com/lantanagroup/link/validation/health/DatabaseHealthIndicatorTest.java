@@ -47,7 +47,7 @@ class DatabaseHealthIndicatorTest {
     /**
      * The case this indicator exists for. Spring's auto indicator asks the pool for a connection
      * with nothing but HikariCP's connectionTimeout behind it -- 30s by default -- which keeps
-     * /health from answering inside the BFF's 5s window and costs the dashboard every row for the
+     * /health from answering inside the BFF's health-check window and costs the dashboard every row for the
      * service, Redis included.
      */
     @Test

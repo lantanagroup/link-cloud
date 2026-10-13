@@ -23,13 +23,13 @@ management:
       enabled: false   # auto Mongo indicator disabled; MongoHealthIndicator checks the ping
       timeout-ms: 2000 # backstop deadline for the ping; an unreachable mongod otherwise blocks for
                        # the driver's serverSelectionTimeoutMS (30s by default), which pushes /health
-                       # past the BFF's 5s health-check timeout and blanks the dashboard entries.
+                       # past the BFF's health-check deadline and blanks the dashboard entries.
                        # Spring runs indicators sequentially on the request thread, so the budgets
                        # add up: 2s here, 3s for the resource-cache backstop below, and 1.5s for the
-                       # Kafka indicator. Any two of the three can fail together and still answer
-                       # inside the deadline, which is what keeps the dashboard populated. All three
-                       # at once comes to 6.5s and still blanks it; closing that last case means
-                       # trimming these two further or giving the BFF more headroom.
+                       # Kafka indicator -- 6.5s with all three backends down at once, inside the
+                       # BFF's 8s deadline (SpringServiceHealth.Deadline). Keep the sum under
+                       # it: exceeding it costs every row for this service, and the rows are what
+                       # say which backend failed.
     redis:
       enabled: false     # auto Redis indicator disabled; ResourceCacheHealthIndicator checks Redis + ABS
     resource-cache:

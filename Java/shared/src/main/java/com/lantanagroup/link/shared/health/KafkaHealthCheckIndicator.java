@@ -24,7 +24,7 @@ public class KafkaHealthCheckIndicator implements HealthIndicator {
      * Backstop deadline for the acknowledgement, configurable via
      * {@code management.health.kafka.timeout-ms}. Keep it above the health producer's
      * {@link Properties#MAX_BLOCK_MS_CONFIG} so the producer gives up first and reports why,
-     * and keep the two together well inside the Admin BFF's 5s window -- it is shared with the
+     * and keep the two together well inside the Admin BFF's health-check window -- it is shared with the
      * other indicators, which Spring runs one after another on this same request thread.
      */
     private final long checkTimeoutMs;

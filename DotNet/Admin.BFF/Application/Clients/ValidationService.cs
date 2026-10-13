@@ -12,16 +12,13 @@ public class ValidationService
     private readonly ILogger<ValidationService> _logger;
     private readonly HttpClient _client;
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
-    private readonly TimeSpan _healthCheckTimeout;
 
     public ValidationService(ILogger<ValidationService> logger, HttpClient client,
-        IOptions<ServiceRegistry> serviceRegistry, IOptions<ServiceHealthCheckSettings> healthCheckSettings)
+        IOptions<ServiceRegistry> serviceRegistry)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
-        _healthCheckTimeout = (healthCheckSettings ?? throw new ArgumentNullException(nameof(healthCheckSettings)))
-            .Value.Timeout;
 
         InitHttpClient();
     }
@@ -41,5 +38,5 @@ public class ValidationService
     }
 
     public Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken) =>
-        SpringServiceHealth.ReadAsync(_client, "Validation", _healthCheckTimeout, _logger, cancellationToken);
+        SpringServiceHealth.ReadAsync(_client, "Validation", SpringServiceHealth.Deadline, _logger, cancellationToken);
 }

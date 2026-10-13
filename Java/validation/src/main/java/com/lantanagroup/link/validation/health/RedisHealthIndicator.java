@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
  * creates the Redis connection factory). Spring's auto-configured Redis health indicator is disabled
  * (management.health.redis.enabled=false) in favor of this one: when Redis is unreachable, Lettuce's
  * reconnect / connection-acquisition path is not reliably bounded by the command timeout, so the
- * default indicator can leave /health hanging long enough for the BFF's 5s window to time out and
+ * default indicator can leave /health hanging long enough for the BFF's health-check window to time out and
  * report every column as N/A.
  * <p>
  * The PING runs on a separate thread bounded by {@link #checkTimeoutMs}, so a down cache is reported

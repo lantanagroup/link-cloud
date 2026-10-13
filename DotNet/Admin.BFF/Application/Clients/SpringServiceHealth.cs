@@ -28,6 +28,24 @@ public static class SpringServiceHealth
     /// <summary>The entry a report carries when the service's own health could not be read.</summary>
     public const string ReadEntry = "Health check";
 
+    /// <summary>
+    /// How long to wait for a Spring service to answer <c>/health</c>.
+    /// </summary>
+    /// <remarks>
+    /// A budget rather than a round number. A Spring service's health endpoint costs the sum of its
+    /// indicators -- they are evaluated sequentially on the request thread -- so this has to clear the
+    /// worst case of whatever that service checks: 2s for the database, 3s for the cache and 1.5s for
+    /// Kafka is 6.5s with every backend down at once. The 5s it replaced cleared any two of those
+    /// three but not all three, so the one outage that most needed the detail was the one that lost
+    /// it. Add a backend to either Java service and this needs revisiting with it.
+    /// <para>
+    /// The cost of waiting longer falls on a row that is already failing: the Admin UI allows 30s per
+    /// request (loader.interceptor.ts) and the dashboard issues its per-service requests
+    /// concurrently, so no healthy service's row waits on a sick one.
+    /// </para>
+    /// </remarks>
+    public static readonly TimeSpan Deadline = TimeSpan.FromSeconds(8);
+
     public static async Task<LinkServiceHealthReport> ReadAsync(
         HttpClient client,
         string service,

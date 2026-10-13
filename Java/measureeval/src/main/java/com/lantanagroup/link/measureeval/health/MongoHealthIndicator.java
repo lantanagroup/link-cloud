@@ -28,10 +28,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * an unreachable mongod leaves the driver in server selection for its full {@code
  * serverSelectionTimeoutMS} -- 30s on the driver default, and the URI is supplied per environment
  * (Azure App Configuration in deployed environments), so the parameter cannot be relied on. Thirty
- * seconds pushes /health past the BFF's 5s health-check timeout, and the BFF then reports the whole
+ * seconds pushes /health past the BFF's health-check deadline, and the BFF then reports the whole
  * service Unhealthy with no entries at all -- so the Admin dashboard loses the MongoDB *and* the
  * Resource Cache rows precisely when they would say what is wrong. The backstop is kept below that
- * 5s deadline, with room for the resource-cache check to spend its own budget, since Spring runs
+ * deadline, with room for the resource-cache check to spend its own budget, since Spring runs
  * indicators sequentially on the request thread.
  * <p>
  * Spring's auto Mongo indicator is disabled (management.health.mongo.enabled=false) in favor of this
