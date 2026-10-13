@@ -69,7 +69,7 @@ public class KafkaOpsPageTests
         text.Should().NotContain("Type the topic name");
         text.Should().Contain("LinkUiTime.Display");
         text.Should().Contain("_LabeledId");
-        text.Should().Contain("_BackButton");
+        text.Should().NotContain("_BackButton", "the Kafka console is the Operations landing page");
         text.Should().Contain("aria-label");
         text.Should().Contain("data-au-refresh");
         text.Should().Contain("returnUrl");

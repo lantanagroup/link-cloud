@@ -93,7 +93,6 @@ public class KafkaConsoleUxTests
         var topic = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Topic.cshtml"));
         var consumers = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Consumers.cshtml"));
         var brokers = File.ReadAllText(Path.Combine(root, "Views", "Operations", "_Brokers.cshtml"));
-        var home = File.ReadAllText(Path.Combine(root, "Views", "Operations", "Index.cshtml"));
 
         overview.Should().NotContain("Read this before changing anything.");
         overview.Should().NotContain("Topics that need attention");
@@ -131,9 +130,6 @@ public class KafkaConsoleUxTests
         IndexOf(brokers, "id=\"kafka-q\"").Should().BeLessThan(IndexOf(brokers, "id=\"kafka-broker-table\""));
         IndexOf(brokers, "id=\"kafka-broker-result\"").Should().BeLessThan(IndexOf(brokers, ">Preview decommission</span>"));
 
-        home.Should().Contain("changes that start as a preview");
-        home.Should().Contain("Open Kafka");
-        home.Should().Contain("btn btn-au-link");
     }
 
     [Fact]
