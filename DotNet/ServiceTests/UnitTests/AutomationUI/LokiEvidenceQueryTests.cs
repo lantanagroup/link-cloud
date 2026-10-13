@@ -40,6 +40,78 @@ public class LokiEvidenceQueryTests
     }
 
     [Fact]
+    public void Lookback_covers_a_run_that_is_longer_than_the_configured_window()
+    {
+        var coverage = TimeSpan.FromMinutes(80);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 0, coverage).Should().Be(coverage);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 1, coverage).Should().Be(coverage);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 3, coverage).Should().Be(coverage);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(90), 0, coverage).Should().Be(TimeSpan.FromMinutes(90));
+        LokiEvidenceQuery.LookbackForRequest(coverage, TimeSpan.FromMinutes(81)).Should().Be(TimeSpan.FromMinutes(81));
+        LokiEvidenceQuery.LookbackForRequest(TimeSpan.FromMinutes(90), coverage).Should().Be(TimeSpan.FromMinutes(90));
+    }
+
+    [Fact]
+    public void Coverage_before_the_run_starts_does_not_shrink_the_lookback()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
+        var coverage = LokiEvidenceQuery.CoverageSince(now.AddMinutes(5), now);
+
+        coverage.Should().Be(TimeSpan.Zero);
+        LokiEvidenceQuery.LookbackForRequest(TimeSpan.FromMinutes(30), coverage).Should().Be(TimeSpan.FromMinutes(30));
+    }
+
+    [Fact]
+    public void Coverage_since_a_past_start_extends_the_lookback()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
+        var coverage = LokiEvidenceQuery.CoverageSince(now.AddMinutes(-80), now);
+
+        coverage.Should().Be(TimeSpan.FromMinutes(80));
+        LokiEvidenceQuery.LookbackForRequest(TimeSpan.FromMinutes(30), coverage).Should().Be(TimeSpan.FromMinutes(80));
+    }
+
+    [Fact]
+    public async Task CollectWithRetry_measures_coverage_after_the_retry_delay()
+    {
+        var coverageReads = 0;
+        var delayed = false;
+        var secondReadWasAfterDelay = false;
+        var lookbacks = new List<TimeSpan>();
+        var output = new CapturingOutput();
+
+        await LokiEvidenceQuery.CollectWithRetryAsync(
+            TimeSpan.FromMinutes(30),
+            ["Observation"],
+            ["Observation"],
+            (lookback, _) =>
+            {
+                lookbacks.Add(lookback);
+                return Task.FromResult(new List<string>());
+            },
+            (_, _) =>
+            {
+                delayed = true;
+                return Task.CompletedTask;
+            },
+            output,
+            coverageNow: () =>
+            {
+                if (coverageReads == 1)
+                    secondReadWasAfterDelay = delayed;
+                return TimeSpan.FromMinutes(80 + coverageReads++);
+            });
+
+        secondReadWasAfterDelay.Should().BeTrue();
+
+        lookbacks.Should().Equal(
+            TimeSpan.FromMinutes(80),
+            TimeSpan.FromMinutes(81),
+            TimeSpan.FromMinutes(82),
+            TimeSpan.FromMinutes(83));
+    }
+
+    [Fact]
     public void Delay_before_retry_attempts_is_5_10_20_seconds()
     {
         LokiEvidenceQuery.DelayBeforeAttempt(0).Should().BeNull();
