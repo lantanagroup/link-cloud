@@ -727,6 +727,7 @@ public sealed class InfraStatus
 {
     public string Provider { get; set; } = "Disabled";
     public bool Enabled { get; set; }
+    public bool BrokerLifecycleEnabled { get; set; }
     public string Detail { get; set; } = "";
 }
 

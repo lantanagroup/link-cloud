@@ -1,6 +1,7 @@
 using System.Text;
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps.Protocol;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
@@ -57,6 +58,9 @@ public sealed class ReassignmentListing
     public bool Known { get; set; }
     public List<string> Topics { get; set; } = [];
     public List<string> Partitions { get; set; } = [];
+
+    /// <summary>Why the listing is unknown, when <see cref="Known"/> is false.</summary>
+    public string Error { get; set; } = "";
 }
 
 public static class KafkaLeaderElection
@@ -111,11 +115,16 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     private readonly SemaphoreSlim _adminGate = new(1, 1);
     private readonly Dictionary<string, int> _failuresByOperation = new(StringComparer.Ordinal);
     private IAdminClient? _admin;
+    private IKafkaReassignmentAdmin? _reassignments;
 
     public KafkaBrokerGateway(KafkaConnection connection)
-        : this(connection, new ConfluentAdminClientFactory())
+        : this(connection, new KafkaAdminWire(KafkaWireSettings.From(connection)))
     {
     }
+
+    public KafkaBrokerGateway(KafkaConnection connection, IKafkaReassignmentAdmin reassignments)
+        : this(connection, new ConfluentAdminClientFactory()) =>
+        _reassignments = reassignments;
 
     internal KafkaBrokerGateway(KafkaConnection connection, IKafkaAdminClientFactory clients)
     {
@@ -374,11 +383,28 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         }
     }
 
-    public Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Kafka's own ListPartitionReassignments answer. Confluent.Kafka has no such call, so it goes through the
+    /// admin wire client. Unknown (with the reason) when Kafka cannot be asked.
+    /// </summary>
+    public async Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        // Confluent.Kafka 2.16.0 still has no ListPartitionReassignments. The service asks the infrastructure provider.
-        return Task.FromResult(new ReassignmentListing());
+        if (_reassignments is null)
+            return new ReassignmentListing { Error = "No reassignment admin client is configured." };
+        try
+        {
+            var ongoing = await _reassignments.ListAsync(cancellationToken);
+            return new ReassignmentListing
+            {
+                Known = true,
+                Topics = ongoing.Select(item => item.Topic).Distinct(StringComparer.Ordinal).ToList(),
+                Partitions = ongoing.Select(item => item.Topic + "\n" + item.Partition).ToList()
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ReassignmentListing { Error = ex.Message };
+        }
     }
 
     public Task ElectPreferredLeadersAsync(IReadOnlyList<TopicPartition> partitions, CancellationToken cancellationToken)

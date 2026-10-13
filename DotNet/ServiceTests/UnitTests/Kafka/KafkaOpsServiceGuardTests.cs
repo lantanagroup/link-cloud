@@ -982,11 +982,25 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal(0, infra.CancelCalls);
         Assert.Equal(KafkaChangeStatus.Converging, (await service.GetAsync(moving.Id, CancellationToken.None))!.Status);
 
-        broker.Reassignments = new ReassignmentListing { Known = false };
+        // Kafka's own listing decides: a provider answer cannot stand in for it.
+        broker.Reassignments = new ReassignmentListing { Known = false, Error = "The controller did not answer." };
         infra.Reassignments = new ReassignmentListing { Known = true, Topics = ["ops-proof-log"] };
+        var kafkaSilent = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None));
+        Assert.Contains("cannot confirm no reassignment is in flight", kafkaSilent.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("The controller did not answer.", kafkaSilent.Message, StringComparison.Ordinal);
+
+        // A provider that runs its own rebalances (Strimzi) adds its list to Kafka's.
+        infra.Name = "Strimzi";
+        broker.Reassignments = new ReassignmentListing { Known = true };
         var named = await service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None);
         Assert.Contains(named.Errors, error => error.Contains("ops-proof-log", StringComparison.Ordinal));
         Assert.DoesNotContain(named.Errors, error => error.Contains("cannot confirm", StringComparison.OrdinalIgnoreCase));
+        infra.Reassignments = new ReassignmentListing { Known = false };
+        var providerSilent = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None));
+        Assert.Contains("Strimzi", providerSilent.Message, StringComparison.Ordinal);
+        infra.Name = "Test";
 
         broker.Reassignments = new ReassignmentListing { Known = true, Topics = ["ops-proof-members"] };
         infra.Reassignments = new ReassignmentListing { Known = false };
@@ -996,34 +1010,96 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
-    public async Task DisabledProvider_RefusesMovesUntilAnInfraProviderIsEnabled()
+    public async Task DisabledProvider_KafkaNativeChangesStillRun_BrokerAndPodChangesNeedAProvider()
     {
         var (service, broker, infra) = NewService(requireSecondApprover: false);
-        broker.Reassignments = new ReassignmentListing { Known = false };
-        infra.Reassignments = new ReassignmentListing { Known = false };
         infra.Enabled = false;
         infra.Name = "Disabled";
 
-        var plan = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None));
-        Assert.Contains("cannot confirm no reassignment is in flight", plan.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("enable an infra provider to allow this", plan.Message, StringComparison.OrdinalIgnoreCase);
+        var plan = await service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None);
+        Assert.DoesNotContain(plan.Errors, error => error.Contains("provider", StringComparison.OrdinalIgnoreCase));
+        var family = await service.PlanFamilyAsync("ReadyToAcquire", false, null, CancellationToken.None);
+        Assert.DoesNotContain(family.Errors, error => error.Contains("provider", StringComparison.OrdinalIgnoreCase));
+        var rebalance = await service.PlanRebalanceAsync(3, CancellationToken.None);
+        Assert.DoesNotContain(rebalance.Errors, error => error.Contains("provider", StringComparison.OrdinalIgnoreCase));
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the log topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        Assert.NotEqual(KafkaChangeStatus.Failed, created.Status);
 
-        var family = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.PlanFamilyAsync("ReadyToAcquire", false, null, CancellationToken.None));
-        Assert.Contains("enable an infra provider to allow this", family.Message, StringComparison.OrdinalIgnoreCase);
-        var decommission = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.PlanDecommissionAsync(3, CancellationToken.None));
-        Assert.Contains("enable an infra provider to allow this", decommission.Message, StringComparison.OrdinalIgnoreCase);
-        var rebalance = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.PlanRebalanceAsync(3, CancellationToken.None));
-        Assert.Contains("enable an infra provider to allow this", rebalance.Message, StringComparison.OrdinalIgnoreCase);
         var add = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
             service.CreateAddBrokerAsync(User("pat", ManageScaling), "add a broker", null, CancellationToken.None));
-        Assert.Contains("enable an infra provider to allow this", add.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(infra.Detail, add.Message);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var decommission = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None));
+        Assert.Equal(infra.Detail, decommission.Message);
+        var scale = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateScaleAsync(User("pat", ManageScaling), "DataAcquisitionWorker", 1, "add a worker", null, CancellationToken.None));
+        Assert.Equal(infra.Detail, scale.Message);
+    }
 
-        var scale = await service.PlanScaleAsync("DataAcquisitionWorker", 1, CancellationToken.None);
-        Assert.DoesNotContain(scale.Errors, error => error.Contains("infra provider", StringComparison.OrdinalIgnoreCase));
+    [Fact]
+    public async Task BrokerLifecycleOff_RefusesBrokerAndPodChanges_AndKeepsKafkaNativeChanges()
+    {
+        Assert.False(new KafkaOpsOptions().BrokerLifecycleEnabled);
+        var (service, broker, infra) = NewService(requireSecondApprover: false, brokerLifecycle: false);
+        Assert.False(service.Infra.BrokerLifecycleEnabled);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var refusals = new List<Func<Task>>
+        {
+            () => service.PlanAddBrokerAsync(CancellationToken.None),
+            () => service.CreateAddBrokerAsync(User("pat", ManageScaling), "add a broker", null, CancellationToken.None),
+            () => service.PlanDecommissionAsync(3, CancellationToken.None),
+            () => service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None),
+            () => service.PlanRebalanceAsync(3, CancellationToken.None),
+            () => service.CreateRebalanceAsync(User("alice", ManageScaling), 3, "spread", null, CancellationToken.None),
+            () => service.PlanScaleAsync("DataAcquisitionWorker", 1, CancellationToken.None),
+            () => service.CreateScaleAsync(User("pat", ManageScaling), "DataAcquisitionWorker", 1, "add a worker", null, CancellationToken.None)
+        };
+        foreach (var refuse in refusals)
+        {
+            var error = await Assert.ThrowsAsync<KafkaOpsRejectedException>(refuse);
+            Assert.Equal(KafkaOpsService.BrokerLifecycleOffDetail, error.Message);
+        }
+
+        Assert.Equal(0, infra.ApplyCalls + infra.RemoveCalls);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the log topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        Assert.NotEqual(KafkaChangeStatus.Failed, created.Status);
+    }
+
+    [Fact]
+    public async Task DisabledProvider_RebalanceAcrossCurrentBrokers_SubmitsOnKafkaInWaves()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: true);
+        infra.Enabled = false;
+        infra.Name = "Disabled";
+        infra.BatchPartitions = 1;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2], Isr = [1, 2] });
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 1, Leader = 1, Replicas = [1, 2], Isr = [1, 2] });
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 2, Leader = 2, Replicas = [2, 1], Isr = [2, 1] });
+        var plan = await service.PlanRebalanceAsync(3, CancellationToken.None);
+        if (!plan.Accepted || plan.Moves.Count < 2)
+            return;
+
+        var created = await service.CreateRebalanceAsync(User("alice", ManageScaling), 3, "spread onto broker 3", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
+        await service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None);
+        var stored = (await service.GetAsync(created.Id, CancellationToken.None))!;
+        Assert.Equal(1, infra.SubmitCalls);
+        Assert.Equal(1, stored.SubmittedPartitions);
+
+        broker.Reassignments = new ReassignmentListing { Known = true };
+        await service.TrackAsync(CancellationToken.None);
+        Assert.Equal(2, infra.SubmitCalls);
+        Assert.Equal(2, stored.SubmittedPartitions);
+        Assert.NotEqual(KafkaChangeStatus.Done, stored.Status);
     }
 
     [Fact]
@@ -1083,8 +1159,8 @@ public class KafkaOpsServiceGuardTests
         await service.TrackAsync(CancellationToken.None);
         Assert.Equal(KafkaChangeStatus.TimedOut, stored.Status);
 
-        broker.Reassignments = new ReassignmentListing { Known = false };
-        infra.Reassignments = new ReassignmentListing { Known = true };
+        broker.Reassignments = new ReassignmentListing { Known = true };
+        infra.Reassignments = new ReassignmentListing { Known = false };
         await service.TrackAsync(CancellationToken.None);
 
         Assert.Equal(KafkaChangeStatus.Failed, stored.Status);
@@ -1162,7 +1238,7 @@ public class KafkaOpsServiceGuardTests
         Assert.Contains("original assignment", done.Progress, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(KafkaChangeStatus.Cancelled, (await service.GetAsync(created.Id, CancellationToken.None))!.Status);
         Assert.Equal(2, infra.CancelCalls);
-        Assert.Equal(created.RebalanceName, infra.LastRebalanceName);
+        Assert.Equal((await service.GetAsync(created.Id, CancellationToken.None))!.ReassignmentJson, infra.LastJson);
     }
 
     [Fact]
@@ -1209,7 +1285,7 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal(KafkaChangeStatus.Cancelled, stored.Status);
         Assert.Equal(1, infra.CancelCalls);
         Assert.Equal(1, infra.ReleaseCalls);
-        Assert.Equal(created.RebalanceName, infra.LastRebalanceName);
+        Assert.Equal(stored.ReassignmentJson, infra.LastJson);
     }
 
     [Fact]
@@ -1596,7 +1672,7 @@ public class KafkaOpsServiceGuardTests
         return new ClaimsPrincipal(identity);
     }
 
-    private static (KafkaOpsService Service, FakeBroker Broker, FlipInfra Infra) NewService(bool requireSecondApprover, int scaleTimeoutSeconds = 180, bool production = false)
+    private static (KafkaOpsService Service, FakeBroker Broker, FlipInfra Infra) NewService(bool requireSecondApprover, int scaleTimeoutSeconds = 180, bool production = false, bool brokerLifecycle = true)
     {
         var broker = new FakeBroker();
         var infra = new FlipInfra();
@@ -1604,6 +1680,7 @@ public class KafkaOpsServiceGuardTests
         {
             TwoPersonApproval = requireSecondApprover,
             RequireSecondApprover = requireSecondApprover,
+            BrokerLifecycleEnabled = brokerLifecycle,
             MaxPartitionsPerTopic = 24,
             RateLimitMinutes = 30,
             ScaleTimeoutSeconds = scaleTimeoutSeconds,
@@ -1623,6 +1700,7 @@ public class KafkaOpsServiceGuardTests
             NullLogger<KafkaOpsService>.Instance,
             configuration,
             Array.Empty<IProducer<string, AuditEventMessage>>(),
+            infra,
             infra);
         return (service, broker, infra);
     }
@@ -1698,8 +1776,37 @@ public class KafkaOpsServiceGuardTests
         }
     }
 
-    private sealed class FlipInfra : IKafkaInfraProvider
+    // Also stands in for the Kafka-native mover so the existing counters cover both paths.
+    private sealed class FlipInfra : IKafkaInfraProvider, IKafkaPartitionMover
     {
+        public int BatchPartitions { get; set; } = 100;
+        public int SubmitCalls { get; private set; }
+        public int ClearCalls { get; private set; }
+
+        public Task<int> SubmitAsync(string reassignmentJson, int alreadySubmitted, long throttleBytesPerSecond, CancellationToken cancellationToken)
+        {
+            ApplyCalls++;
+            SubmitCalls++;
+            LastThrottle = throttleBytesPerSecond;
+            LastJson = reassignmentJson;
+            var total = KafkaNativePartitionMover.Read(reassignmentJson).Count;
+            return Task.FromResult(Math.Min(total, Math.Max(0, alreadySubmitted) + BatchPartitions));
+        }
+
+        public Task CancelAsync(string reassignmentJson, CancellationToken cancellationToken)
+        {
+            CancelCalls++;
+            LastJson = reassignmentJson;
+            return Task.CompletedTask;
+        }
+
+        public Task ClearThrottleAsync(string reassignmentJson, CancellationToken cancellationToken)
+        {
+            ClearCalls++;
+            ReleaseCalls++;
+            return Task.CompletedTask;
+        }
+
         public bool Enabled { get; set; } = true;
         public bool ThrowOnScale { get; set; }
         public int RemoveCalls { get; private set; }

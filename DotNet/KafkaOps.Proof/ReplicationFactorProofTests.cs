@@ -4,6 +4,7 @@ using System.Text;
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps.Protocol;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
@@ -209,6 +210,7 @@ public class ReplicationFactorProofTests
             {
                 TwoPersonApproval = false,
                 RequireSecondApprover = false,
+                BrokerLifecycleEnabled = true,
                 MaxPartitionsPerTopic = 24,
                 RateLimitMinutes = 30,
                 CacheSeconds = 8,
@@ -221,7 +223,14 @@ public class ReplicationFactorProofTests
                 ["Authentication:EnableAnonymousAccess"] = "false"
             }).Build(),
             Array.Empty<IProducer<string, AuditEventMessage>>(),
-            infra);
+            infra,
+            NativeMover(gateway, Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP") ?? "localhost:9092"));
+
+    private static KafkaNativePartitionMover NativeMover(KafkaBrokerGateway gateway, string bootstrap)
+    {
+        var connection = new KafkaConnection { BootstrapServers = [bootstrap], SaslProtocolEnabled = false };
+        return new KafkaNativePartitionMover(new KafkaAdminWire(KafkaWireSettings.From(connection)), gateway, new ConfluentThrottleConfig(connection), 100);
+    }
 
     private static ClaimsPrincipal User()
     {

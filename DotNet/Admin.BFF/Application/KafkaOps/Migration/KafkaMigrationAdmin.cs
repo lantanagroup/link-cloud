@@ -723,8 +723,8 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
         var sasl = DedicatedConnection ? _dedicated.SaslProtocolEnabled : _shared.SaslProtocolEnabled;
         if (!sasl)
             return;
-        config.SecurityProtocol = DedicatedConnection ? SecurityProtocol.SaslPlaintext : _shared.Protocol;
-        config.SaslMechanism = DedicatedConnection ? SaslMechanism.Plain : _shared.Mechanism;
+        config.SecurityProtocol = DedicatedConnection ? _dedicated.Protocol ?? _shared.Protocol : _shared.Protocol;
+        config.SaslMechanism = DedicatedConnection ? _dedicated.Mechanism ?? _shared.Mechanism : _shared.Mechanism;
         config.SaslUsername = DedicatedConnection ? _dedicated.SaslUsername : _shared.SaslUsername;
         config.SaslPassword = DedicatedConnection ? _dedicated.SaslPassword : _shared.SaslPassword;
     }

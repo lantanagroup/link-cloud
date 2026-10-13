@@ -1,4 +1,4 @@
-﻿using HealthChecks.UI.Client;
+using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
@@ -25,6 +25,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps.Protocol;
 using LantanaGroup.Link.Shared.Application.Factories;
 using Link.Authorization.Policies;
 using LantanaGroup.Link.Shared.Settings;
@@ -110,7 +111,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<KafkaOpsOptions>(builder.Configuration.GetSection(KafkaOpsOptions.SectionName));
     builder.Services.Configure<KafkaOpsConnectionOptions>(builder.Configuration.GetSection(KafkaOpsConnectionOptions.SectionName));
-    builder.Services.AddSingleton<KafkaBrokerGateway>();
+    // Partition reassignment goes to Kafka directly with the same KafkaConnection settings the Link services use.
+    builder.Services.AddSingleton<IKafkaReassignmentAdmin>(_ => new KafkaAdminWire(KafkaWireSettings.From(kafkaConnection)));
+    builder.Services.AddSingleton(provider => new KafkaBrokerGateway(kafkaConnection, provider.GetRequiredService<IKafkaReassignmentAdmin>()));
+    builder.Services.AddSingleton<IKafkaThrottleConfig>(_ => new ConfluentThrottleConfig(kafkaConnection));
+    builder.Services.AddSingleton<IKafkaPartitionMover>(provider => new KafkaNativePartitionMover(
+        provider.GetRequiredService<IKafkaReassignmentAdmin>(),
+        provider.GetRequiredService<IKafkaBrokerGateway>(),
+        provider.GetRequiredService<IKafkaThrottleConfig>(),
+        provider.GetRequiredService<IOptions<KafkaOpsOptions>>().Value.ReassignmentBatchPartitions));
     builder.Services.AddSingleton<IKafkaBrokerGateway>(provider => provider.GetRequiredService<KafkaBrokerGateway>());
     builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
     builder.Services.AddSingleton<IKubernetesResourceClient, UnconfiguredKubernetesClient>();

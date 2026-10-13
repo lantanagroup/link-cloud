@@ -33,6 +33,7 @@ public sealed partial class KafkaOpsService
 
     public async Task<ReplicaScalePlan> PlanScaleAsync(string groupId, int desiredMembers, CancellationToken cancellationToken)
     {
+        EnsureBrokerLifecycle();
         var topics = await GetTopicsAsync(cancellationToken);
         if (topics.Error is not null)
             throw new KafkaOpsRejectedException(topics.Error);
@@ -49,6 +50,7 @@ public sealed partial class KafkaOpsService
 
     public async Task<ChangeRequestRecord> CreateScaleAsync(ClaimsPrincipal user, string groupId, int desiredMembers, string reason, string? correlationId, CancellationToken cancellationToken)
     {
+        EnsureBrokerLifecycle();
         EnsureWritable();
         EnsureActor(user, KafkaChangeKind.ScaleReplicas);
         var plan = await PlanScaleAsync(groupId, desiredMembers, cancellationToken);
@@ -69,7 +71,7 @@ public sealed partial class KafkaOpsService
     }
 
     public Task<BrokerMovePlan> PlanDecommissionAsync(int brokerId, CancellationToken cancellationToken) =>
-        PlanDecommissionAsync(brokerId, null, cancellationToken);
+        BrokerLifecycleGate(() => PlanDecommissionAsync(brokerId, null, cancellationToken));
 
     private async Task<BrokerMovePlan> PlanDecommissionAsync(int brokerId, Guid? except, CancellationToken cancellationToken)
     {
@@ -97,6 +99,7 @@ public sealed partial class KafkaOpsService
 
     public async Task<ChangeRequestRecord> CreateDecommissionAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken)
     {
+        EnsureBrokerLifecycle();
         EnsureWritable();
         EnsureActor(user, KafkaChangeKind.DecommissionBroker);
         await EnsureNoReassignmentAsync(null, cancellationToken);
@@ -121,7 +124,7 @@ public sealed partial class KafkaOpsService
     }
 
     public Task<BrokerMovePlan> PlanRebalanceAsync(int brokerId, CancellationToken cancellationToken) =>
-        PlanRebalanceAsync(brokerId, null, cancellationToken);
+        BrokerLifecycleGate(() => PlanRebalanceAsync(brokerId, null, cancellationToken));
 
     private async Task<BrokerMovePlan> PlanRebalanceAsync(int brokerId, Guid? except, CancellationToken cancellationToken)
     {
@@ -131,6 +134,7 @@ public sealed partial class KafkaOpsService
 
     public async Task<ChangeRequestRecord> CreateRebalanceAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken)
     {
+        EnsureBrokerLifecycle();
         EnsureWritable();
         EnsureActor(user, KafkaChangeKind.Rebalance);
         await EnsureNoReassignmentAsync(null, cancellationToken);
@@ -139,8 +143,6 @@ public sealed partial class KafkaOpsService
             throw new KafkaOpsRejectedException(string.Join(" ", plan.Errors));
         if (plan.Moves.Count == 0)
             throw new KafkaOpsRejectedException(plan.Summary);
-        if (!_infra.Enabled)
-            throw new KafkaOpsRejectedException(_infra.Detail);
 
         var json = ReassignmentJson.ForMoves(plan.Moves, null, brokerId);
         var original = OriginalAssignment(await FactsAsync(cancellationToken), plan.Moves);
@@ -158,12 +160,14 @@ public sealed partial class KafkaOpsService
 
     public async Task<InfraStatus> PlanAddBrokerAsync(CancellationToken cancellationToken)
     {
+        EnsureBrokerLifecycle();
         await EnsureNoReassignmentAsync(null, cancellationToken);
         return Infra;
     }
 
     public async Task<ChangeRequestRecord> CreateAddBrokerAsync(ClaimsPrincipal user, string reason, string? correlationId, CancellationToken cancellationToken)
     {
+        EnsureBrokerLifecycle();
         EnsureWritable();
         EnsureActor(user, KafkaChangeKind.AddBroker);
         await EnsureNoReassignmentAsync(null, cancellationToken);
@@ -189,11 +193,11 @@ public sealed partial class KafkaOpsService
         EnsureWritable();
         var target = await RequireAsync(id, cancellationToken);
         EnsureActor(user, target.Kind);
-        if (target.Kind is not (KafkaChangeKind.DecommissionBroker or KafkaChangeKind.Rebalance))
+        if (target.Kind is not (KafkaChangeKind.DecommissionBroker or KafkaChangeKind.Rebalance or KafkaChangeKind.ReplicationFactor))
             throw new KafkaOpsRejectedException("Only an in-flight reassignment can be cancelled.");
         if (target.Status is not (KafkaChangeStatus.Executing or KafkaChangeStatus.Converging or KafkaChangeStatus.TimedOut))
             throw new KafkaOpsRejectedException("This request is not in flight.");
-        if (string.IsNullOrWhiteSpace(target.RebalanceName))
+        if (string.IsNullOrWhiteSpace(target.RebalanceName) || string.IsNullOrWhiteSpace(target.OriginalAssignmentJson))
             throw new KafkaOpsRejectedException("This request has no reassignment to cancel.");
 
         return await SaveNewAsync(user, "Cancel the in-flight reassignment.", null, true,
@@ -225,9 +229,7 @@ public sealed partial class KafkaOpsService
         {
             var listing = await LiveReassignmentsAsync(cancellationToken);
             if (!listing.Known)
-                throw new KafkaOpsRejectedException(UnknownReassignmentDetail());
-            if (!_infra.Enabled)
-                throw new KafkaOpsRejectedException(_infra.Detail);
+                throw new KafkaOpsRejectedException(UnknownReassignmentDetail(listing));
 
             var inFlightTopics = new HashSet<string>(listing.Topics, StringComparer.Ordinal);
             var inFlightPartitions = new HashSet<string>(listing.Partitions, StringComparer.Ordinal);
@@ -237,9 +239,13 @@ public sealed partial class KafkaOpsService
                 : original.Where(move => inFlightTopics.Contains(move.Topic)).ToList();
             var alreadyMoved = original.Count - stillMoving.Count;
             var requested = ReadMoves(record.ReassignmentJson);
-            await _infra.CancelReassignmentAsync(record.RebalanceName, cancellationToken);
+            await _mover.CancelAsync(target.ReassignmentJson, cancellationToken);
+            target.SubmittedPartitions = requested.Count;
+            await WaitUntilNotMovingAsync(stillMoving, cancellationToken);
             var cluster = await _broker.DescribeClusterAsync(cancellationToken);
-            foreach (var move in stillMoving)
+            // Count from where the replicas ended up: a partition in a wave that was never submitted did not move.
+            alreadyMoved = 0;
+            foreach (var move in original)
             {
                 var placement = cluster.Placements.FirstOrDefault(item =>
                     item.Topic == move.Topic && item.Partition == move.Partition);
@@ -259,7 +265,7 @@ public sealed partial class KafkaOpsService
             var now = DateTimeOffset.UtcNow;
             var progress = alreadyMoved == 0
                 ? "Replicas returned to the original assignment."
-                : alreadyMoved + " partitions had already moved and keep their new replicas. The broker was not stopped.";
+                : alreadyMoved + " partitions had already moved and keep their new replicas." + (target.Kind == KafkaChangeKind.DecommissionBroker ? " The broker was not stopped." : "");
             record.Status = KafkaChangeStatus.Cancelled;
             record.Progress = progress;
             record.ClosedUtc = now;
@@ -281,8 +287,27 @@ public sealed partial class KafkaOpsService
         }
     }
 
+    /// <summary>
+    /// Broker add, rebalance and decommission, and service pod scaling, wait for the Kubernetes client design agreed with DevOps.
+    /// The code stays; KafkaOps:BrokerLifecycleEnabled (default false) keeps it unreachable until then.
+    /// </summary>
+    public const string BrokerLifecycleOffDetail = "Adding, rebalancing and decommissioning brokers, and scaling service pods, are turned off in this console (KafkaOps:BrokerLifecycleEnabled is false). Partition increases, partition reassignment, replication-factor changes and cancel are not affected.";
+
+    private void EnsureBrokerLifecycle()
+    {
+        if (!_options.Value.BrokerLifecycleEnabled)
+            throw new KafkaOpsRejectedException(BrokerLifecycleOffDetail);
+    }
+
+    private Task<BrokerMovePlan> BrokerLifecycleGate(Func<Task<BrokerMovePlan>> plan)
+    {
+        EnsureBrokerLifecycle();
+        return plan();
+    }
+
     private async Task<ChangeRequestRecord> ExecuteInfraAsync(ClaimsPrincipal user, ChangeRequestRecord record, CancellationToken cancellationToken)
     {
+        EnsureBrokerLifecycle();
         EnsureActor(user, record.Kind);
         if (record.Kind != KafkaChangeKind.ScaleReplicas)
             await EnsureNoReassignmentAsync(record.Id, cancellationToken);
@@ -292,7 +317,8 @@ public sealed partial class KafkaOpsService
 
         try
         {
-            if (!_infra.Enabled)
+            // A rebalance across the brokers that already exist is a Kafka reassignment and needs no provider.
+            if (record.Kind != KafkaChangeKind.Rebalance && !_infra.Enabled)
                 throw new KafkaOpsRejectedException(_infra.Detail);
 
             switch (record.Kind)
@@ -314,18 +340,18 @@ public sealed partial class KafkaOpsService
                         throw new KafkaOpsRejectedException(string.Join(" ", leaving.Errors));
                     record.ReassignmentJson = ReassignmentJson.ForMoves(leaving.Moves, record.BrokerId, null);
                     if (!leaving.AlreadyEmpty)
-                        await _infra.ApplyReassignmentAsync(record.ReassignmentJson, record.RebalanceName, refresh: false, cancellationToken);
+                        record.SubmittedPartitions = await _mover.SubmitAsync(record.ReassignmentJson, 0, _options.Value.ReassignmentThrottleBytesPerSecond, cancellationToken);
                     record.Progress = leaving.AlreadyEmpty
                         ? "Broker is already empty. Waiting for a green cluster before it is stopped."
-                        : "Replicas are moving off the broker.";
+                        : "Replicas are moving off the broker. " + WaveText(record);
                     break;
                 case KafkaChangeKind.Rebalance:
                     var spread = await PlanRebalanceAsync(record.BrokerId, record.Id, cancellationToken);
                     if (!spread.Accepted || spread.Moves.Count == 0)
                         throw new KafkaOpsRejectedException(spread.Summary);
                     record.ReassignmentJson = ReassignmentJson.ForMoves(spread.Moves, null, record.BrokerId);
-                    await _infra.ApplyReassignmentAsync(record.ReassignmentJson, record.RebalanceName, refresh: false, cancellationToken);
-                    record.Progress = "Replicas are moving onto the broker.";
+                    record.SubmittedPartitions = await _mover.SubmitAsync(record.ReassignmentJson, 0, _options.Value.ReassignmentThrottleBytesPerSecond, cancellationToken);
+                    record.Progress = "Replicas are moving onto the broker. " + WaveText(record);
                     break;
                 default:
                     throw new KafkaOpsRejectedException("This change has no infrastructure action.");
@@ -355,7 +381,7 @@ public sealed partial class KafkaOpsService
         bool done;
         try
         {
-            done = record.Kind switch
+            done = await MovesSubmittedAsync(record, cancellationToken) && record.Kind switch
             {
                 KafkaChangeKind.ScaleReplicas => await ScaleSettledAsync(record, cancellationToken),
                 KafkaChangeKind.AddBroker => await BrokerAddedAsync(record, cancellationToken),
@@ -637,14 +663,11 @@ public sealed partial class KafkaOpsService
     {
         try
         {
-            var listing = await _broker.ListInFlightReassignmentsAsync(cancellationToken);
-            if (listing.Known)
-                return listing;
-            return await _infra.ListInFlightReassignmentsAsync(cancellationToken);
+            return await KafkaReassignmentCheck.ListAsync(_broker, _infra, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new ReassignmentListing();
+            return new ReassignmentListing { Error = ex.Message };
         }
     }
 
@@ -653,7 +676,7 @@ public sealed partial class KafkaOpsService
         var names = new List<string>();
         var listing = await LiveReassignmentsAsync(cancellationToken);
         if (!listing.Known)
-            throw new KafkaOpsRejectedException(UnknownReassignmentDetail());
+            throw new KafkaOpsRejectedException(UnknownReassignmentDetail(listing));
 
         foreach (var topic in listing.Topics)
         {
@@ -705,12 +728,59 @@ public sealed partial class KafkaOpsService
         return JsonSerializer.Serialize(new { partitions });
     }
 
-    private string UnknownReassignmentDetail()
+    private static string UnknownReassignmentDetail(ReassignmentListing listing) =>
+        KafkaReassignmentCheck.UnknownDetail(listing);
+
+    private string WaveText(ChangeRequestRecord record)
     {
-        var detail = "Cannot confirm no reassignment is in flight.";
-        if (!_infra.Enabled)
-            detail += " Enable an infra provider to allow this.";
-        return detail;
+        var total = ReadMoves(record.ReassignmentJson).Count;
+        var size = Math.Max(1, _mover.BatchPartitions);
+        var waves = Math.Max(1, (total + size - 1) / size);
+        var submitted = record.SubmittedPartitions ?? total;
+        var wave = Math.Max(1, (submitted + size - 1) / size);
+        return "Wave " + wave + " of " + waves + " submitted (" + submitted + " of " + total + " partitions).";
+    }
+
+    /// <summary>
+    /// Large plans go to Kafka in waves. The next wave is submitted once every partition of the previous waves has left
+    /// Kafka's reassignment list, so the cluster never copies more than one wave at a time.
+    /// </summary>
+    private async Task<bool> MovesSubmittedAsync(ChangeRequestRecord record, CancellationToken cancellationToken)
+    {
+        if (record.Kind is not (KafkaChangeKind.Rebalance or KafkaChangeKind.DecommissionBroker or KafkaChangeKind.ReplicationFactor)
+            || record.Status == KafkaChangeStatus.TimedOut
+            || record.SubmittedPartitions is not int submitted)
+            return true;
+        var moves = ReadMoves(record.ReassignmentJson);
+        if (submitted >= moves.Count)
+            return true;
+
+        var listing = await LiveReassignmentsAsync(cancellationToken);
+        if (!listing.Known)
+            throw new KafkaOpsRejectedException(UnknownReassignmentDetail(listing));
+        var moving = new HashSet<string>(listing.Partitions, StringComparer.Ordinal);
+        var waiting = moves.Take(submitted).Count(move => moving.Contains(move.Topic + "\n" + move.Partition));
+        if (waiting > 0)
+        {
+            record.Progress = WaveText(record) + " " + waiting + " partitions of it are still moving.";
+            return false;
+        }
+
+        var throttle = record.Kind == KafkaChangeKind.ReplicationFactor ? record.ThrottleBytesPerSecond : _options.Value.ReassignmentThrottleBytesPerSecond;
+        record.SubmittedPartitions = await _mover.SubmitAsync(record.ReassignmentJson, submitted, throttle, cancellationToken);
+        record.Progress = WaveText(record);
+        return false;
+    }
+
+    private async Task WaitUntilNotMovingAsync(IReadOnlyList<ReplicaMove> moves, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 15; attempt++)
+        {
+            var listing = await LiveReassignmentsAsync(cancellationToken);
+            if (listing.Known && !moves.Any(move => listing.Partitions.Contains(move.Topic + "\n" + move.Partition, StringComparer.Ordinal)))
+                return;
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
     }
 
     private async Task FinishMoveAsync(ChangeRequestRecord record, CancellationToken cancellationToken)
@@ -757,11 +827,11 @@ public sealed partial class KafkaOpsService
             return;
         try
         {
-            await _infra.ReleaseRebalanceAsync(record.RebalanceName, cancellationToken);
+            await _mover.ClearThrottleAsync(record.ReassignmentJson, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Rebalance resource was not deleted");
+            _logger.LogWarning(ex, "Replication throttle was not cleared");
         }
     }
 

@@ -640,7 +640,7 @@ public static class KafkaInfraProviderFactory
         if (name.Equals("Strimzi", StringComparison.OrdinalIgnoreCase))
             return new StrimziKafkaInfraProvider(kubernetes, options);
 
-        return new DisabledKafkaInfraProvider("Broker and replica changes are disabled. DevOps must set KafkaOps:InfraProvider before those actions can run.");
+        return new DisabledKafkaInfraProvider("Adding or removing a broker and scaling service pods need an infrastructure provider, and none is configured here. Partition increases, partition reassignment, replication-factor changes and cancel run on Kafka directly and do not need one.");
     }
 }
 

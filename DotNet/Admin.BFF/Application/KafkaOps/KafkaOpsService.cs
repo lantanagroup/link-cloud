@@ -142,6 +142,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     private readonly IHostEnvironment _environment;
     private readonly IProducer<string, AuditEventMessage>? _audit;
     private readonly IKafkaInfraProvider _infra;
+    private readonly IKafkaPartitionMover _mover;
     private readonly IKafkaOpsLease? _lease;
     private readonly IMigrationRuntime? _migrations;
     private readonly ILogger<KafkaOpsService> _logger;
@@ -157,6 +158,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         IConfiguration configuration,
         IEnumerable<IProducer<string, AuditEventMessage>> auditProducers,
         IKafkaInfraProvider infra,
+        IKafkaPartitionMover mover,
         IKafkaOpsLease? lease = null,
         IMigrationRuntime? migrations = null)
     {
@@ -166,6 +168,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         _environment = environment;
         _logger = logger;
         _infra = infra;
+        _mover = mover;
         _lease = lease;
         _migrations = migrations;
         _anonymousAccess = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -190,6 +193,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     {
         Provider = _infra.Name,
         Enabled = _infra.Enabled,
+        BrokerLifecycleEnabled = _options.Value.BrokerLifecycleEnabled,
         Detail = _infra.Detail
     };
 
