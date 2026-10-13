@@ -1,6 +1,13 @@
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
+/// One validation Loki sample. <see cref="NewestUtc"/> is the newest matching
+/// log timestamp, or <see cref="DateTime.MinValue"/> when the response had lines
+/// but no readable timestamp.
+/// </summary>
+public sealed record ValidationActivitySample(string Summary, DateTime NewestUtc);
+
+/// <summary>
 /// Parses Validation INFO lines that a long FHIR/categorize/persist step is still
 /// running. Keep the token in lockstep with <c>ValidationProgressHeartbeat.LOG_TOKEN</c>.
 /// </summary>

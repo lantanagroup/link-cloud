@@ -14,6 +14,23 @@ public interface IDataAcquisitionServiceClient
 
     Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reads the "Other" vendor generic OAuth configuration:
+    /// <c>GET /api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration</c>.
+    /// 404 when the facility has none. The client secret is never returned.
+    /// </summary>
+    Task<LinkApiResponse> GetFhirAuthenticationConfigurationAsync(string facilityId,
+                                                                  CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates or replaces the "Other" vendor generic OAuth configuration:
+    /// <c>PUT /api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration</c>.
+    /// The request body carries the client secret, so it is not captured in the response.
+    /// </summary>
+    Task<LinkApiResponse> UpdateFhirAuthenticationConfigurationAsync(string facilityId,
+                                                                     object request,
+                                                                     CancellationToken cancellationToken = default);
+
     /// <summary>Facility-scoped FHIR connection probe: <c>GET /api/data/connectionValidation/{facilityId}/$validate</c>.</summary>
     Task<LinkApiResponse> ValidateFacilityConnectionAsync(
         string facilityId,
@@ -54,6 +71,7 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> GetReportStatisticsAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<DataAcquisitionReportSummaryApiModel>> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<string>>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<List<AcquiredResourceCountByPatientApiModel>>> GetAcquiredResourceCountsByPatientAsync(string? facilityId, string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<ReferenceResourceApiModel>>> GetReferenceResourcesForLogAsync(long logId, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> ProcessAcquisitionLogAsync(long id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> ProcessAcquisitionLogsBulkAsync(List<long> ids, CancellationToken cancellationToken = default);

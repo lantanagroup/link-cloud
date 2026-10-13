@@ -17,8 +17,18 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private readonly IServiceProvider _services;
     private readonly ILogger<RunSnapshotOrchestrator> _logger;
     private readonly ConcurrentDictionary<Guid, RunPollerHandle> _activePollers = new();
+    private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _runGates = new();
+    private readonly ConcurrentDictionary<Guid, Task> _completions = new();
+    private int _shuttingDown;
+    private CancellationToken _stopToken;
 
     private readonly IAutomationUiMetrics? _metrics;
+
+    /// <summary>
+    /// Test seam. Runs after shutdown starts and before it blocks new pollers,
+    /// so a report switch can still replace the handle shutdown has already seen.
+    /// </summary>
+    internal Func<Task>? AfterShutdownSnapshot;
 
     public RunSnapshotOrchestrator(
         ISnapshotStore store,
@@ -34,6 +44,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _stopToken = stoppingToken;
         _logger.LogInformation("RunSnapshotOrchestrator started");
 
         while (!stoppingToken.IsCancellationRequested)
@@ -62,7 +73,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
 
         // Shutdown: stop all pollers
-        await StopAllPollersAsync();
+        await StopAllPollersAsync(stoppingToken);
         _logger.LogInformation("RunSnapshotOrchestrator stopped");
     }
 
@@ -83,8 +94,100 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         };
 
         await _store.RegisterRunAsync(runId, meta);
-        StartPoller(meta, CancellationToken.None);
+        var gate = Gate(runId);
+        await gate.WaitAsync();
+        try
+        {
+            if (!_activePollers.ContainsKey(runId))
+                await StartPollerAsync(meta, CancellationToken.None);
+        }
+        finally
+        {
+            gate.Release();
+        }
+
         _logger.LogInformation("Registered run {RunId} for snapshot polling", runId);
+    }
+
+    /// <summary>
+    /// Stops this run's poller and deletes its rows while holding the run gate.
+    /// An in-flight domain write finishes first. There is no final poll, and the
+    /// gate is dropped when the delete returns so a deleted run does not stay
+    /// in this singleton. A later write sees that the run row is gone.
+    /// </summary>
+    public async Task QuiesceForDeleteAsync(Guid runId, Func<CancellationToken, Task> deleteRows, CancellationToken ct = default)
+    {
+        var gate = Gate(runId);
+        await gate.WaitAsync(ct);
+        try
+        {
+            if (_activePollers.TryGetValue(runId, out var handle))
+            {
+                TryRemoveExact(_activePollers, runId, handle);
+                try
+                {
+                    await handle.StopAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Stopping the poller before deleting run {RunId} failed", runId);
+                }
+            }
+
+            await deleteRows(ct);
+        }
+        finally
+        {
+            gate.Release();
+            PruneGate(runId);
+        }
+    }
+
+    /// <summary>
+    /// Domain write from the run itself (the execution task, live provisioner, or live inject).
+    /// The poller does not use this. Completion already holds the gate across its final poll,
+    /// and the poller must be able to finish a write while that gate is held.
+    /// </summary>
+    public async Task WriteDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct)
+    {
+        var gate = Gate(runId);
+        try
+        {
+            await gate.WaitAsync(ct);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Delete finished and pruned the gate.
+            return;
+        }
+
+        var runGone = false;
+        try
+        {
+            // Delete holds this gate across the row removal, so a write that
+            // arrives afterwards sees no run and does not recreate the documents.
+            if (await _store.GetRunMetaAsync(runId, ct) == null)
+            {
+                runGone = true;
+                return;
+            }
+
+            await _store.SetDomainAsync(runId, domain, data, ct);
+        }
+        finally
+        {
+            try
+            {
+                gate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The gate was pruned after this write released its turn.
+            }
+
+            if (runGone)
+                PruneGate(runId);
+        }
     }
 
     /// <summary>
@@ -93,23 +196,58 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     /// </summary>
     public async Task UpdateRunAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default)
     {
-        // 1. Stop the existing poller FIRST so it cannot write stale domain data
-        //    after we clear snapshots. StopAsync awaits the current poll cycle, so
-        //    after this returns the old poller is guaranteed idle.
+        // Hold this run's gate across the whole switch. Reconcile reads the same
+        // gate, so it cannot start a poller from the old report while snapshots
+        // are cleared or before the new poller is registered.
+        var gate = Gate(runId);
+        await gate.WaitAsync(ct);
+        try
+        {
+            await UpdateRunCoreAsync(runId, facilityId, reportId, ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task UpdateRunCoreAsync(Guid runId, string facilityId, string reportId, CancellationToken ct)
+    {
+        // Stop the existing poller before clearing snapshots. Completion holds
+        // this same gate through the final poll, so this stop cannot dispose
+        // a scope that flush is still using.
         var isMetricsRun = false;
-        if (_activePollers.TryRemove(runId, out var existingHandle))
+        if (_activePollers.TryGetValue(runId, out var existingHandle))
         {
             isMetricsRun = existingHandle.IsMetricsRun;
+            TryRemoveExact(_activePollers, runId, existingHandle);
             await existingHandle.StopAsync();
             _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
         }
 
-        // 2. Now safe to update meta and clear stale domain snapshots - no writer
-        //    can re-populate them with old-report data.
+        // No writer for this run is still flushing. Clear the old report snapshots.
         await _store.UpdateRunMetaAsync(runId, facilityId, reportId, ct);
 
-        // 3. Immediately start a new poller bound to the regenerated report so the
-        //    UI doesn't have to wait up to 2s for the next reconciliation cycle.
+        // A replacement may have been registered while this update waited.
+        if (_activePollers.TryGetValue(runId, out var registered))
+        {
+            if (string.Equals(registered.FacilityId, facilityId, StringComparison.Ordinal)
+                && string.Equals(registered.ReportId, reportId, StringComparison.Ordinal))
+            {
+                _logger.LogInformation("Leaving the poller already registered for run {RunId}", runId);
+                return;
+            }
+
+            TryRemoveExact(_activePollers, runId, registered);
+            await registered.StopAsync();
+        }
+
+        if (_activePollers.ContainsKey(runId))
+        {
+            _logger.LogInformation("Leaving the poller already registered for run {RunId}", runId);
+            return;
+        }
+
         if (!isMetricsRun)
             isMetricsRun = (await _store.GetRunMetaAsync(runId, ct))?.IsMetricsRun ?? false;
         var meta = new RunSnapshotMeta
@@ -121,23 +259,81 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             IsActive = true,
             IsMetricsRun = isMetricsRun
         };
-        StartPoller(meta, ct);
-
-        _logger.LogInformation("Updated run {RunId} to track new report {ReportId} and started new poller", runId, reportId);
+        if (await StartPollerAsync(meta, ct))
+            _logger.LogInformation("Updated run {RunId} to track new report {ReportId} and started new poller", runId, reportId);
     }
 
     /// <summary>
     /// Marks a run as complete so the orchestrator stops polling.
+    /// A second caller waits for the completion already in flight.
     /// </summary>
-    public async Task CompleteRunAsync(Guid runId)
+    public Task CompleteRunAsync(Guid runId)
     {
-        // Do a final domain-data flush BEFORE stopping the poller,
-        // so the last state of every domain is guaranteed to be persisted.
-        if (_activePollers.TryGetValue(runId, out var activeHandle))
+        while (true)
+        {
+            if (_completions.TryGetValue(runId, out var existing))
+                return existing;
+
+            var work = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_completions.TryAdd(runId, work.Task))
+                continue;
+
+            _ = FinishCompletionAsync(runId, work);
+            return work.Task;
+        }
+    }
+
+    private async Task FinishCompletionAsync(Guid runId, TaskCompletionSource work)
+    {
+        // Same gate as a report switch. Completion waits until that switch
+        // finishes, then finalizes whichever poller is registered.
+        var gate = Gate(runId);
+        await gate.WaitAsync();
+        try
+        {
+            await CompleteRunCoreAsync(runId);
+            work.TrySetResult();
+        }
+        catch (Exception ex)
+        {
+            work.TrySetException(ex);
+        }
+        finally
+        {
+            gate.Release();
+            _completions.TryRemove(new KeyValuePair<Guid, Task>(runId, work.Task));
+            PruneGate(runId);
+        }
+    }
+
+    private async Task CompleteRunCoreAsync(Guid runId)
+    {
+        // Stop the loop before the final flush. The loop and the final poll
+        // write the same domains, and the final poll has to be the last writer.
+        // DrainAsync already cancels the polling loop. The host stop token
+        // cancels the final poll so shutdown does not wait on it.
+        RunPollerHandle? activeHandle = null;
+        var ownsHandle = false;
+        if (_activePollers.TryGetValue(runId, out var candidate))
+        {
+            activeHandle = candidate;
+            ownsHandle = true;
+        }
+
+        if (activeHandle != null)
         {
             try
             {
-                await activeHandle.FinalPollAsync();
+                await activeHandle.DrainAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Stopping the poller before the final snapshot for run {RunId} failed", runId);
+            }
+
+            try
+            {
+                await activeHandle.FinalPollAsync(_stopToken);
             }
             catch (Exception ex)
             {
@@ -170,12 +366,25 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             _logger.LogDebug(ex, "Could not extract pipeline duration for run {RunId}", runId);
         }
 
-        await _store.CompleteRunAsync(runId, duration);
-
-        if (_activePollers.TryRemove(runId, out var handle))
+        try
         {
-            await handle.StopAsync();
-            _logger.LogInformation("Stopped poller for completed run {RunId}", runId);
+            await _store.CompleteRunAsync(runId, duration);
+        }
+        finally
+        {
+            if (ownsHandle && activeHandle != null)
+            {
+                try
+                {
+                    TryRemoveExact(_activePollers, runId, activeHandle);
+                    await activeHandle.StopAsync();
+                    _logger.LogInformation("Stopped poller for completed run {RunId}", runId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Stopping the poller for completed run {RunId} failed", runId);
+                }
+            }
         }
     }
 
@@ -184,65 +393,126 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         var activeRuns = await _store.GetActiveRunsAsync(ct);
         var activeRunIds = activeRuns.Select(r => r.RunId).ToHashSet();
 
-        // Start pollers for runs that don't have one yet
-        foreach (var meta in activeRuns)
+        // Start pollers for runs that don't have one yet. The per-run gate is the
+        // same one UpdateRunAsync holds, and the metadata is read again inside it.
+        foreach (var listed in activeRuns)
         {
-            if (_activePollers.TryGetValue(meta.RunId, out var existingHandle) && existingHandle.IsCompleted)
+            var gate = Gate(listed.RunId);
+            if (!await gate.WaitAsync(0, ct))
+                continue;
+            try
             {
-                if (_activePollers.TryRemove(meta.RunId, out var completedHandle))
+                var meta = await _store.GetRunMetaAsync(listed.RunId, ct);
+                if (meta == null || !meta.IsActive)
+                    continue;
+
+                if (_activePollers.TryGetValue(meta.RunId, out var existingHandle) && existingHandle.IsCompleted)
                 {
-                    await completedHandle.StopAsync();
+                    TryRemoveExact(_activePollers, meta.RunId, existingHandle);
+                    await existingHandle.StopAsync();
                     _logger.LogWarning("Restarting completed poller task for still-active run {RunId}", meta.RunId);
                 }
-            }
 
-            // If run identifiers changed (e.g., regenerate switched to a new reportId),
-            // force a poller restart so snapshots cannot oscillate between contexts.
-            if (_activePollers.TryGetValue(meta.RunId, out existingHandle)
-                && (!string.Equals(existingHandle.FacilityId, meta.FacilityId, StringComparison.Ordinal)
-                    || !string.Equals(existingHandle.ReportId, meta.ReportId, StringComparison.Ordinal)))
-            {
-                if (_activePollers.TryRemove(meta.RunId, out var staleHandle))
+                // If run identifiers changed (e.g., regenerate switched to a new reportId),
+                // force a poller restart so snapshots cannot oscillate between contexts.
+                if (_activePollers.TryGetValue(meta.RunId, out existingHandle)
+                    && (!string.Equals(existingHandle.FacilityId, meta.FacilityId, StringComparison.Ordinal)
+                        || !string.Equals(existingHandle.ReportId, meta.ReportId, StringComparison.Ordinal)))
                 {
-                    await staleHandle.StopAsync();
+                    var oldFacilityId = existingHandle.FacilityId;
+                    var oldReportId = existingHandle.ReportId;
+                    TryRemoveExact(_activePollers, meta.RunId, existingHandle);
+                    await existingHandle.StopAsync();
                     _logger.LogInformation(
                         "Restarting poller for run {RunId} due to context change (facility: {OldFacility}->{NewFacility}, report: {OldReport}->{NewReport})",
                         meta.RunId,
-                        staleHandle.FacilityId,
+                        oldFacilityId,
                         meta.FacilityId,
-                        staleHandle.ReportId,
+                        oldReportId,
                         meta.ReportId);
                 }
-            }
 
-            if (!_activePollers.ContainsKey(meta.RunId))
-            {
-                if (string.IsNullOrWhiteSpace(meta.FacilityId) || string.IsNullOrWhiteSpace(meta.ReportId))
+                if (!_activePollers.ContainsKey(meta.RunId))
                 {
-                    _logger.LogDebug("Skipping poller start for run {RunId}: missing facility/report identifiers", meta.RunId);
-                    continue;
-                }
+                    if (string.IsNullOrWhiteSpace(meta.FacilityId) || string.IsNullOrWhiteSpace(meta.ReportId))
+                    {
+                        _logger.LogDebug("Skipping poller start for run {RunId}: missing facility/report identifiers", meta.RunId);
+                        continue;
+                    }
 
-                StartPoller(meta, ct);
+                    await StartPollerAsync(meta, ct);
+                }
+            }
+            finally
+            {
+                gate.Release();
             }
         }
 
         // Stop pollers for runs no longer active
-        foreach (var (runId, handle) in _activePollers)
+        foreach (var (runId, handle) in _activePollers.ToArray())
         {
-            if (!activeRunIds.Contains(runId))
+            if (activeRunIds.Contains(runId))
+                continue;
+
+            var gate = Gate(runId);
+            if (!await gate.WaitAsync(0, ct))
+                continue;
+            try
             {
-                if (_activePollers.TryRemove(runId, out var removed))
-                {
-                    await removed.StopAsync();
-                    _logger.LogInformation("Removed stale poller for run {RunId}", runId);
-                }
+                if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
+                    continue;
+
+                // The active list was captured before this gate. A run registered
+                // after that read is still active and must keep its poller.
+                var meta = await _store.GetRunMetaAsync(runId, ct);
+                if (meta is { IsActive: true })
+                    continue;
+
+                TryRemoveExact(_activePollers, runId, current);
+                await current.StopAsync();
+                _logger.LogInformation("Removed stale poller for run {RunId}", runId);
+            }
+            finally
+            {
+                gate.Release();
+                PruneGate(runId);
             }
         }
     }
 
-    private void StartPoller(RunSnapshotMeta meta, CancellationToken ct)
+    private void PruneGate(Guid runId)
     {
+        if (_activePollers.ContainsKey(runId) || _completions.ContainsKey(runId))
+            return;
+
+        if (!_runGates.TryRemove(runId, out var gate))
+            return;
+
+        // A report switch may already be waiting on this gate. Leave it in place
+        // then. Dispose only when nobody holds it and nobody is queued.
+        if (!gate.Wait(0))
+        {
+            _runGates.TryAdd(runId, gate);
+            return;
+        }
+
+        gate.Release();
+        gate.Dispose();
+    }
+
+    private SemaphoreSlim Gate(Guid runId)
+        => _runGates.GetOrAdd(runId, static _ => new SemaphoreSlim(1, 1));
+
+    internal static bool TryRemoveExact<T>(ConcurrentDictionary<Guid, T> pollers, Guid runId, T expected)
+        where T : class
+        => pollers.TryRemove(new KeyValuePair<Guid, T>(runId, expected));
+
+    private async Task<bool> StartPollerAsync(RunSnapshotMeta meta, CancellationToken ct)
+    {
+        if (Volatile.Read(ref _shuttingDown) != 0)
+            return false;
+
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
         // Build a scoped service provider for the poller's API clients
@@ -253,15 +523,25 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         var task = poller.RunAsync(cts.Token);
         var handle = new RunPollerHandle(cts, task, scope, poller);
 
-        if (_activePollers.TryAdd(meta.RunId, handle))
-        {
-            _logger.LogInformation("Started poller for run {RunId} (facility={FacilityId})", meta.RunId, meta.FacilityId);
-        }
-        else
+        if (!_activePollers.TryAdd(meta.RunId, handle))
         {
             cts.Cancel();
-            _ = DisposeUnregisteredPollerAsync(task, cts, scope);
+            await DisposeUnregisteredPollerAsync(task, cts, scope);
+            return false;
         }
+
+        // Shutdown can begin after the check above. Stop this handle before
+        // the caller releases the run gate, so the sweep cannot miss it.
+        if (Volatile.Read(ref _shuttingDown) != 0)
+        {
+            TryRemoveExact(_activePollers, meta.RunId, handle);
+            await handle.StopAsync();
+            _logger.LogInformation("Stopped poller for run {RunId} because shutdown started", meta.RunId);
+            return false;
+        }
+
+        _logger.LogInformation("Started poller for run {RunId} (facility={FacilityId})", meta.RunId, meta.FacilityId);
+        return true;
     }
 
     private async Task DisposeUnregisteredPollerAsync(Task task, CancellationTokenSource cts, IServiceScope scope)
@@ -305,16 +585,81 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
     }
 
-    private async Task StopAllPollersAsync()
+    private async Task StopAllPollersAsync(CancellationToken stoppingToken)
     {
-        var tasks = new List<Task>();
-        foreach (var (_, handle) in _activePollers)
+        // A report switch can still replace the handle during this hook.
+        // The flag after it refuses any later registration, and the stop
+        // below covers the handle that is current, including that replacement.
+        if (AfterShutdownSnapshot != null)
+            await AfterShutdownSnapshot();
+
+        Volatile.Write(ref _shuttingDown, 1);
+
+        var pending = _activePollers.ToArray();
+        foreach (var (_, handle) in pending)
+            handle.Cancel();
+
+        // The host calls this after stoppingToken is already cancelled, so waiting
+        // on that token returns before the scopes are disposed. Drain the cancelled
+        // pollers for a few seconds instead. A caller that is not cancelled still
+        // waits on its own token.
+        using var drain = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var waitToken = stoppingToken.CanBeCanceled && !stoppingToken.IsCancellationRequested
+            ? stoppingToken
+            : drain.Token;
+        try
         {
-            tasks.Add(handle.StopAsync());
+            await Task.WhenAll(pending.Select(pair => StopPollerForShutdownAsync(pair.Key, pair.Value, waitToken)))
+                .WaitAsync(waitToken);
+        }
+        catch (OperationCanceledException) when (waitToken.IsCancellationRequested)
+        {
+            // The drain window ended. Do not wait out a stuck poll.
+        }
+    }
+
+    private async Task StopPollerForShutdownAsync(Guid runId, RunPollerHandle handle, CancellationToken ct)
+    {
+        if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
+            return;
+
+        // Completion holds this gate across the final poll and stops the handle
+        // itself. A domain write holds it too, and that write does not stop the
+        // poller. Wait for the write inside the shutdown drain, then stop. If
+        // the drain ends first, leave the handle to completion.
+        var gate = Gate(runId);
+        var acquired = false;
+        try
+        {
+            acquired = await gate.WaitAsync(0, ct);
+            if (!acquired)
+            {
+                await gate.WaitAsync(ct);
+                acquired = true;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
 
-        await Task.WhenAll(tasks);
-        _activePollers.Clear();
+        try
+        {
+            if (!_activePollers.TryGetValue(runId, out current) || !ReferenceEquals(current, handle))
+                return;
+
+            TryRemoveExact(_activePollers, runId, current);
+            await current.StopAsync();
+            _logger.LogInformation("Stopped poller for run {RunId} during shutdown", runId);
+        }
+        finally
+        {
+            if (acquired)
+            {
+                gate.Release();
+                PruneGate(runId);
+            }
+        }
     }
 
     private sealed class RunPollerHandle(
@@ -328,10 +673,43 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         public bool IsMetricsRun => poller.IsMetricsRun;
         public bool IsCompleted => pollerTask.IsCompleted;
 
-        public Task FinalPollAsync() => poller.FinalPollAsync();
+        private int _stopped;
+
+        public void Cancel()
+        {
+            if (Volatile.Read(ref _stopped) != 0)
+                return;
+
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // StopAsync already disposed this handle.
+            }
+        }
+
+        public Task FinalPollAsync(CancellationToken cancellationToken) => poller.FinalPollAsync(cancellationToken);
+
+        public async Task DrainAsync()
+        {
+            await cts.CancelAsync();
+            try
+            {
+                await pollerTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // The loop stops here. StopAsync still disposes the scope after the final poll.
+            }
+        }
 
         public async Task StopAsync()
         {
+            if (Interlocked.Exchange(ref _stopped, 1) == 1)
+                return;
+
             await cts.CancelAsync();
             try
             {
