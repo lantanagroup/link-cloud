@@ -63,6 +63,6 @@ public class HoldConfirmTests
     public void Approve_and_execute_only_show_while_they_can_run()
     {
         var view = Read("Views", "Operations", "_ChangeRequest.cshtml");
-        view.Should().Contain("@if (request.Status == \"Pending\")").And.Contain("@if (request.Status is \"Pending\" or \"Approved\")");
+        view.Should().Contain("@if (KafkaChangeActions.CanApprove(request))").And.Contain("@if (KafkaChangeActions.CanExecute(request))").And.Contain("data-hold=\"@KafkaChangeActions.ExecuteHold(request)\"");
     }
 }

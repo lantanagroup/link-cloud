@@ -26,7 +26,7 @@
             }
             else if (request.Kind == "CancelReassignment")
             {
-                <p>Cancel the in-flight reassignment. A different person must approve it before it runs.</p>
+                <p>Cancel the in-flight reassignment. @(request.SelfApprovalAllowed ? "It is approved before it runs." : "A different person must approve it before it runs.")</p>
             }
             else if (request.Kind == "ScaleReplicas")
             {
@@ -124,10 +124,14 @@
                     <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = request.CorrelationId, Compact = true, CopyLabel = "Copy correlation id" })" /></dd>
                 </dl>
             </details>
+            @if (!terminal && KafkaChangeActions.ApprovalBlocked(request))
+            {
+                <p class="mb-0 mt-2" id="kafka-request-approval-blocked">@KafkaChangeActions.UnidentifiedNote</p>
+            }
             @if (!terminal)
             {
             <div class="d-flex gap-2 mt-2">
-                @if (request.Status == "Pending")
+                @if (KafkaChangeActions.CanApprove(request))
                 {
                 <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/approve">
                     @Html.AntiForgeryToken()
@@ -135,12 +139,12 @@
                     <button class="btn btn-sm btn-success lu-icon-btn" type="submit" title="Approve change" aria-label="Approve change"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Approve</span></button>
                 </form>
                 }
-                @if (request.Status is "Pending" or "Approved")
+                @if (KafkaChangeActions.CanExecute(request))
                 {
                 <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/execute">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="query" />
-                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" title="Execute change" aria-label="Execute change"><i class="bi bi-play-fill" aria-hidden="true"></i><span class="ms-1">Execute</span></button>
+                    <button class="btn btn-sm btn-au-execute lu-icon-btn" type="submit" data-hold="@KafkaChangeActions.ExecuteHold(request)" title="Execute change" aria-label="Execute change"><i class="bi bi-play-fill" aria-hidden="true"></i><span class="ms-1">Execute</span></button>
                 </form>
                 }
                 @if (cancellable)
@@ -151,6 +155,8 @@
                         <button class="btn btn-sm btn-warning lu-icon-btn" type="submit" title="Cancel reassignment" aria-label="Cancel reassignment"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
                     </form>
                 }
+                @if (KafkaChangeActions.CanReject(request))
+                {
                 <form class="d-flex gap-2" method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/reject">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="query" />
@@ -158,6 +164,7 @@
                     <input class="form-control form-control-sm" id="reject-reason" name="reason" placeholder="Rejection reason" />
                     <button class="btn btn-sm btn-warning lu-icon-btn" type="submit" title="Reject change" aria-label="Reject change"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Reject</span></button>
                 </form>
+                }
             </div>
             }
         </div>

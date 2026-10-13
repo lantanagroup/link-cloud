@@ -1602,6 +1602,7 @@ public class KafkaOpsServiceGuardTests
         var infra = new FlipInfra();
         var options = Options.Create(new KafkaOpsOptions
         {
+            TwoPersonApproval = requireSecondApprover,
             RequireSecondApprover = requireSecondApprover,
             MaxPartitionsPerTopic = 24,
             RateLimitMinutes = 30,
