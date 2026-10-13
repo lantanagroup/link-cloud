@@ -611,12 +611,13 @@ public sealed class KafkaMessageBrowser : IKafkaMessageBrowser
         {
             var headers = new Headers();
             headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(message.CorrelationId ?? ""));
-            await _audit.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+            // Same budget as change requests: a missing audit topic must not hold the export.
+            await AuditBudget.WaitAsync(token => _audit.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
                 Key = page.Topic,
                 Value = message,
                 Headers = headers
-            }, cancellationToken);
+            }, token), KafkaOpsService.AuditTimeout, cancellationToken);
         }
         catch (Exception ex)
         {

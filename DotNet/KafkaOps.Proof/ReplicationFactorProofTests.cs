@@ -207,6 +207,7 @@ public class ReplicationFactorProofTests
             new ProofCache(),
             Options.Create(new KafkaOpsOptions
             {
+                TwoPersonApproval = false,
                 RequireSecondApprover = false,
                 MaxPartitionsPerTopic = 24,
                 RateLimitMinutes = 30,
