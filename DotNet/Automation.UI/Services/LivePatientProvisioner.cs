@@ -25,7 +25,8 @@ internal sealed class LivePatientProvisioner(
     ISnapshotStore snapshotStore,
     IGeneratedPatientTemplateCache? generatedTemplateCache = null,
     PatientProfile? shapeTemplate = null,
-    IReadOnlyList<string>? measureBundleJsons = null) : ILivePatientProvisioner
+    IReadOnlyList<string>? measureBundleJsons = null,
+    RunSnapshotOrchestrator? snapshotWrites = null) : ILivePatientProvisioner
 {
     public async Task<LiveProvisionedPatient> GenerateQualifyingPatientAsync(CancellationToken cancellationToken)
     {
@@ -115,7 +116,11 @@ internal sealed class LivePatientProvisioner(
 
     private async Task PersistManifestAsync(CancellationToken cancellationToken)
     {
-        await snapshotStore.SetDomainAsync(runId, "generationManifest", manifest.ToSnapshot(), cancellationToken);
+        var snapshot = manifest.ToSnapshot();
+        if (snapshotWrites != null)
+            await snapshotWrites.WriteDomainAsync(runId, "generationManifest", snapshot, cancellationToken);
+        else
+            await snapshotStore.SetDomainAsync(runId, "generationManifest", snapshot, cancellationToken);
     }
 
     private static ImportedPatientInput BuildBundleImport(string content, string? fileName)
