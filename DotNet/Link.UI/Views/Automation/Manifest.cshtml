@@ -4,8 +4,8 @@
     ViewData["AutomationSection"] = "runs";
 }
 @await Html.PartialAsync("_Nav")
-<div class="d-flex align-items-center justify-content-between mb-3">
-    <h1 class="h3 mb-0">Generation manifest</h1>
-    <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" class="btn btn-au-link">Back to run</a>
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Run", "Automation", new { id = Model.RunId })!, "Back to run"))" />
 </div>
+<h1 class="h3 mb-3">Generation manifest</h1>
 @await Html.PartialAsync("_ReportManifest", Model)
