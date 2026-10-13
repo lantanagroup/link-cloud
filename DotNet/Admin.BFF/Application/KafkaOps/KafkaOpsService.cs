@@ -386,6 +386,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             MaxReplicas = plan.MaxReplicas,
             KeyClass = plan.KeyClass.ToString(),
             SecondApproverRequired = plan.SecondApproverRequired,
+            SelfApprovalAllowed = !_options.Value.DifferentApprover,
             QuietWindowOverride = plan.QuietWindowOverride,
             Reason = reason.Trim(),
             OverrideReason = overrideReason?.Trim() ?? "",
@@ -430,6 +431,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             MaxReplicas = plan.MaxReplicas,
             KeyClass = plan.KeyClass.ToString(),
             SecondApproverRequired = plan.SecondApproverRequired,
+            SelfApprovalAllowed = !_options.Value.DifferentApprover,
             QuietWindowOverride = plan.QuietWindowOverride,
             Reason = reason.Trim(),
             OverrideReason = overrideReason?.Trim() ?? "",
@@ -456,7 +458,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         EnsureActor(user, record.Kind);
         if (record.Kind is not (KafkaChangeKind.CancelReassignment or KafkaChangeKind.ScaleReplicas))
             await EnsureNoReassignmentAsync(record.Id, cancellationToken);
-        var error = ChangeRequestWorkflow.Approve(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
+        var error = ChangeRequestWorkflow.Approve(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.DifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
         await SaveAsync(record, cancellationToken);
@@ -490,7 +492,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
 
         EnsureActor(user, record.Kind);
         await EnsureNoReassignmentAsync(record.Id, cancellationToken);
-        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
+        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.DifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
 
@@ -827,7 +829,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             QuietWindowDetail = quiet.Detail,
             OverrideQuietWindow = overrideQuietWindow,
             OverrideReason = overrideReason,
-            RequireSecondApprover = _options.Value.RequireSecondApprover,
+            RequireSecondApprover = _options.Value.SecondApprover,
             EnvironmentChangeInFlight = records.Any(Open),
             FamilyChangeInFlight = records.Any(record => Open(record) && string.Equals(record.Family, family, StringComparison.OrdinalIgnoreCase)),
             LastFamilyChangeUtc = records
@@ -965,15 +967,13 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         {
             var headers = new Headers();
             headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(record.CorrelationId));
-            // A missing audit topic or a slow broker must not hold the request: give the audit write a short budget.
-            using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            budget.CancelAfter(AuditTimeout);
-            await _audit.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+            // A missing audit topic or a slow broker must not hold the request: the write runs off the request path with a short budget.
+            await AuditBudget.WaitAsync(token => _audit.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
                 Key = record.Family,
                 Value = message,
                 Headers = headers
-            }, budget.Token);
+            }, token), AuditTimeout, cancellationToken);
         }
         catch (Exception ex)
         {

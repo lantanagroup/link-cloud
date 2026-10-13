@@ -6,8 +6,21 @@ public sealed class KafkaOpsOptions
 
     public int MaxPartitionsPerTopic { get; set; } = 24;
 
+    /// <summary>
+    /// Two-person approval. On (the default): every change request needs a second approver who is a different,
+    /// signed-in person, and the console refuses approval when the two people cannot be told apart.
+    /// Off only for local development, where the requester approves and executes their own request.
+    /// </summary>
+    public bool TwoPersonApproval { get; set; } = true;
+
     public bool RequireSecondApprover { get; set; }
     public bool RequireDifferentApprover { get; set; } = true;
+
+    /// <summary>Whether a new request waits for a second approval.</summary>
+    public bool SecondApprover => TwoPersonApproval || RequireSecondApprover;
+
+    /// <summary>Whether the approver and executor must be a different, identifiable person from the requester.</summary>
+    public bool DifferentApprover => TwoPersonApproval || RequireDifferentApprover;
 
     /// <summary>
     /// When the configuration value is absent, the host treats Production as read-only.

@@ -62,6 +62,25 @@ public sealed class ReassignmentListing
 public static class KafkaLeaderElection
 {
     public static readonly ElectionType Kind = ElectionType.Preferred;
+
+    /// <summary>
+    /// Kafka answers ELECTION_NOT_NEEDED for a partition whose preferred replica already leads, and the client raises that
+    /// as an exception for the whole call. Only a partition that reports some other error is a failed election.
+    /// </summary>
+    public static bool OnlyNotNeeded(ElectLeadersException ex) =>
+        ex.Results?.TopicPartitions is { } partitions
+        && partitions.All(partition => partition.Error is null || partition.Error.Code is ErrorCode.NoError or ErrorCode.ElectionNotNeeded);
+
+    public static async Task RunAsync(Func<Task> elect)
+    {
+        try
+        {
+            await elect();
+        }
+        catch (ElectLeadersException ex) when (OnlyNotNeeded(ex))
+        {
+        }
+    }
 }
 
 public interface IKafkaBrokerGateway
@@ -369,10 +388,10 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         return UseClientAsync("election", async (admin, token) =>
         {
             token.ThrowIfCancellationRequested();
-            await admin.ElectLeadersAsync(
+            await KafkaLeaderElection.RunAsync(() => admin.ElectLeadersAsync(
                 KafkaLeaderElection.Kind,
                 partitions,
-                new ElectLeadersOptions { RequestTimeout = TimeSpan.FromSeconds(15), OperationTimeout = TimeSpan.FromSeconds(15) });
+                new ElectLeadersOptions { RequestTimeout = TimeSpan.FromSeconds(15), OperationTimeout = TimeSpan.FromSeconds(15) }));
             return true;
         }, cancellationToken);
     }

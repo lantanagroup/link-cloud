@@ -44,7 +44,7 @@ public sealed partial class KafkaOpsService
         var partitionCount = subscribed.Count == 0 ? 0 : subscribed.Min(row => row.Partitions);
         var linkMax = subscribed.Count == 0 ? partitionCount : subscribed.Min(row => row.MaxReplicas);
         var current = groups.Groups.FirstOrDefault(group => group.GroupId == groupId)?.Members.Count ?? 0;
-        return ReplicaScalePlanner.Evaluate(groupId, current, partitionCount, desiredMembers, linkMax, _options.Value.RequireSecondApprover);
+        return ReplicaScalePlanner.Evaluate(groupId, current, partitionCount, desiredMembers, linkMax, _options.Value.SecondApprover);
     }
 
     public async Task<ChangeRequestRecord> CreateScaleAsync(ClaimsPrincipal user, string groupId, int desiredMembers, string reason, string? correlationId, CancellationToken cancellationToken)
@@ -173,7 +173,7 @@ public sealed partial class KafkaOpsService
         if (cluster.Error is not null)
             throw new KafkaOpsRejectedException(cluster.Error);
 
-        return await SaveNewAsync(user, reason, correlationId, _options.Value.RequireSecondApprover,
+        return await SaveNewAsync(user, reason, correlationId, _options.Value.SecondApprover,
             "Add one broker. The provider starts it, then this request waits until the broker registers and is up. Rebalancing onto it is a separate action.",
             cancellationToken, record =>
             {
@@ -216,7 +216,7 @@ public sealed partial class KafkaOpsService
     private async Task<ChangeRequestRecord> ExecuteCancelAsync(ClaimsPrincipal user, ChangeRequestRecord record, CancellationToken cancellationToken)
     {
         EnsureActor(user, record.Kind);
-        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
+        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.DifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
 
@@ -286,7 +286,7 @@ public sealed partial class KafkaOpsService
         EnsureActor(user, record.Kind);
         if (record.Kind != KafkaChangeKind.ScaleReplicas)
             await EnsureNoReassignmentAsync(record.Id, cancellationToken);
-        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.RequireDifferentApprover);
+        var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow, _options.Value.DifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
 
@@ -583,6 +583,7 @@ public sealed partial class KafkaOpsService
             DryRunSummary = summary,
             CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId.Trim(),
             SecondApproverRequired = secondApprover,
+            SelfApprovalAllowed = !_options.Value.DifferentApprover,
             Status = secondApprover ? KafkaChangeStatus.Pending : KafkaChangeStatus.Approved,
             CreatedUtc = now,
             ApprovedUtc = secondApprover ? null : now

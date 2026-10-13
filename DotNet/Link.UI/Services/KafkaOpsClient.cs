@@ -655,6 +655,7 @@ public sealed class ChangeRequestRecord
     public int MaxReplicas { get; set; }
     public string KeyClass { get; set; } = "";
     public bool SecondApproverRequired { get; set; }
+    public bool SelfApprovalAllowed { get; set; }
     public string Reason { get; set; } = "";
     public string OverrideReason { get; set; } = "";
     public string Requester { get; set; } = "";

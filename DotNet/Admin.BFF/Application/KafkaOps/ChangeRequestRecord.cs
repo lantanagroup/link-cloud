@@ -63,6 +63,7 @@ public sealed class ChangeRequestRecord
     public int MaxReplicas { get; set; }
     public string KeyClass { get; set; } = "";
     public bool SecondApproverRequired { get; set; }
+    public bool SelfApprovalAllowed { get; set; }
     public bool QuietWindowOverride { get; set; }
     public string Reason { get; set; } = "";
     public string OverrideReason { get; set; } = "";
@@ -112,10 +113,12 @@ public static class ChangeRequestWorkflow
             return "Only a pending request can be approved.";
         if (!request.SecondApproverRequired)
             return "This request does not need a separate approver.";
-        if (requireDifferentApprover && SameUser(request.Requester, user))
-            return "The requester cannot approve their own request.";
         if (string.IsNullOrWhiteSpace(user))
             return "An approver identity is required.";
+        if (requireDifferentApprover && (!Identified(request.Requester) || !Identified(user)))
+            return UnidentifiedDetail;
+        if (requireDifferentApprover && SameUser(request.Requester, user))
+            return "The requester cannot approve their own request.";
 
         request.Status = KafkaChangeStatus.Approved;
         request.Approver = user;
@@ -143,6 +146,8 @@ public static class ChangeRequestWorkflow
         {
             if (request.Status != KafkaChangeStatus.Approved)
                 return "This request must be approved by someone else before it can run.";
+            if (requireDifferentApprover && (!Identified(request.Requester) || !Identified(request.Approver) || !Identified(user)))
+                return UnidentifiedDetail;
             if (requireDifferentApprover && SameUser(request.Requester, user))
                 return "The requester cannot execute their own request.";
         }
@@ -157,6 +162,15 @@ public static class ChangeRequestWorkflow
             request.Approver = user;
         return null;
     }
+
+    public const string Anonymous = "anonymous";
+
+    public const string UnidentifiedDetail =
+        "Two-person approval needs the requester and the approver signed in under their own names. This environment signs everyone in as the same anonymous user, so a second approval cannot be told apart from the first. Sign-in must be turned on before this request can be approved or run.";
+
+    /// <summary>A name that belongs to one signed-in person, not the shared anonymous principal.</summary>
+    public static bool Identified(string? user) =>
+        !string.IsNullOrWhiteSpace(user) && !string.Equals(user.Trim(), Anonymous, StringComparison.OrdinalIgnoreCase);
 
     public static bool SameUser(string? left, string? right) =>
         !string.IsNullOrWhiteSpace(left)

@@ -359,7 +359,7 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
             return;
         var partitions = described.PartitionRows.Select(row => new TopicPartition(topic, row.Partition)).ToList();
         using var admin = NewAdmin();
-        await admin.ElectLeadersAsync(KafkaLeaderElection.Kind, partitions, new ElectLeadersOptions { RequestTimeout = TimeSpan.FromSeconds(20) });
+        await KafkaLeaderElection.RunAsync(() => admin.ElectLeadersAsync(KafkaLeaderElection.Kind, partitions, new ElectLeadersOptions { RequestTimeout = TimeSpan.FromSeconds(20) }));
     }
 
     public async Task<IReadOnlyList<string>> ListGroupsWhenHealthyAsync(CancellationToken cancellationToken)
