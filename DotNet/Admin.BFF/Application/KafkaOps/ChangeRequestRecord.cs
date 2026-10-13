@@ -52,6 +52,9 @@ public sealed class ChangeRequestRecord
     public string ReassignmentJson { get; set; } = "";
     public string OriginalAssignmentJson { get; set; } = "";
     public string RebalanceName { get; set; } = "";
+
+    /// <summary>Partitions of ReassignmentJson already submitted to Kafka. Null on requests made before waves.</summary>
+    public int? SubmittedPartitions { get; set; }
     public Guid TargetRequestId { get; set; }
     public string Warning { get; set; } = "";
     public string Progress { get; set; } = "";

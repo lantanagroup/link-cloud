@@ -7,7 +7,7 @@
 {
     var terminal = request.Status is "Done" or "Rejected" or "Failed" or "Cancelled" or "Aborted" or "TimedOut";
     static bool Named(string? who) => !string.IsNullOrWhiteSpace(who) && !string.Equals(who, "anonymous", StringComparison.OrdinalIgnoreCase);
-    var cancellable = request.Kind is "DecommissionBroker" or "Rebalance" && request.Status is "Executing" or "Converging" or "TimedOut";
+    var cancellable = request.Kind is "DecommissionBroker" or "Rebalance" or "ReplicationFactor" && request.Status is "Executing" or "Converging" or "TimedOut";
     <div class="au-card card mt-3" id="kafka-request-progress" data-status-url="/Operations/Kafka/requests/@request.Id.ToString("D")">
         <div class="card-header">Change request</div>
         <div class="card-body">

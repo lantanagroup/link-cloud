@@ -26,12 +26,14 @@ public sealed partial class KafkaOpsService
         var evaluation = await EvaluateReplicationAsync(typed, replicationFactor, throttleBytesPerSecond, "", 1, 25, cancellationToken);
         if (!evaluation.Plan.Accepted)
             throw new KafkaOpsRejectedException(evaluation.Plan.Summary);
-        if (string.Equals(_infra.Name, "Strimzi", StringComparison.OrdinalIgnoreCase))
-            throw new KafkaOpsRejectedException("Strimzi applies a broker rebalance, not an exact replication-factor assignment. This request was not submitted.");
-
         await EnsureNoReassignmentAsync(null, cancellationToken);
-        if (!_infra.Enabled)
-            throw new KafkaOpsRejectedException(_infra.Detail);
+        // Kept so an in-flight change can be cancelled and checked against where the replicas started.
+        var original = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            partitions = (await FactsAsync(cancellationToken))
+                .Where(fact => string.Equals(fact.Topic, evaluation.Plan.Topic, StringComparison.Ordinal))
+                .Select(fact => new { topic = fact.Topic, partition = fact.Partition, replicas = fact.Replicas })
+        });
 
         var record = await SaveNewAsync(user, reason, correlationId, false, evaluation.Plan.Summary, cancellationToken, filled =>
         {
@@ -45,6 +47,7 @@ public sealed partial class KafkaOpsService
             filled.RequestedPartitions = evaluation.Plan.PartitionCount;
             filled.ReassignmentJson = ReplicationFactorPlanner.AssignmentJson(evaluation.Plan.Topic, evaluation.Assignments);
             filled.RebalanceName = KafkaRebalanceNames.For(filled.Id);
+            filled.OriginalAssignmentJson = original;
             filled.SecondApproverRequired = false;
         });
 
@@ -55,7 +58,7 @@ public sealed partial class KafkaOpsService
         record.Progress = "Reassignment submitted. Waiting until every replica is in the ISR.";
         try
         {
-            await _infra.ApplyReassignmentAsync(record.ReassignmentJson, record.RebalanceName, record.ThrottleBytesPerSecond, cancellationToken);
+            record.SubmittedPartitions = await _mover.SubmitAsync(record.ReassignmentJson, 0, record.ThrottleBytesPerSecond, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -204,7 +207,7 @@ public sealed partial class KafkaOpsService
 
         try
         {
-            await _infra.ReleaseRebalanceAsync(record.RebalanceName, cancellationToken);
+            await _mover.ClearThrottleAsync(record.ReassignmentJson, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -66,7 +66,14 @@ public sealed class KafkaOpsOptions
 
     public string ConsumerService { get; set; } = "consumer";
 
+    /// <summary>Replication throttle in bytes per second for rebalance and decommission moves. 0 leaves moves unthrottled.</summary>
     public int ReassignmentThrottleBytesPerSecond { get; set; }
+
+    /// <summary>Broker add, rebalance and decommission, and service pod scaling. Off until the Kubernetes client is agreed with DevOps.</summary>
+    public bool BrokerLifecycleEnabled { get; set; }
+
+    /// <summary>Partitions submitted to Kafka per reassignment wave. The next wave starts when the previous one finishes.</summary>
+    public int ReassignmentBatchPartitions { get; set; } = 100;
 
     public bool AllowTopicMigration { get; set; }
 
@@ -94,6 +101,12 @@ public sealed class KafkaOpsConnectionOptions
     public string BootstrapServers { get; set; } = "";
 
     public bool SaslProtocolEnabled { get; set; }
+
+    /// <summary>Same meaning as KafkaConnection:Protocol. Empty uses the shared connection's value.</summary>
+    public Confluent.Kafka.SecurityProtocol? Protocol { get; set; }
+
+    /// <summary>Same meaning as KafkaConnection:Mechanism. Empty uses the shared connection's value.</summary>
+    public Confluent.Kafka.SaslMechanism? Mechanism { get; set; }
 
     public string? SaslUsername { get; set; }
 
