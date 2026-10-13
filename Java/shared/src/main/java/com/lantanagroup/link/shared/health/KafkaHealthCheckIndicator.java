@@ -13,7 +13,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 
-@Component("kafka")
+@Component("Kafka")
 public class KafkaHealthCheckIndicator implements HealthIndicator {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
