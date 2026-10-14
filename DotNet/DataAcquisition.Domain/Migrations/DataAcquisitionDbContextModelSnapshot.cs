@@ -681,6 +681,11 @@ namespace DataAcquisition.Domain.Migrations
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ExecutionDate", "Id"), new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
 
+                    b.HasIndex("FacilityId", "CorrelationId")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_CorrelationId");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "CorrelationId"), new[] { "QueryPhase", "Status", "ReportTrackingId" });
+
                     b.HasIndex("IsDeleted", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_IsDeleted_Id");
 
@@ -706,11 +711,6 @@ namespace DataAcquisition.Domain.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_DataAcquisitionLogs_ReferenceLogKey")
                         .HasFilter("[CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL AND [ReferenceResourceType] IS NOT NULL");
-
-                    b.HasIndex("FacilityId", "CorrelationId")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_CorrelationId");
-
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "CorrelationId"), new[] { "QueryPhase", "Status", "ReportTrackingId" });
 
                     b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");
@@ -739,7 +739,8 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<long>("DataAcquisitionLogId")
+                    b.Property<long?>("DataAcquisitionLogId")
+                        .IsRequired()
                         .HasColumnType("bigint");
 
                     b.Property<string>("Note")
@@ -765,7 +766,8 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<long>("DataAcquisitionLogId")
+                    b.Property<long?>("DataAcquisitionLogId")
+                        .IsRequired()
                         .HasColumnType("bigint");
 
                     b.Property<string>("ResourceId")
@@ -870,9 +872,6 @@ namespace DataAcquisition.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("NEWID()");
-
-                    b.Property<string>("Authentication")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
