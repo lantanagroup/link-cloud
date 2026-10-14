@@ -460,6 +460,40 @@ public class MigrationMachineTests
     }
 
     [Fact]
+    public void Approvals_FollowTheTwoPersonApprovalOption()
+    {
+        var world = MigrationWorld.Create();
+        var record = world.Record();
+        record.Step = MigrationStep.Pending;
+        record.Requester = "alice";
+        record.PlanHash = "abc";
+        Assert.Null(MigrationApprovals.ValidateApprove(record, "alice", "abc", requireDifferentApprover: false));
+        Assert.Equal(
+            ChangeRequestWorkflow.UnidentifiedDetail,
+            MigrationApprovals.ValidateApprove(record, "anonymous", "abc"));
+
+        record.Requester = "anonymous";
+        Assert.Equal(
+            ChangeRequestWorkflow.UnidentifiedDetail,
+            MigrationApprovals.ValidateApprove(record, "bob", "abc"));
+
+        record.Requester = "alice";
+        record.Step = MigrationStep.Approved;
+        record.Approver = "alice";
+        record.ApprovedHash = "abc";
+        Assert.Null(MigrationApprovals.ValidateExecute(record, "alice", requireDifferentApprover: false));
+        Assert.Equal("The requester cannot execute the migration.", MigrationApprovals.ValidateExecute(record, "alice"));
+
+        record.Step = MigrationStep.H1;
+        record.Executor = "alice";
+        var allowed = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.Go, "alice", record.Topic, world.Now, world.Limits, requireDifferentApprover: false);
+        Assert.Null(allowed.Error);
+        Assert.Equal(MigrationStep.C1, allowed.Completed!.Step);
+        var blocked = MigrationMachine.Describe(record, world.Observe(record), MigrationCommand.Go, "alice", record.Topic, world.Now, world.Limits);
+        Assert.Equal("The requester cannot execute the hold point.", blocked.Error);
+    }
+
+    [Fact]
     public void Preflight_RefusesTheSlice1Gates_AndHashesMaterialFacts()
     {
         var facts = MigrationWorld.Facts();

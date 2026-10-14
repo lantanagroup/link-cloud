@@ -18,7 +18,8 @@ public static class MigrationMachine
         string? actor,
         string? typedName,
         DateTimeOffset now,
-        MigrationLimits? limits = null)
+        MigrationLimits? limits = null,
+        bool requireDifferentApprover = true)
     {
         limits ??= new MigrationLimits();
         if (record.Step is MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected)
@@ -48,7 +49,7 @@ public static class MigrationMachine
         }
 
         if (command == MigrationCommand.Go)
-            return Go(record, actor, typedName, now);
+            return Go(record, actor, typedName, now, requireDifferentApprover);
 
         if (command is MigrationCommand.RecoverForward or MigrationCommand.RecoverOriginal or MigrationCommand.DeleteForeign)
             return MigrationTick.Reject("Recovery is only available from NeedsAttention.");
@@ -69,13 +70,14 @@ public static class MigrationMachine
         return Act(record, seen, now, limits);
     }
 
-    private static MigrationTick Go(MigrationRecord record, string? actor, string? typedName, DateTimeOffset now)
+    private static MigrationTick Go(MigrationRecord record, string? actor, string? typedName, DateTimeOffset now, bool requireDifferentApprover)
     {
         if (record.Step != MigrationStep.H1)
             return MigrationTick.Reject("The go confirmation is only accepted at the hold point.");
         if (!string.Equals(typedName, record.Topic, StringComparison.Ordinal))
             return MigrationTick.Reject("Type the topic name to delete it and continue.");
-        if (string.IsNullOrWhiteSpace(actor) || string.Equals(actor, record.Requester, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(actor)
+            || (requireDifferentApprover && string.Equals(actor, record.Requester, StringComparison.OrdinalIgnoreCase)))
             return MigrationTick.Reject("The requester cannot execute the hold point.");
         if (!string.Equals(actor, record.Executor, StringComparison.OrdinalIgnoreCase))
             return MigrationTick.Reject("The person who started the migration must confirm the hold point.");
@@ -635,22 +637,30 @@ public static class MigrationApprovals
         return null;
     }
 
-    public static string? ValidateApprove(MigrationRecord record, string? approver, string liveHash)
+    public static string? ValidateApprove(MigrationRecord record, string? approver, string liveHash, bool requireDifferentApprover = true)
     {
         if (record.Step != MigrationStep.Pending)
             return "Only a pending migration can be approved.";
-        if (string.IsNullOrWhiteSpace(approver) || string.Equals(approver, record.Requester, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(approver))
+            return "An approver identity is required.";
+        if (requireDifferentApprover && (!ChangeRequestWorkflow.Identified(record.Requester) || !ChangeRequestWorkflow.Identified(approver)))
+            return ChangeRequestWorkflow.UnidentifiedDetail;
+        if (requireDifferentApprover && string.Equals(approver, record.Requester, StringComparison.OrdinalIgnoreCase))
             return "A different person must approve the migration.";
         if (!string.Equals(record.PlanHash, liveHash, StringComparison.Ordinal))
             return "The plan changed. Request it again.";
         return null;
     }
 
-    public static string? ValidateExecute(MigrationRecord record, string? executor)
+    public static string? ValidateExecute(MigrationRecord record, string? executor, bool requireDifferentApprover = true)
     {
         if (record.Step != MigrationStep.Approved)
             return "Approve the migration before it runs.";
-        if (string.IsNullOrWhiteSpace(executor) || string.Equals(executor, record.Requester, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(executor))
+            return "An executor identity is required.";
+        if (requireDifferentApprover && (!ChangeRequestWorkflow.Identified(record.Requester) || !ChangeRequestWorkflow.Identified(record.Approver) || !ChangeRequestWorkflow.Identified(executor)))
+            return ChangeRequestWorkflow.UnidentifiedDetail;
+        if (requireDifferentApprover && string.Equals(executor, record.Requester, StringComparison.OrdinalIgnoreCase))
             return "The requester cannot execute the migration.";
         if (!string.Equals(record.ApprovedHash, record.PlanHash, StringComparison.Ordinal))
             return "The approval is not bound to the current plan.";
