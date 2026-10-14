@@ -684,6 +684,7 @@ public sealed class ReportsService
             FacilityName = opened.Page.FacilityName,
             ReportId = opened.Page.ReportId,
             NotFound = opened.Page.NotFound,
+            FacilityMissing = opened.Page.FacilityMissing,
             LoadError = opened.Page.LoadError,
             Report = opened.Page.Report
         };
@@ -1149,18 +1150,18 @@ public sealed class ReportsService
         var facility = await _facilities.GetAsync(page.FacilityId!, cancellationToken);
         if (facility.StatusCode == StatusCodes.Status404NotFound)
         {
-            page.NotFound = true;
-            page.LoadError = "That facility was not found.";
-            return (page, null);
+            // The schedule is the page. A removed facility record is an empty name, not a missing report.
+            page.FacilityMissing = true;
         }
-
-        if (!facility.IsSuccessStatusCode || facility.Body is null)
+        else if (!facility.IsSuccessStatusCode || facility.Body is null)
         {
             page.LoadError = FacilityFormRules.ServiceMessage("Tenant", facility.StatusCode, facility.RawBody);
             return (page, null);
         }
-
-        page.FacilityName = facility.Body.FacilityName;
+        else
+        {
+            page.FacilityName = facility.Body.FacilityName;
+        }
         var schedule = await _reports.GetScheduleAsync(page.ReportId, cancellationToken);
         if (schedule.StatusCode == StatusCodes.Status404NotFound)
         {
@@ -1304,6 +1305,7 @@ public sealed class ReportsService
         FacilityName = source.FacilityName,
         ReportId = source.ReportId,
         NotFound = source.NotFound,
+        FacilityMissing = source.FacilityMissing,
         LoadError = source.LoadError,
         Report = source.Report
     };
