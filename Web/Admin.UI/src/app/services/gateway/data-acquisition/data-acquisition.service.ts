@@ -17,9 +17,6 @@ import {
   ISftpCredentialStatusModel,
   ISftpConnectionTestResult
 } from 'src/app/interfaces/data-acquisition/sftp-config-model.interface';
-import {
-  IDataAcquisitionAuthenticationConfigModel
-} from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
 import {AppConfigService} from '../../app-config.service';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {
@@ -189,42 +186,6 @@ export class DataAcquisitionService {
         tap(_ => console.log(`Request for FHIR list configuration deletion was sent.`)),
         catchError((error) => {
           throw error;
-        })
-      )
-  }
-
-  getAuthenticationConfig(facilityId: string, queryConfigType: string) {
-    return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`)
-      .pipe(
-        tap(_ => console.log(`Fetched authentication configuration.`)),
-        catchError((error) => {
-          return this.errorHandler.handleError(error);
-        })
-      )
-  }
-
-  createAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
-      .pipe(
-        tap(_ => console.log(`Request for authentication configuration creation was sent.`)),
-        map((response: IEntityCreatedResponse) => {
-          return response;
-        }),
-        catchError((error) => {
-          return this.errorHandler.handleError(error);
-        })
-      )
-  }
-
-  updateAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`, authenticationConfig)
-      .pipe(
-        tap(_ => console.log(`Request for authentication configuration update was sent.`)),
-        map((response: IEntityCreatedResponse) => {
-          return response;
-        }),
-        catchError((error) => {
-          return this.errorHandler.handleError(error);
         })
       )
   }
