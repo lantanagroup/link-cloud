@@ -2,6 +2,7 @@ package com.lantanagroup.link.shared.utils;
 
 public class DiagnosticNames {
     public static final String CORRELATION_ID = "correlation.id";
+    public static final String DEPLOYMENT_ENVIRONMENT_NAME = "deployment.environment.name";
     public static final String FACILITY_ID = "facility.id";
     public static final String ISSUE_COUNT_ACCEPTABLE = "issue.count.acceptable";
     public static final String ISSUE_COUNT_TOTAL = "issue.count.total";

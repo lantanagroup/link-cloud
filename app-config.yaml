@@ -194,6 +194,10 @@ global:
     description: "Prometheus HTTP query base URL used by Automation.UI at Metrics-run completion for optional stage latency enrichment. Empty skips Prom queries and marks stages unavailable. Not the OTLP collector endpoint."
     required: false
     consumers: ["AutomationUI"]
+  - key: "Telemetry:DeploymentEnvironment"
+    description: "Name of the environment (e.g. dev, test, qa, qa2), sent as the deployment.environment.name resource attribute. The test environments share one Prometheus, and this is the only thing that tells their series apart; it appears on target_info, which dashboards join on. Empty leaves the attribute off. Java services read telemetry.deploymentEnvironment."
+    required: false
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
     
   # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
   # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and
@@ -786,6 +790,9 @@ services:
       description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
       required: false
       defaultValue: "false"
+    - key: "telemetry.deploymentEnvironment"
+      description: "Name of the environment (e.g. dev, test, qa, qa2), sent as the deployment.environment.name resource attribute. Must match the .NET services' Telemetry:DeploymentEnvironment in the same environment, or dashboards filter MeasureEval out. Empty leaves the attribute off."
+      required: false
   NHSNAppUIHarness:
     - key: "/nhsn_app_ui/bff/base_url"
       description: "Internal BFF proxy target used by the standalone NHSN-App-UI test harness server. BFF_BASE_URL overrides this value; when neither is supplied the server uses http://nhsn-app-bff:8079/api."
@@ -1012,6 +1019,9 @@ services:
       description: "Cap in seconds on a single Validation blob network attempt; the SDK default is effectively unbounded. Defaults to 10."
       required: false
       defaultValue: "10"
+    - key: "telemetry.deploymentEnvironment"
+      description: "Name of the environment (e.g. dev, test, qa, qa2), sent as the deployment.environment.name resource attribute. Must match the .NET services' Telemetry:DeploymentEnvironment in the same environment, or dashboards filter Validation out. Empty leaves the attribute off."
+      required: false
 $defs:
   serviceMetaEntry:
     type: "object"

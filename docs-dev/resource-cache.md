@@ -530,6 +530,46 @@ underscores) for its miss / partial / unavailable counts. Those queries are scop
 deliberately -- the question they answer is about the evaluation read -- but the same query shape now
 returns comparable series for the two .NET jobs as well.
 
+### Dashboard
+
+`dashboards/resource-cache.json` (Grafana, *Link Resource Cache*) covers every instrument above. The
+local stack provisions everything under `dashboards/` into a *Link* folder, so it is there after
+`docker compose up` at http://localhost:3000. Edits made in the UI last until Grafana restarts; export
+the JSON back over the file to keep them. Elsewhere, import the file and pick a Prometheus datasource.
+
+In Prometheus the service is `exported_job`, not `job`, because Prometheus scrapes the collector and the
+collector's own `job` wins. The values are `DataAcquisitionWorker`, `Normalization` and `measureeval`.
+
+The test environments share one Prometheus and one Grafana, and nothing on a series says which
+environment it came from. Each process reports its environment as the `deployment.environment.name`
+resource attribute, set by `Telemetry:DeploymentEnvironment` in .NET and
+`telemetry.deploymentEnvironment` in Java. That attribute reaches Prometheus only on `target_info`,
+so every query filters by joining to it on the process:
+
+```
+… * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~"$environment"}
+```
+
+The join only filters, so it keeps working if the collector is later set to copy resource attributes
+onto every series. *Environment* is single-select: a hit ratio or a quantile mixed across environments
+means nothing. `docker-compose.yml` sets every service's environment to `local`. A process that
+reports no environment is shown only when the selector is empty, so a service missing the setting
+disappears from the dashboard rather than being counted in the wrong environment.
+
+**Rare events need counting from zero.** These series do not exist until the first recording, and the
+first scrape already shows that observation. `increase()` and `rate()` measure change between samples,
+so a series that appears with a count of 1 and never moves reads as zero. That is harmless for hits but
+hides exactly what the alarm panels exist to catch: the first `empty` + `unavailable` read. Every
+count of a rare outcome in the dashboard therefore treats a series that was absent at the start of the
+window as zero:
+
+```
+clamp_min(max_over_time(x[w]) - (x offset w or max_over_time(x[w]) * 0), 0)
+```
+
+A process restart inside the window resets the counter and can undercount; the high-volume rate panels
+use plain `rate()`.
+
 ## Why the previous design was replaced
 
 The earlier Hybrid implementation read Redis `used_memory`, compared it against a configured
