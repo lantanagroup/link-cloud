@@ -2,5 +2,5 @@
 
 public enum QueryConfigurationTypePathParameter
 {
-    fhirQueryConfiguration, fhirQueryListConfiguration
+    fhirQueryConfiguration
 }
