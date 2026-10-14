@@ -56,7 +56,8 @@ public class ReviewItemsFixesTests
         {
             Assert.DoesNotContain(">Clean up<", view);
             Assert.Contains("title=\"Delete\"", view);
-            Assert.Contains("onsubmit=\"return confirm(", view);
+            Assert.Contains("data-hold=\"@Hold.Of(", view);
+            Assert.DoesNotContain("onsubmit=\"return confirm(", view);
         }
     }
 

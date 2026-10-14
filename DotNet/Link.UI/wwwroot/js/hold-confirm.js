@@ -66,6 +66,12 @@
             if (!again) return;
             job.button = again;
         }
+        if (typeof job.onDone === "function") {
+            var done = job.onDone;
+            job.onDone = null;
+            done();
+            return;
+        }
         var form = job.button.form;
         if (!form) return;
         var target = form.querySelector("[data-hold-target]");
@@ -81,8 +87,8 @@
 
     function text(tag, value, cls) { var n = document.createElement(tag); n.textContent = value; if (cls) n.className = cls; return n; }
 
-    function open(button, spec) {
-        pending = { button: button, spec: spec, raw: button.getAttribute("data-hold") || "", value: button.getAttribute("value") || "" };
+    function open(button, spec, onDone) {
+        pending = { button: button, spec: spec, raw: button.getAttribute("data-hold") || "", value: button.getAttribute("value") || "", onDone: onDone || null };
         done = false;
         stop(true);
         btn.classList.remove("btn-success");
@@ -145,6 +151,6 @@
         }, true);
     }
 
-    window.luHoldConfirm = { open: function (button, spec) { if (!modal) wire(); if (modal) open(button, spec); } };
+    window.luHoldConfirm = { open: function (button, spec, onDone) { if (!modal) wire(); if (modal) open(button, spec, onDone); } };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire); else wire();
 })();

@@ -112,7 +112,7 @@
                                 @if (tenant.IsDeleted)
                                 {
                                     <span class="badge @StatusPills.ForAccountState(true, false)">Deleted</span>
-                                    <form method="post" data-au-save asp-action="Restore" asp-route-id="@tenant.FacilityId" class="mt-2" onsubmit="return confirm('Restore this facility, its reports, and its logs?');">
+                                    <form method="post" data-au-save asp-action="Restore" asp-route-id="@tenant.FacilityId" class="mt-2">
                                         <input type="hidden" name="search" value="@Model.Search" />
                                         <input type="hidden" name="page" value="@Model.Page" />
                                         <input type="hidden" name="pageSize" value="@Model.PageSize" />
@@ -124,7 +124,7 @@
                                         {
                                             <input type="hidden" name="scope" value="@scopeQuery" />
                                         }
-                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore facility"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore facility" data-hold="@Hold.Of("Restore this facility", "Restore this facility, its reports, and its logs.", new[] { Hold.Pair("Facility", tenant.FacilityId) }, Array.Empty<string[]>(), new[] { "The facility comes back onto the active list with its reports and logs." }, "", "Hold to restore")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
                                     </form>
                                 }
                                 else

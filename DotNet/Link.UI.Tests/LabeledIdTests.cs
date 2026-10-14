@@ -42,7 +42,8 @@ public class LabeledIdTests
             text.Should().Contain("aria-label=\"Resubmit\"");
             text.Should().Contain("bi-trash");
             text.Should().Contain("aria-label=\"Delete report @report.Id\"");
-            text.Should().Contain("return confirm(");
+            text.Should().Contain("data-hold=\"@Hold.Of(");
+            text.Should().NotContain("return confirm(");
             text.Should().Contain("id=\"resubmitDialog\"");
         }
 

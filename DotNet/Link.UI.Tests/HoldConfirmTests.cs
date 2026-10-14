@@ -39,6 +39,26 @@ public class HoldConfirmTests
         var js = Read("wwwroot", "js", "hold-confirm.js");
         foreach (var token in new[] { "pointerdown", "pointerup", "pointerleave", "pointercancel", "keydown", "keyup", "ev.repeat", "requestAnimationFrame", "aria-valuenow", "data-hold-target", "requestSubmit", "stopPropagation" })
             js.Should().Contain(token);
+        js.Should().Contain("onDone");
+    }
+
+    [Fact]
+    public void Report_and_run_destructive_actions_hold_instead_of_a_browser_confirm()
+    {
+        foreach (var relative in new[] { new[] { "Views", "Reports", "Index.cshtml" }, new[] { "Views", "Tenants", "_ViewReports.cshtml" } })
+        {
+            var view = Read(relative);
+            view.Should().Contain("data-hold=\"@Hold.Of(");
+            view.Should().NotContain("onsubmit=\"return confirm(");
+        }
+
+        Read("Views", "Tenants", "Index.cshtml").Should().Contain("Hold to restore");
+        Read("Views", "Tenants", "Facility.cshtml").Should().Contain("Hold to remove");
+
+        var script = Read("Views", "Automation", "_RunDetailScript.cshtml");
+        script.Should().Contain("luHoldConfirm.open");
+        script.Should().NotContain("confirm('Delete this run");
+        script.Should().NotContain("confirm('Cancel this running test");
     }
 
     [Fact]
