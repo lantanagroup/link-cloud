@@ -1,4 +1,4 @@
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace UnitTests.Kafka;
@@ -75,13 +75,13 @@ public class PartitionChangePlannerTests
     [Fact]
     public void FacilityTopic_RequiresQuietWindow_AndSaysOneFacilityUsesOnePartition()
     {
-        var blocked = PartitionChangePlanner.Evaluate(Valid("ReportScheduled") with { QuietWindowMet = false });
+        var blocked = PartitionChangePlanner.Evaluate(Valid("ReportScheduled") with { QuietWindowMet = false, RequireSecondApprover = true });
         Assert.False(blocked.Accepted);
         Assert.True(blocked.QuietWindowRequired);
         Assert.True(blocked.SecondApproverRequired);
         Assert.Contains(blocked.Notes, note => note.Contains("single facility", StringComparison.OrdinalIgnoreCase));
 
-        var open = PartitionChangePlanner.Evaluate(Valid("ReportScheduled") with { QuietWindowMet = true });
+        var open = PartitionChangePlanner.Evaluate(Valid("ReportScheduled") with { QuietWindowMet = true, RequireSecondApprover = true });
         Assert.True(open.Accepted);
         Assert.True(open.SecondApproverRequired);
     }
@@ -117,7 +117,8 @@ public class PartitionChangePlannerTests
         {
             QuietWindowMet = false,
             OverrideQuietWindow = true,
-            OverrideReason = " "
+            OverrideReason = " ",
+            RequireSecondApprover = true
         });
 
         Assert.False(plan.Accepted);
@@ -183,12 +184,22 @@ public class PartitionChangePlannerTests
     }
 
     [Fact]
-    public void LogTopicIncrease_RequiresASecondApprover()
+    public void LogTopicIncrease_FollowsTheSecondApproverOption()
     {
-        var plan = PartitionChangePlanner.Evaluate(Valid("ReadyToAcquire") with { RequireSecondApprover = false });
-        Assert.True(plan.Accepted, string.Join(" ", plan.Errors));
-        Assert.False(plan.QuietWindowRequired);
-        Assert.True(plan.SecondApproverRequired);
+        var off = PartitionChangePlanner.Evaluate(Valid("ReadyToAcquire") with { RequireSecondApprover = false });
+        Assert.True(off.Accepted, string.Join(" ", off.Errors));
+        Assert.False(off.QuietWindowRequired);
+        Assert.False(off.SecondApproverRequired);
+        Assert.DoesNotContain(off.Notes, note => note.Contains("different person", StringComparison.OrdinalIgnoreCase));
+
+        var on = PartitionChangePlanner.Evaluate(Valid("ReadyToAcquire") with { RequireSecondApprover = true });
+        Assert.True(on.SecondApproverRequired);
+        Assert.Contains(on.Notes, note => note.Contains("different person", StringComparison.OrdinalIgnoreCase));
+
+        var quietOff = PartitionChangePlanner.Evaluate(Valid("ReportScheduled") with { QuietWindowMet = true, RequireSecondApprover = false });
+        Assert.True(quietOff.Accepted, string.Join(" ", quietOff.Errors));
+        Assert.False(quietOff.SecondApproverRequired);
+        Assert.DoesNotContain(quietOff.Notes, note => note.Contains("different person", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

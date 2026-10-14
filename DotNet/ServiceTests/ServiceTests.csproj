@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -31,6 +31,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
@@ -64,6 +65,7 @@
     <ProjectReference Include="..\DMRP\DMRP.csproj" />
     <ProjectReference Include="..\MockDmrpApi\MockDmrpApi.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
+    <ProjectReference Include="..\Operations\Operations.csproj" />
     <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />

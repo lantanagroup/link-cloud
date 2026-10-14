@@ -22,5 +22,9 @@ else if (Model.NotFound || Model.Manifest is null)
 }
 else
 {
+    @if (Model.FacilityMissing && string.IsNullOrWhiteSpace(Model.Manifest.Notice))
+    {
+        <div class="alert alert-secondary" role="status">The facility record is not available.</div>
+    }
     @await Html.PartialAsync("_ReportManifest", Model.Manifest)
 }

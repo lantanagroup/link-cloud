@@ -311,7 +311,8 @@
 
     document.querySelectorAll('.btn-measure-delete').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            if (!confirm('Delete this custom measure?')) return;
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(btn, "Delete this custom measure", "Delete this custom measure?", ["The custom measure is removed."], function () {
             fetch(deleteUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
@@ -319,6 +320,7 @@
             }).then(function (r) {
                 if (r.ok) auRefreshPage('Deleted.');
                 else r.text().then(function (t) { alert(t || 'Delete failed'); });
+            });
             });
         });
     });

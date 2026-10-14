@@ -47,8 +47,10 @@ public static class StatusPills
             return "au-badge-success";
         if (name is "offline" or "down")
             return "au-badge-danger";
-        if (name is "isrshort" or "needsattention" or "needattention")
+        if (name is "isrshort")
             return "au-badge-warning";
+        if (name is "needsattention" or "needattention")
+            return "au-badge-attention";
         return "au-badge-muted";
     }
 

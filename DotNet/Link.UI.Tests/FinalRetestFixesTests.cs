@@ -34,7 +34,7 @@ public class FinalRetestFixesTests
     [Fact]
     public void Topic_configs_endpoint_turns_a_rejection_into_a_problem_instead_of_a_500()
     {
-        var endpoints = File.ReadAllText(Path.Combine(Root(), "Admin.BFF", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs"));
+        var endpoints = File.ReadAllText(Path.Combine(Root(), "Operations", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs"));
         var start = endpoints.IndexOf("Task<IResult> GetConfigs(", StringComparison.Ordinal);
         var body = endpoints.Substring(start, endpoints.IndexOf("Task<IResult> PlanMigration(", StringComparison.Ordinal) - start);
         Assert.Contains("catch (KafkaOpsRejectedException ex)", body);

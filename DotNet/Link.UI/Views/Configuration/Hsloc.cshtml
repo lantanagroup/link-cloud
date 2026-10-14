@@ -45,7 +45,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Replace a version</div>
     <div class="card-body">
-        <form method="post" data-au-save asp-action="ReplaceHsloc" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Replace this HSLOC version with the uploaded CSV?');">
+        <form method="post" data-au-save asp-action="ReplaceHsloc" enctype="multipart/form-data" class="row g-2 align-items-end">
             <input type="hidden" name="text" value="@query.Text" />
             <input type="hidden" name="version" value="@query.Version" />
             <input type="hidden" name="page" value="@query.Page" />
@@ -62,7 +62,7 @@
                 <input id="csv" name="csv" type="file" accept=".csv,text/csv" class="form-control" required />
             </div>
             <div class="col-12 col-md-2">
-                <button type="submit" class="btn btn-success">Replace</button>
+                <button data-hold="@Hold.Of("Replace this HSLOC version with the uploaded CSV?", "Replace this HSLOC version with the uploaded CSV?", "The current contents are replaced.", "Hold to confirm")" type="submit" class="btn btn-success">Replace</button>
             </div>
         </form>
     </div>
@@ -107,11 +107,11 @@ else
                                 <td>@row.Version</td>
                                 <td>@(row.Active ? "Yes" : "No")</td>
                                 <td>
-                                    <form method="post" data-au-save asp-action="DeleteHsloc" asp-route-id="@row.Id" onsubmit="return confirm('Delete this HSLOC code?');">
+                                    <form method="post" data-au-save asp-action="DeleteHsloc" asp-route-id="@row.Id">
                                         <input type="hidden" name="text" value="@query.Text" />
                                         <input type="hidden" name="version" value="@query.Version" />
                                         <input type="hidden" name="page" value="@bar.Page" />
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Code"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                        <button data-hold="@Hold.Of("Delete this HSLOC code?", "Delete this HSLOC code?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Code"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </td>
                             </tr>

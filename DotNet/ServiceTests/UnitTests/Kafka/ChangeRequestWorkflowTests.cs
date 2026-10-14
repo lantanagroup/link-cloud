@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Permissions;
 

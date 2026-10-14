@@ -1,5 +1,5 @@
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 
 namespace UnitTests.Kafka;
 

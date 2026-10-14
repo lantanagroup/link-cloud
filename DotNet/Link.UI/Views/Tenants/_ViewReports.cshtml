@@ -149,26 +149,26 @@
                                 }
                                 @if (report.CanAbort)
                                 {
-                                    <form method="post" data-au-save asp-action="AbortReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.');">
+                                    <form method="post" data-au-save asp-action="AbortReport" asp-route-id="@Model.FacilityId">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-warning lu-icon-btn" title="Abort" aria-label="Abort"><i class="bi bi-stop-fill" aria-hidden="true"></i><span class="ms-1">Abort</span></button>
+                                        <button type="submit" class="btn btn-sm btn-warning lu-icon-btn" title="Abort" aria-label="Abort" data-hold="@Hold.Of("Stop this report", "Stop this in-progress report. Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The report is soft-deleted and can be restored later." }, "", "Hold to stop")"><i class="bi bi-stop-fill" aria-hidden="true"></i><span class="ms-1">Abort</span></button>
                                     </form>
                                 }
                                 @if (report.CanCleanUp)
                                 {
-                                    <form method="post" data-au-save asp-action="CleanUpReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
+                                    <form method="post" data-au-save asp-action="CleanUpReport" asp-route-id="@Model.FacilityId">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete report @report.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete report @report.Id" data-hold="@Hold.Of("Delete this report", "Remove this report and its associated acquisition logs.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The report is soft-deleted and can be restored later.", "Acquisition logs for this report are removed with it." }, "", "Hold to delete")"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 }
                                 @if (report.CanRestore)
                                 {
-                                    <form method="post" data-au-save asp-action="RestoreReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Restore this report and its acquisition logs?');">
+                                    <form method="post" data-au-save asp-action="RestoreReport" asp-route-id="@Model.FacilityId">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore" data-hold="@Hold.Of("Restore this report", "Restore this report and its acquisition logs.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The report and its acquisition logs come back onto the active lists." }, "", "Hold to restore")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
                                     </form>
                                 }
                                 </div>
@@ -197,8 +197,8 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-au-execute" name="bypassSubmission" value="true">Regenerate without submitting</button>
-                <button type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Resubmit</button>
+                <button type="submit" class="btn btn-au-execute" name="bypassSubmission" data-hold="@Hold.Of("Regenerate without submitting", "Regenerate this report and do not submit it.", "The report is regenerated. Nothing is copied to the submission container.", "Hold to regenerate")" value="true">Regenerate without submitting</button>
+                <button data-hold="@Hold.Of("Resubmit this report", "Regenerate this report and submit it.", "The report is regenerated and sent downstream.", "Hold to resubmit")" type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Resubmit</button>
             </div>
         </form>
     </div>

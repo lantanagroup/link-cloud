@@ -314,6 +314,17 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 window.FinishedAt,
                 input.RunId,
                 cancellationToken);
+            if (previous != null && !MetricsBenchmarkEvaluator.IsFullBaseline(previous))
+            {
+                var recent = await _store.ListRecentSucceededSameFingerprintAsync(
+                    scenarioId,
+                    document.ScenarioFingerprint ?? "",
+                    window.FinishedAt,
+                    input.RunId,
+                    MetricsBenchmarkEvaluator.BaselineLookback,
+                    cancellationToken);
+                previous = MetricsBenchmarkEvaluator.SelectBaseline(recent);
+            }
         }
 
         var evaluation = MetricsBenchmarkEvaluator.Evaluate(
@@ -440,6 +451,56 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 
     internal static string StageErrorQuery(string errorCounter, string facility, string errorOutcome, int windowSeconds) =>
         $"sum(increase({errorCounter}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}}[{windowSeconds}s]))";
+
+    internal static string StageRawCountQuery(string histogramBase, string facility) =>
+        $"sum({histogramBase}_count{{facility_id=\"{facility}\"}})";
+
+    internal static string StageRawCountOffsetQuery(string histogramBase, string facility, int windowSeconds) =>
+        $"sum({histogramBase}_count{{facility_id=\"{facility}\"}} offset {windowSeconds}s)";
+
+    internal static string StageRawQuantileQuery(string histogramBase, string facility, string quantile) =>
+        $"histogram_quantile({quantile}, sum by (le) ({histogramBase}_bucket{{facility_id=\"{facility}\"}}))";
+
+    internal static string StageRawErrorQuery(string errorCounter, string facility, string errorOutcome) =>
+        $"sum({errorCounter}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}})";
+
+    internal static string StageRawErrorOffsetQuery(string errorCounter, string facility, string errorOutcome, int windowSeconds) =>
+        $"sum({errorCounter}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}} offset {windowSeconds}s)";
+
+    internal readonly record struct StageCounterReading(double? Delta, double? Current, double? Before);
+
+    internal enum StageHistogramSource
+    {
+        None,
+        Increase,
+        Cumulative
+    }
+
+    /// <summary>
+    /// A new facility series is often scraped once, already at its final value, and then
+    /// stays flat. increase() is 0 for that series no matter how long we wait, so the
+    /// cumulative histogram is the run. A facility that already had observations at the
+    /// start of the lookback stays on increase() so earlier reports stay out of this run.
+    /// </summary>
+    internal static StageHistogramSource ChooseHistogram(StageCounterReading reading)
+    {
+        var seriesIsNew = reading.Before is null or <= 0;
+        if (seriesIsNew && reading.Current is > 0)
+            return StageHistogramSource.Cumulative;
+
+        if (reading.Delta is > 0)
+            return StageHistogramSource.Increase;
+
+        return StageHistogramSource.None;
+    }
+
+    internal static double ObservedCount(StageCounterReading reading, StageHistogramSource source) =>
+        source switch
+        {
+            StageHistogramSource.Cumulative => reading.Current ?? 0,
+            StageHistogramSource.Increase => reading.Delta ?? 0,
+            _ => 0
+        };
 
     internal static string DotNetPeakMemoryQuery(string exportedJob, int windowSeconds) =>
         $"max(max_over_time(process_memory_usage_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s]))";
@@ -643,36 +704,68 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         CancellationToken cancellationToken)
     {
         var facility = EscapePromLabel(facilityId);
-        var countSelector = StageCountQuery(stage.HistogramBase, facility, windowSeconds);
-
-        var count = await _prometheus.QueryScalarAsync(countSelector, evaluationTime, cancellationToken);
-        if (count is null or <= 0)
+        var duration = await ReadCounterAsync(
+            StageCountQuery(stage.HistogramBase, facility, windowSeconds),
+            StageRawCountQuery(stage.HistogramBase, facility),
+            StageRawCountOffsetQuery(stage.HistogramBase, facility, windowSeconds),
+            evaluationTime,
+            cancellationToken);
+        var source = ChooseHistogram(duration);
+        if (source == StageHistogramSource.None)
             return new StageLatencySnapshot { Unavailable = true };
 
         var p50 = await _prometheus.QueryScalarAsync(
-            StageQuantileQuery(stage.HistogramBase, facility, windowSeconds, "0.50"), evaluationTime, cancellationToken);
+            StageQuantile(stage.HistogramBase, facility, windowSeconds, "0.50", source), evaluationTime, cancellationToken);
         var p95 = await _prometheus.QueryScalarAsync(
-            StageQuantileQuery(stage.HistogramBase, facility, windowSeconds, "0.95"), evaluationTime, cancellationToken);
+            StageQuantile(stage.HistogramBase, facility, windowSeconds, "0.95", source), evaluationTime, cancellationToken);
         var p99 = await _prometheus.QueryScalarAsync(
-            StageQuantileQuery(stage.HistogramBase, facility, windowSeconds, "0.99"), evaluationTime, cancellationToken);
+            StageQuantile(stage.HistogramBase, facility, windowSeconds, "0.99", source), evaluationTime, cancellationToken);
 
         double errorCount = 0;
         if (!string.IsNullOrWhiteSpace(stage.ErrorCounter) && !string.IsNullOrWhiteSpace(stage.ErrorOutcome))
         {
-            var errorSelector = StageErrorQuery(
-                stage.ErrorCounter, facility, EscapePromLabel(stage.ErrorOutcome), windowSeconds);
-            errorCount = await _prometheus.QueryScalarAsync(errorSelector, evaluationTime, cancellationToken) ?? 0;
+            var outcome = EscapePromLabel(stage.ErrorOutcome);
+            var errors = await ReadCounterAsync(
+                StageErrorQuery(stage.ErrorCounter, facility, outcome, windowSeconds),
+                StageRawErrorQuery(stage.ErrorCounter, facility, outcome),
+                StageRawErrorOffsetQuery(stage.ErrorCounter, facility, outcome, windowSeconds),
+                evaluationTime,
+                cancellationToken);
+            errorCount = ObservedCount(errors, ChooseHistogram(errors));
         }
 
         return new StageLatencySnapshot
         {
             Unavailable = p50 is null && p95 is null && p99 is null,
-            Count = count.Value,
+            Count = ObservedCount(duration, source),
             P50Ms = p50 ?? 0,
             P95Ms = p95 ?? 0,
             P99Ms = p99 ?? 0,
             ErrorCount = Math.Max(0, errorCount)
         };
+    }
+
+    private static string StageQuantile(
+        string histogramBase,
+        string facility,
+        int windowSeconds,
+        string quantile,
+        StageHistogramSource source) =>
+        source == StageHistogramSource.Cumulative
+            ? StageRawQuantileQuery(histogramBase, facility, quantile)
+            : StageQuantileQuery(histogramBase, facility, windowSeconds, quantile);
+
+    private async Task<StageCounterReading> ReadCounterAsync(
+        string deltaQuery,
+        string currentQuery,
+        string beforeQuery,
+        DateTimeOffset evaluationTime,
+        CancellationToken cancellationToken)
+    {
+        var delta = await _prometheus.QueryScalarAsync(deltaQuery, evaluationTime, cancellationToken);
+        var current = await _prometheus.QueryScalarAsync(currentQuery, evaluationTime, cancellationToken);
+        var before = await _prometheus.QueryScalarAsync(beforeQuery, evaluationTime, cancellationToken);
+        return new StageCounterReading(delta, current, before);
     }
 
     private static string EscapePromLabel(string value) =>

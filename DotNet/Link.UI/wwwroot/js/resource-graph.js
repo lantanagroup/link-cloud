@@ -322,8 +322,11 @@
             if (palette && palette.length) colors = palette;
             var button = document.getElementById("manifest-interactive");
             var bar = document.getElementById("manifest-interactive-bar");
-            if (button) button.hidden = !graphUrl;
-            if (bar) bar.hidden = !graphUrl;
+            // The bar is d-flex, which beats the hidden attribute, so hide it with d-none.
+            // A blocked button stays visible (disabled, with its tooltip) so the reason can be read.
+            var shown = !!graphUrl || !!(button && button.dataset.blocked);
+            if (bar) bar.classList.toggle("d-none", !shown);
+            if (button && !graphUrl) button.disabled = true;
             if (button && !button.dataset.bound) {
                 button.dataset.bound = "1";
                 button.addEventListener("click", open);
@@ -360,12 +363,47 @@
         showError("");
         setStatus("", 0);
         var button = document.getElementById("manifest-interactive");
-        if (button) button.disabled = false;
+        if (button) button.disabled = !!button.dataset.blocked;
+        if (button && !button.dataset.blocked) setTip("Load this patient's submitted bundle from ABS");
+    }
+
+    function setTip(text) {
+        var wrap = document.getElementById("manifest-interactive-wrap");
+        if (!wrap || !text) return;
+        wrap.setAttribute("title", text);
+        if (window.bootstrap && bootstrap.Tooltip) {
+            var tip = bootstrap.Tooltip.getInstance(wrap);
+            if (tip) tip.dispose();
+            bootstrap.Tooltip.getOrCreateInstance(wrap);
+        }
+    }
+
+    function unavailable(text) {
+        var button = document.getElementById("manifest-interactive");
+        if (button) button.disabled = true;
+        setTip(text);
+        inlineNote(text);
+    }
+
+    // A failed load always says why next to the button; it never fails silently.
+    function inlineNote(text) {
+        var note = document.getElementById("manifest-interactive-note");
+        if (!note) return;
+        note.textContent = text || "";
+        note.hidden = !text;
     }
 
     function open() {
         var row = patient();
-        if (!row || !graphUrl) return;
+        if (!graphUrl) {
+            unavailable("Interactive mode is not available for this page.");
+            return;
+        }
+        if (!row) {
+            inlineNote("Pick a patient first, then open Interactive mode.");
+            return;
+        }
+        inlineNote("");
         abort();
         summaryAbort = new AbortController();
         var box = panel();
@@ -385,6 +423,7 @@
                 if (!done) return;
                 if (done.error && !done.total) {
                     showError(done.error);
+                    inlineNote(done.error);
                     setStatus("", 0, "idle");
                     return;
                 }
@@ -419,7 +458,17 @@
             .catch(function (error) {
                 if (button) button.disabled = false;
                 if (error.name === "AbortError") return;
-                showError(error.message || "The graph was refused.");
+                if (error.status === 404) {
+                    // The submission is gone from ABS: keep the button off and say why.
+                    unavailable(error.message || "The submission for this patient is no longer in ABS.");
+                    if (box) box.hidden = true;
+                    return;
+                }
+                var reason = error.message && error.message !== "Failed to fetch"
+                    ? error.message
+                    : "The submitted bundle could not be loaded. Try again in a moment.";
+                showError(reason);
+                inlineNote(reason);
                 setStatus("", 0, "idle");
             });
     }
@@ -429,7 +478,9 @@
         if (!response.ok) {
             var problem = {};
             try { problem = await response.json(); } catch (ignore) { problem = {}; }
-            throw new Error(problem.detail || "The graph was refused.");
+            var failure = new Error(problem.detail || "The graph was refused.");
+            failure.status = response.status;
+            throw failure;
         }
         var reader = response.body.getReader();
         var decoder = new TextDecoder();

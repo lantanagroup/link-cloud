@@ -2,12 +2,15 @@
 @using LantanaGroup.Link.Shared.Application.Models.Kafka
 @{
     var query = Model.Query;
-    var topicName = Model.SelectedTopic?.Topic ?? query.TopicName;
+    var topicName = string.IsNullOrWhiteSpace(query.TopicName) ? Model.SelectedTopic?.Topic ?? "" : query.TopicName;
+    var mainName = Model.SelectedTopic?.Topic ?? topicName;
     var browse = Model.Messages;
     var error = Model.BrowseError;
     var members = Model.Family is { Members.Count: > 0 }
         ? (IReadOnlyList<KafkaNamedTopic>)Model.Family.Members
-        : KafkaBrowseAllowList.MembersOf(topicName);
+        : (IReadOnlyList<KafkaNamedTopic>)[];
+    var redriveSource = KafkaTopicFamilyRules.RedriveSource(topicName, members);
+    var canRedrive = KafkaTopicFamilyRules.CanRedrive(members);
     var pageSize = KafkaWindows.Size(query.PageSize);
     var messageLogEnd = members.FirstOrDefault(member => string.Equals(member.Topic, topicName, StringComparison.OrdinalIgnoreCase))?.HighWatermarkSum ?? 0;
     var messagePages = KafkaMessageWindow.Pages(browse?.Metadata.Total ?? 0, pageSize, messageLogEnd);
@@ -95,6 +98,10 @@
                             <span class="is-dimmed" aria-disabled="true" title="Not on the broker">@KafkaBrowseText.VariantTab(member)</span>
                         }
                     }
+                    @if (canRedrive)
+                    {
+                        <span class="ms-auto small text-muted align-self-center" id="kafka-redrive-hint">@(redriveSource is null ? "Redrive: open a record on Error or Retry to send it back to " + mainName + "." : "Redrive: open a record and choose Redrive to " + mainName + ".")</span>
+                    }
                 </nav>
             }
             <div class="row g-2 align-items-end">
@@ -104,7 +111,7 @@
                 <div class="col-6 col-md-3 col-lg-2">
                     <label class="form-label" for="browse-kind">Message type</label>
                     <select class="form-select" id="browse-kind" name="mtype">
-                        @foreach (var kind in new[] { "", "Main", "Error", "Retry", "Redrive" })
+                        @foreach (var kind in KafkaTopicFamilyRules.Kinds(members))
                         {
                             var label = kind.Length == 0 ? "All types" : kind;
                             if (kind == query.MessageKind)
@@ -348,7 +355,7 @@
         {
             <section class="card au-card mt-3" id="kafka-open-record">
                 <div class="card-body">
-                    <partial name="_MessageDetail" model="@(new KafkaMessageOpen { Topic = topicName, Record = opened, ReturnHref = query.Href(), ProduceHref = query.Href(view: ThroughputKafkaPageQuery.Produce, topic: topicName, stage: query.OpenRecord) })" />
+                    <partial name="_MessageDetail" model="@(new KafkaMessageOpen { Topic = topicName, Record = opened, ReturnHref = query.Href(), ProduceHref = query.Href(view: ThroughputKafkaPageQuery.Produce, topic: topicName, stage: query.OpenRecord), RedriveHref = redriveSource is null ? "" : query.Href(view: ThroughputKafkaPageQuery.Produce, topic: mainName, stage: query.OpenRecord, redrive: redriveSource.Topic), RedriveTarget = redriveSource is null ? "" : mainName })" />
                 </div>
             </section>
         }

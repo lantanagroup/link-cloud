@@ -104,9 +104,9 @@ else
                                 <td class="text-nowrap">
                                     <div class="lu-row-actions">
                                         <a class="btn btn-sm btn-au-link lu-icon-btn" asp-controller="Tenants" asp-action="Facility" asp-route-id="@row.FacilityId" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
-                                        <form method="post" data-au-save asp-action="DeleteConfiguration" onsubmit="return confirm('Delete this notification configuration?');">
+                                        <form method="post" data-au-save asp-action="DeleteConfiguration">
                                             <input type="hidden" name="id" value="@row.Id" />
-                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                            <button data-hold="@Hold.Of("Delete this notification configuration?", "Delete this notification configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                         </form>
                                     </div>
                                 </td>

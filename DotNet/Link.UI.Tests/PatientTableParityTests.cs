@@ -61,7 +61,9 @@ public class PatientTableParityTests
         Assert.Contains("<th>Mapping", manifest);
         foreach (var label in new[] { "\"Status\"", "\"Submission\"", "\"Location org\"", "\"Encounter mapping\"", "\"HSLOC\"" })
             Assert.Contains("line(identity, " + label, manifest);
-        Assert.Contains("ReportPatientDiagnostics.Mapping(entry.LocationOrgStatus, entry.EncounterMappingStatus, entry.HslocMappingStatus)", service);
+        // The mapping is saved with the manifest and restored when it renders.
+        Assert.Contains("LocationOrgStatus = entry.LocationOrgStatus.ToString()", service);
+        Assert.Contains("ReportPatientDiagnostics.Mapping(location, encounter, hsloc)", service);
 
         // P7-P8: Measure and Log row actions with the go-to-page icon.
         Assert.Contains("title=\"Measure\"", manifest);

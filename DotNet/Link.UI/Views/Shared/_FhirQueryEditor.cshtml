@@ -184,8 +184,8 @@ else
                     </form>
                     @if (query.Exists)
                     {
-                        <form method="post" data-au-save asp-action="DeleteFhirQuery" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR query configuration?');">
-                            <button type="submit" class="btn btn-danger btn-sm">Delete FHIR query</button>
+                        <form method="post" data-au-save asp-action="DeleteFhirQuery" asp-route-id="@Model.FacilityId" class="mt-2">
+                            <button data-hold="@Hold.Of("Delete the FHIR query configuration?", "Delete the FHIR query configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete FHIR query</button>
                         </form>
                     }
                 }
@@ -242,8 +242,8 @@ else
                     </form>
                     @if (list.Exists)
                     {
-                        <form method="post" data-au-save asp-action="DeleteFhirList" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR list configuration?');">
-                            <button type="submit" class="btn btn-danger btn-sm">Delete FHIR list</button>
+                        <form method="post" data-au-save asp-action="DeleteFhirList" asp-route-id="@Model.FacilityId" class="mt-2">
+                            <button data-hold="@Hold.Of("Delete the FHIR list configuration?", "Delete the FHIR list configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete FHIR list</button>
                         </form>
                     }
                 }
@@ -568,9 +568,9 @@ else
                     </form>
                     @if (org.Exists && org.ConfigId is int configId)
                     {
-                        <form method="post" data-au-save asp-action="DeleteReportingOrg" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete this reporting organization configuration?');">
+                        <form method="post" data-au-save asp-action="DeleteReportingOrg" asp-route-id="@Model.FacilityId" class="mt-2">
                             <input type="hidden" name="configId" value="@configId" />
-                            <button type="submit" class="btn btn-danger btn-sm">Delete reporting organization</button>
+                            <button data-hold="@Hold.Of("Delete this reporting organization configuration?", "Delete this reporting organization configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete reporting organization</button>
                         </form>
                     }
                 }
@@ -703,13 +703,13 @@ else
                             </form>
                             @if (sftp.CredentialsSaved == true)
                             {
-                                <form method="post" data-au-save asp-action="DeleteSftpCredentials" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the saved SFTP credentials?');">
-                                    <button type="submit" class="btn btn-danger btn-sm">Delete credentials</button>
+                                <form method="post" data-au-save asp-action="DeleteSftpCredentials" asp-route-id="@Model.FacilityId">
+                                    <button data-hold="@Hold.Of("Delete the saved SFTP credentials?", "Delete the saved SFTP credentials?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete credentials</button>
                                 </form>
                             }
-                            <form method="post" data-au-save asp-action="DeleteSftp" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the SFTP configuration?');">
+                            <form method="post" data-au-save asp-action="DeleteSftp" asp-route-id="@Model.FacilityId">
                                 <input type="hidden" name="configurationId" value="@sftp.ConfigurationId" />
-                                <button type="submit" class="btn btn-danger btn-sm">Delete SFTP</button>
+                                <button data-hold="@Hold.Of("Delete the SFTP configuration?", "Delete the SFTP configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete SFTP</button>
                             </form>
                         </div>
                     }
