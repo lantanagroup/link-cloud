@@ -66,6 +66,12 @@
             if (!again) return;
             job.button = again;
         }
+        if (typeof job.onDone === "function") {
+            var done = job.onDone;
+            job.onDone = null;
+            done();
+            return;
+        }
         var form = job.button.form;
         if (!form) return;
         var target = form.querySelector("[data-hold-target]");
@@ -81,8 +87,8 @@
 
     function text(tag, value, cls) { var n = document.createElement(tag); n.textContent = value; if (cls) n.className = cls; return n; }
 
-    function open(button, spec) {
-        pending = { button: button, spec: spec, raw: button.getAttribute("data-hold") || "", value: button.getAttribute("value") || "" };
+    function open(button, spec, onDone) {
+        pending = { button: button, spec: spec, raw: button.getAttribute("data-hold") || "", value: button.getAttribute("value") || "", onDone: onDone || null };
         done = false;
         stop(true);
         btn.classList.remove("btn-success");
@@ -145,6 +151,16 @@
         }, true);
     }
 
-    window.luHoldConfirm = { open: function (button, spec) { if (!modal) wire(); if (modal) open(button, spec); } };
+    function ask(anchor, title, action, risks, yes) {
+        var node = anchor && typeof anchor.getAttribute === "function" ? anchor : document.body;
+        if (!modal) wire();
+        if (!modal) return;
+        open(node, { title: title || "Confirm", action: action || "", details: [], fields: [], risks: risks || [], confirm: "", label: "Hold to confirm" }, yes);
+    }
+
+    window.luHoldConfirm = {
+        open: function (button, spec, onDone) { if (!modal) wire(); if (modal) open(button, spec, onDone); },
+        ask: ask
+    };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire); else wire();
 })();

@@ -8,10 +8,12 @@
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "report";
     var run = Model.AutomationRun;
+    if (run?.Run is not null)
+        ViewData["NavSection"] = "Automation";
     var detail = run?.Detail;
 }
 <div class="mb-3 d-flex flex-wrap gap-3">
-    @if (Model.RunOnly)
+    @if (Model.RunOnly || run?.Run is not null)
     {
         <partial name="_BackButton" model="@(new BackLink(Url.Action("Index", "Automation")!, "Back to runs"))" />
     }

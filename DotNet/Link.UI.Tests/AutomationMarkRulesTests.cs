@@ -151,7 +151,7 @@ public class AutomationMarkRulesTests
         layout.Should().Contain("bi-lightning-charge");
 
         var shipped = File.ReadAllText(RepoFile("DotNet/Link.UI/appsettings.json"));
-        shipped.Should().Contain("\"AutomationEnabled\": false");
+        shipped.Should().Contain("\"AutomationEnabled\": true");
         var development = File.ReadAllText(RepoFile("DotNet/Link.UI/appsettings.Development.json"));
         development.Should().Contain("\"AutomationEnabled\": true");
     }

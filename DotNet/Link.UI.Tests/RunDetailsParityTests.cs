@@ -182,6 +182,11 @@ public class RunDetailsParityTests
         // Runs that never created a report: same page, clean empty state, still watching for the report.
         Assert.Contains("RunOnly", report);
         Assert.Contains("_RunReportWatch", report);
+        var emptyAt = report.IndexOf("This run ended without creating a report.", StringComparison.Ordinal);
+        Assert.True(emptyAt > 0);
+        var branch = report.LastIndexOf("@if (Model.RunOnly)", emptyAt, StringComparison.Ordinal);
+        Assert.True(branch >= 0);
+        Assert.DoesNotContain("run?.Run is not null", report.Substring(branch, emptyAt - branch), StringComparison.Ordinal);
     }
 
     [Fact]

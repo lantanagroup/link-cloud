@@ -4,8 +4,8 @@ using Claim = System.Security.Claims.Claim;
 using System.Security.Claims;
 using System.Text;
 using Confluent.Kafka;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
-using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Presentation.Endpoints;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -484,7 +484,7 @@ public class KafkaMessageBrowserTests
         string? path = null;
         while (root is not null && path is null)
         {
-            var candidate = Path.Combine(root.FullName, "DotNet", "Admin.BFF", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs");
+            var candidate = Path.Combine(root.FullName, "DotNet", "Operations", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs");
             if (File.Exists(candidate))
                 path = candidate;
             root = root.Parent;

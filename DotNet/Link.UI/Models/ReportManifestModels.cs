@@ -249,6 +249,18 @@ public sealed class ReportManifestModel
 
     public string Lead { get; init; } = string.Empty;
     public string? Notice { get; init; }
+
+    /// <summary>Why Interactive mode is off (the ABS submission is gone). Null when it can load on demand.</summary>
+    public string? InteractiveBlocked { get; set; }
+
+    /// <summary>
+    /// The report whose submission Interactive mode reads, when the page is not the report's own
+    /// manifest (an Automation run's generation manifest). Null on the report page, which uses its route.
+    /// </summary>
+    public string? GraphFacilityId { get; set; }
+
+    /// <summary>See <see cref="GraphFacilityId"/>.</summary>
+    public string? GraphReportId { get; set; }
     public string? PatientNote { get; init; }
     public bool ShowComparison { get; init; }
     public bool ShowGeneration { get; init; }

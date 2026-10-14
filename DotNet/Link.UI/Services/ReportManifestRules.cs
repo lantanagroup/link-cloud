@@ -506,7 +506,8 @@ public static partial class ReportManifestRules
         ReportManifestFacts facts,
         ReportManifestQuery query,
         string path,
-        IReadOnlyDictionary<string, string> route)
+        IReadOnlyDictionary<string, string> route,
+        string? interactiveBlocked = null)
     {
         var useResources = facts.ResourceTypes.Count > 0;
         var typeRows = useResources ? facts.ResourceTypes : facts.Contents;
@@ -525,7 +526,8 @@ public static partial class ReportManifestRules
         return new ReportManifestModel
         {
             Lead = "",
-            Notice = null,
+            Notice = facts.Notice,
+            InteractiveBlocked = interactiveBlocked,
             PatientNote = facts.PatientNote,
             ShowComparison = false,
             ShowGeneration = false,

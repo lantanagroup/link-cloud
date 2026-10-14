@@ -18,13 +18,9 @@ public sealed class OperationsController : Controller
         _kafka = kafka;
     }
 
+    // Kafka is the only Operations console, so the section opens it directly.
     [HttpGet("")]
-    public IActionResult Index()
-    {
-        ViewData["Title"] = "Operations";
-        ViewData["OperationsSection"] = "home";
-        return View();
-    }
+    public IActionResult Index() => RedirectToAction(nameof(Kafka));
 
     [HttpPost("Kafka/migrations/plan")]
     [ValidateAntiForgeryToken]
@@ -624,7 +620,8 @@ public sealed class OperationsController : Controller
         var pagedBrokers = brokerRows.Skip((brokerPage - 1) * query.PageSize).Take(query.PageSize).ToList();
 
         var selectedGroup = groups.Groups.FirstOrDefault(row => string.Equals(row.GroupId, query.Group, StringComparison.Ordinal));
-        var selectedTopic = topics.Topics.FirstOrDefault(row => string.Equals(row.Topic, query.TopicName, StringComparison.Ordinal));
+        // An error or retry topic belongs to its main row; the listing folds siblings into it.
+        var selectedTopic = KafkaTopicFamilyRules.Owner(query.TopicName, topics.Topics);
         var selectedBroker = int.TryParse(query.Broker, out var brokerId)
             ? cluster.Brokers.FirstOrDefault(row => row.Id == brokerId)
             : null;
@@ -640,13 +637,15 @@ public sealed class OperationsController : Controller
         if (query.View is ThroughputKafkaPageQuery.Messages or ThroughputKafkaPageQuery.Produce && !string.IsNullOrWhiteSpace(query.TopicName))
         {
             var familyCall = await _kafka.GetFamilyAsync(query.TopicName, cancellationToken);
-            family = familyCall.Value;
-            var members = family is { Members.Count: > 0 }
-                ? (IReadOnlyList<KafkaNamedTopic>)family.Members
-                : KafkaBrowseAllowList.MembersOf(query.TopicName);
+            // Which siblings exist comes from the topics listing already loaded, not from guessed names.
+            var members = KafkaTopicFamilyRules.Members(selectedTopic, familyCall.Value);
+            family = new KafkaFamilyView { Main = selectedTopic?.Topic ?? familyCall.Value?.Main ?? "", Members = members, Error = familyCall.Value?.Error };
             var browsePlan = KafkaBrowsePlan.For(query, members);
+            var redriveSource = query.View == ThroughputKafkaPageQuery.Produce && query.StageRecord.Length > 0
+                ? KafkaTopicFamilyRules.RedriveSource(query.RedriveFrom, members)
+                : null;
             var messageCall = await _kafka.GetMessagesAsync(
-                browsePlan.Topic,
+                redriveSource?.Topic ?? browsePlan.Topic,
                 browsePlan.Mode,
                 query.BrowsePartitions,
                 query.BrowseOffset,
@@ -676,6 +675,9 @@ public sealed class OperationsController : Controller
             produceDraft = staged is null
                 ? new KafkaProduceDraft { Topic = query.TopicName, Summary = KafkaProduceRules.MissingSentence, FromStage = true }
                 : KafkaProduceRules.FromRecord(query.TopicName, staged);
+            var source = KafkaTopicFamilyRules.RedriveSource(query.RedriveFrom, family?.Members ?? []);
+            if (staged is not null && source is not null)
+                produceDraft = produceDraft with { Summary = "Redrive " + KafkaBrowseText.RecordId(staged.Partition, staged.Offset) + " from " + source.Topic + " back to " + query.TopicName + ". " + produceDraft.Summary };
         }
 
         if (query.View == ThroughputKafkaPageQuery.Migrate && !string.IsNullOrWhiteSpace(query.TopicName))

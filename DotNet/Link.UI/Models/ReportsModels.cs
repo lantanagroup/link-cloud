@@ -126,6 +126,10 @@ public class ReportSectionPage
     public string? FacilityName { get; set; }
     public string ReportId { get; set; } = string.Empty;
     public bool NotFound { get; set; }
+
+    /// <summary>The tenant facility record is gone. The report schedule is still the page.</summary>
+    public bool FacilityMissing { get; set; }
+
     public string? LoadError { get; set; }
     public FacilityReportRow? Report { get; set; }
 }

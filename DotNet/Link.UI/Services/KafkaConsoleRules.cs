@@ -350,6 +350,107 @@ public static class BrokerMovePreview
             .ToList();
 }
 
+/// <summary>
+/// A topic's browsable family, named the way Link names it: <c>{Topic}-Error</c> and
+/// <c>{Topic}-Retry</c> (see BaseListener). Existence comes from the one topics metadata listing
+/// the console already holds, so no per-tab broker call is made. Redrive is not a topic: it sends a
+/// record from the error or retry topic back to the source topic.
+/// </summary>
+public static class KafkaTopicFamilyRules
+{
+    public const string ErrorSuffix = "-Error";
+    public const string RetrySuffix = "-Retry";
+
+    /// <summary>The main row that owns <paramref name="topic"/>: the topic itself, or the main whose error or retry topic it is and that exists.</summary>
+    public static KafkaTopicRow? Owner(string? topic, IReadOnlyList<KafkaTopicRow> rows)
+    {
+        var name = (topic ?? "").Trim();
+        if (name.Length == 0)
+            return null;
+        var exact = rows.FirstOrDefault(row => string.Equals(row.Topic, name, StringComparison.Ordinal));
+        if (exact is not null)
+            return exact;
+        foreach (var (suffix, exists) in new (string, Func<KafkaTopicRow, bool>)[] { (ErrorSuffix, row => row.ErrorPartitions > 0), (RetrySuffix, row => row.RetryPartitions > 0) })
+        {
+            if (!name.EndsWith(suffix, StringComparison.Ordinal) || name.Length == suffix.Length)
+                continue;
+            var main = name[..^suffix.Length];
+            var row = rows.FirstOrDefault(item => string.Equals(item.Topic, main, StringComparison.Ordinal));
+            if (row is not null && exists(row))
+                return row;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Main, then Error and Retry only when they exist on the cluster. Partition, offset and lag
+    /// detail is copied from <paramref name="family"/> when it was read; existence never is.
+    /// </summary>
+    public static List<KafkaNamedTopic> Members(KafkaTopicRow? main, KafkaFamilyView? family)
+    {
+        if (main is null || string.IsNullOrWhiteSpace(main.Topic))
+            return [];
+        var detail = (family?.Members ?? []).ToDictionary(member => member.Topic, StringComparer.Ordinal);
+        KafkaNamedTopic Member(string topic, string kind, int partitions)
+        {
+            detail.TryGetValue(topic, out var read);
+            return new KafkaNamedTopic
+            {
+                Topic = topic,
+                Main = main.Topic,
+                Kind = kind,
+                Exists = true,
+                Browsable = true,
+                Partitions = partitions,
+                HighWatermarkSum = read?.HighWatermarkSum ?? 0,
+                Lag = read?.Lag ?? 0,
+                LagKnown = read?.LagKnown ?? false
+            };
+        }
+
+        var members = new List<KafkaNamedTopic> { Member(main.Topic, KafkaBrowseAllowList.KindMain, main.Partitions) };
+        if (main.ErrorPartitions > 0)
+            members.Add(Member(main.Topic + ErrorSuffix, KafkaBrowseAllowList.KindError, main.ErrorPartitions));
+        if (main.RetryPartitions > 0)
+            members.Add(Member(main.Topic + RetrySuffix, KafkaBrowseAllowList.KindRetry, main.RetryPartitions));
+        return members;
+    }
+
+    /// <summary>The error or retry member <paramref name="topic"/> names, when a record on it can be redriven to its main topic.</summary>
+    public static KafkaNamedTopic? RedriveSource(string? topic, IReadOnlyList<KafkaNamedTopic> members) =>
+        members.FirstOrDefault(member =>
+            member.Exists
+            && member.Kind is KafkaBrowseAllowList.KindError or KafkaBrowseAllowList.KindRetry
+            && string.Equals(member.Topic, (topic ?? "").Trim(), StringComparison.Ordinal));
+
+    /// <summary>Whether there is anything to redrive from: an error or retry topic exists and holds records.</summary>
+    public static bool CanRedrive(IReadOnlyList<KafkaNamedTopic> members) =>
+        members.Any(member => member.Exists
+            && member.HighWatermarkSum > 0
+            && member.Kind is KafkaBrowseAllowList.KindError or KafkaBrowseAllowList.KindRetry);
+
+    /// <summary>The message types the filter offers: only the members that exist.</summary>
+    public static IReadOnlyList<string> Kinds(IReadOnlyList<KafkaNamedTopic> members)
+    {
+        var kinds = new List<string> { "" };
+        foreach (var member in members.Where(member => member.Exists))
+        {
+            var label = member.Kind switch
+            {
+                KafkaBrowseAllowList.KindMain => "Main",
+                KafkaBrowseAllowList.KindError => "Error",
+                KafkaBrowseAllowList.KindRetry => "Retry",
+                _ => ""
+            };
+            if (label.Length > 0 && !kinds.Contains(label))
+                kinds.Add(label);
+        }
+
+        return kinds;
+    }
+}
+
 public static class KafkaBrowseText
 {
     public static string When(long unixMs)

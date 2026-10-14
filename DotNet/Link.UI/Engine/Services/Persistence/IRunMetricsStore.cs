@@ -32,4 +32,16 @@ public interface IRunMetricsStore
         DateTimeOffset beforeFinishedAt,
         Guid excludeRunId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Newest succeeded snapshots for one scenario, limited so a regression check never walks the whole history.
+    /// An empty fingerprint matches any succeeded snapshot, the same rule as the single-document lookup.
+    /// </summary>
+    Task<IReadOnlyList<AutomationRunMetricsDocument>> ListRecentSucceededSameFingerprintAsync(
+        Guid scenarioId,
+        string fingerprint,
+        DateTimeOffset beforeFinishedAt,
+        Guid excludeRunId,
+        int limit,
+        CancellationToken cancellationToken = default);
 }

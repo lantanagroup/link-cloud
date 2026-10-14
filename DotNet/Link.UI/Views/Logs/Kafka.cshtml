@@ -11,16 +11,9 @@
 <h1 class="h3">Kafka</h1>
 
 <div class="au-card card">
-    <div class="card-header">Kafka UI</div>
+    <div class="card-header">Kafka console</div>
     <div class="card-body">
-        <p>Kafka UI is a separate tool. This page links to it when the environment publishes an address. It is not embedded here.</p>
-        @if (string.IsNullOrWhiteSpace(Model.Url))
-        {
-            <p class="mb-0">Default Kafka UI is not available.</p>
-        }
-        else
-        {
-            <a class="btn btn-au-link" href="@Model.Url" target="_blank" rel="noopener noreferrer">Open Kafka UI</a>
-        }
+        <p>The Kafka console is in this app, under Operations. It shows brokers, topics, consumer groups, and messages for this environment.</p>
+        <a class="btn btn-au-link" href="@KafkaConsoleRoutes.Overview()">Open the Kafka console</a>
     </div>
 </div>
