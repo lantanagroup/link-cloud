@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LantanaGroup.Link.Shared.KafkaAdmin</RootNamespace>
+    <AssemblyName>LantanaGroup.Link.Shared.KafkaAdmin</AssemblyName>
+    <Description>Kafka admin protocol client for calls Confluent.Kafka does not cover (partition reassignment, KIP-455).</Description>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+  </ItemGroup>
+
+</Project>

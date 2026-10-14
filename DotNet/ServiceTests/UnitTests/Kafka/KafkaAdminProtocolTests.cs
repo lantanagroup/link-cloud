@@ -1,6 +1,6 @@
 using System.Text;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps.Protocol;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
+using LantanaGroup.Link.Shared.KafkaAdmin.Protocol;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Moq;
 using Xunit;

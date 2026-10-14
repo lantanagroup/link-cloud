@@ -5,13 +5,13 @@ using Moq;
 using System.Security.Claims;
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Permissions;
-using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
+using LantanaGroup.Link.Operations.Presentation.Endpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
@@ -44,7 +44,7 @@ public class KafkaOpsServiceGuardTests
     [Fact]
     public void Routes_MapReplicationFactorAndProduce()
     {
-        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Admin.BFF", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs"));
+        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Operations", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs"));
         Assert.Contains("MapPost(\"/topics/{topic}/replication-factor/plan\"", text, StringComparison.Ordinal);
         Assert.Contains("MapPost(\"/topics/{topic}/replication-factor\"", text, StringComparison.Ordinal);
         Assert.Contains("MapPost(\"/topics/{topic}/messages\"", text, StringComparison.Ordinal);
@@ -116,8 +116,19 @@ public class KafkaOpsServiceGuardTests
             service.CreateReplicationFactorAsync(Operator(), "ResourcesAcquired", 2, 10_485_760, " ", "ResourcesAcquired", "corr", CancellationToken.None));
         Assert.Contains("reason", missing.Message, StringComparison.OrdinalIgnoreCase);
 
-        var created = await service.CreateReplicationFactorAsync(Operator(), "ResourcesAcquired", 2, 10_485_760, "drop a replica", "ResourcesAcquired", "corr-rf", CancellationToken.None);
-        Assert.Equal(KafkaChangeKind.ReplicationFactor, created.Kind);
+        var requested = await service.CreateReplicationFactorAsync(User("alice", ManageTopics), "ResourcesAcquired", 2, 10_485_760, "drop a replica", "ResourcesAcquired", "corr-rf", CancellationToken.None);
+        Assert.Equal(KafkaChangeKind.ReplicationFactor, requested.Kind);
+        // A replication-factor change moves replicas, so it waits for approval and nothing reaches Kafka on create.
+        Assert.Equal(KafkaChangeStatus.Pending, requested.Status);
+        Assert.True(requested.SecondApproverRequired);
+        Assert.Equal(0, infra.ApplyCalls);
+        Assert.Equal(-1, infra.LastThrottle);
+
+        await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ExecuteAsync(User("carol", ManageTopics), requested.Id, CancellationToken.None));
+        Assert.Equal(0, infra.ApplyCalls);
+        await service.ApproveAsync(User("bob", ManageTopics), requested.Id, CancellationToken.None);
+        var created = await service.ExecuteAsync(User("carol", ManageTopics), requested.Id, CancellationToken.None);
         Assert.Equal(KafkaChangeStatus.Converging, created.Status);
         Assert.Equal(3, created.BeforeReplicationFactor);
         Assert.Equal(2, created.TargetReplicationFactor);
@@ -184,14 +195,14 @@ public class KafkaOpsServiceGuardTests
     [Fact]
     public void ExecuteEndpoint_ChecksThePermissionThatMatchesTheKind()
     {
-        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Admin.BFF", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs"));
+        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Operations", "Presentation", "Endpoints", "KafkaOpsEndpoints.cs"));
         Assert.Contains("KafkaOpsExecution.Allows", text, StringComparison.Ordinal);
     }
 
     [Fact]
     public void AuditProducer_DoesNotAutoCreateTheAuditTopic()
     {
-        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Admin.BFF", "Program.cs"));
+        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Operations", "Program.cs"));
         var line = text.Split('\n').Single(candidate => candidate.Contains("AuditEventMessage", StringComparison.Ordinal));
         Assert.Contains("AllowAutoCreateTopics = false", line, StringComparison.Ordinal);
     }
@@ -656,7 +667,7 @@ public class KafkaOpsServiceGuardTests
     [Fact]
     public void Console_ListsBrokerGroupsOnlyAfterTheCatalogDescribe()
     {
-        var root = Path.Combine(RepoRoot(), "DotNet", "Admin.BFF");
+        var root = Path.Combine(RepoRoot(), "DotNet", "Operations");
         foreach (var file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
         {
             var text = File.ReadAllText(file);
@@ -1624,6 +1635,143 @@ public class KafkaOpsServiceGuardTests
         var create = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
             service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None));
         Assert.Contains("could not be read", create.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReplicationFactor_WithApprovalOff_IsApprovedButStillWaitsForExecute()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: false);
+        broker.Configs["min.insync.replicas"] = "1";
+        broker.Brokers =
+        [
+            new BrokerSnapshot { Id = 0, Rack = "a", State = "up", PartitionCount = 4 },
+            new BrokerSnapshot { Id = 1, Rack = "b", State = "up", PartitionCount = 4 },
+            new BrokerSnapshot { Id = 2, Rack = "c", State = "up", PartitionCount = 4 }
+        ];
+        broker.Placements.Add(new PartitionPlacement { Topic = "ResourcesAcquired", Partition = 0, Leader = 0, Replicas = [0, 1, 2], Isr = [0, 1, 2] });
+
+        var created = await service.CreateReplicationFactorAsync(Operator(), "ResourcesAcquired", 2, 10_485_760, "drop a replica", "ResourcesAcquired", "corr-rf", CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Approved, created.Status);
+        Assert.Equal(0, infra.ApplyCalls);
+
+        var executed = await service.ExecuteAsync(Operator(), created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Converging, executed.Status);
+        Assert.Equal(1, infra.ApplyCalls);
+        Assert.False(string.IsNullOrWhiteSpace(executed.OriginalAssignmentJson));
+    }
+
+    [Fact]
+    public async Task PartitionIncrease_Converges_WhenTheGroupReadsOnlyTheMainTopic()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: true);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageTopics), created.Id, CancellationToken.None);
+        var executed = await service.ExecuteAsync(User("carol", ManageTopics), created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Converging, executed.Status);
+        Assert.NotEmpty(executed.AffectedGroups);
+        Assert.Equal("ReadyToAcquire-Retry", executed.RetryTopic);
+
+        // The worker group subscribes to ReadyToAcquire only. Four of four is complete, not four of eight.
+        foreach (var groupId in executed.AffectedGroups)
+        {
+            broker.Groups.Add(new GroupView
+            {
+                GroupId = groupId,
+                State = "Stable",
+                Members = [new GroupMemberView { ClientId = "worker", Assignment = ["ReadyToAcquire-0", "ReadyToAcquire-1", "ReadyToAcquire-2", "ReadyToAcquire-3"] }],
+                Partitions = [new PartitionLagView { Topic = "ReadyToAcquire-Retry", Partition = 0, Committed = -1, Owned = false }]
+            });
+        }
+
+        await service.TrackAsync(CancellationToken.None);
+        var tracked = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Verifying, tracked!.Status);
+        Assert.All(tracked.Groups, group => Assert.Equal(4, group.ExpectedPartitions));
+    }
+
+    [Fact]
+    public async Task PartitionIncrease_WaitsForTheRetryTopic_WhenTheGroupReadsBoth()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: true);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageTopics), created.Id, CancellationToken.None);
+        var executed = await service.ExecuteAsync(User("carol", ManageTopics), created.Id, CancellationToken.None);
+        foreach (var groupId in executed.AffectedGroups)
+        {
+            broker.Groups.Add(new GroupView
+            {
+                GroupId = groupId,
+                State = "Stable",
+                Members = [new GroupMemberView { ClientId = "worker", Assignment = ["ReadyToAcquire-0", "ReadyToAcquire-1", "ReadyToAcquire-2", "ReadyToAcquire-3", "ReadyToAcquire-Retry-0"] }]
+            });
+        }
+
+        await service.TrackAsync(CancellationToken.None);
+        var tracked = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Converging, tracked!.Status);
+        Assert.All(tracked.Groups, group => Assert.Equal(8, group.ExpectedPartitions));
+    }
+
+    [Theory]
+    [InlineData(4, KafkaChangeStatus.Converging)]
+    [InlineData(3, KafkaChangeStatus.Failed)]
+    public async Task Reconcile_ResolvesAPartitionIncreaseLeftExecuting(int partitionsOnKafka, KafkaChangeStatus expected)
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: true);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        var stored = await service.GetAsync(created.Id, CancellationToken.None);
+        // A replica stopped mid-execution ten minutes ago.
+        stored!.Status = KafkaChangeStatus.Executing;
+        stored.ExecutedUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+        stored.UpdatedUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+        broker.SetCount("ReadyToAcquire", partitionsOnKafka);
+
+        await service.TrackAsync(CancellationToken.None);
+
+        var reconciled = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(expected, reconciled!.Status);
+        if (expected == KafkaChangeStatus.Failed)
+            Assert.Contains("stopped while this request was executing", reconciled.Failure, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Reconcile_LeavesARecentExecutionAlone()
+    {
+        var (service, _, _) = NewService(requireSecondApprover: true);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        var stored = await service.GetAsync(created.Id, CancellationToken.None);
+        stored!.Status = KafkaChangeStatus.Executing;
+        stored.ExecutedUtc = DateTimeOffset.UtcNow;
+        stored.UpdatedUtc = DateTimeOffset.UtcNow;
+
+        await service.TrackAsync(CancellationToken.None);
+
+        Assert.Equal(KafkaChangeStatus.Executing, (await service.GetAsync(created.Id, CancellationToken.None))!.Status);
+    }
+
+    [Fact]
+    public async Task Reconcile_ResumesAReassignmentLeftExecuting()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: false);
+        broker.Configs["min.insync.replicas"] = "1";
+        broker.Brokers =
+        [
+            new BrokerSnapshot { Id = 0, Rack = "a", State = "up", PartitionCount = 4 },
+            new BrokerSnapshot { Id = 1, Rack = "b", State = "up", PartitionCount = 4 },
+            new BrokerSnapshot { Id = 2, Rack = "c", State = "up", PartitionCount = 4 }
+        ];
+        broker.Placements.Add(new PartitionPlacement { Topic = "ResourcesAcquired", Partition = 0, Leader = 0, Replicas = [0, 1, 2], Isr = [0, 1, 2] });
+        var created = await service.CreateReplicationFactorAsync(Operator(), "ResourcesAcquired", 2, 10_485_760, "drop a replica", "ResourcesAcquired", "corr-rf", CancellationToken.None);
+        var stored = await service.GetAsync(created.Id, CancellationToken.None);
+        stored!.Status = KafkaChangeStatus.Executing;
+        stored.SubmittedPartitions = null;
+        stored.UpdatedUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+
+        await service.TrackAsync(CancellationToken.None);
+
+        var resumed = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Converging, resumed!.Status);
+        Assert.Contains("Resumed after a restart.", resumed.Steps);
     }
 
     private const string ManageTopics = nameof(LinkSystemPermissions.CanManageKafkaTopics);

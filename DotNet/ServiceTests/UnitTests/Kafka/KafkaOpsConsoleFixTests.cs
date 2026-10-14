@@ -1,5 +1,5 @@
 using Confluent.Kafka;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 using Xunit;
 
 namespace UnitTests.Kafka;

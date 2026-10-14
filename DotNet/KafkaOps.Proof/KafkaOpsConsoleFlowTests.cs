@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps.Protocol;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
+using LantanaGroup.Link.Shared.KafkaAdmin.Protocol;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;

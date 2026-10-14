@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Admin.BFF\Admin.BFF.csproj" />
+    <ProjectReference Include="..\Operations\Operations.csproj" />
   </ItemGroup>
 
   <ItemGroup>
