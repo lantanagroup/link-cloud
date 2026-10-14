@@ -32,7 +32,7 @@
     <div class="alert alert-warning">@actionError</div>
 }
 
-@if (Model.RunOnly || run?.Run is not null)
+@if (Model.RunOnly)
 {
     <h1 class="h3">Report</h1>
     <div class="au-card card mb-3" id="report-card">
@@ -109,7 +109,7 @@ else
         }
         <script src="~/js/automation-run.js" asp-append-version="true"></script>
     }
-    @if (Model.RunOnly || run?.Run is not null)
+    @if (Model.RunOnly)
     {
         <script>
             document.addEventListener("au-refreshed", function (e) {
