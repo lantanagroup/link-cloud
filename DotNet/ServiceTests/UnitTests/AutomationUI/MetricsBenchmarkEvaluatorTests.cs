@@ -62,7 +62,7 @@ public class MetricsBenchmarkEvaluatorTests
     {
         var previous = Full(e2e: 60, p95: 1000);
         var current = Full(e2e: 60, p95: 1000);
-        current.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 1300, Count = 1 };
+        current.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 3000, Count = 1 };
         var benchmark = new AutomationMetricsBenchmarkDocument { Key = "k", RegressionPercent = 10 };
 
         var result = MetricsBenchmarkEvaluator.Evaluate(current, benchmark, null, previous);
@@ -70,6 +70,22 @@ public class MetricsBenchmarkEvaluatorTests
         result.Pass.Should().BeTrue();
         result.PreviousRunId.Should().Be(previous.RunId);
         result.RegressionFlags.Should().Contain(f => f.Contains("Data Acquisition") && f.Contains("slower"));
+    }
+
+    [Fact]
+    public void Neighboring_histogram_buckets_are_not_a_stage_regression()
+    {
+        var previous = Full(e2e: 54, p95: 1000);
+        previous.Stages["measureeval"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 475, Count = 1 };
+        previous.Stages["submission"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 24.25, Count = 1 };
+        var current = Full(e2e: 57, p95: 1000);
+        current.Stages["measureeval"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 950, Count = 1 };
+        current.Stages["submission"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 47.5, Count = 1 };
+
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, benchmark: null, targetDurationSeconds: null, previous);
+
+        result.RegressionFlags.Should().BeEmpty();
+        result.PreviousRunId.Should().Be(previous.RunId);
     }
 
     [Fact]
