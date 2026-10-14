@@ -122,7 +122,6 @@ public class QueryListController : Controller
             {
                 var model = await _fhirQueryListConfigurationManager.CreateAsync(new CreateFhirListConfigurationModel
                 {
-                    Authentication = fhirListConfiguration.Authentication,
                     EHRPatientLists = fhirListConfiguration.EHRPatientLists,
                     FacilityId = fhirListConfiguration.FacilityId,
                     FhirBaseServerUrl = fhirListConfiguration.FhirBaseServerUrl
@@ -174,7 +173,6 @@ public class QueryListController : Controller
                     Id = fhirListConfiguration.Id,
                     FacilityId = fhirListConfiguration.FacilityId,
                     FhirBaseServerUrl = fhirListConfiguration.FhirBaseServerUrl,
-                    Authentication = fhirListConfiguration.Authentication,
                     EHRPatientLists = fhirListConfiguration.EHRPatientLists
                 }, cancellationToken);
 
