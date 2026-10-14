@@ -1,6 +1,6 @@
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Kafka;

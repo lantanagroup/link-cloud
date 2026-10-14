@@ -12,3 +12,4 @@ IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-querydispatch') CR
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-account') CREATE DATABASE [link-account];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-submission') CREATE DATABASE [link-submission];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-mock-dmrp') CREATE DATABASE [link-mock-dmrp];
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-operations') CREATE DATABASE [link-operations];

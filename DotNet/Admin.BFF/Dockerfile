@@ -16,12 +16,14 @@ WORKDIR /src
 COPY ["Directory.Packages.props", "./"]
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Authorization/"]
+COPY ["DotNet/Shared.KafkaAdmin/Shared.KafkaAdmin.csproj", "DotNet/Shared.KafkaAdmin/"]
 COPY ["DotNet/Admin.BFF/Admin.BFF.csproj", "DotNet/Admin.BFF/"]
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
     dotnet restore "DotNet/Admin.BFF/Admin.BFF.csproj" /p:RestorePackagesWithLockFile=false
 
 COPY ["DotNet/Shared/", "DotNet/Shared/"]
 COPY ["DotNet/Link.Authorization/", "DotNet/Link.Authorization/"]
+COPY ["DotNet/Shared.KafkaAdmin/", "DotNet/Shared.KafkaAdmin/"]
 COPY ["DotNet/Admin.BFF/", "DotNet/Admin.BFF/"]
 
 FROM build AS publish
