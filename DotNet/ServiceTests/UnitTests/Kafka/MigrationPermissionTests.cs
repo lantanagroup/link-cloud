@@ -3,7 +3,7 @@ using Claim = System.Security.Claims.Claim;
 using ClaimsIdentity = System.Security.Claims.ClaimsIdentity;
 using ClaimsPrincipal = System.Security.Claims.ClaimsPrincipal;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Permissions;
 using Microsoft.Extensions.Configuration;

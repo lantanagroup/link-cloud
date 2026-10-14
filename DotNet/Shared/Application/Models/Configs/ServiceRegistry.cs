@@ -35,6 +35,10 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public string TerminologyServiceUrl { get; set; } = null!;
         public string? PublicTerminologyServiceUrl { get; set; }
 
+        /// <summary>Operations service (Kafka operations console). Optional: when empty the Admin BFF does not proxy /api/ops/kafka.</summary>
+        public string? OperationsServiceUrl { get; set; }
+        public string? PublicOperationsServiceUrl { get; set; }
+
         public string? TerminologyServiceApiUrl
         {
             get

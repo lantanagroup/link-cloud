@@ -1,5 +1,5 @@
 using System.Text;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace UnitTests.Kafka;

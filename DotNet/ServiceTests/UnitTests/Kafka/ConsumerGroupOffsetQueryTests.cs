@@ -1,5 +1,5 @@
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
 
 namespace UnitTests.Kafka;
 
@@ -71,7 +71,7 @@ public class ConsumerGroupOffsetQueryTests
     [Fact]
     public void Gateway_ListsOffsetsOneGroupAtATime()
     {
-        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Admin.BFF", "Application", "KafkaOps", "KafkaBrokerGateway.cs"));
+        var text = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Operations", "Application", "KafkaOps", "KafkaBrokerGateway.cs"));
         Assert.Contains("ListPerGroupAsync", text, StringComparison.Ordinal);
         Assert.DoesNotContain("ListConsumerGroupOffsetsAsync(ids", text, StringComparison.Ordinal);
     }
