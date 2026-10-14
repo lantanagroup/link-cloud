@@ -31,12 +31,35 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         var descending = IsDescending(sortDir);
 
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (createdFrom.HasValue && createdTo.HasValue && createdFrom.Value > createdTo.Value)
+        {
+            return BadRequest("Created From must be on or before Created To.");
+        }
+
+        if (createdTo == DateOnly.MaxValue)
+        {
+            return BadRequest("Created To is outside the supported date range.");
+        }
+
+        var createdFromUtc = createdFrom.HasValue 
+            ? new DateTimeOffset(createdFrom.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) 
+            : (DateTimeOffset?)null;
+
+        var createdBeforeUtc = createdTo.HasValue
+            ? new DateTimeOffset(createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : (DateTimeOffset?)null;
+
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        recentPage.CreatedFrom = createdFrom;
+        recentPage.CreatedTo = createdTo;
         var scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
             .OrderBy(s => s.IsSystemScenario)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
@@ -66,6 +89,8 @@ public class RunsController(
             TotalPages = recentPage.TotalPages,
             SortBy = recentPage.SortBy,
             SortDescending = recentPage.SortDescending,
+            CreatedFrom = recentPage.CreatedFrom,
+            CreatedTo = recentPage.CreatedTo,
         };
 
         return View(vm);
@@ -77,7 +102,9 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         // Returns just the Recent Runs card markup so the dashboard can refresh
         // the table in place (sort / paginate / SignalR update) without a full
@@ -85,7 +112,28 @@ public class RunsController(
         // partial is reused by both this action and the initial server render
         // in Index.cshtml — there's no divergence between the two templates.
         var descending = IsDescending(sortDir);
-        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (createdFrom.HasValue && createdTo.HasValue && createdFrom.Value > createdTo.Value)
+        {
+            return BadRequest("Created From must be on or before Created To.");
+        }
+
+        if (createdTo == DateOnly.MaxValue)
+        {
+            return BadRequest("Created To is outside the supported date range.");
+        }
+
+        var createdFromUtc = createdFrom.HasValue
+            ? new DateTimeOffset(createdFrom.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : (DateTimeOffset?)null;
+
+        var createdBeforeUtc = createdTo.HasValue
+            ? new DateTimeOffset(createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : (DateTimeOffset?)null;
+
+        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        page.CreatedFrom = createdFrom;
+        page.CreatedTo = createdTo;
         return PartialView("_RecentRunsTable", page);
     }
 
