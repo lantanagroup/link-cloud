@@ -1,5 +1,6 @@
 package com.lantanagroup.link.measureeval.services;
 
+import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
@@ -14,6 +15,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -59,6 +61,92 @@ class MeasureEvalMetricsTest {
 
         var point = evalCountPoints().iterator().next();
         assertEquals("facility-1", point.getAttributes().get(stringKey("facility.id")));
+    }
+
+    // ----- the read instrument is shared with the .NET services -----
+    //
+    // Both runtimes have to omit an absent tag rather than record it empty, so that the same
+    // condition carries the same attribute set in both. Prometheus cannot tell empty from absent, but
+    // OTLP carries the attributes as given. ResourceCacheReaderTest mocks this class, so nothing
+    // there proves it.
+
+    @Test
+    void recordResourceCacheRead_hit_omitsTheFallbackReasonRatherThanRecordingItEmpty() {
+        metrics.recordResourceCacheRead("hit", null, "Initial", 12.5);
+
+        var attributes = singleReadAttributes();
+        assertEquals("hit", attributes.get(stringKey(MeasureEvalMetrics.CACHE_OUTCOME)));
+        assertFalse(attributes.asMap().containsKey(stringKey(MeasureEvalMetrics.CACHE_FALLBACK_REASON)),
+                "a hit must carry no cache.fallback.reason key at all");
+    }
+
+    @Test
+    void recordResourceCacheRead_fallback_carriesTheReason() {
+        metrics.recordResourceCacheRead("fallback", "partial", "Supplemental", 12.5);
+
+        var attributes = singleReadAttributes();
+        assertEquals("fallback", attributes.get(stringKey(MeasureEvalMetrics.CACHE_OUTCOME)));
+        assertEquals("partial", attributes.get(stringKey(MeasureEvalMetrics.CACHE_FALLBACK_REASON)));
+    }
+
+    @Test
+    void recordResourceCacheRead_withoutAPhase_omitsThePhaseTag() {
+        metrics.recordResourceCacheRead("fallback", "miss", null, 12.5);
+
+        // The .NET readers have no phase concept, so every cross-runtime query aggregates over it.
+        // A phase recorded empty here would make that aggregation disagree with this series.
+        assertFalse(singleReadAttributes().asMap().containsKey(stringKey(DiagnosticNames.PHASE)),
+                "an unknown phase must carry no phase key at all");
+    }
+
+    @Test
+    void incrementDurableCountReadFailure_withoutAPhase_omitsThePhaseTag() {
+        metrics.incrementDurableCountReadFailure(null);
+
+        MetricData metric = exported(MeasureEvalMetrics.DURABLE_COUNT_READ_FAILURE_COUNT);
+        LongPointData point = metric.getLongSumData().getPoints().iterator().next();
+
+        assertEquals(1L, point.getValue());
+        assertTrue(point.getAttributes().isEmpty(), "an unphased failure carries no tags");
+    }
+
+    // The same literals ResourceCacheMetricsTests pins on the .NET side. Prometheus serves one HELP per
+    // metric name, so a description that differs between runtimes makes the collector's exporter drop
+    // one runtime's series on every scrape -- which one changes from scrape to scrape.
+
+    @Test
+    void recordResourceCacheRead_sharedInstrument_carriesTheDotNetDescriptionAndUnit() {
+        metrics.recordResourceCacheRead("hit", null, "Initial", 12.5);
+
+        MetricData metric = exported(MeasureEvalMetrics.RESOURCE_CACHE_READ_DURATION);
+        assertEquals("Duration of a resource cache read, tagged by where the resources came from",
+                metric.getDescription());
+        assertEquals("ms", metric.getUnit());
+    }
+
+    @Test
+    void incrementDurableCountReadFailure_sharedInstrument_carriesTheDotNetDescriptionAndUnit() {
+        metrics.incrementDurableCountReadFailure(null);
+
+        MetricData metric = exported(MeasureEvalMetrics.DURABLE_COUNT_READ_FAILURE_COUNT);
+        assertEquals("Reads that trusted the cache entry because its recorded durable count did not parse",
+                metric.getDescription());
+        assertEquals("", metric.getUnit());
+    }
+
+    private Attributes singleReadAttributes() {
+        MetricData metric = exported(MeasureEvalMetrics.RESOURCE_CACHE_READ_DURATION);
+        var points = metric.getHistogramData().getPoints();
+
+        assertEquals(1, points.size(), "one read, one series");
+        return points.iterator().next().getAttributes();
+    }
+
+    private MetricData exported(String name) {
+        return reader.collectAllMetrics().stream()
+                .filter(data -> data.getName().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(name + " was not exported"));
     }
 
     private Map<String, Long> countsByOutcome() {
