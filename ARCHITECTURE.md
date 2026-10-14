@@ -82,7 +82,7 @@ Per-patient work doesn't begin here. It begins when `Census` later emits `Patien
 
 Neither half makes sense alone — Report builds the rows that the downstream pipeline updates; QueryDispatch fires the work that does the updating. Both flows converge at `DataAcquisitionRequested`; from there on the pipeline doesn't know which path triggered it.
 
-Quartz storage is SQL-backed and clustered for every service that uses it (`UsePersistentStore` / `UseSqlServer` / `UseClustering` in shared `RegisterQuartzDatabase`), so triggers survive container restarts via the `quartz.QRTZ_*` tables. `QueryDispatch.ScheduleService.StartAsync` *also* walks the `patientDispatches` SQL table on boot and reconciles Quartz state to it (adds missing triggers, removes orphans) — belt-and-braces, not the only thing preventing dispatch loss.
+Quartz storage is SQL-backed and clustered for every service that uses it (`UsePersistentStore` / `UseSqlServer` / `UseClustering` in shared `RegisterQuartzDatabase`), so triggers survive container restarts via the `quartz.QRTZ_*` tables. Each process gets its own scheduler instance id (`SchedulerId = "AUTO"`, host name + start ticks) under the shared scheduler name, so replicas show up as separate rows in `QRTZ_SCHEDULER_STATE` and a restarting pod only recovers its own in-flight firings, not a live peer's. `QueryDispatch.ScheduleService.StartAsync` *also* walks the `patientDispatches` SQL table on boot and reconciles Quartz state to it (adds missing triggers, removes orphans) — belt-and-braces, not the only thing preventing dispatch loss.
 
 #### Two-phase MeasureEval — the only backward arrow
 
