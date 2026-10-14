@@ -85,13 +85,21 @@
         });
         form.addEventListener("click", function (event) {
             var button = event.target && event.target.closest ? event.target.closest("[data-au-bulk]") : null;
-            if (!button || button.disabled) return;
+            if (!button || button.disabled || button.getAttribute("data-hold-passed") === "1") return;
+            event.preventDefault();
+            event.stopPropagation();
             var kind = button.getAttribute("data-au-bulk");
             var count = bulkCount(form, kind === "cancel" ? "data-can-cancel" : "data-can-process");
-            var message = kind === "cancel"
+            var cancel = kind === "cancel";
+            var message = cancel
                 ? "Cancel " + count + " selected logs that are old enough? This cannot be undone."
                 : "Process " + count + " selected acquisition logs?";
-            if (!window.confirm(message)) event.preventDefault();
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(button, cancel ? "Cancel selected logs" : "Process selected logs", message, cancel ? ["This cannot be undone."] : ["Each selected log is processed."], function () {
+                button.setAttribute("data-hold-passed", "1");
+                button.click();
+                setTimeout(function () { button.removeAttribute("data-hold-passed"); }, 0);
+            });
         });
         paintBulk(form);
     }

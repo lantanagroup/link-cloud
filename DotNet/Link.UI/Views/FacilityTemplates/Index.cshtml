@@ -304,13 +304,15 @@
     });
     document.querySelectorAll('.btn-facility-delete').forEach(function (button) {
         button.addEventListener('click', async function () {
-            if (!window.confirm('Delete this facility template?')) return;
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(button, "Delete this facility template", "Delete this facility template?", ["The facility template is removed."], async function () {
             try {
                 await post(deleteUrl, { id: button.dataset.id });
                 auRefreshPage('Deleted.');
             } catch (err) {
                 alert(err.message || 'Delete failed');
             }
+            });
         });
     });
 })();

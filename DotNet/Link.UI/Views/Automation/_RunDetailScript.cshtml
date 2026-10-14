@@ -939,12 +939,15 @@
                 btn.addEventListener('click', () => {
                     const patientId = btn.getAttribute('data-patient-id');
                     const expected = btn.getAttribute('data-expected') === 'true';
-                    if (!expected && !window.confirm(
-                        `${patientId} is not expected in the report (outside-period / non-qualifying data). Admitting publishes a live census event and can cause this patient to appear in ABS, failing validation. Continue?`))
-                        return;
-                    postLiveEvent(liveAdmitUrl, { id: runId, patientId, notes: null })
+                    const admit = () => postLiveEvent(liveAdmitUrl, { id: runId, patientId, notes: null })
                         .then(() => refreshLiveSimulation())
                         .catch(err => alert(err.message));
+                    if (!expected) {
+                        if (!window.luHoldConfirm) return;
+                        window.luHoldConfirm.ask(btn, "Admit unexpected patient", `${patientId} is not expected in the report (outside-period / non-qualifying data). Admitting publishes a live census event and can cause this patient to appear in ABS, failing validation.`, ["The patient can appear in ABS and fail validation."], admit);
+                        return;
+                    }
+                    admit();
                 });
             });
             body.querySelectorAll('.live-pool-discharge').forEach(btn => {

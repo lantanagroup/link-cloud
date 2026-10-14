@@ -113,9 +113,9 @@
                                     <td>@rule.Summary</td>
                                     <td>@(rule.Inverted ? "Yes" : "No")</td>
                                     <td>
-                                        <form method="post" data-au-save asp-action="DeleteRule" asp-route-ruleId="@rule.Id" onsubmit="return confirm('Delete this rule? This cannot be undone.');">
+                                        <form method="post" data-au-save asp-action="DeleteRule" asp-route-ruleId="@rule.Id">
                                             <input type="hidden" name="id" value="@form.Id" />
-                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete rule @rule.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                            <button data-hold="@Hold.Of("Delete this rule? This cannot be undone.", "Delete this rule? This cannot be undone.", "This cannot be undone.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete rule @rule.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                         </form>
                                     </td>
                                 </tr>

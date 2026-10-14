@@ -1711,10 +1711,11 @@
                 + '. Push Report Start back to ' + proposed
                 + ' so the patient is inside the window? End stays '
                 + (endVal || 'locked') + '.';
-            if (!window.confirm(msg)) return;
-
-            startEl.value = proposed;
-            rerenderImportedEncounterCells();
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(startEl, "Move report start", msg, ["Report Start moves earlier. The end date stays locked."], function () {
+                startEl.value = proposed;
+                rerenderImportedEncounterCells();
+            });
         }
 
         function importedRowEligEditor(elig) {
@@ -2592,13 +2593,15 @@
         }
 
         document.querySelectorAll('.btn-scenario-delete').forEach(function (btn) {
-            btn.addEventListener('click', async function () {
-                if (!confirm('Delete this scenario?')) return;
-                try {
-                    await postJson(deleteUrl, { id: btn.getAttribute('data-id') });
-                    notifyChanged('deleted', btn.getAttribute('data-id'), null);
-                }
-                catch (err) { showError('Delete failed: ' + (err.message || 'Unknown error')); }
+            btn.addEventListener('click', function () {
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.ask(btn, "Delete this scenario", "Delete this scenario?", ["The scenario is removed."], async function () {
+                    try {
+                        await postJson(deleteUrl, { id: btn.getAttribute('data-id') });
+                        notifyChanged('deleted', btn.getAttribute('data-id'), null);
+                    }
+                    catch (err) { showError('Delete failed: ' + (err.message || 'Unknown error')); }
+                });
             });
         });
     })();
