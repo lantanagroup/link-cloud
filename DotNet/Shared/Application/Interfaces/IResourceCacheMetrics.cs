@@ -19,8 +19,39 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// <see cref="ResourceCacheOutcomes.Empty"/>. The ratio of hits to fallbacks is the headline
         /// number: it says whether Redis is actually earning its place.
         /// </param>
+        /// <param name="fallbackReason">
+        /// Why the cache did not serve it, from <see cref="ResourceCacheFallbackReasons"/>, or null on
+        /// a hit. Carried on <see cref="ResourceCacheOutcomes.Empty"/> as well as
+        /// <see cref="ResourceCacheOutcomes.Fallback"/>, because an empty result that followed a Redis
+        /// outage is not the same answer as one that followed a plain miss. MeasureEval tags the same
+        /// instrument the same way; the one rule both runtimes must keep is that the tag is *omitted*
+        /// on a hit rather than recorded empty, so that the same condition carries the same attribute
+        /// set in both runtimes.
+        /// </param>
         /// <param name="milliseconds">Elapsed time for the whole read, including any fallback.</param>
-        void RecordRead(string outcome, double milliseconds);
+        void RecordRead(string outcome, string? fallbackReason, double milliseconds);
+
+        /// <summary>
+        /// Counts reads that served a non-empty cache entry without checking whether it was whole,
+        /// because its recorded durable count could not be used.
+        /// </summary>
+        /// <remarks>
+        /// The partial-entry check is what stops an entry recreated after an eviction being served as
+        /// the whole record. This counts the reads where that check did not run, so it should sit at
+        /// zero; anything else means entries are being trusted unverified.
+        /// <para>
+        /// MeasureEval records the same instrument. The reachable causes differ because the count is
+        /// fetched differently -- there the count rides the same round trip as the resources, so the
+        /// only failure left is an unusable value, while here the read can also fail outright -- so the
+        /// counter is defined by what it means rather than by its cause.
+        /// </para>
+        /// <para>
+        /// MeasureEval also tags its copy with the evaluation pass. There is no equivalent here: the
+        /// cache read path has no notion of a pass, and threading one through
+        /// <see cref="IResourceCache.GetAsync"/> purely to tag a metric would invert the dependency.
+        /// </para>
+        /// </remarks>
+        void IncrementDurableCountReadFailure();
 
         /// <summary>
         /// Records how long a write to one store took.

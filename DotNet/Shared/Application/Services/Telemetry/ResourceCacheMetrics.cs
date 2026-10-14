@@ -8,11 +8,20 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
     /// <inheritdoc cref="IResourceCacheMetrics"/>
     public class ResourceCacheMetrics : IResourceCacheMetrics
     {
+        // Word for word what MeasureEvalMetrics sets on the same two instruments. Prometheus serves one
+        // HELP per metric name, so the collector's exporter drops one runtime's series on every scrape
+        // that sees two different descriptions, and which runtime vanishes changes from scrape to scrape.
+        private const string ReadDurationDescription =
+            "Duration of a resource cache read, tagged by where the resources came from";
+        private const string DurableCountReadFailureDescription =
+            "Reads that trusted the cache entry because its recorded durable count did not parse";
+
         private readonly Histogram<double> _readDuration;
         private readonly Histogram<double> _writeDuration;
         private readonly Histogram<double> _queueWaitDuration;
         private readonly Histogram<double> _drainWaitDuration;
         private readonly Counter<long> _writeRetryCounter;
+        private readonly Counter<long> _durableCountReadFailureCounter;
 
         private Func<int>? _queueDepth;
 
@@ -24,11 +33,17 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
             // Must match the meter OpenTelemetry registers, or none of this is exported.
             var meter = meterFactory.Create($"Link.{serviceInformation.ServiceConfigName}");
 
-            _readDuration = meter.CreateHistogram<double>(DiagnosticNames.ResourceCacheReadDuration, "ms");
+            _readDuration = meter.CreateHistogram<double>(DiagnosticNames.ResourceCacheReadDuration,
+                                                          "ms",
+                                                          ReadDurationDescription);
             _writeDuration = meter.CreateHistogram<double>(DiagnosticNames.ResourceCacheWriteDuration, "ms");
             _queueWaitDuration = meter.CreateHistogram<double>(DiagnosticNames.ResourceCacheQueueWaitDuration, "ms");
             _drainWaitDuration = meter.CreateHistogram<double>(DiagnosticNames.ResourceCacheDrainWaitDuration, "ms");
             _writeRetryCounter = meter.CreateCounter<long>(DiagnosticNames.ResourceCacheWriteRetryCount);
+            _durableCountReadFailureCounter =
+                meter.CreateCounter<long>(DiagnosticNames.ResourceCacheDurableCountReadFailureCount,
+                                          unit: null,
+                                          DurableCountReadFailureDescription);
 
             meter.CreateObservableGauge(
                 DiagnosticNames.ResourceCacheQueueDepth,
@@ -36,9 +51,30 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
         }
 
         /// <inheritdoc/>
-        public void RecordRead(string outcome, double milliseconds)
+        public void RecordRead(string outcome, string? fallbackReason, double milliseconds)
         {
-            _readDuration.Record(milliseconds, new KeyValuePair<string, object?>(DiagnosticNames.CacheOutcome, outcome));
+            // Omitted rather than recorded with a null value. Not for Prometheus' sake -- there a
+            // selector of "" matches an absent label too -- but because OTLP carries the attribute
+            // set as given, so an empty value is a real dimension downstream and makes this a
+            // different metric stream from the one MeasureEval emits for the same condition.
+            if (fallbackReason is null)
+            {
+                _readDuration.Record(
+                    milliseconds,
+                    new KeyValuePair<string, object?>(DiagnosticNames.CacheOutcome, outcome));
+                return;
+            }
+
+            _readDuration.Record(
+                milliseconds,
+                new KeyValuePair<string, object?>(DiagnosticNames.CacheOutcome, outcome),
+                new KeyValuePair<string, object?>(DiagnosticNames.CacheFallbackReason, fallbackReason));
+        }
+
+        /// <inheritdoc/>
+        public void IncrementDurableCountReadFailure()
+        {
+            _durableCountReadFailureCounter.Add(1);
         }
 
         /// <inheritdoc/>
