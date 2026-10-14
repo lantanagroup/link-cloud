@@ -198,13 +198,13 @@ else
                                     {
                                         <div class="lu-row-actions">
                                             <a class="btn btn-au-link btn-sm lu-icon-btn" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
-                                            <form method="post" data-au-save asp-action="DeleteVendorOperation" onsubmit="return confirm('Delete this operation?');">
+                                            <form method="post" data-au-save asp-action="DeleteVendorOperation">
                                                 <input type="hidden" name="operationId" value="@row.Id" />
                                                 @if (row.VendorVersionIds.Count > 0)
                                                 {
                                                     <input type="hidden" name="vendorVersionId" value="@row.VendorVersionIds[0]" />
                                                 }
-                                                <button type="submit" class="btn btn-danger btn-sm lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                                <button data-hold="@Hold.Of("Delete this operation?", "Delete this operation?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             </form>
                                         </div>
                                     }

@@ -232,12 +232,14 @@
     });
     document.querySelectorAll('.btn-pc-delete').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            if (!confirm('Delete this patient configuration?')) return;
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(btn, "Delete this patient configuration", "Delete this patient configuration?", ["The patient configuration is removed."], function () {
             fetch(deleteUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
                 body: JSON.stringify({ id: btn.dataset.id })
             }).then(function () { auRefreshPage('Deleted.'); });
+            });
         });
     });
 })();

@@ -85,9 +85,9 @@
                                         </div>
                                         <div class="d-flex flex-wrap gap-2 align-items-start">
                                             <a class="btn btn-au-link btn-sm lu-icon-btn" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationId="@row.Id" asp-route-sequenceType="@panel.SequenceType" asp-route-operationPage="@(panel.PageNumber> 1 ? panel.PageNumber : null)" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
-                                            <form method="post" data-au-save asp-action="DeleteOperation" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete this operation?');">
+                                            <form method="post" data-au-save asp-action="DeleteOperation" asp-route-id="@Model.FacilityId">
                                                 <input type="hidden" name="operationId" value="@row.Id" />
-                                                <button type="submit" class="btn btn-danger btn-sm lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                                <button data-hold="@Hold.Of("Delete this operation?", "Delete this operation?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                             </form>
                                         </div>
                                     </div>
@@ -648,9 +648,9 @@
                                         <button type="submit" class="btn btn-success">Save sequence</button>
                                     }
                                 </form>
-                                <form method="post" data-au-save asp-action="DeleteOperationSequence" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the sequence for this resource type?');">
+                                <form method="post" data-au-save asp-action="DeleteOperationSequence" asp-route-id="@Model.FacilityId" class="mt-2">
                                     <input type="hidden" name="resourceType" value="@panel.SequenceType" />
-                                    <button type="submit" class="btn btn-danger btn-sm">Delete sequence</button>
+                                    <button data-hold="@Hold.Of("Delete the sequence for this resource type?", "Delete the sequence for this resource type?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete sequence</button>
                                 </form>
                             }
                         }

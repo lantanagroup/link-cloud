@@ -927,9 +927,11 @@
         auRefreshPage('Cloned.');
     }));
     document.querySelectorAll('.btn-op-delete').forEach(btn => btn.addEventListener('click', async () => {
-        if (!confirm('Delete this operation?')) return;
+        if (!window.luHoldConfirm) return;
+        window.luHoldConfirm.ask(btn, "Delete this operation", "Delete this operation?", ["The operation is removed."], async function () {
         await postJson('@Url.Action("DeleteOperation", "Normalizations")', { id: btn.dataset.id });
         auRefreshPage('Deleted.');
+        });
     }));
 
     // ============ SEQUENCE MODAL ============
@@ -1099,9 +1101,11 @@
         auRefreshPage('Cloned.');
     }));
     document.querySelectorAll('.btn-seq-delete').forEach(btn => btn.addEventListener('click', async () => {
-        if (!confirm('Delete this sequence?')) return;
+        if (!window.luHoldConfirm) return;
+        window.luHoldConfirm.ask(btn, "Delete this sequence", "Delete this sequence?", ["The sequence is removed."], async function () {
         await postJson('@Url.Action("DeleteSequence", "Normalizations")', { id: btn.dataset.id });
         auRefreshPage('Deleted.');
+        });
     }));
 
     // ============ SUITE MODAL ============
@@ -1515,9 +1519,11 @@
         auRefreshPage();
     }));
     document.querySelectorAll('.btn-suite-delete').forEach(btn => btn.addEventListener('click', async () => {
-        if (!confirm('Delete this suite?')) return;
+        if (!window.luHoldConfirm) return;
+        window.luHoldConfirm.ask(btn, "Delete this suite", "Delete this suite?", ["The suite is removed."], async function () {
         await postJson('@Url.Action("DeleteSuite", "Normalizations")', { id: btn.dataset.id });
         auRefreshPage('Deleted.');
+        });
     }));
 
     const analyzeUrl = '@Url.Action("Analyze", "ConfigurationGeneration")';

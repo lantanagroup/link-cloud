@@ -18,7 +18,7 @@
 {
     <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
         <span>This is a test facility. Edits here change a throwaway facility.</span>
-        <span class="badge au-badge-warning">Test facility</span>
+        <span class="badge au-badge-test">Test facility</span>
     </div>
 }
 
@@ -194,8 +194,8 @@ else
                             </form>
                             @if (Model.QueryDispatchExists)
                             {
-                                <form method="post" data-au-save asp-action="DeleteQueryDispatch" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the query dispatch configuration?');">
-                                    <button type="submit" class="btn btn-danger btn-sm">Delete query dispatch</button>
+                                <form method="post" data-au-save asp-action="DeleteQueryDispatch" asp-route-id="@Model.FacilityId" class="mt-2">
+                                    <button data-hold="@Hold.Of("Delete the query dispatch configuration?", "Delete the query dispatch configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete query dispatch</button>
                                 </form>
                             }
                         }

@@ -482,6 +482,9 @@ details.au-facility-actions > summary::-webkit-details-marker {
 .au-badge-success  { background: var(--au-success-soft) !important; color: #146c2e !important; }
 .au-badge-danger   { background: #fdecee !important; color: var(--au-danger) !important; }
 .au-badge-warning  { background: #fff6db !important; color: #7a5b00 !important; }
+.au-badge-automation { background: #f7fee7 !important; color: #3f6212 !important; }
+.au-badge-attention { background: #fff1e8 !important; color: #9a3412 !important; }
+.au-badge-test { background: #fff1f2 !important; color: #9f1239 !important; }
 .badge.bg-success { background-color: var(--au-success-soft) !important; color: #146c2e !important; }
 .badge.bg-danger { background-color: #fdecee !important; color: var(--au-danger) !important; }
 .badge.bg-warning { background-color: #fff6db !important; color: #7a5b00 !important; }

@@ -22,4 +22,7 @@ public static class Hold
 
     public static string Of(string title, string action, IEnumerable<string[]> details, IEnumerable<string[]> fields, IEnumerable<string> risks, string confirm = "", string label = "Hold to confirm") =>
         new HoldSpec(title, action, details.ToList(), fields.ToList(), risks.ToList(), confirm, label).Json();
+
+    public static string Of(string title, string action, string risk, string label) =>
+        new HoldSpec(title, action, [], [], [risk], "", label).Json();
 }

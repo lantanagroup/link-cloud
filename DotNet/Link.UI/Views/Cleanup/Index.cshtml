@@ -512,59 +512,61 @@
         });
     });
 
+    function holdCleanup(anchor, message, yes) {
+        if (!message) { yes(); return; }
+        if (!window.luHoldConfirm) return;
+        window.luHoldConfirm.ask(anchor, "Confirm cleanup", message, ["Named production facilities are not touched."], yes);
+    }
+
     document.getElementById('cleanup-settings-form')?.addEventListener('submit', function (e) {
         var submitter = e.submitter;
         var runKind = submitter && submitter.name === 'runKind' ? (submitter.value || '') : '';
         var confirmMsg = submitter && submitter.getAttribute('data-confirm');
-        if (confirmMsg && !window.confirm(confirmMsg)) {
-            e.preventDefault();
-            return;
-        }
         e.preventDefault();
-        if (runKind) {
-            passArmed = true;
-            armedAfter = latestAt;
-            setRunning(true);
-        }
-        postForm(e.currentTarget, { runKind: runKind }, saveUrl).then(function (result) {
-            var payload = result.payload || {};
-            setFlash(payload.message || payload.error, !result.ok);
-            if (payload.activity) applyActivity(payload.activity);
-            if (runKind && result.ok) refreshProgress();
-            if (!result.ok) {
+        holdCleanup(submitter || e.currentTarget, confirmMsg, function () {
+            if (runKind) {
+                passArmed = true;
+                armedAfter = latestAt;
+                setRunning(true);
+            }
+            postForm(e.currentTarget, { runKind: runKind }, saveUrl).then(function (result) {
+                var payload = result.payload || {};
+                setFlash(payload.message || payload.error, !result.ok);
+                if (payload.activity) applyActivity(payload.activity);
+                if (runKind && result.ok) refreshProgress();
+                if (!result.ok) {
+                    passArmed = false;
+                    setRunning(false);
+                }
+            }).catch(function (err) {
                 passArmed = false;
                 setRunning(false);
-            }
-        }).catch(function (err) {
-            passArmed = false;
-            setRunning(false);
-            setFlash('Could not talk to the cleanup endpoint: ' + err, true);
+                setFlash('Could not talk to the cleanup endpoint: ' + err, true);
+            });
         });
     });
 
     document.getElementById('cleanup-range-form')?.addEventListener('submit', function (e) {
         var confirmMsg = e.currentTarget.getAttribute('data-confirm');
-        if (confirmMsg && !window.confirm(confirmMsg)) {
-            e.preventDefault();
-            return;
-        }
         e.preventDefault();
-        passArmed = true;
-        armedAfter = latestAt;
-        setRunning(true);
-        postForm(e.currentTarget, null, rangeUrl).then(function (result) {
-            var payload = result.payload || {};
-            setFlash(payload.message || payload.error, !result.ok);
-            if (payload.activity) applyActivity(payload.activity);
-            if (result.ok) refreshProgress();
-            else {
+        holdCleanup(e.submitter || e.currentTarget, confirmMsg, function () {
+            passArmed = true;
+            armedAfter = latestAt;
+            setRunning(true);
+            postForm(e.currentTarget, null, rangeUrl).then(function (result) {
+                var payload = result.payload || {};
+                setFlash(payload.message || payload.error, !result.ok);
+                if (payload.activity) applyActivity(payload.activity);
+                if (result.ok) refreshProgress();
+                else {
+                    passArmed = false;
+                    setRunning(false);
+                }
+            }).catch(function (err) {
                 passArmed = false;
                 setRunning(false);
-            }
-        }).catch(function (err) {
-            passArmed = false;
-            setRunning(false);
-            setFlash('Could not start custom-range cleanup: ' + err, true);
+                setFlash('Could not start custom-range cleanup: ' + err, true);
+            });
         });
     });
 

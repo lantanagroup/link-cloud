@@ -319,47 +319,51 @@
             var cancel = event.target.closest(".btn-cancel-run");
             if (cancel) {
                 event.preventDefault();
-                if (!confirm("Cancel this running test? This aborts pipeline work for the facility and removes generated FHIR data.")) return;
-                var cancelId = cancel.getAttribute("data-run-id");
-                cancel.disabled = true;
-                postRunAction("/Automation/cancel", cancelId)
-                    .then(function (result) {
-                        if (result.ok && result.body && result.body.success) {
-                            refresh();
-                            return;
-                        }
-                        cancel.disabled = false;
-                        var reason = result.body && (result.body.error || result.body.detail)
-                            ? (result.body.error || result.body.detail)
-                            : "This run is not running.";
-                        alert(reason);
-                    })
-                    .catch(function () {
-                        cancel.disabled = false;
-                        alert("Cancel could not be completed. Refresh the page and check the run status.");
-                    });
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.ask(cancel, "Cancel this run", "Cancel this running test? This aborts pipeline work for the facility and removes generated FHIR data.", ["Pipeline work for the facility is aborted.", "Generated FHIR data is removed."], function () {
+                    var cancelId = cancel.getAttribute("data-run-id");
+                    cancel.disabled = true;
+                    postRunAction("/Automation/cancel", cancelId)
+                        .then(function (result) {
+                            if (result.ok && result.body && result.body.success) {
+                                refresh();
+                                return;
+                            }
+                            cancel.disabled = false;
+                            var reason = result.body && (result.body.error || result.body.detail)
+                                ? (result.body.error || result.body.detail)
+                                : "This run is not running.";
+                            alert(reason);
+                        })
+                        .catch(function () {
+                            cancel.disabled = false;
+                            alert("Cancel could not be completed. Refresh the page and check the run status.");
+                        });
+                });
                 return;
             }
 
             var remove = event.target.closest(".btn-delete-run");
             if (remove) {
                 event.preventDefault();
-                if (!confirm("Delete this run?")) return;
-                var deleteId = remove.getAttribute("data-run-id");
-                remove.disabled = true;
-                postRunAction("/Automation/delete", deleteId)
-                    .then(function (result) {
-                        if (result.ok && result.body && result.body.success) {
-                            refresh();
-                            return;
-                        }
-                        remove.disabled = false;
-                        alert("Unable to delete the run. It may still be active.");
-                    })
-                    .catch(function () {
-                        remove.disabled = false;
-                        alert("Unable to delete the run. Please try again.");
-                    });
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.ask(remove, "Delete this run", "Delete this run?", ["The run is removed from the dashboard."], function () {
+                    var deleteId = remove.getAttribute("data-run-id");
+                    remove.disabled = true;
+                    postRunAction("/Automation/delete", deleteId)
+                        .then(function (result) {
+                            if (result.ok && result.body && result.body.success) {
+                                refresh();
+                                return;
+                            }
+                            remove.disabled = false;
+                            alert("Unable to delete the run. It may still be active.");
+                        })
+                        .catch(function () {
+                            remove.disabled = false;
+                            alert("Unable to delete the run. Please try again.");
+                        });
+                });
             }
         });
 
