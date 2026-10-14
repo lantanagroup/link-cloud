@@ -362,6 +362,10 @@ global:
     description: "The base URL for the Notification Service."
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "ServiceRegistry:MockDmrpApiUrl"
+    description: "The base URL for the Mock DMRP API, used by Automation.UI to seed and clean up DMRP enrollments for DMRP-enabled scenarios. /api is appended by the client."
+    required: false
+    consumers: ["AutomationUI"]
   # Java-notation key under global, which has no owning service to infer a runtime from.
   # Without the marker it is looked up as a .NET key and its /link/report/base-url row is
   # never matched.
