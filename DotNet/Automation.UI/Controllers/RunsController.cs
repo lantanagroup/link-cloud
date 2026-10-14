@@ -65,7 +65,7 @@ public class RunsController(
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var activeRuns = await GetActiveRunsAsync(pageSize, cancellationToken);
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
@@ -150,7 +150,7 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var activeRuns = await GetActiveRunsAsync(pageSize, cancellationToken);
 
         return Json(new
         {
@@ -811,21 +811,31 @@ public class RunsController(
     private static bool IsDescending(string sortDir)
         => !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(
-        AutomationRunIndexViewModel recentPage,
-        int pageSize,
-        CancellationToken cancellationToken)
+    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(int pageSize, CancellationToken cancellationToken)
     {
         var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
-        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
-        var activeRunsSource = recentPage.PageNumber == 1
-            ? recentPage.Runs
-            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+
+        var activeRunSummaries = await Task.WhenAll(
+            activeRunMetas.Select(meta =>
+                runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
+        // Active Runs must remain independent of the Recent Runs date filter.
+        // Always fetch an unfiltered first page for the existing fallback behavior.
+        var unfilteredPage = await runManager.GetRunsPageAsync(
+            1,
+            pageSize,
+            "createdAt",
+            true,
+            cancellationToken);
+
+        var activeRunsSource = unfilteredPage.Runs;
 
         return activeRunSummaries
-            .Where(r => r is not null && (r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Where(r => r is not null &&
+                (r.Status.IsCancellable() || r.Status.IsInProgress()))
             .Select(r => r!)
-            .Concat(activeRunsSource.Where(r => r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Concat(activeRunsSource.Where(r =>
+                r.Status.IsCancellable() || r.Status.IsInProgress()))
             .GroupBy(r => r.RunId)
             .Select(g => g.First())
             .OrderByDescending(r => r.CreatedAt)
