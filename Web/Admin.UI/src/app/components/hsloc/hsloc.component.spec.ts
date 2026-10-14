@@ -6,7 +6,7 @@ import {MatDialog} from '@angular/material/dialog';
 import {of} from 'rxjs';
 import {ToastrService} from 'ngx-toastr';
 import {ErrorHandlingService} from '../../services/error-handling.service';
-import {HslocComponent} from './hsloc.component';
+import {HSLOC_FORMAT_ERROR, HslocComponent, hasHslocHeader} from './hsloc.component';
 import {Hsloc} from '../../services/gateway/normalization/hsloc.service';
 import {AppConfigService} from '../../services/app-config.service';
 
@@ -93,15 +93,55 @@ describe('HslocComponent', () => {
     expect(component.success).toContain('updated');
   });
 
-  it('rejects empty files and non-CSV files', () => {
+  function select(file: File): Promise<void> {
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', {value: [file]});
+    return component.selectFile({target: input} as unknown as Event);
+  }
+
+  it('rejects empty files and non-CSV files', async () => {
     loadRows();
     for (const file of [new File([], 'empty.csv'), new File(['invalid'], 'invalid.txt')]) {
-      const input = document.createElement('input');
-      Object.defineProperty(input, 'files', {value: [file]});
-      component.selectFile({target: input} as unknown as Event);
+      await select(file);
       expect(component.file).toBeNull();
       expect(component.fileError).toBe('Select a non-empty CSV file.');
     }
+  });
+
+  it('explains the required CSV format before upload', () => {
+    loadRows();
+    const help: HTMLElement = fixture.nativeElement.querySelector('#hsloc-format-help');
+    expect(help.textContent).toContain('CDC website cannot be uploaded as-is');
+    for (const column of ['CDCCode', 'ShortDescription', 'HSLOCCode', 'LongDescription']) expect(help.textContent).toContain(column);
+    expect(help.querySelector('pre')!.textContent).toContain('CDCCode,ShortDescription,HSLOCCode,LongDescription');
+    expect(fixture.nativeElement.querySelector('#hsloc-csv').getAttribute('aria-describedby')).toContain('hsloc-format-help');
+  });
+
+  it('accepts a formatted CSV with headers in any order and case', async () => {
+    loadRows();
+    const file = new File(['\uFEFF"hsloccode", longdescription,CDCCODE,ShortDescription\r\n1027-2,Medical,IN:ACUTE:CC:M,Medical'], 'hsloc.csv');
+    await select(file);
+    expect(component.fileError).toBe('');
+    expect(component.file).toBe(file);
+    expect(component.checkingFile).toBeFalse();
+  });
+
+  it('rejects the unformatted CDC download with a format explanation', async () => {
+    loadRows();
+    await select(new File(['Concept Code,Concept Name,Code System\n1027-2,Medical Critical Care,HSLOC'], 'hsloc-cdc.csv'));
+    expect(component.file).toBeNull();
+    expect(component.fileError).toBe(HSLOC_FORMAT_ERROR);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#file-error').textContent).toContain('must be reformatted');
+  });
+
+  it('validates only the header row', () => {
+    loadRows();
+    expect(hasHslocHeader('CDCCode,ShortDescription,HSLOCCode,LongDescription')).toBeTrue();
+    expect(hasHslocHeader('CDCCode,ShortDescription,HSLOCCode')).toBeFalse();
+    expect(hasHslocHeader('CDCCode,ShortDescription,HSLOCCode,LongDescription,Extra')).toBeFalse();
+    expect(hasHslocHeader('CDCCode,CDCCode,HSLOCCode,LongDescription')).toBeFalse();
+    expect(hasHslocHeader('')).toBeFalse();
   });
 
   it('does not upload without required values', () => {
