@@ -1,6 +1,7 @@
 ﻿using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Confluent.Kafka.Extensions.OpenTelemetry;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
@@ -146,7 +147,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                 {
                     otel.WithMetrics(metricsProviderBuilder =>
                         metricsProviderBuilder
-                            .AddMeter(telemetryServiceOptions.MeterName));
+                            .AddMeter(telemetryServiceOptions.MeterName)
+                            .AddMeter(DeadLetterCommit.MeterName));
                 }
 
                 if (telemetryServiceOptions.EnableRuntimeInstrumentation)

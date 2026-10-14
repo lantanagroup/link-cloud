@@ -367,6 +367,7 @@ public class PatientCensusService : IPatientCensusService
                 Key = log.FacilityId,
                 Value = new PatientListMessage
                 {
+                    FacilityId = log.FacilityId,
                     PatientLists = results,
                     ReportTrackingId = log.ReportTrackingId
                 },

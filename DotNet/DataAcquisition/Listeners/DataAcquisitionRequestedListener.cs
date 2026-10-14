@@ -12,7 +12,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
@@ -52,12 +51,12 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
             facilityId = ExtractFacilityId(consumeResult);
 
             if (string.IsNullOrWhiteSpace(facilityId))
-                throw new ArgumentNullException("FacilityId is missing from the message key.");
+                throw new ArgumentNullException("FacilityId is missing from the message.");
         }
         catch (ArgumentNullException ex)
         {
-            Logger.LogError(ex, "FacilityId is missing from the message key.");
-            throw new DeadLetterException("FacilityId is missing from the message key.", ex);
+            Logger.LogError(ex, "FacilityId is missing from the message.");
+            throw new DeadLetterException("FacilityId is missing from the message.", ex);
         }
 
         using var scope = _serviceScopeFactory.CreateScope();
@@ -96,28 +95,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
 
     protected override string ExtractFacilityId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
     {
-        var key = consumeResult.Message.Key;
-
-        if (string.IsNullOrWhiteSpace(key))
-            return string.Empty;
-
-        if (key.TrimStart().StartsWith('{'))
-        {
-            try
-            {
-                var resourceKey = JsonSerializer.Deserialize<ResourceKey>(key);
-                if (resourceKey != null && !string.IsNullOrWhiteSpace(resourceKey.FacilityId))
-                {
-                    return resourceKey.FacilityId;
-                }
-            }
-            catch (JsonException)
-            {
-                // Fallback to returning the raw key if it's not a valid ResourceKey JSON
-            }
-        }
-
-        return key;
+        return KafkaIdentity.Facility(consumeResult.Message.Value?.FacilityId, consumeResult.Message.Key) ?? string.Empty;
     }
 
 

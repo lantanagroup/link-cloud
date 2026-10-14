@@ -35,7 +35,7 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
         ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
     }
 
-    public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
+    public bool HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
     {
         try
         {
@@ -44,20 +44,22 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
                 new { Service = ServiceName, Topic = Topic, Partition = consumeResult.Partition.Value, Offset = consumeResult.Offset.Value });
 
             ProduceDeadLetter(consumeResult, message);
+            return true;
         }
         catch (Exception e)
         {
             _exceptionHandler.Handle(e, "Error in HandleException", LogLevel.Error);
+            return false;
         }
     }
 
-    public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
+    public virtual bool HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
     {
         var dlEx = new DeadLetterException(ex.Message, ex);
-        HandleException(consumeResult, dlEx, facilityId);
+        return HandleException(consumeResult, dlEx, facilityId);
     }
 
-    public virtual void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId)
+    public virtual bool HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId)
     {
         try
         {
@@ -68,10 +70,12 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
                 new { Service = ServiceName, Topic = Topic, Partition = consumeResult.Partition.Value, Offset = consumeResult.Offset.Value });
 
             ProduceDeadLetter(consumeResult, ex.Message);
+            return true;
         }
         catch (Exception e)
         {
             _exceptionHandler.Handle(e, "Error in HandleException", LogLevel.Error);
+            return false;
         }
     }
 
@@ -92,14 +96,27 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
         consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
 
         using var producer = ProducerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd });
+        var failed = 0;
+        var deliveryError = new Confluent.Kafka.Error(ErrorCode.Local_MsgTimedOut, "error topic publish was not acknowledged");
         producer.Produce(Topic, new Message<K, V>
         {
             Key = consumeResult.Message.Key,
             Value = consumeResult.Message.Value,
             Headers = consumeResult.Message.Headers
+        }, report =>
+        {
+            if (report.Error.IsError)
+            {
+                deliveryError = report.Error;
+                Interlocked.Exchange(ref failed, 1);
+            }
         });
 
         producer.Flush();
+        if (failed != 0)
+        {
+            throw new KafkaException(deliveryError);
+        }
     }
 
     public virtual void HandleConsumeException(ConsumeException ex, string facilityId)
@@ -117,9 +134,9 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
             var message = new Message<string, string>()
             {
                 Headers = ex.ConsumerRecord.Message.Headers,
-                Key = ex.ConsumerRecord.Message.Key != null
-                    ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
-                    : string.Empty,
+                Key = ex.ConsumerRecord.Message.Key == null
+                    ? null
+                    : Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key),
                 Value = ex.ConsumerRecord.Message.Value != null
                     ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
                     : string.Empty
@@ -136,7 +153,7 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
         }
     }
 
-    protected void ProduceConsumeExceptionDeadLetter(string key, string value, Headers headers, string exceptionMessage)
+    protected void ProduceConsumeExceptionDeadLetter(string? key, string value, Headers headers, string exceptionMessage)
     {
         if (string.IsNullOrWhiteSpace(Topic))
         {
