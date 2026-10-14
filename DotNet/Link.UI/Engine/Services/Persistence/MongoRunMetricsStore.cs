@@ -133,4 +133,30 @@ public sealed class MongoRunMetricsStore : IRunMetricsStore
             .Limit(1)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<AutomationRunMetricsDocument>> ListRecentSucceededSameFingerprintAsync(
+        Guid scenarioId,
+        string fingerprint,
+        DateTimeOffset beforeFinishedAt,
+        Guid excludeRunId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var take = Math.Clamp(limit, 1, 32);
+        var filters = new List<FilterDefinition<AutomationRunMetricsDocument>>
+        {
+            Builders<AutomationRunMetricsDocument>.Filter.Eq(d => d.ScenarioId, scenarioId),
+            Builders<AutomationRunMetricsDocument>.Filter.Eq(d => d.Outcome, "Succeeded"),
+            Builders<AutomationRunMetricsDocument>.Filter.Lt(d => d.FinishedAt, beforeFinishedAt),
+            Builders<AutomationRunMetricsDocument>.Filter.Ne(d => d.RunId, excludeRunId)
+        };
+        if (!string.IsNullOrWhiteSpace(fingerprint))
+            filters.Add(Builders<AutomationRunMetricsDocument>.Filter.Eq(d => d.ScenarioFingerprint, fingerprint));
+
+        var docs = await _collection.Find(Builders<AutomationRunMetricsDocument>.Filter.And(filters))
+            .Sort(Builders<AutomationRunMetricsDocument>.Sort.Descending(d => d.FinishedAt))
+            .Limit(take)
+            .ToListAsync(cancellationToken);
+        return docs;
+    }
 }

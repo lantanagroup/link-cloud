@@ -47,20 +47,23 @@ public static class MetricsBenchmarkEvaluator
 
         var flags = new List<string>();
         var percent = benchmark?.RegressionPercent > 0 ? benchmark.RegressionPercent : 10;
-        if (previous != null)
+        // A snapshot that missed pipeline steps is not a baseline. Its recorded steps ran against
+        // an unfinished report, so a later full run looks slower even when the pipeline did not.
+        var baseline = previous != null && IsFullBaseline(previous) ? previous : null;
+        if (baseline != null)
         {
-            if (previous.E2eDurationSeconds > 0)
+            if (baseline.E2eDurationSeconds > 0)
             {
-                var limit = previous.E2eDurationSeconds * (1 + percent / 100.0);
+                var limit = baseline.E2eDurationSeconds * (1 + percent / 100.0);
                 if (document.E2eDurationSeconds > limit)
-                    flags.Add($"Total run time ({Format(document.E2eDurationSeconds)} sec) was more than {percent}% slower than the last successful run ({Format(previous.E2eDurationSeconds)} sec).");
+                    flags.Add($"Total run time ({Format(document.E2eDurationSeconds)} sec) was more than {percent}% slower than the last successful run ({Format(baseline.E2eDurationSeconds)} sec).");
             }
 
             foreach (var stage in document.Stages.Keys)
             {
                 if (!document.Stages.TryGetValue(stage, out var current) || current.Unavailable)
                     continue;
-                if (!previous.Stages.TryGetValue(stage, out var prior) || prior.Unavailable || prior.P95Ms <= 0)
+                if (!baseline.Stages.TryGetValue(stage, out var prior) || prior.Unavailable || prior.P95Ms <= 0)
                     continue;
 
                 var limit = prior.P95Ms * (1 + percent / 100.0);
@@ -73,8 +76,44 @@ public static class MetricsBenchmarkEvaluator
             benchmark?.Key ?? document.BenchmarkKey,
             violations.Count == 0,
             violations,
-            previous?.RunId,
+            baseline?.RunId,
             flags);
+    }
+
+    /// <summary>How many recent succeeded snapshots to read when the newest one is missing pipeline steps.</summary>
+    public const int BaselineLookback = 16;
+
+    /// <summary>
+    /// Every pipeline step recorded a slow time. End-to-end time alone is not enough:
+    /// a run that stopped early still has a duration.
+    /// </summary>
+    internal static bool IsFullBaseline(AutomationRunMetricsDocument document)
+    {
+        if (document.E2eDurationSeconds <= 0)
+            return false;
+
+        foreach (var stage in RunMetricsSnapshotService.StageHistograms)
+        {
+            if (!document.Stages.TryGetValue(stage.Stage, out var snapshot) || snapshot.Unavailable || snapshot.P95Ms <= 0)
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Newest succeeded snapshot in the list that recorded every pipeline step.</summary>
+    internal static AutomationRunMetricsDocument? SelectBaseline(IEnumerable<AutomationRunMetricsDocument>? newestFirst)
+    {
+        if (newestFirst is null)
+            return null;
+
+        foreach (var document in newestFirst)
+        {
+            if (IsFullBaseline(document))
+                return document;
+        }
+
+        return null;
     }
 
     internal static double? TryGetValue(AutomationRunMetricsDocument document, string path)

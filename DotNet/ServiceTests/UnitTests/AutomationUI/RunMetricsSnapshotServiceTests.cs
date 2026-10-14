@@ -355,6 +355,63 @@ public class RunMetricsSnapshotServiceTests
     }
 
     [Fact]
+    public async Task Capture_compares_against_an_older_full_baseline_when_the_previous_snapshot_is_partial()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        var partial = new AutomationRunMetricsDocument
+        {
+            RunId = Guid.NewGuid(),
+            Outcome = "Succeeded",
+            E2eDurationSeconds = 40,
+            FinishedAt = DateTimeOffset.Parse("2026-10-14T11:00:00Z"),
+            Stages = new Dictionary<string, StageLatencySnapshot>(StringComparer.Ordinal)
+            {
+                ["acquisition"] = new() { Unavailable = false, P95Ms = 100, Count = 1 },
+                ["normalization"] = new() { Unavailable = false, P95Ms = 100, Count = 1 }
+            }
+        };
+        var full = new AutomationRunMetricsDocument
+        {
+            RunId = Guid.NewGuid(),
+            Outcome = "Succeeded",
+            E2eDurationSeconds = 60,
+            FinishedAt = DateTimeOffset.Parse("2026-10-14T10:00:00Z"),
+            Stages = new Dictionary<string, StageLatencySnapshot>(StringComparer.Ordinal)
+            {
+                ["acquisition"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["normalization"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["measureeval"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["validation"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["submission"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 }
+            }
+        };
+        store.Setup(s => s.GetPreviousSucceededSameFingerprintAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(partial);
+        store.Setup(s => s.GetPreviousSucceededAsync(
+                It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(partial);
+        store.Setup(s => s.ListRecentSucceededSameFingerprintAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([partial, full]);
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+
+        var finished = DateTimeOffset.Parse("2026-10-14T12:00:00Z");
+        var service = CreateService(store.Object, new TelemetrySettings());
+        await service.CaptureAsync(Input(
+            isMetricsRun: true,
+            startedAt: finished.AddSeconds(-50),
+            finishedAt: finished));
+
+        saved.Should().NotBeNull();
+        saved!.Regression.PreviousRunId.Should().Be(full.RunId);
+        saved.Regression.Flags.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Capture_applies_target_duration_slo()
     {
         var store = new Mock<IRunMetricsStore>();

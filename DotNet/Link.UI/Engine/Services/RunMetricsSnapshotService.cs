@@ -314,6 +314,17 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 window.FinishedAt,
                 input.RunId,
                 cancellationToken);
+            if (previous != null && !MetricsBenchmarkEvaluator.IsFullBaseline(previous))
+            {
+                var recent = await _store.ListRecentSucceededSameFingerprintAsync(
+                    scenarioId,
+                    document.ScenarioFingerprint ?? "",
+                    window.FinishedAt,
+                    input.RunId,
+                    MetricsBenchmarkEvaluator.BaselineLookback,
+                    cancellationToken);
+                previous = MetricsBenchmarkEvaluator.SelectBaseline(recent);
+            }
         }
 
         var evaluation = MetricsBenchmarkEvaluator.Evaluate(

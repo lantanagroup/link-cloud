@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -58,6 +59,31 @@ public class MissingFacilityReportTests
         page.LoadError.Should().Be("That report is not for this facility.");
     }
 
+    [Fact]
+    public async Task Missing_facility_still_builds_the_manifest()
+    {
+        var page = await LoadManifest(scheduleFacilityId: FacilityId, scheduleStatus: 200);
+
+        page.NotFound.Should().BeFalse();
+        page.LoadError.Should().BeNull();
+        page.FacilityMissing.Should().BeTrue();
+        page.FacilityName.Should().BeNull();
+        page.Manifest.Should().NotBeNull();
+        page.Manifest!.Notice.Should().BeNull();
+        page.Manifest.Patients.Should().ContainSingle(row => row.PatientId == "patient-1");
+    }
+
+    [Fact]
+    public async Task Missing_facility_and_missing_schedule_does_not_build_a_manifest()
+    {
+        var page = await LoadManifest(scheduleFacilityId: FacilityId, scheduleStatus: 404);
+
+        page.NotFound.Should().BeTrue();
+        page.FacilityMissing.Should().BeTrue();
+        page.Manifest.Should().BeNull();
+        page.LoadError.Should().Be("That report was not found.");
+    }
+
     private static Task<ReportDetailModel> Load(string scheduleFacilityId, int scheduleStatus)
     {
         var facilities = CallStub.Create<IFacilityServiceClient>(new Dictionary<string, Func<object?[]?, object?>>
@@ -99,6 +125,74 @@ public class MissingFacilityReportTests
             Options.Create(new LinkUiFeatureOptions()),
             NullLogger<FacilityViewService>.Instance);
         return service.LoadReportAsync(FacilityId, ReportId.ToString(), query: null, CancellationToken.None);
+    }
+
+    private static Task<ReportManifestPage> LoadManifest(string scheduleFacilityId, int scheduleStatus)
+    {
+        var facilities = CallStub.Create<IFacilityServiceClient>(new Dictionary<string, Func<object?[]?, object?>>
+        {
+            ["GetAsync"] = _ => Task.FromResult(new LinkApiResponse<LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityModel>
+            {
+                StatusCode = StatusCodes.Status404NotFound
+            })
+        });
+        var reports = CallStub.Create<IReportServiceClient>(new Dictionary<string, Func<object?[]?, object?>>
+        {
+            ["GetScheduleAsync"] = _ => Task.FromResult(new LinkApiResponse<ReportScheduleApiModel>
+            {
+                StatusCode = scheduleStatus,
+                Body = scheduleStatus == 200
+                    ? new ReportScheduleApiModel
+                    {
+                        Id = ReportId,
+                        FacilityId = scheduleFacilityId,
+                        Status = ScheduleStatus.Submitted
+                    }
+                    : null
+            }),
+            ["GetEntryCountByScheduleAsync"] = _ => Task.FromResult(new LinkApiResponse<int> { StatusCode = 200, Body = 1 }),
+            ["GetInitialPopulationCountAsync"] = _ => Task.FromResult(new LinkApiResponse<int> { StatusCode = 200, Body = 1 }),
+            ["GetPopulationsByScheduleAsync"] = _ => Task.FromResult(new LinkApiResponse<List<ReportPopulationApiModel>>
+            {
+                StatusCode = 200,
+                Body = []
+            }),
+            ["GetEntrySummaryByScheduleAsync"] = _ => Task.FromResult(new LinkApiResponse<ReportEntrySummaryApiModel>
+            {
+                StatusCode = 200,
+                Body = new ReportEntrySummaryApiModel()
+            }),
+            ["SearchEntriesAsync"] = _ => Task.FromResult(new LinkApiResponse<PagedConfigModel<ReportEntryApiModel>>
+            {
+                StatusCode = 200,
+                Body = new PagedConfigModel<ReportEntryApiModel>(
+                    [
+                        new ReportEntryApiModel
+                        {
+                            PatientId = "patient-1",
+                            ReportingStatus = ReportingStatus.PassedValidation
+                        }
+                    ],
+                    new PaginationMetadata(500, 1, 1))
+            })
+        });
+        var service = new ReportsService(
+            facilities,
+            reports,
+            submission: null,
+            validation: null,
+            measure: null,
+            Options.Create(new LinkUiFeatureOptions()),
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<ReportsService>.Instance);
+        return service.LoadManifestAsync(
+            FacilityId,
+            ReportId.ToString(),
+            new ReportManifestQuery(),
+            "/Reports/Manifest",
+            new Dictionary<string, string>(),
+            patientId => "/Reports/Measure?patientId=" + patientId,
+            CancellationToken.None);
     }
 
     private class CallStub : DispatchProxy

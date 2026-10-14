@@ -60,9 +60,8 @@ public class MetricsBenchmarkEvaluatorTests
     [Fact]
     public void Regression_flags_when_p95_worsens_beyond_percent()
     {
-        var previous = Doc(e2e: 60);
-        previous.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 1000, Count = 1 };
-        var current = Doc(e2e: 60);
+        var previous = Full(e2e: 60, p95: 1000);
+        var current = Full(e2e: 60, p95: 1000);
         current.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 1300, Count = 1 };
         var benchmark = new AutomationMetricsBenchmarkDocument { Key = "k", RegressionPercent = 10 };
 
@@ -71,6 +70,32 @@ public class MetricsBenchmarkEvaluatorTests
         result.Pass.Should().BeTrue();
         result.PreviousRunId.Should().Be(previous.RunId);
         result.RegressionFlags.Should().Contain(f => f.Contains("Data Acquisition") && f.Contains("slower"));
+    }
+
+    [Fact]
+    public void Partial_snapshot_is_not_a_regression_baseline()
+    {
+        var previous = Doc(e2e: 40);
+        previous.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 100, Count = 1 };
+        previous.Stages["normalization"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 100, Count = 1 };
+        var current = Full(e2e: 55, p95: 2000);
+
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, benchmark: null, targetDurationSeconds: null, previous);
+
+        result.RegressionFlags.Should().BeEmpty();
+        result.PreviousRunId.Should().BeNull();
+    }
+
+    [Fact]
+    public void SelectBaseline_skips_a_newer_partial_snapshot()
+    {
+        var partial = Doc(e2e: 40);
+        partial.Stages["acquisition"] = new StageLatencySnapshot { Unavailable = false, P95Ms = 100, Count = 1 };
+        var full = Full(e2e: 60, p95: 1000);
+
+        var chosen = MetricsBenchmarkEvaluator.SelectBaseline([partial, full]);
+
+        chosen.Should().BeSameAs(full);
     }
 
     [Fact]
@@ -107,5 +132,13 @@ public class MetricsBenchmarkEvaluatorTests
                 ["validation"] = new StageLatencySnapshot { Unavailable = true }
             }
         };
+    }
+
+    private static AutomationRunMetricsDocument Full(double e2e, double p95)
+    {
+        var document = Doc(e2e);
+        foreach (var stage in new[] { "acquisition", "normalization", "measureeval", "validation", "submission" })
+            document.Stages[stage] = new StageLatencySnapshot { Unavailable = false, P95Ms = p95, Count = 1 };
+        return document;
     }
 }
