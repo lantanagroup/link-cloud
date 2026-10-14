@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.Extensions.Options;
 using Moq;
 using System.Net;
@@ -185,6 +186,298 @@ public class DataAcquisitionServiceClientTests
         Assert.Equal("/api/data/acquisition-logs/report/rpt-2", request.Path);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task ValidateFhirServerConnectionAsync_CallsExpectedEndpoint()
+    {
+        using var server = new OneShotServer("{\"isConnected\":true}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.ValidateFhirServerConnectionAsync("http://fhir.test/r4");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/connectionValidation/$validate", request.Path);
+        Assert.Contains("fhirServerUrl=", request.Query);
+        Assert.NotNull(result.Body);
+        Assert.True(result.Body.IsConnected);
+        Assert.Null(result.Body.ErrorMessage);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TestSftpConnectionAsync_PostsDetailsAndParsesResult()
+    {
+        const string response = """{"success":true,"message":"Connected.","files":[{"fileName":"census.dat","patients":[{"patientId":"12345","patientName":"Doe, John","admissionDate":"2023-07-07T13:06:43Z"}]}]}""";
+        using var server = new OneShotServer(response);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.TestSftpConnectionAsync(SftpTestRequest(), includeFileContent: true);
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("/api/data/sftp-configurations/test-connection", request.Path);
+        Assert.Contains("includeFileContent=true", request.Query);
+        Assert.Contains("\"hostName\":\"sftp.example.com\"", request.Body);
+        Assert.Contains("\"hostUrlPort\":2222", request.Body);
+        Assert.NotNull(result.Body);
+        Assert.True(result.Body.Success);
+        var file = Assert.Single(result.Body.Files!);
+        var patient = Assert.Single(file.Patients);
+        Assert.Equal("12345", patient.PatientId);
+        Assert.Equal("Doe, John", patient.PatientName);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TestSftpConnectionAsync_IncludeFileContentDefaultsToFalse()
+    {
+        using var server = new OneShotServer("""{"success":true,"message":"Connected."}""");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.TestSftpConnectionAsync(SftpTestRequest());
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Contains("includeFileContent=false", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TestSftpConnectionAsync_DoesNotCaptureTheRequestBody()
+    {
+        using var server = new OneShotServer("""{"success":false,"message":"Authentication failed. Verify the username and password."}""");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.TestSftpConnectionAsync(SftpTestRequest());
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        // The password did go to the service, but it must not be kept on the response, which callers display
+        Assert.Contains(SftpTestPassword, request.Body);
+        Assert.Null(result.RequestBody);
+    }
+
+    private const string SftpTestPassword = "Pa55-must-not-leak";
+
+    private static SftpTestConnectionRequestApiModel SftpTestRequest() => new()
+    {
+        HostName = "sftp.example.com",
+        HostUrlPort = 2222,
+        Username = "facility-user",
+        Password = SftpTestPassword,
+        ReportDirectory = "/data"
+    };
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateFhirQueryConfigurationAsync_PutsToConfigurationEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.UpdateFhirQueryConfigurationAsync(new { facilityId = "f1", fhirServerBaseUrl = "https://ehr/fhir" });
+        var request = http.SingleRequest();
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/data/fhirQueryConfiguration", request.Path);
+        Assert.Contains("f1", request.Body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ValidateFacilityConnectionAsync_GetsFacilityScopedValidateRoute()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.ValidateFacilityConnectionAsync("f1", patientId: "p1", measureId: "m1");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/connectionValidation/f1/$validate", request.Path);
+        Assert.Contains("patientId=p1", request.Query);
+        Assert.Contains("measureId=m1", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateFhirListConfigurationAsync_PutsToListEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.UpdateFhirListConfigurationAsync(new { facilityId = "f1" });
+        var request = http.SingleRequest();
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/data/fhirQueryList", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateQueryPlanAsync_PutsToQueryPlanEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.UpdateQueryPlanAsync("f1", new { planName = "p" });
+        var request = http.SingleRequest();
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/data/f1/QueryPlan", request.Path);
+        Assert.Contains("planName", request.Body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateOrganizationLocationConfigurationAsync_PutsToConfigRoute()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.UpdateOrganizationLocationConfigurationAsync("f1", new { description = "d" });
+        var request = http.SingleRequest();
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/data/location-config/facility/f1", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateOrganizationLocationMappingAsync_PutsToMappingRoute()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.UpdateOrganizationLocationMappingAsync(7, new { locationName = "ICU" });
+        var request = http.SingleRequest();
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/data/location-mappings/7", request.Path);
+    }
+
+    [Theory]
+    [MemberData(nameof(SftpEndpointCalls))]
+    public async System.Threading.Tasks.Task SftpMethods_CallControllerRoutes(
+        string expectedMethod,
+        string expectedPath,
+        Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task> invoke)
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await invoke(client);
+        var request = http.SingleRequest();
+
+        Assert.Equal(expectedMethod, request.Method);
+        Assert.Equal(expectedPath, request.Path);
+    }
+
+    public static IEnumerable<object[]> SftpEndpointCalls()
+    {
+        yield return ["GET", "/api/data/org-1/sftp-configurations", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.GetOrganizationSftpConfigurationAsync("org-1"))];
+        yield return ["POST", "/api/data/org-1/sftp-configurations", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.CreateSftpConfigurationAsync("org-1", new { host = "h" }))];
+        yield return ["PUT", "/api/data/org-1/sftp-configurations/cfg-1", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.UpdateSftpConfigurationAsync("org-1", "cfg-1", new { host = "h" }))];
+        yield return ["DELETE", "/api/data/org-1/sftp-configurations/cfg-1", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.DeleteSftpConfigurationAsync("org-1", "cfg-1"))];
+        yield return ["PUT", "/api/data/org-1/sftp-configurations/credentials", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.UpdateSftpCredentialsAsync("org-1", new { username = "u", password = "p" }))];
+        yield return ["DELETE", "/api/data/org-1/sftp-configurations/credentials", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.DeleteSftpCredentialsAsync("org-1"))];
+        yield return ["GET", "/api/data/org-1/sftp-configurations/credentials/status", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.GetSftpCredentialStatusAsync("org-1"))];
+        yield return ["POST", "/api/data/org-1/sftp-configurations/test-connection", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.TestSavedSftpConnectionAsync("org-1"))];
+        yield return ["GET", "/api/data/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.SearchSftpLogsAsync(facilityId: "f1"))];
+        yield return ["POST", "/api/data/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.CreateSftpLogAsync(new { facilityId = "f1" }))];
+        yield return ["GET", "/api/data/sftp-configurations/7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.GetSftpConfigurationByIdAsync(Guid.Parse("7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10")))];
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateSftpCredentialsAsync_DoesNotCaptureTheRequestBody()
+    {
+        using var http = new FakeHttpBoundary(string.Empty, 204);
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.UpdateSftpCredentialsAsync("org-1", new { username = "facility-user", password = SftpTestPassword });
+        var request = http.SingleRequest();
+
+        // The password did go to the service, but it must not be kept on the response, which callers display
+        Assert.Contains(SftpTestPassword, request.Body);
+        Assert.Null(result.RequestBody);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetFhirAuthenticationConfigurationAsync_CallsExpectedEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{\"tokenUrl\":\"https://v.test/token\",\"clientSecretStored\":true}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.GetFhirAuthenticationConfigurationAsync("f1");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data-acquisition/facilities/f1/fhir-authentication-configuration", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateFhirAuthenticationConfigurationAsync_CallsExpectedEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{}", 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.UpdateFhirAuthenticationConfigurationAsync("f1", new { tokenUrl = "https://v.test/token" });
+        var request = http.SingleRequest();
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/data-acquisition/facilities/f1/fhir-authentication-configuration", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateFhirAuthenticationConfigurationAsync_DoesNotCaptureTheRequestBody()
+    {
+        const string oauthTestSecret = "cl13nt-secret-must-not-leak";
+        using var http = new FakeHttpBoundary("{}", 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.UpdateFhirAuthenticationConfigurationAsync(
+            "f1",
+            new { tokenUrl = "https://v.test/token", clientId = "c1", clientSecret = oauthTestSecret, scope = "s" });
+        var request = http.SingleRequest();
+
+        // The secret did go to the service, but it must not be kept on the response, which callers display
+        Assert.Contains(oauthTestSecret, request.Body);
+        Assert.Null(result.RequestBody);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetOrganizationLocationMappingAsync_GetsMappingById()
+    {
+        using var http = new FakeHttpBoundary("{\"locationMappingId\":7,\"facilityId\":\"f1\",\"locationName\":\"ICU\"}");
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.GetOrganizationLocationMappingAsync(7);
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/location-mappings/7", request.Path);
+        Assert.NotNull(result.Body);
+        Assert.Equal(7, result.Body.LocationMappingId);
+        Assert.Equal("ICU", result.Body.LocationName);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DeleteOrganizationLocationMappingAsync_DeletesMappingById()
+    {
+        using var http = new FakeHttpBoundary(string.Empty, 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.DeleteOrganizationLocationMappingAsync(7);
+        var request = http.SingleRequest();
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/data/location-mappings/7", request.Path);
+    }
+
     private static DataAcquisitionServiceClient CreateClient(string baseUrl)
     {
         var serviceRegistry = Options.Create(new ServiceRegistry
@@ -207,76 +500,4 @@ public class DataAcquisitionServiceClientTests
         return new DataAcquisitionServiceClient(serviceRegistry, bearerOptions, tokenSettings, tokenService.Object);
     }
 
-    private sealed class CapturedRequest
-    {
-        public string Method { get; init; } = string.Empty;
-        public string Path { get; init; } = string.Empty;
-        public string Query { get; init; } = string.Empty;
-        public string Body { get; init; } = string.Empty;
-    }
-
-    private sealed class OneShotServer : IDisposable
-    {
-        private readonly HttpListener _listener;
-        private readonly System.Threading.Tasks.Task<CapturedRequest> _requestTask;
-
-        public string BaseUrl { get; }
-
-        public OneShotServer(string responseBody, int statusCode = 200)
-        {
-            var port = GetFreePort();
-            BaseUrl = $"http://127.0.0.1:{port}";
-
-            _listener = new HttpListener();
-            _listener.Prefixes.Add($"{BaseUrl}/");
-            _listener.Start();
-
-            _requestTask = System.Threading.Tasks.Task.Run(async () =>
-            {
-                var context = await _listener.GetContextAsync();
-
-                string body;
-                using (var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding ?? Encoding.UTF8))
-                {
-                    body = await reader.ReadToEndAsync();
-                }
-
-                var captured = new CapturedRequest
-                {
-                    Method = context.Request.HttpMethod,
-                    Path = context.Request.Url?.AbsolutePath ?? string.Empty,
-                    Query = context.Request.Url?.Query ?? string.Empty,
-                    Body = body
-                };
-
-                context.Response.StatusCode = statusCode;
-                context.Response.ContentType = "application/json";
-                var buffer = Encoding.UTF8.GetBytes(responseBody);
-                await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
-                context.Response.Close();
-
-                return captured;
-            });
-        }
-
-        public System.Threading.Tasks.Task<CapturedRequest> WaitForRequestAsync() => _requestTask;
-
-        public void Dispose()
-        {
-            if (_listener.IsListening)
-            {
-                _listener.Stop();
-            }
-            _listener.Close();
-        }
-
-        private static int GetFreePort()
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
-        }
-    }
 }

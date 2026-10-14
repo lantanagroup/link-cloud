@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -17,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -160,13 +162,16 @@ namespace LantanaGroup.Link.Report.Listeners
                     return;
                 }
 
+                using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
                 using var scope = _serviceScopeFactory.CreateScope();
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+                var mappingOutcomeManager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;
+                var inboundMetricsMode = KafkaHeaderHelper.GetMetricsMode(result.Message.Headers);
                 var startDate = value.StartDate;
                 var endDate = value.EndDate;
                 var reportTypes = value.ReportTypes;
@@ -178,6 +183,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     throw new DeadLetterException("FacilityId is null or empty.");
                 }
+
+                if (await PipelineAbortSkip.ShouldSkipAsync(
+                        scope.ServiceProvider, _logger, Name, facilityId, value.AdhocReportId.ToString(), cancellationToken))
+                    return;
 
                 if (value is { Regenerate: true, ReportId: not null })
                 {
@@ -310,6 +319,21 @@ namespace LantanaGroup.Link.Report.Listeners
                     await reportEntryManager.AddRangeAsync(newEntries, cancellationToken);
                 }
 
+                if (value is { Regenerate: true, ReportId: not null })
+                {
+                    // Regeneration re-evaluates the resources the original run stored, so DataAcquisition
+                    // and Normalization are both bypassed and neither mapping outcome producer fires.
+                    // Carrying the original run's outcomes forward is what keeps the regenerated report
+                    // from showing every indicator as never evaluated. They are not approximations: both
+                    // mapping steps ran before those resources were written, so they describe exactly the
+                    // resource set this report re-evaluates.
+                    //
+                    // The patient set matches by construction, since newEntries is built from the source
+                    // schedule's own entries.
+                    await mappingOutcomeManager.CopyToScheduleAsync(
+                        value.ReportId.Value, reportSchedule.Id, cancellationToken);
+                }
+
                 if (value.Regenerate)
                 {
                     // Fire-and-forget Produce + delivery handler preserves per-message error
@@ -333,10 +357,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         PatientId = entry.PatientId,
                                         ReportTrackingId = reportSchedule.Id.ToString(),
                                     },
-                                    Headers = new Headers
-                                        {
-                                            { KafkaConstants.HeaderConstants.CorrelationId, Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                                        }
+                                    Headers = CreateEvaluationRequestedHeaders(inboundMetricsMode)
                                 },
                                 deliveryReport =>
                                 {
@@ -370,7 +391,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 }
                 else
                 {
-                    await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList(), cancellationToken);
+                    await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList(), cancellationToken, inboundMetricsMode);
                 }
             }
             catch (DeadLetterException ex)
@@ -427,6 +448,20 @@ namespace LantanaGroup.Link.Report.Listeners
             admittedPatients = JsonSerializer.Deserialize<List>(censusContent, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
             return admittedPatients?.Entry?.Select(p => p.Item.Reference.Split('/').Last()).Distinct().ToList() ?? new List<string>();
+        }
+
+        private static Headers CreateEvaluationRequestedHeaders(string? metricsMode)
+        {
+            var headers = new Headers
+            {
+                { KafkaConstants.HeaderConstants.CorrelationId, Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+            };
+            if (!string.IsNullOrWhiteSpace(metricsMode))
+            {
+                KafkaHeaderHelper.SetMetricsMode(headers, metricsMode);
+            }
+
+            return headers;
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

@@ -332,7 +332,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
 
             // GET FHIR List Config → 200
             results.Add(await RunStepAsync(StepNames.FhirListConfigGet200, 200, async () =>
-                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+                await _client.GetFhirListConfigurationAsync(facilityId, cancellationToken: ct), ct: ct));
 
             // POST FHIR List Config → 409 (duplicate)
             results.Add(await RunStepAsync(StepNames.FhirListConfigPost409, 409, async () =>
@@ -348,7 +348,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
 
             // GET FHIR List Config → 404 (after delete)
             results.Add(await RunStepAsync(StepNames.FhirListConfigGet404, 404, async () =>
-                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+                await _client.GetFhirListConfigurationAsync(facilityId, cancellationToken: ct), ct: ct));
 
             // --- Read-only operations (non-existent resources — prove reachability) ---
             var fakeReportId = Guid.NewGuid().ToString();
@@ -579,9 +579,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
 
             result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
                 ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                : responseBody.Length > 500
-                    ? responseBody[..500]
-                    : responseBody;
+                : responseBody;
 
             if (!result.Passed)
             {

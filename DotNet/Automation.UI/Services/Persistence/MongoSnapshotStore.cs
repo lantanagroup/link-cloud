@@ -1,4 +1,6 @@
-﻿using MongoDB.Driver;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text;
 using System.Text.Json;
@@ -32,6 +34,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
+    private readonly IMongoCollection<OwnedFacilityTombstoneDocument> _ownedFacilityTombstones;
+    private readonly IMongoCollection<FacilityTeardownProgressDocument> _facilityTeardownProgress;
     private readonly ISnapshotPayloadStore _snapshotPayloadStore;
     private readonly ILogger<MongoSnapshotStore> _logger;
 
@@ -43,6 +47,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
+        _ownedFacilityTombstones = database.GetCollection<OwnedFacilityTombstoneDocument>("automation_owned_facility_tombstones");
+        _facilityTeardownProgress = database.GetCollection<FacilityTeardownProgressDocument>("automation_facility_teardown_progress");
         _snapshotPayloadStore = snapshotPayloadStore ?? new InlineSnapshotPayloadStore();
         _logger = logger;
     }
@@ -54,6 +60,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.FacilityId, meta.FacilityId)
             .Set(r => r.ReportId, meta.ReportId)
+            .Set(r => r.IsMetricsRun, meta.IsMetricsRun)
             .Set(r => r.IsActive, true)
             .Set(r => r.StartedAt, meta.StartedAt)
             .SetOnInsert(r => r.RunName, $"Run {runId}")
@@ -101,6 +108,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.Set(r => r.PatientCount, summary.PatientCount),
             Builders<AutomationRunDocument>.Update.Set(r => r.ResourcesPerPatient, summary.ResourcesPerPatient),
             Builders<AutomationRunDocument>.Update.Set(r => r.Seed, summary.Seed),
+            Builders<AutomationRunDocument>.Update.Set(r => r.IsMetricsRun, summary.IsMetricsRun),
             Builders<AutomationRunDocument>.Update.Set(r => r.Status, summary.Status.ToString()),
             Builders<AutomationRunDocument>.Update.Set(r => r.CreatedAt, summary.CreatedAt),
             Builders<AutomationRunDocument>.Update.Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt),
@@ -108,9 +116,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
             Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
-            Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled),
+            Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status.IsInProgress() && summary.Status != AutomationRunStatus.CollectingMetrics),
             Builders<AutomationRunDocument>.Update.SetOnInsert(r => r.RunId, summary.RunId)
         };
+
+        // A later summary written before the flag is set must not clear a true marker.
+        if (summary.AutomationCreatedFacility)
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.AutomationCreatedFacility, true));
 
         if (summary.GeneratedTemplateCacheVersionId.HasValue)
             updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheVersionId, summary.GeneratedTemplateCacheVersionId));
@@ -263,17 +275,129 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return docs.Select(ToSummary).ToList();
     }
 
-    public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
+    public async Task MarkAutomationCreatedFacilityAsync(AutomationRunSummary summary, string facilityId, CancellationToken ct = default)
     {
-        await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
+        var hasIdentifiers = !string.IsNullOrWhiteSpace(facilityId)
+            && !string.IsNullOrWhiteSpace(summary.ReportId);
+        var isActive = hasIdentifiers
+            && summary.Status.IsInProgress()
+            && summary.Status != AutomationRunStatus.CollectingMetrics;
+
+        var update = Builders<AutomationRunDocument>.Update
+            .Set(r => r.AutomationCreatedFacility, true)
+            .Set(r => r.FacilityId, facilityId ?? string.Empty)
+            .SetOnInsert(r => r.RunId, summary.RunId)
+            .SetOnInsert(r => r.RunName, summary.RunName)
+            .SetOnInsert(r => r.Scenario, summary.Scenario.ToString())
+            .SetOnInsert(r => r.SelectedMeasure, summary.SelectedMeasure)
+            .SetOnInsert(r => r.PatientCount, summary.PatientCount)
+            .SetOnInsert(r => r.ResourcesPerPatient, summary.ResourcesPerPatient)
+            .SetOnInsert(r => r.Seed, summary.Seed)
+            .SetOnInsert(r => r.IsMetricsRun, summary.IsMetricsRun)
+            .SetOnInsert(r => r.Status, summary.Status.ToString())
+            .SetOnInsert(r => r.CreatedAt, summary.CreatedAt)
+            .SetOnInsert(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt)
+            .SetOnInsert(r => r.FinishedAt, summary.FinishedAt)
+            .SetOnInsert(r => r.Error, summary.Error)
+            .SetOnInsert(r => r.ReportId, summary.ReportId ?? string.Empty)
+            .SetOnInsert(r => r.IsActive, isActive);
+
+        await _runs.UpdateOneAsync(
+            r => r.RunId == summary.RunId,
+            update,
+            new UpdateOptions { IsUpsert = true },
+            ct);
+    }
+
+    public async Task RetainOwnedFacilitiesAsync(AutomationRunSummary summary, CancellationToken ct = default)
+    {
+        foreach (var facilityId in DistinctOwnedFacilityIds(summary))
+        {
+            await _ownedFacilityTombstones.ReplaceOneAsync(
+                t => t.FacilityId == facilityId,
+                new OwnedFacilityTombstoneDocument
+                {
+                    FacilityId = facilityId,
+                    RunId = summary.RunId.ToString(),
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    EligibleAt = RunCleanupHelper.RunTimestamp(summary)
+                },
+                new ReplaceOptions { IsUpsert = true },
+                ct);
+        }
+    }
+
+    internal static IReadOnlyList<string> DistinctOwnedFacilityIds(AutomationRunSummary summary)
+    {
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var facilityId in new[] { summary.FacilityId, summary.RunId.ToString() })
+        {
+            if (!RunCleanupHelper.IsOwnedAutomationFacilityId(summary, facilityId) || string.IsNullOrWhiteSpace(facilityId))
+                continue;
+            if (seen.Add(facilityId))
+                ids.Add(facilityId);
+        }
+
+        return ids;
+    }
+
+    public async Task<IReadOnlyList<RetainedFacility>> GetRetainedFacilitiesAsync(CancellationToken ct = default)
+    {
+        var docs = await _ownedFacilityTombstones.Find(FilterDefinition<OwnedFacilityTombstoneDocument>.Empty)
+            .ToListAsync(ct);
+        return docs.Select(doc => new RetainedFacility(doc.FacilityId, doc.EligibleAt)).ToList();
+    }
+
+    public async Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default)
+        => await _ownedFacilityTombstones.DeleteOneAsync(t => t.FacilityId == facilityId, ct);
+
+    public async Task MarkFacilityTeardownProgressAsync(Guid runId, string facilityId, CancellationToken ct = default)
+    {
+        var exists = await _facilityTeardownProgress.Find(p => p.RunId == runId && p.FacilityId == facilityId)
+            .AnyAsync(ct);
+        if (!exists)
+        {
+            await _facilityTeardownProgress.InsertOneAsync(new FacilityTeardownProgressDocument
+            {
+                Id = ObjectId.GenerateNewId(),
+                RunId = runId,
+                FacilityId = facilityId
+            }, cancellationToken: ct);
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> GetFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default)
+    {
+        var docs = await _facilityTeardownProgress.Find(p => p.RunId == runId).ToListAsync(ct);
+        return docs.Select(doc => doc.FacilityId).ToList();
+    }
+
+    public async Task ClearFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default)
+        => await _facilityTeardownProgress.DeleteManyAsync(p => p.RunId == runId, ct);
+
+    public Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
+        => DeleteRunAsync(runId, retainOwnedFacilities: true, ct);
+
+    public async Task DeleteRunAsync(Guid runId, bool retainOwnedFacilities, CancellationToken ct = default)
+    {
+        var run = await _runs.Find(r => r.RunId == runId).FirstOrDefaultAsync(ct);
+        if (run != null && retainOwnedFacilities)
+            await RetainOwnedFacilitiesAsync(ToSummary(run), ct);
+
+        // Drop child history first and the run summary last. A failure after the
+        // summary is gone would leave history that the next purge can no longer select.
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
 
-        // Only remove externalized payload blobs after Mongo cleanup succeeds so
-        // a DB failure cannot orphan pointer records that still reference payload data.
+        // Payload blobs follow the Mongo child rows so a DB failure cannot orphan
+        // pointer records that still reference payload data. The summary stays until
+        // those deletes succeed.
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
+        await ClearFacilityTeardownProgressAsync(runId, ct);
+        await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
     }
 
     private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)
@@ -337,7 +461,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         FacilityId = doc.FacilityId,
         ReportId = doc.ReportId,
         StartedAt = doc.StartedAt,
-        IsActive = doc.IsActive
+        IsActive = doc.IsActive,
+        IsMetricsRun = doc.IsMetricsRun
     };
 
     private static AutomationRunSummary ToSummary(AutomationRunDocument doc)
@@ -362,6 +487,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             PatientCount = doc.PatientCount,
             ResourcesPerPatient = doc.ResourcesPerPatient,
             Seed = doc.Seed,
+            IsMetricsRun = doc.IsMetricsRun,
             RunConfigurationJson = null,
             Status = status,
             CreatedAt = doc.CreatedAt,
@@ -370,6 +496,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Error = doc.Error,
             Duration = doc.Duration,
             FacilityId = doc.FacilityId,
+            AutomationCreatedFacility = doc.AutomationCreatedFacility,
             ReportId = doc.ReportId,
             GeneratedTemplateCacheVersionId = doc.GeneratedTemplateCacheVersionId,
             GeneratedTemplateCacheVersionNumber = doc.GeneratedTemplateCacheVersionNumber,

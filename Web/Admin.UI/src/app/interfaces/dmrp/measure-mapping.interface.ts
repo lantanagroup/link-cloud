@@ -21,7 +21,13 @@ export const MEASURE_MAPPING_FREQUENCIES: readonly Frequency[] = [
 export interface IMeasureMapping {
   id: string;
   measure: string;
-  dqm: string;
+
+  /**
+   * Null for a measure the DMRP sync recorded that nobody has mapped yet. Such a mapping
+   * schedules nothing until a dQM is set on it, so it is shown as needing one rather than
+   * as an ordinary row with an empty column.
+   */
+  dqm: string | null;
   frequency: Frequency;
 }
 

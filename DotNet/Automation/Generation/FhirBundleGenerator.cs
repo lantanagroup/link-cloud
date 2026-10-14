@@ -1,18 +1,14 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Automation.Generation.ResourceFactories;
+using LantanaGroup.Automation.Generation.Thetis;
 using LantanaGroup.Automation.Helpers;
 
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Orchestrates synthetic FHIR R4 transaction bundle generation for E2E / stress / volume tests.
-///
-/// Every patient is assigned a <see cref="FhirGenerationCodes.ClinicalScenarios"/> row that drives
-/// the primary diagnosis, admission type, medication choices, and procedure reasons so the full
-/// set of resources for a patient forms a coherent clinical story.
-///
-/// All resource creation is delegated to the per-resource *Factory classes in this namespace.
-/// Bundles are chunked to stay within FHIR server transaction size limits (500 entries).
+/// Shared generation IDs, encounter-window helpers, and a small-dataset Thetis
+/// convenience that chunks transaction bundles. Production runs go through
+/// <see cref="FhirGenerationPipeline"/>. Per-patient clinical synthesis is Thetis Engine;
+/// shared org/location/practitioner/medication resources stay factory-built.
 /// </summary>
 public static class FhirBundleGenerator
 {
@@ -111,40 +107,39 @@ public static class FhirBundleGenerator
         var (sharedEntries, sharedPractitionerIds, sharedMedicationIds) =
             ScenarioResourceGeneration.BuildSharedInfrastructure(ids, generationRequirementsPlan);
 
+        var profile = new PatientProfile(new Dictionary<ProfiledMeasureType, MeasureEligibility>
+        {
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
+        });
+        IReadOnlyList<ProfiledMeasureType> measures =
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
+
         // ------------------------------------------------------------------
-        // Per-patient generation
+        // Per-patient generation (Thetis)
         // ------------------------------------------------------------------
         for (var p = 0; p < patientCount; p++)
         {
-            var patientSeed = baseSeed + p;
             var patientId = ids.PatientId(p);
-            var scenario = FhirGenerationCodes.GetScenarioBySeed(patientSeed);
-            var anchors = ScenarioResourceGeneration.ComputePatientAnchors(patientId, patientSeed, sharedPractitionerIds);
             patientIds.Add(patientId);
 
-            // Bound the encounter inside the supplied clinical period when the caller
-            // provides one, so resources spread across the LOS by GenerateScenarioDrivenResources
-            // remain inside any consumer's downstream date-filter window. Falls back to the
-            // legacy 2023-anchored seed-only dates when no period is provided.
-            var (encStart, encEnd) = DeriveInpatientEncounterWindow(patientSeed, clinicalPeriodStart, clinicalPeriodEnd);
+            var entries = ThetisPatientEntryGenerator.Shared.GenerateAsync(new PatientEntryRequest
+            {
+                Profile = profile,
+                PatientIndex = p,
+                BaseSeed = baseSeed,
+                TotalResourcesPerPatient = totalResourcesPerPatient,
+                SharedPractitionerIds = sharedPractitionerIds,
+                SharedMedicationIds = sharedMedicationIds,
+                Measures = measures,
+                ClinicalPeriodStart = clinicalPeriodStart,
+                ClinicalPeriodEnd = clinicalPeriodEnd,
+                Config = config,
+                RequirementsPlan = generationRequirementsPlan,
+                Ids = ids,
+                Output = output
+            }).GetAwaiter().GetResult();
 
-            var entries = new List<Bundle.EntryComponent>();
-
-            var encounter = EncounterFactory.Generate(
-                anchors.EncounterId, patientId, encStart, encEnd,
-                anchors.AttendingPractId, anchors.AdmittingPractId,
-                ids.EdLocation, ids.IcuLocation, ids.StepDownLocation, ids.Organization,
-                anchors.PrimaryDxId, scenario);
-
-            ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
-                entries, patientId, patientSeed, p, baseSeed, totalResourcesPerPatient,
-                encStart, encEnd, scenario, anchors, encounter,
-                sharedPractitionerIds, sharedMedicationIds, config, ids, generationRequirementsPlan);
-
-            output.WriteLine($"  Patient {patientId}: {entries.Count} entries | scenario={scenario.PrimaryDxDisplay} | " +
-                             $"encounter={anchors.EncounterId} LOS={(encEnd - encStart).TotalDays:F1}d " +
-                             $"({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
-
+            output.WriteLine($"  Patient {patientId}: {entries.Count} Thetis entries");
             allEntries.Add((patientId, entries));
         }
 
@@ -324,7 +319,7 @@ public static class FhirBundleGenerator
     /// Builds the run-scoped shared FHIR infrastructure (Organization, Locations, Devices,
     /// Practitioners, Medications) that all per-patient resources reference.
     /// Call once per server lifetime and reuse the returned values in every
-    /// <see cref="GeneratePatientEntries"/> call.
+    /// Thetis patient generation request.
     /// </summary>
     public static (SharedIds Ids, List<Bundle.EntryComponent> SharedEntries, List<string> PractitionerIds, List<string> MedicationIds)
         BuildSharedResources()
@@ -332,47 +327,6 @@ public static class FhirBundleGenerator
         var ids = new SharedIds();
         var (sharedEntries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids);
         return (ids, sharedEntries, practitionerIds, medicationIds);
-    }
-
-    /// <summary>
-    /// Generates all FHIR bundle entries for a single patient using the caller-supplied patient ID.
-    /// The <paramref name="seed"/> drives clinical scenario selection and resource values
-    /// deterministically: the same seed + patient ID always produces identical data.
-    /// When <paramref name="seed"/> is <c>null</c> a stable FNV-1a hash of the patient ID is used,
-    /// so any arbitrary incoming patient ID yields consistent data across service restarts.
-    /// </summary>
-    public static List<Bundle.EntryComponent> GeneratePatientEntries(
-        string patientId,
-        SharedIds ids,
-        List<string> sharedPractitionerIds,
-        List<string> sharedMedicationIds,
-        int totalResourcesPerPatient = DefaultResourcesPerPatient,
-        int? seed = null,
-        FhirGenerationConfig? config = null,
-        GenerationRequirementsPlan? generationRequirementsPlan = null,
-        DateTime? clinicalPeriodStart = null,
-        DateTime? clinicalPeriodEnd = null)
-    {
-        var patientSeed = seed ?? (int)(patientId.GetStableHash32() & 0x7FFFFFFFu);
-        var scenario = FhirGenerationCodes.GetScenarioBySeed(patientSeed);
-        var anchors = ScenarioResourceGeneration.ComputePatientAnchors(patientId, patientSeed, sharedPractitionerIds);
-        var (encStart, encEnd) = DeriveInpatientEncounterWindow(patientSeed, clinicalPeriodStart, clinicalPeriodEnd);
-
-        var encounter = EncounterFactory.Generate(
-            anchors.EncounterId, patientId, encStart, encEnd,
-            anchors.AttendingPractId, anchors.AdmittingPractId,
-            ids.EdLocation, ids.IcuLocation, ids.StepDownLocation, ids.Organization,
-            anchors.PrimaryDxId, scenario);
-
-        var entries = new List<Bundle.EntryComponent>();
-        ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
-            entries, patientId, patientSeed, 0, patientSeed, totalResourcesPerPatient,
-            encStart, encEnd, scenario, anchors, encounter,
-            sharedPractitionerIds, sharedMedicationIds, config, ids, generationRequirementsPlan,
-            measurementPeriodStart: clinicalPeriodStart,
-            measurementPeriodEnd: clinicalPeriodEnd);
-
-        return entries;
     }
 
     internal static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;

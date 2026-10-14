@@ -5,7 +5,6 @@ using Census.Domain.Entities;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Census.Application.HealthChecks;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Application.Repositories;
@@ -193,7 +192,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Health Checks
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, CensusConstants.ServiceName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<CensusContext>>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Swagger

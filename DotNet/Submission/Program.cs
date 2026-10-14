@@ -20,7 +20,6 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
-using LantanaGroup.Link.Submission.Application.HealthChecks;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Middleware;
 using LantanaGroup.Link.Submission.Application.Services;
@@ -173,7 +172,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, SubmissionConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<SubmissionContext>>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Producers

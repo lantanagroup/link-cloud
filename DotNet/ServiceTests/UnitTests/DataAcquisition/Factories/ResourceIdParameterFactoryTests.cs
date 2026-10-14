@@ -120,6 +120,62 @@ namespace UnitTests.DataAcquisition.Factories
         }
 
         [Fact]
+        public async Task Build_WhenPagedNotSetAndIdsExceedDefaultCap_ReturnsPagedEntries()
+        {
+            var parameter = new ResourceIdsParameter
+            {
+                Name = "encounter",
+                Resource = "Encounter",
+                Paged = null
+            };
+            var request = new GetPatientDataRequest
+            {
+                CorrelationId = "CorrId",
+                FacilityId = "FacId"
+            };
+            var resourceIds = Enumerable.Range(1, 150).Select(i => $"enc-{i}").ToList();
+
+            _dataAcquisitionLogQueriesMock
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(resourceIds);
+
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+
+            Assert.NotNull(result);
+            Assert.True(result.paged);
+            Assert.Equal(2, result.values!.Count);
+            Assert.Equal(100, result.values[0].Count());
+            Assert.Equal(50, result.values[1].Count());
+        }
+
+        [Fact]
+        public async Task Build_WhenPagedIs100AndIdsFitInOneQuery_DoesNotPage()
+        {
+            var parameter = new ResourceIdsParameter
+            {
+                Name = "encounter",
+                Resource = "Encounter",
+                Paged = "100"
+            };
+            var request = new GetPatientDataRequest
+            {
+                CorrelationId = "CorrId",
+                FacilityId = "FacId"
+            };
+            var resourceIds = Enumerable.Range(1, 68).Select(i => $"enc-{i}").ToList();
+
+            _dataAcquisitionLogQueriesMock
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), parameter.Resource, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(resourceIds);
+
+            var result = await _resourceIdParameterFactory.Build(parameter, request, _dataAcquisitionLogQueriesMock.Object);
+
+            Assert.NotNull(result);
+            Assert.False(result.paged);
+            Assert.Equal(68, result.value!.Split(',').Length);
+        }
+
+        [Fact]
         public async Task Build_WhenNoResourceIdsFound_ReturnsNull()
         {
             // Arrange

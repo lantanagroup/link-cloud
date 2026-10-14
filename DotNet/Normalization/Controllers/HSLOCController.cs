@@ -27,11 +27,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<HSLOC>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<HSLOC>>> GetAll(bool includeInactive = false)
+        public async Task<ActionResult<List<HSLOC>>> GetAll(
+            bool includeInactive = false,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                return Ok(await _hslocQueries.GetAll(includeInactive));
+                return Ok(await _hslocQueries.GetAll(includeInactive, cancellationToken));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -46,7 +52,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> Update([FromForm] PutHSLOCModel model)
+        public async Task<IActionResult> Update([FromForm] PutHSLOCModel model, CancellationToken cancellationToken)
         {
             model.OldVersion = model.OldVersion.Sanitize();
             model.NewVersion = model.NewVersion.Sanitize();
@@ -59,7 +65,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             try
             {
                 await using var csv = model.CsvFile.OpenReadStream();
-                await _hslocManager.Update(model.OldVersion, model.NewVersion, csv);
+                await _hslocManager.Update(model.OldVersion, model.NewVersion, csv, cancellationToken);
                 return NoContent();
             }
             catch (ArgumentException exception)
@@ -69,6 +75,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
             catch (InvalidOperationException exception)
             {
                 return Problem(detail: exception.Message, statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -80,12 +90,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> DeleteAll()
+        public async Task<IActionResult> DeleteAll(CancellationToken cancellationToken)
         {
             try
             {
-                await _hslocManager.DeleteAll();
+                await _hslocManager.DeleteAll(cancellationToken);
                 return NoContent();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -98,7 +112,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> DeleteByVersion(string version)
+        public async Task<IActionResult> DeleteByVersion(string version, CancellationToken cancellationToken)
         {
             version = version.SanitizeAndRemove();
 
@@ -109,8 +123,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
             try
             {
-                await _hslocManager.DeleteByVersion(version);
+                await _hslocManager.DeleteByVersion(version, cancellationToken);
                 return NoContent();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -123,7 +141,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> DeleteById(Guid id)
+        public async Task<IActionResult> DeleteById(Guid id, CancellationToken cancellationToken)
         {
             if (id == Guid.Empty)
             {
@@ -132,8 +150,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
             try
             {
-                await _hslocManager.DeleteById(id);
+                await _hslocManager.DeleteById(id, cancellationToken);
                 return NoContent();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {

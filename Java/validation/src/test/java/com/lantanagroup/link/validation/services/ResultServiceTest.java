@@ -1,9 +1,11 @@
 package com.lantanagroup.link.validation.services;
 
+import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.models.CategoryIssueModel;
 import com.lantanagroup.link.validation.models.CategorySummaryModel;
+import com.lantanagroup.link.validation.models.ResultSummaryModel;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +60,23 @@ public class ResultServiceTest {
         assertFalse(results.contains(result3)); // INFORMATION is less severe than WARNING
 
         verify(resultRepository).findAllByFacilityIdAndReportId(FACILITY_ID, REPORT_ID);
+    }
+
+    @Test
+    void summarizeReportResults_countsInTheDatabaseAndDoesNotLoadRows() {
+        when(resultRepository.countByFacilityIdAndReportIdAndSeverityIn(
+                eq(FACILITY_ID),
+                eq(REPORT_ID),
+                eq(IssueSeverityUtils.atLeastAsSevere(OperationOutcome.IssueSeverity.WARNING))))
+                .thenReturn(6010L);
+
+        ResultSummaryModel summary = resultService.summarizeReportResults(
+                FACILITY_ID, REPORT_ID, OperationOutcome.IssueSeverity.WARNING);
+
+        assertEquals(6010L, summary.getCount());
+        assertEquals("WARNING", summary.getSeverity());
+        verify(resultRepository, never()).findAllByFacilityIdAndReportId(any(), any());
+        verify(resultRepository, never()).findAllByFacilityIdAndReportIdAndPatientId(any(), any(), any());
     }
 
     @Test

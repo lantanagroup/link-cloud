@@ -4,10 +4,16 @@
 Configuration store. Nothing enforced that, so the catalog accumulated entries no environment
 satisfied and nobody noticed. This is the gate.
 
-LEGLINK-775 will make an Azure pipeline import Config/app-config.*.json into the stores, at
-which point these files stop being a record of deployed configuration and start being its
-source. A missing required key then becomes a deployment defect rather than a documentation
-one, which is why this runs on every PR.
+The exports it checks against live in the private `link-cac` repository (LEGLINK-912 moved them
+out of this public one); config_key_matching.default_config_dir decides where to look.
+
+LEGLINK-775 will make an Azure pipeline import those exports into the stores, at which point
+they stop being a record of deployed configuration and start being its source. A missing
+required key then becomes a deployment defect rather than a documentation one, which is why
+this runs on every PR - but in link-cac's CI, not this repository's. It reports store rows
+absent from the catalog and the labels they carry, and Actions logs on a public repository are
+world-readable, so running it here would publish private key names. Run it by hand before
+merging a catalog change; nothing in this repository's CI will.
 
 Deciding whether a key is "present" is not a string comparison - Java keys are stored in slash
 notation, arrays are stored element-by-element, some rows are JSON blobs the provider flattens,
@@ -31,7 +37,7 @@ Checks:
          sensitive is held as a literal in every store. The store resolving a Key Vault
          reference is the environment declaring the value a secret, so the two can be held
          in step. The second direction is the one that matters: a credential written as a
-         literal lands in a file committed to a public repository.
+         literal lands in git history, which no repository's visibility undoes.
 
   WARN   A key served from Key Vault has no catalog entry at all. A value in Key Vault is
          per-environment with no safe default, which is exactly the catalog's admission rule.
@@ -43,8 +49,9 @@ Checks:
 Exit code is 0 when no errors are found (and, with --strict, no warnings either).
 
 Usage:
-    python Scripts/AzureAppConfig/check_required_config.py
+    python Scripts/AzureAppConfig/check_required_config.py            # link-cac cloned as a sibling
     python Scripts/AzureAppConfig/check_required_config.py --strict
+    python Scripts/AzureAppConfig/check_required_config.py --config-dir <path-to>/link-cac/Config
 """
 
 import argparse
@@ -62,7 +69,6 @@ import config_key_matching as matching
 from config_findings import ERROR, WARN, Finding
 
 DEFAULT_CATALOG = "app-config.yaml"
-DEFAULT_CONFIG_DIR = "Config"
 
 SERILOG_SINK_RE = re.compile(r"^Serilog:WriteTo:(\d+):")
 GRAFANA_SINK = "GrafanaLoki"
@@ -249,7 +255,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Verify required catalog keys exist in every environment store.")
     parser.add_argument("--catalog", default=DEFAULT_CATALOG)
-    parser.add_argument("--config-dir", default=DEFAULT_CONFIG_DIR)
+    parser.add_argument("--config-dir", default=matching.default_config_dir(),
+                        help="Where link-cac's exports are (default: %(default)s; "
+                             "also settable with LINK_CAC_CONFIG_DIR)")
     parser.add_argument("--environments", nargs="*", default=None,
                         help="Override the environments declared in the catalog.")
     parser.add_argument("--strict", action="store_true", help="Treat warnings as errors")

@@ -2,6 +2,8 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,11 +18,16 @@ public class ConnectionValidationController : Controller
 {
     private readonly ILogger<ConnectionValidationController> _logger;
     private readonly IValidateFacilityConnectionService _validateFacilityConnectionService;
+    private readonly IValidateFhirServerConnectionService _validateFhirServerConnectionService;
 
-    public ConnectionValidationController(ILogger<ConnectionValidationController> logger, IValidateFacilityConnectionService validateFacilityConnectionService)
+    public ConnectionValidationController(
+        ILogger<ConnectionValidationController> logger,
+        IValidateFacilityConnectionService validateFacilityConnectionService,
+        IValidateFhirServerConnectionService validateFhirServerConnectionService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _validateFacilityConnectionService = validateFacilityConnectionService ?? throw new ArgumentNullException(nameof(validateFacilityConnectionService));
+        _validateFhirServerConnectionService = validateFhirServerConnectionService ?? throw new ArgumentNullException(nameof(validateFhirServerConnectionService));
     }
 
     /// <summary>
@@ -112,5 +119,61 @@ public class ConnectionValidationController : Controller
         }
 
         return Problem("Something went wrong. Please contact an administrator.", statusCode: StatusCodes.Status500InternalServerError);
+    }
+
+    /// <summary>
+    /// Validates connectivity to a FHIR server using only a server URL, without requiring an existing facility configuration.
+    /// </summary>
+    /// <param name="fhirServerUrl">The base URL of the FHIR server to validate connectivity against.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Missing or invalid fhirServerUrl: 400
+    ///     Unable to connect to the provided FHIR server URL: 502
+    ///     Server Error: 500
+    /// </returns>
+    [HttpGet("$validate")]
+    [ProducesResponseType(typeof(FhirServerConnectionResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult<FhirServerConnectionResult>> ValidateFhirServerConnection(
+        [FromQuery] string fhirServerUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var sanitizedFhirServerUrl = fhirServerUrl.Sanitize();
+
+        if (!ConnectionValidationRequestValidator.ValidateFhirServerUrl(sanitizedFhirServerUrl, out var errorMessage))
+        {
+            return Problem(errorMessage, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var result = await _validateFhirServerConnectionService.ValidateConnection(new ValidateFhirServerConnectionRequest
+            {
+                FhirServerUrl = sanitizedFhirServerUrl
+            }, cancellationToken);
+
+            return Ok(result);
+        }
+        catch (BadRequestException ex)
+        {
+            return Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (FhirConnectionFailedException ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "ValidateFhirServerConnection"), ex, "Unable to connect to FHIR server {FhirServerUrl}", sanitizedFhirServerUrl.SanitizeForLog());
+            return Problem($"Unable to connect to the provided FHIR server URL.\nerrorMessage: {ex.Message}", statusCode: StatusCodes.Status502BadGateway);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(new EventId(LoggingIds.GetItem, "ValidateFhirServerConnection"), ex, "An exception occurred in ValidateFhirServerConnection");
+            return Problem($"An error occurred while validating the connection.\nerror:\n{ex.Message}\nInnerException:\n{ex.InnerException}", statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
 }

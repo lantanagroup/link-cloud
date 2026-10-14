@@ -21,6 +21,8 @@ public class PipelineDataReader
     // MilestoneValidationOrchestrator, StoreBackedServicePoller,
     // PipelineSnapshot) into a single call per TTL window.
     // ---------------------------------------------------------------
+    // Metrics-run pollers share this 8s window with diagnostics so five domains
+    // at 5s do not multiply HTTP. Lightweight runs poll schedule-only at 15s.
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(8);
 
     private readonly ConcurrentDictionary<string, (object? Value, DateTime ExpiresAt)> _cache = new();
@@ -93,7 +95,15 @@ public class PipelineDataReader
 
     public record MeasureReportInfo(string? MeasureReportId, string? Status, string? ReportType, List<ResourceCountInfo> ResourceCounts);
     public record ResourceCountInfo(string ResourceType, int ResourceCount);
-    public record ReportEntryInfo(Guid Id, string? FacilityId, string PatientId, string? ReportingStatus, string? SubmissionStatus, List<MeasureReportInfo> MeasureReports);
+    public record ReportEntryInfo(
+        Guid Id,
+        string? FacilityId,
+        string PatientId,
+        string? ReportingStatus,
+        string? SubmissionStatus,
+        List<MeasureReportInfo> MeasureReports,
+        DateTime? CreateDate = null,
+        DateTime? ModifyDate = null);
     public record EntryMeasureReportInfo(Guid Id, string? ReportType, string? MeasureReportId, string? Status, string PatientId, List<ResourceCountInfo> ResourceCounts);
     public record ScheduleReportTypeInfo(string ReportType);
     public record ReportPopulationInfo(string? ReportType, List<GroupPopulationInfo> GroupPopulations);
@@ -109,7 +119,12 @@ public class PipelineDataReader
         string? QueryPhase,
         List<string> Notes,
         List<string> ResourceAcquiredIds,
-        List<FhirQueryInfo> FhirQueries);
+        List<FhirQueryInfo> FhirQueries,
+        DateTime? ExecutionDate = null,
+        DateTime? CreateDate = null,
+        DateTime? CompletionDate = null,
+        long? CompletionTimeMilliseconds = null,
+        List<string>? ResourceTypes = null);
 
     public record StatusCountInfo(string Status, int Count);
     public record ResourceTypeCountInfo(string ResourceType, int Count);
@@ -137,7 +152,7 @@ public class PipelineDataReader
     public record EncounterLocationInfo(string? LocationId);
     public record EncounterMappingInfo(string? FacilityId, string? PatientId, string? EncounterId, bool MappedToOrg, List<EncounterLocationInfo> EncounterLocations);
 
-    public Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
+    public virtual Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
     {
         return GetOrFetchAsync($"schedule:{scheduleId}", async () =>
         {
@@ -164,7 +179,7 @@ public class PipelineDataReader
     public Task<List<ReportEntryInfo>> GetReportEntriesAsync(Guid scheduleId)
         => GetReportEntriesWithMeasureReportsAsync(scheduleId);
 
-    public async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId)
+    public virtual async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId)
     {
         var result = await GetOrFetchAsync($"entries:{scheduleId}", async () =>
         {
@@ -187,7 +202,9 @@ public class PipelineDataReader
                     e.PatientId,
                     e.ReportingStatus.ToString(),
                     e.SubmissionStatus?.ToString(),
-                    mrs);
+                    mrs,
+                    e.CreateDate,
+                    e.ModifyDate);
             }).ToList();
         });
 
@@ -327,7 +344,12 @@ public class PipelineDataReader
                 log.QueryPhase?.ToString(),
                 log.Notes?.ToList() ?? [],
                 log.ResourceAcquiredIds?.ToList() ?? [],
-                log.FhirQuery.Select(fq => new FhirQueryInfo(fq.ResourceTypes.Where(r => !string.IsNullOrWhiteSpace(r)).ToList())).ToList())));
+                (log.FhirQuery ?? []).Select(fq => new FhirQueryInfo(fq.ResourceTypes.Where(r => !string.IsNullOrWhiteSpace(r)).ToList())).ToList(),
+                log.ExecutionDate,
+                log.CreateDate,
+                log.CompletionDate,
+                log.CompletionTimeMilliseconds,
+                log.ResourceTypes?.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [])));
 
             if (records.Count < pageSize)
                 break;
@@ -389,7 +411,7 @@ public class PipelineDataReader
     public async Task<List<QueryPlanInfo>> GetQueryPlansAsync(string facilityId)
     {
         var list = new List<QueryPlanInfo>();
-        foreach (var type in new[] { "Discharge", "Monthly" })
+        foreach (var type in new[] { "Discharge", "Daily", "Monthly", "Weekly" })
         {
             var response = await _dataAcqClient.GetQueryPlanAsync(facilityId, type);
             if (response.IsSuccessStatusCode)
@@ -547,57 +569,22 @@ public class PipelineDataReader
 
     public async Task<List<PatientResourceTypeCount>> GetDataAcquisitionResourceCountsByPatientTypeAsync(string facilityId, string reportId)
     {
-        var counts = new Dictionary<(string PatientId, string ResourceType), int>();
+        var counts = await GetDataAcquisitionResourceCountsByPatientTypeCoreAsync(facilityId, reportId);
+        if (counts.Count > 0 || string.IsNullOrWhiteSpace(facilityId))
+            return counts;
 
-        var pageNumber = 1;
-        const int pageSize = 100;
-        long scanned = 0;
-        long? totalCount = null;
+        return await GetDataAcquisitionResourceCountsByPatientTypeCoreAsync(string.Empty, reportId);
+    }
 
-        while (true)
-        {
-            var response = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
-            var page = response.Body;
-            var records = page?.Records ?? [];
-            if (records.Count == 0)
-                break;
+    private async Task<List<PatientResourceTypeCount>> GetDataAcquisitionResourceCountsByPatientTypeCoreAsync(string facilityId, string reportId)
+    {
+        var response = await _dataAcqClient.GetAcquiredResourceCountsByPatientAsync(facilityId, reportId);
+        if (!response.IsSuccessStatusCode || response.Body == null)
+            return [];
 
-            totalCount ??= page?.Metadata?.TotalCount;
-            scanned += records.Count;
-
-            foreach (var record in records)
-            {
-                var detailed = await GetAcquisitionLogByIdAsync(record.Id);
-                if (string.IsNullOrWhiteSpace(detailed?.PatientId))
-                    continue;
-
-                foreach (var resourceId in detailed.ResourceAcquiredIds ?? [])
-                {
-                    if (string.IsNullOrWhiteSpace(resourceId) || !resourceId.Contains('/'))
-                        continue;
-
-                    var resourceType = resourceId.Split('/')[0];
-                    if (string.IsNullOrWhiteSpace(resourceType))
-                        continue;
-
-                    var key = (detailed.PatientId!, resourceType);
-                    counts[key] = counts.TryGetValue(key, out var current)
-                        ? current + 1
-                        : 1;
-                }
-            }
-
-            if (records.Count < pageSize)
-                break;
-
-            if (totalCount.HasValue && scanned >= totalCount.Value)
-                break;
-
-            pageNumber++;
-        }
-
-        return counts
-            .Select(kvp => new PatientResourceTypeCount(kvp.Key.PatientId, kvp.Key.ResourceType, kvp.Value))
+        return response.Body
+            .Where(row => !string.IsNullOrWhiteSpace(row.PatientId) && !string.IsNullOrWhiteSpace(row.ResourceType))
+            .Select(row => new PatientResourceTypeCount(row.PatientId, row.ResourceType, row.Count))
             .ToList();
     }
 
