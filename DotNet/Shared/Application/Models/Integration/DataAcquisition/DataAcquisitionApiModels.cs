@@ -15,6 +15,8 @@ public class DataAcquisitionLogApiModel
     public int? RetryAttempts { get; set; }
     public RequestStatus? Status { get; set; }
     public QueryPhase? QueryPhase { get; set; }
+    public DateTime? ExecutionDate { get; set; }
+    public DateTime? CreateDate { get; set; }
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
     public bool IsReferenceLog { get; set; }

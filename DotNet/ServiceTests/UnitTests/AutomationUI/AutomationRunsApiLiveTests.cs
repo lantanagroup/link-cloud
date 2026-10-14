@@ -109,5 +109,9 @@ public class AutomationRunsApiLiveTests
         => new(
             manager.Object,
             Mock.Of<IScenarioStore>(),
+            new MetricsRunPresenter(
+                Mock.Of<IRunMetricsStore>(),
+                manager.Object,
+                Mock.Of<IScenarioStore>()),
             NullLogger<AutomationRunsApiController>.Instance);
 }

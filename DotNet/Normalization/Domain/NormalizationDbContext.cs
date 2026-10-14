@@ -20,6 +20,10 @@ public partial class NormalizationDbContext : DbContext
     public virtual DbSet<OperationSequence> OperationSequences { get; set; }
     public virtual DbSet<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
     public virtual DbSet<HSLOC> HSLOCS { get; set; }
+    public virtual DbSet<FacilityLocation> FacilityLocations { get; set; }
+    public virtual DbSet<FacilityLocationLocalCodeMapping> FacilityLocationLocalCodeMappings { get; set; }
+    public virtual DbSet<OperationSequenceCacheRevision> OperationSequenceCacheRevisions { get; set; }
+    public virtual DbSet<OperationSequenceWriteLock> OperationSequenceWriteLocks { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +74,34 @@ public partial class NormalizationDbContext : DbContext
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.HasIndex(e => new { e.Version, e.HSLOCCode }).IsUnique();
+        });
+
+        modelBuilder.Entity<FacilityLocation>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.HasIndex(e => new { e.FacilityId, e.LocationId }).IsUnique();
+            entity.HasOne(e => e.ParentFacilityLocation).WithMany().HasForeignKey(e => e.ParentFacilityLocationId).HasConstraintName("FK_FacilityLocation_ParentFacilityLocation");
+        });
+
+        modelBuilder.Entity<FacilityLocationLocalCodeMapping>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.HasIndex(e => new { e.FacilityLocationId, e.LocalCodeSystem, e.LocalCode }).IsUnique();
+            entity.HasOne(d => d.FacilityLocation).WithMany(p => p.FacilityLocationLocalCodeMappings).HasConstraintName("FK_FacilityLocationLocalCodeMapping_FacilityLocation");
+            entity.HasOne(d => d.HSLOC).WithMany().HasConstraintName("FK_FacilityLocationLocalCodeMapping_HSLOC");
+        });
+
+        modelBuilder.Entity<OperationSequenceCacheRevision>(entity =>
+        {
+            entity.HasKey(e => e.FacilityId);
+            entity.Property(e => e.FacilityId).HasMaxLength(255).IsUnicode(false);
+            entity.Property(e => e.Revision).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<OperationSequenceWriteLock>(entity =>
+        {
+            entity.HasKey(e => e.FacilityId);
+            entity.Property(e => e.FacilityId).HasMaxLength(255).IsUnicode(false);
         });
 
         // Adds Quartz.NET SqlServer schema to EntityFrameworkCore

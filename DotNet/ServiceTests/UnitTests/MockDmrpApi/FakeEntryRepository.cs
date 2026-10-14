@@ -167,7 +167,6 @@ public class FakeEntryRepository : IBaseEntityRepository<ReportingPlanEntryEntit
     public ReportingPlanEntryEntity Update(ReportingPlanEntryEntity entity) => throw new NotSupportedException();
     public void Delete(object id) => throw new NotSupportedException();
     public Task DeleteAsync(object id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<HealthCheckResult> HealthCheck(int eventId) => throw new NotSupportedException();
     public void StartTransaction() => throw new NotSupportedException();
     public void CommitTransaction() => throw new NotSupportedException();
     public void RollbackTransaction() => throw new NotSupportedException();

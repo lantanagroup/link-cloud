@@ -21,5 +21,9 @@ public sealed class ApiHealthRunDocument
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset StartedAt { get; set; }
 
+    /// <summary>
+    /// Legacy embedded endpoint results retained for compatibility with existing API Health history.
+    /// New results are persisted separately.
+    /// </summary>
     public List<ApiTestRunResult> EndpointResults { get; set; } = [];
 }

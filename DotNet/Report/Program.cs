@@ -27,7 +27,9 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Swagger;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
@@ -45,7 +47,6 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
-ConfigureLogging(builder);
 RegisterServices(builder);
 var app = builder.Build();
 SetupMiddleware(app);
@@ -132,6 +133,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>, KafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -145,6 +147,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<Null, MeasureReportGeneratedValue>, KafkaProducerFactory<Null, MeasureReportGeneratedValue>>();
 
+    // The MappingOutcomeEvaluated dead-letter handler republishes with the consumed key type.
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
+
+    // Required by the typed dead-letter and transient handlers on MappingOutcomeListener: both take an
+    // IKafkaProducerFactory<K, V> to republish onto the -Error and -Retry topics. Without it the listener
+    // cannot be constructed and the service fails at startup.
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+
     builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
@@ -157,6 +167,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
+    builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
+
+    builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     builder.Services.AddLinkBearerServiceAuthentication(options =>
@@ -178,7 +191,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, serviceInformation.ServiceConfigName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<ReportDbContext>>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddEndpointsApiExplorer();
@@ -216,6 +229,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
         c.DocumentFilter<HealthChecksFilter>();
+
+        // IncludeXmlComments documents types, methods and properties but never enum members, so an enum
+        // reaches the spec as a bare list of integers. This adds their names and documentation.
+        c.SchemaFilter<EnumDescriptionSchemaFilter>();
     });
 
 
@@ -226,6 +243,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
             KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
             KafkaTopic.ValidationCompleteRetry.GetStringValue(),
+            KafkaTopic.MappingOutcomeEvaluatedRetry.GetStringValue(),
         ]));
 
     builder.Services.AddHostedService<RetryScheduleService>();
@@ -236,6 +254,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ValidationCompleteListener>();
     builder.Services.AddHostedService<PayloadSubmittedListener>();
     builder.Services.AddHostedService<MeasureReportGeneratedListener>();
+    builder.Services.AddHostedService<MappingOutcomeListener>();
 
     builder.Services.AddTransient<PatientAggregator>();
     builder.Services.AddTransient<MeasureReportAggregator>();
@@ -253,6 +272,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
+
+    ConfigureLogging(builder);
 
     builder.Services.AddLinkCorsService(options =>
     {

@@ -64,15 +64,19 @@ These live in [`AzureAppConfig/`](AzureAppConfig/README.md), which documents the
 the catalog checks, the key inventory and the secret scanning. Run them from the repository
 root. Exit codes are uniform across the checks: `0` clean, `1` findings, `2` inputs unusable.
 
+The catalog (`app-config.yaml`) is here, but the per-environment **exports these read are in
+the private `lantanagroup/link-cac` repository**. They default to a sibling clone at
+`../link-cac/Config`; override with `LINK_CAC_CONFIG_DIR` or `--config-dir`.
+
 | Script | Purpose |
 |---|---|
-| `export-appconfigs.bat` | Exports a store to the committed `Config/app-config.<env>.json` shape. |
+| `export-appconfigs.bat` | Exports a store to the `app-config.<env>.json` shape committed in `link-cac`. |
 | `compare_aac_exports.py` | Diffs two exports. |
 | `validate_aac_secrets.py` | Fails if an export carries a credential. Stdlib only. |
 | `validate_app_config_schema.py` | Validates `app-config.yaml` against the schema embedded in itself. |
 | `check_required_config.py` | **The CI gate** — every `required: true` key has a row in every store. |
 | `reconcile_config_catalog.py` | Where the catalog, the code and the stores disagree, in four buckets. |
-| `apply_appconfig_tags.py` | Tags export rows with their consuming services. Writes to `Config/` only, never to Azure. |
+| `apply_appconfig_tags.py` | Tags export rows with their consuming services. Writes to `link-cac`'s exports only, never to Azure. |
 | `extract_config_keys.py` | Derives the keys the code actually reads; produces the inventory. |
 | `dump_config_symbols.cs` | Roslyn symbol dump feeding the above. Run with `dotnet run --file`. |
 | `config_key_matching.py` | Shared rules for "is this key present in a store". |

@@ -5,6 +5,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Models.Terminology;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
@@ -292,7 +293,8 @@ public class CodeGroupCacheService(
 
         // Read the JSON file and parse it as a FHIR resource
         var jsonContent = await ReadAllTextAsync(jsonFilePath);
-        codeGroup.Resource = new FhirJsonParser().Parse<Resource>(jsonContent);
+        codeGroup.Resource = new FhirJsonDeserializer(new DeserializerSettings().UsingMode(DeserializationMode.Ostrich))
+            .Deserialize<Resource>(jsonContent);
 
         if (codeGroup.Resource is CodeSystem codeSystem)
         {
@@ -460,6 +462,12 @@ public class CodeGroupCacheService(
 
         LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
         LogInvalidStatusWarning(statusParser, codeGroup.Id);
+
+        // Built before the cache swap, not after. The de-duplication behind CodeGroup.DistinctConcepts
+        // is O(codes) and would otherwise be paid by whichever request first read the group
+        // (LEGLINK-968). Building it here also respects the rule below that nothing after
+        // SetCodeGroup may throw, since the build is the part that allocates.
+        codeGroup.PrewarmConceptIndex();
 
         SetCodeGroup(codeGroup);
 

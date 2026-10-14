@@ -1,4 +1,4 @@
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
@@ -24,6 +24,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -55,6 +56,7 @@ namespace IntegrationTests.Normalization
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredDeadLetterHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> ConsumeExceptionHandlerMock { get; } = new();
         public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; } = new();
+        public Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> MappingOutcomeProducerMock { get; } = new();
         public Mock<IVendorVersionResolver> VendorVersionResolverMock { get; } = new();
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
@@ -98,6 +100,7 @@ namespace IntegrationTests.Normalization
             builder.Services.AddSingleton<CopyLocationOperationService>();
             builder.Services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();
             builder.Services.AddSingleton<CodeMapOperationService>();
+            builder.Services.AddSingleton<HSLOCMapOperationService>();
             builder.Services.AddSingleton<ConditionalTransformOperationService>();
             builder.Services.AddSingleton<RemoveExtensionsOperationService>();
 
@@ -119,6 +122,11 @@ namespace IntegrationTests.Normalization
             builder.Services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, LantanaGroup.Link.Normalization.Domain.Database>();
             builder.Services.AddScoped<IOperationManager, OperationManager>();
             builder.Services.AddScoped<IResourceManager, LantanaGroup.Link.Normalization.Domain.Managers.ResourceManager>();
+            builder.Services.AddScoped<IFacilityLocationManager, FacilityLocationManager>();
+            builder.Services.AddScoped<IFacilityLocationLocalCodeMappingManager, FacilityLocationLocalCodeMappingManager>();
+            builder.Services.AddScoped<IFacilityLocationLocalCodeMappingQueries, FacilityLocationLocalCodeMappingQueries>();
+            builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
+            builder.Services.AddSingleton<IHSLOCLookupCache, HSLOCLookupCache>();
             builder.Services.AddScoped<IVendorVersionOperationPresetManager, VendorVersionOperationPresetManager>();
             builder.Services.AddScoped<IOperationQueries, OperationQueries>();
             builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
@@ -143,6 +151,7 @@ namespace IntegrationTests.Normalization
             builder.Services.AddSingleton(ResourcesAcquiredTransientHandlerMock.Object);
             builder.Services.AddSingleton(ConsumeExceptionHandlerMock.Object);
             builder.Services.AddSingleton(ResourcesNormalizedProducerMock.Object);
+            builder.Services.AddSingleton(MappingOutcomeProducerMock.Object);
             
             builder.Services.AddTransient<ResourcesAcquiredListener>();
             builder.Services.AddSingleton(TimeProvider.System);

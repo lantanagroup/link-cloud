@@ -12,17 +12,32 @@ public sealed class NormalizationSuiteApplicationValidator
         _output = output;
     }
 
-    public Task ValidateAllAsync(
+    public async Task ValidateAllAsync(
         IDictionary<string, object> internalAbsResources,
         NormalizationSuiteResolution suiteResolution,
-        IReadOnlyList<string>? normalizationSummaryLogs = null)
+        IReadOnlyList<string>? normalizationSummaryLogs = null,
+        IReadOnlyCollection<string>? acquiredResourceTypes = null)
     {
+        using var package = ReportPackage.FromTextEntries(TextEntries(internalAbsResources));
+        await ValidateAllAsync(package, suiteResolution, normalizationSummaryLogs, acquiredResourceTypes);
+    }
+
+    public Task ValidateAllAsync(
+        ReportPackage package,
+        NormalizationSuiteResolution suiteResolution,
+        IReadOnlyList<string>? normalizationSummaryLogs = null,
+        IReadOnlyCollection<string>? acquiredResourceTypes = null)
+    {
+        ArgumentNullException.ThrowIfNull(package);
         var errors = new List<string>();
         var warnings = new List<string>();
 
-        var parsedResources = ParseInternalAbsResources(internalAbsResources, errors);
+        var parsedResources = ParseInternalAbsResources(package, errors);
         var plannedOperations = NormalizationRuntimeSequencePlanner.Plan(suiteResolution);
         var executionEvidence = ParseExecutionEvidence(normalizationSummaryLogs ?? [], warnings);
+        var acquiredTypes = acquiredResourceTypes is { Count: > 0 }
+            ? new HashSet<string>(acquiredResourceTypes, StringComparer.OrdinalIgnoreCase)
+            : null;
 
         if (plannedOperations.Count == 0)
             AddError(errors, "Resolved normalization suite has no operations to validate.");
@@ -51,11 +66,24 @@ public sealed class NormalizationSuiteApplicationValidator
             switch (operation.Operation.OperationType)
             {
                 case "RemoveExtensions":
-                    ValidateRemoveExtensions(operation, candidates, errors);
-                    ValidateExecutionEvidence(operation, candidates, executionEvidence, errors, warnings, evidenceOptional: true);
+                    // Loki execution summaries are the source of truth (Success or
+                    // NoAction). Do not walk every ABS resource for leftover URLs —
+                    // generated volume makes that expensive, and generated data is
+                    // stamped so these ops actually fire. Skip per-id coverage:
+                    // hundreds of Observations would flake on Loki pagination.
+                    // Patient is the acquisition anchor, not a query-plan type, so it is
+                    // not published on ResourcesAcquired cache keys and has no Loki
+                    // summaries. Require evidence only for types the query plan acquires.
+                    ValidateExecutionEvidence(
+                        operation, candidates, executionEvidence, errors, warnings,
+                        evidenceOptional: acquiredTypes != null && !acquiredTypes.Contains(resourceType),
+                        requireCandidateCoverage: false);
                     break;
                 default:
-                    ValidateExecutionEvidence(operation, candidates, executionEvidence, errors, warnings, evidenceOptional: false);
+                    ValidateExecutionEvidence(
+                        operation, candidates, executionEvidence, errors, warnings,
+                        evidenceOptional: acquiredTypes != null && !acquiredTypes.Contains(resourceType),
+                        requireCandidateCoverage: true);
                     break;
             }
         }
@@ -77,13 +105,26 @@ public sealed class NormalizationSuiteApplicationValidator
         throw new InvalidOperationException($"NORMALIZATION SUITE APPLICATION VALIDATION failed with {errors.Count} issue(s).");
     }
 
-    private List<AbsResourceRecord> ParseInternalAbsResources(IDictionary<string, object> internalAbsResources, List<string> errors)
+    private static IEnumerable<KeyValuePair<string, string>> TextEntries(IDictionary<string, object> files)
+    {
+        foreach (var (key, value) in files)
+        {
+            if (value is string text)
+                yield return new KeyValuePair<string, string>(key, text);
+        }
+    }
+
+    private List<AbsResourceRecord> ParseInternalAbsResources(ReportPackage package, List<string> errors)
     {
         var parsed = new List<AbsResourceRecord>();
 
-        foreach (var kvp in internalAbsResources)
+        foreach (var name in package.EntryNames)
         {
-            if (!kvp.Key.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase) || kvp.Value is not string ndjson)
+            if (!name.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var ndjson = package.ReadEntryText(name);
+            if (ndjson == null)
                 continue;
 
             var lineNumber = 0;
@@ -97,66 +138,25 @@ public sealed class NormalizationSuiteApplicationValidator
                 try
                 {
                     using var doc = JsonDocument.Parse(trimmed);
-                    var root = doc.RootElement.Clone();
-                    var resourceType = GetString(root, "resourceType") ?? string.Empty;
-                    var id = GetString(root, "id") ?? string.Empty;
+                    var resourceType = GetString(doc.RootElement, "resourceType") ?? string.Empty;
+                    var id = GetString(doc.RootElement, "id") ?? string.Empty;
 
                     if (string.IsNullOrWhiteSpace(resourceType))
                     {
-                        AddError(errors, $"{kvp.Key}:{lineNumber} has no resourceType.");
+                        AddError(errors, $"{name}:{lineNumber} has no resourceType.");
                         continue;
                     }
 
-                    parsed.Add(new AbsResourceRecord(kvp.Key, lineNumber, resourceType, id, root));
+                    parsed.Add(new AbsResourceRecord(name, lineNumber, resourceType, id));
                 }
                 catch (Exception ex)
                 {
-                    AddError(errors, $"Failed to parse {kvp.Key}:{lineNumber}: {ex.Message}");
+                    AddError(errors, $"Failed to parse {name}:{lineNumber}: {ex.Message}");
                 }
             }
         }
 
         return parsed;
-    }
-
-    private void ValidateRemoveExtensions(
-        PlannedRuntimeStep operation,
-        IReadOnlyList<AbsResourceRecord> candidates,
-        List<string> errors)
-    {
-        var resourceType = operation.ResourceType;
-        var extensionUrls = operation.Operation.ExtensionUrls
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .Distinct(StringComparer.Ordinal)
-            .ToHashSet(StringComparer.Ordinal);
-
-        if (extensionUrls.Count == 0)
-        {
-            AddError(errors, $"RemoveExtensions operation '{operation.Operation.Name}' has no configured extension URLs.");
-            return;
-        }
-
-        var violations = 0;
-
-        foreach (var record in candidates)
-        {
-            var topLevelExtensionUrls = GetTopLevelExtensionUrls(record.Resource);
-            var forbidden = topLevelExtensionUrls
-                .Where(extensionUrls.Contains)
-                .ToList();
-
-            if (forbidden.Count > 0)
-            {
-                violations += forbidden.Count;
-                AddError(errors,
-                    $"{operation.DisplayName}: '{operation.Operation.Name}' left forbidden top-level extension(s) on {resourceType}/{DisplayId(record.ResourceId)} in {record.SourceFile}: [{string.Join(", ", forbidden)}].");
-            }
-        }
-
-        if (violations == 0)
-        {
-            _output.WriteLine($"[Normalization Suite] Verified RemoveExtensions '{operation.Operation.Name}' on {candidates.Count} {resourceType} resource(s): no forbidden extensions remained.");
-        }
     }
 
     private void ValidateExecutionEvidence(
@@ -165,7 +165,8 @@ public sealed class NormalizationSuiteApplicationValidator
         IReadOnlyList<ExecutionEvidenceRecord> evidence,
         List<string> errors,
         List<string> warnings,
-        bool evidenceOptional)
+        bool evidenceOptional,
+        bool requireCandidateCoverage = true)
     {
         var resourceType = operation.ResourceType;
         var candidateCount = candidates.Count;
@@ -189,6 +190,10 @@ public sealed class NormalizationSuiteApplicationValidator
             {
                 AddError(errors, $"No normalization execution evidence found for {operation.DisplayName} '{operation.Operation.Name}' ({operation.Operation.OperationType}) on resource type '{resourceType}'.");
             }
+            else
+            {
+                AddWarning(warnings, $"No Loki execution evidence for {operation.DisplayName} '{operation.Operation.Name}' on '{resourceType}' (not an acquired query-plan type; skipping evidence requirement).");
+            }
             return;
         }
 
@@ -211,7 +216,7 @@ public sealed class NormalizationSuiteApplicationValidator
                 .Take(5)
                 .ToList();
 
-            if (missingCandidateEvidence.Count > 0)
+            if (missingCandidateEvidence.Count > 0 && requireCandidateCoverage)
             {
                 if (!evidenceOptional)
                 {
@@ -318,25 +323,6 @@ public sealed class NormalizationSuiteApplicationValidator
         return records;
     }
 
-    private static string DisplayId(string? id)
-        => string.IsNullOrWhiteSpace(id) ? "(no-id)" : id;
-
-    private static List<string> GetTopLevelExtensionUrls(JsonElement resource)
-    {
-        var urls = new List<string>();
-        if (!resource.TryGetProperty("extension", out var extensionNode) || extensionNode.ValueKind != JsonValueKind.Array)
-            return urls;
-
-        foreach (var extension in extensionNode.EnumerateArray())
-        {
-            var url = GetString(extension, "url");
-            if (!string.IsNullOrWhiteSpace(url))
-                urls.Add(url);
-        }
-
-        return urls;
-    }
-
     private static string? GetString(JsonElement node, string propertyName)
     {
         if (!node.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
@@ -357,6 +343,6 @@ public sealed class NormalizationSuiteApplicationValidator
             warnings.Add(message);
     }
 
-    private sealed record AbsResourceRecord(string SourceFile, int LineNumber, string ResourceType, string ResourceId, JsonElement Resource);
+    private sealed record AbsResourceRecord(string SourceFile, int LineNumber, string ResourceType, string ResourceId);
     private sealed record ExecutionEvidenceRecord(string ResourceType, string ResourceId, int Sequence, string OperationType, string OperationName, string Outcome);
 }

@@ -59,5 +59,10 @@
         /// Whether patient and correlation metric tags should be emitted.
         /// </summary>
         public bool PatientTags { get; set; } = false;
+
+        /// <summary>
+        /// Prometheus query base URL for run-end snapshots. Empty = skip Prom enrichment.
+        /// </summary>
+        public string? PrometheusQueryEndpoint { get; set; }
     }
 }

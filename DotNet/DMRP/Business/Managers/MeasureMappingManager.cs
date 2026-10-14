@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
     internal sealed class DuplicateMeasureMappingException : ApplicationException
     {
         public DuplicateMeasureMappingException(Exception innerException)
-            : base("A measure mapping with this measure and DQM already exists.", innerException)
+            : base("A measure mapping for this measure already exists.", innerException)
         {
         }
     }
@@ -72,8 +72,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         }
 
         private static bool IsUniqueIndexViolation(DbUpdateException exception) =>
-            exception.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 }
-            || exception.InnerException is SqlException { Number: 2601 or 2627 };
+            DuplicateMeasureMapping.Matches(exception);
 
         // Backstop for the window between the pre-check below and the delete. Which error the database
         // raises depends on EF's change tracker, not just the schema: with the dependent untracked the
@@ -183,7 +182,11 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete All Measure Mappings");
 
-            if (await _reportingPlanRepository.AnyAsync(_ => true, cancellationToken))
+            // Scoped to plans that actually reference a mapping, the same question the single-mapping
+            // delete above asks. A plan whose measure Link has no mapping for holds no foreign key, so
+            // it cannot be what stops a delete - and refusing on its account would leave a database of
+            // nothing but unmapped enrollments unable to clear its mappings at all.
+            if (await _reportingPlanRepository.AnyAsync(p => p.MeasureMappingId != null, cancellationToken))
             {
                 _logger.LogInformation(
                     "Measure mappings are referenced by facility reporting plans and none were deleted");

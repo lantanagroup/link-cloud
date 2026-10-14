@@ -13,10 +13,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
     public interface IHSLOCManager
     {
-        Task Update(string oldVersion, string newVersion, Stream csv);
-        Task DeleteAll();
-        Task DeleteByVersion(string version);
-        Task DeleteById(Guid id);
+        Task Update(string oldVersion, string newVersion, Stream csv, CancellationToken cancellationToken = default);
+        Task DeleteAll(CancellationToken cancellationToken = default);
+        Task DeleteByVersion(string version, CancellationToken cancellationToken = default);
+        Task DeleteById(Guid id, CancellationToken cancellationToken = default);
     }
 
     public class HSLOCManager : IHSLOCManager
@@ -24,16 +24,25 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         private readonly NormalizationDbContext _dbContext;
         private readonly ILogger<HSLOCManager> _logger;
 
-        public HSLOCManager(NormalizationDbContext dbContext, ILogger<HSLOCManager> logger)
+        private readonly LantanaGroup.Link.Normalization.Domain.Queries.IHSLOCLookupCache _lookupCache;
+
+        public HSLOCManager(NormalizationDbContext dbContext, ILogger<HSLOCManager> logger,
+            LantanaGroup.Link.Normalization.Domain.Queries.IHSLOCLookupCache lookupCache)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _lookupCache = lookupCache;
         }
 
-        public async Task Update(string oldVersion, string newVersion, Stream csv)
+        public async Task Update(
+            string oldVersion,
+            string newVersion,
+            Stream csv,
+            CancellationToken cancellationToken = default)
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 ArgumentException.ThrowIfNullOrWhiteSpace(oldVersion);
                 ArgumentException.ThrowIfNullOrWhiteSpace(newVersion);
                 ArgumentNullException.ThrowIfNull(csv);
@@ -43,18 +52,24 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     throw new ArgumentException("The HSLOC CSV stream must be readable.", nameof(csv));
                 }
 
-                var importedRows = ParseCsv(csv);
+                var importedRows = ParseCsv(csv, cancellationToken);
                 var importedCodes = importedRows
                     .Select(row => row.HSLOCCode)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                 var oldRows = await _dbContext.HSLOCS
                     .Where(row => row.Version == oldVersion)
-                    .ToListAsync();
+                    .ToListAsync(cancellationToken);
+                if (oldRows.Count == 0 && await _dbContext.HSLOCS.AnyAsync(cancellationToken))
+                {
+                    throw new ArgumentException("The specified old HSLOC version does not exist.", nameof(oldVersion));
+                }
+
                 var oldRowsByCode = oldRows.ToDictionary(row => row.HSLOCCode, StringComparer.OrdinalIgnoreCase);
 
                 foreach (var importedRow in importedRows)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (oldRowsByCode.TryGetValue(importedRow.HSLOCCode, out var oldRow))
                     {
                         oldRow.CDCCode = importedRow.CDCCode;
@@ -79,10 +94,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 foreach (var oldRow in oldRows.Where(row => !importedCodes.Contains(row.HSLOCCode)))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     oldRow.IsActive = false;
                 }
 
-                await _dbContext.SaveChangesAsync();
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                _lookupCache.Invalidate();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -100,11 +121,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 : value;
         }
 
-        public async Task DeleteAll()
+        public async Task DeleteAll(CancellationToken cancellationToken = default)
         {
             try
             {
-                await _dbContext.HSLOCS.ExecuteDeleteAsync();
+                await _dbContext.HSLOCS.ExecuteDeleteAsync(cancellationToken);
+                _lookupCache.Invalidate();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -113,11 +139,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        public async Task DeleteByVersion(string version)
+        public async Task DeleteByVersion(string version, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _dbContext.HSLOCS.Where(q => q.Version == version).ExecuteDeleteAsync();
+                await _dbContext.HSLOCS.Where(q => q.Version == version).ExecuteDeleteAsync(cancellationToken);
+                _lookupCache.Invalidate();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -126,11 +157,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        public async Task DeleteById(Guid id)
+        public async Task DeleteById(Guid id, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _dbContext.HSLOCS.Where(q => q.Id == id).ExecuteDeleteAsync();
+                await _dbContext.HSLOCS.Where(q => q.Id == id).ExecuteDeleteAsync(cancellationToken);
+                _lookupCache.Invalidate();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -139,7 +175,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        private static List<HSLOC> ParseCsv(Stream csv)
+        private static List<HSLOC> ParseCsv(Stream csv, CancellationToken cancellationToken)
         {
             var expectedHeaders = new[]
             {
@@ -185,6 +221,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 while (!parser.EndOfData)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var fields = parser.ReadFields();
 
                     if (fields is null || fields.Length != headers.Length)

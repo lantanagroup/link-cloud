@@ -50,6 +50,9 @@ public class StartScenarioRequest : IValidatableObject
     /// </summary>
     public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [];
 
+    /// <summary>Measure template ids. Empty on legacy payloads; families then map to system templates.</summary>
+    public List<Guid> SelectedMeasureIds { get; set; } = [];
+
     public List<PatientCohortDefinition>? PatientCohorts { get; set; }
 
     /// <summary>
@@ -78,6 +81,11 @@ public class StartScenarioRequest : IValidatableObject
     public string? NhsnOrganizationId { get; set; }
 
     /// <summary>
+    /// When true, this run uses DMRP enrollment to derive its reporting schedule.
+    /// </summary>
+    public bool EnableDmrp { get; set; }
+
+    /// <summary>
     /// Optional query plan template ID. When set, the run uses this template's
     /// query plan instead of the built-in defaults. When null, the system default is used.
     /// </summary>
@@ -96,6 +104,13 @@ public class StartScenarioRequest : IValidatableObject
     /// </summary>
     public Guid? OrganizationResourceMapTemplateId { get; set; }
 
+    public FacilityConfigurationMode FacilityConfigurationMode { get; set; }
+
+    public Guid? FacilityTemplateId { get; set; }
+
+    /// <summary>Ala carte vendor. Empty means the run does not send a vendor.</summary>
+    public string? VendorName { get; set; }
+
     /// <summary>
     /// When true, a ScheduledReport run holds a short live window and accepts
     /// Admit/Discharge injections before finalizing the report.
@@ -105,6 +120,14 @@ public class StartScenarioRequest : IValidatableObject
     /// <summary>Live reporting window length in minutes (typically 5, 10, or 15).</summary>
     [Range(1, 60)]
     public int? ReportingWindowMinutes { get; set; }
+
+    public bool IsMetricsRun { get; set; }
+    public string? BenchmarkKey { get; set; }
+    [Range(1, int.MaxValue)]
+    public int? TargetDurationSeconds { get; set; }
+    [Range(1, 8)]
+    public int? Concurrency { get; set; }
+    public bool FailRunOnBenchmark { get; set; }
 
     /// <summary>
     /// Cross-field validation. Rejects inverted report windows
@@ -126,6 +149,7 @@ public class StartScenarioRequest : IValidatableObject
     public static StartScenarioRequest FromScenario(TestScenarioDefinition scenario) => new()
     {
         Scenario = AutomationScenarioKind.Custom,
+        ScenarioId = scenario.Id,
         ScenarioName = scenario.Name,
         RunConfigurationJson = SerializeScenarioConfiguration(scenario),
         ReportMethod = scenario.ReportMethod,
@@ -134,17 +158,27 @@ public class StartScenarioRequest : IValidatableObject
         CleanupServiceData = scenario.CleanupServiceData,
         CleanupFhirData = scenario.CleanupFhirData,
         SelectedMeasures = scenario.SelectedMeasures,
+        SelectedMeasureIds = [.. scenario.SelectedMeasureIds],
         PatientCohorts = scenario.PatientCohorts,
         ImportedPatientIds = scenario.ImportedPatientIds,
         ImportedPatientBundles = scenario.ImportedPatientBundles,
         ReportPeriodStart = scenario.ReportPeriodStart,
         ReportPeriodEnd = scenario.ReportPeriodEnd,
         NhsnOrganizationId = scenario.NhsnOrganizationId,
+        EnableDmrp = scenario.EnableDmrp,
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
         NormalizationSuiteId = scenario.NormalizationSuiteId,
         OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
+        FacilityConfigurationMode = scenario.FacilityConfigurationMode,
+        FacilityTemplateId = scenario.FacilityTemplateId,
+        VendorName = scenario.VendorName,
         IsLiveSimulation = scenario.IsLiveSimulation,
         ReportingWindowMinutes = scenario.ReportingWindowMinutes,
+        IsMetricsRun = scenario.IsMetricsRun,
+        BenchmarkKey = scenario.BenchmarkKey,
+        TargetDurationSeconds = scenario.TargetDurationSeconds,
+        Concurrency = scenario.Concurrency,
+        FailRunOnBenchmark = scenario.FailRunOnBenchmark,
     };
 
     private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)
