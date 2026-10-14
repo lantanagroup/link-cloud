@@ -1,6 +1,5 @@
 ﻿using HealthChecks.UI.Client;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -19,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -77,7 +77,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new QueryConfigConverter());
         options.JsonSerializerOptions.Converters.Add(new ParameterConverter());
         options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
-        options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
+        LinkFhirSerializerOptions.ConfigurePermissiveFhirDeserialization(options.JsonSerializerOptions);
     });
 
     //Add Hosted Services
