@@ -77,6 +77,14 @@ public sealed class OperationsServiceShapeTests
         using var production = JsonDocument.Parse(File.ReadAllText(Path.Combine(operations, "appsettings.json")));
         Assert.True(production.RootElement.GetProperty("KafkaOps").GetProperty("TwoPersonApproval").GetBoolean());
         Assert.Equal("SqlServer", production.RootElement.GetProperty("DatabaseProvider").GetString());
+
+        foreach (var local in new[] { "appsettings.Development.json", "appsettings.Docker.json" })
+        {
+            using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(operations, local)));
+            var kafkaOps = settings.RootElement.GetProperty("KafkaOps");
+            Assert.False(kafkaOps.GetProperty("TwoPersonApproval").GetBoolean(), local);
+            Assert.False(kafkaOps.GetProperty("RequireDifferentApprover").GetBoolean(), local);
+        }
     }
 
     [Fact]

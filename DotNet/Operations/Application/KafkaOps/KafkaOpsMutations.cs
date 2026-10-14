@@ -90,11 +90,13 @@ public sealed partial class KafkaOpsService
         if (!cluster.ControllerRolesKnown)
             throw new KafkaOpsRejectedException("Broker roles could not be read, so decommission is refused.");
         await EnsureNoReassignmentAsync(except, cancellationToken);
-        return BrokerMovePlanner.Decommission(
+        var plan = BrokerMovePlanner.Decommission(
             brokerId,
             cluster.Brokers.Select(broker => broker.Id).ToList(),
             await FactsAsync(cancellationToken),
             cluster.ControllerEligibleIds);
+        plan.SecondApproverRequired = _options.Value.SecondApprover;
+        return plan;
     }
 
     public async Task<ChangeRequestRecord> CreateDecommissionAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken)
@@ -111,7 +113,7 @@ public sealed partial class KafkaOpsService
 
         var json = ReassignmentJson.ForMoves(plan.Moves, brokerId, null);
         var original = OriginalAssignment(await FactsAsync(cancellationToken), plan.Moves);
-        return await SaveNewAsync(user, reason, correlationId, true, plan.Summary, cancellationToken, record =>
+        return await SaveNewAsync(user, reason, correlationId, _options.Value.SecondApprover, plan.Summary, cancellationToken, record =>
         {
             record.Kind = KafkaChangeKind.DecommissionBroker;
             record.Family = "broker-" + brokerId;
@@ -119,7 +121,6 @@ public sealed partial class KafkaOpsService
             record.ReassignmentJson = json;
             record.OriginalAssignmentJson = original;
             record.RebalanceName = KafkaRebalanceNames.For(record.Id);
-            record.SecondApproverRequired = true;
         });
     }
 
@@ -129,7 +130,9 @@ public sealed partial class KafkaOpsService
     private async Task<BrokerMovePlan> PlanRebalanceAsync(int brokerId, Guid? except, CancellationToken cancellationToken)
     {
         await EnsureNoReassignmentAsync(except, cancellationToken);
-        return BrokerMovePlanner.SpreadOnto(brokerId, await BrokerIdsAsync(cancellationToken), await FactsAsync(cancellationToken));
+        var plan = BrokerMovePlanner.SpreadOnto(brokerId, await BrokerIdsAsync(cancellationToken), await FactsAsync(cancellationToken));
+        plan.SecondApproverRequired = _options.Value.SecondApprover;
+        return plan;
     }
 
     public async Task<ChangeRequestRecord> CreateRebalanceAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken)
@@ -146,7 +149,7 @@ public sealed partial class KafkaOpsService
 
         var json = ReassignmentJson.ForMoves(plan.Moves, null, brokerId);
         var original = OriginalAssignment(await FactsAsync(cancellationToken), plan.Moves);
-        return await SaveNewAsync(user, reason, correlationId, true, plan.Summary, cancellationToken, record =>
+        return await SaveNewAsync(user, reason, correlationId, _options.Value.SecondApprover, plan.Summary, cancellationToken, record =>
         {
             record.Kind = KafkaChangeKind.Rebalance;
             record.Family = "broker-" + brokerId;
@@ -154,7 +157,6 @@ public sealed partial class KafkaOpsService
             record.ReassignmentJson = json;
             record.OriginalAssignmentJson = original;
             record.RebalanceName = KafkaRebalanceNames.For(record.Id);
-            record.SecondApproverRequired = true;
         });
     }
 
@@ -200,7 +202,7 @@ public sealed partial class KafkaOpsService
         if (string.IsNullOrWhiteSpace(target.RebalanceName) || string.IsNullOrWhiteSpace(target.OriginalAssignmentJson))
             throw new KafkaOpsRejectedException("This request has no reassignment to cancel.");
 
-        return await SaveNewAsync(user, "Cancel the in-flight reassignment.", null, true,
+        return await SaveNewAsync(user, "Cancel the in-flight reassignment.", null, _options.Value.SecondApprover,
             "Cancel the reassignment for " + target.RebalanceName + " and check that replicas return to the original assignment.",
             cancellationToken, record =>
             {
@@ -212,7 +214,6 @@ public sealed partial class KafkaOpsService
                 record.RebalanceName = target.RebalanceName;
                 record.OriginalAssignmentJson = target.OriginalAssignmentJson;
                 record.ReassignmentJson = target.ReassignmentJson;
-                record.SecondApproverRequired = true;
             },
             alongsideReassignment: true);
     }

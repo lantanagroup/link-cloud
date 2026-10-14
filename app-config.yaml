@@ -128,8 +128,13 @@ global:
     required: false
     defaultValue: "24"
     consumers: ["Operations"]
+  - key: "KafkaOps:TwoPersonApproval"
+    description: "When true, every Kafka change request needs a second, different, signed-in person before it runs. When false, the requester approves and runs their own request. Operations reads this. Docker and local development set false in appsettings; every other host stays true. Admin.BFF does not read it."
+    required: false
+    defaultValue: "true"
+    consumers: ["Operations"]
   - key: "KafkaOps:RequireSecondApprover"
-    description: "When true, every partition change needs a second person. Order-sensitive topics, quiet-window overrides, and broker removal always need a second person."
+    description: "When true, a Kafka change still needs a second person even if KafkaOps:TwoPersonApproval is false. It does not turn two-person approval on by itself for order-sensitive topics."
     required: false
     defaultValue: "false"
     consumers: ["Operations"]

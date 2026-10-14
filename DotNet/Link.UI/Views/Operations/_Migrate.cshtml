@@ -78,7 +78,7 @@ else
         <div data-partition-pane="add">
             <div class="form-check">
                 <input class="form-check-input" id="plan-override" type="checkbox" name="overrideQuietWindow" value="true" @(Model.DraftOverride ? "checked" : null) />
-                <label class="form-check-label" for="plan-override">Override the quiet window <partial name="_TermInfo" model="@(new TermInfo { Label = "About the quiet window", Text = "A second approver and a reason are required when the quiet window is overridden." })" /></label>
+                <label class="form-check-label" for="plan-override">Override the quiet window <partial name="_TermInfo" model="@(new TermInfo { Label = "About the quiet window", Text = "A reason is required when the quiet window is overridden. A second approver is required only when two-person approval is on." })" /></label>
             </div>
             <div class="col-12 col-md-6 mt-2" data-lu-when="plan-override">
                 <label class="form-label" for="plan-override-reason">Override reason</label>

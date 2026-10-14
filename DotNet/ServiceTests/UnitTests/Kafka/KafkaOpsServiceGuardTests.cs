@@ -980,13 +980,13 @@ public class KafkaOpsServiceGuardTests
         broker.RolesKnown = true;
         broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
         var moving = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
-        await service.ApproveAsync(User("bob", ManageScaling), moving.Id, CancellationToken.None);
-        await service.ExecuteAsync(User("carol", ManageScaling), moving.Id, CancellationToken.None);
+        Assert.False(moving.SecondApproverRequired);
+        await service.ExecuteAsync(User("alice", ManageScaling), moving.Id, CancellationToken.None);
 
         broker.Reassignments = new ReassignmentListing { Known = false };
         infra.Reassignments = new ReassignmentListing { Known = false };
         var cancel = await service.CancelAsync(User("alice", ManageScaling), moving.Id, CancellationToken.None);
-        await service.ApproveAsync(User("bob", ManageScaling), cancel.Id, CancellationToken.None);
+        Assert.False(cancel.SecondApproverRequired);
         var refusedCancel = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
             service.ExecuteAsync(User("carol", ManageScaling), cancel.Id, CancellationToken.None));
         Assert.Contains("cannot confirm no reassignment is in flight", refusedCancel.Message, StringComparison.OrdinalIgnoreCase);
@@ -1354,18 +1354,19 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
-    public async Task OrderSensitiveFamilyCompletion_RequiresASecondApprover()
+    public async Task OrderSensitiveFamilyCompletion_FollowsTheSecondApproverOption()
     {
-        var (service, broker, _) = NewService(requireSecondApprover: false);
-        broker.SetCount("PatientEvent", 4);
-        broker.SetCount("PatientEvent-Retry", 3);
-        broker.SetCount("PatientEvent-Error", 3);
+        var (off, offBroker, _) = NewService(requireSecondApprover: false);
+        offBroker.SetCount("PatientEvent", 4);
+        offBroker.SetCount("PatientEvent-Retry", 3);
+        offBroker.SetCount("PatientEvent-Error", 3);
 
-        var plan = await service.PlanFamilyAsync("PatientEvent", true, "the window was observed outside this request", CancellationToken.None);
+        var plan = await off.PlanFamilyAsync("PatientEvent", true, "the window was observed outside this request", CancellationToken.None);
         Assert.True(plan.Accepted, string.Join(" ", plan.Errors));
-        Assert.True(plan.SecondApproverRequired);
+        Assert.False(plan.SecondApproverRequired);
+        Assert.DoesNotContain(plan.Notes, note => note.Contains("different person", StringComparison.OrdinalIgnoreCase));
 
-        var created = await service.CreateFamilyAsync(
+        var created = await off.CreateFamilyAsync(
             User("alice", ManageTopics),
             "PatientEvent",
             "catch the family up",
@@ -1374,44 +1375,58 @@ public class KafkaOpsServiceGuardTests
             "PatientEvent",
             null,
             CancellationToken.None);
-        Assert.True(created.SecondApproverRequired);
-        Assert.Equal(KafkaChangeStatus.Pending, created.Status);
+        Assert.False(created.SecondApproverRequired);
+        Assert.Equal(KafkaChangeStatus.Approved, created.Status);
+        var executed = await off.ExecuteAsync(User("alice", ManageTopics), created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Converging, executed.Status);
+
+        var (on, onBroker, _) = NewService(requireSecondApprover: true);
+        onBroker.SetCount("PatientEvent", 4);
+        onBroker.SetCount("PatientEvent-Retry", 3);
+        onBroker.SetCount("PatientEvent-Error", 3);
+        var required = await on.PlanFamilyAsync("PatientEvent", true, "the window was observed outside this request", CancellationToken.None);
+        Assert.True(required.SecondApproverRequired);
+        var pending = await on.CreateFamilyAsync(
+            User("alice", ManageTopics),
+            "PatientEvent",
+            "catch the family up",
+            true,
+            "the window was observed outside this request",
+            "PatientEvent",
+            null,
+            CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Pending, pending.Status);
         var self = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.ApproveAsync(User("alice", ManageTopics), created.Id, CancellationToken.None));
+            on.ApproveAsync(User("alice", ManageTopics), pending.Id, CancellationToken.None));
         Assert.Contains("cannot approve", self.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task PartitionDecommissionAndCancel_RequireASecondApproverWhenTheOptionIsOff()
+    public async Task PartitionDecommissionAndCancel_LetTheRequesterRunThemWhenTheOptionIsOff()
     {
         var (service, broker, _) = NewService(requireSecondApprover: false);
         broker.SetCount("ReadyToAcquire", 3);
         var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the log topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
-        Assert.True(created.SecondApproverRequired);
-        Assert.Equal(KafkaChangeStatus.Pending, created.Status);
-        var self = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.ApproveAsync(User("alice", ManageTopics), created.Id, CancellationToken.None));
-        Assert.Contains("cannot approve", self.Message, StringComparison.OrdinalIgnoreCase);
-        await service.RejectAsync(User("bob", ManageTopics), created.Id, "not now", CancellationToken.None);
+        Assert.False(created.SecondApproverRequired);
+        Assert.Equal(KafkaChangeStatus.Approved, created.Status);
+        Assert.Equal("alice", created.Approver);
+        var executed = await service.ExecuteAsync(User("alice", ManageTopics), created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Converging, executed.Status);
 
-        broker.ControllerId = 2;
-        broker.Eligible.Clear();
-        broker.Eligible.Add(0);
-        broker.RolesKnown = true;
-        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
-        var decommission = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
-        Assert.True(decommission.SecondApproverRequired);
-        var ownDecommission = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.ApproveAsync(User("alice", ManageScaling), decommission.Id, CancellationToken.None));
-        Assert.Contains("cannot approve", ownDecommission.Message, StringComparison.OrdinalIgnoreCase);
-        await service.ApproveAsync(User("bob", ManageScaling), decommission.Id, CancellationToken.None);
-        await service.ExecuteAsync(User("carol", ManageScaling), decommission.Id, CancellationToken.None);
+        var (moves, moveBroker, _) = NewService(requireSecondApprover: false);
+        moveBroker.ControllerId = 2;
+        moveBroker.Eligible.Clear();
+        moveBroker.Eligible.Add(0);
+        moveBroker.RolesKnown = true;
+        moveBroker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var decommission = await moves.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        Assert.False(decommission.SecondApproverRequired);
+        Assert.Equal(KafkaChangeStatus.Approved, decommission.Status);
+        await moves.ExecuteAsync(User("alice", ManageScaling), decommission.Id, CancellationToken.None);
 
-        var cancel = await service.CancelAsync(User("alice", ManageScaling), decommission.Id, CancellationToken.None);
-        Assert.True(cancel.SecondApproverRequired);
-        var ownCancel = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
-            service.ApproveAsync(User("alice", ManageScaling), cancel.Id, CancellationToken.None));
-        Assert.Contains("cannot approve", ownCancel.Message, StringComparison.OrdinalIgnoreCase);
+        var cancel = await moves.CancelAsync(User("alice", ManageScaling), decommission.Id, CancellationToken.None);
+        Assert.False(cancel.SecondApproverRequired);
+        Assert.Equal(KafkaChangeStatus.Approved, cancel.Status);
     }
 
     [Fact]
