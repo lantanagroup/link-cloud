@@ -69,7 +69,7 @@ public class LastIssuesFixesTests
     [Fact]
     public void Migration_reconcile_logs_a_repeated_failure_once()
     {
-        var source = Dot("Admin.BFF", "Application", "KafkaOps", "Migration", "MigrationRuntime.cs");
+        var source = Dot("Operations", "Application", "KafkaOps", "Migration", "MigrationRuntime.cs");
         Assert.Contains("Interlocked.Exchange(ref _reconcileFailure, reason) != reason", source);
         Assert.Contains("_logger.LogTrace(\"Migration reconcile still not finished", source);
     }

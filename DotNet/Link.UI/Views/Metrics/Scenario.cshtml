@@ -126,10 +126,9 @@
                                 <td class="text-nowrap">
                                     <div class="lu-row-actions">
                                         <a asp-action="Details" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-link lu-icon-btn" title="View" aria-label="View"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">View</span></a>
-                                        <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline"
-                                              onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
+                                        <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline">
                                             @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
+                                            <button data-hold="@Hold.Of("Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.", "Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.", "Cards, trends, and compare drop this result. The run log stays.", "Hold to remove")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
                                         </form>
                                     </div>
                                 </td>

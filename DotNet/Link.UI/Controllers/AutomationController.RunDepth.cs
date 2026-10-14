@@ -6,6 +6,7 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -90,10 +91,32 @@ public sealed partial class AutomationController
             ConfigurationNames(),
             run.GeneratedTemplateCacheVersionNumber,
             latest);
+        await ApplyInteractiveAsync(model, run, cancellationToken);
 
         ViewData["Title"] = "Generation manifest";
         ViewData["AutomationSection"] = "runs";
         return View("~/Views/Automation/Manifest.cshtml", model);
+    }
+
+    /// <summary>
+    /// Interactive mode reads the run's submission on demand, so it is only on while the run's report
+    /// still exists. A scenario run that cleaned up deleted it. One schedule read decides; nothing is loaded.
+    /// </summary>
+    private async Task ApplyInteractiveAsync(ReportManifestModel model, AutomationRunSummary run, CancellationToken cancellationToken)
+    {
+        var store = _services.GetService<PatientSubmissionReader>();
+        var configured = store?.IsConfigured == true;
+        bool? exists = null;
+        if (InteractiveAvailability.NeedsCheck(configured, run.FacilityId, run.ReportId)
+            && _services.GetService<ReportsService>() is { } reports)
+            exists = await reports.ReportExistsAsync(run.FacilityId, run.ReportId, cancellationToken);
+
+        model.InteractiveBlocked = InteractiveAvailability.ForRun(configured, run.FacilityId, run.ReportId, exists);
+        if (model.InteractiveBlocked is null)
+        {
+            model.GraphFacilityId = run.FacilityId!.Trim();
+            model.GraphReportId = run.ReportId!.Trim();
+        }
     }
 
     [HttpGet("manifest-data")]

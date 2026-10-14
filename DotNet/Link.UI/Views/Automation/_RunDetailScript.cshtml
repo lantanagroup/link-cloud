@@ -143,8 +143,19 @@
         }
 
         function handleDeleteClick(btn) {
-            if (!confirm('Delete this run and all persisted data?')) return;
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.open(btn, {
+                title: 'Delete this run',
+                action: 'Delete this run and all persisted data.',
+                details: [['Run', runId]],
+                fields: [],
+                risks: ['The run log and the data it persisted are removed.', 'This cannot be undone from this page.'],
+                confirm: '',
+                label: 'Hold to delete'
+            }, function () { deleteRun(btn); });
+        }
 
+        function deleteRun(btn) {
             btn.disabled = true;
             btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Deleting…';
 
@@ -186,10 +197,23 @@
         var cancelBtn = document.getElementById('btnCancelRun');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', function () {
-                if (!confirm('Cancel this running test? This aborts pipeline work for the facility and removes generated FHIR data.')) return;
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.open(cancelBtn, {
+                    title: 'Cancel this run',
+                    action: 'Cancel this running test. This aborts pipeline work for the facility and removes generated FHIR data.',
+                    details: [['Run', runId]],
+                    fields: [],
+                    risks: ['Pipeline work for this facility is aborted.', 'Generated FHIR data for this run is removed.'],
+                    confirm: '',
+                    label: 'Hold to cancel'
+                }, function () { cancelRun(); });
+            });
+        }
 
-                cancelBtn.disabled = true;
-                cancelBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Cancelling…';
+        function cancelRun() {
+            if (!cancelBtn) return;
+            cancelBtn.disabled = true;
+            cancelBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Cancelling…';
 
                 fetch('@Url.Action("CancelJson", "Automation")', {
                     method: 'POST',
@@ -218,7 +242,6 @@
                     cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancel';
                     alert('Cancel could not be completed. Refresh the page and check the run status.');
                 });
-            });
         }
 
         const connection = new signalR.HubConnectionBuilder()
@@ -916,12 +939,15 @@
                 btn.addEventListener('click', () => {
                     const patientId = btn.getAttribute('data-patient-id');
                     const expected = btn.getAttribute('data-expected') === 'true';
-                    if (!expected && !window.confirm(
-                        `${patientId} is not expected in the report (outside-period / non-qualifying data). Admitting publishes a live census event and can cause this patient to appear in ABS, failing validation. Continue?`))
-                        return;
-                    postLiveEvent(liveAdmitUrl, { id: runId, patientId, notes: null })
+                    const admit = () => postLiveEvent(liveAdmitUrl, { id: runId, patientId, notes: null })
                         .then(() => refreshLiveSimulation())
                         .catch(err => alert(err.message));
+                    if (!expected) {
+                        if (!window.luHoldConfirm) return;
+                        window.luHoldConfirm.ask(btn, "Admit unexpected patient", `${patientId} is not expected in the report (outside-period / non-qualifying data). Admitting publishes a live census event and can cause this patient to appear in ABS, failing validation.`, ["The patient can appear in ABS and fail validation."], admit);
+                        return;
+                    }
+                    admit();
                 });
             });
             body.querySelectorAll('.live-pool-discharge').forEach(btn => {

@@ -12,13 +12,13 @@
 <div class="au-card card mb-3">
     <div class="card-header">Consumers</div>
     <div class="card-body">
-        <form method="post" data-au-save asp-action="StartConsumers" class="row g-2 align-items-end" onsubmit="return confirm('Start consumers for this correlation id?');">
+        <form method="post" data-au-save asp-action="StartConsumers" class="row g-2 align-items-end">
             <div class="col-12 col-md-8">
                 <label class="form-label" for="startCorrelation">Correlation id</label>
                 <input id="startCorrelation" name="correlationId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-au-execute">Start consumers</button>
+                <button data-hold="@Hold.Of("Start consumers for this correlation id?", "Start consumers for this correlation id?", "Consumers for this correlation id change.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Start consumers</button>
             </div>
         </form>
         <p class="text-muted small">Leave the id blank to generate one. The success message shows the id to use for read and stop.</p>
@@ -31,13 +31,13 @@
                 <button type="submit" class="btn btn-au-execute">Read consumers</button>
             </div>
         </form>
-        <form method="post" data-au-save asp-action="StopConsumers" class="row g-2 align-items-end mt-2" onsubmit="return confirm('Stop consumers for this correlation id?');">
+        <form method="post" data-au-save asp-action="StopConsumers" class="row g-2 align-items-end mt-2">
             <div class="col-12 col-md-8">
                 <label class="form-label" for="stopCorrelation">Correlation id</label>
                 <input id="stopCorrelation" name="correlationId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-warning">Stop consumers</button>
+                <button data-hold="@Hold.Of("Stop consumers for this correlation id?", "Stop consumers for this correlation id?", "Consumers for this correlation id change.", "Hold to confirm")" type="submit" class="btn btn-warning">Stop consumers</button>
             </div>
         </form>
     </div>
@@ -107,7 +107,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Report scheduled</div>
     <div class="card-body">
-        <form method="post" data-au-save asp-action="ScheduleReport" class="row g-2" onsubmit="return confirm('Post this report-scheduled event?');">
+        <form method="post" data-au-save asp-action="ScheduleReport" class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="facilityId">Facility</label>
                 <input id="facilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -139,7 +139,7 @@
                 <input id="reportTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-au-execute">Post report scheduled</button>
+                <button data-hold="@Hold.Of("Post this report-scheduled event?", "Post this report-scheduled event?", "This event is published to the pipeline.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Post report scheduled</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The start date has to be in the past. Report types are separated by commas.</p>
@@ -149,7 +149,7 @@
 <div class="au-card card">
     <div class="card-header">Patient list acquired</div>
     <div class="card-body">
-        <form method="post" data-au-save asp-action="AcquirePatientList" class="row g-2" onsubmit="return confirm('Post this patient-list-acquired event?');">
+        <form method="post" data-au-save asp-action="AcquirePatientList" class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="listFacilityId">Facility</label>
                 <input id="listFacilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -183,7 +183,7 @@
                 <input id="listTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-au-execute">Post patient list</button>
+                <button data-hold="@Hold.Of("Post this patient-list-acquired event?", "Post this patient-list-acquired event?", "This event is published to the pipeline.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Post patient list</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Patient ids are separated by commas or spaces.</p>
@@ -193,7 +193,7 @@
 <div class="au-card card mb-3 mt-3">
     <div class="card-header">Patient event</div>
     <div class="card-body">
-        <form method="post" data-au-save asp-action="PostPatientEvent" class="row g-2" onsubmit="return confirm('Post this patient event?');">
+        <form method="post" data-au-save asp-action="PostPatientEvent" class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="eventFacilityId">Facility</label>
                 <input id="eventFacilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -213,7 +213,7 @@
                 </select>
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-au-execute">Post patient event</button>
+                <button data-hold="@Hold.Of("Post this patient event?", "Post this patient event?", "This event is published to the pipeline.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Post patient event</button>
             </div>
         </form>
     </div>
@@ -222,7 +222,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Data acquisition requested</div>
     <div class="card-body">
-        <form method="post" data-au-save asp-action="PostDataAcquisition" class="row g-2" onsubmit="return confirm('Post this data-acquisition-requested event?');">
+        <form method="post" data-au-save asp-action="PostDataAcquisition" class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="acquisitionFacilityId">Facility</label>
                 <input id="acquisitionFacilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -254,7 +254,7 @@
                 <input id="acquisitionEnd" name="endDate" type="date" class="form-control" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-au-execute">Post data acquisition</button>
+                <button data-hold="@Hold.Of("Post this data-acquisition-requested event?", "Post this data-acquisition-requested event?", "This event is published to the pipeline.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Post data acquisition</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The start date has to be in the past and before the end date. Report types are separated by commas.</p>
@@ -264,7 +264,7 @@
 <div class="au-card card">
     <div class="card-header">Patient acquired</div>
     <div class="card-body">
-        <form method="post" data-au-save asp-action="PostPatientAcquired" class="row g-2" onsubmit="return confirm('Post this patient-acquired event?');">
+        <form method="post" data-au-save asp-action="PostPatientAcquired" class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="acquiredFacilityId">Facility</label>
                 <input id="acquiredFacilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -278,7 +278,7 @@
                 <input id="acquiredTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-au-execute">Post patient acquired</button>
+                <button data-hold="@Hold.Of("Post this patient-acquired event?", "Post this patient-acquired event?", "This event is published to the pipeline.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Post patient acquired</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Patient ids are separated by commas or spaces. A blank tracking id is filled in.</p>

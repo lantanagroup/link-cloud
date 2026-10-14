@@ -1,7 +1,8 @@
 using System.Security.Claims;
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
+using LantanaGroup.Link.Operations.Application.KafkaOps;
+using LantanaGroup.Link.Shared.KafkaAdmin.Protocol;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
@@ -191,6 +192,7 @@ public class KafkaOpsConsoleFlowTests
             Options.Create(new KafkaOpsOptions
             {
                 RequireSecondApprover = true,
+                BrokerLifecycleEnabled = true,
                 MaxPartitionsPerTopic = 24,
                 RateLimitMinutes = 30,
                 CacheSeconds = 8
@@ -202,7 +204,14 @@ public class KafkaOpsConsoleFlowTests
                 ["Authentication:EnableAnonymousAccess"] = "false"
             }).Build(),
             Array.Empty<IProducer<string, AuditEventMessage>>(),
-            new QuietClusterInfra());
+            new QuietClusterInfra(),
+            NativeMover(gateway, Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP") ?? "localhost:9092"));
+
+    private static KafkaNativePartitionMover NativeMover(KafkaBrokerGateway gateway, string bootstrap)
+    {
+        var connection = new KafkaConnection { BootstrapServers = [bootstrap], SaslProtocolEnabled = false };
+        return new KafkaNativePartitionMover(new KafkaAdminWire(KafkaWireSettings.From(connection)), gateway, new ConfluentThrottleConfig(connection), 100);
+    }
 
     // The kit has no console-run reassignment, and the proof script verifies its own moves completed. Report a known, empty list.
     private sealed class QuietClusterInfra : IKafkaInfraProvider

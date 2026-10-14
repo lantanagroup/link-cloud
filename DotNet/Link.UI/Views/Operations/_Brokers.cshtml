@@ -19,10 +19,15 @@
 {
 <section class="card au-card mt-3" id="kafka-brokers">
     <h2 class="card-header h6 mb-0 d-flex justify-content-between align-items-center">
-        <span>Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = "Open a broker to preview a decommission or a rebalance. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions. A broker that is not up is listed first. Alter is what an in-place partition increase needs. Topics that cannot alter partitions are listed under Broker rights." + (string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail) ? "" : " " + Model.Cluster.LogDirDetail) + (Model.Infra.Enabled ? "" : " " + Model.Infra.Detail) })" /></span>
+        <span>Brokers <partial name="_TermInfo" model="@(new TermInfo { Label = "About brokers", Text = (Model.Infra.BrokerLifecycleEnabled ? "Open a broker to preview a decommission or a rebalance. A preview plans the partitions and changes nothing. Decommission stops the broker only after every replica and leader has moved and the cluster has no under-replicated or offline partitions." : "Adding, rebalancing and decommissioning brokers are turned off in this console.") + " A broker that is not up is listed first. Alter is what an in-place partition increase needs. Topics that cannot alter partitions are listed under Broker rights." + (string.IsNullOrWhiteSpace(Model.Cluster.LogDirDetail) ? "" : " " + Model.Cluster.LogDirDetail) + (Model.Infra.Enabled ? "" : " " + Model.Infra.Detail) })" /></span>
+        @if (Model.Infra.BrokerLifecycleEnabled)
+        {
         <button class="btn btn-sm btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#kafka-add-broker" aria-expanded="false" aria-controls="kafka-add-broker">Add broker</button>
+        }
     </h2>
     <div class="card-body">
+        @if (Model.Infra.BrokerLifecycleEnabled)
+        {
         <div class="collapse mb-3" id="kafka-add-broker">
             <form method="post" action="/Operations/Kafka/brokers">
                 @Html.AntiForgeryToken()
@@ -38,6 +43,7 @@
                 </div>
             </form>
         </div>
+        }
         <form class="row g-2 align-items-end mb-3" method="get" action="@(string.IsNullOrWhiteSpace(query.Broker) ? "/Operations/Kafka/Brokers" : KafkaConsoleRoutes.Broker(query.Broker))">
             <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
             <input type="hidden" name="page" value="1" />
@@ -120,6 +126,8 @@
     <section class="card au-card mt-3 @(KafkaAttention.Broker(selected) ? "lu-kafka-attention" : null)" id="kafka-broker-card">
         <h2 class="card-header h6 mb-0">Broker @selected.Id <partial name="_CopyButton" model="@(new CopyTarget { Value = selected.Id.ToString(), Label = "Copy broker id" })" /></h2>
         <div class="card-body">
+            @if (Model.Infra.BrokerLifecycleEnabled)
+            {
             <form method="post" action="/Operations/Kafka/brokers/decommission/plan" data-kafka-busy="Dry run is running.">
                     @Html.AntiForgeryToken()
                     <partial name="_QueryFields" model="@(query with { Broker = selected.Id.ToString() })" />
@@ -220,6 +228,7 @@
                         <button class="btn btn-sm btn-au-execute lu-icon-btn @(brokerBlocked ? "is-dimmed" : null)" type="submit" formaction="/Operations/Kafka/brokers/rebalance" data-hold="@Hold.Of("Rebalance onto broker " + selected.Id, "Move partitions onto broker " + selected.Id + ".", new[] { Hold.Pair("Broker", selected.Id), Hold.Pair("Host", selected.Host + ":" + selected.Port), Hold.Pair("Partitions", selected.PartitionCount) }, new[] { new[] { "reason", "Reason" } }, new[] { "Partition moves add network and disk load until they finish.", "Leaders can change while partitions move." }, "", "Hold to rebalance")" title="Rebalance onto this broker" aria-label="Rebalance onto this broker" @(brokerBlocked ? "disabled" : null)><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span class="ms-1">Rebalance</span></button>
                     </div>
                 </form>
+            }
             <div class="row g-2 mt-3">
                 <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@selected.Host:@selected.Port</div><div class="au-stat-label">Host</div></div></div>
                 <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@(string.IsNullOrWhiteSpace(selected.Rack) ? "—" : selected.Rack)</div><div class="au-stat-label">Rack</div></div></div>

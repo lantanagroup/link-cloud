@@ -511,7 +511,7 @@
     }));
     document.querySelectorAll('.btn-map-clone').forEach(b=>b.addEventListener('click',async()=>{ await post(cloneUrl,{id:b.dataset.id}); auRefreshPage('Cloned.'); }));
     document.querySelectorAll('.btn-map-default').forEach(b=>b.addEventListener('click',async()=>{ await post(defUrl,{id:b.dataset.id}); auRefreshPage('Saved.'); }));
-    document.querySelectorAll('.btn-map-delete').forEach(b=>b.addEventListener('click',async()=>{ if(confirm('Delete this template?')){ await post(delUrl,{id:b.dataset.id}); auRefreshPage('Deleted.'); } }));
+    document.querySelectorAll('.btn-map-delete').forEach(b=>b.addEventListener('click',()=>{ if(!window.luHoldConfirm) return; window.luHoldConfirm.ask(b, "Delete this template", "Delete this template?", ["The template is removed."], async function () { await post(delUrl,{id:b.dataset.id}); auRefreshPage('Deleted.'); }); }));
 
     const analyzeUrl='@Url.Action("Analyze","ConfigurationGeneration")';
     const applyOrmUrl='@Url.Action("ApplyOrm","ConfigurationGeneration")';

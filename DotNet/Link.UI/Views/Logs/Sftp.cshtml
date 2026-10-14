@@ -160,8 +160,8 @@ else
                                         <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="SftpDetail" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                                         @if (row.CanReset)
                                         {
-                                            <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@row.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
-                                                <button type="submit" class="btn btn-sm btn-au-execute lu-icon-btn" title="Reset" aria-label="Reset"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span class="ms-1">Reset</span></button>
+                                            <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@row.Id" class="d-inline">
+                                                <button data-hold="@Hold.Of("Reset this SFTP log for retry?", "Reset this SFTP log for retry?", "The log is queued to retry.", "Hold to reset")" type="submit" class="btn btn-sm btn-au-execute lu-icon-btn" title="Reset" aria-label="Reset"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span class="ms-1">Reset</span></button>
                                             </form>
                                         }
                                     </div>

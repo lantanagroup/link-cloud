@@ -36,8 +36,8 @@
                 </form>
                 @if (Model.CensusExists)
                 {
-                    <form method="post" data-au-save asp-controller="Tenants" asp-action="DeleteCensus" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the census configuration?');">
-                        <button type="submit" class="btn btn-danger btn-sm">Delete census</button>
+                    <form method="post" data-au-save asp-controller="Tenants" asp-action="DeleteCensus" asp-route-id="@Model.FacilityId" class="mt-2">
+                        <button data-hold="@Hold.Of("Delete the census configuration?", "Delete the census configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete census</button>
                     </form>
                 }
             }

@@ -39,6 +39,56 @@ public class HoldConfirmTests
         var js = Read("wwwroot", "js", "hold-confirm.js");
         foreach (var token in new[] { "pointerdown", "pointerup", "pointerleave", "pointercancel", "keydown", "keyup", "ev.repeat", "requestAnimationFrame", "aria-valuenow", "data-hold-target", "requestSubmit", "stopPropagation" })
             js.Should().Contain(token);
+        js.Should().Contain("onDone");
+        js.Should().Contain("ask:");
+    }
+
+    [Fact]
+    public void Browser_confirm_is_gone_and_colliding_badges_are_distinct()
+    {
+        var hits = new List<string>();
+        foreach (var folder in new[] { Path.Combine(Root(), "Views"), Path.Combine(Root(), "wwwroot", "js") })
+        {
+            foreach (var file in Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories))
+            {
+                if (!file.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase) && !file.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (File.ReadAllText(file).Contains("confirm(", StringComparison.Ordinal))
+                    hits.Add(Path.GetRelativePath(Root(), file));
+            }
+        }
+
+        hits.Should().BeEmpty();
+        var css = Read("wwwroot", "css", "site.css");
+        css.Should().Contain(".au-badge-automation { background: #f7fee7");
+        css.Should().Contain(".au-badge-attention { background: #fff1e8");
+        css.Should().Contain(".au-badge-test { background: #fff1f2");
+        Read("Views", "Shared", "_AutomationBadge.cshtml").Should().Contain("au-badge-automation").And.NotContain("au-badge-warning");
+        Read("Views", "Tenants", "Facility.cshtml").Should().Contain("au-badge-test\">Test facility");
+        StatusPills.ForKafkaHealth("Needs attention").Should().Be("au-badge-attention");
+        StatusPills.ForKafkaHealth("ISR short").Should().Be("au-badge-warning");
+        var kafka = Read("Views", "Logs", "Kafka.cshtml");
+        kafka.Should().Contain("The Kafka console is in this app").And.Contain("Open the Kafka console").And.NotContain("separate tool");
+        Read("wwwroot", "js", "facility-save.js").Should().Contain("luHoldConfirm.ask").And.Contain("beforeunload");
+    }
+
+    [Fact]
+    public void Report_and_run_destructive_actions_hold_instead_of_a_browser_confirm()
+    {
+        foreach (var relative in new[] { new[] { "Views", "Reports", "Index.cshtml" }, new[] { "Views", "Tenants", "_ViewReports.cshtml" } })
+        {
+            var view = Read(relative);
+            view.Should().Contain("data-hold=\"@Hold.Of(");
+            view.Should().NotContain("onsubmit=\"return confirm(");
+        }
+
+        Read("Views", "Tenants", "Index.cshtml").Should().Contain("Hold to restore");
+        Read("Views", "Tenants", "Facility.cshtml").Should().Contain("Hold to remove");
+
+        var script = Read("Views", "Automation", "_RunDetailScript.cshtml");
+        script.Should().Contain("luHoldConfirm.open");
+        script.Should().NotContain("confirm('Delete this run");
+        script.Should().NotContain("confirm('Cancel this running test");
     }
 
     [Fact]
@@ -63,6 +113,6 @@ public class HoldConfirmTests
     public void Approve_and_execute_only_show_while_they_can_run()
     {
         var view = Read("Views", "Operations", "_ChangeRequest.cshtml");
-        view.Should().Contain("@if (request.Status == \"Pending\")").And.Contain("@if (request.Status is \"Pending\" or \"Approved\")");
+        view.Should().Contain("@if (KafkaChangeActions.CanApprove(request))").And.Contain("@if (KafkaChangeActions.CanExecute(request))").And.Contain("data-hold=\"@KafkaChangeActions.ExecuteHold(request)\"");
     }
 }

@@ -156,8 +156,8 @@
                                     <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Account" asp-route-id="@user.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
                                     @if (user.IsDeleted)
                                     {
-                                        <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline" onsubmit="return confirm('Restore this account?');">
-                                            <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
+                                        <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline">
+                                            <button data-hold="@Hold.Of("Restore this account?", "Restore this account?", "The selected logs change.", "Hold to restore")" type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
                                         </form>
                                     }
                                 </div>

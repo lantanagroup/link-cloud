@@ -80,10 +80,24 @@ public class ResourceGraphRulesTests
         one.Metadata.TotalCount.Should().Be(1);
         one.Records.Should().ContainSingle(row => row.Id == known.Id);
 
-        var pageWatch = Stopwatch.StartNew();
-        var page = ReportManifestRules.ScaleReport(new ReportManifestQuery { PageSize = 25, Descending = true });
-        pageWatch.Stop();
-        var model = page.Manifest!;
+        // The first call pays for JIT. The budget is the median after that, so one
+        // pause does not fail the test. Building every patient row, or walking the
+        // 15,000 resources onto the page, still lands over half a second.
+        var timingQuery = new ReportManifestQuery { PageSize = 25, Descending = true };
+        ReportManifestRules.ScaleReport(timingQuery);
+        var samples = new long[5];
+        ReportManifestPage? page = null;
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var sampleWatch = Stopwatch.StartNew();
+            page = ReportManifestRules.ScaleReport(timingQuery);
+            sampleWatch.Stop();
+            samples[index] = sampleWatch.ElapsedMilliseconds;
+        }
+
+        Array.Sort(samples);
+        samples[samples.Length / 2].Should().BeLessThan(500, "samples were " + string.Join(", ", samples));
+        var model = page!.Manifest!;
         model.PatientCount.Should().Be(5_000);
         model.Patients.Should().HaveCount(25);
         model.Patients[0].PatientId.Should().Be(ResourceGraphRules.ScalePatientId);
@@ -93,7 +107,6 @@ public class ResourceGraphRulesTests
         model.Populations.Should().ContainSingle();
         model.Populations[0].Rate.Should().Be("53.8%");
         model.Route["scale"].Should().Be("1");
-        pageWatch.ElapsedMilliseconds.Should().BeLessThan(500);
 
         ResourceGraphRules.TryFixture(ResourceGraphRules.ScalePatientId, scale: true, out var heavy).Should().BeTrue();
         heavy.Counts.Sum(pair => pair.Count).Should().Be(15_000);

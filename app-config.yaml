@@ -74,6 +74,7 @@ serviceMeta:
   NHSNAppUIHarness:      { label: "NHSNAppUIHarness",      runtime: "node" }
   Normalization:         { label: "Normalization",         runtime: "dotnet" }
   Notification:          { label: "Notification",          runtime: "dotnet" }
+  Operations:            { label: "Operations",            runtime: "dotnet" }
   QueryDispatch:         { label: "QueryDispatch",         runtime: "dotnet" }
   Report:                { label: "Report",                runtime: "dotnet" }
   Submission:            { label: "Submission",            runtime: "dotnet" }
@@ -85,17 +86,17 @@ global:
   - key: "KafkaConnection:BootstrapServers"
     description: "Comma-separated list of Kafka bootstrap servers for event messaging."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
   - key: "KafkaConnection:SaslUsername"
     description: "The SASL username for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
     required: true
     sensitive: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
   - key: "KafkaConnection:SaslPassword"
     description: "The SASL password for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
     required: true
     sensitive: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
   # SASL_PLAINTEXT is deliberate, and is catalogued so review tooling stops proposing SASL_SSL.
   # Three things would all have to change together first:
   #   1. The brokers have no TLS listener. docker-compose maps every listener to SASL_PLAINTEXT,
@@ -113,195 +114,210 @@ global:
   - key: "KafkaConnection:Protocol"
     description: "Confluent.Kafka SecurityProtocol for the .NET clients. SaslPlaintext today; see the note above before changing it."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
   - key: "KafkaConnection:Mechanism"
     description: "Confluent.Kafka SaslMechanism for the .NET clients. ScramSha512, matching the brokers' SCRAM-SHA-512 credentials."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
   - key: "KafkaConnection:SaslProtocolEnabled"
     description: "Whether the .NET clients send SASL credentials at all. When false, KafkaConnection.CreateConsumerConfig/CreateProducerConfig skip the security protocol, username, password and mechanism entirely, producing an unauthenticated connection."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
   - key: "KafkaOps:MaxPartitionsPerTopic"
-    description: "Upper bound for a partition increase requested through the Admin BFF operations API."
+    description: "Upper bound for a partition increase requested through the Operations service API."
     required: false
     defaultValue: "24"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
+  - key: "KafkaOps:TwoPersonApproval"
+    description: "When true, every Kafka change request needs a second, different, signed-in person before it runs. When false, the requester approves and runs their own request. Operations reads this. Docker and local development set false in appsettings; every other host stays true. Admin.BFF does not read it."
+    required: false
+    defaultValue: "true"
+    consumers: ["Operations"]
   - key: "KafkaOps:RequireSecondApprover"
-    description: "When true, every partition change needs a second person. Order-sensitive topics, quiet-window overrides, and broker removal always need a second person."
+    description: "When true, a Kafka change still needs a second person even if KafkaOps:TwoPersonApproval is false. It does not turn two-person approval on by itself for order-sensitive topics."
     required: false
     defaultValue: "false"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ReadOnly"
     description: "When true, the operations API refuses partition changes. When the key is absent, a Production host refuses writes and every other host allows them."
     required: false
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:MetadataRefreshIntervalMs"
     description: "Metadata refresh interval the partition flow uses for the quiet window and the convergence alert. Two times this interval is the quiet window."
     required: false
     defaultValue: "30000"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ExpectedConfigVersion"
     description: "Consumer client-id suffix version that must be running before a partition increase is allowed."
     required: false
     defaultValue: "1"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:CacheSeconds"
     description: "Seconds to cache topic, group, cluster, and capability views. Clamped to 5-10. A view with an error is not cached."
     required: false
     defaultValue: "8"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:VerificationWindowSeconds"
     description: "How long to watch lag, committed offsets, and the error topic after a partition increase converges."
     required: false
     defaultValue: "900"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:RateLimitMinutes"
     description: "Minimum minutes between partition increases for the same topic family."
     required: false
     defaultValue: "30"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ConvergenceAlertMultiple"
     description: "Raise an alert when convergence takes longer than this multiple of the metadata refresh interval."
     required: false
     defaultValue: "3"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:InfraProvider"
     description: "Who starts brokers and scales consumer replicas. Disabled refuses those buttons. Strimzi and LocalCompose stay off until this key is set. LocalCompose is refused on a Production host."
     required: false
     defaultValue: "Disabled"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ScaleTimeoutSeconds"
     description: "How long to wait for a replica change or a broker move to settle before the request is marked timed out. The broker is not removed when the wait ends."
     required: false
     defaultValue: "180"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ComposeProject"
     description: "Compose project name used only when KafkaOps:InfraProvider is LocalCompose. Empty unless a local proof host sets it."
     required: false
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:KubernetesNamespace"
     description: "Namespace for Strimzi KafkaNodePool, KafkaRebalance, and consumer Deployment resources. Used only when KafkaOps:InfraProvider is Strimzi."
     required: false
     defaultValue: "kafka"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:KafkaNodePool"
     description: "Strimzi KafkaNodePool name. Adding a broker increases spec.replicas. Removing a broker sets the strimzi.io/remove-node-ids annotation to that broker id and decreases spec.replicas by one."
     required: false
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ConsumerDeployments"
     description: "Comma-separated group=deployment pairs that map a consumer group id to the Deployment the Strimzi provider scales."
     required: false
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ComposeFile"
     description: "Pipe-separated compose file paths used only when KafkaOps:InfraProvider is LocalCompose. Empty means the compose command does not pass -f. A path may contain a drive letter and backslashes."
     required: false
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ExtraBrokerProfile"
     description: "Compose profile that starts the extra broker when LocalCompose adds a broker."
     required: false
     defaultValue: "extra-broker"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ExtraBrokerService"
-    description: "Compose service name, or a comma-separated list of up to 4, started when LocalCompose adds a broker. List the host proxy too (broker-3,host-proxy-3) when the BFF runs on the host."
+    description: "Compose service name, or a comma-separated list of up to 4, started when LocalCompose adds a broker. List the host proxy too (broker-3,host-proxy-3) when Operations runs on the host."
     required: false
     defaultValue: "broker-3"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:KafkaToolsPath"
     description: "Directory of the Kafka CLI scripts inside the LocalCompose broker container. /opt/kafka/bin for apache/kafka, /opt/bitnami/kafka/bin for Bitnami images."
     required: false
     defaultValue: "/opt/kafka/bin"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:BrokerInternalPort"
     description: "Port LocalCompose uses with KafkaOps:BrokerService as the --bootstrap-server for reassignment commands."
     required: false
     defaultValue: "9092"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:BrokerServices"
     description: "Optional comma-separated brokerId=service map. A mapped id is the compose service LocalCompose stops when that broker is removed; unmapped ids use KafkaOps:BrokerServicePrefix plus the id."
     required: false
     defaultValue: ""
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:BrokerServicePrefix"
     description: "Prefix plus the broker id is the compose service LocalCompose stops when a broker is removed."
     required: false
     defaultValue: "broker-"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:BrokerService"
     description: "Compose service LocalCompose execs into when it runs the partition reassignment tool."
     required: false
     defaultValue: "broker-0"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:AllowTopicMigration"
     description: "Allows the Kafka console to plan and run an increase-only topic migration. Off until an environment opts in."
     required: false
     defaultValue: "false"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:MigrationBackupRetentionHours"
     description: "Hours a finished migration keeps its _linkmig backup before the console may delete it. Failure, abort, and rollback never delete the backup."
     required: false
     defaultValue: "168"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:MigrationMaxBackupMinutes"
     description: "Minutes allowed for the backup copy and its verify before the migration rolls back."
     required: false
     defaultValue: "15"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:MigrationHoldMinutes"
     description: "Minutes the migration waits at the hold point for a typed go before it rolls back."
     required: false
     defaultValue: "15"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:MigrationUnknownDiskMaxBytes"
     description: "Largest estimated backup, in bytes, accepted when broker disk free space is unknown."
     required: false
     defaultValue: "1073741824"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:TopicOperatorManagesLinkTopics"
     description: "When true, a Strimzi topic operator is expected to own Link topics and migration refuses to create or delete them."
     required: false
     defaultValue: "false"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:Workloads"
     description: "Comma-separated workload=deployment pairs the migration stops and starts. Distinct from KafkaOps:ConsumerDeployments."
     required: false
     defaultValue: ""
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:WorkloadNamespace"
     description: "Namespace of the Deployments named by KafkaOps:Workloads. Used when KafkaOps:InfraProvider is Strimzi."
     required: false
     defaultValue: ""
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:ManualChecklist"
     description: "When true on Strimzi, workload stop and start are recorded for an operator instead of patched."
     required: false
     defaultValue: "false"
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:Connection:BootstrapServers"
     description: "Comma-separated bootstrap servers for the KafkaOps admin principal. Required outside LocalCompose. Empty uses the shared connection only on LocalCompose."
     required: false
     defaultValue: ""
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:Connection:SaslUsername"
     description: "SASL username for the KafkaOps admin principal."
     required: false
     sensitive: true
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
   - key: "KafkaOps:Connection:SaslPassword"
     description: "SASL password for the KafkaOps admin principal."
     required: false
     sensitive: true
-    consumers: ["AdminBFF"]
+    consumers: ["Operations"]
+  - key: "KafkaOps:ReconcileExecutingAfterSeconds"
+    description: "A Kafka change request still Executing this many seconds after its last save is treated as left behind by an Operations replica that stopped, and is resumed or closed by the replica holding the executor lease."
+    required: false
+    defaultValue: "300"
+    consumers: ["Operations"]
+  - key: "KafkaOps:HistoryRetentionDays"
+    description: "Closed Kafka change requests older than this are left out of the console history. Open requests are always listed; nothing is deleted."
+    required: false
+    defaultValue: "30"
+    consumers: ["Operations"]
   - key: "DatabaseProvider"
     description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
     required: false
     defaultValue: "SqlServer"
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
     required: true
     sensitive: true
-    consumers: ["Account", "Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
 
   # Inbound-auth coordination note:
   # Automation.UI short-circuits every non-/health request with 503 when
@@ -316,11 +332,11 @@ global:
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
     required: true
-    consumers: ["Account", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "Authentication:EnableAnonymousAccess"
     description: "Whether services skip authentication. The effect differs by consumer and the polarity is easy to misread. In the eleven backend services, false registers UseAuthentication() and UserScopeMiddleware, so true serves requests without authenticating them. Admin.BFF additionally stops attaching a bearer token to its downstream service calls and drops the YARP authorization transforms. Automation.UI is the exception: it has no built-in authentication, so false makes it serve nothing - every non-/health request is short-circuited with 503 - and true serves the UI anonymously, intended only behind an authenticating proxy. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation in Automation.UI. Link.UI uses the same flag for pages and hubs. When it is false and Authentication:ApiBearer:Enabled is false, Link.UI also returns 503 for /api/runs and /api/api-health-runs. When bearer auth is enabled, those bearer routes stay on ApiBearer and the other native automation routes still return 503. /health and the Admin.BFF /api proxy stay open. See the note above."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "LinkUI", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "LinkUI", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "Authentication:ApiBearer:Enabled"
     description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI and Link.UI for /api/runs and POST /api/api-health-runs/start-all-for-pipeline."
     required: true
@@ -336,12 +352,12 @@ global:
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Operations"]
   - key: "LinkTokenService:SigningKey"
     description: "The secret key used for signing internal tokens. Must be kept secure."
     required: true
     sensitive: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "Logging:HmacKey"
     description: "The HMAC key used to pseudonymise identifiers before they reach the logs. Read by Account, Admin BFF, Audit and Notification."
     required: true
@@ -355,7 +371,7 @@ global:
   - key: "DataProtection:Enabled"
     description: "Whether ASP.NET Data Protection encrypts values before they are cached. When false, Admin.BFF writes the serialized Account to the shared cache as plain JSON. Set to False in all three stores today, overriding the true shipped in appsettings.json."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "DataProtection:KeyRing"
     description: "The Data Protection key ring name, used to scope keys so services sharing a store do not read each other's protected payloads. Only meaningful when DataProtection:Enabled is true."
     required: true
@@ -363,7 +379,7 @@ global:
   - key: "Telemetry:EnableTelemetry"
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "Telemetry:PrometheusQueryEndpoint"
     description: "Prometheus HTTP query base URL used by Automation.UI and Link.UI at Metrics-run completion for optional stage latency enrichment. Empty skips Prom queries and marks stages unavailable. Not the OTLP collector endpoint."
     required: false
@@ -431,36 +447,36 @@ global:
   - key: "CORS:AllowAllOrigins"
     description: "Whether any origin is accepted. When true the shared builder reflects the caller's Origin header rather than emitting a wildcard, which is legal with credentials and therefore dangerous when paired with them. False on the unlabeled rows; Admin.BFF sets it false and lists origins explicitly."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "CORS:AllowCredentials"
     description: "Whether cross-origin requests may carry cookies or TLS client certificates. False on the unlabeled rows: the backend services are reached server-side through Admin.BFF, so no browser sends them credentials. Admin.BFF sets it true, paired with an explicit AllowedOrigins list."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "CORS:AllowAllMethods"
     description: "Whether any HTTP method is accepted. When false the service uses AllowedMethods, falling back to a built-in default list."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "CORS:AllowAllHeaders"
     description: "Whether any request header is accepted. When false the service uses AllowedHeaders, falling back to a built-in default list."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "CORS:AllowedExposedHeaders"
     description: "Response headers a browser may read cross-origin. Stored element by element (CORS:AllowedExposedHeaders:0). X-Pagination, so paged responses expose their metadata."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "CORS:MaxAge"
     description: "Preflight cache lifetime in seconds."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "ConnectionStrings:Redis"
     description: "The Redis connection string. The password is supplied separately via Redis:Password. Required for distributed locks and Redis/Hybrid resource caching in DataAcquisition and DataAcquisitionWorker."
     required: true
-    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
+    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker", "Operations"]
   - key: "Redis:Password"
     description: "The password for the Redis instance addressed by ConnectionStrings:Redis. Supplied separately because that key holds only host:port."
     required: true
     sensitive: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology", "Operations"]
   - key: "InternalBlobStorage:ConnectionString"
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
     required: true
@@ -536,6 +552,10 @@ global:
     description: "The base URL for the Notification Service."
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "ServiceRegistry:OperationsServiceUrl"
+    description: "The base URL for the Operations Service. The Admin BFF proxies /api/ops/kafka (the Kafka operations console) there and reads topic migration holds from it. Optional: when empty the console routes return 404 and integration producers see no holds."
+    required: false
+    consumers: ["AdminBFF"]
   # Java-notation key under global, which has no owning service to infer a runtime from.
   # Without the marker it is looked up as a .NET key and its /link/report/base-url row is
   # never matched.

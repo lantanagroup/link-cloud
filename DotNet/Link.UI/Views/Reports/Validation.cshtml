@@ -32,7 +32,7 @@
 }
 
 <div class="mb-3">
-    <partial name="_BackButton" model="@(new BackLink(Url.Action("View", "Tenants", new { id = Model.FacilityId, section = "reports" })!, "Back to facility"))" />
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = Model.ReportId })!, "Back to report"))" />
 </div>
 
 <partial name="_ReportNav" />

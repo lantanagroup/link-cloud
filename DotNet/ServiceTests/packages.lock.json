@@ -56,6 +56,16 @@
           "SQLitePCLRaw.core": "2.1.6"
         }
       },
+      "Microsoft.EntityFrameworkCore.Sqlite": {
+        "type": "Direct",
+        "requested": "[8.0.27, )",
+        "resolved": "8.0.27",
+        "contentHash": "jrikpJbWGdzrfU0yStS9HDT1Tko22Pc9fmFEtOzIehayGmKdJZCCoPYBygbMZLG357a7iXaP2jzL4pejxzDSSA==",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore.Sqlite.Core": "8.0.27",
+          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.6"
+        }
+      },
       "Microsoft.Extensions.TimeProvider.Testing": {
         "type": "Direct",
         "requested": "[8.10.0, )",
@@ -2574,6 +2584,7 @@
           "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
           "Azure.Identity": "[1.21.0, )",
           "FluentValidation.AspNetCore": "[11.3.1, )",
+          "LantanaGroup.Link.Shared.KafkaAdmin": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[8.0.27, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[8.0.27, )",
           "Microsoft.AspNetCore.OpenApi": "[8.0.27, )",
@@ -2788,6 +2799,33 @@
           "LinkSdk": "[1.0.0, )",
           "LinqKit.Core": "[1.2.11, )",
           "Quartz": "[3.18.1, )",
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
+      "LantanaGroup.Link.Operations": {
+        "type": "Project",
+        "dependencies": {
+          "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
+          "LantanaGroup.Link.Shared.KafkaAdmin": "[1.0.0, )",
+          "Microsoft.AspNetCore.Authentication.JwtBearer": "[8.0.27, )",
+          "Microsoft.AspNetCore.OpenApi": "[8.0.27, )",
+          "Microsoft.EntityFrameworkCore.SqlServer": "[8.0.27, )",
+          "Microsoft.Extensions.Caching.StackExchangeRedis": "[10.0.10, )",
+          "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
+          "Serilog": "[4.3.1, )",
+          "Serilog.AspNetCore": "[8.0.3, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
+          "Serilog.Exceptions": "[8.4.0, )",
+          "Serilog.Expressions": "[5.0.0, )",
+          "Serilog.Sinks.Console": "[6.1.1, )",
+          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
+          "Swashbuckle.AspNetCore": "[6.9.0, )",
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
+      "LantanaGroup.Link.Shared.KafkaAdmin": {
+        "type": "Project",
+        "dependencies": {
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
@@ -3452,16 +3490,6 @@
         "dependencies": {
           "Microsoft.EntityFrameworkCore": "8.0.27",
           "Microsoft.Extensions.Configuration.Abstractions": "8.0.0"
-        }
-      },
-      "Microsoft.EntityFrameworkCore.Sqlite": {
-        "type": "CentralTransitive",
-        "requested": "[8.0.27, )",
-        "resolved": "8.0.27",
-        "contentHash": "jrikpJbWGdzrfU0yStS9HDT1Tko22Pc9fmFEtOzIehayGmKdJZCCoPYBygbMZLG357a7iXaP2jzL4pejxzDSSA==",
-        "dependencies": {
-          "Microsoft.EntityFrameworkCore.Sqlite.Core": "8.0.27",
-          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.6"
         }
       },
       "Microsoft.EntityFrameworkCore.Sqlite.Core": {

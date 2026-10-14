@@ -115,7 +115,8 @@ public class SaveInPlaceTests
             text.Should().Contain("id=\"resubmitDialog\"");
             text.Should().Contain("id=\"resubmitForm\"");
             text.Should().Contain("data-resubmit-open");
-            text.Should().Contain("name=\"bypassSubmission\" value=\"true\">Regenerate without submitting");
+            text.Should().Contain("name=\"bypassSubmission\" data-hold=");
+            text.Should().Contain("value=\"true\">Regenerate without submitting");
             text.Should().NotContain("Bypass submission");
             text.Should().NotContain("type=\"checkbox\" name=\"bypassSubmission\"");
         }

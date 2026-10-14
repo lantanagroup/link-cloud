@@ -120,7 +120,7 @@
                 <input type="hidden" id="QpIsSystem" value="false" />
 
                 @* ---- Tabs: Visual Editor / JSON Import ---- *@
-                <ul class="lu-section-nav" id="qpEditorTabs" role="tablist">
+                <ul class="nav lu-section-nav" id="qpEditorTabs" role="tablist">
                     <li role="presentation">
                         <button class="active" id="tab-visual" data-bs-toggle="tab" data-bs-target="#pane-visual" type="button" role="tab">
                             <i class="bi bi-pencil-square me-1"></i>Visual Editor
@@ -752,9 +752,11 @@
 
     document.querySelectorAll('.btn-qp-delete').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-            if (!confirm('Delete this query plan?')) return;
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(btn, "Delete this query plan", "Delete this query plan?", ["The query plan is removed."], async function () {
             try { await qpPostJson(deleteUrl, { id: btn.getAttribute('data-id') }); auRefreshPage('Deleted.'); }
             catch (err) { showQpError('Delete failed: ' + (err.message || 'Unknown error')); openModal(); }
+            });
         });
     });
 

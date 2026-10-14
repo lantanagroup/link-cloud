@@ -53,11 +53,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\Shared.KafkaAdmin\Shared.KafkaAdmin.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ServiceTests" />
-    <InternalsVisibleTo Include="KafkaOps.Proof" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 

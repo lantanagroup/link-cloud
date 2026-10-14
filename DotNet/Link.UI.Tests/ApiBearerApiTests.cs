@@ -807,6 +807,7 @@ internal static class ApiRunsFakes
         public Task<AutomationRunMetricsDocument?> GetPreviousAsync(Guid scenarioId, DateTimeOffset beforeFinishedAt, Guid excludeRunId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<AutomationRunMetricsDocument?> GetPreviousSucceededAsync(Guid scenarioId, DateTimeOffset beforeFinishedAt, Guid excludeRunId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<AutomationRunMetricsDocument?> GetPreviousSucceededSameFingerprintAsync(Guid scenarioId, string fingerprint, DateTimeOffset beforeFinishedAt, Guid excludeRunId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<AutomationRunMetricsDocument>> ListRecentSucceededSameFingerprintAsync(Guid scenarioId, string fingerprint, DateTimeOffset beforeFinishedAt, Guid excludeRunId, int limit, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         private static AutomationRunMetricsDocument Document() => new()
         {

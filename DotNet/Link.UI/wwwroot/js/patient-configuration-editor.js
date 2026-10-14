@@ -1141,12 +1141,18 @@
                     ? e.target.selectedOptions[0].textContent
                     : 'that configuration';
                 var hasDx = selectedCodes($('PcPrimaryDxPicker')).length > 0;
-                if ((lastSeededIntent || hasDx || emptyToNull(val('PcName'))) &&
-                    !window.confirm('Replace this form with “' + label + '”? The source is not overwritten.')) {
+                var chosen = id;
+                var seed = function () { seedFromBaseline(chosen, { suggestName: !emptyToNull(val('PcName')) }); };
+                if (lastSeededIntent || hasDx || emptyToNull(val('PcName'))) {
                     e.target.value = '';
+                    if (!window.luHoldConfirm) return;
+                    window.luHoldConfirm.ask(e.target, "Replace this form", 'Replace this form with “' + label + '”? The source is not overwritten.', ["The form is replaced. The source configuration is not overwritten."], function () {
+                        e.target.value = chosen;
+                        seed();
+                    });
                     return;
                 }
-                seedFromBaseline(id, { suggestName: !emptyToNull(val('PcName')) });
+                seed();
             }
             updateSectionBadges();
         });
