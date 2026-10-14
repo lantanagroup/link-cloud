@@ -185,7 +185,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
     {
         var record = await GetAsync(user, id, mutate: true, cancellationToken);
         var live = await PlanAsync(record.Topic, record.TargetPartitions, record.BackupSkipped, record.BackupSkipped, record.AcknowledgedGroups, cancellationToken);
-        var error = MigrationApprovals.ValidateApprove(record, KafkaOpsService.UserName(user), live.PlanHash);
+        var error = MigrationApprovals.ValidateApprove(record, KafkaOpsService.UserName(user), live.PlanHash, _options.DifferentApprover);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
         record.Approver = KafkaOpsService.UserName(user);
@@ -201,7 +201,10 @@ public sealed class MigrationRuntime : IMigrationRuntime
         var record = await GetAsync(user, id, mutate: true, cancellationToken);
         if (record.Step is not (MigrationStep.Pending or MigrationStep.Approved))
             throw new KafkaOpsRejectedException("Only a pending or approved migration can be rejected.");
-        if (string.Equals(KafkaOpsService.UserName(user), record.Requester, StringComparison.OrdinalIgnoreCase))
+        var rejector = KafkaOpsService.UserName(user);
+        if (_options.DifferentApprover && (!ChangeRequestWorkflow.Identified(record.Requester) || !ChangeRequestWorkflow.Identified(rejector)))
+            throw new KafkaOpsRejectedException(ChangeRequestWorkflow.UnidentifiedDetail);
+        if (_options.DifferentApprover && string.Equals(rejector, record.Requester, StringComparison.OrdinalIgnoreCase))
             throw new KafkaOpsRejectedException("A different person must reject the migration.");
         record.Step = MigrationStep.Rejected;
         record.Failure = string.IsNullOrWhiteSpace(reason) ? "Rejected." : reason.Trim();
@@ -461,7 +464,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
         var record = await GetAsync(user, id, mutate: true, cancellationToken);
         if (execute)
         {
-            var error = MigrationApprovals.ValidateExecute(record, KafkaOpsService.UserName(user));
+            var error = MigrationApprovals.ValidateExecute(record, KafkaOpsService.UserName(user), _options.DifferentApprover);
             if (error is not null)
                 throw new KafkaOpsRejectedException(error);
             record.Executor = KafkaOpsService.UserName(user);
@@ -529,7 +532,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
         {
             admitRecover = false;
             var seen = await ObserveAsync(record, cancellationToken);
-            var tick = MigrationMachine.Describe(record, seen, command, actor, typed, DateTimeOffset.UtcNow, Limits());
+            var tick = MigrationMachine.Describe(record, seen, command, actor, typed, DateTimeOffset.UtcNow, Limits(), _options.DifferentApprover);
             command = MigrationCommand.Tick;
             typed = null;
             if (tick.Error is not null)
@@ -540,7 +543,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
                 await SaveAsync(intent, fence, cancellationToken);
                 await ApplyAsync(intent, tick.Effects, cancellationToken);
                 var after = await ObserveAsync(intent, cancellationToken);
-                var resume = MigrationMachine.Describe(intent, after, MigrationCommand.Tick, record.Executor, null, DateTimeOffset.UtcNow, Limits());
+                var resume = MigrationMachine.Describe(intent, after, MigrationCommand.Tick, record.Executor, null, DateTimeOffset.UtcNow, Limits(), _options.DifferentApprover);
                 record = resume.Completed ?? resume.Persist ?? intent;
                 await SaveAsync(record, fence, cancellationToken);
                 if (resume.Error is not null)
