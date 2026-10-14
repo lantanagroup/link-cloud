@@ -151,6 +151,16 @@
         }, true);
     }
 
-    window.luHoldConfirm = { open: function (button, spec, onDone) { if (!modal) wire(); if (modal) open(button, spec, onDone); } };
+    function ask(anchor, title, action, risks, yes) {
+        var node = anchor && typeof anchor.getAttribute === "function" ? anchor : document.body;
+        if (!modal) wire();
+        if (!modal) return;
+        open(node, { title: title || "Confirm", action: action || "", details: [], fields: [], risks: risks || [], confirm: "", label: "Hold to confirm" }, yes);
+    }
+
+    window.luHoldConfirm = {
+        open: function (button, spec, onDone) { if (!modal) wire(); if (modal) open(button, spec, onDone); },
+        ask: ask
+    };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire); else wire();
 })();

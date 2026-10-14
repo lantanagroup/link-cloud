@@ -53,10 +53,9 @@
                     History of this use case
                 </a>
             }
-            <form asp-action="Delete" asp-route-id="@Model.RunId" method="post" class="d-inline"
-                  onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
+            <form asp-action="Delete" asp-route-id="@Model.RunId" method="post" class="d-inline">
                 @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-sm btn-danger">
+                <button data-hold="@Hold.Of("Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.", "Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.", "Cards, trends, and compare drop this result. The run log stays.", "Hold to remove")" type="submit" class="btn btn-sm btn-danger">
                     <i class="bi bi-trash me-1"></i>Remove from history
                 </button>
             </form>

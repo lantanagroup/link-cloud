@@ -78,8 +78,8 @@
                                         <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Name"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
                                         <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Name"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
                                     </form>
-                                    <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Name"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                    <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id">
+                                        <button data-hold="@Hold.Of("Delete this vendor?", "Delete this vendor?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Name"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </div>
                             </td>

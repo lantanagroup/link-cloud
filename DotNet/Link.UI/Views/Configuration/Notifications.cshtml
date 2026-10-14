@@ -33,7 +33,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Send a notification</div>
     <div class="card-body">
-        <form method="post" data-au-save class="row g-2" onsubmit="return confirm('Send this notification?');">
+        <form method="post" data-au-save class="row g-2">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="sendType">Type</label>
                 <select id="sendType" name="NotificationType" class="form-select" required>
@@ -65,7 +65,7 @@
                 <textarea id="body" name="Body" class="form-control" rows="4" maxlength="4000" required></textarea>
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-au-execute">Send</button>
+                <button data-hold="@Hold.Of("Send this notification?", "Send this notification?", "The notification is sent.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Send</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Separate addresses with commas or new lines. This posts to the notification service.</p>

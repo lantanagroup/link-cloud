@@ -308,25 +308,27 @@
         submit.title = "Delete";
         submit.setAttribute("aria-label", "Delete " + label);
         submit.addEventListener("click", function () {
-            if (!window.confirm("Delete " + label + "? It is deleted when you save the facility.")) return;
-            form.setAttribute("data-facility-force", "true");
-            applySkip(form);
-            var row = form.closest("[data-collection-row]");
-            if (row) row.classList.add("lu-row-staged");
-            var note = document.createElement("div");
-            note.className = "alert alert-warning mt-2 lu-remove-note";
-            note.appendChild(document.createTextNode("Staged for removal. "));
-            note.appendChild(undoButton(function () {
-                form.removeAttribute("data-facility-force");
-                syncSkip(action);
-                if (row) row.classList.remove("lu-row-staged");
-                note.remove();
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(submit, "Delete " + label, "Delete " + label + "? It is deleted when you save the facility.", ["It is removed when you save the facility."], function () {
+                form.setAttribute("data-facility-force", "true");
+                applySkip(form);
+                var row = form.closest("[data-collection-row]");
+                if (row) row.classList.add("lu-row-staged");
+                var note = document.createElement("div");
+                note.className = "alert alert-warning mt-2 lu-remove-note";
+                note.appendChild(document.createTextNode("Staged for removal. "));
+                note.appendChild(undoButton(function () {
+                    form.removeAttribute("data-facility-force");
+                    syncSkip(action);
+                    if (row) row.classList.remove("lu-row-staged");
+                    note.remove();
+                    refreshFlag();
+                    updateCounts();
+                }));
+                form.appendChild(note);
                 refreshFlag();
                 updateCounts();
-            }));
-            form.appendChild(note);
-            refreshFlag();
-            updateCounts();
+            });
         });
     }
 
@@ -348,11 +350,13 @@
             button.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
-                if (!window.confirm("Delete " + label + "? It is deleted when you save the facility.")) return;
-                form.setAttribute("data-facility-force", "true");
-                applySkip(form);
-                showStaged();
-                refreshFlag();
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.ask(button, "Delete " + label, "Delete " + label + "? It is deleted when you save the facility.", ["It is removed when you save the facility."], function () {
+                    form.setAttribute("data-facility-force", "true");
+                    applySkip(form);
+                    showStaged();
+                    refreshFlag();
+                });
             });
             slot.appendChild(button);
         }
@@ -551,11 +555,18 @@
                 showResults(["All four query plan types already exist."]);
                 return;
             }
-            if (sectionDirty(item) && !window.confirm("This query plan has unsaved changes. Continue and discard them?")) return;
-            var url = new URL(window.location.href);
-            url.searchParams.set("planType", missing);
-            url.searchParams.set("planEdit", "add");
-            swapItem(url.toString(), "queryPlanItem");
+            var go = function () {
+                var url = new URL(window.location.href);
+                url.searchParams.set("planType", missing);
+                url.searchParams.set("planEdit", "add");
+                swapItem(url.toString(), "queryPlanItem");
+            };
+            if (sectionDirty(item)) {
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.ask(item, "Discard unsaved changes", "This query plan has unsaved changes. Continue and discard them?", ["Edits in this query plan are lost."], go);
+                return;
+            }
+            go();
         });
         var undo = item.querySelector("#queryPlanAddUndo");
         if (undo && undo.getAttribute("data-wired") !== "1") {
@@ -617,8 +628,8 @@
         button.addEventListener("click", function () {
             var row = button.closest("[data-dispatch-row]");
             var form = button.closest("form");
-            if (!row || !form) return;
-            if (!window.confirm("Delete this dispatch schedule? It is removed when you save the facility.")) return;
+            if (!row || !form || !window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(button, "Delete this dispatch schedule", "Delete this dispatch schedule? It is removed when you save the facility.", ["It is removed when you save the facility."], function () {
             if (row.getAttribute("data-dispatch-new") === "true") {
                 row.remove();
                 if (!form.querySelector("[data-dispatch-new='true'], .lu-row-staged") && form.getAttribute("data-facility-edited") !== "1")
@@ -649,6 +660,7 @@
             row.appendChild(note);
             markDirty(form);
             updateCounts();
+            });
         });
     }
 
@@ -680,8 +692,8 @@
         button.addEventListener("click", function () {
             var row = button.closest("[data-email-row]");
             var form = button.closest("form");
-            if (!row || !form) return;
-            if (!window.confirm("Delete this address? It is removed when you save the facility.")) return;
+            if (!row || !form || !window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(button, "Delete this address", "Delete this address? It is removed when you save the facility.", ["It is removed when you save the facility."], function () {
             if (row.getAttribute("data-email-new") === "true") {
                 row.remove();
             } else {
@@ -711,6 +723,7 @@
                 markDirty(form);
             refreshFlag();
             updateCounts();
+            });
         });
     }
 
@@ -787,15 +800,26 @@
         select.addEventListener("change", function () {
             var item = select.closest(".accordion-item");
             if (!item || !item.id) return;
-            if (sectionDirty(item) && !window.confirm("This query plan has unsaved changes. Switch type without saving?")) {
-                select.value = select.getAttribute("data-current");
+            var next = select.value;
+            var previous = select.getAttribute("data-current");
+            var go = function () {
+                var url = new URL(window.location.href);
+                url.searchParams.set("planType", next);
+                swapItem(url.toString(), item.id).then(function (ok) {
+                    if (!ok && select.isConnected) select.value = previous;
+                    else select.setAttribute("data-current", next);
+                });
+            };
+            if (sectionDirty(item)) {
+                select.value = previous;
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.ask(select, "Switch query plan", "This query plan has unsaved changes. Switch type without saving?", ["Edits in this query plan are lost."], function () {
+                    select.value = next;
+                    go();
+                });
                 return;
             }
-            var url = new URL(window.location.href);
-            url.searchParams.set("planType", select.value);
-            swapItem(url.toString(), item.id).then(function (ok) {
-                if (!ok && select.isConnected) select.value = select.getAttribute("data-current");
-            });
+            go();
         });
     }
 
@@ -835,9 +859,13 @@
         var cancel = document.getElementById("facilityCancelButton");
         if (save) save.addEventListener("click", saveAll);
         if (cancel) cancel.addEventListener("click", function () {
-            if (isDirty() && !window.confirm("This facility has unsaved changes. Leave without saving?")) return;
-            leaving = true;
-            window.location.reload();
+            var go = function () {
+                leaving = true;
+                window.location.reload();
+            };
+            if (!isDirty()) { go(); return; }
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(cancel, "Leave without saving", "This facility has unsaved changes. Leave without saving?", ["Edits on this facility are lost."], go);
         });
         refreshFlag();
     }
@@ -988,27 +1016,41 @@
         if (!editor || editor.getAttribute("data-facility-ready") !== "1" || !editor.contains(event.target)) return;
         var form = event.target;
         if (!form || !form.getAttribute) return;
+        if (form.getAttribute("data-hold-passed") === "1") {
+            form.removeAttribute("data-hold-passed");
+            return;
+        }
         if ((form.method || "").toLowerCase() === "get") {
             var swapId = form.getAttribute("data-facility-swap");
             if (swapId) {
                 event.preventDefault();
                 event.stopPropagation();
                 var swapTarget = document.getElementById(swapId);
-                if (sectionDirty(swapTarget) && !window.confirm("This section has unsaved changes. Continue and discard them?")) return;
-                var url = new URL(form.action, window.location.href);
-                new FormData(form).forEach(function (value, key) {
-                    if (value) url.searchParams.set(key, value);
-                });
-                swapItem(withPlanType(url).toString(), swapId);
+                var goSwap = function () {
+                    var url = new URL(form.action, window.location.href);
+                    new FormData(form).forEach(function (value, key) {
+                        if (value) url.searchParams.set(key, value);
+                    });
+                    swapItem(withPlanType(url).toString(), swapId);
+                };
+                if (sectionDirty(swapTarget)) {
+                    if (!window.luHoldConfirm) return;
+                    window.luHoldConfirm.ask(form, "Discard unsaved changes", "This section has unsaved changes. Continue and discard them?", ["Edits in this section are lost."], goSwap);
+                    return;
+                }
+                goSwap();
                 return;
             }
             if (!isDirty()) return;
-            if (!window.confirm("This facility has unsaved changes. Leave without saving?")) {
-                event.preventDefault();
-                event.stopPropagation();
-            } else {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(form, "Leave without saving", "This facility has unsaved changes. Leave without saving?", ["Edits on this facility are lost."], function () {
                 leaving = true;
-            }
+                form.setAttribute("data-hold-passed", "1");
+                if (form.requestSubmit) form.requestSubmit();
+                else form.submit();
+            });
             return;
         }
         if (form.getAttribute("data-facility-immediate") === "1") return;
@@ -1029,11 +1071,16 @@
         event.stopImmediatePropagation();
         var swapId = link.getAttribute("data-facility-swap");
         var swapTarget = document.getElementById(swapId);
-        if (sectionDirty(swapTarget) && !window.confirm("This section has unsaved changes. Continue and discard them?")) return;
         var url;
         try { url = new URL(link.href, window.location.href); }
         catch (e) { return; }
-        swapItem(withPlanType(url).toString(), swapId);
+        var go = function () { swapItem(withPlanType(url).toString(), swapId); };
+        if (sectionDirty(swapTarget)) {
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.ask(link, "Discard unsaved changes", "This section has unsaved changes. Continue and discard them?", ["Edits in this section are lost."], go);
+            return;
+        }
+        go();
     }, true);
 
     document.addEventListener("click", function (event) {
@@ -1048,12 +1095,13 @@
         catch (e) { return; }
         if (url.origin !== window.location.origin) return;
         if (url.pathname === window.location.pathname && url.search === window.location.search) return;
-        if (!window.confirm("This facility has unsaved changes. Leave without saving?")) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-        }
-        leaving = true;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!window.luHoldConfirm) return;
+        window.luHoldConfirm.ask(link, "Leave without saving", "This facility has unsaved changes. Leave without saving?", ["Edits on this facility are lost."], function () {
+            leaving = true;
+            window.location.assign(url.toString());
+        });
     }, true);
 
     window.addEventListener("beforeunload", function (event) {
@@ -1065,9 +1113,16 @@
     document.addEventListener("show.bs.tab", function (event) {
         var editor = root();
         if (!editor || !editor.contains(event.target) || !isDirty()) return;
-        if (!window.confirm("This facility has unsaved changes. Switch tabs without saving?")) {
-            event.preventDefault();
+        if (event.target.getAttribute("data-hold-passed") === "1") {
+            event.target.removeAttribute("data-hold-passed");
+            return;
         }
+        event.preventDefault();
+        if (!window.luHoldConfirm) return;
+        window.luHoldConfirm.ask(event.target, "Switch tabs", "This facility has unsaved changes. Switch tabs without saving?", ["Edits on this facility are lost."], function () {
+            event.target.setAttribute("data-hold-passed", "1");
+            if (window.bootstrap && window.bootstrap.Tab) window.bootstrap.Tab.getOrCreateInstance(event.target).show();
+        });
     });
 
     document.addEventListener("au-refreshed", function () { init(); });
