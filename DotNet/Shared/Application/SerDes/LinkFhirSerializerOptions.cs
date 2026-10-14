@@ -27,8 +27,15 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
         };
 
         public static readonly JsonSerializerOptions ForFhirLenientSerialization =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, PermissiveConverterOptions)
-                .UsingMode(DeserializationMode.Ostrich);
+            ConfigurePermissiveFhirDeserialization(new JsonSerializerOptions());
+
+        public static JsonSerializerOptions ConfigurePermissiveFhirDeserialization(JsonSerializerOptions options)
+        {
+            options.AllowTrailingCommas = true;
+            options.PropertyNameCaseInsensitive = true;
+            options.ForFhir(ModelInfo.ModelInspector, PermissiveConverterOptions);
+            return options.UsingMode(DeserializationMode.Ostrich);
+        }
 
         /// <summary>
         /// Permissive POCO deserializer. Replaces Firely 5 <c>FhirJsonParser</c> + <c>PermissiveParsing</c>.
