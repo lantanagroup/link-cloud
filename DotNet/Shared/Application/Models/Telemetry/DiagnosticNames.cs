@@ -13,6 +13,7 @@
         public const string PatientId = "patient.id";
         public const string PatientEvent = "patient.event";
         public const string Phase = "phase";
+        public const string DeploymentEnvironmentName = "deployment.environment.name";
         public const string Resource = "resource";
         public const string ResourceType = "resource.type";
         public const string ResourceId = "resource.id";
