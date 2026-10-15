@@ -32,6 +32,8 @@ import * as moment from 'moment-timezone';
 import {ScheduledReportsValidator} from "../../validators/ScheduledReportsValidator";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import { AppConfig, AppConfigService } from '../../../services/app-config.service';
+import { DmrpStatusService } from '../../../services/gateway/dmrp/dmrp-status.service';
+import { firstValueFrom } from 'rxjs';
 
 export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): ValidatorFn {
   return (control: AbstractControl) => {
@@ -106,23 +108,36 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   appConfig?: AppConfig;
 
   /**
-   * DMRP feature flag. When DMRP is enabled the facility's schedule comes from its DMRP reporting
-   * plans, so the report pickers are hidden and the Tenant API is sent an empty schedule. It refuses
-   * one that is not.
+   * Tenant's DMRP:Enabled, read from api/dmrp/dmrp-status. When DMRP is enabled a facility's schedule
+   * comes from its DMRP reporting plans, and the Tenant API refuses a schedule in the request unless the
+   * Mock DMRP API is switched on.
    *
-   * The fallback is the safe direction rather than the eventual one: assuming the flag is off means a
-   * config that failed to load leaves the form asking for a schedule, which the API then rejects out
-   * loud. Assuming it is on would quietly create facilities that report nothing.
+   * Off until Tenant answers, and off if it cannot be asked: the form then asks for a schedule, which
+   * Tenant refuses loudly if DMRP is in fact on, rather than quietly creating a facility that reports
+   * nothing.
    */
-  get dmrpEnabled(): boolean {
-    return this.appConfig?.dmrpEnabled ?? false;
+  dmrpEnabled = false;
+
+  /**
+   * True when Tenant writes the facility's selected reports through to the Mock DMRP API as its
+   * enrollment, so the pickers stay editable even with DMRP enabled.
+   */
+  mockDmrpEnabled = false;
+
+  /**
+   * The report pickers are shown and their selections sent with DMRP off, or with DMRP on when the
+   * selections are written through to the Mock DMRP API.
+   */
+  get showReportPickers(): boolean {
+    return !this.dmrpEnabled || this.mockDmrpEnabled;
   }
 
   constructor(
     private snackBar: MatSnackBar,
     private tenantService: TenantService,
     private measureDefinitionConfigurationService: MeasureDefinitionService,
-    private appConfigService: AppConfigService) { }
+    private appConfigService: AppConfigService,
+    private dmrpStatusService: DmrpStatusService) { }
 
   compareReportTypes(object1: any, object2: any) {
     return (object1 && object2) && object1 === object2;
@@ -136,6 +151,10 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
 
     this.appConfig = await this.appConfigService.loadConfig();
+
+    const dmrpStatus = await firstValueFrom(this.dmrpStatusService.getStatus());
+    this.dmrpEnabled = dmrpStatus.dmrpEnabled;
+    this.mockDmrpEnabled = dmrpStatus.mockDmrpEnabled;
 
     this.facilityConfigForm = new FormGroup(
       {
@@ -319,14 +338,15 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
 
-      // DMRP feature flag. With DMRP enabled the schedule is derived from the facility's reporting
-      // plans, and the Tenant API refuses a request that carries one. The block itself still has to
-      // be sent: its three arrays are not nullable, so leaving it out fails model binding before the
-      // API sees it. Editing an existing facility loads its stored schedule into these controls, so
-      // the arrays are emptied here rather than relying on the controls being untouched.
-      let monthlyReports : string[] = this.dmrpEnabled ? [] : (this.monthlyReportsControl.value ?? []);
-      let weeklyReports : string[] = this.dmrpEnabled ? [] : (this.weeklyReportsControl.value ?? []);
-      let dailyReports : string[] = this.dmrpEnabled ? [] : (this.dailyReportsControl.value ?? []);
+      // With DMRP enabled and no Mock DMRP API the schedule is derived from the facility's reporting
+      // plans, and the Tenant API refuses a request that carries one. The block itself still has to be
+      // sent: its three arrays are not nullable, so leaving it out fails model binding before the API
+      // sees it. Editing an existing facility loads its stored schedule into these controls, so the
+      // arrays are emptied here rather than relying on the controls being untouched.
+      const sendSelection = this.showReportPickers;
+      let monthlyReports : string[] = sendSelection ? (this.monthlyReportsControl.value ?? []) : [];
+      let weeklyReports : string[] = sendSelection ? (this.weeklyReportsControl.value ?? []) : [];
+      let dailyReports : string[] = sendSelection ? (this.dailyReportsControl.value ?? []) : [];
       let scheduledReports: { daily: string[], monthly: string[], weekly: string[] } = {"daily": dailyReports, "monthly": monthlyReports, "weekly": weeklyReports};
 
       if(this.formMode == FormMode.Create) {

@@ -178,18 +178,21 @@
                     <div class="card-header"><i class="bi bi-clock-history me-2"></i>Status</div>
                     <div class="card-body">
                         <dl class="row mb-0 small">
-                            <dt class="col-6">Now (UTC)</dt>
-                            <dd class="col-6" id="cleanup-now">@Model.NowUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
-                            <dt class="col-6">Next daily teardown</dt>
-                            <dd class="col-6">@Model.NextDailyTeardownUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-                            <dt class="col-6">Next weekly purge</dt>
-                            <dd class="col-6">@Model.NextWeeklyPurgeUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-                            <dt class="col-6">Last daily</dt>
-                            <dd class="col-6">@(s.LastDailyTeardownAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
-                            <dt class="col-6">Last weekly</dt>
-                            <dd class="col-6">@(s.LastWeeklyPurgeAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
-                            <dt class="col-6">Last quiesce</dt>
-                            <dd class="col-6" id="cleanup-last-quiesce">@(Model.LastQuiesceAt?.UtcDateTime.ToString("HH:mm:ss") ?? "not yet this process")</dd>
+                            <dt class="col-6 border-bottom pb-2">Now (UTC)</dt>
+                            <dd class="col-6 border-bottom pb-2" id="cleanup-now">@Model.NowUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
+
+                            <dt class="col-6 pt-2">Next daily teardown</dt>
+                            <dd class="col-6 pt-2">@Model.NextDailyTeardownUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+                            <dt class="col-6 border-bottom pb-2">Next weekly purge</dt>
+                            <dd class="col-6 border-bottom pb-2">@Model.NextWeeklyPurgeUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+
+                            <dt class="col-6 pt-2">Last daily teardown</dt>
+                            <dd class="col-6 pt-2">@(s.LastDailyTeardownAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+                            <dt class="col-6 border-bottom pb-2">Last weekly purge</dt>
+                            <dd class="col-6 border-bottom pb-2">@(s.LastWeeklyPurgeAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+
+                            <dt class="col-6 pt-2">Last quiesce</dt>
+                            <dd class="col-6 pt-2" id="cleanup-last-quiesce">@(Model.LastQuiesceAt?.UtcDateTime.ToString("HH:mm:ss") ?? "not yet this process")</dd>
                         </dl>
                         @if (!string.IsNullOrWhiteSpace(s.LastDailyTeardownResult))
                         {

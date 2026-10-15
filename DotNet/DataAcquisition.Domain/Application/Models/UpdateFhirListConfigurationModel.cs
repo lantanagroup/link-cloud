@@ -8,7 +8,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models
         public string? Id { get; set; }
         public string FacilityId { get; set; }
         public string FhirBaseServerUrl { get; set; }
-        public AuthenticationConfigurationModel? Authentication { get; set; }
         public List<EhrPatientListModel> EHRPatientLists { get; set; }
     }
 }

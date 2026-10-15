@@ -275,9 +275,16 @@ public sealed class DmrpTestSuite : ServiceTestSuiteBase
             scheduledFacilityId = $"ApiHealth-DMRP-{Guid.NewGuid():N}";
             var candidate = scheduledFacilityId;
 
+            // With the Mock DMRP write-through Tenant accepts a schedule and enrolls the facility from it, but
+            // still refuses a dQM no measure mapping covers. Naming one keeps this a 400 that enrolls nothing.
+            var status = await _client.GetDmrpStatusAsync(ct);
+            var scheduledDqm = status.IsSuccessStatusCode && status.Body?.MockDmrpEnabled == true
+                ? $"ApiHealth-Unmapped-{Guid.NewGuid():N}"
+                : dqm;
+
             results.Add(await RunStepAsync<FacilityModel>(StepNames.FacilityPost400WithSchedule, 400, async () =>
             {
-                var response = await _facilityClient.CreateAsync(FacilityWithSchedule(candidate, dqm), ct);
+                var response = await _facilityClient.CreateAsync(FacilityWithSchedule(candidate, scheduledDqm), ct);
                 if (!response.IsSuccessStatusCode)
                 {
                     // Nothing was created, so nothing needs removing in cleanup.

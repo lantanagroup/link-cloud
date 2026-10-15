@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -12,11 +12,11 @@ public interface IDataAcquisitionServiceClient
 
     /// <summary>
     /// Creates a FHIR query configuration, including authentication when the body carries it.
-    /// <c>POST /api/data/fhirQueryConfiguration</c>.
+    /// <c>POST /api/data-acquisition/fhirQueryConfiguration</c>.
     /// </summary>
     Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(object request, CancellationToken cancellationToken = default);
 
-    /// <summary>Saves/updates the FHIR server connection settings: <c>PUT /api/data/fhirQueryConfiguration</c>.</summary>
+    /// <summary>Saves/updates the FHIR server connection settings: <c>PUT /api/data-acquisition/fhirQueryConfiguration</c>.</summary>
     Task<LinkApiResponse> UpdateFhirQueryConfigurationAsync(object request, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -38,7 +38,7 @@ public interface IDataAcquisitionServiceClient
                                                                      object request,
                                                                      CancellationToken cancellationToken = default);
 
-    /// <summary>Facility-scoped FHIR connection probe: <c>GET /api/data/connectionValidation/{facilityId}/$validate</c>.</summary>
+    /// <summary>Facility-scoped FHIR connection probe: <c>GET /api/data-acquisition/connectionValidation/{facilityId}/$validate</c>.</summary>
     Task<LinkApiResponse> ValidateFacilityConnectionAsync(
         string facilityId,
         string? patientId = null,
@@ -51,14 +51,14 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, bool includePatients = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
 
-    /// <summary>Saves/updates the Epic patient-list configurations: <c>PUT /api/data/fhirQueryList</c>.</summary>
+    /// <summary>Saves/updates the Epic patient-list configurations: <c>PUT /api/data-acquisition/fhirQueryList</c>.</summary>
     Task<LinkApiResponse> UpdateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> DeleteFhirListConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateQueryPlanAsync(string facilityId, CreateQueryPlanRequestApiModel request, CancellationToken cancellationToken = default);
 
-    /// <summary>Saves/updates the pre-configured per-vendor query plan: <c>PUT /api/data/{facilityId}/QueryPlan</c>.</summary>
+    /// <summary>Saves/updates the pre-configured per-vendor query plan: <c>PUT /api/data-acquisition/{facilityId}/QueryPlan</c>.</summary>
     Task<LinkApiResponse> UpdateQueryPlanAsync(string facilityId, object request, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> DeleteQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
@@ -82,7 +82,7 @@ public interface IDataAcquisitionServiceClient
         AcquisitionLogQuery query,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Day totals and the failed total: <c>POST /api/data/acquisition-logs/counts</c>.</summary>
+    /// <summary>Day totals and the failed total: <c>POST /api/data-acquisition/acquisition-logs/counts</c>.</summary>
     Task<LinkApiResponse<AcquisitionActivityCounts>> GetActivityCountsAsync(
         AcquisitionActivityCountRequest request,
         CancellationToken cancellationToken = default);
@@ -131,7 +131,7 @@ public interface IDataAcquisitionServiceClient
 
     /// <summary>
     /// Paged location mappings for one facility:
-    /// <c>GET /api/data/location-mappings/facility/{facilityId}/search</c>.
+    /// <c>GET /api/data-acquisition/location-mappings/facility/{facilityId}/search</c>.
     /// </summary>
     Task<LinkApiResponse<PagedConfigModel<OrganizationLocationMappingApiModel>>> SearchOrganizationLocationMappingsAsync(
         string facilityId,
@@ -149,7 +149,7 @@ public interface IDataAcquisitionServiceClient
 
     /// <summary>
     /// Paged encounter mappings for one facility:
-    /// <c>GET /api/data/encounter-mappings/facilities/{facilityId}/search</c>.
+    /// <c>GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}/search</c>.
     /// </summary>
     Task<LinkApiResponse<PagedConfigModel<EncounterMappingApiModel>>> SearchEncounterMappingsAsync(
         string facilityId,
@@ -182,26 +182,26 @@ public interface IDataAcquisitionServiceClient
     // Organization location configuration (update)
     Task<LinkApiResponse> UpdateOrganizationLocationConfigurationAsync(string facilityId, object request, CancellationToken cancellationToken = default);
 
-    /// <summary>Updates one reporting-organization configuration: <c>PUT /api/data/location-config/{id}</c>.</summary>
+    /// <summary>Updates one reporting-organization configuration: <c>PUT /api/data-acquisition/location-config/{id}</c>.</summary>
     Task<LinkApiResponse> UpdateOrganizationLocationConfigurationByIdAsync(int id, object request, CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes one reporting-organization configuration: <c>DELETE /api/data/location-config/{id}</c>.</summary>
+    /// <summary>Deletes one reporting-organization configuration: <c>DELETE /api/data-acquisition/location-config/{id}</c>.</summary>
     Task<LinkApiResponse> DeleteOrganizationLocationConfigurationByIdAsync(int id, CancellationToken cancellationToken = default);
 
     // Organization location mappings
-    /// <summary>Reads one organization/location mapping: <c>GET /api/data/location-mappings/{id}</c>.</summary>
+    /// <summary>Reads one organization/location mapping: <c>GET /api/data-acquisition/location-mappings/{id}</c>.</summary>
     Task<LinkApiResponse<OrganizationLocationMappingApiModel>> GetOrganizationLocationMappingAsync(int id, CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes one organization/location mapping: <c>DELETE /api/data/location-mappings/{id}</c>.</summary>
+    /// <summary>Deletes one organization/location mapping: <c>DELETE /api/data-acquisition/location-mappings/{id}</c>.</summary>
     Task<LinkApiResponse> DeleteOrganizationLocationMappingAsync(int id, CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes every organization/location mapping for one facility: <c>DELETE /api/data/location-mappings/facility/{facilityId}</c>.</summary>
+    /// <summary>Deletes every organization/location mapping for one facility: <c>DELETE /api/data-acquisition/location-mappings/facility/{facilityId}</c>.</summary>
     Task<LinkApiResponse> DeleteOrganizationLocationMappingsAsync(string facilityId, CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes every encounter mapping for one facility: <c>DELETE /api/data/encounter-mappings/facilities/{facilityId}</c>.</summary>
+    /// <summary>Deletes every encounter mapping for one facility: <c>DELETE /api/data-acquisition/encounter-mappings/facilities/{facilityId}</c>.</summary>
     Task<LinkApiResponse> DeleteEncounterMappingsAsync(string facilityId, CancellationToken cancellationToken = default);
 
-    /// <summary>Saves the resolved organization/location mapping: <c>PUT /api/data/location-mappings/{id}</c>.</summary>
+    /// <summary>Saves the resolved organization/location mapping: <c>PUT /api/data-acquisition/location-mappings/{id}</c>.</summary>
     Task<LinkApiResponse> UpdateOrganizationLocationMappingAsync(int id, object request, CancellationToken cancellationToken = default);
 
     // sFTP acquisition configuration (Cerner)
@@ -216,20 +216,20 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> GetSftpCredentialStatusAsync(string organizationId, CancellationToken cancellationToken = default);
     /// <summary>
     /// Tests the saved sFTP configuration. HTTP 200 still carries <c>success</c> and <c>message</c>; a failed connection is not an error status.
-    /// <c>POST /api/data/{organizationId}/sftp-configurations/test-connection</c>.
+    /// <c>POST /api/data-acquisition/{organizationId}/sftp-configurations/test-connection</c>.
     /// </summary>
     Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSavedSftpConnectionAsync(string organizationId, CancellationToken cancellationToken = default);
 
-    /// <summary>Reads one sFTP acquisition log: <c>GET /api/data/sftp-logs/{logId}</c>.</summary>
+    /// <summary>Reads one sFTP acquisition log: <c>GET /api/data-acquisition/sftp-logs/{logId}</c>.</summary>
     Task<LinkApiResponse<SftpLogApiModel>> GetSftpLogAsync(string logId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Resets an sFTP log so it can be retried: <c>POST /api/data/sftp-logs/{logId}/reset</c>.
+    /// Resets an sFTP log so it can be retried: <c>POST /api/data-acquisition/sftp-logs/{logId}/reset</c>.
     /// Only ConfigurationRequired and MaxRetriesReached logs reset.
     /// </summary>
     Task<LinkApiResponse> ResetSftpLogAsync(string logId, CancellationToken cancellationToken = default);
 
-    /// <summary>Typed sFTP log search: <c>GET /api/data/sftp-logs</c>.</summary>
+    /// <summary>Typed sFTP log search: <c>GET /api/data-acquisition/sftp-logs</c>.</summary>
     Task<LinkApiResponse<PagedConfigModel<SftpLogApiModel>>> SearchSftpAcquisitionLogsAsync(
         string? facilityId = null,
         string? status = null,
@@ -253,6 +253,6 @@ public interface IDataAcquisitionServiceClient
         bool? includeDeleted = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Records an sFTP acquisition log: <c>POST /api/data/sftp-logs</c>.</summary>
+    /// <summary>Records an sFTP acquisition log: <c>POST /api/data-acquisition/sftp-logs</c>.</summary>
     Task<LinkApiResponse> CreateSftpLogAsync(object request, CancellationToken cancellationToken = default);
 }

@@ -16,8 +16,6 @@ public class FhirListConfiguration
     [Required]
     public string FhirBaseServerUrl { get; set; }
 
-    public AuthenticationConfiguration? Authentication { get; set; }
-
     [Required]
     [Column("EHRPatientLists")]
     public List<EhrPatientList> EHRPatientLists { get; set; } = new List<EhrPatientList>();

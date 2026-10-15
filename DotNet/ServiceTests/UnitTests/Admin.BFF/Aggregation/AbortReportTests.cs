@@ -102,7 +102,7 @@ public class AbortReportTests
                 deleteSchedulePath = path;
                 return NoContent();
             }
-            if (request.Method == HttpMethod.Delete && path.Contains($"api/data/acquisition-logs/report/{ReportId}"))
+            if (request.Method == HttpMethod.Delete && path.Contains($"api/data-acquisition/acquisition-logs/report/{ReportId}"))
             {
                 deleteLogsCalled = true;
                 return NoContent();

@@ -15,6 +15,7 @@
 | `MeasureEvalServiceClient` | MeasureEval (Java) | `IMeasureEvalServiceClient` |
 | `ValidationServiceClient` | Validation (Java) | `IValidationServiceClient` |
 | `SubmissionServiceClient` | Submission | `ISubmissionServiceClient` |
+| `MockDmrpServiceClient` | Mock DMRP API support surface (`/api/mock-dmrp`) | `IMockDmrpServiceClient` |
 
 ## Design
 
@@ -31,6 +32,14 @@ Use `AddLinkSdk()` from `LantanaGroup.Link.Sdk.DependencyInjection` to register 
 
 ```csharp
 builder.Services.AddLinkSdk();
+```
+
+`MockDmrpServiceClient` is not part of `AddLinkSdk()`. The mock's address is held in different places by
+different callers (Tenant uses `DMRP:Api:BaseUrl`, Automation uses `ServiceRegistry:MockDmrpApiUrl`), so each
+registers it with the mock's root address:
+
+```csharp
+builder.Services.AddMockDmrpServiceClient(sp => /* the mock's root URL */);
 ```
 
 ### Prerequisites in DI

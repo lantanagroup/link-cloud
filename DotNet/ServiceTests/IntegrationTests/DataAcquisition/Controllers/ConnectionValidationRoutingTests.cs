@@ -1,5 +1,7 @@
 using LantanaGroup.Link.DataAcquisition.Controllers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -19,7 +21,8 @@ namespace IntegrationTests.DataAcquisition.Controllers;
 /// <summary>
 /// The configuration-free "$validate" route sits directly beside the pre-existing
 /// "{facilityId}/$validate" route on the same controller. These tests boot the real MVC routing
-/// stack to prove the two templates resolve to the right actions and neither shadows the other.
+/// stack to prove the two templates resolve to the right actions and neither shadows the other,
+/// on both the canonical prefix and the deprecated /api/data alias.
 /// </summary>
 [Trait("Category", "IntegrationTests")]
 public class ConnectionValidationRoutingTests : IClassFixture<ConnectionValidationRoutingFactory>
@@ -31,12 +34,20 @@ public class ConnectionValidationRoutingTests : IClassFixture<ConnectionValidati
         _factory = factory;
     }
 
-    [Fact]
-    public async Task ValidateRoute_WithoutFacilityId_RoutesToFhirServerConnectionAction()
+    public static TheoryData<string> Prefixes => new()
     {
+        "/api/data-acquisition",
+        "/api/data"
+    };
+
+    [Theory]
+    [MemberData(nameof(Prefixes))]
+    public async Task ValidateRoute_WithoutFacilityId_RoutesToFhirServerConnectionAction(string prefix)
+    {
+        _factory.FhirServerConnectionService.Invocations.Clear();
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/data/connectionValidation/$validate?fhirServerUrl=http://fhir.test/r4");
+        var response = await client.GetAsync($"{prefix}/connectionValidation/$validate?fhirServerUrl=http://fhir.test/r4");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -49,18 +60,20 @@ public class ConnectionValidationRoutingTests : IClassFixture<ConnectionValidati
             Times.Once);
     }
 
-    [Fact]
-    public async Task ValidateRoute_MissingFhirServerUrl_ReturnsBadRequest()
+    [Theory]
+    [MemberData(nameof(Prefixes))]
+    public async Task ValidateRoute_MissingFhirServerUrl_ReturnsBadRequest(string prefix)
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/data/connectionValidation/$validate");
+        var response = await client.GetAsync($"{prefix}/connectionValidation/$validate");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [Fact]
-    public async Task ValidateRoute_WithFacilityId_StillRoutesToFacilityAction()
+    [Theory]
+    [MemberData(nameof(Prefixes))]
+    public async Task ValidateRoute_WithFacilityId_StillRoutesToFacilityAction(string prefix)
     {
         var client = _factory.CreateClient();
 
@@ -68,7 +81,7 @@ public class ConnectionValidationRoutingTests : IClassFixture<ConnectionValidati
         // What matters here is that the request reaches that action at all rather than 404ing or
         // being captured by the new configuration-free route. The "Patient" wording is unique to the
         // facility validator - the configuration-free action only ever complains about the server URL.
-        var response = await client.GetAsync("/api/data/connectionValidation/test-facility/$validate");
+        var response = await client.GetAsync($"{prefix}/connectionValidation/test-facility/$validate");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -81,6 +94,7 @@ public sealed class ConnectionValidationRoutingFactory : WebApplicationFactory<C
 {
     public Mock<IValidateFhirServerConnectionService> FhirServerConnectionService { get; } = new();
     public Mock<IValidateFacilityConnectionService> FacilityConnectionService { get; } = new();
+    public Mock<IDataAcquisitionServiceMetrics> Metrics { get; } = new();
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -103,6 +117,7 @@ public sealed class ConnectionValidationRoutingFactory : WebApplicationFactory<C
                     {
                         services.AddSingleton(FhirServerConnectionService.Object);
                         services.AddSingleton(FacilityConnectionService.Object);
+                        services.AddSingleton(Metrics.Object);
 
                         services
                             .AddControllers()
@@ -117,7 +132,7 @@ public sealed class ConnectionValidationRoutingFactory : WebApplicationFactory<C
                     })
                     .Configure(app =>
                     {
-                        app.UseRouting();
+                        app.UseRoutingWithLegacyRoutePrefix();
                         app.UseAuthorization();
                         app.UseEndpoints(endpoints => endpoints.MapControllers());
                     });
