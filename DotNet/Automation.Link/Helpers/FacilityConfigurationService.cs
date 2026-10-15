@@ -41,7 +41,7 @@ public static partial class FacilityConfigurationService
         IAutomationOutput output,
         FacilityModel existing,
         string? vendorName,
-        bool dmrpEnabled,
+        bool sendEmptySchedule,
         CancellationToken cancellationToken)
     {
         var desired = ResolveVendor(vendorName, vendorExplicit: true);
@@ -65,7 +65,7 @@ public static partial class FacilityConfigurationService
             TimeZone = string.IsNullOrWhiteSpace(existing.TimeZone) ? FacilityTimeZone : existing.TimeZone,
             Vendor = desired,
             VendorVersionId = vendorVersionId,
-            ScheduledReports = dmrpEnabled
+            ScheduledReports = sendEmptySchedule
                 ? MonthlySchedule([])
                 : existing.ScheduledReports ?? MonthlySchedule([]),
             IsTest = true
@@ -242,25 +242,37 @@ public static partial class FacilityConfigurationService
             output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
             if (vendorExplicit)
             {
-                var dmrpEnabledForUpdate = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
+                var dmrpForUpdate = await GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
                 await ApplyExplicitVendorAsync(
-                    facilityClient, output, existing.Body, vendorName, dmrpEnabledForUpdate, cancellationToken);
+                    facilityClient, output, existing.Body, vendorName,
+                    sendEmptySchedule: TenantDerivesTheSchedule(dmrpForUpdate), cancellationToken);
             }
 
             await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
             return false;
         }
 
-        var dmrpEnabled = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
+        var dmrp = await GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
+        var derived = TenantDerivesTheSchedule(dmrp);
+
+        if (dmrp.MockDmrpEnabled)
+        {
+            // Tenant turns each scheduled report into enrollment through its measure mapping, and refuses
+            // one it has no mapping for.
+            foreach (var measureId in measureIds)
+            {
+                await EnsureMeasureMappingAsync(dmrpClient, output, measureId, cancellationToken);
+            }
+        }
 
         var facility = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            // Empty under DMRP, and not merely unselected: a request that names any report is refused
-            // outright. The measures are enrolled below instead.
-            ScheduledReports = MonthlySchedule(dmrpEnabled ? [] : measureIds),
+            // Empty while Tenant derives the schedule, and not merely unselected: a request that names any
+            // report is refused outright. The measures are enrolled below instead.
+            ScheduledReports = MonthlySchedule(derived ? [] : measureIds),
             IsTest = true
         };
         MarkTest(facility);
@@ -278,7 +290,7 @@ public static partial class FacilityConfigurationService
 
         await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
 
-        if (dmrpEnabled)
+        if (derived)
         {
             await EnrollFacilityInDmrpMeasuresAsync(facilityClient, dmrpClient, output, facilityId,
                 measureIds, cancellationToken, vendorName, vendorExplicit);
@@ -302,6 +314,59 @@ public static partial class FacilityConfigurationService
     /// its routes answer 404 and there is nothing else to read — which keeps this from becoming a
     /// third place the flag has to be set and kept in step with the stack and the Admin UI.
     /// </remarks>
+
+    /// <summary>
+    /// Whether the Tenant service hosts the DMRP module, and whether it writes facility schedules through
+    /// to the Mock DMRP API.
+    /// </summary>
+    /// <remarks>
+    /// Asked rather than configured, so no third copy of either switch has to be kept in step. A Tenant
+    /// that predates <c>api/dmrp/dmrp-status</c> answers it 404; for that one the module is detected the
+    /// older way, by its reporting-plans route, and there is no write-through.
+    /// </remarks>
+    public static async Task<DmrpStatusModel> GetDmrpStatusAsync(
+        IDmrpServiceClient dmrpClient,
+        IAutomationOutput output,
+        CancellationToken cancellationToken = default)
+    {
+        var status = await dmrpClient.GetDmrpStatusAsync(cancellationToken);
+
+        if (status.StatusCode == (int)HttpStatusCode.NotFound)
+        {
+            return new DmrpStatusModel
+            {
+                DmrpEnabled = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken)
+            };
+        }
+
+        if (!status.IsSuccessStatusCode || status.Body is null)
+        {
+            throw new InvalidOperationException(
+                "Could not determine whether DMRP is enabled on the Tenant service. " +
+                $"GET api/dmrp/dmrp-status returned HTTP {status.StatusCode}: {status.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine(status.Body switch
+        {
+            { DmrpEnabled: false } =>
+                "DMRP is not enabled on the Tenant service; the facility's schedule is posted with it.",
+            { MockDmrpEnabled: true } =>
+                "DMRP is enabled with the Mock DMRP API switched on; the facility's schedule is posted with it " +
+                "and Tenant writes it to the mock as enrollment.",
+            _ =>
+                "DMRP is enabled on the Tenant service; the facility's schedule is derived from its reporting plans."
+        });
+
+        return status.Body;
+    }
+
+    /// <summary>
+    /// True when Tenant builds the facility's schedule from its reporting plans and refuses one in the
+    /// request: DMRP on, with no Mock DMRP write-through.
+    /// </summary>
+    private static bool TenantDerivesTheSchedule(DmrpStatusModel status) =>
+        status.DmrpEnabled && !status.MockDmrpEnabled;
+
     private static async Task<bool> DmrpIsEnabledAsync(
         IDmrpServiceClient dmrpClient,
         IAutomationOutput output,
@@ -906,7 +971,7 @@ public static partial class FacilityConfigurationService
             if (vendorExplicit)
             {
                 await ApplyExplicitVendorAsync(
-                    facilityClient, output, existing.Body, vendorName, dmrpEnabled: true, cancellationToken);
+                    facilityClient, output, existing.Body, vendorName, sendEmptySchedule: true, cancellationToken);
             }
 
             await WaitForFacilityReadConsistencyAsync(
@@ -947,6 +1012,69 @@ public static partial class FacilityConfigurationService
             cancellationToken);
         return true;
     }
+
+    public static async Task<bool> EnsureDmrpFacilityWithScheduleAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        CancellationToken cancellationToken = default,
+        string? vendorName = null,
+        bool vendorExplicit = false,
+        Func<Task>? onCreated = null)
+    {
+        var facility = new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityId,
+            TimeZone = FacilityTimeZone,
+            ScheduledReports = MonthlySchedule(measureIds),
+            IsTest = true
+        };
+        MarkTest(facility);
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+
+        var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
+
+        if (existing.IsSuccessStatusCode && existing.Body != null)
+        {
+            var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
+
+            if (!updated.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to save DMRP facility '{facilityId}'. " +
+                    $"HTTP {updated.StatusCode}: {updated.RawBody ?? "(no body)"}");
+            }
+
+            output.WriteLine(
+                $"Facility '{facilityId}' already exists; saved it scheduled for {string.Join(", ", measureIds)}, " +
+                "which enrolls it in the Mock DMRP API.");
+
+            await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
+            return false;
+        }
+
+        var created = await facilityClient.CreateAsync(facility, cancellationToken);
+
+        if (!created.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to create DMRP facility '{facilityId}'. " +
+                $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine(
+            $"Created facility '{facilityId}' scheduled for {string.Join(", ", measureIds)}, " +
+            "which enrolls it in the Mock DMRP API.");
+
+        if (onCreated != null)
+            await onCreated();
+
+        await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
+        return true;
+    }
+
 
     public static async Task RefreshDmrpDerivedScheduleAsync(
     IFacilityServiceClient facilityClient,

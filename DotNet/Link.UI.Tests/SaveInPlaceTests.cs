@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Xunit;
 
 namespace Link.UI.Tests;
@@ -233,7 +233,7 @@ public class SaveInPlaceTests
         body.Should().Contain("response.Body?.Message");
 
         var client = File.ReadAllText(RepoFile("DotNet/LinkSdk/Clients/DataAcquisitionServiceClient.cs"));
-        client.Should().Contain("SendAsync<SftpTestConnectionResultApiModel>(() => Request($\"data/{organizationId}/sftp-configurations/test-connection\")");
+        client.Should().Contain("SendAsync<SftpTestConnectionResultApiModel>(() => Request($\"data-acquisition/{organizationId}/sftp-configurations/test-connection\")");
     }
 
     [Fact]
