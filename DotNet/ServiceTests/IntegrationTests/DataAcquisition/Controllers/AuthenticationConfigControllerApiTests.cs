@@ -37,7 +37,7 @@ public class AuthenticationConfigControllerApiTests : IClassFixture<Authenticati
         var client = _factory.CreateClient();
 
         var request = new HttpRequestMessage(new HttpMethod(method),
-                                             $"/api/data/facility-1/{pathValue}/authentication");
+                                             $"/api/data-acquisition/facility-1/{pathValue}/authentication");
         if (method is "POST" or "PUT")
         {
             request.Content = new StringContent(BasicAuthBody, Encoding.UTF8, "application/json");
@@ -62,7 +62,7 @@ public class AuthenticationConfigControllerApiTests : IClassFixture<Authenticati
             .ReturnsAsync(new AuthenticationConfigurationModel { AuthType = "Basic" });
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/data/facility-1/fhirQueryConfiguration/authentication");
+        var response = await client.GetAsync("/api/data-acquisition/facility-1/fhirQueryConfiguration/authentication");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         _factory.QueryConfigurationQueries.Verify(

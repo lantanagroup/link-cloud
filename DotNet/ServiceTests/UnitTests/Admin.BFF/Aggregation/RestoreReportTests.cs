@@ -104,7 +104,7 @@ public class RestoreReportTests
             var path = request.RequestUri!.PathAndQuery;
             if (request.Method == HttpMethod.Patch && path.Contains($"api/schedules/{ReportId}/restore"))
                 return NoContent();
-            if (request.Method == HttpMethod.Patch && path.Contains($"api/data/acquisition-logs/report/{ReportId}/restore"))
+            if (request.Method == HttpMethod.Patch && path.Contains($"api/data-acquisition/acquisition-logs/report/{ReportId}/restore"))
                 return NoContent();
             if (request.Method == HttpMethod.Delete && path.Contains($"api/schedules/{ReportId}"))
             {
@@ -112,7 +112,7 @@ public class RestoreReportTests
                 return NoContent();
             }
 
-            if (request.Method == HttpMethod.Delete && path.Contains($"api/data/acquisition-logs/report/{ReportId}"))
+            if (request.Method == HttpMethod.Delete && path.Contains($"api/data-acquisition/acquisition-logs/report/{ReportId}"))
             {
                 logsRolledBack = true;
                 return NoContent();

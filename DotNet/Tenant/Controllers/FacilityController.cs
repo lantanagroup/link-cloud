@@ -319,6 +319,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{facilityId}")]
         public async Task<ActionResult<FacilityModel>> PutFacility(string facilityId, FacilityModel facilityConfig, CancellationToken cancellationToken)
@@ -353,6 +354,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (ScheduledReportsNotAcceptedException ex)
             {
                 return BadRequestProblem(ex.Message);
+            }
+            catch (DmrpApiException ex)
+            {
+                return Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway, title: "DMRP could not be reached");
             }
             catch (ApplicationException ex)
             {

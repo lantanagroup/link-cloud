@@ -174,7 +174,7 @@ public static class ApiEndPointLibrary
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildDataAcquisitionMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data/info"),
+        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data-acquisition/info"),
         [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
     };
 
@@ -213,7 +213,9 @@ public static class ApiEndPointLibrary
             [DmrpSteps.MappingDelete204] = new EndpointMeta("Deletes a mapping once nothing references it.", $"DELETE {mappings}/{{id}}"),
             [DmrpSteps.MappingDelete404] = new EndpointMeta("Answers not-found when deleting a mapping twice.", $"DELETE {mappings}/{{id}}"),
             [DmrpSteps.FacilityPost400WithSchedule] = new EndpointMeta(
-                "Refuses a facility that carries its own schedule while DMRP is enabled; the schedule is derived from reporting plans.",
+                "Refuses a facility that carries its own schedule while DMRP is enabled, since the schedule is " +
+                "derived from reporting plans. With the Mock DMRP API switched on, refuses one naming a dQM no " +
+                "measure mapping covers.",
                 "POST /api/Facility")
         };
     }

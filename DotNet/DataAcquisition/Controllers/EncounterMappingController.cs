@@ -14,7 +14,7 @@ using System.Net;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data/encounter-mappings")]
+[Route("api/data-acquisition/encounter-mappings")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class EncounterMappingController : Controller
@@ -46,7 +46,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// GET /api/data/encounter-mappings/{id}
+    /// GET /api/data-acquisition/encounter-mappings/{id}
     /// </summary>
     [HttpGet("{id:int}")]
     [ActionName(nameof(GetByIdAsync))]
@@ -74,7 +74,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// GET /api/data/encounter-mappings/facilities/{facilityId}
+    /// GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}
     /// Returns 200 OK with empty list [] when none exist.
     /// </summary>
     [HttpGet("facilities/{facilityId}")]
@@ -106,7 +106,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// GET /api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}
+    /// GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}
     /// </summary>
     [HttpGet("facilities/{facilityId}/encounters/{encounterId}")]
     [ProducesResponseType(typeof(EncounterMappingModel), StatusCodes.Status200OK)]
@@ -149,7 +149,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// GET /api/data/encounter-mappings/facilities/{facilityId}/patients/{patientId}
+    /// GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}/patients/{patientId}
     /// Returns 200 OK with empty list [] when none exist.
     /// </summary>
     [HttpGet("facilities/{facilityId}/patients/{patientId}")]
@@ -186,7 +186,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// GET /api/data/encounter-mappings/facilities/{facilityId}/search
+    /// GET /api/data-acquisition/encounter-mappings/facilities/{facilityId}/search
     /// </summary>
     [HttpGet("facilities/{facilityId}/search")]
     [ProducesResponseType(typeof(PagedConfigModel<EncounterMappingModel>), StatusCodes.Status200OK)]
@@ -236,7 +236,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// PUT /api/data/encounter-mappings/{id}
+    /// PUT /api/data-acquisition/encounter-mappings/{id}
     /// Updates the MappedToOrg flag for the specified EncounterMapping.
     /// </summary>
     [HttpPut("{id:int}")]
@@ -273,7 +273,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// PUT /api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}
+    /// PUT /api/data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}
     /// Updates the MappedToOrg flag for the specified encounter within a facility.
     /// </summary>
     [HttpPut("facilities/{facilityId}/encounters/{encounterId}")]
@@ -320,7 +320,7 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
-    /// POST /api/data/encounter-mappings
+    /// POST /api/data-acquisition/encounter-mappings
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryOrBearerToken]

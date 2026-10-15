@@ -22,7 +22,7 @@ using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.Da
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data/acquisition-logs")]
+[Route("api/data-acquisition/acquisition-logs")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class LogController : Controller

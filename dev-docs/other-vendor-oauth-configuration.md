@@ -37,7 +37,7 @@ credentials in the vault without consulting the database.
 
 An existing secret name is reused rather than replaced when the caller omits `clientSecret`, because
 an operator may have provisioned that secret by hand under a name of their own through the older
-`api/data/{facilityId}/{queryConfigurationType}/authentication` endpoint.
+`api/data-acquisition/{facilityId}/{queryConfigurationType}/authentication` endpoint.
 
 ## Write ordering, and the window it leaves
 
