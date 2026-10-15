@@ -44,6 +44,13 @@ $env:E2E_WINDOW_SIZE='1600,1300'
 npm run e2e:demo
 ```
 
+Run it **in your own terminal, in the foreground**. Do not background it, pipe it, or launch it
+from a tool or agent: the walkthrough is one long-lived headed browser, and anything that
+reaps the parent process closes the window mid-stage. That failure looks exactly like the demo
+"finishing early" — the browser vanishes partway through with no error on screen, and because a
+pipe buffers the reporter's output you do not even get a verdict. Pipe nothing; watch the
+terminal.
+
 A real Chromium window opens and drives itself. This is the `demo` Playwright project: headed,
 `slowMo`-paced, test timeout disabled, and it waits on the window's close event at the end so
 you can talk over the finished screen. It is deliberately **not** part of `npm run e2e`, so CI
@@ -143,6 +150,7 @@ tier proves the same page objects still work against a real BFF. The selector co
 | Long pause on first navigation | `ng serve` compiles each route on first hit. Pre-warm by visiting the routes once before the meeting. |
 | Demo browser opens on the wrong screen | `E2E_WINDOW_POSITION` is stale — re-run the `AllScreens` command. `0,0` is always the laptop. |
 | Window closes immediately at the end | `E2E_KEEP_OPEN=0` is still set from the rehearsal. |
+| Window vanishes partway through, no error visible | The run was interrupted, not failed — something reaped the parent process. Check `test-results/`: a real failure leaves `test-failed-1.png`, an interruption leaves only an orphaned `.playwright-artifacts-0`. Re-run in the foreground, unpiped. |
 | Flaky "the click did nothing" in the mocked tier | Too many workers starving one `ng serve`; the config caps at 4 locally for this reason. |
 | Live tier fails to start | It needs the compose stack — a preflight pings the BFF and prints instructions. Skip it; the live tier is not part of this demo. |
 
