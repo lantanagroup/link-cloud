@@ -85,6 +85,18 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         new("submission", "Submission", "Uploading the report package", "Submission", ProcessRuntimeKind.DotNet)
     ];
 
+    // The acquisition worker has no real API (only /health and an info endpoint), so it is
+    // left out of API response time and the slowest-endpoints table.
+    internal static readonly string[] NoApiExportedJobs = ["DataAcquisitionWorker", "DataAcquisition.AcquisitionWorker"];
+
+    internal static bool HasApi(string? exportedJobOrKey) =>
+        !string.IsNullOrWhiteSpace(exportedJobOrKey)
+        && !string.Equals(exportedJobOrKey, "acquisition-worker", StringComparison.OrdinalIgnoreCase)
+        && !NoApiExportedJobs.Contains(exportedJobOrKey, StringComparer.OrdinalIgnoreCase);
+
+    internal static IEnumerable<ProcessUtilizationQuery> ApiLatencyQueries =>
+        ProcessUtilizationQueries.Where(q => HasApi(q.Key) && HasApi(q.ExportedJob));
+
     private readonly IRunMetricsStore _store;
     private readonly IMetricsBenchmarkStore _benchmarks;
     private readonly IPrometheusHistogramClient _prometheus;
@@ -191,11 +203,14 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                             lookbackSeconds,
                             evaluationTime,
                             cancellationToken);
-                        apiLatency[processQuery.Key] = await QueryApiLatencyAsync(
-                            processQuery,
-                            lookbackSeconds,
-                            evaluationTime,
-                            cancellationToken);
+                        if (HasApi(processQuery.Key) && HasApi(processQuery.ExportedJob))
+                        {
+                            apiLatency[processQuery.Key] = await QueryApiLatencyAsync(
+                                processQuery,
+                                lookbackSeconds,
+                                evaluationTime,
+                                cancellationToken);
+                        }
                     }
 
                     slowestRoutes = await QuerySlowestApiRoutesAsync(
@@ -592,7 +607,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         var countByKey = counts.ToDictionary(RouteKey, s => s.Value, StringComparer.Ordinal);
 
         return p95
-            .Where(s => s.Value > 0 && !string.IsNullOrWhiteSpace(ReadLabel(s, "http_route")))
+            .Where(s => s.Value > 0 && HasApi(s.ExportedJob) && !string.IsNullOrWhiteSpace(ReadLabel(s, "http_route")))
             .Select(s => new ApiRouteLatencySnapshot
             {
                 Service = DisplayNameForJob(s.ExportedJob),
