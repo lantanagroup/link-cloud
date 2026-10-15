@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Extensions;
 using LantanaGroup.Link.Report.Application.Interfaces;
@@ -29,6 +28,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Swagger;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -184,7 +184,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.ForFhir();
+        LinkFhirSerializerOptions.ConfigurePermissiveFhirDeserialization(options.JsonSerializerOptions);
         options.JsonSerializerOptions.Converters.Add(new JsonDateTimeConverter());
         options.JsonSerializerOptions.Converters.Add(new JsonNullableDateTimeConverter());
     });
