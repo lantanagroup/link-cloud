@@ -852,11 +852,11 @@ public class RunsController(
     }
 
     private static bool TryGetCreatedDateRange(
-    DateOnly? createdFrom,
-    DateOnly? createdTo,
-    out DateTimeOffset? createdFromUtc,
-    out DateTimeOffset? createdBeforeUtc,
-    out string? error)
+        DateOnly? createdFrom,
+        DateOnly? createdTo,
+        out DateTimeOffset? createdFromUtc,
+        out DateTimeOffset? createdBeforeUtc,
+        out string? error)
     {
         createdFromUtc = null;
         createdBeforeUtc = null;
