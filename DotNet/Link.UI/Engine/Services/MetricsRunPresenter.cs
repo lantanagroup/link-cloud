@@ -376,7 +376,7 @@ public sealed class MetricsRunPresenter
 
     internal static IReadOnlyList<ApiLatencyItemView> ToApiLatency(AutomationRunMetricsDocument document)
     {
-        return RunMetricsSnapshotService.ProcessUtilizationQueries.Select(query =>
+        return RunMetricsSnapshotService.ApiLatencyQueries.Select(query =>
         {
             document.ApiLatency.TryGetValue(query.Key, out var snapshot);
             snapshot ??= new ApiLatencySnapshot { Unavailable = true };
@@ -395,7 +395,7 @@ public sealed class MetricsRunPresenter
     }
 
     internal static IReadOnlyList<ApiLatencyItemView> EmptyUnavailableApiLatency() =>
-        RunMetricsSnapshotService.ProcessUtilizationQueries.Select(query => new ApiLatencyItemView
+        RunMetricsSnapshotService.ApiLatencyQueries.Select(query => new ApiLatencyItemView
         {
             Key = query.Key,
             Name = query.Name,
@@ -403,7 +403,9 @@ public sealed class MetricsRunPresenter
         }).ToList();
 
     internal static IReadOnlyList<ApiRouteLatencyItemView> ToSlowestApiRoutes(AutomationRunMetricsDocument document) =>
-        (document.SlowestApiRoutes ?? []).Select(r => new ApiRouteLatencyItemView
+        (document.SlowestApiRoutes ?? [])
+        .Where(r => !IsNoApiService(r.Service))
+        .Select(r => new ApiRouteLatencyItemView
         {
             Service = r.Service,
             Method = r.Method,
@@ -411,6 +413,13 @@ public sealed class MetricsRunPresenter
             P95Ms = r.P95Ms,
             Count = r.Count
         }).ToList();
+
+    // Older saved runs can still carry worker routes; keep them out of the table.
+    private static bool IsNoApiService(string? service) =>
+        !string.IsNullOrWhiteSpace(service)
+        && (string.Equals(service, "Data Acquisition worker", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(service, "DA worker", StringComparison.OrdinalIgnoreCase)
+            || !RunMetricsSnapshotService.HasApi(service));
 
     private static MetricsDurationPoint ToPoint(AutomationRunMetricsDocument d) => new()
     {
