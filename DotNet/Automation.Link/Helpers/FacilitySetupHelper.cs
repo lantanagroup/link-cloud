@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
@@ -129,6 +130,25 @@ public static class FacilitySetupHelper
     string? vendorName = null,
     bool vendorExplicit = false) =>
         FacilityConfigurationService.RefreshDmrpDerivedScheduleAsync(facilityClient, output, facilityId, cancellationToken, vendorName, vendorExplicit);
+
+    
+    public static Task<DmrpStatusModel> GetDmrpStatusAsync(
+        IDmrpServiceClient dmrpClient,
+        IAutomationOutput output,
+        CancellationToken cancellationToken = default) =>
+        FacilityConfigurationService.GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
+
+    public static Task<bool> EnsureDmrpFacilityWithScheduleAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        CancellationToken cancellationToken = default,
+        string? vendorName = null,
+        bool vendorExplicit = false,
+        Func<Task>? onCreated = null) =>
+        FacilityConfigurationService.EnsureDmrpFacilityWithScheduleAsync(
+            facilityClient, output, facilityId, measureIds, cancellationToken, vendorName, vendorExplicit, onCreated);
 
     public static Task<string> EnsureDmrpMeasureMappingAsync(
     IDmrpServiceClient dmrpClient,
