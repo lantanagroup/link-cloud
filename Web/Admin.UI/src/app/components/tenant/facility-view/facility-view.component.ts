@@ -22,7 +22,7 @@ import {LocationsListComponent} from './locations-list/locations-list.component'
 import {HslocLocationsListComponent} from './hsloc-locations-list/hsloc-locations-list.component';
 import {EncountersListComponent} from './encounters-list/encounters-list.component';
 import {FacilityReportingPlansComponent} from './facility-reporting-plans/facility-reporting-plans.component';
-import {AppConfigService} from '../../../services/app-config.service';
+import {DmrpStatusService} from '../../../services/gateway/dmrp/dmrp-status.service';
 import {faArrowLeft, faGears} from '@fortawesome/free-solid-svg-icons';
 import {forkJoin} from 'rxjs';
 import {MatSnackBarModule} from '@angular/material/snack-bar';
@@ -79,19 +79,18 @@ export class FacilityViewComponent extends ReportScheduleGridBase implements OnI
     private route: ActivatedRoute,
     private router: Router,
     private facilityViewService: FacilityViewService,
-    private appConfigService: AppConfigService) {
+    private dmrpStatusService: DmrpStatusService) {
     super();
   }
 
   /**
-   * DMRP feature flag, mirroring the nav bar's gating: the Reporting Plans tab only exists while
-   * the module is on, because its api/dmrp routes do not exist when it is off.
+   * Tenant's DMRP:Enabled, from api/dmrp/dmrp-status. The Reporting Plans tab only exists while the module
+   * is on, because its other api/dmrp routes do not exist when it is off.
    */
-  get dmrpEnabled(): boolean {
-    return this.appConfigService.config?.dmrpEnabled ?? false;
-  }
+  dmrpEnabled = false;
 
   ngOnInit(): void {
+    this.dmrpStatusService.getStatus().subscribe(status => this.dmrpEnabled = status.dmrpEnabled);
     this.initPagination();
     this.watchReportIdFilter();
 

@@ -1,4 +1,4 @@
-﻿using Flurl.Http;
+using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -34,6 +34,10 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
         ICreateSystemToken tokenService)
         : base(route, bearerOptions, tokenServiceSettings, tokenService)
     { }
+
+    public Task<LinkApiResponse<DmrpStatusModel>> GetDmrpStatusAsync(CancellationToken cancellationToken = default) =>
+        SendAsync<DmrpStatusModel>(() => Request("/dmrp/dmrp-status")
+            .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<MeasureMappingModel>> CreateMeasureMappingAsync(
         MeasureMappingModel request,
