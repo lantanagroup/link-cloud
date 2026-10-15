@@ -1411,7 +1411,7 @@ a.au-scenario-card:hover {
 
 /* Advanced performance: slowest endpoints. Service fits its content (max 12rem),
    Call takes the rest and wraps long paths, Slow and Calls stay narrow on the right. */
-table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-service:is(th, td) {
+:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-service:is(th, td) {
   width: 1%;
   max-width: 12rem;
   white-space: normal;
@@ -1419,7 +1419,7 @@ table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-service:is
   overflow: visible;
   text-overflow: clip;
 }
-table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-call:is(th, td) {
+:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-call:is(th, td) {
   width: auto;
   max-width: none;
   white-space: normal;
@@ -1428,12 +1428,12 @@ table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-call:is(th
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-table.au-table.au-slowest-endpoints > tbody > tr > td.au-se-call > code {
+:root table.au-table.au-slowest-endpoints > tbody > tr > td.au-se-call > code {
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-num:is(th, td) {
+:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-num:is(th, td) {
   width: 1%;
   max-width: none;
   white-space: nowrap;
