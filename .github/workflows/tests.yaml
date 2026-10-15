@@ -392,6 +392,13 @@ jobs:
       - name: Install Admin UI dependencies
         run: npm ci
 
+      # Playwright transpiles specs with esbuild, which strips types without checking them, so
+      # the fixtures' typing against src/app/interfaces only means something if tsc runs. Kept
+      # ahead of the browser download: a stale fixture should fail in seconds, not after a
+      # Chromium install.
+      - name: Typecheck Admin UI e2e suite
+        run: npm run typecheck:e2e
+
       # Same rationale as the live tier: key on the Playwright version so only a real
       # @playwright/test upgrade rotates the browser cache.
       - name: Get Playwright version
