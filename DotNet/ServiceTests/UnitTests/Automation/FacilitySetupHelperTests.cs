@@ -36,6 +36,11 @@ public class FacilitySetupHelperTests
     {
         _output.Setup(o => o.WriteLine(It.IsAny<string>()));
 
+        // A Tenant that predates api/dmrp/dmrp-status, so DMRP is detected by its reporting-plans route
+        // and there is no Mock DMRP write-through. The tests about the write-through override this.
+        _dmrpClient.Setup(d => d.GetDmrpStatusAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<DmrpStatusModel>(404));
+
         // The facility does not exist until it is created, and reads back once it does.
         var exists = false;
 
@@ -531,6 +536,128 @@ public class FacilitySetupHelperTests
         Assert.True(created);
         Assert.Single(_created);
     }
+
+    /// <summary>
+    /// With the Mock DMRP write-through, Tenant turns the posted schedule into enrollment through the
+    /// measure mappings, so the schedule is posted as with DMRP off and no reporting plan is written directly.
+    /// </summary>
+    [Fact]
+    public async Task Posts_the_schedule_and_maps_each_measure_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        var plans = CaptureReportingPlans();
+
+        await EnsureFacilityAsync();
+
+        var created = Assert.Single(_created);
+        Assert.Equal([MeasureId], created.ScheduledReports.Monthly);
+        Assert.Empty(plans);
+        Assert.Empty(_updated);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(
+            It.Is<MeasureMappingModel>(m => m.Measure == MeasureId && m.DQM == MeasureId &&
+                                            m.Frequency == Frequency.Monthly),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Derives_the_schedule_from_reporting_plans_when_tenant_reports_dmrp_without_the_mock()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: false);
+        var plans = CaptureReportingPlans();
+
+        await EnsureFacilityAsync();
+
+        Assert.Empty(Assert.Single(_created).ScheduledReports.Monthly);
+        Assert.NotEmpty(plans);
+    }
+
+    [Fact]
+    public async Task Posts_the_schedule_when_tenant_reports_dmrp_off()
+    {
+        GivenDmrpStatus(dmrpEnabled: false, mockDmrpEnabled: false);
+
+        await EnsureFacilityAsync();
+
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
+    /// <summary>
+    /// With the write-through an empty schedule un-enrolls the facility, so a vendor change sends back the
+    /// schedule the facility already has.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Sends_the_stored_schedule_with_a_vendor_change_unless_tenant_derives_it(
+        bool mockDmrpEnabled, bool expectEmpty)
+    {
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: mockDmrpEnabled);
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel
+            {
+                FacilityId = FacilityId,
+                FacilityName = FacilityId,
+                TimeZone = "America/Chicago",
+                Vendor = new VendorModel { Name = "Epic" },
+                ScheduledReports = new TenantScheduledReportConfig { Monthly = [MeasureId], Daily = [], Weekly = [] }
+            }));
+
+        await FacilitySetupHelper.EnsureFacilityAsync(_facilityClient.Object, _dmrpClient.Object, _output.Object,
+            FacilityId, [MeasureId], vendorName: "Cerner", vendorExplicit: true);
+
+        var updated = Assert.Single(_updated);
+        Assert.Equal(expectEmpty, updated.ScheduledReports.Monthly.Length == 0);
+    }
+
+    [Fact]
+    public async Task Refuses_to_guess_when_the_status_route_fails()
+    {
+        _dmrpClient.Setup(d => d.GetDmrpStatusAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<DmrpStatusModel>(500, rawBody: "boom"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(EnsureFacilityAsync);
+
+        Assert.Contains("api/dmrp/dmrp-status", exception.Message);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Write_through_setup_creates_the_facility_with_its_schedule()
+    {
+        var created = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(_facilityClient.Object,
+            _output.Object, FacilityId, [MeasureId]);
+
+        Assert.True(created);
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+        Assert.Empty(_updated);
+    }
+
+    /// <summary>
+    /// A reused facility is saved again with the run's schedule, since that save is what enrolls it.
+    /// </summary>
+    [Fact]
+    public async Task Write_through_setup_saves_an_existing_facility_with_its_schedule()
+    {
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel { FacilityId = FacilityId }));
+
+        var created = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(_facilityClient.Object,
+            _output.Object, FacilityId, [MeasureId]);
+
+        Assert.False(created);
+        Assert.Equal([MeasureId], Assert.Single(_updated).ScheduledReports.Monthly);
+        Assert.Empty(_created);
+    }
+
+    private void GivenDmrpStatus(bool dmrpEnabled, bool mockDmrpEnabled) =>
+        _dmrpClient.Setup(d => d.GetDmrpStatusAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new DmrpStatusModel
+            {
+                DmrpEnabled = dmrpEnabled,
+                MockDmrpEnabled = mockDmrpEnabled
+            }));
 
     private Task<bool> EnsureFacilityAsync() =>
         FacilitySetupHelper.EnsureFacilityAsync(_facilityClient.Object, _dmrpClient.Object, _output.Object,
