@@ -307,12 +307,10 @@ public class FacilitySetupHelperTests
     {
         GivenDmrpIsEnabled();
 
-        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(MeasureId, MeasureId, It.IsAny<Frequency?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel>
-            {
-                Records = [new MeasureMappingModel { Id = MappingId, Measure = MeasureId, DQM = MeasureId }]
-            }));
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Monthly
+        });
 
         var plans = CaptureReportingPlans();
 
@@ -560,6 +558,119 @@ public class FacilitySetupHelperTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>
+    /// Measure is unique on its own, so a mapping left with another frequency blocks creating the
+    /// Monthly one, and the write-through cannot enroll the Monthly schedule through it. It is corrected.
+    /// </summary>
+    [Fact]
+    public async Task Corrects_an_existing_mapping_with_the_wrong_frequency_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Adhoc
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        AssertCorrectedToMonthly(Assert.Single(updates));
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Corrects_an_existing_mapping_with_a_different_dqm_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = "SomeOtherDqm", Frequency = Frequency.Monthly
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        AssertCorrectedToMonthly(Assert.Single(updates));
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
+    /// <summary>
+    /// The search matches measure as a substring, so a mapping for a measure that only contains this
+    /// one's id is someone else's and must not be reused.
+    /// </summary>
+    [Fact]
+    public async Task Does_not_reuse_a_mapping_whose_measure_only_contains_the_measure_id()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = "other-mapping", Measure = MeasureId + "V2", DQM = MeasureId + "V2", Frequency = Frequency.Monthly
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        Assert.Empty(updates);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(
+            It.Is<MeasureMappingModel>(m => m.Measure == MeasureId && m.DQM == MeasureId &&
+                                            m.Frequency == Frequency.Monthly),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reuses_a_correct_mapping_without_updating_it_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Monthly
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        Assert.Empty(updates);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
+    /// <summary>
+    /// A create refused as a duplicate gets the same exact-match check and correction as a mapping
+    /// found up front.
+    /// </summary>
+    [Fact]
+    public async Task Corrects_the_mapping_found_after_a_duplicate_create_is_refused()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        _dmrpClient.SetupSequence(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<PagedConfigModel<MeasureMappingModel>>(204))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel>
+            {
+                Records =
+                [
+                    new MeasureMappingModel { Id = "other-mapping", Measure = MeasureId + "V2", DQM = MeasureId + "V2", Frequency = Frequency.Monthly },
+                    new MeasureMappingModel { Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Adhoc }
+                ]
+            }));
+        _dmrpClient.Setup(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<MeasureMappingModel>(400, rawBody: "duplicate"));
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        AssertCorrectedToMonthly(Assert.Single(updates));
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
     [Fact]
     public async Task Derives_the_schedule_from_reporting_plans_when_tenant_reports_dmrp_without_the_mock()
     {
@@ -694,6 +805,34 @@ public class FacilitySetupHelperTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((FacilityReportingPlanRequest request, CancellationToken _) =>
                 Response(201, new FacilityReportingPlanModel { FacilityId = request.FacilityId }));
+    }
+
+    private void GivenMeasureMappings(params MeasureMappingModel[] records) =>
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel> { Records = [.. records] }));
+
+    private List<(string Id, MeasureMappingModel Model)> CaptureMeasureMappingUpdates()
+    {
+        var updates = new List<(string Id, MeasureMappingModel Model)>();
+
+        _dmrpClient.Setup(d => d.UpdateMeasureMappingAsync(It.IsAny<string>(), It.IsAny<MeasureMappingModel>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string id, MeasureMappingModel model, CancellationToken _) =>
+            {
+                updates.Add((id, model));
+                return Response(200, model);
+            });
+
+        return updates;
+    }
+
+    private static void AssertCorrectedToMonthly((string Id, MeasureMappingModel Model) update)
+    {
+        Assert.Equal(MappingId, update.Id);
+        Assert.Equal(MeasureId, update.Model.Measure);
+        Assert.Equal(MeasureId, update.Model.DQM);
+        Assert.Equal(Frequency.Monthly, update.Model.Frequency);
     }
 
     private List<FacilityReportingPlanRequest> CaptureReportingPlans()
