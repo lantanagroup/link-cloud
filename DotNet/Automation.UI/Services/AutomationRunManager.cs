@@ -397,7 +397,13 @@ public class AutomationRunManager : IAutomationRunManager
                 return false;
         }
 
-        await _snapshotStore.DeleteRunAsync(runId, cancellationToken);
+        // Stop the poller and remove the rows while holding the run gate.
+        // A write that already holds the gate finishes first. A write that
+        // arrives afterwards sees no run row and does not recreate the documents.
+        await _orchestrator.QuiesceForDeleteAsync(
+            runId,
+            token => _snapshotStore.DeleteRunAsync(runId, token),
+            cancellationToken);
         return true;
     }
 
@@ -440,13 +446,20 @@ public class AutomationRunManager : IAutomationRunManager
         try
         {
             // Build snapshot from store-cached domain data (zero API calls).
+            AcquisitionLogChart? acquisitionChart = null;
             var builder = new PipelineSummarySnapshotBuilder(async (scheduleId, fId) =>
             {
                 var schedule = await SafeGetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule", cancellationToken);
-                var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
-                var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
+                var entryRollup = await SafeGetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, "entries", cancellationToken);
+                var entries = entryRollup == null
+                    ? await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? []
+                    : [];
+                var populationCounts = await ReadPopulationCountsAsync(runId, cancellationToken);
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
-                var acquisitionLogs = await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? [];
+                acquisitionChart = await SafeGetDomainAsync<AcquisitionLogChart>(runId, "acquisitionLogs", cancellationToken);
+                var acquisitionLogs = acquisitionChart == null
+                    ? await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? []
+                    : [];
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
                 var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
@@ -454,8 +467,8 @@ public class AutomationRunManager : IAutomationRunManager
                     "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}",
                     runId,
                     schedule != null,
-                    entries.Count,
-                    populations.Count,
+                    entryRollup?.EntryCount ?? entries.Count,
+                    populationCounts?.ReportTypeCount ?? 0,
                     acquisitionSummary != null,
                     acquisitionSummary?.TotalLogs ?? 0,
                     measureResources.Count);
@@ -464,7 +477,8 @@ public class AutomationRunManager : IAutomationRunManager
                 {
                     Schedule = schedule,
                     Entries = entries,
-                    Populations = populations,
+                    EntryRollup = entryRollup,
+                    PopulationCounts = populationCounts,
                     AcquisitionSummary = acquisitionSummary,
                     AcquisitionLogs = acquisitionLogs,
                     MeasureEvalResourceCounts = measureResources,
@@ -473,6 +487,8 @@ public class AutomationRunManager : IAutomationRunManager
             });
 
             var snapshot = await builder.BuildAsync(facilityId, reportId, logs, cancellationToken);
+            if (acquisitionChart != null)
+                acquisitionChart.Apply(snapshot.DataAcquisition, snapshot.DataAcquisition.ResourceCount, snapshot.GeneratedAt);
             snapshot.IsFinal = isFinal;
             return snapshot;
         }
@@ -735,6 +751,18 @@ public class AutomationRunManager : IAutomationRunManager
 
         summary.RunConfigurationJson = null;
         await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId, cancellationToken);
+    }
+
+    private async Task<PipelineDataReader.PopulationCountSnapshot?> ReadPopulationCountsAsync(
+        Guid runId,
+        CancellationToken cancellationToken)
+    {
+        var counts = await SafeGetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, "populations", cancellationToken);
+        if (counts != null)
+            return counts;
+
+        var legacy = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken);
+        return legacy == null ? null : RunHistorySlim.ToPopulationCounts(legacy);
     }
 
     /// <summary>

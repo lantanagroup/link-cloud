@@ -8,6 +8,18 @@
 
   <section class="upload-section" aria-labelledby="upload-title">
     <h2 id="upload-title">Upload HSLOC CSV</h2>
+    <div class="format-help" id="hsloc-format-help" role="note" aria-label="Required HSLOC CSV format">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <div>
+        <p><strong>The HSLOC CSV published on the CDC website cannot be uploaded as-is.</strong>
+          Reformat it so the first row is a header containing exactly these four columns, in any order:</p>
+        <ul>
+          @for (column of csvColumns; track column.name) { <li><code>{{ column.name }}</code>: {{ column.description }}</li> }
+        </ul>
+        <p>Every row needs a value in all four columns, each HSLOC code may appear only once, and any other columns must be removed. Example:</p>
+        <pre><code>{{ sampleCsv }}</code></pre>
+      </div>
+    </div>
     <form (ngSubmit)="upload(fileInput)">
       <mat-form-field appearance="outline">
         <mat-label>Old version</mat-label>
@@ -19,10 +31,10 @@
       </mat-form-field>
       <div class="file-field">
         <label for="hsloc-csv">CSV file</label>
-        <input #fileInput id="hsloc-csv" type="file" accept=".csv,text/csv" [disabled]="busy" (change)="selectFile($event)" aria-describedby="file-error">
+        <input #fileInput id="hsloc-csv" type="file" accept=".csv,text/csv" [disabled]="busy" (change)="selectFile($event)" aria-describedby="hsloc-format-help file-error">
         @if (fileError) { <span id="file-error" role="alert" class="error">{{ fileError }}</span> }
       </div>
-      <button mat-flat-button color="primary" type="submit" [disabled]="busy || !loaded || !file || !oldVersion.trim() || !newVersion.trim()">
+      <button mat-flat-button color="primary" type="submit" [disabled]="busy || checkingFile || !loaded || !file || !oldVersion.trim() || !newVersion.trim()">
         <mat-icon>upload</mat-icon>Upload
       </button>
     </form>

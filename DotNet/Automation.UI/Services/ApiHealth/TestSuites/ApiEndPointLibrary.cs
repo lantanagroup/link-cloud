@@ -213,7 +213,9 @@ public static class ApiEndPointLibrary
             [DmrpSteps.MappingDelete204] = new EndpointMeta("Deletes a mapping once nothing references it.", $"DELETE {mappings}/{{id}}"),
             [DmrpSteps.MappingDelete404] = new EndpointMeta("Answers not-found when deleting a mapping twice.", $"DELETE {mappings}/{{id}}"),
             [DmrpSteps.FacilityPost400WithSchedule] = new EndpointMeta(
-                "Refuses a facility that carries its own schedule while DMRP is enabled; the schedule is derived from reporting plans.",
+                "Refuses a facility that carries its own schedule while DMRP is enabled, since the schedule is " +
+                "derived from reporting plans. With the Mock DMRP API switched on, refuses one naming a dQM no " +
+                "measure mapping covers.",
                 "POST /api/Facility")
         };
     }

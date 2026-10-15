@@ -1,22 +1,20 @@
 import {CanActivate, Router, UrlTree} from "@angular/router";
 import {Injectable} from "@angular/core";
-import {AppConfigService} from "../app-config.service";
+import {Observable, map} from "rxjs";
+import {DmrpStatusService} from "../gateway/dmrp/dmrp-status.service";
 
 /**
- * Blocks the DMRP screens when the module is off (the app config's dmrpEnabled flag,
- * mirroring the backend's DMRP:Enabled). The nav bar already hides the entries; this
- * covers direct URLs and stale bookmarks.
+ * Blocks the DMRP screens when the module is off, as Tenant reports it at api/dmrp/dmrp-status. The nav
+ * bar already hides the entries; this covers direct URLs and stale bookmarks.
  */
 @Injectable({providedIn: 'root'})
 export class DmrpGuard implements CanActivate {
-  constructor(private router: Router, private appConfigService: AppConfigService) {
+  constructor(private router: Router, private dmrpStatusService: DmrpStatusService) {
   }
 
-  canActivate(): boolean | UrlTree {
-    if (this.appConfigService.config?.dmrpEnabled) {
-      return true;
-    }
-
-    return this.router.createUrlTree(['/dashboard']);
+  canActivate(): Observable<boolean | UrlTree> {
+    return this.dmrpStatusService.getStatus().pipe(
+      map(status => status.dmrpEnabled ? true : this.router.createUrlTree(['/dashboard']))
+    );
   }
 }

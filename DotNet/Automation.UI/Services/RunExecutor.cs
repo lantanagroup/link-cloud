@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -160,7 +161,7 @@ internal sealed class RunExecutor
         var output = callbacks.Output;
 
         ServiceProvider? runServices = null;
-        MockDmrpApiHelper? mockDmrpApiHelperForCleanup = null;
+        IMockDmrpServiceClient? mockDmrpClientForCleanup = null;
         var cleanupMockDmrpEntries = false;
 
         state.Status = AutomationRunStatus.Running;
@@ -211,8 +212,11 @@ internal sealed class RunExecutor
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
             var dmrpClient = services.GetRequiredService<IDmrpServiceClient>();
-            var mockDmrpApiHelper = services.GetRequiredService<MockDmrpApiHelper>();
-            mockDmrpApiHelperForCleanup = mockDmrpApiHelper;
+            // Resolved only for a DMRP run, so a stack with no mock URL configured can still run the rest.
+            var mockDmrpClient = state.Options.EnableDmrp
+                ? services.GetRequiredService<IMockDmrpServiceClient>()
+                : null;
+            mockDmrpClientForCleanup = mockDmrpClient;
             var reportHelper = services.GetRequiredService<ReportApiHelper>();
             var validationHelper = services.GetRequiredService<ValidationApiHelper>();
             var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
@@ -242,9 +246,17 @@ internal sealed class RunExecutor
             {
                 ValidateDmrpScenario(state.Options);
 
-                await mockDmrpApiHelper.EnsureReachableAsync(
-                    state.Options.NhsnOrganizationId,
-                    cancellationToken);
+                var reachable = await mockDmrpClient!.SearchEntriesAsync(
+                    facilityId: state.Options.NhsnOrganizationId,
+                    pageSize: 1,
+                    cancellationToken: cancellationToken);
+
+                if (!reachable.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        $"MockDmrpApi reachability check failed with HTTP {reachable.StatusCode}. " +
+                        $"Response: {reachable.RawBody}");
+                }
 
                 output.WriteLine(
                     $"MockDmrpApi reachable for NHSN Organization ID " +
@@ -471,7 +483,7 @@ internal sealed class RunExecutor
                 output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             var facilityClient = services.GetRequiredService<IFacilityServiceClient>();
@@ -494,58 +506,105 @@ internal sealed class RunExecutor
                 var reportingPeriods = FacilitySetupHelper.GetDmrpReportingPeriods();
                 var seededDmrpEntries = new List<object>();
 
-                // Start from a clean mock enrollment for this NHSN organization.
-                // Facility-scoped cleanup is intentionally used instead of the global endpoint.
-                cleanupMockDmrpEntries = true;
+                var dmrpStatus = await FacilitySetupHelper.GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
 
-                await mockDmrpApiHelper.DeleteFacilityEntriesAsync(
-                    facilityId,
-                    cancellationToken);
-
-                foreach (var (month, year) in reportingPeriods)
+                if (dmrpStatus.MockDmrpEnabled)
                 {
-                    var seeded = await mockDmrpApiHelper.CreateEntryAsync(
-                        new MockDmrpEntryRequest
+                    // Tenant writes a facility's schedule through to the mock as enrollment, so saving the
+                    // facility scheduled for the dQM is what enrolls it, the same as saving the Admin UI form.
+                    // Seeding the mock here and then saving the facility with no schedule would un-enroll it.
+                    // cleanupMockDmrpEntries stays false on purpose: the entries live as long as the facility,
+                    // and its teardown (a Tenant hard delete) clears them. Deleting them at the end of the run
+                    // would leave a facility Link still has enrolled with no enrollment in the mock.
+                    state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        [measureId],
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces,
+                        onCreated: async () =>
                         {
+                            state.AutomationCreatedFacility = true;
+                            await callbacks.PersistOwnership();
+                        });
+
+                    foreach (var (month, year) in reportingPeriods)
+                    {
+                        seededDmrpEntries.AddRange(await ReadMockDmrpEntriesAsync(mockDmrpClient!,
+                                                                                  facilityId,
+                                                                                  month,
+                                                                                  year,
+                                                                                  cancellationToken));
+                    }
+                }
+                else
+                {
+                    // Start from a clean mock enrollment for this NHSN organization.
+                    // Facility-scoped cleanup is intentionally used instead of the global endpoint.
+                    cleanupMockDmrpEntries = true;
+
+                    await DeleteMockDmrpEntriesAsync(
+                        mockDmrpClient!,
+                        facilityId,
+                        cancellationToken);
+
+                    foreach (var (month, year) in reportingPeriods)
+                    {
+                        var created = await mockDmrpClient!.CreateEntryAsync(
+                            new MockDmrpEntryRequest
+                            {
+                                FacilityId = facilityId,
+                                Component = component,
+                                Measure = nhsnMeasure,
+                                ReportingMonth = month,
+                                ReportingYear = year,
+                                IsReporting = "Y"
+                            },
+                            cancellationToken);
+
+                        if (!created.IsSuccessStatusCode || created.Body is null)
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to seed MockDmrpApi entry. " +
+                                $"HTTP {created.StatusCode}. Response: {created.RawBody}");
+                        }
+
+                        var seeded = created.Body;
+
+                        seededDmrpEntries.Add(new
+                        {
+                            seeded.Id,
                             FacilityId = facilityId,
                             Component = component,
                             Measure = nhsnMeasure,
                             ReportingMonth = month,
                             ReportingYear = year,
                             IsReporting = "Y"
-                        },
-                        cancellationToken);
+                        });
 
-                    seededDmrpEntries.Add(new
-                    {
-                        seeded.Id,
-                        FacilityId = facilityId,
-                        Component = component,
-                        Measure = nhsnMeasure,
-                        ReportingMonth = month,
-                        ReportingYear = year,
-                        IsReporting = "Y"
-                    });
+                        output.WriteLine(
+                            $"Seeded MockDmrpApi enrollment '{seeded.Id}': " +
+                            $"{facilityId}, {component}/{nhsnMeasure}, {month}/{year}.");
+                    }
 
-                    output.WriteLine(
-                        $"Seeded MockDmrpApi enrollment '{seeded.Id}': " +
-                        $"{facilityId}, {component}/{nhsnMeasure}, {month}/{year}.");
+                    // Tenant refuses refresh for a facility it does not know, so create the
+                    // facility first with an empty DMRP-derived schedule.
+                    state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces,
+                        onCreated: async () =>
+                        {
+                            state.AutomationCreatedFacility = true;
+                            await callbacks.PersistOwnership();
+                        });
                 }
 
-                // Tenant refuses refresh for a facility it does not know, so create the
-                // facility first with an empty DMRP-derived schedule.
-                state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
-                    facilityClient,
-                    output,
-                    facilityId,
-                    cancellationToken,
-                    state.Options.VendorName,
-                    state.Options.HonorExplicitFacilityPieces,
-                    onCreated: async () =>
-                    {
-                        state.AutomationCreatedFacility = true;
-                        await callbacks.PersistOwnership();
-                    });
                 if (!state.AutomationCreatedFacility)
                     await callbacks.PersistRunSummary();
 
@@ -594,15 +653,19 @@ internal sealed class RunExecutor
                         $"for {month}/{year}.");
                 }
 
-                // The reporting plans now exist. Re-save the facility so
-                // DmrpFacilityOperations derives ScheduledReports from them.
-                await FacilitySetupHelper.RefreshDmrpDerivedScheduleAsync(
-                    facilityClient,
-                    output,
-                    facilityId,
-                    cancellationToken,
-                    state.Options.VendorName,
-                    state.Options.HonorExplicitFacilityPieces);
+                // The reporting plans now exist. Re-save the facility so DmrpFacilityOperations derives
+                // ScheduledReports from them. Not with the write-through: the save that enrolled the facility
+                // already derived its schedule, and saving it again with no schedule would un-enroll it.
+                if (!dmrpStatus.MockDmrpEnabled)
+                {
+                    await FacilitySetupHelper.RefreshDmrpDerivedScheduleAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces);
+                }
 
                 pipelineDataReader.InvalidateCache();
 
@@ -614,7 +677,7 @@ internal sealed class RunExecutor
                         $"Facility '{facilityId}' could not be read after applying the DMRP-derived schedule.");
                 }
 
-                await _snapshotStore.SetDomainAsync(
+                await _orchestrator.WriteDomainAsync(
                     state.RunId,
                     "dmrp",
                     new
@@ -881,7 +944,7 @@ internal sealed class RunExecutor
 
                 // Persist the submitted-patient override before validators run so the
                 // dashboard reflects prediction scope even when a later validator fails.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             // RegenerateReport: the first report is just a prerequisite.
@@ -982,7 +1045,7 @@ internal sealed class RunExecutor
             try
             {
                 var absSnapshot = AbsUploadSnapshot.Build(internalPackage);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
             }
             catch (Exception absEx)
             {
@@ -996,7 +1059,7 @@ internal sealed class RunExecutor
             try
             {
                 var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalPackage);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
@@ -1016,7 +1079,7 @@ internal sealed class RunExecutor
             // localise a discrepancy. Results are persisted after each validator so partial results
             // stay visible in the dashboard even when a later validator fails.
             var validatorRunner = new ValidatorRunner((results, ct) =>
-                _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", results, ct));
+                _orchestrator.WriteDomainAsync(state.RunId, "validatorResults", results, ct));
 
             Task RunValidator(string name, Func<Task> action) =>
                 validatorRunner.RunAsync(name, action, cancellationToken);
@@ -1043,7 +1106,7 @@ internal sealed class RunExecutor
             // snapshot taken at line ~506.
             if (generationManifest != null)
             {
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             if (isLiveSimulation)
@@ -1109,33 +1172,38 @@ internal sealed class RunExecutor
             {
                 var logs = new List<string>();
 
+                // Each Loki call stamps its own end time. Refresh coverage here so a
+                // later resource type does not start after the run began.
+                TimeSpan LookbackForThisRequest() =>
+                    LokiEvidenceQuery.LookbackForRequest(
+                        lookback,
+                        LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
+
+                Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
+                    lokiScraper.QueryServiceLogsAsync(
+                        LokiScraper.Components.Normalization,
+                        normalizationSummaryMarker,
+                        LookbackForThisRequest(),
+                        additionalContainsFilters: filters,
+                        limit: limit,
+                        maxPages: maxPages,
+                        cancellationToken: queryToken);
+
                 if (evidenceRequiredResourceTypes.Count > 0)
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
                         queryToken.ThrowIfCancellationRequested();
                         var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
-                        var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
-                            limit: 5000,
-                            maxPages: 20,
-                            cancellationToken: queryToken);
+                        var logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 5000, maxPages: 20);
 
                         if (logsForResourceType.Count == 0)
                         {
                             queryToken.ThrowIfCancellationRequested();
                             output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
-                            logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                                LokiScraper.Components.Normalization,
-                                normalizationSummaryMarker,
-                                lookback,
-                                additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
-                                limit: 500,
-                                maxPages: 40,
-                                cancellationToken: queryToken);
+                            logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 500, maxPages: 40);
                         }
 
                         output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
@@ -1146,27 +1214,13 @@ internal sealed class RunExecutor
                     {
                         output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
                         queryToken.ThrowIfCancellationRequested();
-                        logs = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: runScopeFilters,
-                            limit: 5000,
-                            maxPages: 20,
-                            cancellationToken: queryToken);
+                        logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                     }
                 }
                 else
                 {
                     queryToken.ThrowIfCancellationRequested();
-                    logs = await lokiScraper.QueryServiceLogsAsync(
-                        LokiScraper.Components.Normalization,
-                        normalizationSummaryMarker,
-                        lookback,
-                        additionalContainsFilters: runScopeFilters,
-                        limit: 5000,
-                        maxPages: 20,
-                        cancellationToken: queryToken);
+                    logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                 }
 
                 return logs
@@ -1176,46 +1230,18 @@ internal sealed class RunExecutor
 
             async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
             {
-                var plan = NormalizationDiagnosticsWriter.PlanPersistence(evidence);
-                for (var index = 0; index < plan.Chunks.Count; index++)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    try
-                    {
-                        await _snapshotStore.SetDomainAsync(
-                            state.RunId,
-                            NormalizationEvidenceSnapshot.ChunkDomain(index + 1),
-                            plan.Chunks[index],
-                            ct);
-                    }
-                    catch (Exception ex) when (!ct.IsCancellationRequested)
-                    {
-                        output.WriteLine(
-                            $"[Normalization Suite] Failed to persist evidence chunk {index + 1}: {ex.Message}");
-                        output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
-                        return;
-                    }
-                }
-
                 try
                 {
-                    await _snapshotStore.SetDomainAsync(
+                    await _orchestrator.WriteDomainAsync(
                         state.RunId,
                         NormalizationEvidenceSnapshot.Domain,
-                        plan.Header,
+                        RunHistorySlim.SlimNormalizationEvidence(evidence),
                         ct);
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
                     output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
                     output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
-                    return;
-                }
-
-                if (plan.Chunks.Count > 0)
-                {
-                    output.WriteLine(
-                        $"[Normalization Suite] Evidence snapshot is stored as {plan.Chunks.Count} chunk(s) in the snapshot store. Operation counts stay on the header.");
                 }
             }
 
@@ -1238,7 +1264,10 @@ internal sealed class RunExecutor
                         (lookback, queryToken) => QueryNormalizationSummaryLogsAsync(lookback, queryToken),
                         (delay, ct) => Task.Delay(delay, ct),
                         output,
-                        cancellationToken);
+                        cancellationToken,
+                        coverageNow: () => LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
@@ -1401,12 +1430,13 @@ internal sealed class RunExecutor
         finally
         {
             if (cleanupMockDmrpEntries &&
-                mockDmrpApiHelperForCleanup != null &&
+                mockDmrpClientForCleanup != null &&
                 !string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
             {
                 try
                 {
-                    await mockDmrpApiHelperForCleanup.DeleteFacilityEntriesAsync(
+                    await DeleteMockDmrpEntriesAsync(
+                        mockDmrpClientForCleanup,
                         state.Options.NhsnOrganizationId,
                         CancellationToken.None);
 
@@ -1432,6 +1462,56 @@ internal sealed class RunExecutor
                 _liveInjector.CloseSession(state.RunId);
 
             runServices?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The facility's mock entries for one period, as the run summary records them.
+    /// </summary>
+    private static async Task<IEnumerable<object>> ReadMockDmrpEntriesAsync(IMockDmrpServiceClient client,
+                                                                          string facilityId,
+                                                                          int month,
+                                                                          int year,
+                                                                          CancellationToken cancellationToken)
+    {
+        var page = await client.SearchEntriesAsync(facilityId: facilityId,
+                                                   reportingMonth: month,
+                                                   reportingYear: year,
+                                                   pageSize: 100,
+                                                   cancellationToken: cancellationToken);
+
+        if (!page.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to read MockDmrpApi entries for '{facilityId}' for {month}/{year}. " +
+                $"HTTP {page.StatusCode}. Response: {page.RawBody}");
+        }
+
+        return (page.Body?.Records ?? [])
+            .Select(e => (object)new
+            {
+                e.Id,
+                e.FacilityId,
+                e.Component,
+                e.Measure,
+                e.ReportingMonth,
+                e.ReportingYear,
+                e.IsReporting
+            })
+            .ToList();
+    }
+
+    private static async Task DeleteMockDmrpEntriesAsync(IMockDmrpServiceClient client,
+                                                         string nhsnOrganizationId,
+                                                         CancellationToken cancellationToken)
+    {
+        var deleted = await client.DeleteEntriesForFacilityAsync(nhsnOrganizationId, cancellationToken);
+
+        if (!deleted.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clean up MockDmrpApi entries for NHSN organization " +
+                $"'{nhsnOrganizationId}'. HTTP {deleted.StatusCode}. Response: {deleted.RawBody}");
         }
     }
 
@@ -1931,7 +2011,8 @@ internal sealed class RunExecutor
                 _snapshotStore,
                 _generatedTemplateCache,
                 liveShape,
-                state.Options.MeasureBundleJsons);
+                state.Options.MeasureBundleJsons,
+                _orchestrator);
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,
@@ -2229,7 +2310,14 @@ internal sealed class RunExecutor
 
         services.AddTransient<ValidationApiHelper>();
         services.AddTransient<ReportApiHelper>();
-        services.AddTransient<MockDmrpApiHelper>();
+        services.AddMockDmrpServiceClient(sp =>
+        {
+            var url = sp.GetRequiredService<IOptions<ServiceRegistry>>().Value.MockDmrpApiUrl;
+
+            return string.IsNullOrWhiteSpace(url)
+                ? throw new InvalidOperationException("ServiceRegistry:MockDmrpApiUrl is not configured.")
+                : url;
+        });
         services.AddTransient<ReportDatabaseValidator>();
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();

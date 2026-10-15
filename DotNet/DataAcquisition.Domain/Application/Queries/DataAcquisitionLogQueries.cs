@@ -553,6 +553,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ExecutionDate,
                     log.CreateDate,
                     CompletionDate = log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null),
+                    log.CompletionTimeMilliseconds,
                     log.RetryAttempts,
                     log.Status,
                     log.IsDeleted
@@ -645,6 +646,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ExecutionDate = log.ExecutionDate,
                         CreateDate = log.CreateDate,
                         CompletionDate = log.CompletionDate,
+                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
