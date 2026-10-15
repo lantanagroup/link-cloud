@@ -131,7 +131,7 @@ public class RestoreFacilityTests
 
             // DA logs restore
             if (request.Method == HttpMethod.Patch &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/") &&
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
                 return NoContentResponse();
 
@@ -321,7 +321,7 @@ public class RestoreFacilityTests
 
             // DA restore fails
             if (request.Method == HttpMethod.Patch &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/") &&
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
                 return StatusResponse(HttpStatusCode.ServiceUnavailable);
 
@@ -380,7 +380,7 @@ public class RestoreFacilityTests
                 return NoContentResponse();
 
             if (request.Method == HttpMethod.Patch &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/") &&
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
                 throw new HttpRequestException("DA service unavailable");
 
@@ -465,7 +465,7 @@ public class RestoreFacilityTests
                 return NoContentResponse();
             }
 
-            if (request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/"))
+            if (request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/"))
             {
                 daCalled = true;
                 return NoContentResponse();
@@ -511,7 +511,7 @@ public class RestoreFacilityTests
 
             // DA restore succeeds
             if (request.Method == HttpMethod.Patch &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/") &&
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
                 return NoContentResponse();
 
@@ -523,7 +523,7 @@ public class RestoreFacilityTests
 
             // DA rollback (soft-delete)
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
             {
                 daSoftDeleteCalled = true;
                 return NoContentResponse();
@@ -586,7 +586,7 @@ public class RestoreFacilityTests
                 return NoContentResponse();
 
             if (request.Method == HttpMethod.Patch &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/") &&
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
                 return NoContentResponse();
 
@@ -598,7 +598,7 @@ public class RestoreFacilityTests
 
             // DA rollback (soft-delete)
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
             {
                 daSoftDeleteCalled = true;
                 return NoContentResponse();

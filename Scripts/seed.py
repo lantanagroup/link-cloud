@@ -236,7 +236,7 @@ def create_query_plan(admin_bff_url, tenant_name, admin_bff_token=None):
     if admin_bff_token:
         headers['Authorization'] = f'Bearer {admin_bff_token}'
 
-    post_url = f"{admin_bff_url}/api/data/{tenant_name}/QueryPlan"
+    post_url = f"{admin_bff_url}/api/data-acquisition/{tenant_name}/QueryPlan"
     print(f"Creating query plan for tenant '{tenant_name}' at {post_url}...")
 
     try:
@@ -281,7 +281,7 @@ def create_query_config(admin_bff_url, tenant_name, fhir_server_base, admin_bff_
     if admin_bff_token:
         headers['Authorization'] = f'Bearer {admin_bff_token}'
 
-    post_url = f"{admin_bff_url}/api/data/fhirQueryConfiguration"
+    post_url = f"{admin_bff_url}/api/data-acquisition/fhirQueryConfiguration"
     print(f"Creating query config at {post_url}...")
 
     try:
