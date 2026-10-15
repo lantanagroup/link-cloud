@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -501,7 +501,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("DELETE", request.Method);
-        Assert.Equal("/api/data/location-mappings/facility/facility-a", request.Path);
+        Assert.Equal("/api/data-acquisition/location-mappings/facility/facility-a", request.Path);
     }
 
     [Fact]
@@ -514,7 +514,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("DELETE", request.Method);
-        Assert.Equal("/api/data/encounter-mappings/facilities/facility-a", request.Path);
+        Assert.Equal("/api/data-acquisition/encounter-mappings/facilities/facility-a", request.Path);
     }
 
     [Fact]
@@ -534,7 +534,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/data/acquisition-logs", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs", request.Path);
         Assert.Contains("statuses=Pending", request.Query);
         Assert.Contains("statuses=Failed", request.Query);
         Assert.Contains("facilityId=f1", request.Query);
@@ -551,7 +551,7 @@ public class DataAcquisitionServiceClientTests
         await client.GetReportStatusCountsAsync("r1", patientId: "p1");
         var request = http.SingleRequest();
 
-        Assert.Equal("/api/data/acquisition-logs/report/r1/status-counts", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/report/r1/status-counts", request.Path);
         Assert.Contains("patientId=p1", request.Query);
     }
 
@@ -566,7 +566,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal($"/api/data/sftp-logs/{id}", request.Path);
+        Assert.Equal($"/api/data-acquisition/sftp-logs/{id}", request.Path);
         Assert.Equal(Guid.Parse(id), result.Body!.ExternalId);
     }
 
@@ -581,7 +581,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal($"/api/data/sftp-logs/{id}/reset", request.Path);
+        Assert.Equal($"/api/data-acquisition/sftp-logs/{id}/reset", request.Path);
     }
 
     [Fact]
@@ -594,7 +594,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/data/sftp-logs", request.Path);
+        Assert.Equal("/api/data-acquisition/sftp-logs", request.Path);
         Assert.Contains("facilityId=f1", request.Query);
         Assert.Contains("status=Failed", request.Query);
         Assert.Contains("acquisitionType=Census", request.Query);
