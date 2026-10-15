@@ -224,12 +224,29 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             });
     }
 
-    public async Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default)
+    public async Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default, DateTimeOffset? createdFromUtc = null, DateTimeOffset? createdBeforeUtc = null)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
-        var total = await _runs.CountDocumentsAsync(FilterDefinition<AutomationRunDocument>.Empty, cancellationToken: ct);
+        var filterBuilder = Builders<AutomationRunDocument>.Filter;
+        var filter = FilterDefinition<AutomationRunDocument>.Empty;
+
+        if (createdFromUtc.HasValue)
+        {
+            filter &= filterBuilder.Gte(
+                r => r.CreatedAt,
+                createdFromUtc.Value);
+        }
+
+        if (createdBeforeUtc.HasValue)
+        {
+            filter &= filterBuilder.Lt(
+                r => r.CreatedAt,
+                createdBeforeUtc.Value);
+        }
+
+        var total = await _runs.CountDocumentsAsync(filter, cancellationToken: ct);
 
         // Build the sort spec from a server-side whitelist. Anything unrecognized
         // (or null) falls back to CreatedAt DESC, the existing default. The client
@@ -257,7 +274,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // primary-sort value (e.g. two runs in the same Status bucket) are returned
         // in storage order; in practice this is stable across consecutive page
         // requests because the underlying documents do not move.
-        var docs = await _runs.Find(FilterDefinition<AutomationRunDocument>.Empty)
+        var docs = await _runs.Find(filter)
             .Sort(primary)
             .Skip((pageNumber - 1) * pageSize)
             .Limit(pageSize)
