@@ -1,0 +1,57 @@
+# Oct 15 demo: Kafka console changes take effect on a real 3-broker cluster (broker-3 on demand).
+# Separate compose project; does not touch the dev stack (wt-link-ui-scaffold) or Link.UI instances A/B.
+# Usage (from this folder):  docker compose up -d --build     /     docker compose --profile extra-broker down -v
+name: link-demo-oct15
+
+include:
+  - ../Scripts/kafka-ops-proof/compose.yml
+
+services:
+  demo-admin-bff:
+    build:
+      context: ..
+      dockerfile: demo/AdminBff.demo.Dockerfile
+    image: link-demo-admin-bff
+    ports: ["8163:8080"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../Scripts/kafka-ops-proof:/demo-kafka:ro
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      SecretManagement__Manager: Local
+      Cache__Type: InMemory
+      Telemetry__EnableTelemetry: "false"
+      Telemetry__EnableOtelCollector: "false"
+      Serilog__WriteTo__1__Name: Console
+      Authentication__EnableAnonymousAccess: "true"
+      Authentication__DefaultChallengeScheme: link_cookie
+      Authentication__Schemas__Jwt__Enabled: "false"
+      Authentication__Schemas__OpenIdConnect__Enabled: "false"
+      Authentication__Schemas__Oauth2__Enabled: "false"
+      LinkTokenService__SigningKey: local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes
+      KafkaConnection__BootstrapServers__0: broker-0:9092
+      KafkaConnection__SaslProtocolEnabled: "false"
+      KafkaOps__Connection__BootstrapServers: broker-0:9092,broker-1:9092,broker-2:9092
+      KafkaOps__Connection__SaslProtocolEnabled: "false"
+      KafkaOps__InfraProvider: LocalCompose
+      KafkaOps__ComposeProject: link-demo-oct15
+      KafkaOps__ComposeFile: /demo-kafka/compose.yml
+      KafkaOps__BrokerService: broker-0
+      KafkaOps__BrokerServicePrefix: broker-
+      KafkaOps__ExtraBrokerProfile: extra-broker
+      KafkaOps__ExtraBrokerService: broker-3
+      KafkaOps__KafkaToolsPath: /opt/kafka/bin
+      KafkaOps__ConsumerDeployments: ops-proof-consumers=consumer
+      KafkaOps__AllowTopicMigration: "true"
+      KafkaOps__RequireDifferentApprover: "false"
+    depends_on: [broker-0, broker-1, broker-2]
+
+  demo-kafka-init:
+    image: apache/kafka:3.7.1
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - until /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-0:9092 --create --if-not-exists --topic AuditableEventOccurred --partitions 3 --replication-factor 3 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-0:9092 --create --if-not-exists --topic Service-Healthcheck --partitions 3 --replication-factor 3; do sleep 2; done
+    depends_on: [broker-0, broker-1, broker-2]
+
+
