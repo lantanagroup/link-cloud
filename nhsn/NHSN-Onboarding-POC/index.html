@@ -644,7 +644,11 @@
   }
   .modal.modal-wide { width: 960px; max-width: 95vw; max-height: 90vh; }
   .modal.modal-xwide { width: 1300px; max-width: 96vw; max-height: 92vh; }
-  #preQualModal .modal { max-height: 97vh; }
+  #preQualModal .modal { height: 97vh; max-height: 97vh; display: flex; flex-direction: column; }
+  #preQualMainView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #preQualMainView[hidden] { display: none; }
+  #pqUnacceptableSection { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #pqUnacceptableSection .pq-category-scroll { flex: 1; min-height: 0; max-height: none; }
   .pq-wrap-table { table-layout: fixed; }
   .pq-wrap-table th, .pq-wrap-table td { word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
   .pq-category-scroll { max-height: 620px; }
@@ -1785,23 +1789,14 @@
     <div id="preQualMainView">
       <h3>Pre-Qual Validation Results</h3>
       <p class="form-hint" style="margin-top:-6px;">Patient <strong id="pqPatientId"></strong> &mdash; <span id="pqMeasureName"></span></p>
-      <div class="section-title" style="margin-top:0; margin-bottom:6px;">Issues Summary</div>
-      <div id="pqChart" style="margin-bottom:10px;"></div>
       <div id="pqUnacceptableSection">
-        <div class="section-title" style="margin-top:14px; margin-bottom:6px;">Unacceptable Categories</div>
+        <div class="section-title" style="margin-top:0; margin-bottom:6px;">Unacceptable Categories</div>
         <div class="table-scroll pq-category-scroll">
           <table class="pq-wrap-table">
             <thead><tr><th style="width:22%;">Category</th><th style="width:14%;">Number of Issues</th><th style="width:64%;">Guidance</th></tr></thead>
             <tbody id="pqUnacceptableBody"></tbody>
           </table>
         </div>
-      </div>
-      <div class="section-title" style="margin-top:14px; margin-bottom:6px;">Acceptable Categories</div>
-      <div class="table-scroll pq-category-scroll" style="margin-bottom:8px;">
-        <table class="pq-wrap-table">
-          <thead><tr><th style="width:22%;">Category</th><th style="width:14%;">Number of Issues</th><th style="width:64%;">Guidance</th></tr></thead>
-          <tbody id="pqAcceptableBody"></tbody>
-        </table>
       </div>
       <div class="modal-actions" style="justify-content:flex-start; flex-wrap:wrap;">
         <button type="button" class="btn btn-secondary" id="pqDownloadBtn">
@@ -5863,65 +5858,6 @@
   }
 
   // ---------- Pre-Qual Results modal ----------
-  function truncateLabel(s, max) {
-    return s.length > max ? s.slice(0, max - 1) + '…' : s;
-  }
-
-  function buildBarChartSvg(bars, width) {
-    width = width || 1180;
-    var height = 250;
-    var padLeft = 40, padBottom = 82, padTop = 16, padRight = 16;
-    var plotW = width - padLeft - padRight;
-    var plotH = height - padTop - padBottom;
-    if (!bars.length) {
-      return '<svg viewBox="0 0 ' + width + ' 120" style="width:100%; height:auto; display:block; max-width:' + width + 'px;">' +
-        '<text x="' + (width / 2) + '" y="60" text-anchor="middle" font-size="13" fill="var(--gray-600)">No issues recorded.</text></svg>';
-    }
-    var maxVal = bars.reduce(function (m, b) { return Math.max(m, b.value); }, 0) || 1;
-    var niceMax = Math.max(4, Math.ceil(maxVal * 1.15));
-    var n = bars.length;
-    var gap = 18;
-    var barW = Math.min(120, (plotW - gap * (n - 1)) / n);
-    var groupW = barW * n + gap * (n - 1);
-    var groupX = padLeft + Math.max(0, (plotW - groupW) / 2);
-
-    var svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" style="width:100%; height:auto; display:block; max-width:' + width + 'px;">';
-    var ticks = 4;
-    for (var t = 0; t <= ticks; t++) {
-      var val = Math.round(niceMax * t / ticks);
-      var y = padTop + plotH - (val / niceMax) * plotH;
-      svg += '<line x1="' + padLeft + '" y1="' + y + '" x2="' + (padLeft + plotW) + '" y2="' + y + '" stroke="var(--gray-100)" stroke-width="1"/>';
-      svg += '<text x="' + (padLeft - 8) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="var(--gray-600)">' + val + '</text>';
-    }
-    svg += '<line x1="' + padLeft + '" y1="' + (padTop + plotH) + '" x2="' + (padLeft + plotW) + '" y2="' + (padTop + plotH) + '" stroke="var(--gray-200)" stroke-width="1"/>';
-
-    bars.forEach(function (b) {
-      var idx = bars.indexOf(b);
-      var x = groupX + idx * (barW + gap);
-      var h = (b.value / niceMax) * plotH;
-      var y = padTop + plotH - h;
-      svg += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="4" fill="' + b.color + '"><title>' + escapeHtml(b.label) + ': ' + b.value + '</title></rect>';
-      svg += '<text x="' + (x + barW / 2) + '" y="' + (y - 6) + '" text-anchor="middle" font-size="12" font-weight="700" fill="var(--gray-800)">' + b.value + '</text>';
-      var lx = x + barW / 2, ly = padTop + plotH + 14;
-      svg += '<text x="' + lx + '" y="' + ly + '" text-anchor="end" font-size="11" fill="var(--gray-700)" transform="rotate(-35 ' + lx + ',' + ly + ')"><title>' + escapeHtml(b.label) + '</title>' + escapeHtml(truncateLabel(b.label, 20)) + '</text>';
-    });
-    svg += '</svg>';
-    return svg;
-  }
-
-  function preQualCategoryCounts(rows) {
-    var counts = {};
-    var order = [];
-    rows.forEach(function (row) {
-      var t = row.category.t;
-      if (!counts[t]) { counts[t] = { value: 0, acceptable: row.category.a }; order.push(t); }
-      counts[t].value++;
-    });
-    return order.map(function (t) {
-      return { label: t, value: counts[t].value, color: counts[t].acceptable ? '#15803d' : '#c62828' };
-    });
-  }
-
   function preQualCategorySummary(rows, acceptableFlag) {
     var byTitle = {};
     var order = [];
@@ -5960,16 +5896,12 @@
   function openPreQualModal(reportId, patientId, measure) {
     var r = findReport(reportId);
     if (!r) return;
-    var entry = r.patients[patientId].measures[measure];
     var rows = getPreQualRowsFor(r, patientId, measure);
     preQualContext = { reportId: reportId, patientId: patientId, measure: measure, rows: rows };
 
     $('pqPatientId').textContent = patientId;
     $('pqMeasureName').textContent = measure;
-    $('pqChart').innerHTML = buildBarChartSvg(preQualCategoryCounts(rows));
-    $('pqUnacceptableSection').hidden = !!(entry && entry.status === 'passed_validation');
     renderPreQualCategoryTable('pqUnacceptableBody', preQualCategorySummary(rows, 0));
-    renderPreQualCategoryTable('pqAcceptableBody', preQualCategorySummary(rows, 1));
 
     $('preQualDetailView').hidden = true;
     $('preQualMainView').hidden = false;
@@ -5989,9 +5921,7 @@
   }
 
   function buildPreQualResultsXlsx(ctx) {
-    var counts = preQualCategoryCounts(ctx.rows);
     var unacceptable = preQualCategorySummary(ctx.rows, 0);
-    var acceptable = preQualCategorySummary(ctx.rows, 1);
     var titleLines = [
       'NHSN Link - Pre-Qual Validation Results',
       'Patient: ' + ctx.patientId,
@@ -5999,9 +5929,7 @@
       'Report Id: ' + ctx.reportId
     ];
     var sections = [
-      { title: 'Issues Summary', headers: ['Title', 'Number of Issues'], rows: counts.map(function (b) { return [b.label, b.value]; }) },
       { title: 'Unacceptable Categories', headers: ['Category', 'Number of Issues', 'Guidance'], rows: unacceptable.map(function (c) { return [c.title, c.count, c.guidance]; }) },
-      { title: 'Acceptable Categories', headers: ['Category', 'Number of Issues', 'Guidance'], rows: acceptable.map(function (c) { return [c.title, c.count, c.guidance]; }) },
       { title: 'All Issues', headers: ['Category', 'Message', 'Expression', 'Location'], rows: ctx.rows.map(function (row) { return [row.category.t, row.message, row.expression, row.location]; }) }
     ];
     return buildSectionedXlsx('Pre-Qual Results', titleLines, sections);
