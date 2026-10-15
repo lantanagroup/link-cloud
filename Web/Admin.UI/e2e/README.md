@@ -1,5 +1,7 @@
 # Admin.UI end-to-end tests (Playwright)
 
+Presenting this suite to a team? See [DEMO.md](DEMO.md) for a paced 10-minute runbook.
+
 Two tiers, selected via Playwright projects:
 
 | Project  | What it tests                     | Backend                | Run with |
@@ -25,8 +27,16 @@ Nothing else needs to be running — Playwright boots `ng serve` itself (`webSer
   recorded in `api.unmatched` — assert it stays empty to catch missing fixtures
 
 Fixtures live in `e2e/fixtures/` as **typed TypeScript** against the app's own interfaces
-(`src/app/interfaces/...`), so backend model drift breaks the build instead of silently
-passing. See `tools/capture-fixtures.md` for how to capture new ones.
+(`src/app/interfaces/...`), so model drift surfaces as a type error on the fixture rather than
+a stale shape that silently passes. Playwright transpiles with esbuild and does not typecheck,
+so that guarantee needs `tsc` to run:
+
+```powershell
+npm run typecheck:e2e   # tsc --noEmit -p e2e/tsconfig.json
+```
+
+CI runs it in the `Admin UI Tests (mocked)` job before installing browsers. See
+`tools/capture-fixtures.md` for how to capture new fixtures.
 
 ## Live tier
 
