@@ -184,18 +184,21 @@
                     <div class="card-header"><i class="bi bi-clock-history me-2"></i>Status</div>
                     <div class="card-body">
                         <dl class="row mb-0 small">
-                            <dt class="col-6">Now</dt>
-                            <dd class="col-6" id="cleanup-now">@LinkUiTime.Display(Model.NowUtc)</dd>
-                            <dt class="col-6">Next daily teardown</dt>
-                            <dd class="col-6">@LinkUiTime.Display(Model.NextDailyTeardownUtc)</dd>
-                            <dt class="col-6">Next weekly purge</dt>
-                            <dd class="col-6">@LinkUiTime.Display(Model.NextWeeklyPurgeUtc)</dd>
-                            <dt class="col-6">Last daily</dt>
-                            <dd class="col-6">@(s.LastDailyTeardownAt is null ? "never" : LinkUiTime.Display(s.LastDailyTeardownAt.Value))</dd>
-                            <dt class="col-6">Last weekly</dt>
-                            <dd class="col-6">@(s.LastWeeklyPurgeAt is null ? "never" : LinkUiTime.Display(s.LastWeeklyPurgeAt.Value))</dd>
-                            <dt class="col-6">Last quiesce</dt>
-                            <dd class="col-6" id="cleanup-last-quiesce">@(Model.LastQuiesceAt is null ? "not yet this process" : LinkUiTime.Display(Model.LastQuiesceAt.Value))</dd>
+                            <dt class="col-6 border-bottom pb-2">Now</dt>
+                            <dd class="col-6 border-bottom pb-2" id="cleanup-now">@LinkUiTime.Display(Model.NowUtc)</dd>
+
+                            <dt class="col-6 pt-2">Next daily teardown</dt>
+                            <dd class="col-6 pt-2">@LinkUiTime.Display(Model.NextDailyTeardownUtc)</dd>
+                            <dt class="col-6 border-bottom pb-2">Next weekly purge</dt>
+                            <dd class="col-6 border-bottom pb-2">@LinkUiTime.Display(Model.NextWeeklyPurgeUtc)</dd>
+
+                            <dt class="col-6 pt-2">Last daily teardown</dt>
+                            <dd class="col-6 pt-2">@(s.LastDailyTeardownAt is null ? "never" : LinkUiTime.Display(s.LastDailyTeardownAt.Value))</dd>
+                            <dt class="col-6 border-bottom pb-2">Last weekly purge</dt>
+                            <dd class="col-6 border-bottom pb-2">@(s.LastWeeklyPurgeAt is null ? "never" : LinkUiTime.Display(s.LastWeeklyPurgeAt.Value))</dd>
+
+                            <dt class="col-6 pt-2">Last quiesce</dt>
+                            <dd class="col-6 pt-2" id="cleanup-last-quiesce">@(Model.LastQuiesceAt is null ? "not yet this process" : LinkUiTime.Display(Model.LastQuiesceAt.Value))</dd>
                         </dl>
                         @if (!string.IsNullOrWhiteSpace(s.LastDailyTeardownResult))
                         {
