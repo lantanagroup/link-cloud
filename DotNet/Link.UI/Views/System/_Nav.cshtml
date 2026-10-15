@@ -1,4 +1,4 @@
-@{
+﻿@{
     var active = ViewData["SystemSection"] as string ?? "";
     string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-link";
 }
@@ -8,4 +8,5 @@
     <a class="@Btn("health")" asp-controller="System" asp-action="Health"><i class="bi bi-heart-pulse me-1"></i>Health</a>
     <a class="@Btn("configuration")" asp-controller="System" asp-action="AppConfiguration"><i class="bi bi-sliders me-1"></i>App configuration</a>
     <a class="@Btn("integration")" asp-controller="System" asp-action="Integration"><i class="bi bi-plug me-1"></i>Integration test</a>
+    <a class="@Btn("about")" asp-controller="About" asp-action="Index"><i class="bi bi-info-circle me-1"></i>About</a>
 </nav>
