@@ -1054,6 +1054,28 @@
             });
     }
 
+    // Remember the current Runs homepage URL when navigating to run details.
+    // This preserves sorting, pagination, and any URL-based filters.
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 ||
+            e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+
+        var link = e.target.closest('a[href]');
+
+        if (!link || !link.closest('#recentRunsHost, #activeRunsCard')) return;
+
+        var linkUrl = new URL(link.href, window.location.origin);
+
+        if (linkUrl.origin !== window.location.origin ||
+            !linkUrl.pathname.includes('/Details/')) return;
+
+        try {
+            sessionStorage.setItem('runsReturnUrl', window.location.href);
+        } catch (_) {
+            // Storage may be unavailable; normal navigation still works.
+        }
+    });
+
     // --- Recent Runs table: sort / page / size all go through the partial-view
     // AJAX path. Handlers are delegated on `document` so they keep working after
     // refreshRecentRunsCard replaces the #recentRunsHost contents.
