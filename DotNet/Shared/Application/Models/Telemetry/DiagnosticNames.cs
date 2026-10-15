@@ -33,6 +33,8 @@
         public const string Cache = "cache";
         public const string From = "from";
         public const string To = "to";
+        public const string Route = "http.route";
+        public const string Method = "http.request.method";
 
         //Diagnostic tags Searching
         public const string SearchParameters = "search.parameters";
@@ -63,6 +65,7 @@
         public const string TerminologyLookupDuration = "link_terminology_lookup_duration";
         public const string AutomationPollerHttpCount = "link_automation_poller_http_count";
         public const string AutomationMetricsSnapshotMissing = "link_automation_metrics_snapshot_missing";
+        public const string DataAcquisitionLegacyRouteRequests = "link_data_acq_legacy_route_requests";
 
         public static string NormalizePhase(string? phase)
         {

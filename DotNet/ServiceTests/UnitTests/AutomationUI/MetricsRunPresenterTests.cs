@@ -90,7 +90,7 @@ public class MetricsRunPresenterTests
             {
                 Service = "Data Acquisition",
                 Method = "GET",
-                Route = "api/data/{facilityId}/QueryPlan",
+                Route = "api/data-acquisition/{facilityId}/QueryPlan",
                 P95Ms = 220,
                 Count = 12
             }
