@@ -1101,5 +1101,90 @@ public class DataAcquisitionLogManagerTests
         await dbContext.SaveChangesAsync();
         return logs;
     }
-}
 
+    /// <summary>
+    /// Regression (run 24d4820a): a log's terminal status must not be visible before its resource-id rows.
+    /// TryCompleteTailAsync builds ResourcesAcquired.CacheKeys from those rows once every sibling is terminal;
+    /// publishing Status first let a sibling claim the tail without this log's resource type.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_PersistsResourceIdsBeforePublishingTerminalStatus()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var setupContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var reportTrackingId = Guid.NewGuid();
+        setupContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = ScheduledFrequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
+        await setupContext.SaveChangesAsync();
+        var created = await CreateManager(scope).CreateAsync(new CreateDataAcquisitionLogModel
+        {
+            FacilityId = "OrderFacility",
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = reportTrackingId.ToString(),
+            QueryPhase = QueryPhase.Supplemental,
+            QueryType = FhirQueryType.Search,
+            Status = RequestStatus.Processing,
+            Priority = AcquisitionPriority.Normal,
+            FhirQuery = new List<CreateFhirQueryModel>()
+        });
+
+        var recorder = new CommandOrderRecorder();
+        var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
+            .UseSqlServer(setupContext.Database.GetConnectionString())
+            .AddInterceptors(recorder)
+            .Options;
+        await using var recordingContext = new DataAcquisitionDbContext(options);
+        var manager = new DataAcquisitionLogManager(
+            new Mock<ILogger<DataAcquisitionLogManager>>().Object,
+            scope.ServiceProvider.GetRequiredService<IDatabase>(),
+            recordingContext,
+            scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>(),
+            CreateSemaphoreProviderMock(),
+            scope.ServiceProvider.GetRequiredService<IResourceCache>());
+
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = created.Id,
+            Status = RequestStatus.Completed,
+            CompletionDate = DateTime.UtcNow,
+            ResourceAcquiredIds = ["Observation/obs-1", "Observation/obs-2"]
+        });
+
+        var insertIds = recorder.Commands.FindIndex(sql => sql.Contains("INSERT", StringComparison.OrdinalIgnoreCase) && sql.Contains("ResourceId", StringComparison.OrdinalIgnoreCase));
+        var publishStatus = recorder.Commands.FindLastIndex(sql => sql.TrimStart().StartsWith("UPDATE", StringComparison.OrdinalIgnoreCase) && sql.Contains("[Status]", StringComparison.Ordinal));
+        Assert.True(insertIds >= 0, "resource ids were not inserted");
+        Assert.True(publishStatus >= 0, "status was not updated");
+        Assert.True(insertIds < publishStatus, "terminal status was published before the resource-id rows were saved");
+
+        var log = await scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>().GetAsync(created.Id);
+        Assert.Equal(RequestStatus.Completed, log!.Status);
+        var ids = await setupContext.DataAcquisitionLogResourceIds.Where(r => r.DataAcquisitionLogId == created.Id).Select(r => r.ResourceId).ToListAsync();
+        Assert.Equal(new[] { "Observation/obs-1", "Observation/obs-2" }, ids.OrderBy(id => id));
+    }
+
+    private sealed class CommandOrderRecorder : Microsoft.EntityFrameworkCore.Diagnostics.DbCommandInterceptor
+    {
+        public List<string> Commands { get; } = new();
+
+        public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> NonQueryExecutingAsync(
+            System.Data.Common.DbCommand command, Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            lock (Commands) Commands.Add(command.CommandText);
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader>> ReaderExecutingAsync(
+            System.Data.Common.DbCommand command, Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            lock (Commands) Commands.Add(command.CommandText);
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
+}
