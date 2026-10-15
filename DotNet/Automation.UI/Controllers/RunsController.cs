@@ -39,23 +39,15 @@ public class RunsController(
 
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
 
-        if (createdFrom.HasValue && createdTo.HasValue && createdFrom.Value > createdTo.Value)
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
         {
-            return BadRequest("Created From must be on or before Created To.");
+            return BadRequest(dateError);
         }
-
-        if (createdTo == DateOnly.MaxValue)
-        {
-            return BadRequest("Created To is outside the supported date range.");
-        }
-
-        var createdFromUtc = createdFrom.HasValue 
-            ? new DateTimeOffset(createdFrom.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) 
-            : (DateTimeOffset?)null;
-
-        var createdBeforeUtc = createdTo.HasValue
-            ? new DateTimeOffset(createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
-            : (DateTimeOffset?)null;
 
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
         recentPage.CreatedFrom = createdFrom;
@@ -65,7 +57,17 @@ public class RunsController(
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var activeRuns = await GetActiveRunsAsync(pageSize, cancellationToken);
+        var canReuseRecentPage =
+            !createdFrom.HasValue &&
+            !createdTo.HasValue &&
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
@@ -113,23 +115,15 @@ public class RunsController(
         // in Index.cshtml — there's no divergence between the two templates.
         var descending = IsDescending(sortDir);
 
-        if (createdFrom.HasValue && createdTo.HasValue && createdFrom.Value > createdTo.Value)
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
         {
-            return BadRequest("Created From must be on or before Created To.");
+            return BadRequest(dateError);
         }
-
-        if (createdTo == DateOnly.MaxValue)
-        {
-            return BadRequest("Created To is outside the supported date range.");
-        }
-
-        var createdFromUtc = createdFrom.HasValue
-            ? new DateTimeOffset(createdFrom.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
-            : (DateTimeOffset?)null;
-
-        var createdBeforeUtc = createdTo.HasValue
-            ? new DateTimeOffset(createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
-            : (DateTimeOffset?)null;
 
         var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
         page.CreatedFrom = createdFrom;
@@ -150,7 +144,15 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
-        var activeRuns = await GetActiveRunsAsync(pageSize, cancellationToken);
+        var canReuseRecentPage =
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         return Json(new
         {
@@ -811,7 +813,7 @@ public class RunsController(
     private static bool IsDescending(string sortDir)
         => !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(int pageSize, CancellationToken cancellationToken)
+    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(int pageSize, CancellationToken cancellationToken, AutomationRunIndexViewModel? unfilteredFirstPage = null)
     {
         var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
 
@@ -820,13 +822,14 @@ public class RunsController(
                 runManager.GetRunAsync(meta.RunId, cancellationToken)));
 
         // Active Runs must remain independent of the Recent Runs date filter.
-        // Always fetch an unfiltered first page for the existing fallback behavior.
-        var unfilteredPage = await runManager.GetRunsPageAsync(
-            1,
-            pageSize,
-            "createdAt",
-            true,
-            cancellationToken);
+        // Reuse the first page when possible; otherwise fetch an unfiltered page.
+        var unfilteredPage = unfilteredFirstPage
+            ?? await runManager.GetRunsPageAsync(
+                1,
+                pageSize,
+                "createdAt",
+                true,
+                cancellationToken);
 
         var activeRunsSource = unfilteredPage.Runs;
 
@@ -846,5 +849,45 @@ public class RunsController(
     {
         var latest = await templateCacheVersionStore.GetLatestAsync(scenarioKey, cancellationToken);
         return latest?.VersionNumber;
+    }
+
+    private static bool TryGetCreatedDateRange(
+    DateOnly? createdFrom,
+    DateOnly? createdTo,
+    out DateTimeOffset? createdFromUtc,
+    out DateTimeOffset? createdBeforeUtc,
+    out string? error)
+    {
+        createdFromUtc = null;
+        createdBeforeUtc = null;
+        error = null;
+
+        if (createdFrom.HasValue &&
+            createdTo.HasValue &&
+            createdFrom.Value > createdTo.Value)
+        {
+            error = "Created From must be on or before Created To.";
+            return false;
+        }
+
+        if (createdTo == DateOnly.MaxValue)
+        {
+            error = "Created To is outside the supported date range.";
+            return false;
+        }
+
+        createdFromUtc = createdFrom.HasValue
+            ? new DateTimeOffset(
+                createdFrom.Value.ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        createdBeforeUtc = createdTo.HasValue
+            ? new DateTimeOffset(
+                createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        return true;
     }
 }
