@@ -5058,16 +5058,16 @@ table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }
 .lu-hold-details dt { font-weight: 600; }
 
 /* Advanced performance: slowest endpoints. Service fits its content (max 12rem),
-   Call takes the rest and wraps long paths, Slow and Calls stay narrow on the right. */
-:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-service:is(th, td) {
+   Call takes the rest and wraps long paths, Slow and Calls stay narrow on the right.
+   Selectors are doubled to outrank the generic first-child / code ellipsis rule. */
+:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-service.au-se-service:is(th, td) {
   width: 1%;
   max-width: 12rem;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  overflow: visible;
-  text-overflow: clip;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-call:is(th, td) {
+:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-call.au-se-call:is(th, td) {
   width: auto;
   max-width: none;
   white-space: normal;
@@ -5076,12 +5076,12 @@ table > tbody > tr > td .btn.btn-sm.lu-row-icon > i.bi { margin: 0 !important; }
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-:root table.au-table.au-slowest-endpoints > tbody > tr > td.au-se-call > code {
+:root table.au-table.au-slowest-endpoints > tbody > tr > td.au-se-call.au-se-call > code {
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-num:is(th, td) {
+:root table.au-table.au-slowest-endpoints > :is(thead, tbody) > tr > .au-se-num.au-se-num:is(th, td) {
   width: 1%;
   max-width: none;
   white-space: nowrap;
