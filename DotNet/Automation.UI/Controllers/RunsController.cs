@@ -31,18 +31,43 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         var descending = IsDescending(sortDir);
 
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
+        {
+            return BadRequest(dateError);
+        }
+
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        recentPage.CreatedFrom = createdFrom;
+        recentPage.CreatedTo = createdTo;
         var scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
             .OrderBy(s => s.IsSystemScenario)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var canReuseRecentPage =
+            !createdFrom.HasValue &&
+            !createdTo.HasValue &&
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
@@ -66,6 +91,8 @@ public class RunsController(
             TotalPages = recentPage.TotalPages,
             SortBy = recentPage.SortBy,
             SortDescending = recentPage.SortDescending,
+            CreatedFrom = recentPage.CreatedFrom,
+            CreatedTo = recentPage.CreatedTo,
         };
 
         return View(vm);
@@ -77,7 +104,9 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         // Returns just the Recent Runs card markup so the dashboard can refresh
         // the table in place (sort / paginate / SignalR update) without a full
@@ -85,7 +114,20 @@ public class RunsController(
         // partial is reused by both this action and the initial server render
         // in Index.cshtml — there's no divergence between the two templates.
         var descending = IsDescending(sortDir);
-        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
+        {
+            return BadRequest(dateError);
+        }
+
+        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        page.CreatedFrom = createdFrom;
+        page.CreatedTo = createdTo;
         return PartialView("_RecentRunsTable", page);
     }
 
@@ -102,7 +144,15 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var canReuseRecentPage =
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         return Json(new
         {
@@ -763,21 +813,32 @@ public class RunsController(
     private static bool IsDescending(string sortDir)
         => !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(
-        AutomationRunIndexViewModel recentPage,
-        int pageSize,
-        CancellationToken cancellationToken)
+    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(int pageSize, CancellationToken cancellationToken, AutomationRunIndexViewModel? unfilteredFirstPage = null)
     {
         var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
-        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
-        var activeRunsSource = recentPage.PageNumber == 1
-            ? recentPage.Runs
-            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+
+        var activeRunSummaries = await Task.WhenAll(
+            activeRunMetas.Select(meta =>
+                runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
+        // Active Runs must remain independent of the Recent Runs date filter.
+        // Reuse the first page when possible; otherwise fetch an unfiltered page.
+        var unfilteredPage = unfilteredFirstPage
+            ?? await runManager.GetRunsPageAsync(
+                1,
+                pageSize,
+                "createdAt",
+                true,
+                cancellationToken);
+
+        var activeRunsSource = unfilteredPage.Runs;
 
         return activeRunSummaries
-            .Where(r => r is not null && (r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Where(r => r is not null &&
+                (r.Status.IsCancellable() || r.Status.IsInProgress()))
             .Select(r => r!)
-            .Concat(activeRunsSource.Where(r => r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Concat(activeRunsSource.Where(r =>
+                r.Status.IsCancellable() || r.Status.IsInProgress()))
             .GroupBy(r => r.RunId)
             .Select(g => g.First())
             .OrderByDescending(r => r.CreatedAt)
@@ -788,5 +849,45 @@ public class RunsController(
     {
         var latest = await templateCacheVersionStore.GetLatestAsync(scenarioKey, cancellationToken);
         return latest?.VersionNumber;
+    }
+
+    private static bool TryGetCreatedDateRange(
+        DateOnly? createdFrom,
+        DateOnly? createdTo,
+        out DateTimeOffset? createdFromUtc,
+        out DateTimeOffset? createdBeforeUtc,
+        out string? error)
+    {
+        createdFromUtc = null;
+        createdBeforeUtc = null;
+        error = null;
+
+        if (createdFrom.HasValue &&
+            createdTo.HasValue &&
+            createdFrom.Value > createdTo.Value)
+        {
+            error = "Created From must be on or before Created To.";
+            return false;
+        }
+
+        if (createdTo == DateOnly.MaxValue)
+        {
+            error = "Created To is outside the supported date range.";
+            return false;
+        }
+
+        createdFromUtc = createdFrom.HasValue
+            ? new DateTimeOffset(
+                createdFrom.Value.ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        createdBeforeUtc = createdTo.HasValue
+            ? new DateTimeOffset(
+                createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        return true;
     }
 }
