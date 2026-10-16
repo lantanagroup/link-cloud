@@ -62,11 +62,10 @@ In CI the live project runs inside the `backend-e2e-tests` job (`.github/workflo
 against the already-running compose stack, after the health check and before the backend
 test categories. Its report uploads as the `admin-ui-e2e-report` artifact.
 
-To leave this tier out of a run, label the PR `skip-live-ui`: the live tests and the
-Playwright install they need are skipped, and the stack, the backend categories and the
-mocked UI job all run as normal. The label is read from the event payload, so it has to be
-on the PR before the push that starts the run — adding it and re-running an existing run
-will not work.
+To leave this tier out of a run, set `RUN_LIVE_UI: "false"` in the `backend-e2e-tests`
+env block in `.github/workflows/tests.yaml` and push. The live tests and the Playwright
+install they need are skipped; the stack, the backend categories and the mocked UI job all
+run as normal. It is committed, so it shows up in the diff — do not merge with it off.
 
 Note: helmet/CSP in `server/main.js` is enabled only when `production: true`. If
 `LINK_PRODUCTION=true` is ever set on the compose admin-ui service, its default CSP will

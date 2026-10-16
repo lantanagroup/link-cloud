@@ -79,14 +79,13 @@ jobs:
       AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
       LEFTOVER_CLEANUP_ENABLED: "false"
 
-      # Live UI tier switch: label a PR "skip-live-ui" to leave the Playwright live tests
-      # and the toolchain install they need out of this job. The stack, the backend
-      # categories and the mocked UI job are all unaffected.
+      # Live UI tier switch. Set to "false" to leave the Playwright live tests, and the
+      # toolchain install they need, out of this job; the stack, the backend categories and
+      # the mocked UI job are unaffected either way.
       #
-      # Read from the event payload, so the label has to be on the PR before the push that
-      # starts the run. Re-running an existing run replays the original payload and will not
-      # see a label added after the fact.
-      RUN_LIVE_UI: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-live-ui') }}
+      # Flip it here and push — the push is what starts the run that honours it. Because it
+      # is committed, a reviewer can see it in the diff, so do not merge with it off.
+      RUN_LIVE_UI: "true"
 
     steps:
       - name: Checkout code
