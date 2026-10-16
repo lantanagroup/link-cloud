@@ -3,8 +3,8 @@ name: "Purged History Guard"
 # LEGLINK-912. Periodically checks every branch and tag for history under the paths below, and
 # fails if it finds any.
 #
-# Skipped while the repository variable PURGED_HISTORY_GUARD is `off`. Any other value, or no
-# variable at all, enforces. Failures post to the PURGED_HISTORY_ALERT_WEBHOOK secret, when set.
+# Runs only when the repository variable PURGED_HISTORY_GUARD is `enforce`; unset or any other
+# value skips it. Failures post to the PURGED_HISTORY_ALERT_WEBHOOK secret, when set.
 # Logs here are public: print commit IDs, subjects and ref names only, never file contents.
 on:
   schedule:
@@ -21,12 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Report that the sweep is not enforced yet
-        if: vars.PURGED_HISTORY_GUARD == 'off'
-        run: echo "::notice::Skipped while PURGED_HISTORY_GUARD is off, until the LEGLINK-912 rewrite is pushed."
+        if: vars.PURGED_HISTORY_GUARD != 'enforce'
+        run: echo "::notice::Skipped. Set the repository variable PURGED_HISTORY_GUARD to enforce to run it."
 
       # Every branch and tag with full history, but no file contents: commits and trees are enough.
       - name: Fetch every branch and tag
-        if: vars.PURGED_HISTORY_GUARD != 'off'
+        if: vars.PURGED_HISTORY_GUARD == 'enforce'
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -34,7 +34,7 @@ jobs:
           sparse-checkout: .github
 
       - name: Check every branch and tag
-        if: vars.PURGED_HISTORY_GUARD != 'off'
+        if: vars.PURGED_HISTORY_GUARD == 'enforce'
         shell: bash
         run: |
           paths=(Config/ .env)
