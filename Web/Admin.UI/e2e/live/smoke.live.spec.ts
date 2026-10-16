@@ -35,7 +35,14 @@ test('tenant list loads from the real BFF (rows or empty state)', async ({ page 
 test('health monitor renders real service statuses', async ({ page }) => {
   await page.goto('/monitor/health');
 
-  await expect(page.locator('mat-toolbar', { hasText: 'Service Health Status' })).toBeVisible({ timeout: 20_000 });
-  // At least one service should report in a running stack.
-  await expect(page.locator('table tr[mat-row]').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('mat-toolbar', { hasText: 'Health Checks' })).toBeVisible({ timeout: 20_000 });
+
+  // The screen builds a row per service up front and fills each one from its own request, so
+  // a visible row proves nothing by itself — wait for one to leave the Loading placeholder,
+  // which is what shows a service actually answered.
+  const healthTable = page.getByRole('table', { name: 'Service health checks' });
+  await expect(healthTable.locator('> tbody > tr:not(.detail-row)').first()).toBeVisible({ timeout: 20_000 });
+  await expect(
+    healthTable.locator('.health-status:not([data-status="Loading..."])').first(),
+  ).toBeVisible({ timeout: 20_000 });
 });

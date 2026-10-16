@@ -79,9 +79,13 @@ test('GET /facility returns the paged envelope and the fields the tenant table r
     expect(typeof record.facilityId).toBe('string');
     expect(typeof record.facilityName).toBe('string');
     expect(typeof record.timeZone).toBe('string');
-    // vendor is an optional object (VendorModel) now; the tenant table renders row.vendor?.name.
-    // These facilities are created without one, so assert the shape rather than its presence.
-    if (record.vendor != null) {
+    // vendor is an object now (VendorModel), not a string — the tenant table renders
+    // row.vendor?.name. Tenant answers with the object present but its members null for a
+    // facility that has none, which is what this one is (typeof null is "object", so a
+    // null-check on the object itself is not enough). Assert the field is there, and the
+    // member types only once something populates them.
+    expect(record).toHaveProperty('vendor');
+    if (record.vendor?.id != null) {
       expect(typeof record.vendor.id).toBe('string');
       expect(typeof record.vendor.name).toBe('string');
     }
