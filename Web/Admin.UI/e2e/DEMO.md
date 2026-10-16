@@ -21,12 +21,21 @@ Leave `ng serve` up in its own terminal. `playwright.config.ts` sets
 pause from the middle of the demo. Then rehearse once:
 
 ```powershell
-$env:E2E_KEEP_OPEN='0'; npm run e2e:demo   # ~15s with pacing disabled, ~4 min at demo pacing
-npm run e2e                                # 64 tests, ~30s warm
+$env:E2E_KEEP_OPEN='0'; npm run e2e:demo   # ~1 min at default pacing
+npm run e2e                                # 64 tests, ~20s warm
 ```
 
 Both should be green. Clear `E2E_KEEP_OPEN` afterwards (`Remove-Item Env:\E2E_KEEP_OPEN`) so
 the real demo holds the window open at the end.
+
+**Set the pacing before the meeting.** The defaults run the whole walkthrough in about a
+minute, which is far too fast to talk over — nine talking points in 59 seconds. These values
+stretch it to ~3.5 minutes, roughly 12 seconds a point (all timings measured 2026-10-16):
+
+```powershell
+$env:E2E_SLOW_MO='2200'     # individual clicks (default 700)
+$env:E2E_STEP_PAUSE='4000'  # dwell between stages (default 1500)
+```
 
 If you have a second screen, park the demo browser on it — otherwise it opens over your notes.
 Ask Windows where your screens are rather than reusing coordinates from someone else's setup:
@@ -48,7 +57,7 @@ The primary screen's origin is `0,0`; screens placed above or to the left of it 
 coordinates, which is normal. Re-run the command whenever you rearrange or reconnect
 displays — the numbers move.
 
-## Act 1 — watch it drive the app (~4 min)
+## Act 1 — watch it drive the app (~3.5 min at the pacing above)
 
 ```powershell
 npm run e2e:demo
@@ -80,19 +89,16 @@ What it does, and what to say while it happens:
 | Its census panel offers to create one | That prompt only appears because the mock 404s for a facility with no config — we exercise the empty path on purpose. |
 | Gives it a census cron and a dispatch schedule | End to end, through the UI, with the payloads checked. |
 
-Pacing levers, if it is running too fast or too slow to narrate:
-
-```powershell
-$env:E2E_SLOW_MO='1800'     # slower individual clicks (default 700)
-$env:E2E_STEP_PAUSE='3000'  # longer dwell between stages (default 1500)
-```
+If you skipped the pacing in pre-flight, this is the moment you will regret it — set
+`E2E_SLOW_MO` and `E2E_STEP_PAUSE` as above. Measured durations, so you can pick a different
+target: defaults ~1 min, `2200`/`4000` ~3.5 min, pacing off (`0`/`0`) ~8s.
 
 Close the browser window to end the run.
 
 ## Act 2 — the real suite (~3 min)
 
 ```powershell
-npm run e2e          # 64 tests, 13 spec files, ~30s warm
+npm run e2e          # 64 tests, 13 spec files, ~20s warm
 npm run e2e:report   # opens the HTML report
 ```
 
