@@ -161,6 +161,7 @@ tier proves the same page objects still work against a real BFF. The selector co
 | Demo browser opens on the wrong screen | `E2E_WINDOW_POSITION` no longer matches your display layout — re-run the `AllScreens` command. `0,0` is the primary screen. |
 | Window closes immediately at the end | `E2E_KEEP_OPEN=0` is still set from the rehearsal. |
 | Window vanishes partway through, no error visible | The run was interrupted, not failed — something reaped the parent process. Check `test-results/`: a real failure leaves `test-failed-1.png`, an interruption leaves only an orphaned `.playwright-artifacts-0`. Re-run in the foreground, unpiped. |
+| It sits on one stage doing nothing | A selector stopped matching. The demo project caps actions at 30s (`actionTimeout`), so it now fails with the locator named instead of waiting forever — run `npm run e2e` to see whether it is a real break. |
 | Flaky "the click did nothing" in the mocked tier | Too many workers starving one `ng serve`; the config caps at 4 locally for this reason. |
 | Live tier fails to start | It needs the compose stack — a preflight pings the BFF and prints instructions. Skip it; the live tier is not part of this demo. |
 
