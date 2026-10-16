@@ -71,6 +71,12 @@ export default defineConfig({
       use: {
         baseURL: 'http://localhost:4200',
         headless: false,
+        // `timeout: 0` above removes the test timeout so the walkthrough can sit on the open
+        // window at the end. On its own that also means an action waiting on something that
+        // never appears waits forever, so a stale selector hangs the demo instead of failing
+        // it — which has cost real time twice. Generous enough for a cold ng serve compiling
+        // a route on first visit, short enough that a break is obvious.
+        actionTimeout: 30_000,
         // Explicit viewport rather than `viewport: null` — null is rejected alongside the
         // deviceScaleFactor that the Desktop Chrome preset brings in. Playwright sizes the
         // real window to fit this, so --window-size is unnecessary; only position is passed.

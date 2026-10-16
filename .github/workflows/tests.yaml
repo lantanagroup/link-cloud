@@ -205,9 +205,9 @@ jobs:
         working-directory: Web/Admin.UI
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for services to start
-        run: sleep 10
-
+      # No fixed sleep ahead of this: check_health.sh is a poll loop with its own timeout, so
+      # a head start bought nothing — and with the toolchain installed above, the containers
+      # are already healthy by the time it runs (0s on run #3712, down from 21s).
       - name: Wait for Services to Become Healthy
         run: |
           chmod +x Scripts/check_health.sh
