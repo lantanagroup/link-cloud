@@ -157,6 +157,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             {
                 FacilityId = facilityId,
                 FacilityName = facilityName,
+                // facilityName carries whatever the user typed into the search box, so match it
+                // as a fragment of either the name or the id — the same way the autocomplete
+                // endpoint below does. Without this the two disagreed: the dropdown offered a
+                // facility that the table underneath reported as "not found".
+                PartialMatch = true,
                 TimeZone = timeZone,
                 Vendor = vendor
             };
@@ -186,7 +191,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 if (!string.IsNullOrEmpty(search))
                 {
                     searchModel.FacilityName = search;
-                    searchModel.FacilityNameContains = true;
+                    searchModel.PartialMatch = true;
                     if (!includeDeleted)
                     {
                         searchModel.IsDeleted = false;
