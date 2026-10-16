@@ -72,6 +72,33 @@ Note: helmet/CSP in `server/main.js` is enabled only when `production: true`. If
 block the cross-origin BFF calls and these tests will fail — that is a real config problem,
 not a test bug.
 
+## What this costs in CI
+
+Both tiers together add about **10 seconds** to a pull request. Worth knowing, because the
+question comes up and the intuition is usually wrong.
+
+The mocked tier is its own job, so it runs beside the backend work and finishes while that
+job is still building images — it contributes nothing to the pipeline's wall clock, however
+long it takes. The live tier runs as steps inside `backend-e2e-tests`, which does set the
+wall clock, but its toolchain installs ahead of the stack health check: that wait shrinks by
+however long the install took, so most of the cost overlaps time the job was already
+spending. What is left is the tests themselves.
+
+Measured on run #3714 (2026-10-16): install 27s + health wait 11s + tests 10s + upload 1s =
+49s, against ~40s for the health wait alone without the tier. The mocked job was 2m 54s, in
+parallel. For comparison, that job spends 4m building images and 2m starting the stack
+before any test runs, and its backend categories alone vary by a minute between runs on
+identical code — so this difference is far smaller than the noise and is only visible in the
+per-step durations, never in the run total.
+
+To re-measure: open the run, click the `Backend E2E Tests with Docker Compose` job, and read
+the step durations. Do not compare run totals.
+
+One asymmetry to be aware of: `Tests / Backend E2E Tests with Docker Compose` is a required
+check on `dev` and `Tests / Admin UI Tests (mocked)` is not, so a live-tier failure blocks a
+merge while a mocked-tier failure only shows a red X. Read the Required badges in a PR's
+merge box to confirm — it changes without notice and needs repo admin to alter.
+
 ## Conventions
 
 - Page objects in `e2e/support/pages/` are shared by both tiers — that is the selector
