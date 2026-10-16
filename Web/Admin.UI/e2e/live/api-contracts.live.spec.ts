@@ -39,7 +39,8 @@ async function withFacility(
       facilityId,
       facilityName: 'UI Contract Check Facility',
       timeZone: 'America/New_York',
-      vendor: 'Epic',
+      // No vendor: it is an optional VendorModel object now rather than a string, and naming
+      // one would mean assuming a seeded vendor exists — which this tier deliberately avoids.
       scheduledReports: { daily: [], weekly: [], monthly: [] },
     },
   });
@@ -78,7 +79,12 @@ test('GET /facility returns the paged envelope and the fields the tenant table r
     expect(typeof record.facilityId).toBe('string');
     expect(typeof record.facilityName).toBe('string');
     expect(typeof record.timeZone).toBe('string');
-    expect(typeof record.vendor).toBe('string');
+    // vendor is an optional object (VendorModel) now; the tenant table renders row.vendor?.name.
+    // These facilities are created without one, so assert the shape rather than its presence.
+    if (record.vendor != null) {
+      expect(typeof record.vendor.id).toBe('string');
+      expect(typeof record.vendor.name).toBe('string');
+    }
     expect(typeof record.isDeleted).toBe('boolean');
   });
 });
