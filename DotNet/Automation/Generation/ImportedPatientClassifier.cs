@@ -50,8 +50,8 @@ namespace LantanaGroup.Automation.Generation;
 /// pre-populated checkboxes in the scenario editor.
 /// </para>
 ///
-/// Results are advisory only and are intended to be presented to the user as
-/// pre-populated checkboxes that they can override before saving the scenario.
+/// Results are the derived Q/NQ display for imported patients. The pipeline
+/// re-classifies from the bundle at run time; there is no manual override.
 /// </summary>
 public static class ImportedPatientClassifier
 {
@@ -71,6 +71,7 @@ public static class ImportedPatientClassifier
         var conditions = new List<Condition>();
         var medicationRequests = new List<MedicationRequest>();
         var medicationAdministrations = new List<MedicationAdministration>();
+        var medicationCodes = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var e in entries)
         {
@@ -80,6 +81,10 @@ public static class ImportedPatientClassifier
                 case Condition cond: conditions.Add(cond); break;
                 case MedicationRequest mr: medicationRequests.Add(mr); break;
                 case MedicationAdministration ma: medicationAdministrations.Add(ma); break;
+                case Medication medication:
+                    if (!string.IsNullOrWhiteSpace(medication.Id))
+                        medicationCodes[medication.Id] = ExtractCodes(medication.Code);
+                    break;
             }
         }
 
@@ -90,8 +95,8 @@ public static class ImportedPatientClassifier
         // CQL additionally requires the drug to occur during the encounter's hospitalization
         // window; we currently only check existence — encounter linkage is a known gap.
         var hasAntidiabeticMedication =
-            medicationRequests.Any(IsAntidiabeticMedicationRequest)
-            || medicationAdministrations.Any(IsAntidiabeticMedicationAdministration);
+            medicationRequests.Any(mr => IsAntidiabetic(mr.Medication, medicationCodes))
+            || medicationAdministrations.Any(ma => IsAntidiabetic(ma.Medication, medicationCodes));
 
         // Permissive fallback for bundles that don't carry medications. Generator-produced
         // qualifying patients always include a diabetic Condition in the bundle, so this
@@ -128,11 +133,22 @@ public static class ImportedPatientClassifier
         return true;
     }
 
-    private static bool IsAntidiabeticMedicationRequest(MedicationRequest mr)
-        => HasAntidiabeticCoding((mr?.Medication as CodeableConcept)?.Coding);
+    private static bool IsAntidiabetic(
+        DataType? medication,
+        IReadOnlyDictionary<string, List<string>> medicationCodes)
+    {
+        if (HasAntidiabeticCoding((medication as CodeableConcept)?.Coding))
+            return true;
 
-    private static bool IsAntidiabeticMedicationAdministration(MedicationAdministration ma)
-        => HasAntidiabeticCoding((ma?.Medication as CodeableConcept)?.Coding);
+        var reference = (medication as ResourceReference)?.Reference;
+        if (string.IsNullOrWhiteSpace(reference))
+            return false;
+
+        var id = FhirReferenceId.FromReference(reference);
+        if (!medicationCodes.TryGetValue(id, out var codes))
+            return false;
+        return codes.Any(EncounterIpClassification.IsDiabetesMedicationCode);
+    }
 
     private static bool HasAntidiabeticCoding(IEnumerable<Coding>? codings)
     {
@@ -143,6 +159,17 @@ public static class ImportedPatientClassifier
                 return true;
         }
         return false;
+    }
+
+    private static List<string> ExtractCodes(CodeableConcept? concept)
+    {
+        if (concept?.Coding == null)
+            return [];
+        return concept.Coding
+            .Select(c => c.Code)
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code!)
+            .ToList();
     }
 
     private static bool IsDiabeticHypoglycemicCondition(Condition cond)

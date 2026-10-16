@@ -20,15 +20,27 @@ management:
     diskspace:
       enabled: false
     mongo:
-      enabled: false
+      enabled: false   # auto Mongo indicator disabled; MongoHealthIndicator checks the ping
+      timeout-ms: 2000 # backstop deadline for the ping; an unreachable mongod otherwise blocks for
+                       # the driver's serverSelectionTimeoutMS (30s by default), which pushes /health
+                       # past the BFF's health-check deadline and blanks the dashboard entries.
+                       # Spring runs indicators sequentially on the request thread, so the budgets
+                       # add up: 2s here, 3s for the resource-cache backstop below, and 1.5s for the
+                       # Kafka indicator -- 6.5s with all three backends down at once, inside the
+                       # BFF's 8s deadline (SpringServiceHealth.Deadline). Keep the sum under
+                       # it: exceeding it costs every row for this service, and the rows are what
+                       # say which backend failed.
     redis:
       enabled: false     # auto Redis indicator disabled; ResourceCacheHealthIndicator checks Redis + ABS
     resource-cache:
-      timeout-ms: 3000   # backstop deadline for the combined Redis+ABS check; the 2s Redis command
-                         # timeout (spring.data.redis.timeout) reports DOWN sooner in the common case,
-                         # and this stays below the BFF's 5s health-check timeout
+      timeout-ms: 3000   # backstop deadline for the combined Redis+ABS check. The 2s Redis command
+                         # timeout (spring.data.redis.timeout) reports DOWN sooner in the common case
+                         # but does not bound the ABS half, so this is what the budget above counts.
     kafka:
-      enabled: true  # Ensures Kafka health is checked
+      enabled: true      # Ensures Kafka health is checked
+      timeout-ms: 1500   # backstop deadline for the acknowledgement; stays above the health
+                         # producer's max.block.ms (Properties.MAX_BLOCK_MS_CONFIG, 1000) so an
+                         # unreachable broker is reported as one rather than as a timed-out future
 
 logging:
   level:
@@ -89,8 +101,13 @@ spring:
         max.request.size: 10485760
 
     retry:
-      maxAttempts: 3
-      retry-backoff-ms: 3000
+      # consumer-retry-duration is the single source of truth for retry depth and timing: each entry is
+      # the delay before that retry, and the attempt count is the list size + 1 (then dead-lettered).
+      consumer-retry-duration:
+        - PT20S
+        - PT60S
+        - PT120S
+      disable-retry-consumer: false
 
 link:
   info-route: /api/measureeval/info

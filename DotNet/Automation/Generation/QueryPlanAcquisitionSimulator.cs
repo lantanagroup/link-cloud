@@ -195,13 +195,13 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
-                // Observation `date` can be represented by different effective shapes; keep
-                // a multi-shape check there. For DiagnosticReport, use effective[x] only.
-                // Including issued here can over-predict boundary resources (issued slightly
-                // after period start while effective is before it), which does not match the
-                // DataAcquisition behavior observed in scheduled runs.
+                // Observation/DiagnosticReport `date` is FHIR effective[x] only.
+                // Including issued here over-predicts boundary resources (issued slightly
+                // after period start while effective is before it) — the DxRpt-042 class of
+                // scheduled ABS misses.
                 if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase))
+                    && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
                 {
                     var matchedAny = false;
                     var recognizedAny = false;
@@ -209,7 +209,7 @@ public static class QueryPlanAcquisitionSimulator
                     if (TryGetEffective(resource.Resource, out var effStart, out var effEnd))
                     {
                         recognizedAny = true;
-                        matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
+                        matchedAny |= PassesTemporalBound(isGe, bound.Value, effStart, effEnd);
                     }
 
                     if (!recognizedAny)
@@ -268,19 +268,7 @@ public static class QueryPlanAcquisitionSimulator
                     return false;
                 }
 
-                if (isGe && resourceEnd < bound.Value)
-                {
-                    if (allowEncounterAnchoredDateOverrideForOutOfRange
-                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
-                    {
-                        continue;
-                    }
-
-                    return false;
-                }
-
-                if (isLe && resourceStart > bound.Value)
+                if (!PassesTemporalBound(isGe, bound.Value, resourceStart, resourceEnd))
                 {
                     if (allowEncounterAnchoredDateOverrideForOutOfRange
                         && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
@@ -298,6 +286,35 @@ public static class QueryPlanAcquisitionSimulator
     }
 
     /// <summary>
+    /// FHIR date search values carry an interval implied by their precision.
+    /// Data Acquisition formats PeriodEnd as <c>yyyy-MM-ddTHH:mm:ssZ</c> (second
+    /// precision, no fraction), so <c>le2023-01-15T23:59:59Z</c> matches any instant
+    /// in <c>[23:59:59.000, 24:00:00.000)</c> — HAPI inclusive-whole-second semantics.
+    /// Treating the bound as an exact tick (<c>resourceStart &lt;= 23:59:59.000</c>)
+    /// drops the last Observation of a Daily ACH 1-day window (spread across a
+    /// ±6h padded encounter at 0.3 of 1000 resources lands at ~23:59:59.167).
+    /// </summary>
+    private static bool PassesTemporalBound(
+        bool isGe,
+        DateTimeOffset bound,
+        DateTimeOffset resourceStart,
+        DateTimeOffset resourceEnd)
+    {
+        if (isGe)
+            return resourceEnd >= bound;
+
+        return resourceStart < ExclusiveLeBound(bound);
+    }
+
+    private static DateTimeOffset ExclusiveLeBound(DateTimeOffset bound)
+    {
+        if (bound.Millisecond == 0 && bound.Ticks % TimeSpan.TicksPerSecond == 0)
+            return bound.AddSeconds(1);
+
+        return bound.AddTicks(1);
+    }
+
+    /// <summary>
     /// Some DA query paths are encounter-anchored and can include resources linked to an
     /// already-acquired encounter. The simulator always uses this as a fallback when a
     /// resource doesn't expose a recognizable date field, and can optionally apply it to
@@ -310,8 +327,10 @@ public static class QueryPlanAcquisitionSimulator
         GeneratedResource resource,
         Dictionary<string, HashSet<string>> acquiredByType)
     {
+        // DiagnosticReport date search is effective[x] only. Encounter-anchoring DRs
+        // (including unrecognized-date fallback) over-predicts scheduled ABS
+        // (DxRpt-042 / DxRpt-043 class).
         if (!(string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
-              || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)
               || string.Equals(resource.ResourceType, "Procedure", StringComparison.OrdinalIgnoreCase)))
         {
             return false;
@@ -357,7 +376,50 @@ public static class QueryPlanAcquisitionSimulator
             }
         }
 
+        if (string.Equals(targetType, "Location", StringComparison.OrdinalIgnoreCase))
+            ExpandReferencedLocationParents(result, typeMap);
+
         return result;
+    }
+
+    /// <summary>
+    /// Data Acquisition follows <c>Location.partOf</c> when resolving referenced locations
+    /// (ward → hospital). Expand the referenced-id set so the Hospital parent is acquired
+    /// along with encounter stay locations.
+    /// </summary>
+    private static void ExpandReferencedLocationParents(
+        HashSet<string> referencedIds,
+        Dictionary<string, List<GeneratedResource>> typeMap)
+    {
+        if (!typeMap.TryGetValue("Location", out var locations) || locations.Count == 0)
+            return;
+
+        var byId = new Dictionary<string, GeneratedResource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var location in locations)
+        {
+            if (!string.IsNullOrWhiteSpace(location.ResourceId))
+                byId[location.ResourceId] = location;
+        }
+
+        var pending = new Queue<string>(referencedIds);
+        while (pending.Count > 0)
+        {
+            var id = pending.Dequeue();
+            if (!byId.TryGetValue(id, out var location))
+                continue;
+
+            foreach (var reference in EnumerateReferences(location.Resource))
+            {
+                if (!reference.StartsWith("Location/", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var parentId = reference["Location/".Length..];
+                if (string.IsNullOrWhiteSpace(parentId))
+                    continue;
+                if (referencedIds.Add(parentId))
+                    pending.Enqueue(parentId);
+            }
+        }
     }
 
     private static IEnumerable<string> EnumerateReferences(JsonElement element)

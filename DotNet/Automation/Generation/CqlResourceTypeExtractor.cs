@@ -138,6 +138,24 @@ public static class CqlResourceTypeExtractor
     }
 
     /// <summary>
+    /// Union of reachable CQL retrieve types across inline measure-bundle JSON payloads.
+    /// </summary>
+    public static HashSet<string> ExtractReachableFromBundleJsons(IEnumerable<string> bundleJsons)
+    {
+        var union = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var json in bundleJsons)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                continue;
+
+            foreach (var t in ExtractReachableFromBundleJson(json))
+                union.Add(t);
+        }
+
+        return union;
+    }
+
+    /// <summary>
     /// Extracts CQL-referenced resource types from an embedded measure bundle resource.
     /// </summary>
     public static HashSet<string> ExtractFromEmbeddedResource(string resourceName, Assembly? assembly = null)

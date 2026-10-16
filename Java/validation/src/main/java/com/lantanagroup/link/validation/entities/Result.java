@@ -27,7 +27,8 @@ public class Result {
     private static final Logger logger = LoggerFactory.getLogger(Result.class);
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @SequenceGenerator(name = "result_seq", sequenceName = "result_sequence", allocationSize = 100)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "result_seq")
     private Long id;
 
     @Column(nullable = false)
@@ -453,6 +454,10 @@ public class Result {
             case I18nConstants.TYPE_SPECIFIC_CHECKS_DT_DECIMAL_RANGE:
                 return OperationOutcome.IssueType.VALUE;
             default:
+                if (messageId.contains("#")) {          // i.e. http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/indv-measurereport-deqm#deqm-0
+                    return OperationOutcome.IssueType.INVARIANT;
+                }
+
                 logger.warn("Unknown message ID: {}", messageId);
                 return OperationOutcome.IssueType.NULL;
         }

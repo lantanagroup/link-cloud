@@ -1,6 +1,7 @@
-﻿using Confluent.Kafka;
+﻿using System.Net;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -55,7 +56,11 @@ public class PatientCensusServiceTests
     /// Seeds FhirListConfiguration + FhirQueryConfiguration into the DB.
     /// Returns the facilityId for reference.
     /// </summary>
-    private async Task SeedFhirListAndQueryConfigAsync(DataAcquisitionDbContext dbContext, string facilityId, string fhirBaseUrl = "http://localhost/fhir")
+    private async Task SeedFhirListAndQueryConfigAsync(
+        DataAcquisitionDbContext dbContext,
+        string facilityId,
+        string fhirBaseUrl = "http://localhost/fhir",
+        AuthenticationConfiguration? queryAuthentication = null)
     {
         var listConfig = new FhirListConfiguration
         {
@@ -71,6 +76,7 @@ public class PatientCensusServiceTests
             Id = Guid.NewGuid(),
             FacilityId = facilityId,
             FhirServerBaseUrl = fhirBaseUrl,
+            Authentication = queryAuthentication,
         };
         dbContext.FhirQueryConfigurations.Add(queryConfig);
 
@@ -119,7 +125,6 @@ public class PatientCensusServiceTests
 
         return new PatientCensusService(
             new Mock<ILogger<PatientCensusService>>().Object,
-            new Mock<IAuthenticationRetrievalService>().Object,
             fhirListQueries,
             fhirQueryConfigQueries,
             (readFhirCommandMock ?? new Mock<IReadFhirCommand>()).Object,
@@ -396,6 +401,60 @@ public class PatientCensusServiceTests
     }
 
     [Fact]
+    public async Task RetrieveListData_QueryConfigHasAuth_ReadsEveryListWithQueryConfigAuthAndCompletes()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var facilityId = $"CensusTest_QueryAuth_{tag}";
+
+        // FhirListConfiguration has no Authentication any more, so the stale list-level key behind LEGLINK-1429
+        // can't be planted here; the compiler now prevents that path. This pins that every List read uses the
+        // query configuration's credentials.
+        await SeedFhirListAndQueryConfigAsync(
+            dbContext,
+            facilityId,
+            queryAuthentication: new AuthenticationConfiguration
+            {
+                AuthType = "Epic",
+                ClientId = "query-client",
+            });
+
+        var service = CreateService(scope);
+        await service.CreateLog(facilityId, CancellationToken.None);
+
+        var logEntity = await dbContext.DataAcquisitionLogs
+            .Include(l => l.FhirQueries)
+                .ThenInclude(q => q.FhirQueryResourceTypes)
+            .Where(l => l.FacilityId == facilityId && l.IsCensus)
+            .SingleAsync();
+        var logModel = DataAcquisitionLogModel.FromDomain(logEntity);
+
+        var readFhirMock = new Mock<IReadFhirCommand>();
+        readFhirMock
+            .Setup(r => r.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ReadFhirCommandRequest req, CancellationToken _) => new List
+            {
+                Id = req.resourceId,
+                Entry = [new List.EntryComponent { Item = new ResourceReference($"Patient/PT-{req.resourceId}") }],
+            });
+
+        var retrieveService = CreateService(scope, readFhirMock);
+
+        var results = await retrieveService.RetrieveListData(logModel, triggerMessage: false, CancellationToken.None);
+
+        Assert.Equal(6, results.Count);
+
+        var updatedLog = await logQueries.GetAsync(logEntity.Id);
+        Assert.Equal(RequestStatus.Completed, updatedLog!.Status);
+
+        readFhirMock.Verify(r => r.ExecuteAsync(
+            It.Is<ReadFhirCommandRequest>(req => req.fhirQueryConfiguration.Authentication!.ClientId == "query-client"),
+            It.IsAny<CancellationToken>()), Times.Exactly(6));
+    }
+
+    [Fact]
     public async Task RetrieveListData_FhirReadFails_MarksLogFailed_ThrowsWhenTriggerMessage()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -469,6 +528,87 @@ public class PatientCensusServiceTests
 
         var updatedLog = await logQueries.GetAsync(logEntity.Id);
         Assert.Equal(RequestStatus.Failed, updatedLog!.Status);
+    }
+
+    [Fact]
+    public async Task RetrieveListData_FhirListNotFound_MarksConfigurationMissing_DoesNotThrow()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var facilityId = $"CensusTest_NotFound_{tag}";
+
+        await SeedFhirListAndQueryConfigAsync(dbContext, facilityId);
+
+        var service = CreateService(scope);
+        await service.CreateLog(facilityId, CancellationToken.None);
+
+        var logEntity = await dbContext.DataAcquisitionLogs
+            .Include(l => l.FhirQueries)
+                .ThenInclude(q => q.FhirQueryResourceTypes)
+            .Where(l => l.FacilityId == facilityId && l.IsCensus)
+            .SingleAsync();
+        var logModel = DataAcquisitionLogModel.FromDomain(logEntity);
+
+        var readFhirMock = new Mock<IReadFhirCommand>();
+        readFhirMock
+            .Setup(r => r.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FhirOperationException(
+                "Resource List/census-missing-admit-24to48 is not known",
+                HttpStatusCode.NotFound));
+
+        var kafkaProducerMock = new Mock<IProducer<string, PatientListMessage>>();
+        var missingService = CreateService(scope, readFhirMock, kafkaProducerMock);
+
+        var results = await missingService.RetrieveListData(logModel, triggerMessage: true, CancellationToken.None);
+
+        Assert.Empty(results);
+
+        var updatedLog = await logQueries.GetAsync(logEntity.Id);
+        Assert.Equal(RequestStatus.ConfigurationMissing, updatedLog!.Status);
+        kafkaProducerMock.Verify(
+            p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, PatientListMessage>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task RetrieveListData_FhirListGone_NoTrigger_MarksConfigurationMissing()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var facilityId = $"CensusTest_Gone_{tag}";
+
+        await SeedFhirListAndQueryConfigAsync(dbContext, facilityId);
+
+        var service = CreateService(scope);
+        await service.CreateLog(facilityId, CancellationToken.None);
+
+        var logEntity = await dbContext.DataAcquisitionLogs
+            .Include(l => l.FhirQueries)
+                .ThenInclude(q => q.FhirQueryResourceTypes)
+            .Where(l => l.FacilityId == facilityId && l.IsCensus)
+            .SingleAsync();
+        var logModel = DataAcquisitionLogModel.FromDomain(logEntity);
+
+        var readFhirMock = new Mock<IReadFhirCommand>();
+        readFhirMock
+            .Setup(r => r.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FhirOperationException("Gone", HttpStatusCode.Gone));
+
+        var missingService = CreateService(scope, readFhirMock);
+
+        var results = await missingService.RetrieveListData(logModel, triggerMessage: false, CancellationToken.None);
+
+        Assert.Empty(results);
+
+        var updatedLog = await logQueries.GetAsync(logEntity.Id);
+        Assert.Equal(RequestStatus.ConfigurationMissing, updatedLog!.Status);
     }
 
     // ─────────────────────────────────────────────────────────────────

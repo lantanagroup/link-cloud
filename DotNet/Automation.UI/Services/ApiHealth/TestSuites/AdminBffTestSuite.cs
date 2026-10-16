@@ -49,21 +49,42 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
     public override async Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default)
     {
         var results = new List<ApiTestRunResult>();
-        var baseUrl = _serviceRegistry.Value.AdminBffServiceApiUrl?.TrimEnd('/');
+        var baseUrl = _serviceRegistry.Value.AdminBffServiceUrl?.TrimEnd('/');
+        var apiBaseUrl = _serviceRegistry.Value.AdminBffServiceApiUrl?.TrimEnd('/');
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            results.Add(new ApiTestRunResult
+            const string error = "ServiceRegistry:AdminBffServiceUrl is not configured.";
+
+            foreach (var endpointName in new[]
             {
-                EndpointKey = $"{ServiceName}::{StepNames.HealthGet200}",
-                ServiceName = ServiceName,
-                Passed = false,
-                ErrorMessage = "ServiceRegistry:AdminBffServiceUrl is not configured.",
-                RequestBody = "Request was not sent because ServiceRegistry:AdminBffServiceUrl is missing.",
-                ResponseBody = "Response was not received because ServiceRegistry:AdminBffServiceUrl is missing."
-            });
+                StepNames.InfoGet200,
+                StepNames.HealthGet200
+            })
+            {
+                results.Add(new ApiTestRunResult
+                {
+                    EndpointKey = $"{ServiceName}::{endpointName}",
+                    ServiceName = ServiceName,
+                    EndpointName = endpointName,
+                    Passed = false,
+                    ExpectedStatusCode = 200,
+                    ErrorMessage = error,
+                    RequestBody = "Request was not sent because the Admin BFF service URL is missing.",
+                    ResponseBody = "Response was not received because the Admin BFF service URL is missing.",
+                    ExecutedAt = DateTimeOffset.UtcNow
+                });
+            }
+
             return results;
         }
+
+        // --- /api/AdminBff/info ---
+        results.Add(await CallRawGetAsync(
+            StepNames.InfoGet200,
+            baseUrl,
+            "/api/info",
+            ct));
 
         var adminBffClient = _serviceProvider.GetRequiredService<IAdminBffIntegrationClient>();
 
@@ -88,8 +109,8 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             }
             else
             {
-                results.Add(MakeFailedResult(StepNames.FacilityDelete200, "Prerequisite: facility creation via BFF failed."));
-                results.Add(MakeFailedResult(StepNames.FacilityRestorePatch200, "Prerequisite: facility creation via BFF failed."));
+                results.Add(MakeFailedResult(StepNames.FacilityDelete200, "Prerequisite: facility creation via BFF failed.", "DELETE", 200, $"{apiBaseUrl}/aggregate/facility/{facilityId}"));
+                results.Add(MakeFailedResult(StepNames.FacilityRestorePatch200, "Prerequisite: facility creation via BFF failed.", "PATCH", 200, $"{apiBaseUrl}/aggregate/facility/{facilityId}/restore"));
             }
         }
         finally
@@ -146,8 +167,8 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         }
         else
         {
-            results.Add(MakeFailedResult(StepNames.ReportDelete204, reportSeedMissing));
-            results.Add(MakeFailedResult(StepNames.ReportRestorePatch204, reportSeedMissing));
+            results.Add(MakeFailedResult(StepNames.ReportDelete204, reportSeedMissing, "DELETE", 204, $"{apiBaseUrl}/aggregate/reports/{{reportScheduleId}}"));
+            results.Add(MakeFailedResult(StepNames.ReportRestorePatch204, reportSeedMissing, "PATCH", 204, $"{apiBaseUrl}/aggregate/reports/{{reportScheduleId}}/restore"));
         }
 
         var fakeScheduleId = Guid.NewGuid().ToString();
@@ -172,7 +193,10 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
                 FacilityId = facilityId,
                 FacilityName = facilityId,
                 TimeZone = "America/Chicago",
-                Vendor = Vendor.Epic,
+                Vendor = new VendorModel
+                {
+                    Name = "Epic"
+                },
                 ScheduledReports = new TenantScheduledReportConfig
                 {
                     Daily = [],
@@ -225,7 +249,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             var body = response.RawBody;
             var capturedBody = string.IsNullOrWhiteSpace(body)
                 ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                : (body.Length > 500 ? body[..500] : body);
+                : body;
             result.ResponseBody = capturedBody;
             if (!result.Passed)
                 result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
@@ -274,13 +298,16 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         return CallBffAsync(endpointName, method, expectedStatus, sendUntyped, ct);
     }
 
-    private ApiTestRunResult MakeFailedResult(string endpointName, string error) => new()
+    private ApiTestRunResult MakeFailedResult(string endpointName, string error, string method, int expectedStatus, string requestUrl) => new()
     {
         EndpointKey = $"{ServiceName}::{endpointName}",
         ServiceName = ServiceName,
         EndpointName = endpointName,
         Passed = false,
+        ExpectedStatusCode = expectedStatus,
         ErrorMessage = error,
+        RequestMethod = method,
+        RequestUrl = requestUrl,
         RequestBody = "Request was not sent because prerequisite setup failed.",
         ResponseBody = "Response was not received because prerequisite setup failed.",
         ExecutedAt = DateTimeOffset.UtcNow
@@ -333,6 +360,83 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         {
             return trimmed;
         }
+    }
+
+    private async Task<ApiTestRunResult> CallRawGetAsync(
+        string endpointName,
+        string baseUrl,
+        string relativePath,
+        CancellationToken ct)
+    {
+        var result = new ApiTestRunResult
+        {
+            EndpointKey = $"{ServiceName}::{endpointName}",
+            ServiceName = ServiceName,
+            EndpointName = endpointName,
+            ExpectedStatusCode = 200,
+            ExecutedAt = DateTimeOffset.UtcNow,
+            RequestMethod = "GET",
+            RequestUrl = $"{baseUrl}{relativePath}",
+            RequestBody = "No request body was sent (GET)."
+        };
+
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient("ApiHealthTest");
+            using var response = await httpClient.GetAsync(
+                $"{baseUrl}{relativePath}",
+                ct);
+
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
+
+            sw.Stop();
+
+            result.ActualStatusCode = (int)response.StatusCode;
+            result.DurationMs = sw.ElapsedMilliseconds;
+            result.Passed = result.ActualStatusCode == 200;
+
+            result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
+                ? $"No response body was returned (HTTP {result.ActualStatusCode})."
+                : responseBody;
+
+            if (!result.Passed)
+            {
+                result.ErrorMessage = BuildStatusMismatchMessage(
+                    200,
+                    result.ActualStatusCode ?? 0,
+                    result.ResponseBody,
+                    null);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TaskCanceledException)
+        {
+            sw.Stop();
+            result.DurationMs = sw.ElapsedMilliseconds;
+            result.Passed = false;
+            result.ErrorMessage = "Request timed out.";
+            result.ResponseBody =
+                "No response body was received because the request timed out.";
+        }
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            result.DurationMs = sw.ElapsedMilliseconds;
+            result.Passed = false;
+            result.ErrorMessage = $"HTTP error: {ex.Message}";
+            result.ResponseBody =
+                "No response body was received because the HTTP request failed.";
+        }
+
+        return result;
     }
 
 }

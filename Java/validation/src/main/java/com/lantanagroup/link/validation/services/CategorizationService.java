@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -75,9 +76,14 @@ public class CategorizationService {
 
     @Transactional
     public void saveCategorySnapshot(CategorySnapshot categorySnapshot) {
+        // Category has an assigned (non-generated) ID, so save() always routes through merge(). For an
+        // ID that isn't in the database yet, merge() returns a *different* managed instance than the one
+        // passed in — the rule has to be attached to that instance, or the persistence context ends up
+        // holding two representations of the same category.
         Category category = categoryRepository.findById(categorySnapshot.getId())
+                .map(categorySnapshot::applyTo)
                 .orElseGet(categorySnapshot::toCategory);
-        categoryRepository.save(category);
+        category = categoryRepository.save(category);
         CategoryRule categoryRule = categorySnapshot.toCategoryRule(category);
         categoryRuleRepository.save(categoryRule);
     }
@@ -101,6 +107,13 @@ public class CategorizationService {
     }
 
     private void doCategorize(List<Result> results, List<CategoryRule> categoryRules) {
+        int total = results.size();
+        if (total == 0) {
+            return;
+        }
+
+        logger.info("Categorizing validation results: 0/{}", total);
+        AtomicInteger done = new AtomicInteger();
         results.parallelStream().forEach(result -> {
             List<Category> categories = categoryRules.stream()
                     .filter(Objects::nonNull)
@@ -108,6 +121,10 @@ public class CategorizationService {
                     .map(CategoryRule::getCategory)
                     .toList();
             result.setCategories(categories);
+            int n = done.incrementAndGet();
+            if (n == total || n % 5000 == 0) {
+                logger.info("Categorizing validation results: {}/{}", n, total);
+            }
         });
     }
 

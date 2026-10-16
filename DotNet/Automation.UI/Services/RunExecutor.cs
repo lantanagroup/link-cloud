@@ -1,6 +1,8 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
-using Automation.UI.Models;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -9,11 +11,14 @@ using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Task = System.Threading.Tasks.Task;
 
@@ -43,12 +48,22 @@ internal sealed class RunExecutor
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
     private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
     private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
+    private readonly ImportedBundleExecutionResolver _importedBundleResolver;
+    private readonly IGeneratedPatientTemplateCache _generatedTemplateCache;
+    private readonly GeneratedTemplateCacheVersionStore _generatedTemplateVersionStore;
     private readonly bool _suppressExternalManifest;
     private readonly bool _includePatientAggregatorOrganizationResource;
     private readonly string _includePatientAggregatorOrganizationResourceSource;
     private readonly ReportAbsManifestValidator.OperationOutcomeExpectationSettings _operationOutcomeExpectations;
     private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
+    private readonly ILivePatientEventInjector _liveInjector;
+
+    internal sealed record GenerationPipelineRequest(
+        IReadOnlyList<ProfiledMeasureType> SelectedMeasures,
+        IReadOnlyList<PatientProfile> Profiles,
+        IReadOnlyList<ImportedPatientInput>? ImportedPatients,
+        IGeneratedPatientTemplateCache? GeneratedTemplateCache);
 
     public RunExecutor(
         AutomationConfig automationConfig,
@@ -58,8 +73,12 @@ internal sealed class RunExecutor
         QueryPlanTemplateResolver queryPlanResolver,
         NormalizationSuiteResolver normalizationSuiteResolver,
         OrganizationResourceMapTemplateResolver organizationResourceMapResolver,
+        ImportedBundleExecutionResolver importedBundleResolver,
+        IGeneratedPatientTemplateCache generatedTemplateCache,
+        GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
         IConfiguration configuration,
-        ILogger logger)
+        ILogger logger,
+        ILivePatientEventInjector liveInjector)
     {
         _automationConfig = automationConfig;
         _hostServices = hostServices;
@@ -68,6 +87,9 @@ internal sealed class RunExecutor
         _queryPlanResolver = queryPlanResolver;
         _normalizationSuiteResolver = normalizationSuiteResolver;
         _organizationResourceMapResolver = organizationResourceMapResolver;
+        _importedBundleResolver = importedBundleResolver;
+        _generatedTemplateCache = generatedTemplateCache;
+        _generatedTemplateVersionStore = generatedTemplateVersionStore;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
         var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
         _includePatientAggregatorOrganizationResource = includeOrg.Value;
@@ -76,6 +98,7 @@ internal sealed class RunExecutor
         _operationOutcomeExpectations = ooExpectations.Settings;
         _operationOutcomeExpectationSource = ooExpectations.Source;
         _logger = logger;
+        _liveInjector = liveInjector;
     }
 
     private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
@@ -99,39 +122,24 @@ internal sealed class RunExecutor
     private static (ReportAbsManifestValidator.OperationOutcomeExpectationSettings Settings, string Source)
         ResolveOperationOutcomeExpectations(IConfiguration configuration)
     {
-        var reportWritePreQual = TryGetBool(configuration, "PreQualification:WritePreQualOperationOutcome");
-
         var validationCandidates = new[]
         {
             "/pre-qualification/write-pre-qual-operation-outcome",
             "pre-qualification.write-pre-qual-operation-outcome"
         };
 
-        bool? validationWritePreQual = null;
-        string validationSource = "default(false)";
         foreach (var key in validationCandidates)
         {
             var value = TryGetBool(configuration, key);
             if (!value.HasValue)
                 continue;
 
-            validationWritePreQual = value.Value;
-            validationSource = key;
-            break;
+            return (
+                new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(value.Value),
+                key);
         }
 
-        var reportWritesLegacyWhenInvalid = !(reportWritePreQual ?? false);
-        var validationWritesPreQualWhenInvalid = validationWritePreQual ?? false;
-
-        var source =
-            $"Report(PreQualification:WritePreQualOperationOutcome={(reportWritePreQual.HasValue ? reportWritePreQual.Value.ToString() : "default(false)")}), " +
-            $"Validation({validationSource}={(validationWritePreQual.HasValue ? validationWritePreQual.Value.ToString() : "default(false)")})";
-
-        return (
-            new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(
-                ReportWritesLegacyOperationOutcomeWhenInvalid: reportWritesLegacyWhenInvalid,
-                ValidationWritesPreQualOperationOutcomeWhenInvalid: validationWritesPreQualWhenInvalid),
-            source);
+        return (ReportAbsManifestValidator.OperationOutcomeExpectationSettings.Default, "default(false)");
     }
 
     /// <summary>
@@ -142,7 +150,8 @@ internal sealed class RunExecutor
     public sealed record ExecutorCallbacks(
         IAutomationOutput Output,
         Func<Task> BroadcastStatus,
-        Func<Task> PersistRunSummary);
+        Func<Task> PersistRunSummary,
+        Func<Task> PersistOwnership);
 
     public async Task ExecuteAsync(
         MutableRunState state,
@@ -151,99 +160,148 @@ internal sealed class RunExecutor
     {
         var output = callbacks.Output;
 
+        ServiceProvider? runServices = null;
+        IMockDmrpServiceClient? mockDmrpClientForCleanup = null;
+        var cleanupMockDmrpEntries = false;
+
         state.Status = AutomationRunStatus.Running;
         state.StartedAt = DateTimeOffset.UtcNow;
         await callbacks.BroadcastStatus();
+
+        GenerationManifest? generationManifest = null;
+        long generationDurationMs = 0;
+        IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults = [];
 
         try
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
-            var usesScheduledWorkflow = state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
-            var hasImportedPatients = state.Options.ImportedPatientIds.Count > 0 || state.Options.ImportedPatientBundles.Count > 0;
+            var isLiveSimulation = state.Options.IsLiveSimulation;
+            var usesScheduledWorkflow = ReportExecution.UsesCensusScheduleKickoff(state.Options.ReportMethod);
 
-            // For scheduled-style runs, compute the active window immediately so generation
-            // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
+            // Short Kafka window so EOP jobs fire during the test. Applies to Scheduled
+            // (including live) and to regenerate's prerequisite Scheduled report. The
+            // regenerated report itself is Adhoc in Report. This clock is for generation;
+            // live inject uses a later countdown, and StartScheduledReport reconciles dates.
             if (usesScheduledWorkflow)
             {
-                // Imported-patient scheduled/regenerate runs must use an explicit
-                // configured report period so eligibility expectations remain deterministic.
-                if (hasImportedPatients)
-                {
-                    if (!state.Options.ReportPeriodStart.HasValue || !state.Options.ReportPeriodEnd.HasValue)
-                    {
-                        throw new InvalidOperationException(
-                            "Report period start and end are required for scheduled/regenerate runs that include imported patients.");
-                    }
+                var now = DateTimeOffset.UtcNow;
+                var alignedNow = new DateTimeOffset(
+                    now.Year, now.Month, now.Day,
+                    now.Hour, now.Minute, 0,
+                    TimeSpan.Zero);
+                var closeMinutes = isLiveSimulation
+                    ? StartScenarioRequestResolver.NormalizeReportingWindowMinutes(state.Options.ReportingWindowMinutes)
+                    : ReportExecution.NonLiveScheduledCloseMinutes;
+                var end = alignedNow.AddMinutes(closeMinutes);
+                var start = state.Options.ReportPeriodStart ?? alignedNow.AddDays(-5);
+                if (start > end)
+                    start = alignedNow.AddDays(-5);
 
-                    scenarioConfig.StartDate = ToZulu(state.Options.ReportPeriodStart.Value);
-                    scenarioConfig.EndDate = ToZulu(state.Options.ReportPeriodEnd.Value);
-                }
-                else
-                {
-                    // Use a clinically meaningful rolling window for generation so scheduled
-                    // inpatient patterns produce rich in-period evidence (not minute-scale data).
-                    // End-of-period runtime is kept short separately by publishing a small
-                    // delay value to Admin.BFF.
-                    var now = DateTimeOffset.UtcNow;
-                    var alignedNow = new DateTimeOffset(
-                        now.Year, now.Month, now.Day,
-                        now.Hour, now.Minute, 0,
-                        TimeSpan.Zero);
-                    var start = alignedNow.AddDays(-5);
-                    var end = alignedNow.AddMinutes(2);
-                    scenarioConfig.StartDate = ToZulu(start);
-                    scenarioConfig.EndDate = ToZulu(end);
-                }
+                scenarioConfig.StartDate = ToZulu(start);
+                scenarioConfig.EndDate = ToZulu(end);
+                if (isLiveSimulation)
+                    scenarioConfig.MaxPollingDurationMinutes = Math.Max(scenarioConfig.MaxPollingDurationMinutes, closeMinutes + 30);
             }
 
-            using var services = BuildRunServiceProvider(output);
+            var services = runServices = BuildRunServiceProvider(output);
 
             var lokiScraper = services.GetRequiredService<LokiScraper>();
             var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
             state.FhirDataLoader = fhirDataLoader;
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
-
+            var dmrpClient = services.GetRequiredService<IDmrpServiceClient>();
+            // Resolved only for a DMRP run, so a stack with no mock URL configured can still run the rest.
+            var mockDmrpClient = state.Options.EnableDmrp
+                ? services.GetRequiredService<IMockDmrpServiceClient>()
+                : null;
+            mockDmrpClientForCleanup = mockDmrpClient;
             var reportHelper = services.GetRequiredService<ReportApiHelper>();
-
             var validationHelper = services.GetRequiredService<ValidationApiHelper>();
             var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
             var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
             var dataAcqValidator = services.GetRequiredService<DataAcquisitionDatabaseValidator>();
             var normalizationValidator = services.GetRequiredService<NormalizationDatabaseValidator>();
+            var hslocMappingRunValidator = services.GetRequiredService<HslocMappingRunValidator>();
             var normalizationSuiteApplicationValidator = new NormalizationSuiteApplicationValidator(output);
             var tenantValidator = services.GetRequiredService<TenantDatabaseValidator>();
             var validationResultsValidator = services.GetRequiredService<ValidationResultsValidator>();
             var pipelineSnapshot = services.GetRequiredService<PipelineSnapshot>();
+            var pipelineDataReader = services.GetRequiredService<PipelineDataReader>();
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
             output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
+            var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
+            output.WriteLine("FHIR generator: Thetis Engine");
+
+            await ValidateDmrpConfigurationAsync(
+                state.Options.EnableDmrp,
+                dmrpClient,
+                output);
+
+            if (state.Options.EnableDmrp)
+            {
+                ValidateDmrpScenario(state.Options);
+
+                var reachable = await mockDmrpClient!.SearchEntriesAsync(
+                    facilityId: state.Options.NhsnOrganizationId,
+                    pageSize: 1,
+                    cancellationToken: cancellationToken);
+
+                if (!reachable.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        $"MockDmrpApi reachability check failed with HTTP {reachable.StatusCode}. " +
+                        $"Response: {reachable.RawBody}");
+                }
+
+                output.WriteLine(
+                    $"MockDmrpApi reachable for NHSN Organization ID " +
+                    $"'{state.Options.NhsnOrganizationId}'.");
+            }
 
             List<string> patientIds;
             List<string> expectedSubmittedPatientIds;
-            GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
             // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, the pipeline handles the union.
-            var primaryMeasure = state.Options.SelectedMeasures[0];
-            var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
-            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
-            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(state.Options.OrganizationResourceMapTemplateId, cancellationToken);
+            var honorFacilityPieces = state.Options.HonorExplicitFacilityPieces;
+            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(
+                state.Options.NormalizationSuiteId, cancellationToken, honorFacilityPieces);
+            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(
+                state.Options.OrganizationResourceMapTemplateId, cancellationToken, honorFacilityPieces);
             var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution, organizationResourceMapTemplate);
 
             await fhirDataLoader.WaitForServerAsync(output);
 
             // Resolve the query plan template early so the acquisition simulator uses the
             // same plan the scenario is configured with (not always the built-in default).
-            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(state.Options.QueryPlanTemplateId, cancellationToken);
+            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(
+                state.Options.QueryPlanTemplateId, cancellationToken, honorFacilityPieces);
             var queryPlanInput = queryPlanResolution.Input;
-            var effectiveQueryPlan = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+            var effectiveQueryPlan = queryPlanInput;
+            if (effectiveQueryPlan == null)
+            {
+                if (honorFacilityPieces)
+                {
+                    throw new InvalidOperationException(
+                        "No query plan is configured for this run. Choose one on the facility template or in ala carte mode.");
+                }
+
+                effectiveQueryPlan = QueryPlanDefaults.GetDefaultAsInput();
+            }
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
+            var acquisitionSimulation = CreateAcquisitionSimulationConfig(
+                effectiveQueryPlan,
+                scenarioConfig.StartDate,
+                scenarioConfig.EndDate,
+                organizationResourceMapTemplate);
 
             var locationQueryCount = effectiveQueryPlan.InitialQueries.Concat(effectiveQueryPlan.SupplementalQueries)
                 .Count(q => string.Equals(q.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
@@ -258,117 +316,111 @@ internal sealed class RunExecutor
             if (encounterQueryCount == 0)
                 output.WriteLine("WARNING: Query plan has no Encounter query entries; encounter mapping checks will be limited for this run.");
 
-            if (state.Options.PatientProfiles is { Count: > 0 }
-                || state.Options.ImportedPatientIds.Count > 0
-                || state.Options.ImportedPatientBundles.Count > 0)
+            var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
+            var profiles = state.Options.PatientProfiles;
+            var importedPatients = new List<ImportedPatientInput>(
+                state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count);
+            importedPatients.AddRange(state.Options.ImportedPatientIds);
+            importedPatients.AddRange(await _importedBundleResolver.ResolveAsync(
+                state.Options.ImportedPatientBundles,
+                state.RunCancellation.Token));
+
+            if (profiles.Count == 0 && importedPatients.Count == 0)
             {
-                var profiles = state.Options.PatientProfiles;
-                var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
-                var qualAllCount = profiles.Count(p => p.QualifiesForAll(selectedMeasures));
-                var nqAllCount = profiles.Count(p => p.QualifiesForNone(selectedMeasures));
-                var mixedCount = profiles.Count - qualAllCount - nqAllCount;
-                var importedTotal = state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count;
-                output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed" +
-                                 (importedTotal > 0 ? $" + {importedTotal} imported patient(s)" : string.Empty));
-
-                var importedPatients = new List<ImportedPatientInput>(
-                    state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count);
-                importedPatients.AddRange(state.Options.ImportedPatientIds);
-                importedPatients.AddRange(state.Options.ImportedPatientBundles);
-
-                // Pre-load imported patient FHIR data so the pipeline can reuse it without
-                // re-fetching, and surface — but do NOT enforce — whether each imported
-                // encounter sits inside the scenario's configured reporting period. A
-                // mismatched scenario is a legitimate test case (proper disqualification by
-                // measure-eval); the run continues either way.
-                if (importedPatients.Count > 0)
-                {
-                    output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
-                    await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
-
-                    var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
-                    if (impStart.HasValue || impEnd.HasValue)
-                    {
-                        var periodStart = TryParseUtc(scenarioConfig.StartDate);
-                        var periodEnd = TryParseUtc(scenarioConfig.EndDate);
-
-                        var beforeStart = periodStart.HasValue && impStart.HasValue && impStart.Value < periodStart.Value;
-                        var afterEnd = periodEnd.HasValue && impEnd.HasValue && impEnd.Value > periodEnd.Value;
-
-                        if (beforeStart || afterEnd)
-                        {
-                            output.WriteLine($"  WARNING: Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] fall " +
-                                             $"{(beforeStart ? "before" : "")}{(beforeStart && afterEnd ? "/" : "")}{(afterEnd ? "after" : "")} " +
-                                             "the configured Report Period. Affected resources will be filtered by measure-eval / CQL " +
-                                             "and may cause the patient to be classified non-qualifying.");
-                        }
-                        else
-                        {
-                            output.WriteLine($"  Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] sit inside the report period.");
-                        }
-                    }
-                }
-
-                // Use the streaming pipeline: generate ? upload ? dispose per patient.
-                // The pipeline builds the manifest incrementally and runs acquisition
-                // simulation per-patient, so no serialized FHIR JSON is retained.
-                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
-                    output,
-                    fhirDataLoader,
+                // Safety net for hand-built ResolvedRunOptions (built-in scenario kinds
+                // now expand in StartScenarioRequestResolver). Same All-Qualifying shape
+                // the old non-profile executor branch synthesized.
+                var fallback = BuildNonProfileGenerationRequest(
                     selectedMeasures,
-                    profiles,
+                    state.Options.PatientCount,
                     state.Options.ResourcesPerPatient,
                     state.Options.Seed,
-                    generationConfig,
-                    generationRequirementsPlan,
-                    acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
-                    {
-                        QueryPlan = effectiveQueryPlan,
-                        ClinicalPeriodStart = scenarioConfig.StartDate,
-                        ClinicalPeriodEnd = scenarioConfig.EndDate,
-                        OrganizationLocationConditionFhirPaths = organizationResourceMapTemplate?.Conditions
-                            ?.Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
-                            .OrderBy(c => c.Priority)
-                            .Select(c => NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath))
-                            .ToList(),
-                        // Keep simulation strict for date-filtered resources. Encounter-anchored
-                        // out-of-range override can over-predict scheduled ABS content for
-                        // Observation/DiagnosticReport/Procedure, causing false expected-key
-                        // assertions (e.g. Observation-001 / DxRpt-042 class mismatches).
-                        // We still allow encounter anchoring when a resource has no recognized
-                        // date shape (handled inside the simulator), but not when its recognized
-                        // date is outside the reporting window.
-                        AllowEncounterAnchoredDateOverrideForOutOfRange = false
-                    },
-                    importedPatients: importedPatients.Count > 0 ? importedPatients : null);
-
-                patientIds = pipelineResult.PatientIds;
-                generationManifest = pipelineResult.Manifest;
-
-                // Manifest carries explicit patient/profile pairs. Build the initial expected
-                // submitted set from those pairs; scheduled runs are recomputed later after
-                // profiles are aligned to the canonical patient ID order.
-                expectedSubmittedPatientIds = generationManifest.PatientIds
-                    .Where((_, idx) => idx < generationManifest.Profiles.Count
-                                       && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
-                    .ToList();
-
+                    _generatedTemplateCache);
+                profiles = fallback.Profiles.ToList();
             }
-            else
+
+            var qualAllCount = profiles.Count(p => p.QualifiesForAll(selectedMeasures));
+            var nqAllCount = profiles.Count(p => p.QualifiesForNone(selectedMeasures));
+            var mixedCount = profiles.Count - qualAllCount - nqAllCount;
+            output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed" +
+                             (importedPatients.Count > 0 ? $" + {importedPatients.Count} imported patient(s)" : string.Empty));
+
+            // Prefetch imported FHIR once. The pipeline reuses PreLoadedEntries and does
+            // not fetch $everything again. Dates outside the period are a warning only:
+            // out-of-period imports are a legitimate NQ test case and we do not widen
+            // the report window here.
+            if (importedPatients.Count > 0)
             {
-                var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
-                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Seed,
-                    generationConfig,
-                    generationRequirementsPlan);
+                output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
+                await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
 
-                patientIds = genPatientIds;
-                expectedSubmittedPatientIds = patientIds.ToList();
+                var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
+                if (impStart.HasValue || impEnd.HasValue)
+                {
+                    var periodStart = TryParseUtc(scenarioConfig.StartDate);
+                    var periodEnd = TryParseUtc(scenarioConfig.EndDate);
 
-                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
+                    var beforeStart = periodStart.HasValue && impStart.HasValue && impStart.Value < periodStart.Value;
+                    var afterEnd = periodEnd.HasValue && impEnd.HasValue && impEnd.Value > periodEnd.Value;
+
+                    if (beforeStart || afterEnd)
+                    {
+                        output.WriteLine($"  WARNING: Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] fall " +
+                                         $"{(beforeStart ? "before" : "")}{(beforeStart && afterEnd ? "/" : "")}{(afterEnd ? "after" : "")} " +
+                                         "the configured Report Period. Affected resources will be filtered by measure-eval / CQL " +
+                                         "and may cause the patient to be classified non-qualifying.");
+                    }
+                    else
+                    {
+                        output.WriteLine($"  Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] sit inside the report period.");
+                    }
+                }
             }
+
+            var generationRequest = BuildProfileGenerationRequest(
+                selectedMeasures,
+                profiles,
+                importedPatients,
+                _generatedTemplateCache);
+
+            var generationStarted = DateTimeOffset.UtcNow;
+            var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+                output,
+                fhirDataLoader,
+                generationRequest.SelectedMeasures,
+                generationRequest.Profiles,
+                state.Options.ResourcesPerPatient,
+                state.Options.Seed,
+                generationConfig,
+                generationRequirementsPlan,
+                acquisitionSimulation: acquisitionSimulation,
+                importedPatients: generationRequest.ImportedPatients,
+                generatedTemplateCache: generationRequest.GeneratedTemplateCache,
+                maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients,
+                measureBundleJsons: scenarioConfig.MeasureBundleJsons,
+                cancellationToken: state.RunCancellation.Token);
+
+            patientIds = pipelineResult.PatientIds;
+            generationManifest = pipelineResult.Manifest;
+            generationDurationMs = (long)Math.Max(0, (DateTimeOffset.UtcNow - generationStarted).TotalMilliseconds);
+            await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
+
+            expectedSubmittedPatientIds = generationManifest.PatientIds
+                .Where((_, idx) => idx < generationManifest.Profiles.Count
+                                   && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
+                .ToList();
 
             if (scenarioConfig.PatientIds.Count == 0)
                 scenarioConfig.PatientIds = patientIds;
+
+            if (generationManifest != null)
+            {
+                await FhirAcquisitionReadiness.WaitAsync(
+                    fhirDataLoader,
+                    output,
+                    generationManifest,
+                    cancellationToken: state.RunCancellation.Token);
+            }
 
             IReadOnlyList<PatientProfile>? profilesAlignedToPatientIds = null;
             if (generationManifest != null)
@@ -378,7 +430,7 @@ internal sealed class RunExecutor
                     generationManifest.PatientIds,
                     generationManifest.Profiles);
 
-                if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+                if (state.Options.ReportMethod == ReportMethod.ScheduledReport && !isLiveSimulation)
                 {
                     expectedSubmittedPatientIds = ComputeExpectedScheduledSubmittedPatientIds(
                         patientIds,
@@ -401,8 +453,21 @@ internal sealed class RunExecutor
                 throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
             var measureId = measureIds[0];
 
-            var facilityId = state.RunId.ToString();
+            var facilityId = state.Options.EnableDmrp
+                ? state.Options.NhsnOrganizationId
+                : state.RunId.ToString();
+
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new InvalidOperationException(
+                    "A facility ID could not be resolved for this Automation run.");
+            }
+
             state.FacilityId = facilityId;
+            using var facilitySetupLock = await FacilitySetupGate.AcquireAsync(
+                facilityId,
+                message => output.WriteLine(message),
+                cancellationToken);
 
             // Finalize manifest metadata now that we have measure IDs and query plan.
             if (generationManifest != null)
@@ -410,27 +475,291 @@ internal sealed class RunExecutor
                 generationManifest.MeasureIds = measureIds;
                 generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
-                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+                if (scenarioConfig.MeasureBundleJsons.Count == 0)
+                    throw new InvalidOperationException("Measure bundle JSON is required.");
+                generationManifest.CqlReferencedResourceTypes =
+                    CqlResourceTypeExtractor.ExtractReachableFromBundleJsons(scenarioConfig.MeasureBundleJsons);
                 generationManifest.IncludePatientAggregatorOrganizationResource = _includePatientAggregatorOrganizationResource;
                 output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
-            await FacilitySetupHelper.EnsureFacilityAsync(
-                services.GetRequiredService<IFacilityServiceClient>(),
-                output, facilityId, measureIds);
-            normalizationResolution = await EnsureNormalizationFromSuiteAsync(
+            var facilityClient = services.GetRequiredService<IFacilityServiceClient>();
+
+            if (state.Options.EnableDmrp)
+            {
+                const string nhsnMeasure = "HOB";
+                const string component = "MSC";
+
+                // The Automation scenario runs the loaded dQM, while Mock DMRP exposes
+                // the NHSN-facing measure name. Tenant resolves the two through this mapping.
+                var mappingId = await FacilitySetupHelper.EnsureDmrpMeasureMappingAsync(
+                    dmrpClient,
+                    output,
+                    nhsnMeasure,
+                    measureId,
+                    Frequency.Monthly,
+                    cancellationToken);
+
+                var reportingPeriods = FacilitySetupHelper.GetDmrpReportingPeriods();
+                var seededDmrpEntries = new List<object>();
+
+                var dmrpStatus = await FacilitySetupHelper.GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
+
+                if (dmrpStatus.MockDmrpEnabled)
+                {
+                    // Tenant writes a facility's schedule through to the mock as enrollment, so saving the
+                    // facility scheduled for the dQM is what enrolls it, the same as saving the Admin UI form.
+                    // Seeding the mock here and then saving the facility with no schedule would un-enroll it.
+                    // cleanupMockDmrpEntries stays false on purpose: the entries live as long as the facility,
+                    // and its teardown (a Tenant hard delete) clears them. Deleting them at the end of the run
+                    // would leave a facility Link still has enrolled with no enrollment in the mock.
+                    state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        [measureId],
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces,
+                        onCreated: async () =>
+                        {
+                            state.AutomationCreatedFacility = true;
+                            await callbacks.PersistOwnership();
+                        });
+
+                    foreach (var (month, year) in reportingPeriods)
+                    {
+                        seededDmrpEntries.AddRange(await ReadMockDmrpEntriesAsync(mockDmrpClient!,
+                                                                                  facilityId,
+                                                                                  month,
+                                                                                  year,
+                                                                                  cancellationToken));
+                    }
+                }
+                else
+                {
+                    // Start from a clean mock enrollment for this NHSN organization.
+                    // Facility-scoped cleanup is intentionally used instead of the global endpoint.
+                    cleanupMockDmrpEntries = true;
+
+                    await DeleteMockDmrpEntriesAsync(
+                        mockDmrpClient!,
+                        facilityId,
+                        cancellationToken);
+
+                    foreach (var (month, year) in reportingPeriods)
+                    {
+                        var created = await mockDmrpClient!.CreateEntryAsync(
+                            new MockDmrpEntryRequest
+                            {
+                                FacilityId = facilityId,
+                                Component = component,
+                                Measure = nhsnMeasure,
+                                ReportingMonth = month,
+                                ReportingYear = year,
+                                IsReporting = "Y"
+                            },
+                            cancellationToken);
+
+                        if (!created.IsSuccessStatusCode || created.Body is null)
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to seed MockDmrpApi entry. " +
+                                $"HTTP {created.StatusCode}. Response: {created.RawBody}");
+                        }
+
+                        var seeded = created.Body;
+
+                        seededDmrpEntries.Add(new
+                        {
+                            seeded.Id,
+                            FacilityId = facilityId,
+                            Component = component,
+                            Measure = nhsnMeasure,
+                            ReportingMonth = month,
+                            ReportingYear = year,
+                            IsReporting = "Y"
+                        });
+
+                        output.WriteLine(
+                            $"Seeded MockDmrpApi enrollment '{seeded.Id}': " +
+                            $"{facilityId}, {component}/{nhsnMeasure}, {month}/{year}.");
+                    }
+
+                    // Tenant refuses refresh for a facility it does not know, so create the
+                    // facility first with an empty DMRP-derived schedule.
+                    state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces,
+                        onCreated: async () =>
+                        {
+                            state.AutomationCreatedFacility = true;
+                            await callbacks.PersistOwnership();
+                        });
+                }
+
+                if (!state.AutomationCreatedFacility)
+                    await callbacks.PersistRunSummary();
+
+                // Force Tenant through the real DMRP client for every period we seeded.
+                foreach (var (month, year) in reportingPeriods)
+                {
+                    var refreshed = await dmrpClient.GetFacilityReportingPlansForFacilityAsync(
+                        facilityId,
+                        month: month,
+                        year: year,
+                        isReporting: true,
+                        refresh: true,
+                        cancellationToken: cancellationToken);
+
+                    if (!refreshed.IsSuccessStatusCode)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to refresh DMRP reporting plans for facility " +
+                            $"'{facilityId}' for {month}/{year}. " +
+                            $"HTTP {refreshed.StatusCode}: {refreshed.RawBody ?? "(no body)"}");
+                    }
+
+                    var plans = refreshed.Body ?? [];
+
+                    if (plans.Count == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Tenant refreshed DMRP for facility '{facilityId}' " +
+                            $"for {month}/{year}, but no reporting plans were returned.");
+                    }
+
+                    if (!plans.Any(p =>
+                            string.Equals(
+                                p.MeasureMappingId,
+                                mappingId,
+                                StringComparison.Ordinal)))
+                    {
+                        throw new InvalidOperationException(
+                            $"Tenant refreshed DMRP for facility '{facilityId}' " +
+                            $"for {month}/{year}, but the expected mapping " +
+                            $"'{mappingId}' was not present.");
+                    }
+
+                    output.WriteLine(
+                        $"Verified Tenant DMRP enrollment for '{facilityId}' " +
+                        $"for {month}/{year}.");
+                }
+
+                // The reporting plans now exist. Re-save the facility so DmrpFacilityOperations derives
+                // ScheduledReports from them. Not with the write-through: the save that enrolled the facility
+                // already derived its schedule, and saving it again with no schedule would un-enroll it.
+                if (!dmrpStatus.MockDmrpEnabled)
+                {
+                    await FacilitySetupHelper.RefreshDmrpDerivedScheduleAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces);
+                }
+
+                pipelineDataReader.InvalidateCache();
+
+                var dmrpFacility = await pipelineDataReader.GetFacilityAsync(facilityId);
+
+                if (dmrpFacility == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Facility '{facilityId}' could not be read after applying the DMRP-derived schedule.");
+                }
+
+                await _orchestrator.WriteDomainAsync(
+                    state.RunId,
+                    "dmrp",
+                    new
+                    {
+                        Enabled = true,
+                        NhsnOrganizationId = facilityId,
+
+                        Enrollment = new
+                        {
+                            Component = component,
+                            NhsnMeasure = nhsnMeasure,
+                            DqmMeasureId = measureId,
+                            MeasureMappingId = mappingId,
+                            Frequency = Frequency.Monthly.ToString(),
+
+                            ReportingPeriods = reportingPeriods
+                                .Select(p => new
+                                {
+                                    p.Month,
+                                    p.Year
+                                })
+                                .ToList(),
+
+                            SeededEntries = seededDmrpEntries
+                        },
+
+                        Tenant = new
+                        {
+                            RefreshCompleted = true,
+                            DerivedScheduleApplied = true,
+
+                            ScheduledReports = new
+                            {
+                                Daily = dmrpFacility.ScheduledReports?.Daily ?? [],
+                                Weekly = dmrpFacility.ScheduledReports?.Weekly ?? [],
+                                Monthly = dmrpFacility.ScheduledReports?.Monthly ?? []
+                            }
+                        }
+                    },
+                    cancellationToken);
+            }
+            else
+            {
+                state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureFacilityAsync(
+                    facilityClient,
+                    dmrpClient,
+                    output,
+                    facilityId,
+                    measureIds,
+                    cancellationToken,
+                    state.Options.VendorName,
+                    state.Options.HonorExplicitFacilityPieces,
+                    onCreated: async () =>
+                    {
+                        state.AutomationCreatedFacility = true;
+                        await callbacks.PersistOwnership();
+                    });
+                if (!state.AutomationCreatedFacility)
+                    await callbacks.PersistRunSummary();
+            }
+
+            var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
-                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
+                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution, patientIds);
+            normalizationResolution = normalizationSetup.Resolution;
+            var runtimeNormalizationSequences = normalizationSetup.RuntimeSequences;
+            var ehrDescription = effectiveQueryPlan.EhrDescription;
+            if (string.IsNullOrWhiteSpace(ehrDescription))
+            {
+                ehrDescription = honorFacilityPieces
+                    ? state.Options.VendorName ?? string.Empty
+                    : "Epic";
+            }
+
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                output, facilityId, measureIds, "Epic", queryPlanInput);
+                output, facilityId, measureIds, ehrDescription, queryPlanInput);
             await FacilitySetupHelper.EnsureQueryConfigAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
-                output, facilityId);
+                output, facilityId,
+                concurrencyOverride: state.Options.Concurrency);
             await EnsureOrganizationLocationConfigurationFromTemplateAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 output,
@@ -472,7 +801,38 @@ internal sealed class RunExecutor
             Frequency? scheduledRunFrequency = null;
             string reportId;
             string normalizationEvidenceReportId;
-            if (usesScheduledWorkflow)
+            if (isLiveSimulation)
+            {
+                var scheduledWorkflowState = await ExecuteLiveScheduledReportWorkflowAsync(
+                    state,
+                    callbacks,
+                    reportHelper,
+                    output,
+                    facilityId,
+                    measureIds,
+                    scenarioConfig,
+                    patientIds,
+                    profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                    generationManifest,
+                    fhirDataLoader,
+                    generationConfig,
+                    generationRequirementsPlan,
+                    acquisitionSimulation,
+                    cancellationToken);
+
+                reportId = scheduledWorkflowState.ReportTrackingId;
+                normalizationEvidenceReportId = reportId;
+                scheduledRunFrequency = scheduledWorkflowState.Frequency;
+                MergeLiveManifestPatients(generationManifest, patientIds, scenarioConfig);
+                // Live scheduled reports are census-driven. Expected ABS / inclusion is
+                // patients who were admitted AND the predictor says they qualify — not
+                // everyone appended to the generation manifest (pool-only Generate).
+                expectedSubmittedPatientIds = _liveInjector.GetState(state.RunId).ExpectedPopulation.ToList();
+                expectedReportEntryPatientIds = expectedSubmittedPatientIds.ToList();
+                lock (state.Sync)
+                    state.LiveExpectedPopulation = expectedSubmittedPatientIds;
+            }
+            else if (usesScheduledWorkflow)
             {
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
                     reportHelper,
@@ -500,11 +860,11 @@ internal sealed class RunExecutor
             }
 
             // Register with orchestrator so store-backed pollers start automatically.
-            await _orchestrator.RegisterRunAsync(state.RunId, facilityId, reportId);
+            await _orchestrator.RegisterRunAsync(state.RunId, facilityId, reportId, scenarioConfig.IsMetricsRun);
 
-            var diagnosticsPollInterval = scenarioConfig.PatientIds.Count >= 500
-                ? TimeSpan.FromSeconds(15)
-                : TimeSpan.FromSeconds(5);
+            var diagnosticsPollInterval = AutomationRunPollingPolicy.DiagnosticsInterval(
+                scenarioConfig.IsMetricsRun,
+                scenarioConfig.PatientIds.Count);
 
             await using (var diagnostics = new BackgroundDiagnosticsMonitor(
                 output,
@@ -514,10 +874,11 @@ internal sealed class RunExecutor
                 expectedPatientCount: scenarioConfig.PatientIds.Count,
                 pollInterval: diagnosticsPollInterval,
                 forwardInternalLogsToOutput: true,
-                pipelineReader: services.GetRequiredService<PipelineDataReader>()))
+                pipelineReader: services.GetRequiredService<PipelineDataReader>(),
+                scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun)))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
-                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics);
+                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics, cancellationToken);
                 await diagnostics.StopAsync();
 
                 if (!submitted)
@@ -530,14 +891,32 @@ internal sealed class RunExecutor
                 // reached terminal values. Wait for terminal completion before snapshots
                 // and validators run. This wait is synchronization only; expected sets
                 // remain prediction-driven and are not overwritten from terminal-state output.
-                await reportHelper.WaitForTerminalReportStateAsync(
+                var terminalState = await reportHelper.WaitForTerminalReportStateAsync(
                     reportId,
                     allowEntrylessTerminal: expectedSubmittedPatientIds.Count == 0,
                     cancellationToken: cancellationToken);
 
+                if (isLiveSimulation)
+                {
+                    await _liveInjector.RecordActualPopulationAsync(
+                        state.RunId,
+                        terminalState.SubmittedPatientIds.Count > 0
+                            ? terminalState.SubmittedPatientIds
+                            : terminalState.EntryPatientIds,
+                        expectedSubmittedPatientIds,
+                        cancellationToken);
+                    var liveDiagnostics = _liveInjector.GetDiagnostics(state.RunId);
+                    output.WriteLine(
+                        $"Live inclusion: expected={liveDiagnostics.ExpectedPopulation.Count}, " +
+                        $"actual={liveDiagnostics.ActualPopulation.Count}, " +
+                        $"missing={liveDiagnostics.MissingFromReport.Count}, " +
+                        $"unexpected={liveDiagnostics.UnexpectedInReport.Count}, " +
+                        $"passed={liveDiagnostics.InclusionPassed}.");
+                }
+
                 // Refresh cached reads after the terminal-state wait so downstream
                 // snapshots/validators see committed entry statuses.
-                services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+                pipelineDataReader.InvalidateCache();
             }
 
             // Scope ABS prediction to the same submitted-patient truth used by validators.
@@ -565,7 +944,7 @@ internal sealed class RunExecutor
 
                 // Persist the submitted-patient override before validators run so the
                 // dashboard reflects prediction scope even when a later validator fails.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             // RegenerateReport: the first report is just a prerequisite.
@@ -577,10 +956,10 @@ internal sealed class RunExecutor
                 output.WriteLine("---------------------------------------------------------------");
 
                 // Flush stale domain data so the regenerated report starts fresh.
-                services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+                pipelineDataReader.InvalidateCache();
 
                 var originalReportId = reportId;
-                var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId);
+                var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId, scenarioConfig.IsMetricsRun);
                 reportId = regeneratedReportId;
                 normalizationEvidenceReportId = originalReportId;
                 lock (state.Sync)
@@ -603,10 +982,11 @@ internal sealed class RunExecutor
                     pollInterval: diagnosticsPollInterval,
                     forwardInternalLogsToOutput: true,
                     pipelineReader: services.GetRequiredService<PipelineDataReader>(),
-                    expectsDataAcquisition: false);
+                    expectsDataAcquisition: false,
+                    scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun));
 
                 await regenDiagnostics.StartAsync(facilityId, reportId);
-                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics);
+                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics, cancellationToken);
                 await regenDiagnostics.StopAsync();
 
                 if (!regenSubmitted)
@@ -621,17 +1001,51 @@ internal sealed class RunExecutor
                 reportId,
                 BuildNormalizationSuiteSnapshot(normalizationResolution));
 
-            var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
-            var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
+            // External names are checked and that package is released before the
+            // internal ZIP is downloaded. Holding both expanded packages is what
+            // exhausted the process on a large census.
+            await using (var externalPackage = await reportHelper.DownloadReportAsync(
+                facilityId, reportId, scenarioConfig, cancellationToken: cancellationToken))
+            {
+                output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
 
-            output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
-            output.WriteLine($"[ABS] OperationOutcome expectation mode: failed-patient count={_operationOutcomeExpectations.ExpectedCountPerFailedValidationPatient} ({_operationOutcomeExpectationSource}).");
+                if (!externalPackage.TryMatchEntry("manifest.ndjson", out var manifestKey))
+                {
+                    if (_suppressExternalManifest)
+                    {
+                        output.WriteLine("manifest.ndjson is not present in external submission package because ExternalBlobStorage:SuppressManifest=true; continuing.");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
+                    }
+                }
+                else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
+                {
+                    output.WriteLine($"Found external manifest using flattened name '{manifestKey}'.");
+                }
+
+                foreach (var patientId in expectedSubmittedPatientIds)
+                {
+                    var expectedPatientFile = $"patient-{patientId}.ndjson";
+                    if (!externalPackage.TryMatchEntry(expectedPatientFile, out var patientFileKey))
+                        throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
+
+                    if (!string.Equals(patientFileKey, expectedPatientFile, StringComparison.Ordinal))
+                        output.WriteLine($"Found external patient file using flattened name '{patientFileKey}'.");
+                }
+            }
+
+            await using var internalPackage = await reportHelper.DownloadReportAsync(
+                facilityId, reportId, scenarioConfig, external: false, cancellationToken: cancellationToken);
+
+            output.WriteLine($"[ABS] OperationOutcome writer={(_operationOutcomeExpectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}; expected only for FailedValidation patients ({_operationOutcomeExpectationSource}).");
 
             // Capture a lightweight ABS upload snapshot for the manifest detail page.
             try
             {
-                var absSnapshot = AbsUploadSnapshot.Build(internalAbsResources);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
+                var absSnapshot = AbsUploadSnapshot.Build(internalPackage);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
             }
             catch (Exception absEx)
             {
@@ -644,77 +1058,35 @@ internal sealed class RunExecutor
             // Best-effort: a persistence failure must not abort the run.
             try
             {
-                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalAbsResources);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
+                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalPackage);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
                 output.WriteLine($"[WARN] Failed to persist ABS export locator metadata: {absFilesEx.Message}");
             }
 
-            static bool HasExternalFile(IReadOnlyDictionary<string, object> files, string expectedFileName, out string? matchedKey)
-            {
-                if (files.ContainsKey(expectedFileName))
-                {
-                    matchedKey = expectedFileName;
-                    return true;
-                }
-
-                var suffix = "_" + expectedFileName;
-                matchedKey = files.Keys.FirstOrDefault(k =>
-                    k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
-                return matchedKey != null;
-            }
-
-            if (!HasExternalFile(downloadedResources, "manifest.ndjson", out var manifestKey))
-            {
-                if (_suppressExternalManifest)
-                {
-                    output.WriteLine("manifest.ndjson is not present in external submission package because ExternalBlobStorage:SuppressManifest=true; continuing.");
-                }
-                else
-                {
-                    throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
-                }
-
-            }
-            else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
-            {
-                output.WriteLine($"Found external manifest using flattened name '{manifestKey}'.");
-            }
-
-            foreach (var patientId in expectedSubmittedPatientIds)
-            {
-                var expectedPatientFile = $"patient-{patientId}.ndjson";
-                if (!HasExternalFile(downloadedResources, expectedPatientFile, out var patientFileKey))
-                    throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
-
-                if (!string.Equals(patientFileKey, expectedPatientFile, StringComparison.Ordinal))
-                    output.WriteLine($"Found external patient file using flattened name '{patientFileKey}'.");
-            }
-
             // Flush stale cache from diagnostics polling so validators read authoritative data.
-            services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+            pipelineDataReader.InvalidateCache();
 
             // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
-            // For non-profile runs (no pipeline), generationManifest remains null.
 
             // Failures are collected and re-thrown together once every validator has run — see
             // ValidatorRunner for why failing on the first one destroyed the evidence needed to
             // localise a discrepancy. Results are persisted after each validator so partial results
             // stay visible in the dashboard even when a later validator fails.
             var validatorRunner = new ValidatorRunner((results, ct) =>
-                _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", results, ct));
+                _orchestrator.WriteDomainAsync(state.RunId, "validatorResults", results, ct));
 
             Task RunValidator(string name, Func<Task> action) =>
                 validatorRunner.RunAsync(name, action, cancellationToken);
 
             await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
                 reportAbsValidator.ValidateAllAsync(
-                    internalAbsResources,
+                    internalPackage,
                     expectedSubmittedPatientIds,
                     measureIds,
                     scenarioConfig.StartDate,
@@ -727,15 +1099,32 @@ internal sealed class RunExecutor
                     manifest: generationManifest,
                     operationOutcomeExpectations: _operationOutcomeExpectations));
 
-            // The ABS manifest validator enriches the manifest with downstream-derived
-            // predictions that are not known at generation time — most notably the
-            // per-patient OperationOutcome count (one OO is appended to the ABS blob for
-            // every patient whose ReportingStatus is FailedValidation). Re-persist the
-            // snapshot so the Runs dashboard shows the final, fully-enriched predictions
-            // rather than the pre-validation snapshot taken at line ~506.
+            // The ABS manifest validator overwrites any generation-time OperationOutcome
+            // count from ReportEntry.ReportingStatus (one OO per FailedValidation patient
+            // when the writer flag is on). Re-persist the snapshot so the Runs dashboard
+            // shows the final, fully-enriched predictions rather than the pre-validation
+            // snapshot taken at line ~506.
             if (generationManifest != null)
             {
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+            }
+
+            if (isLiveSimulation)
+            {
+                await RunValidator("LIVE INCLUSION VALIDATION", () =>
+                {
+                    var diagnostics = _liveInjector.GetDiagnostics(state.RunId);
+                    if (diagnostics.InclusionPassed == false)
+                    {
+                        throw new InvalidOperationException(
+                            "Live report inclusion does not match the final report. " +
+                            $"Missing: [{string.Join(", ", diagnostics.MissingFromReport)}]. " +
+                            $"Unexpected: [{string.Join(", ", diagnostics.UnexpectedInReport)}].");
+                    }
+
+                    output.WriteLine("Live inclusion validation passed.");
+                    return Task.CompletedTask;
+                });
             }
 
             await RunValidator("REPORT DATABASE VALIDATION", () =>
@@ -770,46 +1159,68 @@ internal sealed class RunExecutor
             var normalizationSummaryMarker = "[NormalizationExecutionSummary]";
             var evidenceRequiredResourceTypes = normalizationResolution.Sequences
                 .SelectMany(s => s.Operations)
-                .Where(s => !string.Equals(s.Operation.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
                 .SelectMany(s => s.Operation.ResourceTypes)
-                .Concat(
-                    normalizationResolution.StandaloneOperations
-                        .Where(o => !string.Equals(o.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
-                        .SelectMany(o => o.ResourceTypes))
+                .Concat(normalizationResolution.StandaloneOperations.SelectMany(o => o.ResourceTypes))
                 .Where(rt => !string.IsNullOrWhiteSpace(rt))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
+            var acquiredResourceTypesForEvidence = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
 
-            async Task<List<string>> QueryNormalizationSummaryLogsAsync()
+            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback, CancellationToken queryToken)
             {
                 var logs = new List<string>();
+
+                // Each Loki call stamps its own end time. Refresh coverage here so a
+                // later resource type does not start after the run began.
+                TimeSpan LookbackForThisRequest() =>
+                    LokiEvidenceQuery.LookbackForRequest(
+                        lookback,
+                        LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
+
+                Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
+                    lokiScraper.QueryServiceLogsAsync(
+                        LokiScraper.Components.Normalization,
+                        normalizationSummaryMarker,
+                        LookbackForThisRequest(),
+                        additionalContainsFilters: filters,
+                        limit: limit,
+                        maxPages: maxPages,
+                        cancellationToken: queryToken);
 
                 if (evidenceRequiredResourceTypes.Count > 0)
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
-                        var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            scenarioConfig.LokiScrapeWindow,
-                            additionalContainsFilters: [.. runScopeFilters, resourceType],
-                            limit: 5000,
-                            maxPages: 20);
+                        queryToken.ThrowIfCancellationRequested();
+                        var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
+                        var logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 5000, maxPages: 20);
 
+                        if (logsForResourceType.Count == 0)
+                        {
+                            queryToken.ThrowIfCancellationRequested();
+                            output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
+                            logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 500, maxPages: 40);
+                        }
+
+                        output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
                         logs.AddRange(logsForResourceType);
+                    }
+
+                    if (logs.Count == 0)
+                    {
+                        output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
+                        queryToken.ThrowIfCancellationRequested();
+                        logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                     }
                 }
                 else
                 {
-                    logs = await lokiScraper.QueryServiceLogsAsync(
-                        LokiScraper.Components.Normalization,
-                        normalizationSummaryMarker,
-                        scenarioConfig.LokiScrapeWindow,
-                        additionalContainsFilters: runScopeFilters,
-                        limit: 5000,
-                        maxPages: 20);
+                    queryToken.ThrowIfCancellationRequested();
+                    logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                 }
 
                 return logs
@@ -817,21 +1228,101 @@ internal sealed class RunExecutor
                     .ToList();
             }
 
-            var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
-            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
+            async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
+            {
+                try
+                {
+                    await _orchestrator.WriteDomainAsync(
+                        state.RunId,
+                        NormalizationEvidenceSnapshot.Domain,
+                        RunHistorySlim.SlimNormalizationEvidence(evidence),
+                        ct);
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
+                    output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                }
+            }
 
-            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
-                normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
+            var hslocMapEnabled = runtimeNormalizationSequences.Any(s =>
+                string.Equals(s.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(s.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
+            var hslocSettleTimeout = hslocMapEnabled ? TimeSpan.FromSeconds(90) : TimeSpan.Zero;
 
-            await RunValidator("TENANT DATABASE VALIDATION", () =>
-                tenantValidator.ValidateAllAsync(facilityId, measureId));
+            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", async () =>
+            {
+                var deadline = hslocMapEnabled
+                    ? DateTimeOffset.UtcNow.Add(hslocSettleTimeout)
+                    : DateTimeOffset.UtcNow;
+                while (true)
+                {
+                    var normalizationSummaryLogs = await LokiEvidenceQuery.CollectWithRetryAsync(
+                        scenarioConfig.LokiScrapeWindow,
+                        evidenceRequiredResourceTypes,
+                        acquiredResourceTypesForEvidence,
+                        (lookback, queryToken) => QueryNormalizationSummaryLogsAsync(lookback, queryToken),
+                        (delay, ct) => Task.Delay(delay, ct),
+                        output,
+                        cancellationToken,
+                        coverageNow: () => LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
+                    output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
+
+                    var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
+                        normalizationResolution,
+                        runtimeNormalizationSequences,
+                        normalizationSummaryLogs);
+                    NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
+                    await PersistNormalizationEvidenceAsync(normalizationEvidence, cancellationToken);
+
+                    try
+                    {
+                        await normalizationSuiteApplicationValidator.ValidateAllAsync(
+                            internalPackage, normalizationResolution, normalizationSummaryLogs);
+                        return;
+                    }
+                    catch (InvalidOperationException ex) when (hslocMapEnabled && DateTimeOffset.UtcNow < deadline)
+                    {
+                        output.WriteLine($"[Normalization Suite] HSLOCMap Loki evidence not ready ({ex.Message}). Retrying scrape.");
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    }
+                }
+            });
+
+            await RunValidator("HSLOC MAPPING RUN VALIDATION", () =>
+                hslocMappingRunValidator.ValidateAllAsync(
+                    facilityId, hslocMapEnabled, patientIds, cancellationToken, hslocSettleTimeout));
+
+            if (state.Options.EnableDmrp)
+            {
+                await RunValidator("TENANT DATABASE VALIDATION", () =>
+                    tenantValidator.ValidateAllAsync(
+                        facilityId,
+                        expectedDaily: [],
+                        expectedWeekly: [],
+                        expectedMonthly: [measureId]));
+            }
+            else
+            {
+                await RunValidator("TENANT DATABASE VALIDATION", () =>
+                    tenantValidator.ValidateAllAsync(
+                        facilityId,
+                        measureId));
+            }
 
             await RunValidator("VALIDATION RESULTS (API)", () =>
-                validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
+                validationResultsValidator.ValidateAllAsync(
+                    facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow, cancellationToken));
+
+            validatorResults = validatorRunner.Results;
 
             // Thrown before cleanup, matching the previous behaviour of leaving a failed run's data in
             // place for inspection.
             validatorRunner.ThrowIfAnyFailed();
+
+            await QuiescePipelineAsync(state, output, cancellationToken);
 
             await RunCleanupHelper.CleanupAfterRunAsync(
                 scenarioConfig,
@@ -845,12 +1336,64 @@ internal sealed class RunExecutor
                 facilityId,
                 reportId);
 
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
-                throw new OperationCanceledException("Run was cancelled.");
+            lock (state.Sync)
+            {
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                    throw new OperationCanceledException("Run was cancelled.");
+            }
 
-            state.Status = AutomationRunStatus.Succeeded;
             state.FinishedAt = DateTimeOffset.UtcNow;
-            await _orchestrator.CompleteRunAsync(state.RunId);
+            AutomationRunMetricsDocument? metricsSnapshot = null;
+            if (MetricsCapturePolicy.ShouldCapture(state.Options.IsMetricsRun, validatorsPassed: true))
+            {
+                lock (state.Sync)
+                {
+                    if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                        throw new OperationCanceledException("Run was cancelled.");
+                    state.Status = AutomationRunStatus.CollectingMetrics;
+                }
+                await _orchestrator.CompleteRunAsync(state.RunId);
+                await callbacks.BroadcastStatus();
+                output.WriteLine("Collecting step timings… this can take about a minute.");
+                metricsSnapshot = await CaptureMetricsSnapshotAsync(
+                    state, validatorResults, generationManifest, generationDurationMs, cancellationToken);
+                lock (state.Sync)
+                {
+                    if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                        throw new OperationCanceledException("Run was cancelled.");
+                }
+            }
+            else
+            {
+                await _orchestrator.CompleteRunAsync(state.RunId);
+            }
+
+            if (state.Options.FailRunOnBenchmark
+                && metricsSnapshot?.Benchmark.Pass == false)
+            {
+                lock (state.Sync)
+                {
+                    if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                        throw new OperationCanceledException("Run was cancelled.");
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = "Missed the time budget or saved limits: " + string.Join("; ", metricsSnapshot.Benchmark.Violations);
+                }
+                metricsSnapshot.Outcome = state.Status.ToString();
+                var store = _hostServices.GetService<IRunMetricsStore>();
+                if (store != null)
+                    await store.UpsertAsync(metricsSnapshot, cancellationToken);
+                await callbacks.BroadcastStatus();
+                output.WriteLine($"Run failed: {state.Error}");
+                return;
+            }
+
+            lock (state.Sync)
+            {
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                    throw new OperationCanceledException("Run was cancelled.");
+                state.Status = AutomationRunStatus.Succeeded;
+                state.FinishedAt = DateTimeOffset.UtcNow;
+            }
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
         }
@@ -860,19 +1403,248 @@ internal sealed class RunExecutor
         }
         catch (Exception ex)
         {
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+            bool cancelledAfterFault;
+            lock (state.Sync)
+            {
+                cancelledAfterFault = state.CancelRequested || state.Status == AutomationRunStatus.Cancelled;
+                if (!cancelledAfterFault)
+                {
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = ex.Message;
+                    state.FinishedAt = DateTimeOffset.UtcNow;
+                }
+            }
+
+            if (cancelledAfterFault)
             {
                 _logger.LogInformation(ex, "Run {RunId} faulted after cancel request: {ExceptionType}", state.RunId, ex.GetType().Name);
                 return;
             }
 
             _logger.LogError(ex, "Run {RunId} failed", state.RunId);
-            state.Status = AutomationRunStatus.Failed;
-            state.Error = ex.Message;
-            state.FinishedAt = DateTimeOffset.UtcNow;
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
+            await QuiescePipelineAsync(state, output, CancellationToken.None);
+        }
+        finally
+        {
+            if (cleanupMockDmrpEntries &&
+                mockDmrpClientForCleanup != null &&
+                !string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
+            {
+                try
+                {
+                    await DeleteMockDmrpEntriesAsync(
+                        mockDmrpClientForCleanup,
+                        state.Options.NhsnOrganizationId,
+                        CancellationToken.None);
+
+                    output.WriteLine(
+                        $"MockDmrpApi enrollment cleanup complete for NHSN Organization ID " +
+                        $"'{state.Options.NhsnOrganizationId}'.");
+                }
+                catch (Exception ex)
+                {
+                    // Cleanup failure should not replace the actual run failure/result.
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to clean up MockDmrpApi entries for NHSN Organization ID {NhsnOrganizationId}",
+                        state.Options.NhsnOrganizationId);
+
+                    output.WriteLine(
+                        $"WARNING: MockDmrpApi cleanup failed for " +
+                        $"'{state.Options.NhsnOrganizationId}': {ex.Message}");
+                }
+            }
+
+            if (state.Options.IsLiveSimulation)
+                _liveInjector.CloseSession(state.RunId);
+
+            runServices?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The facility's mock entries for one period, as the run summary records them.
+    /// </summary>
+    private static async Task<IEnumerable<object>> ReadMockDmrpEntriesAsync(IMockDmrpServiceClient client,
+                                                                          string facilityId,
+                                                                          int month,
+                                                                          int year,
+                                                                          CancellationToken cancellationToken)
+    {
+        var page = await client.SearchEntriesAsync(facilityId: facilityId,
+                                                   reportingMonth: month,
+                                                   reportingYear: year,
+                                                   pageSize: 100,
+                                                   cancellationToken: cancellationToken);
+
+        if (!page.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to read MockDmrpApi entries for '{facilityId}' for {month}/{year}. " +
+                $"HTTP {page.StatusCode}. Response: {page.RawBody}");
+        }
+
+        return (page.Body?.Records ?? [])
+            .Select(e => (object)new
+            {
+                e.Id,
+                e.FacilityId,
+                e.Component,
+                e.Measure,
+                e.ReportingMonth,
+                e.ReportingYear,
+                e.IsReporting
+            })
+            .ToList();
+    }
+
+    private static async Task DeleteMockDmrpEntriesAsync(IMockDmrpServiceClient client,
+                                                         string nhsnOrganizationId,
+                                                         CancellationToken cancellationToken)
+    {
+        var deleted = await client.DeleteEntriesForFacilityAsync(nhsnOrganizationId, cancellationToken);
+
+        if (!deleted.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clean up MockDmrpApi entries for NHSN organization " +
+                $"'{nhsnOrganizationId}'. HTTP {deleted.StatusCode}. Response: {deleted.RawBody}");
+        }
+    }
+
+    private async Task QuiescePipelineAsync(MutableRunState state, IAutomationOutput output, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(state.FacilityId))
+            return;
+
+        try
+        {
+            var leftoverCleanup = _hostServices.GetService<LeftoverRunCleanupService>();
+            if (leftoverCleanup == null)
+                return;
+
+            output.WriteLine($"Aborting in-flight pipeline work for facility '{state.FacilityId}'.");
+            await leftoverCleanup.QuiesceFacilityAsync(
+                state.FacilityId,
+                state.ReportId,
+                cancellationToken,
+                deactivateSchedules: false);
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Warning: pipeline quiesce failed: {ex.Message}");
+            _logger.LogWarning(ex, "Pipeline quiesce failed for run {RunId} facility {FacilityId}.", state.RunId, state.FacilityId.SanitizeForLog());
+        }
+    }
+
+    internal static IReadOnlyList<string> PatientShapeKeys(ResolvedRunOptions options) =>
+        options.PatientCohorts.Select(c => string.Join(':',
+            c.PatientConfigurationId?.ToString("N") ?? "",
+            c.ScheduledInpatientPattern?.ToString() ?? "",
+            c.Intent?.EncounterClass ?? "",
+            c.Intent?.DurationMinutes?.ToString() ?? "",
+            c.Intent?.IncludeHypoglycemicInsulin?.ToString() ?? "",
+            c.Intent?.PrimaryConditionSnomed ?? "",
+            c.PatientCount.ToString())).ToList();
+
+    private async Task<AutomationRunMetricsDocument?> CaptureMetricsSnapshotAsync(
+        MutableRunState state,
+        IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults,
+        GenerationManifest? generationManifest,
+        long generationDurationMs,
+        CancellationToken cancellationToken)
+    {
+        if (!state.Options.IsMetricsRun)
+            return null;
+
+        try
+        {
+            var service = _hostServices.GetService<IRunMetricsSnapshotService>();
+            if (service == null)
+                return null;
+
+            var manifest = generationManifest?.ToSnapshot();
+            var patientCount = manifest?.PatientCount
+                ?? state.Options.PatientProfiles.Count
+                    + state.Options.ImportedPatientIds.Count
+                    + state.Options.ImportedPatientBundles.Count;
+            if (patientCount <= 0)
+                patientCount = state.Options.PatientCount;
+
+            var resourcesMin = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMin ?? state.Options.ResourcesPerPatient;
+            var resourcesMax = state.Options.PatientCohorts.FirstOrDefault()?.ResourcesPerPatientMax ?? state.Options.ResourcesPerPatient;
+
+            DateTime? reportCreatedAt = null;
+            DateTime? submittedAt = null;
+            try
+            {
+                var schedule = await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(
+                    state.RunId, "schedule", cancellationToken);
+                reportCreatedAt = schedule?.Data?.CreateDate;
+                submittedAt = schedule?.Data?.SubmitReportDateTime;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not read report schedule timestamps for metrics run {RunId}", state.RunId);
+            }
+
+            return await service.CaptureAsync(
+                new RunMetricsCaptureInput(
+                    state.RunId,
+                    state.ScenarioId,
+                    state.RunNameOverride ?? state.Scenario.ToString(),
+                    state.Options.BenchmarkKey,
+                    state.Options.IsMetricsRun,
+                    AutomationRunStatus.Succeeded.ToString(),
+                    state.FacilityId ?? state.RunId.ToString(),
+                    state.ReportId ?? string.Empty,
+                    state.StartedAt ?? state.CreatedAt,
+                    state.FinishedAt ?? DateTimeOffset.UtcNow,
+                    state.Options.Seed,
+                    patientCount,
+                    resourcesMin,
+                    resourcesMax,
+                    manifest?.TotalResourceCount ?? 0,
+                    validatorResults,
+                    state.Options.TargetDurationSeconds,
+                    state.Options.Concurrency,
+                    state.Options.SelectedMeasures.Select(m => m.ToString()).ToList(),
+                    state.Options.QueryPlanTemplateId,
+                    state.Options.NormalizationSuiteId,
+                    generationDurationMs,
+                    reportCreatedAt,
+                    submittedAt,
+                    state.Options.SelectedMeasureIds.Select(id => id.ToString("N")).ToList(),
+                    state.Options.MeasureBundleJsons,
+                    PatientShapeKeys(state.Options)),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist metrics snapshot for run {RunId}", state.RunId);
+            return null;
+        }
+    }
+
+    private static void MergeLiveManifestPatients(
+        GenerationManifest? generationManifest,
+        List<string> patientIds,
+        TestScenarioConfig scenarioConfig)
+    {
+        if (generationManifest == null)
+            return;
+
+        foreach (var id in generationManifest.PatientIds)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+            if (!patientIds.Contains(id, StringComparer.Ordinal))
+                patientIds.Add(id);
+            if (!scenarioConfig.PatientIds.Contains(id, StringComparer.Ordinal))
+                scenarioConfig.PatientIds.Add(id);
         }
     }
 
@@ -893,6 +1665,96 @@ internal sealed class RunExecutor
         }
 
         return expected;
+    }
+
+    internal static FhirGenerationPipeline.AcquisitionSimulationConfig CreateAcquisitionSimulationConfig(
+        QueryPlanInput effectiveQueryPlan,
+        string clinicalPeriodStart,
+        string clinicalPeriodEnd,
+        OrganizationResourceMapTemplate? organizationResourceMapTemplate)
+    {
+        return new FhirGenerationPipeline.AcquisitionSimulationConfig
+        {
+            QueryPlan = effectiveQueryPlan,
+            ClinicalPeriodStart = clinicalPeriodStart,
+            ClinicalPeriodEnd = clinicalPeriodEnd,
+            OrganizationLocationConditionFhirPaths = organizationResourceMapTemplate?.Conditions
+                ?.Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                .OrderBy(c => c.Priority)
+                .Select(c => NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath))
+                .ToList(),
+            // Keep simulation strict for date-filtered resources. Encounter-anchored
+            // out-of-range override can over-predict scheduled ABS content for
+            // Observation/DiagnosticReport/Procedure, causing false expected-key
+            // assertions (e.g. Observation-001 / DxRpt-042 class mismatches).
+            // We still allow encounter anchoring when a resource has no recognized
+            // date shape (handled inside the simulator), but not when its recognized
+            // date is outside the reporting window.
+            AllowEncounterAnchoredDateOverrideForOutOfRange = false
+        };
+    }
+
+    internal static GenerationPipelineRequest BuildProfileGenerationRequest(
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures,
+        IReadOnlyList<PatientProfile> profiles,
+        IReadOnlyList<ImportedPatientInput> importedPatients,
+        IGeneratedPatientTemplateCache generatedTemplateCache)
+    {
+        return new GenerationPipelineRequest(
+            SelectedMeasures: selectedMeasures,
+            Profiles: profiles,
+            ImportedPatients: importedPatients.Count > 0 ? importedPatients : null,
+            GeneratedTemplateCache: generatedTemplateCache);
+    }
+
+    internal static GenerationPipelineRequest BuildNonProfileGenerationRequest(
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures,
+        int patientCount,
+        int resourcesPerPatient,
+        int seed,
+        IGeneratedPatientTemplateCache? generatedTemplateCache = null)
+    {
+        var syntheticCohorts = new List<PatientCohortDefinition>
+        {
+            PatientCohortDefinition.AllQualifying(
+                selectedMeasures,
+                patientCount: patientCount,
+                resourcesMin: resourcesPerPatient,
+                resourcesMax: resourcesPerPatient)
+        };
+
+        var syntheticProfiles = PatientCohortDefinition.ExpandProfiles(syntheticCohorts, seed);
+
+        return new GenerationPipelineRequest(
+            SelectedMeasures: selectedMeasures,
+            Profiles: syntheticProfiles,
+            ImportedPatients: null,
+            GeneratedTemplateCache: generatedTemplateCache);
+    }
+
+    private async Task BindGeneratedTemplateCacheAsync(
+        MutableRunState state,
+        IReadOnlyList<string> generatedTemplateKeys,
+        IAutomationOutput output)
+    {
+        var cacheBinding = await _generatedTemplateVersionStore.BindRunAsync(
+            state.RunId,
+            state.ScenarioId,
+            state.RunNameOverride,
+            generatedTemplateKeys,
+            state.RunCancellation.Token);
+        if (cacheBinding == null)
+            return;
+
+        lock (state.Sync)
+        {
+            state.GeneratedTemplateCacheVersionId = cacheBinding.VersionId;
+            state.GeneratedTemplateCacheVersionNumber = cacheBinding.VersionNumber;
+            state.GeneratedTemplateCacheScenarioKey = cacheBinding.ScenarioKey;
+            state.GeneratedTemplateSetHash = cacheBinding.TemplateSetHash;
+        }
+
+        output.WriteLine($"[cache-version] Bound run to {cacheBinding.ScenarioKey} v{cacheBinding.VersionNumber} ({cacheBinding.VersionId}).");
     }
 
     private static IReadOnlyList<PatientProfile> AlignProfilesToPatientIds(
@@ -947,7 +1809,16 @@ internal sealed class RunExecutor
         IReadOnlyList<PatientProfile> profiles,
         CancellationToken cancellationToken)
     {
-        var window = DeriveScheduledReportWindow(scenarioConfig);
+        var scheduled = await StartAndReconcileScheduledReportAsync(
+            reportHelper,
+            output,
+            facilityId,
+            measureIds,
+            selectedMeasures,
+            scenarioConfig,
+            cancellationToken);
+
+        var reportTrackingId = scheduled.ReportTrackingId;
 
         // Resolve each patient's census behavior from its scheduled inpatient pattern.
         // ScheduledInpatientPattern.GetCensusBehavior() is the single source of truth shared
@@ -992,35 +1863,9 @@ internal sealed class RunExecutor
                 remainInpatient.Add(patientIds[i]);
         }
 
-        var scheduleFrequency = selectedMeasures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
-            ? Frequency.Monthly
-            : Frequency.Daily;
-
-        var reportTrackingId = await reportHelper.StartScheduledReportAsync(
-            facilityId,
-            measureIds,
-            window.Start,
-            window.Duration,
-            scheduleFrequency,
-            reportTrackingId: Guid.NewGuid().ToString());
-
         output.WriteLine(
             $"Scheduled inpatient patterns resolved: admit-in-period={admitDuringWindow.Count}, " +
             $"remain-inpatient={remainInpatient.Count}, discharge-in-period={dischargeDuringWindow.Count}.");
-
-        // The ReportScheduled event is processed asynchronously, so the schedule record is not
-        // committed the instant StartScheduledReportAsync returns. Block until Report has persisted
-        // it: otherwise the admit snapshot below produces PatientEvents that reach Report's
-        // PatientEventListener before the schedule exists, throwing "No Scheduled Reports found".
-        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
-
-        // Reconcile to persisted report-period dates (single source of truth). This keeps
-        // validators aligned with real schedule boundaries even when the scheduler/broker path
-        // normalizes or computes end-date differently than the original request payload.
-        var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
-        var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
-        scenarioConfig.StartDate = ToZulu(new DateTimeOffset(persistedStartUtc));
-        scenarioConfig.EndDate = ToZulu(new DateTimeOffset(persistedEndUtc));
 
         // --- Census snapshot 1: admit every in-period patient. ---
         // Each admit produces a PatientEvent that the Report service turns into a
@@ -1059,7 +1904,179 @@ internal sealed class RunExecutor
         if (remainInpatient.Count > 0)
             output.WriteLine($"{remainInpatient.Count} patient(s) remain inpatient; they will be acquired by the end-of-report-period job.");
 
+        return new ScheduledWorkflowState(reportTrackingId, scheduled.Frequency);
+    }
+
+    private static async Task<ScheduledWorkflowState> StartAndReconcileScheduledReportAsync(
+        ReportApiHelper reportHelper,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures,
+        TestScenarioConfig scenarioConfig,
+        CancellationToken cancellationToken)
+    {
+        var window = DeriveScheduledReportWindow(scenarioConfig);
+        var scheduleFrequency = selectedMeasures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            ? Frequency.Monthly
+            : Frequency.Daily;
+
+        var reportTrackingId = await reportHelper.StartScheduledReportAsync(
+            facilityId,
+            measureIds,
+            window.Start,
+            window.Duration,
+            scheduleFrequency,
+            reportTrackingId: Guid.NewGuid().ToString(),
+            isMetricsRun: scenarioConfig.IsMetricsRun);
+
+        // The ReportScheduled event is processed asynchronously, so the schedule record is not
+        // committed the instant StartScheduledReportAsync returns. Block until Report has persisted
+        // it: otherwise census PatientEvents can reach Report before the schedule exists.
+        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
+
+        var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
+        var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
+        scenarioConfig.StartDate = ToZulu(new DateTimeOffset(persistedStartUtc));
+        scenarioConfig.EndDate = ToZulu(new DateTimeOffset(persistedEndUtc));
+
         return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
+    }
+
+    private async Task<ScheduledWorkflowState> ExecuteLiveScheduledReportWorkflowAsync(
+        MutableRunState state,
+        ExecutorCallbacks callbacks,
+        ReportApiHelper reportHelper,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        TestScenarioConfig scenarioConfig,
+        IReadOnlyList<string> patientIds,
+        IReadOnlyList<PatientProfile>? profiles,
+        GenerationManifest? generationManifest,
+        FhirDataLoader fhirDataLoader,
+        FhirGenerationConfig? generationConfig,
+        GenerationRequirementsPlan? generationRequirementsPlan,
+        FhirGenerationPipeline.AcquisitionSimulationConfig? acquisitionSimulation,
+        CancellationToken cancellationToken)
+    {
+        var scheduled = await StartAndReconcileScheduledReportAsync(
+            reportHelper,
+            output,
+            facilityId,
+            measureIds,
+            state.Options.SelectedMeasures,
+            scenarioConfig,
+            cancellationToken);
+        var reportTrackingId = scheduled.ReportTrackingId;
+
+        var minutes = StartScenarioRequestResolver.NormalizeReportingWindowMinutes(state.Options.ReportingWindowMinutes);
+        var windowStart = DateTimeOffset.UtcNow;
+        var windowEnd = windowStart.AddMinutes(minutes);
+        var automaticDischargeAt = LiveExpectedStateTracker.ComputeAutomaticDischargeAtUtc(windowStart, windowEnd);
+        lock (state.Sync)
+        {
+            state.ReportId = reportTrackingId;
+            state.LiveWindowStartUtc = windowStart;
+            state.LiveWindowEndUtc = windowEnd;
+        }
+
+        var importedIds = state.Options.ImportedPatientIds
+            .Concat(state.Options.ImportedPatientBundles)
+            .Select(p => p.PatientId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        var expectedFromManifest = generationManifest?.ExpectedSubmittedPatientIds()
+            .ToHashSet(StringComparer.Ordinal);
+        var seeds = LivePatientPoolBuilder.Build(patientIds, profiles, importedIds, expectedFromManifest);
+        var censusPublisher = new LiveCensusPublisher(reportHelper, facilityId, reportTrackingId, output);
+        var liveShape = (profiles ?? []).FirstOrDefault(p => p.IsExpectedToBeSubmitted(state.Options.SelectedMeasures))
+            ?? (profiles ?? []).FirstOrDefault();
+        ILivePatientProvisioner? patientProvisioner = generationManifest == null
+            ? null
+            : new LivePatientProvisioner(
+                state.RunId,
+                output,
+                fhirDataLoader,
+                generationManifest,
+                state.Options.SelectedMeasures,
+                state.Options.ResourcesPerPatient,
+                state.Options.Seed,
+                generationConfig,
+                generationRequirementsPlan,
+                acquisitionSimulation,
+                _snapshotStore,
+                _generatedTemplateCache,
+                liveShape,
+                state.Options.MeasureBundleJsons,
+                _orchestrator);
+        _liveInjector.OpenSession(
+            state.RunId,
+            windowStart,
+            windowEnd,
+            generatedPatientIds: patientIds,
+            censusPublisher: censusPublisher,
+            poolSeeds: seeds,
+            patientProvisioner: patientProvisioner);
+
+        output.WriteLine(
+            $"Live pool: {seeds.Count} patient(s), {seeds.Count(s => s.Origin == LivePatientOrigin.Import)} imported, {seeds.Count(s => s.ExpectedInReport == true)} expected in report.");
+        var autoAdmits = await _liveInjector.ApplyAutomaticAdmitsAsync(state.RunId, cancellationToken);
+
+        state.Status = AutomationRunStatus.LiveWindowOpen;
+        await callbacks.BroadcastStatus();
+        output.WriteLine(
+            $"Live window open until {windowEnd:u}. Auto-admitted {autoAdmits.Count} patient(s). Optional Admit/Discharge/Generate/Upload/Reference until the window closes. Auto-discharges at {automaticDischargeAt:u}.");
+
+        var remainingToDischarge = automaticDischargeAt - DateTimeOffset.UtcNow;
+        if (remainingToDischarge > TimeSpan.Zero)
+            await Task.Delay(remainingToDischarge, cancellationToken);
+
+        var autoDischarges = await _liveInjector.ApplyAutomaticDischargesAsync(state.RunId, cancellationToken);
+        output.WriteLine($"Automatic pattern discharges applied: {autoDischarges.Count}.");
+
+        var remaining = windowEnd - DateTimeOffset.UtcNow;
+        if (remaining > TimeSpan.Zero)
+            await Task.Delay(remaining, cancellationToken);
+
+        await _liveInjector.NotifyWindowClosingAsync(state.RunId, windowEnd, cancellationToken);
+        await _liveInjector.FreezeAsync(state.RunId, cancellationToken);
+
+        var expected = _liveInjector.GetState(state.RunId).ExpectedPopulation.ToList();
+        lock (state.Sync)
+        {
+            state.LiveExpectedPopulation = expected;
+            state.Status = AutomationRunStatus.ReportFinalization;
+        }
+
+        await callbacks.BroadcastStatus();
+        output.WriteLine(
+            $"Live window closed. Report inclusion expected={expected.Count} (admitted and predictor-qualifying). Finalizing report.");
+
+        return new ScheduledWorkflowState(reportTrackingId, scheduled.Frequency);
+    }
+
+    private sealed class LiveCensusPublisher(
+        ReportApiHelper reportHelper,
+        string facilityId,
+        string reportTrackingId,
+        IAutomationOutput output) : ILiveCensusPublisher
+    {
+        public async Task PublishAsync(PatientEventType eventType, string patientId, CancellationToken cancellationToken)
+        {
+            if (eventType is not (PatientEventType.Admit or PatientEventType.Discharge))
+                return;
+
+            output.WriteLine($"Live census {eventType} — {patientId}");
+            await reportHelper.PublishPatientListAcquiredAsync(
+                facilityId,
+                reportTrackingId,
+                admitPatientIds: eventType == PatientEventType.Admit ? [patientId] : null,
+                dischargePatientIds: eventType == PatientEventType.Discharge ? [patientId] : null);
+        }
     }
 
     private static async Task WriteOrganizationLocationMappingStatusAsync(
@@ -1132,7 +2149,7 @@ internal sealed class RunExecutor
     {
         if (template == null)
         {
-            output.WriteLine($"No Organization Resource Map template resolved for facility '{facilityId}'. Skipping org-location configuration create.");
+            await ClearOrganizationLocationConfigurationsAsync(dataAcqClient, output, facilityId, cancellationToken);
             return;
         }
 
@@ -1149,11 +2166,11 @@ internal sealed class RunExecutor
         if (conditions.Count == 0)
             throw new InvalidOperationException($"Organization resource map template '{template.Name}' has no valid conditions.");
 
-        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
-        if (existing.IsSuccessStatusCode && existing.Body != null)
+        var existing = await ReadOrganizationLocationConfigurationsAsync(dataAcqClient, facilityId, cancellationToken);
+        if (existing.Count > 0)
         {
             var normalizedTemplate = string.Join("\n", conditions.Select(c => $"{c.Priority}:{c.FhirPath}"));
-            var hasMatchingActive = existing.Body.Any(cfg =>
+            var hasMatchingActive = existing.Any(cfg =>
                 cfg.IsActive
                 && string.Join("\n", cfg.Conditions.OrderBy(c => c.Priority).Select(c => $"{c.Priority}:{c.FhirPath}")) == normalizedTemplate);
 
@@ -1162,6 +2179,8 @@ internal sealed class RunExecutor
                 output.WriteLine($"Org-location configuration for facility '{facilityId}' already matches template '{template.Name}'. Skipping create.");
                 return;
             }
+
+            await ClearOrganizationLocationConfigurationsAsync(dataAcqClient, output, facilityId, cancellationToken);
         }
 
         var create = await dataAcqClient.CreateOrganizationLocationConfigurationAsync(
@@ -1181,6 +2200,48 @@ internal sealed class RunExecutor
         output.WriteLine($"Ensured org-location configuration for facility '{facilityId}' from template '{template.Name}'.");
     }
 
+    private static async Task ClearOrganizationLocationConfigurationsAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await ReadOrganizationLocationConfigurationsAsync(dataAcqClient, facilityId, cancellationToken);
+        if (existing.Count == 0)
+        {
+            output.WriteLine($"No organization location configuration to clear for facility '{facilityId}'.");
+            return;
+        }
+
+        var deleted = await dataAcqClient.DeleteOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (!deleted.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clear organization location configuration for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine($"Cleared {existing.Count} organization location configuration(s) for facility '{facilityId}'.");
+    }
+
+    /// <summary>
+    /// A failed read is not an empty configuration. Treating it as empty leaves the previous
+    /// mapping in place while the run applies a different template.
+    /// </summary>
+    private static async Task<List<OrganizationLocationConfigurationApiModel>> ReadOrganizationLocationConfigurationsAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (!existing.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to read organization location configuration for facility '{facilityId}'. HTTP {existing.StatusCode}: {existing.RawBody ?? "(no body)"}");
+        }
+
+        return existing.Body ?? [];
+    }
+
     private static string NormalizeOrgLocationFhirPathForDataAcquisition(string fhirPath)
     {
         var path = (fhirPath ?? string.Empty).Trim();
@@ -1188,6 +2249,29 @@ internal sealed class RunExecutor
             return path["Location.".Length..];
 
         return path;
+    }
+
+    /// <summary>
+    /// Maps stored operator names to the Normalization API <c>ConditionOperator</c> numeric values.
+    /// The API deserializes this as an enum and rejects the string "Equal".
+    /// </summary>
+    private static int ToConditionOperatorValue(string? operatorName)
+    {
+        if (int.TryParse(operatorName, out var numeric))
+            return numeric;
+
+        return operatorName?.Trim().ToLowerInvariant() switch
+        {
+            "equal" => 0,
+            "greaterthan" => 1,
+            "greaterthanorequal" => 2,
+            "lessthan" => 3,
+            "lessthanorequal" => 4,
+            "notequal" => 5,
+            "exists" => 6,
+            "notexists" => 7,
+            _ => 0
+        };
     }
 
     private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)
@@ -1226,10 +2310,19 @@ internal sealed class RunExecutor
 
         services.AddTransient<ValidationApiHelper>();
         services.AddTransient<ReportApiHelper>();
+        services.AddMockDmrpServiceClient(sp =>
+        {
+            var url = sp.GetRequiredService<IOptions<ServiceRegistry>>().Value.MockDmrpApiUrl;
+
+            return string.IsNullOrWhiteSpace(url)
+                ? throw new InvalidOperationException("ServiceRegistry:MockDmrpApiUrl is not configured.")
+                : url;
+        });
         services.AddTransient<ReportDatabaseValidator>();
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();
         services.AddTransient<NormalizationDatabaseValidator>();
+        services.AddTransient<HslocMappingRunValidator>();
         services.AddTransient<TenantDatabaseValidator>();
         services.AddTransient<ValidationResultsValidator>();
         services.AddTransient<PipelineSnapshot>();
@@ -1334,19 +2427,80 @@ internal sealed class RunExecutor
         return plan;
     }
 
+    private static void ValidateDmrpScenario(ResolvedRunOptions options)
+    {
+        if (options.ReportMethod != ReportMethod.ScheduledReport)
+        {
+            throw new InvalidOperationException(
+                "DMRP enrollment is currently supported only for scheduled report scenarios.");
+        }
+
+        if (options.SelectedMeasures.Count != 1 ||
+            options.SelectedMeasures[0] !=
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+        {
+            throw new InvalidOperationException(
+                "DMRP enrollment is currently supported only for the ACH Monthly measure.");
+        }
+    }
+
+    private static async Task ValidateDmrpConfigurationAsync(
+        bool enableDmrp,
+        IDmrpServiceClient dmrpClient,
+        IAutomationOutput output)
+    {
+        var tenantDmrpEnabled = await IsTenantDmrpEnabledAsync(dmrpClient);
+
+        if (enableDmrp && !tenantDmrpEnabled)
+        {
+            throw new InvalidOperationException(
+                "DMRP is enabled for this Automation scenario, but DMRP is disabled in Tenant.");
+        }
+
+        output.WriteLine(
+            $"DMRP configuration validated: scenario={(enableDmrp ? "enabled" : "disabled")}, " +
+            $"Tenant={(tenantDmrpEnabled ? "enabled" : "disabled")}.");
+    }
+
+    private static async Task<bool> IsTenantDmrpEnabledAsync(
+        IDmrpServiceClient dmrpClient)
+    {
+        var response = await dmrpClient.SearchFacilityReportingPlansAsync(pageSize: 1);
+
+        // When Tenant DMRP is disabled, the DMRP routes are not registered.
+        if ((int)response.StatusCode == StatusCodes.Status404NotFound)
+            return false;
+
+        // Anything other than success or the expected disabled-route 404 is a real
+        // connectivity/auth/service problem and must not be treated as "disabled".
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Unable to determine Tenant DMRP configuration. " +
+                $"DMRP reporting-plan probe returned HTTP {(int)response.StatusCode}.");
+        }
+
+        return true;
+    }
+
+    private sealed record NormalizationFacilitySetup(
+        NormalizationSuiteResolution Resolution,
+        List<NormalizationRuntimeSequenceStep> RuntimeSequences);
+
     /// <summary>
     /// Resolves the normalization suite and creates the appropriate operations and sequences
     /// via the Normalization API for the given facility. Replaces the legacy
     /// <c>FacilitySetupHelper.EnsureNormalizationConfigAsync</c> which only created a single
     /// hard-coded CopyProperty operation.
     /// </summary>
-    private async Task<NormalizationSuiteResolution> EnsureNormalizationFromSuiteAsync(
+    private async Task<NormalizationFacilitySetup> EnsureNormalizationFromSuiteAsync(
         INormalizationServiceClient normalizationClient,
         IAutomationOutput output,
         string facilityId,
         Guid? suiteId,
         CancellationToken cancellationToken,
-        NormalizationSuiteResolution? preResolved = null)
+        NormalizationSuiteResolution? preResolved = null,
+        IReadOnlyList<string>? generatedPatientIds = null)
     {
         static string[] GetPlannedResourceTypes(NormalizationOperationDefinition planned)
             => planned.ResourceTypes
@@ -1354,15 +2508,6 @@ internal sealed class RunExecutor
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-
-        static List<NormalizationOperationApiModel> BuildKeyedOperationPool(
-            List<NormalizationOperationApiModel> operations,
-            string name,
-            string operationType)
-            => operations
-                .Where(op => string.Equals(op.Name ?? string.Empty, name, StringComparison.Ordinal)
-                             && string.Equals(op.OperationType ?? string.Empty, operationType, StringComparison.Ordinal))
-                .ToList();
 
         static bool TryTakeMatchingOperation(
             List<NormalizationOperationApiModel> candidates,
@@ -1424,14 +2569,38 @@ internal sealed class RunExecutor
 
         output.WriteLine($"Using normalization suite: {resolution.SuiteName} ({resolution.Operations.Count} operation(s))");
 
+        var runtimeSequences = new List<NormalizationRuntimeSequenceStep>();
         if (resolution.Operations.Count == 0)
         {
-            output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
-            return resolution;
+            if (existingOperations.Count > 0)
+            {
+                var deletedOps = await normalizationClient.DeleteFacilityOperationsAsync(facilityId, cancellationToken);
+                if (!IsSuccessOrMissing(deletedOps))
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to clear normalization operations for facility '{facilityId}'. HTTP {deletedOps.StatusCode}: {deletedOps.RawBody ?? "(no body)"}");
+                }
+            }
+
+            // Deleting the operations already removes their sequences, so this delete is often a 404.
+            // A facility can also have sequences and no operations. Either way, nothing left is success.
+            var deletedSequences = await normalizationClient.DeleteOperationSequencesAsync(facilityId, cancellationToken: cancellationToken);
+            if (!IsSuccessOrMissing(deletedSequences))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to clear normalization sequences for facility '{facilityId}'. HTTP {deletedSequences.StatusCode}: {deletedSequences.RawBody ?? "(no body)"}");
+            }
+
+            if (existingOperations.Count == 0 && deletedSequences.StatusCode == 404)
+                output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            else
+                output.WriteLine($"Cleared normalization configuration for facility '{facilityId}' because the suite has none.");
+
+            return new NormalizationFacilitySetup(resolution, runtimeSequences);
         }
 
         // Track sequence intent in suite order; operation IDs are resolved after reconciliation.
-        var createdOpsByResourceType = new Dictionary<string, List<(Guid OpId, int Order)>>(StringComparer.OrdinalIgnoreCase);
+        var createdOpsByResourceType = new Dictionary<string, List<(Guid OpId, int Order, string Name, string Type)>>(StringComparer.OrdinalIgnoreCase);
 
         var existingPoolByKey = existingOperations
             .GroupBy(op => (op.Name ?? string.Empty, op.OperationType ?? string.Empty), EqualityComparer<(string Name, string Type)>.Default)
@@ -1451,8 +2620,8 @@ internal sealed class RunExecutor
 
             var apiOp = new CreateNormalizationOperationDetailsApiModel
             {
-                OperationType = opDef.OperationType,
-                Name = opDef.Name,
+                OperationType = opDef.OperationType ?? string.Empty,
+                Name = opDef.Name ?? string.Empty,
                 Description = opDef.Description ?? string.Empty,
                 SourceFhirPath = opDef.SourceFhirPath ?? string.Empty,
                 TargetFhirPath = opDef.TargetFhirPath ?? string.Empty
@@ -1467,13 +2636,19 @@ internal sealed class RunExecutor
                     apiOp.Conditions = opDef.Conditions.Select(c => new CreateNormalizationConditionApiModel
                     {
                         FhirPathSource = c.FhirPathSource,
-                        Operator = c.Operator,
+                        Operator = ToConditionOperatorValue(c.Operator),
                         Value = c.Value
                     }).ToList();
                     break;
                 case "CodeMap":
-                    apiOp.FhirPath = opDef.CodeMapFhirPath;
-                    apiOp.CodeSystemMaps = opDef.CodeSystemMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
+                case "HSLOCMap":
+                    var codeMaps = string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase)
+                        ? HslocAutomationMaps.Merge(opDef.CodeSystemMaps, generatedPatientIds)
+                        : opDef.CodeSystemMaps;
+                    apiOp.FhirPath = string.IsNullOrWhiteSpace(opDef.CodeMapFhirPath)
+                        ? (string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase) ? "type" : opDef.CodeMapFhirPath)
+                        : opDef.CodeMapFhirPath;
+                    apiOp.CodeSystemMaps = codeMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
                     {
                         SourceSystem = csm.SourceSystem,
                         TargetSystem = csm.TargetSystem,
@@ -1481,9 +2656,22 @@ internal sealed class RunExecutor
                             kvp => kvp.Key,
                             kvp => new CreateNormalizationCodeMapEntryApiModel { Code = kvp.Value.Code, Display = kvp.Value.Display })
                     }).ToList();
+                    if (string.Equals(opDef.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase)
+                        && (apiOp.CodeSystemMaps.Count == 0 || apiOp.CodeSystemMaps.All(m => m.CodeMaps.Count == 0)))
+                    {
+                        throw new InvalidOperationException(
+                            $"HSLOCMap operation '{opDef.Name}' has no CodeSystemMaps. Mapping cannot run.");
+                    }
                     break;
                 case "RemoveExtensions":
-                    apiOp.ExtensionUrls = opDef.ExtensionUrls;
+                    apiOp.ExtensionUrls = [.. (opDef.ExtensionUrls ?? [])
+                        .Select(u => u?.Trim() ?? "")
+                        .Where(u => Uri.TryCreate(u, UriKind.Absolute, out _))];
+                    if (apiOp.ExtensionUrls.Count == 0)
+                    {
+                        output.WriteLine($"  Skipping '{opDef.Name}' (RemoveExtensions): no absolute extension URLs remain after filtering.");
+                        continue;
+                    }
                     break;
                 case "CopyLocationAliasToTypeIteratively":
                     apiOp.MaxIterations = opDef.MaxIterations;
@@ -1497,16 +2685,29 @@ internal sealed class RunExecutor
                 FacilityId = facilityId,
                 Operation = apiOp,
                 Description = opDef.Description ?? string.Empty,
-                VendorIds = []
+                VendorVersionIds = []
             }, cancellationToken);
 
             if (!createResp.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {(int)createResp.StatusCode}");
+                var detail = string.IsNullOrWhiteSpace(createResp.RawBody) ? "" : $": {createResp.RawBody}";
+                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {(int)createResp.StatusCode}{detail}");
             }
 
             output.WriteLine($"  Created operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", opDef.ResourceTypes)}]");
 
+        }
+
+        foreach (var leftover in existingPoolByKey.SelectMany(pair => pair.Value))
+        {
+            var deleted = await normalizationClient.DeleteFacilityOperationAsync(facilityId, leftover.Id, cancellationToken);
+            if (!IsSuccessOrMissing(deleted))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to remove normalization operation '{leftover.Name}' ({leftover.OperationType}) for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+            }
+
+            output.WriteLine($"  Removed operation that is not in suite '{resolution.SuiteName}': {leftover.Name} ({leftover.OperationType})");
         }
 
         // Create sequences per resource type.
@@ -1542,14 +2743,16 @@ internal sealed class RunExecutor
                         createdOpsByResourceType[resourceType] = mapped;
                     }
 
-                    mapped.Add((matched.Id, i + 1));
+                    mapped.Add((matched.Id, i + 1, planned.Name ?? string.Empty, planned.OperationType ?? string.Empty));
                 }
             }
 
+            // Per-resource-type 1..N numbering must stay aligned with
+            // NormalizationRuntimeSequencePlanner (suite sequences, then standalone).
             foreach (var (resourceType, ops) in createdOpsByResourceType)
             {
-                var sequences = ops
-                    .OrderBy(o => o.Order)
+                var ordered = ops.OrderBy(o => o.Order).ToList();
+                var sequences = ordered
                     .Select((o, idx) => new CreateNormalizationOperationSequenceApiModel
                     {
                         OperationId = o.OpId,
@@ -1559,12 +2762,32 @@ internal sealed class RunExecutor
 
                 var seqResp = await normalizationClient.CreateOperationSequencesAsync(facilityId, resourceType, sequences, cancellationToken);
                 if (seqResp.IsSuccessStatusCode)
+                {
                     output.WriteLine($"  Created operation sequence for resource type: {resourceType} ({sequences.Count} op(s))");
+                    for (var idx = 0; idx < ordered.Count; idx++)
+                    {
+                        var step = new NormalizationRuntimeSequenceStep
+                        {
+                            ResourceType = resourceType,
+                            Sequence = idx + 1,
+                            OperationType = ordered[idx].Type,
+                            OperationName = ordered[idx].Name
+                        };
+                        runtimeSequences.Add(step);
+                        output.WriteLine($"    [runtime] {resourceType}#{step.Sequence} {step.OperationType} '{step.OperationName}'");
+                    }
+                }
                 else
                     throw new InvalidOperationException($"Failed to create normalization sequence for resource type '{resourceType}' in facility '{facilityId}'. HTTP {(int)seqResp.StatusCode}");
             }
         }
 
-        return resolution;
+        return new NormalizationFacilitySetup(resolution, runtimeSequences);
     }
+
+    /// <summary>
+    /// Normalization returns 404 when the facility already has nothing to delete.
+    /// </summary>
+    private static bool IsSuccessOrMissing(LantanaGroup.Link.Sdk.ApiClient.LinkApiResponse response) =>
+        response.IsSuccessStatusCode || response.StatusCode == 404;
 }

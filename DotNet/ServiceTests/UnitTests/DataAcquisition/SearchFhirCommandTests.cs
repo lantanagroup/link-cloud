@@ -8,7 +8,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Telemetry;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -161,8 +163,8 @@ public class SearchFhirCommandTests
         var provider = new Mock<IDistributedSemaphoreProvider>();
 
         semaphore
-            .Setup(s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
-            .Returns(handle.Object);
+            .Setup(s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<IDistributedSynchronizationHandle>(handle.Object));
         provider
             .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
             .Returns(semaphore.Object);
@@ -226,12 +228,41 @@ public class SearchFhirCommandTests
         Assert.Single(results);
         Assert.Equal("b1", results[0].Id);
         semaphore.Verify(
-            s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
+            s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
             Times.Once());
         handle.Verify(h => h.Dispose(), Times.Once());
         metrics.Verify(
             m => m.IncrementResourceAcquiredCounter(It.IsAny<List<KeyValuePair<string, object?>>>()),
             Times.Once());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ResourceAcquiredCounter_OmitsUnboundedIdentityLabels()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        List<KeyValuePair<string, object?>>? capturedTags = null;
+        metrics
+            .Setup(m => m.IncrementResourceAcquiredCounter(It.IsAny<List<KeyValuePair<string, object?>>>()))
+            .Callback<List<KeyValuePair<string, object?>>>(tags => capturedTags = tags);
+
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        Assert.NotNull(capturedTags);
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.FacilityId && (tag.Value?.ToString() ?? "") == "test-facility");
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.ResourceType && (tag.Value?.ToString() ?? "") == "Patient");
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.Phase);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ResourceId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ReportTrackingId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.PatientId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.CorrelationId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == "patient_id");
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == "correlation_id");
     }
 
     [Fact]
@@ -287,7 +318,7 @@ public class SearchFhirCommandTests
         // Semaphore acquired twice (initial + paging), released twice even
         // though the second acquire threw during ContinueAsync.
         semaphore.Verify(
-            s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
+            s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2));
         handle.Verify(h => h.Dispose(), Times.Exactly(2));
     }
@@ -308,13 +339,13 @@ public class SearchFhirCommandTests
         var semaphore = new Mock<IDistributedSemaphore>();
 
         semaphore
-            .Setup(s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
                 trace.Add("acquired");
                 var h = new Mock<IDistributedSynchronizationHandle>();
                 h.Setup(x => x.Dispose()).Callback(() => trace.Add("released"));
-                return h.Object;
+                return new ValueTask<IDistributedSynchronizationHandle>(h.Object);
             });
         provider
             .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
@@ -351,5 +382,38 @@ public class SearchFhirCommandTests
         var captured = Assert.Single(stub.CapturedRequests);
         Assert.Equal(HttpMethod.Post, captured.Method);
         Assert.EndsWith("_search", captured.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotRecordSemaphoreWaitWhenLightweight()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        metrics.Verify(
+            m => m.RecordSemaphoreWaitDuration(It.IsAny<string>(), It.IsAny<double>()),
+            Times.Never());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RecordsSemaphoreWaitWhenPerformanceMode()
+    {
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var metrics = SetupMetricsMock();
+        var sut = BuildSut(stub, semProvider, metrics, SetupNoAuthMock());
+
+        using var scope = MetricsModeScope.Begin(true);
+        await foreach (var _ in sut.ExecuteAsync(CreateRequest())) { }
+
+        metrics.Verify(
+            m => m.RecordSemaphoreWaitDuration("test-facility", It.Is<double>(d => d >= 0)),
+            Times.Once());
     }
 }

@@ -35,18 +35,46 @@ public sealed class MongoIndexManager
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
+        EnsureGeneratedTemplateCacheVersionIndexes();
         EnsureQueryPlanTemplateIndexes();
+        EnsureMeasureTemplateIndexes();
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
+        EnsureFacilityTemplateIndexes();
+        EnsurePatientConfigurationIndexes();
+        EnsureGenerationCatalogIndexes();
         EnsureApiHealthRunIndexes();
+        EnsureApiHealthRunResultIndexes();
         EnsureApiHealthExecutionRunIndexes();
+        EnsureCleanupReportIndexes();
+        EnsureRunMetricsIndexes();
+        EnsureMetricsBenchmarkIndexes();
     }
 
     // --- automation_org_resource_map_templates ---
 
     private void EnsureOrganizationResourceMapTemplateIndexes()
     {
-        var collection = _database.GetCollection<BsonDocument>("automation_org_resource_map_templates");
+        var collection = _database.GetCollection<BsonDocument>(
+            "automation_org_resource_map_templates");
+
+        // Retain Name index because GetAllAsync sorts by display Name.
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "Name", 1 } },
+            unique: false,
+            "idx_name_asc");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "IsDefault", 1 } },
+            unique: false,
+            "idx_isDefault");
+    }
+
+    private void EnsureFacilityTemplateIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoFacilityTemplateStore.CollectionName);
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
         CreateIndexSafe(collection, new BsonDocument { { "IsDefault", 1 } }, unique: false, "idx_isDefault");
     }
@@ -147,6 +175,20 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "ScenarioIds", 1 } }, unique: false, "idx_scenarioIds");
     }
 
+    // --- automation_generated_template_versions ---
+
+    private void EnsureGeneratedTemplateCacheVersionIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_generated_template_versions");
+
+        // Supports latest-version lookup per scenario key (SortByDescending VersionNumber).
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioKey", 1 }, { "VersionNumber", -1 } }, unique: false, "idx_scenarioKey_versionNumber_desc");
+
+        // Supports exact lookup by scenario + template hash and must be UNIQUE to
+        // preserve GeneratedTemplateCacheVersionStore's schema invariant.
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioKey", 1 }, { "TemplateSetHash", 1 } }, unique: true, "ux_generated_template_versions_scenario_hash");
+    }
+
     // --- automation_query_plan_templates ---
 
     private void EnsureQueryPlanTemplateIndexes()
@@ -155,6 +197,31 @@ public sealed class MongoIndexManager
 
         // Sort index for GetAllAsync (ORDER BY Name ASC).
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    private void EnsureMeasureTemplateIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_measure_templates");
+        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "GenerationFamily", 1 } }, unique: false, "idx_generationFamily");
+        CreateIndexSafe(collection, new BsonDocument { { "IsSystem", 1 } }, unique: false, "idx_isSystem");
+    }
+
+    private void EnsurePatientConfigurationIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_patient_configurations");
+        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    private void EnsureGenerationCatalogIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoGenerationCatalogStore.CollectionName);
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "Kind", 1 }, { "System", 1 }, { "Code", 1 } },
+            unique: true,
+            "idx_kind_system_code");
+        CreateIndexSafe(collection, new BsonDocument { { "Kind", 1 }, { "Display", 1 } }, unique: false, "idx_kind_display");
     }
 
     // --- automation_normalization_* ---
@@ -184,6 +251,42 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "EndpointResults.EndpointKey", 1 }, { "StartedAt", -1 } }, unique: false, "idx_endpoint_results_endpointKey_startedAt");
     }
 
+    // --- api_health_run_results ---
+
+    private void EnsureApiHealthRunResultIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_run_results");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument
+            {
+            { "EndpointKey", 1 },
+            { "StartedAt", -1 }
+            },
+            unique: false,
+            "idx_endpointKey_startedAt");
+
+        CreateIndexSafe(
+            collection,
+            new BsonDocument
+            {
+            { "RunId", 1 },
+            { "ServiceName", 1 },
+            { "EndpointKey", 1 }
+            },
+            unique: true,
+            "ux_runId_serviceName_endpointKey");
+    }
+
+    // --- automation_cleanup_reports ---
+
+    private void EnsureCleanupReportIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoCleanupReportStore.CollectionName);
+        CreateIndexSafe(collection, new BsonDocument { { "FinishedAt", -1 } }, unique: false, "idx_finishedAt_desc");
+    }
+
     // --- api_health_execution_runs ---
 
     private void EnsureApiHealthExecutionRunIndexes()
@@ -191,6 +294,24 @@ public sealed class MongoIndexManager
         var collection = _database.GetCollection<BsonDocument>("api_health_execution_runs");
 
         CreateIndexSafe(collection, new BsonDocument { { "IsCompleted", 1 }, { "StartedAt", -1 } }, unique: false, "idx_isCompleted_startedAt");
+    }
+
+    // --- automation_run_metrics ---
+
+    private void EnsureRunMetricsIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoRunMetricsStore.CollectionName);
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioId", 1 }, { "FinishedAt", -1 } }, unique: false, "idx_scenarioId_finishedAt");
+        CreateIndexSafe(collection, new BsonDocument { { "FinishedAt", -1 } }, unique: false, "idx_finishedAt_desc");
+        CreateIndexSafe(collection, new BsonDocument { { "CreatedAt", -1 } }, unique: false, "idx_createdAt_desc");
+    }
+
+    // --- automation_metrics_benchmarks ---
+
+    private void EnsureMetricsBenchmarkIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoMetricsBenchmarkStore.CollectionName);
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioId", 1 } }, unique: false, "idx_scenarioId");
     }
 
     // --- Helpers ---
@@ -259,7 +380,7 @@ public sealed class MongoIndexManager
             if (!string.Equals(left.Name, right.Name, StringComparison.OrdinalIgnoreCase))
                 return false;
 
-            if (left.Value.ToInt32() != right.Value.ToInt32())
+            if (!left.Value.Equals(right.Value))
                 return false;
         }
 

@@ -2,6 +2,10 @@ import { test, expect } from '../support/test';
 import { TenantDashboardPage } from '../support/pages/tenant-dashboard.page';
 import { pagedFacilities, facilityLookup } from '../fixtures/facilities';
 import { measureDefinitions } from '../fixtures/measure-defs';
+import { vendorVersions } from '../fixtures/vendors';
+
+/** The form offers vendor *versions*; the POST carries the vendor and the version id apart. */
+const vendor = vendorVersions[0];
 
 test('creating a facility posts the expected payload and closes the dialog', async ({ page, api }) => {
   api.mock('GET /api/facility', pagedFacilities());
@@ -23,7 +27,7 @@ test('creating a facility posts the expected payload and closes the dialog', asy
   await page.getByRole('option', { name: 'America/New_York', exact: true }).click();
 
   await dialog.getByRole('combobox', { name: 'Vendor' }).click();
-  await page.getByRole('option', { name: 'Epic', exact: true }).click();
+  await page.getByRole('option', { name: `${vendor.vendorName} - ${vendor.version}`, exact: true }).click();
 
   await dialog.getByRole('combobox', { name: 'Monthly' }).click();
   await page.getByRole('option', { name: measureDefinitions[0].id }).click();
@@ -39,7 +43,8 @@ test('creating a facility posts the expected payload and closes the dialog', asy
     facilityId: 'NewFacility01',
     facilityName: 'Brand New Hospital',
     timeZone: 'America/New_York',
-    vendor: 'Epic',
+    vendor: { id: vendor.vendorId, name: vendor.vendorName },
+    vendorVersionId: vendor.id,
     scheduledReports: { daily: [], weekly: [], monthly: [measureDefinitions[0].id] },
   });
 });

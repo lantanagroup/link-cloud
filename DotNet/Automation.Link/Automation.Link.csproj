@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ServiceTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Automation\Automation.csproj" />
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />

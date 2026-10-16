@@ -1,4 +1,5 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -8,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -135,6 +137,35 @@ public class ReadyToAcquireListenerTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task ExecuteListenerAsync_WhenPerformanceHeader_EnqueuesWorkItemInPerformanceMode()
+    {
+        var logManagerMock = new Mock<IDataAcquisitionLogManager>();
+        logManagerMock
+            .Setup(m => m.TrySetLogToQueuedAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        AcquisitionWorkItem? enqueued = null;
+        var processor = new TestAcquisitionProcessorBackgroundService
+        {
+            OnEnqueueAsync = (item, _) =>
+            {
+                enqueued = item;
+                return ValueTask.CompletedTask;
+            }
+        };
+
+        var listener = CreateListener(logManagerMock, processor);
+        var consume = CreateConsumeResult(321, "facility-perf");
+        consume.Message.Headers = new Headers();
+        KafkaHeaderHelper.ApplyIfPerformance(consume.Message.Headers, "performance");
+
+        await listener.InvokeExecuteListenerAsync(consume, CancellationToken.None);
+
+        Assert.NotNull(enqueued);
+        Assert.True(enqueued!.IsPerformanceMode);
+    }
+
     private static TestReadyToAcquireListener CreateListener(
         Mock<IDataAcquisitionLogManager> logManagerMock,
         TestAcquisitionProcessorBackgroundService processor)
@@ -201,6 +232,7 @@ public class ReadyToAcquireListenerTests
                 new Mock<ILogger<AcquisitionProcessorBackgroundService>>().Object,
                 new ServiceCollection().BuildServiceProvider(),
                 new Mock<IProducer<ResourceKey, ResourcesAcquired>>().Object,
+                new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>().Object,
                 Options.Create(new LantanaGroup.Link.DataAcquisition.Domain.Settings.AcquisitionWorkerProcessorSettings()))
         {
         }

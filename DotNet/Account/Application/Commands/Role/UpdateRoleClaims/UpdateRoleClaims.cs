@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                         foreach (var user in users)
                         {
                             var userKey = $"user:{user.Email}";
-                            _cache.Remove(userKey);
+                            await _cache.RemoveAsync(userKey, cancellationToken);
                         }
                     }
                 }

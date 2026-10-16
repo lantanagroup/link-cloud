@@ -81,6 +81,13 @@ public class TenantApiService : ITenantApiService
         throw new Exception($"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}");
     }
 
+    public async Task<string?> GetVendorSigningKeySecretId(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var facility = await GetFacilityConfig(facilityId, cancellationToken);
+
+        return facility?.Vendor?.Authentication?.SigningKeySecretId;
+    }
+
     public async Task<FacilityModel> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
     {
         string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId);

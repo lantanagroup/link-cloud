@@ -7,8 +7,9 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
-import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -19,8 +20,11 @@ import org.hl7.fhir.r4.model.MeasureReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -30,7 +34,7 @@ import java.util.function.Predicate;
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 @Service
-public class EvaluationRequestedConsumer extends AsyncListener<String, EvaluationRequested> {
+public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, EvaluationRequested> {
 
     private static final Logger logger = LoggerFactory.getLogger(EvaluationRequestedConsumer.class);
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
@@ -51,7 +55,8 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
                                 MeasureReportGeneratedProducer measureReportGeneratedProducer,
                                 BlobStorageService blobStorageService,
                                 EvaluateMeasureService evaluateMeasureService,
-                                ConsumerRecordRecoverer recoverer, FhirContext fhirContext) {
+                                @Qualifier("evaluationRequestedRecoverer") ConsumerRecordRecoverer recoverer,
+                                FhirContext fhirContext) {
         super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
         this.reportabilityPredicate = reportabilityPredicate;
@@ -63,6 +68,13 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         this.fhirContext = fhirContext;
     }
 
+    @KafkaListener(topics = Topics.EVALUATION_REQUESTED, containerFactory = "manualAckListenerContainerFactory")
+    public void consume(
+            ConsumerRecord<String, EvaluationRequested> record,
+            Acknowledgment acknowledgment) {
+        doConsume(record, acknowledgment);
+    }
+
     @Override
     protected void process(ConsumerRecord<String, EvaluationRequested> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
@@ -71,16 +83,14 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        var reportTrackingId = record.value().getReportTrackingId();
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_TRACKING_ID), reportTrackingId).build();
-        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
-
         String facilityId = record.key();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), facilityId).build();
+        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
         var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId()).orElse(null);
 
         if (patientReportStatus != null) {
             var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
-            evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle);
+            evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle, record.headers());
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
             throw new IllegalStateException("Patient status not found for previous report ID");
@@ -88,6 +98,10 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
     }
 
     private void evaluateMeasures (String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
+        evaluateMeasures(correlationId, value, patientStatus, bundle, null);
+    }
+
+    private void evaluateMeasures (String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, org.apache.kafka.common.header.Headers inboundHeaders) {
         if (logger.isDebugEnabled()) {
             logger.debug("Evaluating measures");
         }
@@ -126,10 +140,10 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
             boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
             r.setReportable(reportable);
             if (reportable) {
-                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport);
+                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport, inboundHeaders);
             } else {
                 String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
-                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null);
+                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null, inboundHeaders);
             }
         }
 
@@ -141,9 +155,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
+        Attributes attributes = MeasureEvalMetrics.buildPatientOutcomeAttributes(null, patientStatus);
             measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportablePatient);
 
     }

@@ -6,7 +6,6 @@ import { pagedFacilities, facilityLookup, testFacilities } from '../fixtures/fac
 import { censusConfiguration, pagedOperations } from '../fixtures/facility-detail';
 import { measureDefinitions } from '../fixtures/measure-defs';
 import { IFacilityConfigModel } from '../../src/app/interfaces/tenant/facility-config-model.interface';
-import { Vendor } from '../../src/app/interfaces/tenant/vendor.enum';
 
 const facility = testFacilities[0];
 const facilityId = facility.facilityId;
@@ -31,11 +30,11 @@ function mockFacilityEdit(api: ApiMock, config: IFacilityConfigModel = facility)
  */
 function mockDataAcquisitionPanel(api: ApiMock, overrides: Record<string, object> = {}): void {
   const notConfigured = { status: 404, json: { detail: 'not found' } };
-  api.mock(`GET /api/data/${facilityId}/fhirQueryConfiguration`, overrides['fhirQuery'] ?? notConfigured);
-  api.mock(`GET /api/data/${facilityId}/fhirQueryList`, overrides['fhirList'] ?? notConfigured);
-  api.mock(`GET /api/data/${facilityId}/sftp-configurations`, overrides['sftp'] ?? notConfigured);
-  api.mock(`GET /api/data/${facilityId}/QueryPlan`, overrides['queryPlan'] ?? notConfigured);
-  api.mock(`GET /api/data/location-config/facility/${facilityId}`, overrides['locationConfig'] ?? []);
+  api.mock(`GET /api/data-acquisition/${facilityId}/fhirQueryConfiguration`, overrides['fhirQuery'] ?? notConfigured);
+  api.mock(`GET /api/data-acquisition/${facilityId}/fhirQueryList`, overrides['fhirList'] ?? notConfigured);
+  api.mock(`GET /api/data-acquisition/${facilityId}/sftp-configurations`, overrides['sftp'] ?? notConfigured);
+  api.mock(`GET /api/data-acquisition/${facilityId}/QueryPlan`, overrides['queryPlan'] ?? notConfigured);
+  api.mock(`GET /api/data-acquisition/location-config/facility/${facilityId}`, overrides['locationConfig'] ?? []);
 }
 
 test('shows the facility in a read-only configuration form', async ({ page, api }) => {
@@ -107,9 +106,9 @@ test('expanding data acquisition loads every configuration behind its tabs', asy
   await edit.goto(facilityId);
   await edit.expand(edit.dataAcquisitionPanel);
 
-  await expect.poll(() => api.callsTo('GET', `/api/data/${facilityId}/fhirQueryConfiguration`).length).toBe(1);
-  await expect.poll(() => api.callsTo('GET', `/api/data/${facilityId}/fhirQueryList`).length).toBe(1);
-  await expect.poll(() => api.callsTo('GET', `/api/data/${facilityId}/sftp-configurations`).length).toBe(1);
+  await expect.poll(() => api.callsTo('GET', `/api/data-acquisition/${facilityId}/fhirQueryConfiguration`).length).toBe(1);
+  await expect.poll(() => api.callsTo('GET', `/api/data-acquisition/${facilityId}/fhirQueryList`).length).toBe(1);
+  await expect.poll(() => api.callsTo('GET', `/api/data-acquisition/${facilityId}/sftp-configurations`).length).toBe(1);
 
   for (const label of ['Fhir Query', 'Fhir List', 'SFTP Configuration', 'Query Plan']) {
     await expect(edit.dataAcquisitionPanel.getByRole('tab', { name: label })).toBeVisible();
@@ -117,7 +116,8 @@ test('expanding data acquisition loads every configuration behind its tabs', asy
 });
 
 test('the Reporting Organization tab is disabled until the facility has a vendor', async ({ page, api }) => {
-  mockFacilityEdit(api); // the base fixture has no vendor
+  // The shared fixture now carries a vendor, so strip it here — the absence is the point.
+  mockFacilityEdit(api, { ...facility, vendor: undefined });
   mockDataAcquisitionPanel(api);
 
   const edit = new FacilityEditPage(page);
@@ -131,7 +131,7 @@ test('the Reporting Organization tab is disabled until the facility has a vendor
 });
 
 test('a facility with a vendor enables the Reporting Organization tab', async ({ page, api }) => {
-  mockFacilityEdit(api, { ...facility, vendor: Vendor.Epic });
+  mockFacilityEdit(api, { ...facility, vendor: { id: 'epic-id', name: 'Epic' } });
   mockDataAcquisitionPanel(api);
 
   const edit = new FacilityEditPage(page);

@@ -1,6 +1,11 @@
-﻿using Hl7.Fhir.Model;
+﻿using System.Net;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Terminology.Application.Formatters;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -20,6 +25,81 @@ namespace LantanaGroup.Link.Terminology.Controllers;
 [ApiController]
 public class FhirController(FhirService fhirService) : Controller
 {
+    /// <summary>
+    /// Sanitizes an untrusted terminology value (url, system, code or display) that is compared
+    /// against loaded terminology content rather than rendered as markup.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="HtmlInputSanitizer.Sanitize"/> strips markup but also HTML-encodes the surviving text,
+    /// which corrupts values that legitimately contain reserved characters — over 2,000 LOINC displays
+    /// contain "&amp;", and encoding one to "&amp;amp;" turns a correct display into a spurious
+    /// "Display does not match code". Decoding afterwards restores the plain text while still dropping
+    /// any markup the sanitizer removed.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when a non-empty value sanitizes away to nothing, i.e. the caller supplied markup and no
+    /// content. The emptied value must not be passed on: an empty display disables the display check
+    /// entirely, so the request would be answered with result=true instead of being rejected.
+    /// </exception>
+    private bool IsPerformanceModeRequest()
+    {
+        if (Request?.Headers.TryGetValue(KafkaConstants.HeaderConstants.MetricsMode, out var values) != true)
+            return false;
+
+        return string.Equals(values.ToString(), "performance", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? SanitizeTerminologyValue(string? value, string parameterName)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var sanitized = WebUtility.HtmlDecode(value.Sanitize());
+
+        if (value.Length > 0 && sanitized.Length == 0)
+        {
+            throw new ArgumentException($"Invalid value supplied for '{parameterName}'");
+        }
+
+        return sanitized;
+    }
+
+    /// <summary>
+    /// Builds an RFC 9457 Problem Details result for a failed terminology request, matching the shape
+    /// <see cref="ConfigController"/> already returns. The <c>traceId</c> extension is added by the
+    /// service-wide customization in <c>TerminologyProblemDetailsExtensions</c>.
+    /// </summary>
+    /// <remarks>
+    /// Exception messages are written as fragments ("Value set not found with ID x") because they are
+    /// also read from logs and asserted in unit tests. <c>detail</c> is prose, so a terminating period
+    /// is added here rather than baked into every message at the throw site.
+    /// </remarks>
+    private ObjectResult TerminologyProblem(HttpStatusCode statusCode, string title, string type, string detail)
+    {
+        var sentence = detail.EndsWith('.') || detail.EndsWith('?') || detail.EndsWith('!')
+            ? detail
+            : detail + ".";
+
+        return Problem(detail: sentence, statusCode: (int)statusCode, title: title, type: type);
+    }
+
+    /// <summary>Client input failed validation. RFC 9110 section 15.5.1.</summary>
+    private ObjectResult BadRequestProblem(string detail) => TerminologyProblem(
+        HttpStatusCode.BadRequest, "Bad Request", "https://tools.ietf.org/html/rfc9110#section-15.5.1", detail);
+
+    /// <summary>The requested terminology resource is not loaded. RFC 9110 section 15.5.5.</summary>
+    private ObjectResult NotFoundProblem(string detail) => TerminologyProblem(
+        HttpStatusCode.NotFound, "Not Found", "https://tools.ietf.org/html/rfc9110#section-15.5.5", detail);
+
+    /// <summary>
+    /// A loaded code group could not be used as requested. RFC 9110 section 15.6.1. The customization
+    /// replaces <c>detail</c> with a generic message so internal state is not exposed to the caller.
+    /// </summary>
+    private ObjectResult InternalServerErrorProblem(string detail) => TerminologyProblem(
+        HttpStatusCode.InternalServerError, "Internal Server Error", "https://tools.ietf.org/html/rfc9110#section-15.6.1", detail);
+
     #region Value Sets
 
     /// <summary>
@@ -41,11 +121,11 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ex.Message);
+            return NotFoundProblem(ex.Message);
         }
     }
 
@@ -61,21 +141,42 @@ public class FhirController(FhirService fhirService) : Controller
     /// ValueSet resources. Returns a 400 Bad Request response if neither <paramref name="url"/>
     /// nor <paramref name="summary"/> are provided.
     /// </returns>
+    /// <param name="count">
+    /// The maximum number of codes to embed in the expansion. Omitting it applies the configured
+    /// default page size; a value above the configured maximum is reduced to that maximum rather than
+    /// rejected; zero returns the total with no codes. Ignored when <paramref name="summary"/> is true.
+    /// </param>
+    /// <param name="offset">
+    /// The zero-based index of the first code to embed, for paging. Defaults to zero. Ignored when
+    /// <paramref name="summary"/> is true.
+    /// </param>
     [HttpGet("ValueSet")]
+    [SwaggerOperation(
+        Summary = "Search for value sets.",
+        Description = "Without _summary=true and with a url, the response embeds one page of the value "
+                      + "set's codes in ValueSet.expansion, bounded by count and offset. "
+                      + "expansion.total reports the full number of codes, expansion.offset the page "
+                      + "returned, and expansion.parameter the count and offset actually applied. With "
+                      + "_summary=true, count and offset are ignored and the stored resource is "
+                      + "returned unexpanded.")]
     public ActionResult<Bundle> GetValueSets([FromQuery] string? url,
-        [FromQuery(Name = "_summary")] SummaryType? summary)
+        [FromQuery(Name = "_summary")] SummaryType? summary,
+        [FromQuery(Name = "count")] int? count = null,
+        [FromQuery(Name = "offset")] int? offset = null)
     {
         try
         {
-            return Ok(fhirService.GetValueSets(url?.Sanitize(), summary));
+            // count and offset bind as int? and are never compared against cached terminology content,
+            // so they do not go through the sanitizers the string parameters need.
+            return Ok(fhirService.GetValueSets(url?.Sanitize(), summary, count, offset));
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            return InternalServerErrorProblem(ex.Message);
         }
     }
 
@@ -89,26 +190,41 @@ public class FhirController(FhirService fhirService) : Controller
     /// An <see cref="ActionResult{T}"/> containing the expanded <see cref="ValueSet"/>
     /// if it exists, or appropriate error responses such as 404 Not Found or 500 Internal Server Error.
     /// </returns>
+    /// <param name="count">
+    /// The maximum number of codes to return. Omitting it applies the configured default page size; a
+    /// value above the configured maximum is reduced to that maximum rather than rejected; zero returns
+    /// expansion.total with no codes.
+    /// </param>
+    /// <param name="offset">The zero-based index of the first code to return. Defaults to zero.</param>
     [HttpGet("ValueSet/$expand")]
     [HttpGet("ValueSet/{id}/$expand")]
+    [SwaggerOperation(
+        Summary = "Expand a value set into one page of its codes.",
+        Description = "The expansion is always bounded. count and offset are the FHIR $expand paging "
+                      + "parameters, not _count. expansion.total reports the full size, and "
+                      + "expansion.offset and expansion.parameter report the page actually returned, so "
+                      + "a client can page through the whole value set. filter, includeDesignations, "
+                      + "activeOnly and date are not supported.")]
     public ActionResult<ValueSet> ExpandValueSet([FromRoute] string? id, [FromQuery] string? url,
-        [FromQuery] string? date)
+        [FromQuery] string? date,
+        [FromQuery(Name = "count")] int? count = null,
+        [FromQuery(Name = "offset")] int? offset = null)
     {
         try
         {
-            return Ok(fhirService.ExpandValueSet(id?.Sanitize(), url?.Sanitize(), date?.Sanitize()));
+            return Ok(fhirService.ExpandValueSet(id?.Sanitize(), url?.Sanitize(), date?.Sanitize(), count, offset));
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ex.Message);
+            return NotFoundProblem(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            return InternalServerErrorProblem(ex.Message);
         }
     }
 
@@ -134,11 +250,11 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ex.Message);
+            return NotFoundProblem(ex.Message);
         }
     }
 
@@ -155,20 +271,39 @@ public class FhirController(FhirService fhirService) : Controller
     /// CodeSystem resources. Returns a 400 Bad Request response if neither the <paramref name="url"/>
     /// nor <paramref name="summary"/> is provided.
     /// </returns>
+    /// <param name="count">
+    /// The maximum number of concepts to return. Omitting it applies the configured default page size;
+    /// a value above the configured maximum is reduced to that maximum rather than rejected; zero
+    /// returns no concepts. Ignored when <paramref name="summary"/> is true.
+    /// </param>
+    /// <param name="offset">
+    /// The zero-based index of the first concept to return. Defaults to zero. Ignored when
+    /// <paramref name="summary"/> is true.
+    /// </param>
     [HttpGet("CodeSystem")]
-    public ActionResult<Bundle> GetCodeSystems([FromQuery] string? url, [FromQuery(Name = "_summary")] SummaryType? summary)
+    [SwaggerOperation(
+        Summary = "Search for code systems.",
+        Description = "Without _summary=true and with a url, the response carries one page of the code "
+                      + "system's concepts, bounded by count and offset. CodeSystem.count always "
+                      + "reports the full number of distinct concepts, and CodeSystem.content reports "
+                      + "fragment whenever the page is a subset. With _summary=true, count and offset "
+                      + "are ignored and behaviour is unchanged.")]
+    public ActionResult<Bundle> GetCodeSystems([FromQuery] string? url,
+        [FromQuery(Name = "_summary")] SummaryType? summary,
+        [FromQuery(Name = "count")] int? count = null,
+        [FromQuery(Name = "offset")] int? offset = null)
     {
         try
         {
-            return Ok(fhirService.GetCodeSystems(url?.Sanitize(), summary));
+            return Ok(fhirService.GetCodeSystems(url?.Sanitize(), summary, count, offset));
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            return InternalServerErrorProblem(ex.Message);
         }
     }
 
@@ -190,19 +325,106 @@ public class FhirController(FhirService fhirService) : Controller
     public ActionResult<Parameters> ValidateCodeInCodeSystem([FromQuery] string? url, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? display, [FromBody] Parameters? parameters)
     {
+        using var metricsMode = MetricsModeScope.Begin(IsPerformanceModeRequest());
         try
         {
             return Ok(fhirService.ValidateCodeInCodeSystem(
-                url?.Sanitize(),
-                id?.Sanitize(),
-                code?.Sanitize(),
-                display?.Sanitize(),
+                SanitizeTerminologyValue(url, nameof(url)),
+                SanitizeTerminologyValue(id, nameof(id)),
+                SanitizeTerminologyValue(code, nameof(code)),
+                SanitizeTerminologyValue(display, nameof(display)),
                 parameters));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequestProblem(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query parameters.
+    /// </summary>
+    [HttpGet("CodeSystem/$lookup")]
+    [HttpGet("CodeSystem/{id}/$lookup")]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version)
+    {
+        try
+        {
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                null));
         }
         catch (ArgumentException ex)
         {
             return BadRequest(ex.Message);
         }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query/body parameters.
+    /// </summary>
+    [HttpPost("CodeSystem/$lookup")]
+    [HttpPost("CodeSystem/{id}/$lookup")]
+    [ValidateAntiForgeryOrBearerToken]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version, [FromBody] Parameters? parameters)
+    {
+        try
+        {
+            var sanitizedParameters = SanitizeLookupCodeParameters(parameters);
+
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                sanitizedParameters));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    private static Parameters? SanitizeLookupCodeParameters(Parameters? parameters)
+    {
+        if (parameters == null)
+        {
+            return null;
+        }
+
+        foreach (var parameter in parameters.Parameter)
+        {
+            if (parameter.Name is "code" or "system" or "version")
+            {
+                var sanitizedValue = parameter.Value?.ToString()?.Sanitize();
+                parameter.Value = sanitizedValue == null ? null : new FhirString(sanitizedValue);
+                continue;
+            }
+
+            if (parameter.Name == "coding" && parameter.Value is Coding coding)
+            {
+                coding.Code = coding.Code?.Sanitize();
+                coding.System = coding.System?.Sanitize();
+                coding.Version = coding.Version?.Sanitize();
+            }
+        }
+
+        return parameters;
     }
 
     /// <summary>
@@ -216,21 +438,29 @@ public class FhirController(FhirService fhirService) : Controller
     /// <param name="parameters">Additional parameters supplied in the request body to guide the validation operation. This parameter is optional.</param>
     /// <returns>
     /// A <see cref="Parameters"/> resource that indicates the result of the validation and may contain
-    /// additional information about the validation outcome.
+    /// additional information about the validation outcome, or a 400 Bad Request response when neither
+    /// <paramref name="url"/> nor <paramref name="id"/> identifies a ValueSet.
     /// </returns>
     [HttpPost("ValueSet/$validate-code")]
     [HttpPost("ValueSet/{id}/$validate-code")]
     public ActionResult<Parameters> ValidateCodeInValueSet([FromQuery] string? url, [FromRoute] string? id,
-        [FromQuery] string? system, [FromQuery] string? code, [FromQuery] string? display,
+        [FromQuery][PreserveEmptyString] string? system, [FromQuery] string? code, [FromQuery] string? display,
         [FromBody] Parameters? parameters)
     {
+        using var metricsMode = MetricsModeScope.Begin(IsPerformanceModeRequest());
         try
         {
-            return Ok(fhirService.ValidateCodeInValueSet(url, id, system, code, display, parameters));
+            return Ok(fhirService.ValidateCodeInValueSet(
+                SanitizeTerminologyValue(url, nameof(url)),
+                SanitizeTerminologyValue(id, nameof(id)),
+                SanitizeTerminologyValue(system, nameof(system)),
+                SanitizeTerminologyValue(code, nameof(code)),
+                SanitizeTerminologyValue(display, nameof(display)),
+                parameters));
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
     }
 

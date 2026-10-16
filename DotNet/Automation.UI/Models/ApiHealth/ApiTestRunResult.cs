@@ -40,6 +40,26 @@ public sealed class ApiTestRunResult
     public DateTimeOffset ExecutedAt { get; set; } = DateTimeOffset.UtcNow;
     public long DurationMs { get; set; }
 
+    /// <summary>
+    /// Source commit of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Commit { get; set; }
+
+    /// <summary>
+    /// Build of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Build { get; set; }
+
+    /// <summary>
+    /// Version of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Version { get; set; }
+
+    /// <summary>
+    /// Product version of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? ProductVersion { get; set; }
+
     // --- Diagnostic fields (populated from LinkApiResponse) ---
 
     /// <summary>The full URL that was called (e.g., https://host/api/normalization/operations/facility/xyz).</summary>
@@ -54,6 +74,6 @@ public sealed class ApiTestRunResult
     /// <summary>Trace ID from the response headers for correlating with Grafana/distributed tracing.</summary>
     public string? TraceId { get; set; }
 
-    /// <summary>Truncated response body (for both success and failure diagnostics).</summary>
+    /// <summary>Response body (or exception details) for both success and failure diagnostics.</summary>
     public string? ResponseBody { get; set; }
 }

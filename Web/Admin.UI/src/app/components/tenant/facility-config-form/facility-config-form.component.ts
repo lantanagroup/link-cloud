@@ -17,7 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
-import {Vendor} from 'src/app/interfaces/tenant/vendor.enum';
+import {IVendorVersion} from 'src/app/interfaces/tenant/vendor-interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
@@ -32,6 +32,8 @@ import * as moment from 'moment-timezone';
 import {ScheduledReportsValidator} from "../../validators/ScheduledReportsValidator";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import { AppConfig, AppConfigService } from '../../../services/app-config.service';
+import { DmrpStatusService } from '../../../services/gateway/dmrp/dmrp-status.service';
+import { firstValueFrom } from 'rxjs';
 
 export function facilityIdConditionalValidator(allowAlphaNumeric: boolean): ValidatorFn {
   return (control: AbstractControl) => {
@@ -94,7 +96,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
 
   timezones: string[] = moment.tz.names();
-  vendors = Object.values(Vendor);
+  vendors: IVendorVersion[] = [];
 
   formMode!: FormMode;
   facilityConfigForm!: FormGroup;
@@ -105,14 +107,44 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   appConfig?: AppConfig;
 
+  /**
+   * Tenant's DMRP:Enabled, read from api/dmrp/dmrp-status. When DMRP is enabled a facility's schedule
+   * comes from its DMRP reporting plans, and the Tenant API refuses a schedule in the request unless the
+   * Mock DMRP API is switched on.
+   *
+   * Off until Tenant answers, and off if it cannot be asked: the form then asks for a schedule, which
+   * Tenant refuses loudly if DMRP is in fact on, rather than quietly creating a facility that reports
+   * nothing.
+   */
+  dmrpEnabled = false;
+
+  /**
+   * True when Tenant writes the facility's selected reports through to the Mock DMRP API as its
+   * enrollment, so the pickers stay editable even with DMRP enabled.
+   */
+  mockDmrpEnabled = false;
+
+  /**
+   * The report pickers are shown and their selections sent with DMRP off, or with DMRP on when the
+   * selections are written through to the Mock DMRP API.
+   */
+  get showReportPickers(): boolean {
+    return !this.dmrpEnabled || this.mockDmrpEnabled;
+  }
+
   constructor(
     private snackBar: MatSnackBar,
     private tenantService: TenantService,
     private measureDefinitionConfigurationService: MeasureDefinitionService,
-    private appConfigService: AppConfigService) { }
+    private appConfigService: AppConfigService,
+    private dmrpStatusService: DmrpStatusService) { }
 
   compareReportTypes(object1: any, object2: any) {
     return (object1 && object2) && object1 === object2;
+  }
+
+  compareVendors(vendor1: IVendorVersion | null, vendor2: IVendorVersion | null): boolean {
+    return vendor1?.id === vendor2?.id;
   }
 
   async ngOnInit(): Promise<void> {
@@ -120,18 +152,32 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
     this.appConfig = await this.appConfigService.loadConfig();
 
+    const dmrpStatus = await firstValueFrom(this.dmrpStatusService.getStatus());
+    this.dmrpEnabled = dmrpStatus.dmrpEnabled;
+    this.mockDmrpEnabled = dmrpStatus.mockDmrpEnabled;
+
     this.facilityConfigForm = new FormGroup(
       {
         facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
         facilityName: new FormControl('', Validators.required),
         timeZone: new FormControl('', Validators.required),
-        vendor: new FormControl<Vendor | null>(null, Validators.required),
+        vendor: new FormControl<IVendorVersion | null>(null),
         monthlyReports: new FormControl([]),
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
       },
       { validators: ScheduledReportsValidator() } // Apply the custom validator to the entire FormGroup
     );
+
+    this.tenantService.getVendorVersions().subscribe({
+      next: (vendors) => {
+        this.vendors = vendors;
+        this.setVendorFromItem();
+      },
+      error: (err) => {
+        this.submittedConfiguration.emit({id: '', message: err.message});
+      }
+    });
 
     this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
       {
@@ -156,8 +202,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
-      this.vendorControl.setValue(this.item.vendor ?? null);
-      this.vendorControl.updateValueAndValidity();
+      this.setVendorFromItem();
 
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly);
       this.monthlyReportsControl.updateValueAndValidity();
@@ -197,8 +242,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
-      this.vendorControl.setValue(this.item.vendor ?? null);
-      this.vendorControl.updateValueAndValidity();
+      this.setVendorFromItem();
 
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly)
       this.monthlyReportsControl.updateValueAndValidity();
@@ -269,6 +313,14 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     return this.facilityConfigForm.get('dailyReports') as FormControl;
   }
 
+  private setVendorFromItem(): void {
+    const vendorVersionId = this.item?.vendorVersionId;
+    const vendor = this.vendors.find(candidate => candidate.id === vendorVersionId) ?? null;
+
+    this.vendorControl.setValue(vendor);
+    this.vendorControl.updateValueAndValidity();
+  }
+
   clearFacilityId(): void {
     this.facilityIdControl.setValue('');
     this.facilityIdControl.updateValueAndValidity();
@@ -279,10 +331,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.facilityNameControl.updateValueAndValidity();
   }
 
-  get noReportsEntered(): string | null {
-    return this.facilityConfigForm.errors?.['noReportsEntered'] || null;
-  }
-
   get reportsNotUniqueError(): string | null {
     return this.facilityConfigForm.errors?.['reportsNotUnique'] || null;
   }
@@ -290,9 +338,15 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
 
-      let monthlyReports : string[] = this.monthlyReportsControl.value ?? [];
-      let weeklyReports : string[] = this.weeklyReportsControl.value ?? [];
-      let dailyReports : string[] = this.dailyReportsControl.value ?? [];
+      // With DMRP enabled and no Mock DMRP API the schedule is derived from the facility's reporting
+      // plans, and the Tenant API refuses a request that carries one. The block itself still has to be
+      // sent: its three arrays are not nullable, so leaving it out fails model binding before the API
+      // sees it. Editing an existing facility loads its stored schedule into these controls, so the
+      // arrays are emptied here rather than relying on the controls being untouched.
+      const sendSelection = this.showReportPickers;
+      let monthlyReports : string[] = sendSelection ? (this.monthlyReportsControl.value ?? []) : [];
+      let weeklyReports : string[] = sendSelection ? (this.weeklyReportsControl.value ?? []) : [];
+      let dailyReports : string[] = sendSelection ? (this.dailyReportsControl.value ?? []) : [];
       let scheduledReports: { daily: string[], monthly: string[], weekly: string[] } = {"daily": dailyReports, "monthly": monthlyReports, "weekly": weeklyReports};
 
       if(this.formMode == FormMode.Create) {

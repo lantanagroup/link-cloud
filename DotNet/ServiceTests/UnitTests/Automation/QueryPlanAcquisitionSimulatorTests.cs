@@ -154,8 +154,8 @@ public class QueryPlanAcquisitionSimulatorTests
     [Fact]
     public void Observation_EffectivePeriod_OverlapsPeriod_IsAcquired()
     {
-        // Lab observations in the synthetic generator (and many real EHRs) use
-        // effectivePeriod, not effectiveDateTime.
+        // Imported/EHR lab observations may use effectivePeriod rather than
+        // effectiveDateTime. The simulator must still apply FHIR overlap.
         var entry = Entry("Observation", "O1", """
             { "resourceType":"Observation","id":"O1",
               "category":[{"coding":[{"code":"laboratory"}]}],
@@ -357,5 +357,163 @@ public class QueryPlanAcquisitionSimulatorTests
         // Even fail-closed only kicks in when the date filter has actual bounds. With no
         // bounds the date check is vacuous; resource is included.
         Assert.Contains("Observation/O-NoDate3", acquired);
+    }
+
+    [Fact]
+    public void Location_ReferenceQuery_FollowsPartOfParent()
+    {
+        var encounter = Entry("Encounter", "E1", """
+            { "resourceType":"Encounter","id":"E1",
+              "period": { "start":"2024-06-01T08:00:00Z", "end":"2024-06-05T08:00:00Z" },
+              "location":[{"location":{"reference":"Location/L-ROOM"}}] }
+            """);
+        var room = Entry("Location", "L-ROOM", """
+            { "resourceType":"Location","id":"L-ROOM",
+              "partOf":{"reference":"Location/L-HOSP"} }
+            """);
+        var hospital = Entry("Location", "L-HOSP", """
+            { "resourceType":"Location","id":"L-HOSP" }
+            """);
+        var unused = Entry("Location", "L-UNUSED", """
+            { "resourceType":"Location","id":"L-UNUSED",
+              "partOf":{"reference":"Location/L-HOSP"} }
+            """);
+
+        var plan = new QueryPlanInput
+        {
+            EhrDescription = "Test",
+            LookBack = "P0D",
+            InitialQueries =
+            [
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "Encounter",
+                    QueryConfigType = "Parameter",
+                    Parameters =
+                    [
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "patient", Variable = 0 },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 2, Format = "ge{0}" },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 3, Format = "le{0}" }
+                    ]
+                },
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "Location",
+                    QueryConfigType = "Reference",
+                    OperationType = 1,
+                    Paged = 100
+                }
+            ]
+        };
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1",
+            [encounter],
+            [room, hospital, unused],
+            plan,
+            PeriodStart,
+            PeriodEnd);
+
+        Assert.Contains("Encounter/E1", acquired);
+        Assert.Contains("Location/L-ROOM", acquired);
+        Assert.Contains("Location/L-HOSP", acquired);
+        Assert.DoesNotContain("Location/L-UNUSED", acquired);
+    }
+
+    [Fact]
+    public void DiagnosticReport_IssuedInPeriod_EffectiveBeforePeriod_IsExcluded()
+    {
+        var encounter = Entry("Encounter", "E1", """
+            { "resourceType":"Encounter","id":"E1",
+              "period": { "start":"2024-06-01T08:00:00Z", "end":"2024-06-05T08:00:00Z" } }
+            """);
+        var report = Entry("DiagnosticReport", "DxRpt-042", """
+            { "resourceType":"DiagnosticReport","id":"DxRpt-042",
+              "encounter":{"reference":"Encounter/E1"},
+              "effectiveDateTime":"2023-12-01T08:00:00Z",
+              "issued":"2024-06-15T08:00:00Z" }
+            """);
+
+        var plan = new QueryPlanInput
+        {
+            EhrDescription = "Test",
+            LookBack = "P0D",
+            InitialQueries =
+            [
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "Encounter",
+                    QueryConfigType = "Parameter",
+                    Parameters =
+                    [
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "patient", Variable = 0 },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 2, Format = "ge{0}" },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 3, Format = "le{0}" }
+                    ]
+                }
+            ],
+            SupplementalQueries =
+            [
+                new QueryPlanQueryEntry
+                {
+                    ResourceType = "DiagnosticReport",
+                    QueryConfigType = "Parameter",
+                    Parameters =
+                    [
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "patient", Variable = 0 },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 2, Format = "ge{0}" },
+                        new QueryPlanParameterEntry { ParameterType = "Variable", Name = "date", Variable = 3, Format = "le{0}" }
+                    ]
+                }
+            ]
+        };
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1",
+            [encounter, report],
+            null,
+            plan,
+            PeriodStart,
+            PeriodEnd,
+            allowEncounterAnchoredDateOverrideForOutOfRange: false);
+
+        Assert.Contains("Encounter/E1", acquired);
+        Assert.DoesNotContain("DiagnosticReport/DxRpt-042", acquired);
+    }
+
+    [Fact]
+    public void Observation_EffectiveInLastSecondOfPeriodEnd_IsAcquired()
+    {
+        // Daily ACH PeriodEnd is formatted as le2023-01-15T23:59:59Z (second precision).
+        // HAPI treats that bound as covering [23:59:59.000, 24:00:00). A generated
+        // Observation at 23:59:59.167 is included by DA and must be predicted.
+        var encounter = Entry("Encounter", "E1", """
+            { "resourceType":"Encounter","id":"E1",
+              "period": { "start":"2023-01-14T18:00:00Z", "end":"2023-01-16T05:59:59Z" } }
+            """);
+        var inLastSecond = Entry("Observation", "O-last-second", """
+            { "resourceType":"Observation","id":"O-last-second",
+              "category":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/observation-category","code":"vital-signs"}]}],
+              "encounter":{"reference":"Encounter/E1"},
+              "effectiveDateTime":"2023-01-15T23:59:59.167Z" }
+            """);
+        var atNextMidnight = Entry("Observation", "O-next-midnight", """
+            { "resourceType":"Observation","id":"O-next-midnight",
+              "category":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/observation-category","code":"vital-signs"}]}],
+              "encounter":{"reference":"Encounter/E1"},
+              "effectiveDateTime":"2023-01-16T00:00:00Z" }
+            """);
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            "P1",
+            [encounter, inLastSecond, atNextMidnight],
+            null,
+            QueryPlanDefaults.GetDefaultAsInput(),
+            "2023-01-15T00:00:00Z",
+            "2023-01-15T23:59:59Z",
+            allowEncounterAnchoredDateOverrideForOutOfRange: false);
+
+        Assert.Contains("Observation/O-last-second", acquired);
+        Assert.DoesNotContain("Observation/O-next-midnight", acquired);
     }
 }

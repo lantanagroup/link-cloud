@@ -8,7 +8,6 @@ using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Application.Validators;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Extensions;
-using LantanaGroup.Link.Account.Infrastructure.Health;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
 using LantanaGroup.Link.Account.Persistence;
@@ -185,7 +184,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AccountConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<AccountDbContext>>(HealthCheckType.Database.ToString())
         .AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 

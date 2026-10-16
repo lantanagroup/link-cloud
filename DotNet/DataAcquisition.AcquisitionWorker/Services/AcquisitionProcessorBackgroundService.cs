@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -17,6 +18,8 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Threading.Channels;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 
@@ -26,6 +29,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly Channel<AcquisitionWorkItem> _workChannel;
     private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
+    private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
 
     // Tune these via configuration if desired
     private readonly int _maxConcurrency = 8;          // adjust based on CPU / expected query duration
@@ -35,12 +39,14 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         ILogger<AcquisitionProcessorBackgroundService> logger,
         IServiceProvider serviceProvider,
         IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
+        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer,
         IOptions<AcquisitionWorkerProcessorSettings>? settings = null
         )
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
         _resourceAcquiredProducer = resourceAcquiredProducer;
+        _mappingOutcomeProducer = mappingOutcomeProducer;
 
         if (settings?.Value != null)
         {
@@ -111,6 +117,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
     private async Task ProcessWorkItemAsync(AcquisitionWorkItem item, CancellationToken ct)
     {
+        using var metricsMode = MetricsModeScope.Begin(item.IsPerformanceMode);
         using var scope = _serviceProvider.CreateScope();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
@@ -135,6 +142,22 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             {
                 _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping",
                     log.Id.ToString().SanitizeForLog(), log.Status?.ToString()?.SanitizeForLog());
+                return;
+            }
+
+            var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+            if (abortRegistry != null &&
+                await abortRegistry.IsAbortedAsync(log.FacilityId, log.ReportTrackingId, ct))
+            {
+                await logManager.TrySetLogStatusAsync(
+                    log.Id,
+                    [RequestStatus.Queued],
+                    RequestStatus.Cancelled,
+                    note: $"[{DateTime.UtcNow:O}] Cancelled: pipeline aborted.",
+                    cancellationToken: ct);
+                _logger.LogDebug(
+                    "Cancelled queued acquisition LogId {LogId} for aborted pipeline FacilityId={FacilityId}, ReportTrackingId={ReportTrackingId}.",
+                    log.Id.SanitizeForLog(), log.FacilityId.SanitizeForLog(), log.ReportTrackingId.SanitizeForLog());
                 return;
             }
 
@@ -173,7 +196,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     note: $"[{DateTime.UtcNow:O}] Patient not reportable (no org-mapped encounters); acquisition skipped.",
                     cancellationToken: ct);
 
-                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, item.IsPerformanceMode, ct);
                 return;
             }
         }
@@ -230,7 +253,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             _logger.LogInformation("Successfully completed acquisition for LogId {LogId}", log.Id);
 
             // Inline tail check if all siblings are terminal, produce AcquisitionComplete.
-            await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+            await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, item.IsPerformanceMode, ct);
         }
         catch (Exception ex)
         {
@@ -240,7 +263,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             // so attempt the tail check to avoid stalling downstream.
             try
             {
-                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, item.IsPerformanceMode, ct);
             }
             catch (Exception tailEx)
             {
@@ -249,39 +272,88 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         }
     }
 
-    private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, CancellationToken ct)
+    private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, bool isPerformanceMode, CancellationToken ct)
     {
+        TailCompletionResult? tailResult = null;
         try
         {
-            var tailResult = await logManager.TryCompleteTailAsync(logId, ct);
+            tailResult = await logManager.TryCompleteTailAsync(logId, ct);
             if (tailResult == null)
             {
                 return; // Group not yet complete.
             }
 
-            // Remove non-org encounters from the cache before the bundle reaches MeasureEval. The
-            // Encounter was cached by its own (ungated) primary log, so the NotReportable status on a
-            // dependent log doesn't keep it out of evaluation. Stripping here means an all-non-org patient
-            // has no qualifying encounter (non-reportable outcome), and a mixed patient keeps only org
-            // encounters. Runs before ProduceAsync so Normalization rehydrates the already-filtered cache.
-            var locationMappingService = scopeProvider.GetRequiredService<ILocationMappingService>();
-            
-            // Normalize the patient id to the bare form (strip any "Patient/" prefix) so it matches the
-            // EncounterMapping.PatientId the strip looks up — mirrors AcquisitionDependencyChecker.
-            await locationMappingService.StripNonOrgEncountersFromCacheAsync(
-                tailResult.FacilityId, tailResult.CorrelationId, tailResult.PatientId.SplitReference(), ct);
+            // Strips non-org encounters from the cache and then drops any cache key left empty, so
+            // ResourcesAcquired never points Normalization at an empty location. Runs before ProduceAsync
+            // so the cache the tail announces is already filtered.
+            //
+            // The strip's result is returned rather than discarded: how the patient resolved against the
+            // facility's organization is computed here and nowhere else, and it is what the report's
+            // Location Org and Encounter Mapping indicators record.
+            var tailFinalizer = scopeProvider.GetRequiredService<IResourcesAcquiredTailFinalizer>();
+            var locationOrgOutcome = await tailFinalizer.FinalizeAsync(tailResult, ct);
 
             var headers = new Headers
             {
                 new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
                     Encoding.UTF8.GetBytes(tailResult.CorrelationId))
             };
+            KafkaHeaderHelper.ApplyIfPerformance(headers, isPerformanceMode ? "performance" : null);
 
             if (!string.IsNullOrEmpty(tailResult.TraceParentId))
             {
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
             }
 
+            // Encounters are acquired and org-filtered on the INITIAL pass only. SUPPLEMENTAL enriches the
+            // encounters that survived, so by then the non-org ones have been deleted from the cache and its
+            // counts would describe the survivors -- arriving last and overwriting the real result.
+            var isInitialPhase = string.Equals(
+                tailResult.ResourcesAcquired.QueryType,
+                nameof(QueryPhase.Initial),
+                StringComparison.OrdinalIgnoreCase);
+
+            if (isInitialPhase)
+            {
+                try
+                {
+                    // Produced before ResourcesAcquired so that a failure here is handled while the pipeline
+                    // message is still unsent, rather than leaving the correlation half-announced. Report is
+                    // the only consumer of this topic; the strip above has already filtered the cache, so
+                    // nothing downstream depends on the ordering of these two produces.
+                    await _mappingOutcomeProducer.ProduceAsync(
+                        KafkaTopic.MappingOutcomeEvaluated.ToString(),
+                        new Message<ResourceKey, MappingOutcomeEvaluatedValue>
+                        {
+                            Key = new ResourceKey
+                                { FacilityId = tailResult.FacilityId, PatientId = tailResult.PatientId },
+                            Headers = headers,
+                            Value = new MappingOutcomeEvaluatedValue
+                            {
+                                Source = MappingOutcomeSource.Acquisition,
+                                ScheduledReports = tailResult.ResourcesAcquired.ScheduledReports,
+                                LocationOrgOutcome = locationOrgOutcome,
+
+                                // Names the pass this outcome describes. Report does not read it on the
+                                // acquisition path -- that write overwrites its own columns unconditionally,
+                                // so a redelivery is already idempotent -- but the contract declares the
+                                // field, and a message that identifies itself is what makes a duplicate or
+                                // an out-of-order delivery legible when reading the topic.
+                                CorrelationId = tailResult.CorrelationId,
+                                QueryType = tailResult.ResourcesAcquired.QueryType
+                            }
+                        },
+                        ct);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    // Capture error but let it continue to produce the tail message, so the log group can complete
+                    // and not stall downstream.
+                    _logger.LogError(e, "Failed to produce MappingOutcomeEvaluated message for LogId {LogId}. " +
+                                        "The mapping outcome for this correlation is lost; its report will show " +
+                                        "no mapping indicators for this patient.", logId);
+                }
+            }
 
             await _resourceAcquiredProducer.ProduceAsync(
                     KafkaTopic.ResourcesAcquired.ToString(),
@@ -297,6 +369,12 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     },
                     ct);
 
+            await logManager.MarkTailSentAsync(
+                tailResult.FacilityId,
+                tailResult.CorrelationId,
+                tailResult.QueryPhase,
+                ct);
+
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
                 tailResult.FacilityId.SanitizeForLog(), tailResult.CorrelationId.SanitizeForLog());
@@ -307,6 +385,25 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
+            if (tailResult != null)
+            {
+                try
+                {
+                    await logManager.RevertTailSentAsync(
+                        tailResult.FacilityId,
+                        tailResult.CorrelationId,
+                        tailResult.QueryPhase,
+                        CancellationToken.None);
+                }
+                catch (Exception revertEx)
+                {
+                    _logger.LogError(
+                        revertEx,
+                        "Failed to revert tail claim after inline tail failure for LogId {LogId}. Stale claim will be reclaimed after the lease.",
+                        logId);
+                }
+            }
+
             _logger.LogError(ex, "Failed to produce inline tail message for LogId {LogId}. Safety-net poller will recover.", logId);
         }
     }

@@ -1,13 +1,13 @@
 package com.lantanagroup.link.measureeval.health;
 
 import com.lantanagroup.link.measureeval.services.AbsResourceService;
+import com.lantanagroup.link.shared.health.TimedHealthIndicator;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
@@ -33,11 +33,11 @@ import java.util.concurrent.TimeoutException;
  * <p>
  * The combined probe runs on a separate thread bounded by {@link #checkTimeoutMs}, because both the
  * Lettuce reconnect path and the Azure SDK's retry/backoff can otherwise leave /health hanging when
- * a backend is unreachable. The backstop is kept below the BFF's 5s health-check timeout so the BFF
+ * a backend is unreachable. The backstop is kept below the BFF's health-check deadline so the BFF
  * still receives a real DOWN rather than timing out to N/A.
  */
-@Component("resourceCache")
-public class ResourceCacheHealthIndicator implements HealthIndicator {
+@Component("Resource Cache")
+public class ResourceCacheHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(ResourceCacheHealthIndicator.class);
     private static final String AVAILABLE = "Available";
@@ -71,7 +71,7 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         CompletableFuture<CacheStatus> probe = null;
         try {
             probe = CompletableFuture.supplyAsync(this::runChecks, executor);

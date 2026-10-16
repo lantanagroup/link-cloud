@@ -1,9 +1,11 @@
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Controllers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authentication;
@@ -35,6 +37,9 @@ namespace IntegrationTests.DataAcquisition.Controllers
     /// That lets us assert what the framework actually does *before* the action body
     /// is reached — which a direct call can never exercise.
     ///
+    /// Every test runs on both the canonical /api/data-acquisition prefix and the
+    /// deprecated /api/data alias, which must behave identically.
+    ///
     /// The factory stands up only this controller with mocked dependencies; it does
     /// NOT boot the real <c>Program</c> (which eagerly needs SQL Server, Redis and
     /// Kafka), so the tests stay fast and require no Docker.
@@ -49,8 +54,15 @@ namespace IntegrationTests.DataAcquisition.Controllers
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         }
 
-        [Fact]
-        public async Task GetQueryPlan_WhitespaceFacilityId_RejectedByFrameworkBeforeAction()
+        public static TheoryData<string> Prefixes => new()
+        {
+            "/api/data-acquisition",
+            "/api/data"
+        };
+
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task GetQueryPlan_WhitespaceFacilityId_RejectedByFrameworkBeforeAction(string prefix)
         {
             // "%20" decodes to a single space. It matches the route (non-empty
             // segment), but [Required] trims whitespace by default, so the
@@ -60,7 +72,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
             _factory.QueryPlanQueries.Reset();
             var client = _factory.CreateClient();
 
-            var response = await client.GetAsync("/api/data/%20/QueryPlan?type=Monthly");
+            var response = await client.GetAsync($"{prefix}/%20/QueryPlan?type=Monthly");
             var body = await response.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -68,8 +80,9 @@ namespace IntegrationTests.DataAcquisition.Controllers
             Assert.Contains("The facilityId field is required.", body);
         }
 
-        [Fact]
-        public async Task GetQueryPlan_HtmlStrippedFacilityId_ReachesActionAndReturnsInvalidParams()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task GetQueryPlan_HtmlStrippedFacilityId_ReachesActionAndReturnsInvalidParams(string prefix)
         {
             // "%40%40%40" decodes to "@@@": non-whitespace, so it passes [Required]
             // and reaches the action. There SanitizeAndRemove() strips every
@@ -79,7 +92,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
             _factory.QueryPlanQueries.Reset();
             var client = _factory.CreateClient();
 
-            var response = await client.GetAsync("/api/data/%40%40%40/QueryPlan?type=Monthly");
+            var response = await client.GetAsync($"{prefix}/%40%40%40/QueryPlan?type=Monthly");
             var body = await response.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -91,15 +104,16 @@ namespace IntegrationTests.DataAcquisition.Controllers
                 Times.Never);
         }
 
-        [Fact]
-        public async Task GetQueryPlan_MissingType_FrameworkReturns400_AndActionNeverRuns()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task GetQueryPlan_MissingType_FrameworkReturns400_AndActionNeverRuns(string prefix)
         {
             // Type is [Required] on GetQueryPlanParameters, so the [ApiController]
             // filter rejects the request before the action body executes.
             _factory.QueryPlanQueries.Reset();
             var client = _factory.CreateClient();
 
-            var response = await client.GetAsync("/api/data/test-facility/QueryPlan");
+            var response = await client.GetAsync($"{prefix}/test-facility/QueryPlan");
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -109,33 +123,36 @@ namespace IntegrationTests.DataAcquisition.Controllers
                 Times.Never);
         }
 
-        [Fact]
-        public async Task GetQueryPlan_InvalidTypeValue_FrameworkReturns400()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task GetQueryPlan_InvalidTypeValue_FrameworkReturns400(string prefix)
         {
             // An unparseable enum value fails model binding -> invalid ModelState -> 400.
             var client = _factory.CreateClient();
 
-            var response = await client.GetAsync("/api/data/test-facility/QueryPlan?type=NotAFrequency");
+            var response = await client.GetAsync($"{prefix}/test-facility/QueryPlan?type=NotAFrequency");
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
 
-        [Fact]
-        public async Task GetQueryPlan_EmptyFacilityId_RouteReturns404_NotBadRequest()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task GetQueryPlan_EmptyFacilityId_RouteReturns404_NotBadRequest(string prefix)
         {
-            // The route template is api/data/{facilityId}/QueryPlan. An empty path
+            // The route template is api/data-acquisition/{facilityId}/QueryPlan. An empty path
             // segment does not match {facilityId}, so the real pipeline returns 404
             // here -- NOT the 400 that the direct-call unit test asserts. The unit
             // test can't surface this difference because it bypasses routing.
             var client = _factory.CreateClient();
 
-            var response = await client.GetAsync("/api/data//QueryPlan?type=Monthly");
+            var response = await client.GetAsync($"{prefix}//QueryPlan?type=Monthly");
 
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
 
-        [Fact]
-        public async Task GetQueryPlan_ValidRequest_PassesValidationAndReachesAction()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task GetQueryPlan_ValidRequest_PassesValidationAndReachesAction(string prefix)
         {
             _factory.QueryPlanQueries.Reset();
             _factory.QueryPlanQueries
@@ -144,7 +161,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
 
             var client = _factory.CreateClient();
 
-            var response = await client.GetAsync("/api/data/facility-1/QueryPlan?type=Monthly");
+            var response = await client.GetAsync($"{prefix}/facility-1/QueryPlan?type=Monthly");
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             _factory.QueryPlanQueries.Verify(
@@ -153,7 +170,36 @@ namespace IntegrationTests.DataAcquisition.Controllers
         }
 
         [Fact]
-        public async Task CreateQueryPlan_NullBody_FrameworkReturns400_AndActionNeverRuns()
+        public async Task GetQueryPlan_LegacyPrefix_CountedWithControllerRouteTemplate()
+        {
+            // The counter's tag is what identifies a straggling caller, so it must be the
+            // controller's real attribute-route template, not the raw path with its facility id.
+            _factory.Metrics.Invocations.Clear();
+            var client = _factory.CreateClient();
+
+            await client.GetAsync("/api/data/facility-1/QueryPlan?type=Monthly");
+
+            _factory.Metrics.Verify(
+                x => x.IncrementPathRewriteCounter("api/data-acquisition/{facilityId}/QueryPlan", "GET"),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task GetQueryPlan_CanonicalPrefix_NotCounted()
+        {
+            _factory.Metrics.Invocations.Clear();
+            var client = _factory.CreateClient();
+
+            await client.GetAsync("/api/data-acquisition/facility-1/QueryPlan?type=Monthly");
+
+            _factory.Metrics.Verify(
+                x => x.IncrementPathRewriteCounter(It.IsAny<string>(), It.IsAny<string>()),
+                Times.Never);
+        }
+
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task CreateQueryPlan_NullBody_FrameworkReturns400_AndActionNeverRuns(string prefix)
         {
             // [Required, FromBody] QueryPlanApiModel with no request body: the body
             // model binder produces a validation error, so the [ApiController] filter
@@ -161,7 +207,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
             _factory.QueryPlanManager.Reset();
             var client = _factory.CreateClient();
 
-            var response = await client.PostAsync("/api/data/test-facility/QueryPlan", content: null);
+            var response = await client.PostAsync($"{prefix}/test-facility/QueryPlan", content: null);
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             _factory.QueryPlanManager.Verify(
@@ -169,8 +215,9 @@ namespace IntegrationTests.DataAcquisition.Controllers
                 Times.Never);
         }
 
-        [Fact]
-        public async Task CreateQueryPlan_EmptyBody_FrameworkReturns400_AndActionNeverRuns()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task CreateQueryPlan_EmptyBody_FrameworkReturns400_AndActionNeverRuns(string prefix)
         {
             // An empty JSON payload is also rejected before the action: the body fails
             // to bind / [Required] is unsatisfied.
@@ -178,7 +225,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
             var client = _factory.CreateClient();
 
             var response = await client.PostAsync(
-                "/api/data/test-facility/QueryPlan",
+                $"{prefix}/test-facility/QueryPlan",
                 new StringContent("", Encoding.UTF8, "application/json"));
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -187,13 +234,14 @@ namespace IntegrationTests.DataAcquisition.Controllers
                 Times.Never);
         }
 
-        [Fact]
-        public async Task UpdateQueryPlan_NullBody_FrameworkReturns400_AndActionNeverRuns()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task UpdateQueryPlan_NullBody_FrameworkReturns400_AndActionNeverRuns(string prefix)
         {
             _factory.QueryPlanManager.Reset();
             var client = _factory.CreateClient();
 
-            var response = await client.PutAsync("/api/data/test-facility/QueryPlan", content: null);
+            var response = await client.PutAsync($"{prefix}/test-facility/QueryPlan", content: null);
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             _factory.QueryPlanManager.Verify(
@@ -201,14 +249,15 @@ namespace IntegrationTests.DataAcquisition.Controllers
                 Times.Never);
         }
 
-        [Fact]
-        public async Task UpdateQueryPlan_EmptyBody_FrameworkReturns400_AndActionNeverRuns()
+        [Theory]
+        [MemberData(nameof(Prefixes))]
+        public async Task UpdateQueryPlan_EmptyBody_FrameworkReturns400_AndActionNeverRuns(string prefix)
         {
             _factory.QueryPlanManager.Reset();
             var client = _factory.CreateClient();
 
             var response = await client.PutAsync(
-                "/api/data/test-facility/QueryPlan",
+                $"{prefix}/test-facility/QueryPlan",
                 new StringContent("", Encoding.UTF8, "application/json"));
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -227,6 +276,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
     {
         public Mock<IQueryPlanManager> QueryPlanManager { get; } = new();
         public Mock<IQueryPlanQueries> QueryPlanQueries { get; } = new();
+        public Mock<IDataAcquisitionServiceMetrics> Metrics { get; } = new();
 
         protected override IHost CreateHost(IHostBuilder builder)
         {
@@ -263,6 +313,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
                             // about the pipeline, not data access.
                             services.AddSingleton(QueryPlanManager.Object);
                             services.AddSingleton(QueryPlanQueries.Object);
+                            services.AddSingleton(Metrics.Object);
 
                             // Satisfy [Authorize(Policy = IsLinkAdmin)] with a test scheme
                             // that always authenticates. The policy still requires an
@@ -276,7 +327,7 @@ namespace IntegrationTests.DataAcquisition.Controllers
                         })
                         .Configure(app =>
                         {
-                            app.UseRouting();
+                            app.UseRoutingWithLegacyRoutePrefix();
                             app.UseAuthentication();
                             app.UseAuthorization();
                             app.UseEndpoints(endpoints => endpoints.MapControllers());

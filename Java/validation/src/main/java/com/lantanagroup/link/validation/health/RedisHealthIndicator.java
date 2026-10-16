@@ -1,11 +1,11 @@
 package com.lantanagroup.link.validation.health;
 
+import com.lantanagroup.link.shared.health.TimedHealthIndicator;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -18,20 +18,19 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Reports Redis cache reachability under the "redis" component so the Admin BFF can map it to the
- * dashboard's Cache column. Registered only when {@code cache.type=redis} (the same condition that
+ * Reports Redis cache reachability. Registered only when {@code cache.type=redis} (the same condition that
  * creates the Redis connection factory). Spring's auto-configured Redis health indicator is disabled
  * (management.health.redis.enabled=false) in favor of this one: when Redis is unreachable, Lettuce's
  * reconnect / connection-acquisition path is not reliably bounded by the command timeout, so the
- * default indicator can leave /health hanging long enough for the BFF's 5s window to time out and
+ * default indicator can leave /health hanging long enough for the BFF's health-check window to time out and
  * report every column as N/A.
  * <p>
  * The PING runs on a separate thread bounded by {@link #checkTimeoutMs}, so a down cache is reported
  * DOWN within the deadline.
  */
-@Component("redis")
+@Component("Redis")
 @ConditionalOnProperty(name = "cache.type", havingValue = "redis")
-public class RedisHealthIndicator implements HealthIndicator {
+public class RedisHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(RedisHealthIndicator.class);
 
@@ -59,7 +58,7 @@ public class RedisHealthIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         if (checkRedisConnection()) {
             return Health.up().withDetail("Cache", "Available").build();
         } else {

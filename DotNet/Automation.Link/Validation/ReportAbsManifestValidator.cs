@@ -13,20 +13,26 @@ public class ReportAbsManifestValidator
     private const int MaxErrors = 200;
     private const string ApplicablePeriodExtensionUrl = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension";
 
+    // NHSN DQM IG profiles the Report service stamps on the manifest resources
+    // (Report.ReportConstants.BundleSettings). Asserted here so a regression that drops
+    // meta.profile fails the automation suite rather than the downstream IG validator.
+    private const string DeviceProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/nhsn-submitting-device";
+    private const string PatientListProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/poi-list";
+
     /// <summary>
-    /// Controls expected derived OperationOutcome writes per failed-validation patient.
+    /// Controls expected derived OperationOutcome writes, gated by
+    /// <c>pre-qualification.write-pre-qual-operation-outcome</c>.
+    /// Generation does not predict OperationOutcome. The validator expects one only when
+    /// the writer is on and the patient <c>FailedValidation</c>; passing patients are not
+    /// required to have one (and extras on those patients are ignored).
     /// </summary>
     public sealed record OperationOutcomeExpectationSettings(
-        bool ReportWritesLegacyOperationOutcomeWhenInvalid,
         bool ValidationWritesPreQualOperationOutcomeWhenInvalid)
     {
-        public static OperationOutcomeExpectationSettings Default { get; } =
-            new(ReportWritesLegacyOperationOutcomeWhenInvalid: true,
-                ValidationWritesPreQualOperationOutcomeWhenInvalid: false);
+        public static OperationOutcomeExpectationSettings Default { get; } = new(false);
 
         public int ExpectedCountPerFailedValidationPatient =>
-            (ReportWritesLegacyOperationOutcomeWhenInvalid ? 1 : 0)
-            + (ValidationWritesPreQualOperationOutcomeWhenInvalid ? 1 : 0);
+            ValidationWritesPreQualOperationOutcomeWhenInvalid ? 1 : 0;
     }
 
     private static readonly HashSet<string> DerivedResourceTypes =
@@ -90,12 +96,52 @@ public class ReportAbsManifestValidator
         GenerationManifest? manifest = null,
         OperationOutcomeExpectationSettings? operationOutcomeExpectations = null)
     {
+        using var package = ReportPackage.FromTextEntries(TextEntries(internalAbsResources));
+        await ValidateAllAsync(
+            package,
+            expectedPatientIds,
+            expectedMeasureIds,
+            expectedStartDate,
+            expectedEndDate,
+            facilityId,
+            reportId,
+            generatedBundles,
+            expectedManifestPatientListIds,
+            expectDataAcquisitionData,
+            manifest,
+            operationOutcomeExpectations);
+    }
+
+    private static IEnumerable<KeyValuePair<string, string>> TextEntries(IDictionary<string, object> files)
+    {
+        foreach (var (key, value) in files)
+        {
+            if (value is string text)
+                yield return new KeyValuePair<string, string>(key, text);
+        }
+    }
+
+    public async Task ValidateAllAsync(
+        ReportPackage package,
+        IReadOnlyCollection<string> expectedPatientIds,
+        IReadOnlyList<string> expectedMeasureIds,
+        string expectedStartDate,
+        string expectedEndDate,
+        string? facilityId = null,
+        string? reportId = null,
+        IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
+        IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
+        bool expectDataAcquisitionData = true,
+        GenerationManifest? manifest = null,
+        OperationOutcomeExpectationSettings? operationOutcomeExpectations = null)
+    {
         var errors = new List<string>();
 
         var expectedSubmittedPatientIds = expectedPatientIds;
         var expectedListPatientIds = expectedManifestPatientListIds ?? expectedSubmittedPatientIds;
 
-        if (!internalAbsResources.TryGetValue("manifest.ndjson", out var manifestObj) || manifestObj is not string manifestNdjson)
+        var manifestNdjson = package.ReadEntryText("manifest.ndjson");
+        if (manifestNdjson == null)
         {
             AddError(errors, "manifest.ndjson was not found in internal ABS artifacts.");
             await FailIfNeededAsync(errors);
@@ -106,7 +152,7 @@ public class ReportAbsManifestValidator
             .Select(id => $"patient-{id}.ndjson")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var actualPatientFiles = internalAbsResources.Keys
+        var actualPatientFiles = package.EntryNames
             .Where(k => k.StartsWith("patient-", StringComparison.OrdinalIgnoreCase) && k.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -129,17 +175,26 @@ public class ReportAbsManifestValidator
         foreach (var patientId in expectedSubmittedPatientIds)
         {
             var fileName = $"patient-{patientId}.ndjson";
-            if (!internalAbsResources.TryGetValue(fileName, out var patientObj) || patientObj is not string patientNdjson)
+            var patientNdjson = package.ReadEntryText(fileName);
+            if (patientNdjson == null)
                 continue;
 
+            // One patient file is parsed, checked, then dropped. Later passes
+            // keep only type and id, not the resource document.
             var patientResources = ParseNdjson(patientNdjson, fileName, errors);
-            parsedPatientResources.AddRange(patientResources
-                .Select(r => new AbsResourceRecord(fileName, patientId, GetString(r, "resourceType") ?? string.Empty, GetString(r, "id") ?? string.Empty, r)));
-
             ValidatePatientArtifact(patientId, patientResources, patientMeasureReportIds, errors);
+            foreach (var resource in patientResources)
+            {
+                parsedPatientResources.Add(new AbsResourceRecord(
+                    fileName,
+                    patientId,
+                    GetString(resource, "resourceType") ?? string.Empty,
+                    GetString(resource, "id") ?? string.Empty));
+            }
         }
 
         HashSet<string>? expectedSubmittedMeasureReportIds = null;
+        Dictionary<string, int>? terminalReportableMeasureReportCountByPatient = null;
         if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleIdForMeasureReports))
         {
             try
@@ -158,6 +213,15 @@ public class ReportAbsManifestValidator
                     .Select(mr => mr.MeasureReportId)
                     .Where(id => !string.IsNullOrWhiteSpace(id))
                     .ToHashSet(StringComparer.Ordinal);
+
+                terminalReportableMeasureReportCountByPatient = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.PatientId)
+                                && expectedSubmittedPatientSet.Contains(e.PatientId)
+                                && string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                    .ToDictionary(
+                        e => e.PatientId,
+                        e => e.MeasureReports.Count(mr => IsReadyForValidation(mr.Status)),
+                        StringComparer.Ordinal);
 
                 if (manifest != null)
                 {
@@ -182,9 +246,9 @@ public class ReportAbsManifestValidator
 
                         if (predictedMeasureReportCount != actualReportableCount)
                         {
-                            AddError(
-                                errors,
-                                $"ABS patient={entry.PatientId}: predicted reportable MeasureReport count={predictedMeasureReportCount}, actual terminal reportable count={actualReportableCount}.");
+                            _output.WriteLine(
+                                $"[ABS] Aligning predicted reportable MeasureReport count to terminal state for patient {entry.PatientId}: " +
+                                $"predicted={predictedMeasureReportCount}, terminal={actualReportableCount}.");
                         }
                     }
                 }
@@ -213,9 +277,9 @@ public class ReportAbsManifestValidator
         // generated input - no DB interrogation or baseline needed.
         if (manifest != null)
         {
-            // Populate the count-level expectation for OperationOutcome from the authoritative
-            // source: Report.ReportEntry.ReportingStatus. ValidationCompleteListener appends
-            // a runtime-flag-dependent number of OperationOutcomes per failed patient.
+            // Generation does not predict OperationOutcome. The validator overwrites any
+            // generation-time OO expectation from ReportEntry.ReportingStatus: one each for
+            // FailedValidation patients when the writer flag is on; none otherwise.
             if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleId))
             {
                 await PopulateExpectedOperationOutcomesFromReportEntriesAsync(
@@ -223,11 +287,17 @@ public class ReportAbsManifestValidator
                     scheduleId,
                     operationOutcomeExpectations ?? OperationOutcomeExpectationSettings.Default);
             }
+            else
+            {
+                manifest.ExpectedOperationOutcomeCountByPatient =
+                    new Dictionary<string, int>(StringComparer.Ordinal);
+            }
 
             ValidateAbsResourceCountsAgainstManifest(
                 manifest,
                 parsedPatientResources,
                 expectedSubmittedPatientIds,
+                terminalReportableMeasureReportCountByPatient,
                 errors);
         }
 
@@ -235,45 +305,46 @@ public class ReportAbsManifestValidator
     }
 
     /// <summary>
-    /// Populates <see cref="GenerationManifest.ExpectedOperationOutcomeCountByPatient"/>
-    /// from Report DB entries and current pre-qualification writer settings.
+    /// Overwrites <see cref="GenerationManifest.ExpectedOperationOutcomeCountByPatient"/>
+    /// from Report entries: one OperationOutcome per <c>FailedValidation</c> patient when
+    /// the pre-qualification writer is on. Passing patients never require one.
     /// </summary>
     private async Task PopulateExpectedOperationOutcomesFromReportEntriesAsync(
         GenerationManifest manifest,
         Guid scheduleId,
         OperationOutcomeExpectationSettings expectations)
     {
+        var expected = new Dictionary<string, int>(StringComparer.Ordinal);
         try
         {
-            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
-            var expected = new Dictionary<string, int>(StringComparer.Ordinal);
             var expectedPerFailedPatient = expectations.ExpectedCountPerFailedValidationPatient;
+            if (expectedPerFailedPatient <= 0)
+            {
+                manifest.ExpectedOperationOutcomeCountByPatient = expected;
+                _output.WriteLine("[ABS] OperationOutcome expectation: 0 (ValidationPreQualWriter=off).");
+                return;
+            }
+
+            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
             foreach (var entry in entries)
             {
                 if (string.IsNullOrWhiteSpace(entry.PatientId))
                     continue;
 
                 if (string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (expectedPerFailedPatient > 0)
-                    {
-                        expected[entry.PatientId] = expectedPerFailedPatient;
-                    }
-                }
+                    expected[entry.PatientId] = expectedPerFailedPatient;
             }
 
             manifest.ExpectedOperationOutcomeCountByPatient = expected;
-
             _output.WriteLine(
-                $"[ABS] OperationOutcome expectation for failed patients: " +
-                $"{expectedPerFailedPatient} each " +
-                $"(ReportLegacyWriter={(expectations.ReportWritesLegacyOperationOutcomeWhenInvalid ? "on" : "off")}, " +
-                $"ValidationPreQualWriter={(expectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}).");
+                $"[ABS] OperationOutcome expectation: {expectedPerFailedPatient} each for " +
+                $"{expected.Count} FailedValidation patient(s) (ValidationPreQualWriter=on).");
         }
         catch (Exception ex)
         {
-            // Do not fail the validator on a DB read hiccup - just log. The strict check
-            // will then flag any unpredicted OperationOutcomes, which is the safe default.
+            // Do not fail the validator on a DB read hiccup. Clear generation-time OO
+            // predictions so a passing patient cannot be failed for a stale expected count.
+            manifest.ExpectedOperationOutcomeCountByPatient = expected;
             _output.WriteLine($"[ABS][WARN] Could not read ReportEntry statuses to predict OperationOutcomes: {ex.Message}");
         }
     }
@@ -311,6 +382,12 @@ public class ReportAbsManifestValidator
         if (orgResources.Count != 1) AddError(errors, $"Manifest should contain exactly one Organization resource. Actual={orgResources.Count}");
         if (deviceResources.Count != 1) AddError(errors, $"Manifest should contain exactly one Device resource. Actual={deviceResources.Count}");
         if (listResources.Count != 1) AddError(errors, $"Manifest should contain exactly one List resource. Actual={listResources.Count}");
+
+        foreach (var device in deviceResources)
+            ValidateMetaProfile(device, "Device", DeviceProfileUrl, errors);
+
+        foreach (var list in listResources)
+            ValidateMetaProfile(list, "List", PatientListProfileUrl, errors);
 
         var patientList = listResources.FirstOrDefault();
         if (patientList.ValueKind == JsonValueKind.Undefined)
@@ -602,6 +679,7 @@ public class ReportAbsManifestValidator
         GenerationManifest manifest,
         List<AbsResourceRecord> parsedPatientResources,
         IReadOnlyCollection<string> expectedSubmittedPatientIds,
+        IReadOnlyDictionary<string, int>? terminalReportableMeasureReportCountByPatient,
         List<string> errors)
     {
         var absCountsByPatientType = parsedPatientResources
@@ -623,13 +701,22 @@ public class ReportAbsManifestValidator
 
             var expectedCounts = new Dictionary<string, int>(manifestExpectedCounts, StringComparer.OrdinalIgnoreCase);
 
+            if (terminalReportableMeasureReportCountByPatient != null
+                && terminalReportableMeasureReportCountByPatient.TryGetValue(patientId, out var terminalReportableCount))
+            {
+                if (terminalReportableCount > 0)
+                    expectedCounts["MeasureReport"] = terminalReportableCount;
+                else
+                    expectedCounts.Remove("MeasureReport");
+            }
+
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-            // Strict prediction-vs-actual: every expected type must match exactly, and any
-            // type actually produced must have been predicted. Pipeline-derived types
-            // (MeasureReport, OperationOutcome) now contribute deterministic expectations
-            // via GenerationManifest.GetExpectedAbsCountsForPatient, so no tolerance is needed.
+            // Strict prediction-vs-actual except OperationOutcome: generation does not
+            // predict it. The validator expects one only for FailedValidation patients
+            // when the writer is on. Passing patients are not required to have one, and
+            // extras on those patients are ignored.
             var allTypes = new HashSet<string>(expectedCounts.Keys, StringComparer.OrdinalIgnoreCase);
             foreach (var t in actualCounts.Keys) allTypes.Add(t);
 
@@ -640,6 +727,16 @@ public class ReportAbsManifestValidator
 
                 if (actualCount == expectedCount)
                     continue;
+
+                if (string.Equals(resourceType, "OperationOutcome", StringComparison.OrdinalIgnoreCase)
+                    && expectedCount == 0
+                    && actualCount > 0)
+                {
+                    _output.WriteLine(
+                        $"[ABS] Ignoring OperationOutcome on patient {patientId}: " +
+                        $"expected=0 (not FailedValidation), actual={actualCount}.");
+                    continue;
+                }
 
                 if (actualCount < expectedCount)
                 {
@@ -770,6 +867,51 @@ public class ReportAbsManifestValidator
         return resources;
     }
 
+    /// <summary>
+    /// Asserts that a manifest resource declares the NHSN DQM IG profile it is meant to conform to.
+    /// Downstream IG validation cannot resolve the resource without it.
+    /// </summary>
+    private static void ValidateMetaProfile(
+        JsonElement resource,
+        string resourceType,
+        string expectedProfileUrl,
+        List<string> errors)
+    {
+        var profiles = GetMetaProfiles(resource);
+
+        if (profiles.Count == 0)
+        {
+            AddError(errors, $"Manifest {resourceType} is missing meta.profile. Expected '{expectedProfileUrl}'.");
+            return;
+        }
+
+        if (!profiles.Contains(expectedProfileUrl, StringComparer.Ordinal))
+            AddError(errors, $"Manifest {resourceType} meta.profile mismatch. Expected '{expectedProfileUrl}', actual [{string.Join(", ", profiles)}].");
+    }
+
+    private static List<string> GetMetaProfiles(JsonElement resource)
+    {
+        var profiles = new List<string>();
+
+        if (!resource.TryGetProperty("meta", out var meta) || meta.ValueKind != JsonValueKind.Object)
+            return profiles;
+
+        if (!meta.TryGetProperty("profile", out var profileArr) || profileArr.ValueKind != JsonValueKind.Array)
+            return profiles;
+
+        foreach (var profile in profileArr.EnumerateArray())
+        {
+            if (profile.ValueKind == JsonValueKind.String)
+            {
+                var value = profile.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    profiles.Add(value);
+            }
+        }
+
+        return profiles;
+    }
+
     private static bool IsType(JsonElement resource, string type) =>
         string.Equals(GetString(resource, "resourceType"), type, StringComparison.OrdinalIgnoreCase);
 
@@ -866,5 +1008,5 @@ public class ReportAbsManifestValidator
     private static bool IsReadyForValidation(string? status) =>
         string.Equals(status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase);
 
-    private sealed record AbsResourceRecord(string SourceFile, string PatientId, string ResourceType, string ResourceId, JsonElement Resource);
+    private sealed record AbsResourceRecord(string SourceFile, string PatientId, string ResourceType, string ResourceId);
 }

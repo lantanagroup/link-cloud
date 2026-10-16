@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using Automation.UI.Models;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using System.Globalization;
 using System.IO.Compression;
@@ -47,50 +48,69 @@ public sealed class RunExportService : IRunExportService
         if (run == null)
             return null;
 
-        using var ms = new MemoryStream();
-        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        var path = Path.Combine(Path.GetTempPath(), "link-export-" + Guid.NewGuid().ToString("N") + ".zip");
+        try
         {
-            await SafeWriteAsync(archive, "RunDetails.txt",
-                () => Task.FromResult(BuildRunDetails(run)));
+            await using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+            using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                await SafeWriteAsync(archive, "RunDetails.txt",
+                    () => Task.FromResult(BuildRunDetails(run)));
 
-            await SafeWriteAsync(archive, "RunManifest.txt",
-                async () => await BuildRunManifestAsync(runId));
+                await SafeWriteAsync(archive, "RunManifest.txt",
+                    async () => await BuildRunManifestAsync(runId));
 
-            await SafeWriteAsync(archive, "LokiLogs.txt",
-                () => Task.FromResult(FilterLogs(run.Logs, IsLokiLine,
-                    "Loki error/diagnostic lines captured by the run.")));
+                await SafeWriteAsync(archive, "LokiLogs.txt",
+                    () => Task.FromResult(FilterLogs(run.Logs, IsLokiLine,
+                        "Loki error/diagnostic lines captured by the run.")));
 
-            await SafeWriteAsync(archive, "Kafka.txt",
-                () => Task.FromResult(FilterLogs(run.Logs, IsKafkaLine,
-                    "Kafka error/retry topic entries captured by the run.")));
+                await SafeWriteAsync(archive, "Kafka.txt",
+                    () => Task.FromResult(FilterLogs(run.Logs, IsKafkaLine,
+                        "Kafka error/retry topic entries captured by the run.")));
 
-            // Service-scoped sections sourced from the per-run pipeline snapshot,
-            // which is itself rebuilt from the persisted domain snapshots so this
-            // path makes no live cross-service calls.
-            var pipelineSnapshot = await SafeGetPipelineSnapshotAsync(runId, cancellationToken);
+                // Service-scoped sections sourced from the per-run pipeline snapshot,
+                // which is itself rebuilt from the persisted domain snapshots so this
+                // path makes no live cross-service calls.
+                var pipelineSnapshot = await SafeGetPipelineSnapshotAsync(runId, cancellationToken);
 
-            await SafeWriteAsync(archive, "Report.txt",
-                async () => await BuildReportSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "Report.txt",
+                    async () => await BuildReportSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "DataAcquisition.txt",
-                async () => await BuildDataAcquisitionSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "DataAcquisition.txt",
+                    async () => await BuildDataAcquisitionSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "Validation.txt",
-                async () => await BuildValidationSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "Validation.txt",
+                    async () => await BuildValidationSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "MeasureEval.txt",
-                async () => await BuildMeasureEvalSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "MeasureEval.txt",
+                    async () => await BuildMeasureEvalSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "Normalization.txt",
-                () => Task.FromResult(BuildNormalizationSection(run.Logs, pipelineSnapshot)));
+                await SafeWriteAsync(archive, "Normalization.txt",
+                    async () => await BuildNormalizationSectionAsync(runId, run.Logs, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "abs/_README.txt",
-                async () => await WriteAbsFilesAsync(archive, run, cancellationToken));
+                await SafeWriteAsync(archive, "LiveSimulation.json",
+                    async () => await BuildLiveSimulationSectionAsync(runId, cancellationToken));
+            }
+
+            await AppendAbsSectionAsync(path, run, cancellationToken);
+
+            return new RunExportPackage(
+                FileName: $"TestRunDiagnostics-{runId:D}.zip",
+                FilePath: path);
         }
+        catch
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (IOException)
+            {
+            }
 
-        return new RunExportPackage(
-            FileName: $"TestRunDiagnostics-{runId:D}.zip",
-            Content: ms.ToArray());
+            throw;
+        }
     }
 
     // --- Section builders ---
@@ -169,6 +189,22 @@ public sealed class RunExportService : IRunExportService
             WriteSubHeader(sb, "Expected ABS totals (generated ∩ acquired ∩ CQL-referenced)");
             foreach (var (type, count) in manifest.ExpectedAbsTotalCountsByType.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
                 sb.AppendLine($"  {type,-32} {count,8:N0}");
+
+            sb.AppendLine();
+            WriteSubHeader(sb, "Per-patient prediction");
+            WriteKvp(sb, "Expected submitted patients",
+                manifest.ExpectedSubmittedPatientIds.Count == 0
+                    ? "(none)"
+                    : string.Join(", ", manifest.ExpectedSubmittedPatientIds));
+
+            foreach (var patientId in manifest.PatientIds)
+            {
+                manifest.PatientEligibility.TryGetValue(patientId, out var qualifying);
+                manifest.PatientInpatientPatterns.TryGetValue(patientId, out var pattern);
+                var expected = manifest.ExpectedSubmittedPatientIds.Contains(patientId);
+                sb.AppendLine(
+                    $"  {patientId}  expectedSubmitted={expected}  qualifying=[{string.Join(", ", qualifying ?? [])}]  pattern={pattern ?? "-"}");
+            }
         }
 
         sb.AppendLine();
@@ -183,6 +219,8 @@ public sealed class RunExportService : IRunExportService
             WriteKvp(sb, "Patient Count", abs.PatientIds.Count.ToString(CultureInfo.InvariantCulture));
             WriteKvp(sb, "Manifest Resource Count", abs.ManifestResourceCount.ToString("N0", CultureInfo.InvariantCulture));
             WriteKvp(sb, "Manifest Resource Types", string.Join(", ", abs.ManifestResourceTypes));
+            WriteKvp(sb, "ABS patient IDs",
+                abs.PatientIds.Count == 0 ? "(none)" : string.Join(", ", abs.PatientIds));
 
             sb.AppendLine();
             WriteSubHeader(sb, "ABS totals by resource type");
@@ -208,6 +246,60 @@ public sealed class RunExportService : IRunExportService
                 abs.TotalCountsByType.TryGetValue(type, out var actual);
                 var delta = actual - expected;
                 sb.AppendLine($"  {type,-32} {expected,10:N0} {actual,10:N0} {delta,+10:+#,0;-#,0;0}");
+            }
+
+            sb.AppendLine();
+            WriteSubHeader(sb, "Expected vs actual patient artifacts");
+            var expectedPatients = manifest.ExpectedSubmittedPatientIds;
+            var actualPatients = abs.PatientIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var patientId in expectedPatients)
+            {
+                var present = actualPatients.Contains(patientId);
+                sb.AppendLine($"  patient-{patientId}.ndjson  {(present ? "PRESENT" : "MISSING")}");
+            }
+
+            var unexpected = abs.PatientIds
+                .Where(id => !expectedPatients.Contains(id, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            foreach (var patientId in unexpected)
+                sb.AppendLine($"  patient-{patientId}.ndjson  UNEXPECTED");
+
+            if (expectedPatients.Count > 0 && actualPatients.Count == 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("  NOTE: Predicted patients were omitted from ABS. Typical cause is MeasureEval");
+                sb.AppendLine("  Initial Population count=0 (ReportingStatus=NotReportable), which skips");
+                sb.AppendLine("  supplemental acquisition and does not write patient-*.ndjson.");
+            }
+        }
+
+        var entryRollup = (await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, "entries", default))?.Data;
+        if (entryRollup is { EntryCount: > 0 })
+        {
+            sb.AppendLine();
+            WriteSubHeader(sb, "Report entry status");
+            sb.AppendLine($"  Entries                      : {entryRollup.EntryCount}");
+            foreach (var status in entryRollup.ReportingStatuses)
+                sb.AppendLine($"  reporting {status.Status,-22} {status.Count,8:N0}");
+            foreach (var status in entryRollup.SubmissionStatuses)
+                sb.AppendLine($"  submission {status.Status,-21} {status.Count,8:N0}");
+            sb.AppendLine("  Per-patient rows stay in Report.");
+        }
+        else
+        {
+            var entries = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", default))?.Data;
+            if (entries is { Count: > 0 })
+            {
+                sb.AppendLine();
+                WriteSubHeader(sb, "Report entry status vs prediction");
+                foreach (var entry in entries)
+                {
+                    var expected = manifest?.ExpectedSubmittedPatientIds.Contains(entry.PatientId) == true;
+                    var measureStatuses = string.Join(", ", entry.MeasureReports.Select(mr => $"{mr.ReportType}:{mr.Status}"));
+                    sb.AppendLine(
+                        $"  {entry.PatientId}  expectedSubmitted={expected} reporting={entry.ReportingStatus} submission={entry.SubmissionStatus}" +
+                        (string.IsNullOrWhiteSpace(measureStatuses) ? "" : $"  [{measureStatuses}]"));
+                }
             }
         }
 
@@ -264,7 +356,7 @@ public sealed class RunExportService : IRunExportService
 
         await AppendRawDomainAsync(sb, runId, "schedule",      "Raw report schedule",      ct);
         await AppendRawDomainAsync(sb, runId, "entries",       "Raw report entries",       ct);
-        await AppendRawDomainAsync(sb, runId, "populations",   "Raw report populations",   ct);
+        await AppendPopulationCountsAsync(sb, runId, ct);
 
         return sb.ToString();
     }
@@ -280,10 +372,102 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.DataAcquisition is { } da)
             AppendServiceStats(sb, "Data Acquisition",
                 da.CompletionRatePerSecond, da.ResourceCount, da.AverageResourcesPerSecond,
-                da.StatusCounts, funnelCounts: null, da.ResourceTypeCounts, da.ThroughputBuckets, da.Errors);
+                da.StatusCounts, funnelCounts: null, da.ResourceTypeCounts, da.ThroughputBuckets, da.Errors,
+                da.ActiveDurationSeconds);
 
         await AppendRawDomainAsync(sb, runId, "acquisitionSummary", "Raw acquisition summary", ct);
+        await AppendAcquisitionLogsAsync(sb, runId, ct);
+        await AppendOrgLocationAsync(sb, runId, ct);
         return sb.ToString();
+    }
+
+    private async Task AppendAcquisitionLogsAsync(StringBuilder sb, Guid runId, CancellationToken ct)
+    {
+        var chart = (await _snapshotStore.GetDomainAsync<AcquisitionLogChart>(runId, "acquisitionLogs", ct))?.Data;
+        if (chart == null)
+        {
+            var legacy = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", ct))?.Data;
+            if (legacy is { Count: > 0 })
+                chart = RunHistorySlim.ToAcquisitionChart(legacy);
+        }
+
+        if (chart == null || chart.TotalLogs == 0)
+            return;
+
+        sb.AppendLine();
+        WriteSubHeader(sb, $"Acquisition log summary ({chart.TotalLogs})");
+        sb.AppendLine("  Individual logs are not kept on the run. Open Data Acquisition while the source is still there.");
+        sb.AppendLine($"  Completed                    : {chart.CompletedCount}");
+        sb.AppendLine($"  Skipped                      : {chart.SkippedCount}");
+        sb.AppendLine($"  Failed                       : {chart.FailureCount}");
+        sb.AppendLine($"  Duration ms (min/avg/max)    : {AcquisitionLogChart.FormatDuration(chart)}");
+        if (chart.ResourceTypeCounts.Count > 0)
+        {
+            sb.AppendLine("  Logs by resource type:");
+            foreach (var type in chart.ResourceTypeCounts)
+                sb.AppendLine($"    {type.Status,-28} {type.Count}");
+        }
+
+        if (chart.Failures.Count == 0)
+            return;
+
+        sb.AppendLine($"  Failure sample ({chart.Failures.Count} of {chart.FailureCount}):");
+        foreach (var failure in chart.Failures)
+        {
+            var types = string.Join(",", failure.ResourceTypes);
+            sb.AppendLine($"    log={failure.LogId} status={failure.Status} phase={failure.QueryPhase} types=[{types}] {failure.Message}");
+        }
+    }
+
+    private async Task AppendPopulationCountsAsync(StringBuilder sb, Guid runId, CancellationToken ct)
+    {
+        var counts = (await _snapshotStore.GetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, "populations", ct))?.Data;
+        if (counts == null)
+        {
+            var legacy = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", ct))?.Data;
+            if (legacy == null)
+                return;
+
+            counts = RunHistorySlim.ToPopulationCounts(legacy);
+        }
+
+        sb.AppendLine();
+        WriteSubHeader(sb, "Report populations");
+        sb.AppendLine($"  Report types                 : {counts.ReportTypeCount}");
+        sb.AppendLine($"  Group population sets        : {counts.GroupCount}");
+        sb.AppendLine($"  Measure-report references    : {counts.MeasureReportPopulationCount}");
+        sb.AppendLine("  Measure-report ids are not kept on the run. They stay in Report.");
+    }
+
+    private async Task AppendOrgLocationAsync(StringBuilder sb, Guid runId, CancellationToken ct)
+    {
+        var summary = (await _snapshotStore.GetDomainAsync<OrgLocationSummary>(runId, "orgLocation", ct))?.Data;
+        if (summary == null || summary.ConfigurationCount + summary.LocationMappingCount + summary.EncounterMappingCount == 0)
+        {
+            var legacy = (await _snapshotStore.GetDomainAsync<StoreBackedServicePoller.OrgLocationSnapshot>(runId, "orgLocation", ct))?.Data;
+            if (legacy != null)
+                summary = RunHistorySlim.SlimOrgLocation(legacy);
+        }
+
+        if (summary == null)
+            return;
+
+        sb.AppendLine();
+        WriteSubHeader(sb, "Org-location mapping (post-run)");
+
+        sb.AppendLine($"  Configurations           : {summary.ConfigurationCount} (active={summary.ActiveConfigurationCount})");
+        sb.AppendLine($"  Location mappings        : {summary.LocationMappingCount} (IsOrgLocation={summary.OrgLocationMappingCount})");
+        sb.AppendLine($"  Encounter mappings       : {summary.EncounterMappingCount} (MappedToOrg={summary.MappedToOrgCount})");
+        sb.AppendLine("  Location and encounter rows are not kept on the run. They stay in Data Acquisition.");
+
+        if (summary.ActiveConfigurationCount > 0
+            && summary.EncounterMappingCount > 0
+            && summary.MappedToOrgCount == 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("  WARNING: no encounters MappedToOrg. Data Acquisition strips those encounters");
+            sb.AppendLine("  before MeasureEval, which yields empty Initial Population and no ABS patient files.");
+        }
     }
 
     private async Task<string> BuildValidationSectionAsync(
@@ -297,7 +481,8 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.Validation is { } v)
             AppendServiceStats(sb, "Validation",
                 v.CompletionRatePerSecond, v.ResourceCount, v.AverageResourcesPerSecond,
-                v.StatusCounts, v.FunnelCounts, v.ResourceTypeCounts, v.ThroughputBuckets, v.Errors);
+                v.StatusCounts, v.FunnelCounts, v.ResourceTypeCounts, v.ThroughputBuckets, v.Errors,
+                v.ActiveDurationSeconds);
 
         if (pipeline?.ValidatorResults is { Count: > 0 } validators)
         {
@@ -322,15 +507,19 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.MeasureEval is { } me)
             AppendServiceStats(sb, "Measure Eval",
                 me.CompletionRatePerSecond, me.ResourceCount, me.AverageResourcesPerSecond,
-                me.StatusCounts, me.FunnelCounts, me.ResourceTypeCounts, me.ThroughputBuckets, me.Errors);
+                me.StatusCounts, me.FunnelCounts, me.ResourceTypeCounts, me.ThroughputBuckets, me.Errors,
+                me.ActiveDurationSeconds);
 
-        await AppendRawDomainAsync(sb, runId, "measureResources", "Raw measure-eval resource counts", ct);
+        await AppendRawDomainAsync(sb, runId, "measureResources", "Measure-eval resource counts by type", ct);
+        sb.AppendLine("  Per-patient measure rows are not kept on the run. They stay in Report.");
         return sb.ToString();
     }
 
-    private static string BuildNormalizationSection(
+    private async Task<string> BuildNormalizationSectionAsync(
+        Guid runId,
         IReadOnlyList<string> logs,
-        PipelineSummarySnapshotBuilder.PipelineSummarySnapshot? pipeline)
+        PipelineSummarySnapshotBuilder.PipelineSummarySnapshot? pipeline,
+        CancellationToken ct)
     {
         var sb = new StringBuilder();
         WriteHeader(sb, "NORMALIZATION");
@@ -338,10 +527,17 @@ public sealed class RunExportService : IRunExportService
         if (pipeline?.Normalization is { } n)
             AppendServiceStats(sb, "Normalization",
                 n.CompletionRatePerSecond, n.ResourceCount, n.AverageResourcesPerSecond,
-                n.StatusCounts, n.FunnelCounts, n.ResourceTypeCounts, n.ThroughputBuckets, n.Errors);
+                n.StatusCounts, n.FunnelCounts, n.ResourceTypeCounts, n.ThroughputBuckets, n.Errors,
+                n.ActiveDurationSeconds);
+
+        var evidence = await TryGetNormalizationEvidenceAsync(runId, ct);
+        sb.Append(NormalizationDiagnosticsWriter.FormatExportAppendix(evidence));
 
         var normalizationLines = logs
-            .Where(l => l.Contains("[Normalization]", StringComparison.OrdinalIgnoreCase)
+            .Where(l => l.Contains("[Normalization Suite]", StringComparison.OrdinalIgnoreCase)
+                        || l.Contains("[Snapshot][Norm", StringComparison.OrdinalIgnoreCase)
+                        || l.Contains("[runtime]", StringComparison.OrdinalIgnoreCase)
+                        || l.Contains("[Normalization]", StringComparison.OrdinalIgnoreCase)
                         || l.Contains("normalizing", StringComparison.OrdinalIgnoreCase)
                         || l.Contains("ResourceNormalized", StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -355,6 +551,72 @@ public sealed class RunExportService : IRunExportService
         }
 
         return sb.ToString();
+    }
+
+    private async Task<NormalizationEvidenceSnapshot?> TryGetNormalizationEvidenceAsync(Guid runId, CancellationToken ct)
+    {
+        try
+        {
+            var header = (await _snapshotStore.GetDomainAsync<NormalizationEvidenceSnapshot>(
+                runId, NormalizationEvidenceSnapshot.Domain, ct))?.Data;
+            if (header == null || header.EvidenceChunkCount <= 0)
+                return header;
+
+            var chunks = new List<NormalizationEvidenceChunk>();
+            for (var index = 1; index <= header.EvidenceChunkCount; index++)
+            {
+                var chunk = (await _snapshotStore.GetDomainAsync<NormalizationEvidenceChunk>(
+                    runId, NormalizationEvidenceSnapshot.ChunkDomain(index), ct))?.Data;
+                if (chunk != null)
+                    chunks.Add(chunk);
+            }
+
+            return NormalizationDiagnosticsWriter.Assemble(header, chunks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Export][{RunId}] Failed to read normalization evidence snapshot.", runId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Adds the ABS section by swapping in a finished copy of the diagnostics file.
+    /// A failure while writing <c>abs/</c> deletes that copy, so the returned
+    /// archive does not keep a partial live section.
+    /// </summary>
+    private async Task AppendAbsSectionAsync(string exportPath, AutomationRunSummary run, CancellationToken ct)
+    {
+        try
+        {
+            await ZipSectionCommit.CommitAsync(exportPath, async (archive, token) =>
+            {
+                var readme = await WriteAbsFilesAsync(archive, run, token);
+                await WriteEntryAsync(archive, "abs/_README.txt", readme);
+            }, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Export][{RunId}] Failed while committing the ABS section.", run.RunId);
+            await AppendTextEntryAsync(
+                exportPath,
+                "abs/_README.txt.ERROR.txt",
+                $"Failed to build this section: {ex.GetType().Name}: {ex.Message}",
+                ct);
+        }
+    }
+
+    private static async Task AppendTextEntryAsync(string zipPath, string entryName, string content, CancellationToken ct)
+    {
+        await ZipSectionCommit.CommitAsync(zipPath, (archive, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            return WriteEntryAsync(archive, entryName, content);
+        }, ct);
     }
 
     /// <summary>
@@ -381,13 +643,13 @@ public sealed class RunExportService : IRunExportService
             return sb.ToString();
         }
 
-        // Preferred path: re-download internal ABS at export time.
-        var downloaded = await TryDownloadInternalAbsAsync(run, ct);
-        if (downloaded is { Count: > 0 })
+        // Preferred path: re-download internal ABS at export time, one entry at a time.
+        var listing = new StringBuilder();
+        if (await TryCopyInternalAbsIntoArchiveAsync(archive, run, listing, ct))
         {
             sb.AppendLine("Source: live download from Submission Service (external=false).\n");
             AppendAbsLocatorDetails(sb, locator, run);
-            WriteAbsFilesToArchive(archive, downloaded, sb);
+            sb.Append(listing);
             return sb.ToString();
         }
 
@@ -417,47 +679,108 @@ public sealed class RunExportService : IRunExportService
         return sb.ToString();
     }
 
-    private async Task<Dictionary<string, string>?> TryDownloadInternalAbsAsync(AutomationRunSummary run, CancellationToken ct)
+    private async Task<bool> TryCopyInternalAbsIntoArchiveAsync(
+        ZipArchive archive,
+        AutomationRunSummary run,
+        StringBuilder listing,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(run.FacilityId) || string.IsNullOrWhiteSpace(run.ReportId))
-            return null;
+            return false;
 
+        var tempPath = ReportPackage.CreateTempPath();
+        var stageDir = Path.Combine(Path.GetTempPath(), "link-abs-" + Guid.NewGuid().ToString("N"));
+        var staged = new List<(string Name, string Path, int CharCount)>();
         try
         {
-            var response = await _submissionClient.DownloadSubmissionAsync(run.FacilityId, run.ReportId, external: false, cancellationToken: ct);
-            if (!response.IsSuccessStatusCode || response.Body == null || response.Body.Length < 4)
-                return null;
-
-            var bytes = response.Body;
-            var isZipPayload = bytes[0] == 0x50
-                               && bytes[1] == 0x4B
-                               && bytes[2] == 0x03
-                               && bytes[3] == 0x04;
-            if (!isZipPayload)
-                return null;
-
-            using var zipStream = new MemoryStream(bytes);
-            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-
-            var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in archive.Entries)
+            var stagedOk = false;
+            try
             {
-                if (entry.Length == 0)
-                    continue;
+                await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+                {
+                    var result = await _submissionClient.CopySubmissionAsync(
+                        run.FacilityId, run.ReportId, file, external: false, cancellationToken: ct);
+                    if (!result.IsSuccess)
+                        return false;
+                }
 
-                using var entryStream = entry.Open();
-                using var reader = new StreamReader(entryStream);
-                files[entry.FullName] = await reader.ReadToEndAsync(ct);
+                if (!ReportPackage.HasZipHeader(tempPath))
+                    return false;
+
+                using var package = ReportPackage.Open(tempPath, deleteOnDispose: true);
+                var names = package.EntryNames
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (names.Count == 0)
+                    return false;
+
+                // Stage every entry before touching the diagnostics archive. A later
+                // failure must not leave a partial live copy next to the fallback note.
+                Directory.CreateDirectory(stageDir);
+                foreach (var name in names)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var stagedPath = Path.Combine(stageDir, Guid.NewGuid().ToString("N"));
+                    await using var stagedFile = new FileStream(stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
+                    var charCount = await package.CopyEntryTextToAsync(name, stagedFile, ct);
+                    if (charCount == null)
+                        return false;
+
+                    staged.Add((name, stagedPath, charCount.Value));
+                }
+
+                stagedOk = true;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "[Export][{RunId}] Failed to live-download internal ABS artifacts for facility={FacilityId} report={ReportId}.",
+                    run.RunId, run.FacilityId, run.ReportId);
+                return false;
             }
 
-            return files;
+            if (!stagedOk)
+                return false;
+
+            listing.AppendLine($"Total files: {staged.Count:N0}");
+            listing.AppendLine();
+            foreach (var (name, stagedPath, charCount) in staged)
+            {
+                ct.ThrowIfCancellationRequested();
+                listing.AppendLine($"  {name}  ({charCount:N0} chars)");
+
+                var entry = archive.CreateEntry($"abs/{name}", CompressionLevel.Optimal);
+                await using var target = entry.Open();
+                await using var source = new FileStream(stagedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+                await source.CopyToAsync(target, 81920, ct);
+            }
+
+            return true;
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogWarning(ex,
-                "[Export][{RunId}] Failed to live-download internal ABS artifacts for facility={FacilityId} report={ReportId}.",
-                run.RunId, run.FacilityId, run.ReportId);
-            return null;
+            try
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch (IOException)
+            {
+                // The package dispose already tries to delete this file.
+            }
+
+            try
+            {
+                if (Directory.Exists(stageDir))
+                    Directory.Delete(stageDir, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
         }
     }
 
@@ -521,8 +844,9 @@ public sealed class RunExportService : IRunExportService
             object? data = domain switch
             {
                 "schedule"           => (await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, domain, ct))?.Data,
-                "entries"            => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, domain, ct))?.Data,
-                "populations"        => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, domain, ct))?.Data,
+                "entries"            => (object?)(await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, domain, ct))?.Data
+                    ?? (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, domain, ct))?.Data,
+                "populations"        => (await _snapshotStore.GetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, domain, ct))?.Data,
                 "acquisitionSummary" => (await _snapshotStore.GetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, domain, ct))?.Data,
                 "measureResources"   => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, domain, ct))?.Data,
                 "validatorResults"   => (await _snapshotStore.GetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, domain, ct))?.Data,
@@ -554,12 +878,16 @@ public sealed class RunExportService : IRunExportService
         IReadOnlyList<PipelineSummarySnapshotBuilder.CategoryCountSnapshot>? funnelCounts,
         IReadOnlyList<PipelineSummarySnapshotBuilder.CategoryCountSnapshot>? resourceTypeCounts,
         IReadOnlyList<PipelineSummarySnapshotBuilder.ThroughputBucketSnapshot>? throughput,
-        IReadOnlyList<string>? errors)
+        IReadOnlyList<string>? errors,
+        double? activeDurationSeconds = null)
     {
         WriteKvp(sb, "Service", serviceName);
         WriteKvp(sb, "Completion rate (events/s)", completionRatePerSecond.ToString("F2", CultureInfo.InvariantCulture));
         WriteKvp(sb, "Resource count", resourceCount.ToString("N0", CultureInfo.InvariantCulture));
         WriteKvp(sb, "Avg resources/s", avgResourcesPerSecond.ToString("F2", CultureInfo.InvariantCulture));
+        WriteKvp(sb, "Active duration", activeDurationSeconds is > 0
+            ? $"{activeDurationSeconds.Value.ToString("F2", CultureInfo.InvariantCulture)}s"
+            : "n/a");
 
         AppendCounts(sb, "Status counts", statusCounts);
         AppendCounts(sb, "Funnel counts", funnelCounts);
@@ -623,6 +951,10 @@ public sealed class RunExportService : IRunExportService
             var content = await contentFactory();
             await WriteEntryAsync(archive, entryName, content);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[Export] Failed to build {Entry}; emitting placeholder.", entryName);
@@ -672,5 +1004,18 @@ public sealed class RunExportService : IRunExportService
             // Not valid JSON — return the original text so the caller still sees something.
             return json;
         }
+    }
+
+    private async Task<string> BuildLiveSimulationSectionAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        var snapshot = await _snapshotStore.GetDomainAsync<LiveSimulationDiagnostics>(
+            runId,
+            LivePatientEventInjector.SnapshotDomain,
+            cancellationToken);
+
+        if (snapshot?.Data == null)
+            return "{\n  \"message\": \"No live simulation snapshot persisted for this run.\"\n}";
+
+        return JsonSerializer.Serialize(snapshot.Data, PrettyJson);
     }
 }

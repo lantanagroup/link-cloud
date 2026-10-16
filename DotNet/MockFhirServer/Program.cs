@@ -94,7 +94,7 @@ app.MapGet("/fhir/{resourceType}/{id}", async (
         await store.EnsurePatientGeneratedAsync(id, ct);
     }
 
-    var resource = store.GetById(resourceType, id);
+    var resource = await store.GetByIdAsync(resourceType, id, ct);
     if (resource == null)
         return Results.NotFound(FhirNotFound(resourceType, id));
 
@@ -195,7 +195,7 @@ static async Task<IResult> ExecuteFhirSearch(
 
 static IResult WriteFhirResponse(Base resource)
 {
-    var serializer = new FhirJsonSerializer(new SerializerSettings { Pretty = false });
+    var serializer = new FhirJsonSerializer();
     var json = serializer.SerializeToString(resource);
     return Results.Content(json, "application/fhir+json; charset=utf-8");
 }

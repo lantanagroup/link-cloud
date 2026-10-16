@@ -53,6 +53,8 @@ public class ReadFhirCommand : IReadFhirCommand
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService), "Authentication retrieval service cannot be null.");
     }
 
+    protected virtual HttpMessageHandler CreateInnerHttpMessageHandler() => new HttpClientHandler();
+
     public async Task<DomainResource> ExecuteAsync(ReadFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("ReadFhirCommand.ExecuteAsync");
@@ -77,23 +79,20 @@ public class ReadFhirCommand : IReadFhirCommand
         _logger.LogDebug(
             "Semaphore: Read acquire attempt facility={FacilityId} resource={ResourceType}/{ResourceId} maxConcurrent={MaxConcurrent}",
             maskedFacilityId, request.resourceType, maskedResourceId, maxConcurrent);
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+        using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
                 "Semaphore: Read acquired facility={FacilityId} resource={ResourceType}/{ResourceId} waitMs={WaitMs}",
                 maskedFacilityId, request.resourceType, maskedResourceId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
+            var innerHandler = CreateInnerHttpMessageHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
             var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
-            var fhirClient = new FhirClient(request.baseUrl.Trim('/'), httpClientWithHandler, new FhirClientSettings
-            {
-                PreferredFormat = ResourceFormat.Json
-            });
+            var fhirClient = FhirCommandUtils.CreateFhirClient(request.baseUrl.Trim('/'), httpClientWithHandler);
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
                 if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)

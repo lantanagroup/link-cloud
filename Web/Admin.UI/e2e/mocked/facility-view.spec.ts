@@ -10,7 +10,7 @@ import { IPagedReportSchedule } from '../../src/app/interfaces/report/report-sch
 const facility = testFacilities[0];
 const facilityId = facility.facilityId;
 const SUMMARIES = '/api/aggregate/reports/summaries';
-const LOCATION_MAPPINGS = '/api/data/location-mappings';
+const LOCATION_MAPPINGS = '/api/data-acquisition/location-mappings';
 
 // The screen is scoped to one facility, so every schedule it lists belongs to that facility.
 const schedules = reportSchedules.map((r) => ({ ...r, facilityId }));
@@ -186,7 +186,7 @@ test('Configuration navigates to the facility edit screen', async ({ page, api }
   await expect(page.getByTestId('facility-edit-header')).toHaveText(`Facility: ${facilityId}`);
 });
 
-test('the Locations tab loads its mappings only once opened', async ({ page, api }) => {
+test('the Org Locations tab loads its mappings only once opened', async ({ page, api }) => {
   mockFacilityView(api);
   api.mock(`GET ${LOCATION_MAPPINGS}/facility/${facilityId}/search`, pagedLocationMappings());
 
@@ -196,7 +196,7 @@ test('the Locations tab loads its mappings only once opened', async ({ page, api
   // The tab body sits behind an *ngTemplate matTabContent — nothing is fetched until it is shown.
   expect(api.callsTo('GET', LOCATION_MAPPINGS)).toHaveLength(0);
 
-  await view.tab('Locations').click();
+  await view.tab('Org Locations').click();
 
   await expect.poll(() => api.callsTo('GET', LOCATION_MAPPINGS).length).toBe(1);
   // Cell-scoped: the alias "SURG" is also a substring of its row's other columns.

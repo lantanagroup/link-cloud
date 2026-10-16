@@ -3,7 +3,6 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
@@ -241,26 +240,4 @@ public class BaseEntityRepository<T, TDbContext> : IBaseEntityRepository<T>
         return sortExpression;
     }
 
-
-    public async Task<HealthCheckResult> HealthCheck(int eventId)
-    {
-        try
-        {
-            bool outcome = await _dbContext.Database.CanConnectAsync();
-
-            if (outcome)
-            {
-                return HealthCheckResult.Healthy();
-            }
-            else
-            {
-                return HealthCheckResult.Unhealthy();
-            }
-
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy(exception: ex);
-        }
-    }
 }

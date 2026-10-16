@@ -20,7 +20,7 @@ import {
   IOrganizationLocationMappingModel,
 } from '../../src/app/interfaces/data-acquisition/organization-location-mapping-model.interface';
 import { IFacilityConfigModel } from '../../src/app/interfaces/tenant/facility-config-model.interface';
-import { Vendor } from '../../src/app/interfaces/tenant/vendor.enum';
+import { vendorVersions } from '../fixtures/vendors';
 
 /**
  * A single, continuous session that walks the facility journey the way a person would:
@@ -40,13 +40,16 @@ const facility = testFacilities[0];
 const facilityId = facility.facilityId;
 const schedules = reportSchedules.map((r) => ({ ...r, facilityId }));
 
+/** The form picks a vendor *version*; the POST then carries the vendor and version id apart. */
+const vendorVersion = vendorVersions[0];
+
 /** The facility the walkthrough creates through the UI, and the census cron it hands it. */
 const newFacility = {
   id: '33333333-3333-3333-3333-333333333333',
   facilityId: 'DemoFacility03',
   facilityName: 'Riverside Demo Hospital',
   timeZone: 'America/Denver',
-  vendor: Vendor.Epic,
+  vendor: { id: vendorVersion.vendorId, name: vendorVersion.vendorName },
   monthlyReport: measureDefinitions[0].id,
 };
 const newCensusTrigger = '0 0 6 * * ?';
@@ -148,25 +151,25 @@ function mockFacilityDetail(
   detail: { locations?: IOrganizationLocationMappingModel[]; encounters?: IEncounterMappingModel[] } = {},
 ): void {
   // Facility view
-  api.mock(`GET /api/data/location-mappings/facility/${id}/search`, pagedLocationMappings(detail.locations));
-  api.mock(`GET /api/data/encounter-mappings/facilities/${id}/search`, pagedEncounterMappings(detail.encounters));
+  api.mock(`GET /api/data-acquisition/location-mappings/facility/${id}/search`, pagedLocationMappings(detail.locations));
+  api.mock(`GET /api/data-acquisition/encounter-mappings/facilities/${id}/search`, pagedEncounterMappings(detail.encounters));
 
   // Facility edit
   api.mock(`GET /api/normalization/operations/facility/${id}`, pagedOperations());
-  api.mock(`GET /api/data/${id}/fhirQueryConfiguration`, {
+  api.mock(`GET /api/data-acquisition/${id}/fhirQueryConfiguration`, {
     id: `fq-${id}`,
     facilityId: id,
     fhirServerBaseUrl: 'https://fhir.example.org/r4',
   });
-  api.mock(`GET /api/data/${id}/fhirQueryList`, {
+  api.mock(`GET /api/data-acquisition/${id}/fhirQueryList`, {
     id: `fl-${id}`,
     facilityId: id,
     fhirBaseServerUrl: 'https://fhir.example.org/r4',
     ehrPatientLists: [],
   });
-  api.mock(`GET /api/data/${id}/sftp-configurations`, notConfigured);
-  api.mock(`GET /api/data/${id}/QueryPlan`, notConfigured);
-  api.mock(`GET /api/data/location-config/facility/${id}`, []);
+  api.mock(`GET /api/data-acquisition/${id}/sftp-configurations`, notConfigured);
+  api.mock(`GET /api/data-acquisition/${id}/QueryPlan`, notConfigured);
+  api.mock(`GET /api/data-acquisition/location-config/facility/${id}`, []);
 }
 
 /** Every endpoint the walkthrough touches, in one place. */
@@ -228,8 +231,8 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await view.showDeletedCheckbox.uncheck();
   });
 
-  await stage('visit the Locations and Encounters tabs', async () => {
-    await view.tab('Locations').click();
+  await stage('visit the Org Locations and Encounters tabs', async () => {
+    await view.tab('Org Locations').click();
     await expect(page.getByRole('cell', { name: 'LOC-001', exact: true })).toBeVisible();
 
     await view.tab('Encounters').click();
@@ -279,7 +282,7 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await page.getByRole('option', { name: newFacility.timeZone, exact: true }).click();
 
     await dialog.getByRole('combobox', { name: 'Vendor' }).click();
-    await page.getByRole('option', { name: newFacility.vendor, exact: true }).click();
+    await page.getByRole('option', { name: `${vendorVersion.vendorName} - ${vendorVersion.version}`, exact: true }).click();
 
     await dialog.getByRole('combobox', { name: 'Monthly' }).click();
     await page.getByRole('option', { name: newFacility.monthlyReport }).click();
@@ -294,6 +297,7 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
       facilityName: newFacility.facilityName,
       timeZone: newFacility.timeZone,
       vendor: newFacility.vendor,
+      vendorVersionId: vendorVersion.id,
       scheduledReports: { daily: [], weekly: [], monthly: [newFacility.monthlyReport] },
     });
   });

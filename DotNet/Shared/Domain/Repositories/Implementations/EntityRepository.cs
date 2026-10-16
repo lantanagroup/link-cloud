@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -54,6 +53,17 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
         public void Remove(T entity)
         {
             _dbContext.Set<T>().Remove(entity);
+        }
+
+        public Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate)
+        {
+            return ExecuteDeleteAsync(predicate, CancellationToken.None);
+        }
+
+        public async Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return await _dbContext.Set<T>().Where(predicate).ExecuteDeleteAsync(cancellationToken);
         }
 
         // Query Methods
@@ -228,28 +238,6 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
         {
             cancellationToken.ThrowIfCancellationRequested();
             await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        // Health Check
-        public Task<HealthCheckResult> HealthCheck(int eventId)
-        {
-            return HealthCheck(eventId, CancellationToken.None);
-        }
-
-        public async Task<HealthCheckResult> HealthCheck(int eventId, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            bool outcome = await _dbContext.Database.CanConnectAsync(cancellationToken);
-
-            if (outcome)
-            {
-                return HealthCheckResult.Healthy();
-            }
-            else
-            {
-                return HealthCheckResult.Unhealthy();
-            }
         }
 
         // Private Helper Methods

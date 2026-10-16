@@ -171,44 +171,49 @@ namespace LantanaGroup.Link.Submission.Application.Services
             await stream.WriteAsync(content, cancellationToken);
         }
 
-        private async Task<IDictionary<string, byte[]>> DownloadAsync(BlobContainerClient containerClient, string prefix, CancellationToken cancellationToken = default)
-        {
-            IDictionary<string, byte[]> files = new Dictionary<string, byte[]>();
-            await foreach (BlobItem blob in containerClient.GetBlobsAsync(BlobTraits.None, BlobStates.None, prefix, cancellationToken))
-            {
-                _logger.LogDebug("Downloading: {}", blob.Name);
-                BlockBlobClient blobClient = containerClient.GetBlockBlobClient(blob.Name);
-                using Stream input = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
-                using MemoryStream output = new();
-                await input.CopyToAsync(output, cancellationToken);
-                _logger.LogDebug("Downloaded: {} byte(s)", output.Length);
-                string fileName = blob.Name.Split('/').Last();
-                files.Add(fileName, output.ToArray());
-            }
-            return files;
-        }
-
-        public Task<IDictionary<string, byte[]>> DownloadFromInternalAsync(string payloadRootUri, CancellationToken cancellationToken = default)
+        public Task WriteInternalAsZipAsync(string payloadRootUri, Stream destination, CancellationToken cancellationToken = default)
         {
             if (!HasInternalClient())
-            {
                 throw new InvalidOperationException("Not configured for internal blob storage.");
-            }
-            BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
-            string prefix = uriBuilder.BlobName;
-            return DownloadAsync(_internalContainerClient, prefix, cancellationToken);
+
+            var prefix = new BlobUriBuilder(new Uri(payloadRootUri)).BlobName;
+            return WriteContainerPrefixAsZipAsync(_internalContainerClient!, prefix, destination, cancellationToken);
         }
 
-        public Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(ICollection<string> reportTypes, string payloadRootUri, CancellationToken cancellationToken = default)
+        public Task WriteExternalAsZipAsync(ICollection<string> reportTypes, string payloadRootUri, Stream destination, CancellationToken cancellationToken = default)
         {
             if (!HasExternalClient())
-            {
                 throw new InvalidOperationException("Not configured for external blob storage.");
-            }
+
             string? measurePrefix = GetMeasurePrefix(reportTypes);
-            BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
-            string prefix = ChangeBlobRoot(measurePrefix, uriBuilder.BlobName);
-            return DownloadAsync(_externalContainerClient, prefix, cancellationToken);
+            var blobName = new BlobUriBuilder(new Uri(payloadRootUri)).BlobName;
+            var prefix = ChangeBlobRoot(measurePrefix, blobName);
+            return WriteContainerPrefixAsZipAsync(_externalContainerClient!, prefix, destination, cancellationToken);
+        }
+
+        private Task WriteContainerPrefixAsZipAsync(
+            BlobContainerClient container,
+            string prefix,
+            Stream destination,
+            CancellationToken cancellationToken) =>
+            SubmissionZipWriter.WriteAsync(destination, EnumerateBlobsAsync(container, prefix, cancellationToken), cancellationToken);
+
+        private async IAsyncEnumerable<SubmissionZipWriter.Entry> EnumerateBlobsAsync(
+            BlobContainerClient container,
+            string prefix,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (BlobItem blob in container.GetBlobsAsync(BlobTraits.None, BlobStates.None, prefix, cancellationToken))
+            {
+                var fileName = blob.Name.Split('/').Last();
+                var blobName = blob.Name;
+                yield return new SubmissionZipWriter.Entry(fileName, async token =>
+                {
+                    _logger.LogDebug("Adding blob {BlobName} to submission zip.", blobName);
+                    var blobClient = container.GetBlockBlobClient(blobName);
+                    return await blobClient.OpenReadAsync(cancellationToken: token).ConfigureAwait(false);
+                });
+            }
         }
     }
 }

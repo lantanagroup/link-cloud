@@ -8,11 +8,12 @@ import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
-import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
@@ -38,7 +39,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<ResourceKey, T> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AbstractAsyncConsumer<ResourceKey, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private static final Logger performanceLogger = LoggerFactory.getLogger("com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
 
@@ -53,6 +54,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
     private final RedisResourceService redisResourceService;
     private final AbsResourceService absResourceService;
+    private final ResourceCacheCleanup cacheCleanup;
     private final MongoOperations mongoOperations;
 
     public AbstractResourceConsumer (
@@ -79,6 +81,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.blobStorageService = blobStorageService;
         this.redisResourceService = redisResourceService;
         this.absResourceService = absResourceService;
+        this.cacheCleanup = new ResourceCacheCleanup(redisResourceService, absResourceService);
         this.mongoOperations = mongoOperations;
     }
 
@@ -88,6 +91,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         StopWatch totalStopWatch = perf ? new StopWatch() : null;
         StopWatch taskStopWatch = perf ? new StopWatch() : null;
         if (perf) totalStopWatch.start();
+
+        String correlationId = null;
+        CacheType cacheType = null;
+        boolean keepCacheForSupplemental = false;
 
         try {
             Span currentSpan = Span.current();
@@ -114,14 +121,18 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (value.getCacheType() == null) {
                 throw new ValidationException("Cache Type is null.");
             }
-            String correlationId = value.getCacheKey();
+            cacheType = value.getCacheType();
+            correlationId = value.getCacheKey();
             if (correlationId == null || correlationId.isEmpty()) {
                 throw new ValidationException("Cache Key is null or empty.");
             }
             if (perf) taskStopWatch.stop();
 
             if (perf) taskStopWatch.start("incrementRecordCount");
-            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.CORRELATION_ID), correlationId).build();
+            Attributes attributes = Attributes.builder()
+                    .put(stringKey(DiagnosticNames.FACILITY_ID), facilityId)
+                    .put(stringKey(DiagnosticNames.PHASE), DiagnosticNames.normalizePhase(value.getQueryType() != null ? value.getQueryType().toString() : null))
+                    .build();
             measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
             if (perf) taskStopWatch.stop();
 
@@ -134,8 +145,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                     value.getCacheType(),
                     value.getQueryType(),
                     value.getScheduledReports() != null ? value.getScheduledReports().size() : 0);
-
-            CacheType cacheType = value.getCacheType();
 
             if (perf) taskStopWatch.start("readResources");
             long readStart = perf ? System.nanoTime() : 0;
@@ -161,7 +170,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             }
 
             if (resources.isEmpty()) {
-                logger.info("Cache empty for correlationId={}; evaluating with empty bundle to produce a not-reportable report", correlationId);
+                logger.warn(
+                        "Cache empty for correlationId={}; evaluating with empty bundle to produce a not-reportable report. " +
+                        "If this patient had acquired resources, the resource-cache write/copy path failed.",
+                        LogUtils.sanitize(correlationId));
             }
 
             logger.trace("Beginning patient status update");
@@ -169,8 +181,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             PatientReportingEvaluationStatus patientStatus = patientStatusCache.computeIfAbsent(correlationId, k -> {
                 if (perf) taskStopWatch.start("retrieveOrCreatePatientStatus");
                 PatientReportingEvaluationStatus _patientStatus = Objects.requireNonNullElseGet(
-                        retrievePatientStatus(facilityId, correlationId),
-                        () -> createPatientStatus(facilityId, correlationId, patientId, value));
+                        retrievePatientStatus(facilityId, k),
+                        () -> createPatientStatus(facilityId, k, patientId, value));
                 if (perf) taskStopWatch.stop();
 
                 return _patientStatus;
@@ -195,13 +207,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             // Evaluate measures and determine reportability.
             if (perf) taskStopWatch.start("evaluateMeasures");
             long kafkaIngestTimestamp = record.timestamp();
-            boolean reportablePatient = evaluateMeasures(value, patientStatus, bundle, kafkaIngestTimestamp);
+            boolean reportablePatient = evaluateMeasures(value, patientStatus, bundle, kafkaIngestTimestamp, record.headers());
             if (perf) taskStopWatch.stop();
 
             bundle = null;
 
             boolean initialReportable =
                     value.getQueryType() == QueryType.INITIAL && reportablePatient;
+
+            // INITIAL + reportable keeps the cache for the SUPPLEMENTAL pass to reuse; every other
+            // successful outcome cleans it up below.
+            keepCacheForSupplemental = initialReportable;
 
             if (initialReportable) {
                 logger.debug("Skipping Mongo write for INITIAL reportable patient, correlationId={}",
@@ -214,25 +230,28 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                         resources.size(), correlationId);
             }
 
-            // Clean up cache after SUPPLEMENTAL, or after INITIAL if patient is not reportable.
-            // INITIAL + reportable keeps the cache for the SUPPLEMENTAL pass to reuse.
-            if (initialReportable) {
-                logger.debug("Keeping cache for SUPPLEMENTAL pass, correlationId={}", correlationId);
+            // Cleanup runs ONLY when processing succeeded. A thrown exception must leave the cache
+            // intact: the recoverer may route the record to -Retry, and the redelivered record needs
+            // its cached resources. Terminal (dead-letter) cleanup is the recoverer's job — it is the
+            // only place the routing decision is known (see the terminal-failure hook in KafkaConfig).
+            if (keepCacheForSupplemental) {
+                logger.debug("Keeping cache for SUPPLEMENTAL pass, correlationId={}", LogUtils.sanitize(correlationId));
             } else {
                 if (perf) taskStopWatch.start("cleanupCache");
-                switch (cacheType) {
-                    case REDIS -> redisResourceService.cleanup(correlationId);
-                    case ABS -> {
-                        if (absResourceService != null) {
-                            absResourceService.cleanup(correlationId);
-                        }
-                    }
+                try {
+                    cacheCleanup.cleanup(correlationId, cacheType);
+                } finally {
+                    if (perf) taskStopWatch.stop();
                 }
-                if (perf) taskStopWatch.stop();
-                logger.debug("Cache cleanup complete for correlationId={}, cacheType={}", correlationId, cacheType);
             }
 
         } finally {
+            // A task may still be running if we got here by way of an exception; stop it so that its
+            // elapsed time is reported.
+            if (perf && taskStopWatch.isRunning()) {
+                taskStopWatch.stop();
+            }
+
             if (perf) {
                 totalStopWatch.stop();
                 for (StopWatch.TaskInfo task : taskStopWatch.getTaskInfo()) {
@@ -366,6 +385,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     }
 
     private boolean evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, long kafkaIngestTimestamp) {
+        return evaluateMeasures(value, patientStatus, bundle, kafkaIngestTimestamp, null);
+    }
+
+    private boolean evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, long kafkaIngestTimestamp, org.apache.kafka.common.header.Headers inboundHeaders) {
         logger.debug("Evaluating measures");
 
         logger.debug("EVALUATING MEASURES: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] QUERY_TYPE=[{}] REPORT_COUNT=[{}]",
@@ -406,20 +429,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
                     if (!reportable) {
                         String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
-                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReportId, null, null);
+                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReportId, null, null, inboundHeaders);
                         recordNormalizedToReportGeneratedDuration(kafkaIngestTimestamp, patientStatus, report);
                     }
                 }
                 case SUPPLEMENTAL -> {
-                    blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport);
+                    blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport, inboundHeaders);
                     recordNormalizedToReportGeneratedDuration(kafkaIngestTimestamp, patientStatus, report);
                 }
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
 
-            // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
-            Attributes attributes = MeasureEvalMetrics.buildAttributes(value.getQueryType().toString(), patientStatus, report.getReportTrackingId(), null);
-            measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportable);
         }
 
         if (value.getQueryType() == QueryType.INITIAL) {
@@ -432,7 +452,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
         // if the query type is INITIAL and at least one measure is reportable, produce the DataAcquisitionRequested record
         if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
-            produceDataAcquisitionRequestedRecord(value, patientStatus);
+            produceDataAcquisitionRequestedRecord(value, patientStatus, inboundHeaders);
         }
 
         return reportablePatient;
@@ -441,9 +461,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
 
         if (value.getQueryType() == QueryType.INITIAL) {
-            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
+            Attributes attributes = MeasureEvalMetrics.buildPatientOutcomeAttributes(value.getQueryType().toString(), patientStatus);
             if (reportablePatient) {
                 measureEvalMetrics.IncrementPatientReportableCounter(attributes);
             } else {
@@ -457,19 +475,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report) {
         long elapsedMs = System.currentTimeMillis() - kafkaIngestTimestamp;
-        Attributes attributes = Attributes.builder()
-                .put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId())
-                .put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId())
-                .put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId())
-                .put(stringKey("report.type"), report.getReportType())
-                .build();
+        Attributes attributes = MeasureEvalMetrics.buildAttributes(
+                null,
+                patientStatus,
+                report.getReportType());
         measureEvalMetrics.recordNormalizedToReportGeneratedDuration(elapsedMs, attributes);
         logger.info("Normalized-to-MeasureReportGenerated duration: {} ms [facility={}, patient={}, correlationId={}, reportType={}]",
                 elapsedMs, patientStatus.getFacilityId(), patientStatus.getPatientId(),
                 patientStatus.getCorrelationId(), report.getReportType());
     }
 
-    private void produceDataAcquisitionRequestedRecord (T value, PatientReportingEvaluationStatus patientStatus) {
+    private void produceDataAcquisitionRequestedRecord (T value, PatientReportingEvaluationStatus patientStatus, org.apache.kafka.common.header.Headers inboundHeaders) {
         logger.debug("Producing {}", Topics.DATA_ACQUISITION_REQUESTED);
         DataAcquisitionRequested valueDa = new DataAcquisitionRequested();
         valueDa.setPatientId(patientStatus.getPatientId());
@@ -485,6 +501,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             valueDa.getScheduledReports().add(scheduledReportDa);
         });
         org.apache.kafka.common.header.Headers headers = new RecordHeaders().add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
+        Headers.copyMetricsMode(inboundHeaders, headers);
         dataAcquisitionRequestedTemplate.send(new ProducerRecord<>(
                 Topics.DATA_ACQUISITION_REQUESTED,
                 null,

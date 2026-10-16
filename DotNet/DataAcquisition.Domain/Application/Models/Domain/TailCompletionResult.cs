@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 
@@ -10,6 +11,7 @@ public class TailCompletionResult
 {
     public string FacilityId { get; set; } = string.Empty;
     public string CorrelationId { get; set; } = string.Empty;
+    public QueryPhase? QueryPhase { get; set; }
     public string? TraceParentId { get; set; }
     public string PatientId { get; set; } = string.Empty;
     public ResourcesAcquired ResourcesAcquired { get; set; } = new ResourcesAcquired();
