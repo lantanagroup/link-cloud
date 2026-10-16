@@ -21,11 +21,13 @@ import {
 } from '../../src/app/interfaces/data-acquisition/organization-location-mapping-model.interface';
 import { IFacilityConfigModel } from '../../src/app/interfaces/tenant/facility-config-model.interface';
 import { vendorVersions } from '../fixtures/vendors';
+import { IReportEntrySummary } from '../../src/app/interfaces/report/report-entry.interface';
 
 /**
  * A single, continuous session that walks the facility journey the way a person would:
  * tenant list → facility → filters → tabs → configuration → panels → back → create a new
- * facility → give it a census and a query dispatch configuration.
+ * facility → give it a census and a query dispatch configuration → request an ad-hoc report
+ * against it.
  *
  * Unlike the specs in e2e/mocked, this exists to be *watched*. It runs in the `demo`
  * project (headed, slowMo-paced, no timeout) and holds the browser open at the end.
@@ -54,6 +56,38 @@ const newFacility = {
 };
 const newCensusTrigger = '0 0 6 * * ?';
 const newDispatchDuration = 'PT10S';
+
+/**
+ * The ad-hoc report request. POST /Facility/{id}/AdHocReport answers with a
+ * GenerateAdhocReportResponse — `reportId`, not `id`; reading the wrong field routed the app
+ * to an undefined segment once already (see e2e/mocked/generate-report.spec.ts).
+ */
+const GENERATED_REPORT_ID = 'cccccccc-0000-0000-0000-000000000001';
+
+const emptyEntrySummary: IReportEntrySummary = {
+  reportTypeCounts: {},
+  reportingStatusCounts: {},
+  submissionStatusCounts: {},
+};
+
+/**
+ * Submitting the form routes straight to the new report's view page, so that page's own
+ * fetches have to be answered too — the catch-all would 404 them and the walkthrough would
+ * land on a broken screen in front of an audience.
+ */
+function mockAdHocReport(api: ApiMock, id: string): void {
+  api.mock(`POST /api/Facility/${id}/AdHocReport`, { reportId: GENERATED_REPORT_ID });
+  api.mock(`GET /api/aggregate/reports/summaries/${GENERATED_REPORT_ID}`, {
+    ...reportSchedules[0],
+    id: GENERATED_REPORT_ID,
+    facilityId: id,
+  });
+  api.mock('GET /api/entries/search', {
+    records: [],
+    metadata: { pageSize: 10, pageNumber: 1, totalCount: 0, totalPages: 1 },
+  });
+  api.mock(`GET /api/entries/schedules/${GENERATED_REPORT_ID}/summary`, emptyEntrySummary);
+}
 
 /** How long to linger on each finished stage before moving on, so it reads as steps. */
 const STEP_PAUSE = Number(process.env['E2E_STEP_PAUSE'] ?? 1500);
@@ -188,9 +222,10 @@ function mockEverything(api: ApiMock): void {
 
   mockFacilityDetail(api, facilityId);
   mockFacilityDetail(api, newFacility.facilityId, { locations: [], encounters: [] });
+  mockAdHocReport(api, newFacility.facilityId);
 }
 
-test('walkthrough: tenant list → facility → filters → tabs → configuration → create a facility', async ({ page, api }) => {
+test('walkthrough: tenant list → facility → filters → tabs → configuration → create a facility → ad-hoc report', async ({ page, api }) => {
   mockEverything(api);
 
   const tenants = new TenantDashboardPage(page);
@@ -389,6 +424,39 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await expect(page).toHaveURL(/\/tenant$/);
     await expect(tenants.rowFor(facilityId)).toBeVisible();
     await expect(tenants.rowFor(newFacility.facilityId)).toBeVisible();
+  });
+
+  await stage('request an ad-hoc report for the facility we just built', async () => {
+    await page.goto('/reports/generate-report');
+
+    await page.getByLabel('Facility').fill(newFacility.facilityId);
+    await page.getByRole('option', { name: newFacility.facilityId }).click();
+
+    await page.getByRole('combobox', { name: 'Report Types' }).click();
+    await page.getByRole('option', { name: newFacility.monthlyReport }).click();
+    await page.keyboard.press('Escape'); // close the multi-select overlay
+
+    await page.getByRole('radio', { name: 'Custom' }).check();
+    await page.getByLabel('Start Date').fill('6/1/2026');
+    await page.getByLabel('End Date').fill('6/30/2026');
+    await page.getByRole('radio', { name: 'Use Census' }).check();
+
+    await page.getByRole('button', { name: 'Generate Report' }).click();
+
+    // The click fires the POST asynchronously, so poll rather than reading the log straight
+    // after it.
+    const adhoc = `/api/Facility/${newFacility.facilityId}/AdHocReport`;
+    await expect.poll(() => api.callsTo('POST', adhoc).length).toBe(1);
+
+    const payload = JSON.parse(api.callsTo('POST', adhoc)[0].postData ?? '{}');
+    expect(payload.reportTypes).toEqual([newFacility.monthlyReport]);
+    expect(payload.bypassSubmission).toBe(false);
+  });
+
+  await stage('which routes straight through to the report it created', async () => {
+    await expect(page).toHaveURL(
+      new RegExp(`/tenant/facility/${newFacility.facilityId}/report/${GENERATED_REPORT_ID}$`),
+    );
   });
 
   // Hold the window open on the finished state. `page.pause()` is not used here: under the
