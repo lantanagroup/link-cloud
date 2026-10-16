@@ -79,6 +79,15 @@ jobs:
       AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
       LEFTOVER_CLEANUP_ENABLED: "false"
 
+      # Live UI tier switch: label a PR "skip-live-ui" to leave the Playwright live tests
+      # and the toolchain install they need out of this job. The stack, the backend
+      # categories and the mocked UI job are all unaffected.
+      #
+      # Read from the event payload, so the label has to be on the PR before the push that
+      # starts the run. Re-running an existing run replays the original payload and will not
+      # see a label added after the fact.
+      RUN_LIVE_UI: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-live-ui') }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -163,6 +172,7 @@ jobs:
       # dotnet categories mutate facilities/reports, so the UI roundtrip cannot race them.
 
       - name: Setup Node for Admin UI e2e
+        if: ${{ env.RUN_LIVE_UI == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -170,6 +180,7 @@ jobs:
           cache-dependency-path: Web/Admin.UI/package-lock.json
 
       - name: Install Admin UI e2e dependencies
+        if: ${{ env.RUN_LIVE_UI == 'true' }}
         working-directory: Web/Admin.UI
         run: npm ci
 
@@ -177,17 +188,20 @@ jobs:
       # cached browsers only change when @playwright/test does, so unrelated dependency
       # bumps should not force a ~150MB Chromium re-download.
       - name: Get Playwright version
+        if: ${{ env.RUN_LIVE_UI == 'true' }}
         id: playwright-version
         working-directory: Web/Admin.UI
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
+        if: ${{ env.RUN_LIVE_UI == 'true' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright Chromium
+        if: ${{ env.RUN_LIVE_UI == 'true' }}
         working-directory: Web/Admin.UI
         run: npx playwright install --with-deps chromium
 
@@ -202,6 +216,7 @@ jobs:
       # check_health.sh treats containers without a healthcheck (admin-ui) as healthy,
       # so wait for the UI to actually respond before pointing a browser at it.
       - name: Wait for Admin UI (8066)
+        if: ${{ env.RUN_LIVE_UI == 'true' }}
         shell: bash
         run: |
           for i in $(seq 1 30); do
@@ -216,6 +231,7 @@ jobs:
       # delete real facilities, and running them concurrently makes the cleanup DELETEs
       # collide. Serial is also faster here, since nothing waits on a shared dev server.
       - name: Admin UI live e2e tests
+        if: ${{ env.RUN_LIVE_UI == 'true' }}
         id: ui_e2e
         continue-on-error: true
         working-directory: Web/Admin.UI
@@ -384,7 +400,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Admin UI e2e report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.RUN_LIVE_UI == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: admin-ui-e2e-report
