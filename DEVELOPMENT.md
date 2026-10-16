@@ -12,7 +12,7 @@ docker compose down -v --remove-orphans       # tear everything down (resets vol
 
 `--wait` implies detached mode, so `-d` is redundant with it. Give it a timeout: without one it waits indefinitely for a service that is never coming up. CI uses `Scripts/check_health.sh` instead — it dumps each unhealthy container's logs to `service-logs/` on timeout, which matters when the runner is gone by the time anyone looks.
 
-Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, admin-bff 8063, kafka 9092, kafka-ui 9095, loki 3100, grafana 3000, azurite 10000, mssql 1433, mongo 17017). The root `.env` provides default credentials used by compose.
+Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, admin-bff 8063, kafka 9092, kafka-ui 9095, loki 3100, grafana 3000, azurite 10000, mssql 1433, mongo 17017). Compose and locally run services read credentials from a root `.env`, which is not committed: copy `.env.example` to `.env` and set its two `CHANGE_ME` passwords (the template says what each needs).
 
 ### Azure Artifacts (Thetis)
 
