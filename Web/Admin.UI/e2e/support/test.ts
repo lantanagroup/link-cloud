@@ -1,5 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { ApiMock } from './api-mock';
+import { dmrpOff } from '../fixtures/dmrp';
+import { vendors, vendorVersions } from '../fixtures/vendors';
 import { AppConfigOverrides, injectAppConfig } from './app-config';
 
 export interface E2eFixtures {
@@ -76,6 +78,12 @@ export const test = base.extend<E2eFixtures>({
       await injectAppConfig(page, appConfig);
       const api = new ApiMock(page);
       await api.install();
+      // Calls the app makes on its own rather than at a screen's request: the nav bar asks for
+      // the DMRP status on every page, and the facility screens load the vendor lookup lists
+      // on open. Registered before the spec body, so a spec can still replace any of them.
+      api.mock('GET /api/dmrp/dmrp-status', dmrpOff);
+      api.mock('GET /api/vendor', vendors);
+      api.mock('GET /api/VendorVersion', vendorVersions);
       await use(api);
       // Every unmocked /api call surfaced a 404 (and usually an error toast) in the app.
       // Fail loudly and name the endpoints, so missing fixtures never pass silently.

@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -15,7 +13,6 @@ using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -23,9 +20,6 @@ namespace LantanaGroup.Link.Submission.Listeners
     public class SubmitPayloadListener : BackgroundService
     {
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
-
-        private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializerModes.Ostrich);
 
         private readonly ILogger<SubmitPayloadListener> _logger;
         private readonly IConsumer<SubmitPayloadKey, SubmitPayloadValue> _consumer;
@@ -202,6 +196,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                     uploadStopwatch.Stop();
                     _metrics.IncrementResourceCount(metricTags);
+                    _metrics.IncrementUploadCount(metricTags, "success");
                     _metrics.RecordUploadDuration(uploadStopwatch.Elapsed.TotalMilliseconds, metricTags);
                     _metrics.RecordUploadSize(content.LongLength, metricTags);
                     uploaded = true;
@@ -214,6 +209,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                 {
                     _logger.LogError(ex, "Failed to upload to external blob storage.");
                     await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
+                    List<KeyValuePair<string, object?>> failureTags = _metrics.BuildTags(correlationId, key.ReportScheduleId, value.PatientId, facilityId, _blobStorageService.DestinationType);
+                    _metrics.IncrementUploadCount(failureTags, "failure");
 
                     throw new TransientException("Failed to upload to external blob storage.");
                 }

@@ -87,7 +87,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -181,7 +181,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -203,7 +203,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -241,7 +241,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -253,23 +253,27 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
             return await _client.GetAsync($"api/schedules/facilities/{Uri.EscapeDataString(facilityId)}?blocking=true", cancellationToken);
         }
 
-        public async Task<HttpResponseMessage> SoftDeleteReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
+        public async Task<HttpResponseMessage> SoftDeleteReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken, bool allowInProgress = false)
         {
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            return await _client.DeleteAsync($"api/schedules/{Uri.EscapeDataString(reportScheduleId)}", cancellationToken);
+            var path = $"api/schedules/{Uri.EscapeDataString(reportScheduleId)}";
+            if (allowInProgress)
+                path += "?allowInProgress=true";
+
+            return await _client.DeleteAsync(path, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> RestoreReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
@@ -277,7 +281,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -290,7 +294,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 

@@ -189,14 +189,16 @@ test('row actions appear only for the statuses that allow them', async ({ page, 
   const reports = new ReportsDashboardPage(page);
   await reports.goto();
 
-  // Resubmit is Submitted-only; delete is Submitted or Scheduled and not already deleted.
-  // TestFacility01 is Submitted, TestFacility02 is InProgress — so the second row is bare,
-  // which reads like a rendering fault until you check the template.
+  // Resubmit covers Submitted and CompletedNotSubmitted; cleanup covers those plus Scheduled
+  // (canCleanUpScheduleStatus), and only while the report is not already deleted. Abort is for
+  // New and EndOfPeriod. TestFacility01 is Submitted; TestFacility02 is "InProgress", which is
+  // not a ScheduleStatus member at all, so that row is bare — it reads like a rendering
+  // fault until you check the template.
   const submitted = reports.rows.filter({ hasText: 'TestFacility01' });
   const inProgress = reports.rows.filter({ hasText: 'TestFacility02' });
 
   await expect(submitted.getByRole('button', { name: /Resubmit/ })).toBeVisible();
-  await expect(submitted.getByRole('button', { name: 'Soft delete this report' })).toBeVisible();
+  await expect(submitted.getByRole('button', { name: 'Clean up this report' })).toBeVisible();
   await expect(inProgress.getByRole('button')).toHaveCount(0);
 });
 
@@ -209,11 +211,11 @@ test('soft deleting a report confirms first, then refetches the list', async ({ 
   await reports.goto();
   const before = api.callsTo('GET', SUMMARIES).length;
 
-  await reports.rows.filter({ hasText: target.facilityId }).getByRole('button', { name: 'Soft delete this report' }).click();
+  await reports.rows.filter({ hasText: target.facilityId }).getByRole('button', { name: 'Clean up this report' }).click();
 
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toContainText('soft delete this report');
-  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(dialog).toContainText('Remove this report');
+  await dialog.getByRole('button', { name: 'Clean up', exact: true }).click();
 
   // Poll rather than reading the log straight after the click — the DELETE is in flight and
   // a synchronous read races it.
@@ -232,8 +234,8 @@ test('a report that is still running cannot be deleted and says so', async ({ pa
   const reports = new ReportsDashboardPage(page);
   await reports.goto();
 
-  await reports.rows.filter({ hasText: target.facilityId }).getByRole('button', { name: 'Soft delete this report' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await reports.rows.filter({ hasText: target.facilityId }).getByRole('button', { name: 'Clean up this report' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Clean up', exact: true }).click();
 
   // 409 is special-cased into its own title rather than the generic failure message.
   const alert = page.getByRole('dialog');

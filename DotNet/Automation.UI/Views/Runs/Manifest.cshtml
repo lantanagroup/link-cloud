@@ -97,6 +97,7 @@
 
     <!-- ════════════════════ PATIENTS TAB ════════════════════ -->
     <div class="tab-pane fade" id="tab-patients">
+        <div id="generationTemplateBanner" class="mb-3"></div>
         <div class="au-card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-people me-2"></i>Per-Patient Resource Breakdown</span>
@@ -136,9 +137,15 @@
 
     const runId = '@runId';
     const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(run.RunConfigurationJson ?? string.Empty));
+    const patientConfigurationCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        ((List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? []).Select(c => new { c.Id, c.Name }),
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     const manifestDataUrl = '@Url.Action("ManifestData", "Runs")';
     const absDataUrl = '@Url.Action("AbsUploadData", "Runs")';
+    const downloadBundleUrl = '@Url.Action("DownloadGeneratedBundle", "Runs")';
     const isComplete = @(isComplete ? "true" : "false");
+    const cacheVersion = @(ViewBag.TemplateCacheVersionNumber as int? ?? 0);
+    const latestCacheVersion = @(ViewBag.LatestTemplateCacheVersionNumber as int? ?? 0);
 
     const measureShortNames = {
         NhsnAcuteCareHospitalMonthlyInitialPopulation: 'ACH Monthly',
@@ -147,12 +154,12 @@
     };
 
     const scheduledPatternShortNames = {
-        AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → Remains after',
-        AdmittedBeforePeriodDischargedDuringPeriod: 'Before → Discharged during',
-        AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → Remains after',
-        AdmittedDuringPeriodDischargedDuringPeriod: 'During → Discharged during',
-        AdmittedAndDischargedBeforePeriod: 'Before → Before',
-        AdmittedAndDischargedAfterPeriod: 'After → After'
+        AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → after',
+        AdmittedBeforePeriodDischargedDuringPeriod: 'Before → during',
+        AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → after',
+        AdmittedDuringPeriodDischargedDuringPeriod: 'During → during',
+        AdmittedAndDischargedBeforePeriod: 'Entirely before',
+        AdmittedAndDischargedAfterPeriod: 'Entirely after'
     };
     const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
 
@@ -166,6 +173,47 @@
         const d = document.createElement('div');
         d.appendChild(document.createTextNode(s));
         return d.innerHTML;
+    }
+
+    function generatedBundleDownloadLink(patientId) {
+        const hasTemplate = !!(manifestData?.templateCacheKeyByPatient?.[patientId]);
+        if (!hasTemplate) {
+            return `<span class="text-muted" title="Imported patients have no generated template to replay.">&ndash;</span>`;
+        }
+
+        const stale = latestCacheVersion > cacheVersion && cacheVersion > 0;
+        const title = stale
+            ? `Download generated FHIR bundle. This run used generation template v${cacheVersion}; latest is v${latestCacheVersion} (the generator has changed since this run). Replay uses the template stored for this run.`
+            : 'Download generated FHIR bundle (replayed from this run\'s generation template)';
+        const href = `${downloadBundleUrl}?id=${encodeURIComponent(runId)}&patientId=${encodeURIComponent(patientId)}`;
+        const staleClass = stale ? ' btn-outline-warning' : ' btn-outline-secondary';
+        return `<a href="${href}" class="btn btn-sm${staleClass} py-0 px-1" title="${escapeHtml(title)}" download>
+            <i class="bi bi-download"></i><span class="visually-hidden">Download bundle</span>
+        </a>`;
+    }
+
+    function renderGenerationTemplateBanner() {
+        const banner = document.getElementById('generationTemplateBanner');
+        if (!banner) return;
+        if (!cacheVersion) {
+            banner.innerHTML = '';
+            return;
+        }
+
+        if (latestCacheVersion > cacheVersion) {
+            banner.innerHTML = `<div class="alert alert-warning py-2 small mb-0">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                This run used <strong>generation templates v${cacheVersion}</strong>.
+                Latest for this scenario is <strong>v${latestCacheVersion}</strong> — the generator has changed since this run.
+                Downloads replay the templates stored for <em>this</em> run, not the latest generator.
+            </div>`;
+            return;
+        }
+
+        banner.innerHTML = `<div class="alert alert-info py-2 small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Patient bundles are replayed from <strong>generation templates v${cacheVersion}</strong> (the same ABS templates used to generate this run).
+        </div>`;
     }
 
     function formatScheduledPattern(value) {
@@ -193,6 +241,40 @@
     // ─── Fetch & Render ────────────────────────────────────────────
     let manifestData = null;
     let fallbackInpatientPatternByPatient = null;
+    let patientSortDirection = 'asc';
+
+    function comparePatientIds(left, right) {
+        return String(left).localeCompare(String(right), undefined, {
+            numeric: true,
+            sensitivity: 'base'
+        });
+    }
+
+    function sortPatientEntries(entries) {
+        const direction = patientSortDirection === 'desc' ? -1 : 1;
+
+        return [...entries].sort(([leftId], [rightId]) =>
+            direction * comparePatientIds(leftId, rightId)
+        );
+    }
+
+    function patientSortIcon() {
+        return patientSortDirection === 'asc'
+            ? '<i class="bi bi-sort-up ms-1"></i>'
+            : '<i class="bi bi-sort-down ms-1"></i>';
+    }
+
+    function togglePatientSort() {
+        patientSortDirection =
+            patientSortDirection === 'asc' ? 'desc' : 'asc';
+
+        if (!manifestData) return;
+
+        renderEligibility(manifestData);
+        if (allPatientEntries.length > 0) {
+            renderPatientBreakdown();
+        }
+    }
 
     fetch(`${manifestDataUrl}?id=${runId}`)
         .then(r => r.ok && r.status !== 204 ? r.json() : null)
@@ -257,24 +339,7 @@
             <div><div class="small text-muted mb-1">CQL Referenced</div>${renderBadgeSet(m.cqlReferencedResourceTypes)}</div>`;
 
         // Eligibility
-        const el = document.getElementById('eligibilitySection');
-        const eb = document.getElementById('eligibilityBadge');
-        if (m.patientEligibility && Object.keys(m.patientEligibility).length) {
-            const entries = Object.entries(m.patientEligibility);
-            const q = entries.filter(([, ms]) => ms.length > 0).length;
-            eb.textContent = `${q}/${entries.length} qualifying`;
-            let html = '<div style="max-height:300px;overflow-y:auto;"><table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th>Qualifying Measures</th></tr></thead><tbody>';
-            entries.forEach(([pid, measures]) => {
-                const b = measures.length > 0
-                    ? `<span class="badge au-badge-success">${measures.length} measure(s)</span>`
-                    : `<span class="badge au-badge-muted">None</span>`;
-                html += `<tr><td><code>${escapeHtml(pid)}</code></td><td>${b}</td></tr>`;
-            });
-            html += '</tbody></table></div>';
-            el.innerHTML = html;
-        } else {
-            el.innerHTML = '<span class="text-muted small">No eligibility data</span>';
-        }
+        renderEligibility(m);
 
         // Resource counts table
         const allCounts = { ...(m.totalCountsByType || {}) };
@@ -320,31 +385,141 @@
         }
     }
 
-    // ─── PATIENTS TAB ──────────────────────────────────────────────
-    function renderPatients(m) {
-        const container = document.getElementById('patientBreakdownContainer');
-        const patients = Object.entries(m.resourceCountsByPatient || {});
-        if (!patients.length) {
-            container.innerHTML = '<span class="text-muted small">No per-patient data</span>';
+    function renderEligibility(m) {
+        const el = document.getElementById('eligibilitySection');
+        const eb = document.getElementById('eligibilityBadge');
+
+        if (!m.patientEligibility ||
+            !Object.keys(m.patientEligibility).length) {
+            eb.textContent = '';
+            el.innerHTML =
+                '<span class="text-muted small">No eligibility data</span>';
             return;
         }
 
-        fallbackInpatientPatternByPatient = buildFallbackInpatientPatternMap(m);
+        const entries = sortPatientEntries(
+            Object.entries(m.patientEligibility)
+        );
 
-        // Bar chart: total resources per patient (top 50)
-        const patientTotals = patients.map(([pid, counts]) => ({
-            pid,
-            total: Object.values(counts).reduce((s, c) => s + c, 0)
-        })).sort((a, b) => b.total - a.total);
+        const qualifyingCount = entries.filter(
+            ([, measures]) => measures.length > 0
+        ).length;
 
-        const chartPatients = patientTotals.slice(0, 50);
-        new Chart(document.getElementById('patientBarChart'), {
+        eb.textContent =
+            `${qualifyingCount}/${entries.length} qualifying`;
+
+        let html = `
+            <div style="max-height:300px;overflow-y:auto;">
+                <table class="au-table table table-sm small mb-0">
+                    <thead>
+                        <tr>
+                            <th>
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 text-white text-decoration-none patient-sort-button"
+                                        aria-label="Sort patient IDs ${patientSortDirection === 'asc' ? 'descending' : 'ascending'}">
+                                    Patient
+                                    ${patientSortIcon()}
+                                </button>
+                            </th>
+                            <th>Qualifying Measures</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        entries.forEach(([pid, measures]) => {
+            const badge = measures.length > 0
+                ? `<span class="badge au-badge-success">${measures.length} measure(s)</span>`
+                : '<span class="badge au-badge-muted">None</span>';
+
+            html += `
+                <tr>
+                    <td><code>${escapeHtml(pid)}</code></td>
+                    <td>${badge}</td>
+                </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        el.innerHTML = html;
+
+        el.querySelector('.patient-sort-button')
+            ?.addEventListener('click', togglePatientSort);
+    }
+
+    // ─── PATIENTS TAB ──────────────────────────────────────────────
+    let allPatientEntries = [];
+    let patientBarChart = null;
+
+    function renderPatients(m) {
+        allPatientEntries = Object.entries(
+            m.resourceCountsByPatient || {}
+        );
+
+        const container =
+            document.getElementById('patientBreakdownContainer');
+
+        if (!allPatientEntries.length) {
+            container.innerHTML =
+                '<span class="text-muted small">No per-patient data</span>';
+            return;
+        }
+
+        fallbackInpatientPatternByPatient =
+            buildFallbackInpatientPatternMap(m);
+
+        renderGenerationTemplateBanner();
+        renderPatientBreakdown();
+
+        const searchInput = document.getElementById('patientSearch');
+
+        searchInput.addEventListener('input', function () {
+            renderPatientBreakdown();
+        });
+    }
+
+    function getVisiblePatientEntries() {
+        const searchTerm =
+            document.getElementById('patientSearch')
+                ?.value
+                ?.trim()
+                ?.toLowerCase() || '';
+
+        const filtered = allPatientEntries.filter(([pid]) =>
+            !searchTerm || pid.toLowerCase().includes(searchTerm)
+        );
+
+        return sortPatientEntries(filtered);
+    }
+
+    function renderPatientBreakdown() {
+        const patients = getVisiblePatientEntries();
+
+        renderPatientBarChart(patients);
+        renderPatientCards(patients);
+    }
+
+    function renderPatientBarChart(patients) {
+        const patientTotals = patients
+            .map(([pid, counts]) => ({
+                pid,
+                total: Object.values(counts)
+                    .reduce((sum, count) => sum + count, 0)
+            }))
+            .slice(0, 50);
+
+        const chartCanvas =
+            document.getElementById('patientBarChart');
+
+        if (patientBarChart) {
+            patientBarChart.destroy();
+        }
+
+        patientBarChart = new Chart(chartCanvas, {
             type: 'bar',
             data: {
-                labels: chartPatients.map(p => p.pid),
+                labels: patientTotals.map(patient => patient.pid),
                 datasets: [{
                     label: 'Total Resources',
-                    data: chartPatients.map(p => p.total),
+                    data: patientTotals.map(patient => patient.total),
                     backgroundColor: 'var(--au-accent)',
                     borderRadius: 3
                 }]
@@ -353,36 +528,63 @@
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
-                    legend: { display: false },
-                    tooltip: { callbacks: { label: ctx => `${ctx.parsed.y.toLocaleString()} resources` } }
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: context =>
+                                `${context.parsed.y.toLocaleString()} resources`
+                        }
+                    }
                 },
                 scales: {
-                    x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
-                    y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } }
+                    x: {
+                        ticks: {
+                            font: { size: 10 },
+                            maxRotation: 45
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => value.toLocaleString()
+                        }
+                    }
                 }
             }
-        });
-
-        // Patient cards
-        renderPatientCards(patients);
-
-        // Search
-        document.getElementById('patientSearch').addEventListener('input', function () {
-            const q = this.value.toLowerCase();
-            const filtered = patients.filter(([pid]) => pid.toLowerCase().includes(q));
-            renderPatientCards(filtered);
         });
     }
 
     function renderPatientCards(patients) {
         const container = document.getElementById('patientBreakdownContainer');
+        disposeTooltips(container);
         if (!patients.length) {
             container.innerHTML = '<span class="text-muted small">No matching patients</span>';
             return;
         }
 
         // Compact table view for many patients
-        let html = '<table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th>Inpatient Pattern</th><th class="text-end">Total</th><th>Resource Types</th></tr></thead><tbody>';
+        let html = `
+            <table class="au-table table table-sm small mb-0">
+                <thead>
+                    <tr>
+                        <th>
+                            <button type="button"
+                                class="btn btn-link btn-sm p-0 text-white text-decoration-none patient-sort-button"
+                                aria-label="Sort patient IDs ${patientSortDirection === 'asc' ? 'descending' : 'ascending'}">
+                            Patient
+                            ${patientSortIcon()}
+                        </button>
+                    </th>
+                <th>Inpatient Pattern</th>
+                <th>Patient config</th>
+                <th class="text-end">Total</th>
+                <th>Resource Types</th>
+                <th class="text-end">Bundle</th>
+            </tr>
+        </thead>
+        <tbody>`;
         patients.forEach(([pid, counts]) => {
             const total = Object.values(counts).reduce((s, c) => s + c, 0);
             const inpatientPattern = manifestData?.patientInpatientPatterns?.[pid]
@@ -394,14 +596,26 @@
             html += `<tr>
                 <td><code>${escapeHtml(pid)}</code></td>
                 <td>${formatScheduledPattern(inpatientPattern)}</td>
+                <td>${escapeHtml(patientConfigLabelForId(pid))}</td>
                 <td class="text-end fw-semibold">${total.toLocaleString()}</td>
                 <td style="max-width:500px;">${types}</td>
+                <td class="text-end">${generatedBundleDownloadLink(pid)}</td>
             </tr>`;
         });
         html += '</tbody></table>';
         container.innerHTML = html;
+        container.querySelector('.patient-sort-button')
+            ?.addEventListener('click', togglePatientSort);
         // Re-init tooltips for new elements
         container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+    }
+
+    function disposeTooltips(container) {
+        container
+            .querySelectorAll('[data-bs-toggle="tooltip"]')
+            .forEach(el => {
+                bootstrap.Tooltip.getInstance(el)?.dispose();
+            });
     }
 
     function normalizePatternForDisplay(value) {
@@ -443,6 +657,29 @@
         }
 
         return map;
+    }
+
+    function patientConfigLabelForId(patientId) {
+        try {
+            const cfg = runConfigurationJson ? JSON.parse(runConfigurationJson) : null;
+            const cohorts = Array.isArray(cfg?.patientCohorts) ? cfg.patientCohorts : [];
+            if (!cohorts.length || !manifestData?.patientIds) return 'No configuration';
+            const index = manifestData.patientIds.indexOf(patientId);
+            if (index < 0) return 'No configuration';
+            let cursor = 0;
+            for (const c of cohorts) {
+                const count = Number.parseInt(String(c?.patientCount ?? 0), 10);
+                const safe = Number.isFinite(count) && count > 0 ? count : 0;
+                if (index < cursor + safe) {
+                    const id = c?.patientConfigurationId;
+                    if (!id) return 'No configuration';
+                    const hit = (patientConfigurationCatalog || []).find(x => x.id === id);
+                    return hit ? hit.name : String(id).slice(0, 8);
+                }
+                cursor += safe;
+            }
+        } catch { /* ignore */ }
+        return 'No configuration';
     }
 
     // ─── COMPARISON TAB ────────────────────────────────────────────
@@ -594,14 +831,26 @@
                 <span><i class="bi bi-people me-2"></i>Per-Patient Prediction vs ABS</span>
                 <input type="text" class="form-control form-control-sm" id="compPatientSearch" placeholder="Search patients…" style="width:200px;">
             </div><div class="card-body p-0">
-            <div style="max-height:600px;overflow-y:auto;">
-            <table class="au-table table table-sm small mb-0" id="compPatientTable"><thead><tr>
+                <div style="max-height:600px;overflow:auto;">
+            <table class="au-table table small mb-0" id="compPatientTable" style="table-layout:fixed;min-width:900px;">
+                <colgroup>
+                    <col style="width:34%">
+                    <col style="width:13%">
+                    <col style="width:13%">
+                    <col style="width:13%">
+                    <col style="width:7%">
+                    <col style="width:12%">
+                    <col style="width:64px">
+                    <col style="width:52px">
+                </colgroup>
+            <thead><tr>
                 <th>Patient</th>
                 <th class="text-end">Generated</th>
                 <th class="text-end" style="color:var(--au-accent);">Predicted</th>
                 <th class="text-end">Actual ABS</th>
                 <th class="text-end">Δ</th>
                 <th>Verdict</th>
+                <th class="text-end">Bundle</th>
                 <th></th>
             </tr></thead><tbody>`;
 
@@ -623,7 +872,32 @@
 
                 // Build per-type detail for expand row
                 const patientTypes = [...new Set([...Object.keys(gCounts), ...Object.keys(eCounts), ...Object.keys(aCounts)])].sort();
-                let detailHtml = '<table class="table table-sm table-borderless small mb-0" style="background:#f8fafc;"><thead><tr><th>Type</th><th class="text-end">Gen</th><th class="text-end" style="color:var(--au-accent);">Pred</th><th class="text-end">ABS</th><th class="text-end">Δ</th><th>Status</th></tr></thead><tbody>';
+                let detailHtml = `
+                    <table class="au-table table table-borderless small mb-0"
+                            style="background:#f8fafc;table-layout:fixed;min-width:900px;">
+                        <colgroup>
+                            <col style="width:34%">
+                            <col style="width:13%">
+                            <col style="width:13%">
+                            <col style="width:13%">
+                            <col style="width:7%">
+                            <col style="width:12%">
+                            <col style="width:64px">
+                            <col style="width:52px">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th class="text-end">Gen</th>
+                                <th class="text-end" style="color:var(--au-accent);">Pred</th>
+                                <th class="text-end">ABS</th>
+                                <th class="text-end">Δ</th>
+                                <th>Status</th>
+                                <th></th>   <!-- Bundle column -->
+                                <th></th>   <!-- Chevron column -->
+                            </tr>
+                        </thead>
+                        <tbody>`;
                 patientTypes.forEach(t => {
                     const pg = gCounts[t] || 0;
                     const pe = eCounts[t] || 0;
@@ -638,7 +912,17 @@
                     else if (pg > 0 && pe === 0) pv = '<span class="text-muted">Filtered</span>';
                     else pv = '&ndash;';
                     const prc = pe > 0 && pa === 0 ? 'table-danger' : pa < pe ? 'table-warning' : '';
-                    detailHtml += `<tr class="${prc}"><td>${escapeHtml(t)}</td><td class="text-end">${pg || '&ndash;'}</td><td class="text-end">${pe || '&ndash;'}</td><td class="text-end">${pa || '&ndash;'}</td><td class="text-end">${pd !== 0 ? pds + pd : '&ndash;'}</td><td>${pv}</td></tr>`;
+                    detailHtml += `
+                        <tr class="${prc}">
+                            <td>${escapeHtml(t)}</td>
+                            <td class="text-end">${pg || '&ndash;'}</td>
+                            <td class="text-end">${pe || '&ndash;'}</td>
+                            <td class="text-end">${pa || '&ndash;'}</td>
+                            <td class="text-end">${pd !== 0 ? pds + pd : '&ndash;'}</td>
+                            <td>${pv}</td>
+                            <td></td>   <!-- Bundle column -->
+                            <td></td>   <!-- Chevron column -->
+                        </tr>`;
                 });
                 detailHtml += '</tbody></table>';
 
@@ -649,9 +933,10 @@
                     <td class="text-end">${aTotal > 0 ? aTotal.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
                     <td class="text-end fw-semibold">${d !== 0 ? dSign + d.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
                     <td>${verdict}</td>
+                    <td class="text-end">${generatedBundleDownloadLink(pid)}</td>
                     <td><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="this.closest('tr').nextElementSibling.classList.toggle('d-none');this.querySelector('i').classList.toggle('bi-chevron-down');this.querySelector('i').classList.toggle('bi-chevron-up');"><i class="bi bi-chevron-down"></i></button></td>
                 </tr>
-                <tr class="d-none"><td colspan="7" class="p-0">${detailHtml}</td></tr>`;
+                <tr class="d-none"><td colspan="8" class="p-0">${detailHtml}</td></tr>`;
             });
             html += '</tbody></table></div></div></div>';
         }
@@ -663,7 +948,7 @@
         const searchInput = document.getElementById('compPatientSearch');
         if (searchInput) {
             searchInput.addEventListener('input', function () {
-                const q = this.value.toLowerCase();
+                    const q = this.value.trim().toLowerCase();
                 document.querySelectorAll('.comp-patient-row').forEach(row => {
                     const pid = row.dataset.pid?.toLowerCase() || '';
                     const match = pid.includes(q);

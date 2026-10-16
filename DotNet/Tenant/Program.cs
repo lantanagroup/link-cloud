@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Reflection;
+﻿using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -12,15 +11,23 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Config;
+using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
+using LantanaGroup.Link.Sdk.DependencyInjection;
+using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Extensions;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
@@ -28,6 +35,7 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Debugging;
@@ -78,7 +86,6 @@ namespace Tenant
 
             // Add services to the container.
             builder.Services.AddSingleton<ScheduleService>();
-            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
 
             builder.Services.Configure<FacilityIdSettings>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.FacilityIdSettings));
             builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
@@ -97,6 +104,9 @@ namespace Tenant
             //Managers and Queries
             builder.Services.AddScoped<IFacilityManager, FacilityManager>();
             builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
+            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+            builder.Services.AddLinkSdk();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();
@@ -138,37 +148,54 @@ namespace Tenant
 
             builder.Services.AddHttpClient();
 
-            builder.Services.AddControllers();
+            var mvcBuilder = builder.Services.AddControllers();
+
+            // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
+            // enabled, and is inert otherwise. Its entities live in TenantDbContext.
+            builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
+            builder.Services.AddScoped<TenantFacilityDirectory>();
+            builder.Services.AddScoped<IFacilityTimeZoneSource>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
+            builder.Services.AddScoped<IFacilityDirectory>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
+
+            // The facility endpoints resolve this rather than calling the manager, so the DMRP module
+            // can put its own behavior in front of it when enabled.
+            builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
+
+            var dmrpEnabled = builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(
+                mvcBuilder, ReportSchedulingJobs.ClassicJobGroup);
+
+            if (!dmrpEnabled)
+            {
+                // Only one owner of the shared Quartz scheduler at a time. With DMRP on,
+                // DmrpNightlyScheduleHostedService - registered above, inside AddDmrpModule - sweeps the
+                // classic jobs, reconciles its own, and starts and shuts the scheduler down; hosting
+                // ScheduleService alongside it would mean two starts and two shutdowns.
+                //
+                // ScheduleService stays registered as a singleton either way, because
+                // TenantFacilityOperations calls its per-facility Add/Update/Delete methods on every
+                // facility save. Those return early while the flag is on.
+                //
+                // Keep this registration after the AddDmrpModule call above: hosted services start in
+                // registration order, and DmrpNightlyScheduleCleanupService - registered inside that
+                // call when the flag is off - has to sweep the module's zone jobs before ScheduleService
+                // starts the shared scheduler, or a zone job could fire with its services long gone.
+                builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
+            }
 
             //Add problem details
-            builder.Services.AddProblemDetails(options =>
-            {
-                options.CustomizeProblemDetails = ctx =>
-                {
-                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-                    if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-                    {
-                        string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                        ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-                    }
-
-                    if (builder.Environment.IsDevelopment())
-                    {
-                        ctx.ProblemDetails.Extensions.Add("service", "Tenant");
-                    }
-                    else
-                    {
-                        ctx.ProblemDetails.Extensions.Remove("exception");
-                    }
-                };
-            });
+            builder.Services.AddTenantProblemDetails(builder.Environment);
 
             //Add health checks
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
 
-            builder.Services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+            var healthChecks = builder.Services.AddHealthChecks()
+                .AddCheck<DatabaseHealthCheck<TenantDbContext>>(HealthCheckType.Database.ToString())
                 .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
+
+            if (dmrpEnabled)
+            {
+                healthChecks.AddCheck<DmrpHealthCheck>("DMRP", failureStatus: HealthStatus.Degraded);
+            }
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -177,6 +204,13 @@ namespace Tenant
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 c.IncludeXmlComments(xmlPath);
+
+                // Document the DMRP module's controllers alongside this service's own.
+                var dmrpXmlPath = Path.Combine(AppContext.BaseDirectory,
+                    $"{typeof(DmrpModuleExtensions).Assembly.GetName().Name}.xml");
+                if (File.Exists(dmrpXmlPath))
+                    c.IncludeXmlComments(dmrpXmlPath);
+
                 c.DocumentFilter<HealthChecksFilter>();
             });
 
@@ -185,7 +219,7 @@ namespace Tenant
             var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                .Filter.ByExcluding("RequestPath like '/health%'")
+                .Filter.ByExcluding("RequestPath like '/health%' and @l in ['Verbose', 'Debug', 'Information']")
                 .Filter.ByExcluding("RequestPath like '/swagger%'")
                 .Enrich.WithExceptionDetails()
                 .Enrich.FromLogContext()
@@ -224,7 +258,27 @@ namespace Tenant
             // Configure the HTTP request pipeline.
             app.ConfigureSwagger();
 
+            // The DMRP module changes which routes this service serves, so record the flag's state.
+            var dmrpSettings = app.Services.GetRequiredService<IOptions<DmrpSettings>>().Value;
+            app.Logger.LogInformation("DMRP module enabled: {DmrpEnabled}", dmrpSettings.Enabled);
+
             app.AutoMigrateEF<TenantDbContext>();
+
+            app.UseStatusCodePages();
+
+            // Without a handler an unhandled exception never reaches the problem-details
+            // pipeline, so it answers with an empty body instead of a traceable problem
+            // response. The developer page only outside deployment, as Terminology does: it
+            // renders the stack trace, which is what you want on a workstation and never what
+            // a caller should receive.
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseExceptionHandler();
+            }
 
             app.UseRouting();
             app.UseCors(CorsSettings.DefaultCorsPolicyName);

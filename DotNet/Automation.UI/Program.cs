@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Normalization.Engine;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
@@ -7,13 +8,17 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +41,8 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+builder.Services.Configure<LeftoverRunCleanupOptions>(builder.Configuration.GetSection(LeftoverRunCleanupOptions.SectionName));
+builder.Services.Configure<ImportedBundleBlobStorageSettings>(builder.Configuration.GetSection(ImportedBundleBlobStorageSettings.Key));
 
 var lokiUrl = builder.Configuration["Loki:Url"];
 if (string.IsNullOrWhiteSpace(lokiUrl))
@@ -225,24 +232,45 @@ builder.Services.AddOptions<KeyManagementOptions>()
     });
 
 builder.Services.AddSingleton<MongoIndexManager>();
+builder.Services.AddSingleton<IImportedBundleContentStore, AzureBlobImportedBundleContentStore>();
+builder.Services.AddSingleton<ISnapshotPayloadStore, AzureBlobSnapshotPayloadStore>();
+builder.Services.AddSingleton<LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache, MongoGeneratedPatientTemplateCache>();
+builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
+builder.Services.AddSingleton<IGeneratedTemplateCacheVersionLookup>(sp => sp.GetRequiredService<GeneratedTemplateCacheVersionStore>());
+builder.Services.AddSingleton<GeneratedPatientBundleReplayService>();
+builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
+builder.Services.AddSingleton<ICleanupSettingsStore, MongoCleanupSettingsStore>();
+builder.Services.AddSingleton<ICleanupReportStore, MongoCleanupReportStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddSingleton<IMeasureTemplateStore, MongoMeasureTemplateStore>();
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
+builder.Services.AddSingleton<IPatientConfigurationStore, MongoPatientConfigurationStore>();
+builder.Services.AddSingleton<IFacilityTemplateStore, MongoFacilityTemplateStore>();
+builder.Services.AddSingleton<IGenerationCatalogStore, MongoGenerationCatalogStore>();
+builder.Services.AddHttpClient("TerminologyLookup");
+builder.Services.AddSingleton<ITerminologyCodeLookup, TerminologyCodeLookup>();
+builder.Services.AddNormalizationEngine();
+builder.Services.AddSingleton<Automation.UI.Services.ConfigurationGeneration.BundleConfigurationGenerationService>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
 
 // -- API Health test suites --
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.TenantServiceTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.DataAcquisitionTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.NormalizationTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.CensusServiceTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ReportServiceTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.QueryDispatchTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.SubmissionServiceTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.MeasureEvalTestSuite>();
-builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ValidationServiceTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AccountServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AuditServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.CensusServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.DataAcquisitionTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.DmrpTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.MeasureEvalTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.NormalizationTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.QueryDispatchTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ReportServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.SubmissionServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.TenantServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.TerminologyServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ValidationServiceTestSuite>();
 
 var enableAdminBffAuthSuite = builder.Configuration.GetValue<bool>("ApiHealth:EnableAdminBffAuthSuite");
 if (enableAdminBffAuthSuite)
@@ -255,6 +283,7 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutio
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedOrchestrator, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedOrchestrator>();
 builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
+builder.Services.AddHostedService<PatientBundleExternalizationMigrationService>();
 builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
 builder.Services.AddHealthChecks();
@@ -273,10 +302,22 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddScoped<PipelineDataReader>();
 
 // -- Seed system scenarios and query plan templates --
+builder.Services.AddHostedService<PatientConfigurationSeedService>();
 builder.Services.AddHostedService<ScenarioSeedService>();
+builder.Services.AddHostedService<MeasureTemplateSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 builder.Services.AddHostedService<NormalizationSuiteSeedService>();
 builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
+builder.Services.AddHostedService<FacilityTemplateSeedService>();
+builder.Services.AddHostedService<GenerationCatalogSeedService>();
+
+// Allow large imported-patient bundle uploads in the Automation UI.
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = long.MaxValue;
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
 
 // -- Seed synthetic runs for dashboard verification.
 //    Gated on config (Dashboard:SeedFakeRuns). Used for Debugging Dashbhoard.
@@ -291,10 +332,63 @@ builder.Services.AddControllersWithViews()
     {
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+    };
+});
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Automation.UI API",
+        Version = "v1",
+        Description = "Service-to-service automation run APIs. Metrics endpoints read Mongo snapshots and do not query Prometheus."
+    });
+});
 builder.Services.AddSignalR();
+
+var assemblyVersion = Assembly.GetExecutingAssembly()
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+    ?? "0.0.0";
+builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+{
+    options.Environment = builder.Environment;
+    options.ServiceName = builder.Configuration["ServiceInformation:ServiceConfigName"] ?? "AutomationUI";
+    options.ServiceVersion = assemblyVersion;
+});
+builder.Services.AddSingleton<IAutomationUiMetrics, AutomationUiServiceMetrics>();
+builder.Services.AddSingleton<IRunMetricsStore, MongoRunMetricsStore>();
+builder.Services.AddSingleton<IMetricsBenchmarkStore, MongoMetricsBenchmarkStore>();
+builder.Services.PostConfigure<TelemetrySettings>(settings =>
+{
+    settings.PrometheusQueryEndpoint = PrometheusHistogramClient.ResolveQueryEndpoint(settings.PrometheusQueryEndpoint);
+});
+builder.Services.AddHttpClient<IPrometheusHistogramClient, PrometheusHistogramClient>((sp, client) =>
+{
+    var endpoint = sp.GetRequiredService<IOptions<TelemetrySettings>>().Value.PrometheusQueryEndpoint;
+    if (!string.IsNullOrWhiteSpace(endpoint))
+        client.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddTransient<IRunMetricsSnapshotService, RunMetricsSnapshotService>();
+builder.Services.AddTransient<ILiveProcessUtilizationService, LiveProcessUtilizationService>();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+builder.Services.AddSingleton<LeftoverRunCleanupService>();
+builder.Services.AddSingleton<ILeftoverRunCleanup>(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
+builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
+builder.Services.AddSingleton<MetricsRunPresenter>();
+builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
 var app = builder.Build();
@@ -340,9 +434,15 @@ else
 }
 
 // -- Middleware --
+app.UseWhen(
+    ctx => ctx.Request.Path.StartsWithSegments("/api"),
+    api => api.UseExceptionHandler());
+
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Runs/Index");
+    app.UseWhen(
+        ctx => !ctx.Request.Path.StartsWithSegments("/api"),
+        mvc => mvc.UseExceptionHandler("/Runs/Index"));
     app.UseHsts();
     app.UseHttpsRedirection();
 }
@@ -350,6 +450,12 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Automation.UI API v1");
+});
 
 app.UseAuthentication();
 
@@ -360,6 +466,7 @@ app.MapControllerRoute(
     pattern: "{controller=Runs}/{action=Index}/{id?}");
 
 app.MapHub<RunHub>("/hubs/runs");
+app.MapHub<CleanupHub>("/hubs/cleanup");
 app.MapHealthChecks("/health");
 
 app.Run();

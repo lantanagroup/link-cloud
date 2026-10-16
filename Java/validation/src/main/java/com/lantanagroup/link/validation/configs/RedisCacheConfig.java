@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.configs;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -57,7 +58,7 @@ public class RedisCacheConfig {
 
         // Bound Redis commands and socket connects so cache ops (and the health indicator that uses
         // this factory) fail fast when Redis is unreachable, instead of blocking on Lettuce's ~60s
-        // default. Keeps the BFF's 5s health-check window from timing out and showing every column N/A.
+        // default. Keeps the BFF's health-check window from timing out and showing every column N/A.
         SocketOptions socketOptions = SocketOptions.builder()
                 .connectTimeout(Duration.ofSeconds(1))
                 .build();
@@ -94,7 +95,12 @@ public class RedisCacheConfig {
                         "@class"
                 )
                 .setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY)
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                // LookupCodeResult (and similar HAPI types) expose collection properties via getters
+                // with no corresponding setter. With NON_FINAL default typing, Jackson cannot handle
+                // "setterless" typed deserialization and throws. Disabling this feature tells Jackson
+                // to skip getter-only collection properties during deserialization rather than failing.
+                .disable(MapperFeature.USE_GETTERS_AS_SETTERS);
 
         Jackson2JsonRedisSerializer<Object> jacksonSerializer = new Jackson2JsonRedisSerializer<>(objectMapper, Object.class);
 

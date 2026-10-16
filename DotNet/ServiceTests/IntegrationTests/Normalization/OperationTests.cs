@@ -3,6 +3,10 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Man
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Domain;
+using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,16 +34,9 @@ namespace IntegrationTests.Normalization
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
-            var vendorQueries = scope.ServiceProvider.GetRequiredService<IVendorQueries>();
             var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
-            var vendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-
-            var vendorVersion = (await vendorQueries.SearchVendors(new VendorSearchModel()
-            {
-                VendorId = vendor.Id
-            })).First().Versions.Single();
+            var vendorVersionId = Guid.NewGuid();
 
             var facilityId = Guid.NewGuid().ToString();
             var operation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
@@ -52,7 +49,7 @@ namespace IntegrationTests.Normalization
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"],
-                VendorIds = [vendor.Id]
+                VendorVersionIds = [vendorVersionId]
             });
 
             Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
@@ -86,8 +83,8 @@ namespace IntegrationTests.Normalization
             Assert.Contains("Copy Location Identifier to Type", sequences[0].OperationResourceType.Operation.OperationJson);
             Assert.NotEmpty(sequences[0].VendorPresets);
             Assert.Equal(result.VendorPresets[0].Id, sequences[0].VendorPresets[0].Id);
-            Assert.Equal(vendor.Name, sequences[0].VendorPresets[0].VendorVersion.Vendor.Name);
-            Assert.Equal("default", sequences[0].VendorPresets[0].VendorVersion.Version);
+            Assert.Equal(vendorVersionId, sequences[0].VendorPresets[0].VendorVersion.Id);
+            Assert.Equal("test", sequences[0].VendorPresets[0].VendorVersion.Version);
             Assert.Equal("Location", sequences[0].VendorPresets[0].OperationResourceType.Resource.ResourceName);
 
             var deleteResult = await operationManager.DeleteOperationSequence(new DeleteOperationSequencesModel()
@@ -112,11 +109,11 @@ namespace IntegrationTests.Normalization
             };
         }
 
-        private CreateOperationModel GetValidCreateModelWithVendors(List<Guid> vendorIds, List<string> resourceTypes)
+        private CreateOperationModel GetValidCreateModelWithVendorVersions(List<Guid> vendorVersionIds, List<string> resourceTypes)
         {
             return new CreateOperationModel
             {
-                VendorIds = vendorIds,
+            VendorVersionIds = vendorVersionIds,
                 OperationType = "CopyProperty",
                 OperationJson = "{\"Name\": \"Test Copy\", \"Description\": \"Test Copy Description\", \"SourceFhirPath\": \"id\", \"TargetFhirPath\": \"meta.versionId\"}",
                 ResourceTypes = resourceTypes,
@@ -124,6 +121,129 @@ namespace IntegrationTests.Normalization
                 Description = "Test",
                 IsDisabled = false
             };
+        }
+
+        [Theory]
+        [InlineData(false, "active", true)]
+        [InlineData(true, "active", true)]
+        [InlineData(false, "inactive", false)]
+        [InlineData(true, "inactive", false)]
+        [InlineData(false, "unknown", false)]
+        [InlineData(true, "unknown", false)]
+        [InlineData(false, "cdc", false)]
+        [InlineData(true, "cdc", false)]
+        public async Task SaveHSLOCMap_RequiresActiveHSLOCCode(bool update, string codeKind, bool expectedSuccess)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            var queries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var context = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
+            var prefix = Guid.NewGuid().ToString();
+            context.HSLOCS.AddRange(
+                new HSLOC { HSLOCCode = prefix + "active", CDCCode = prefix + "cdc", IsActive = true },
+                new HSLOC { HSLOCCode = prefix + "inactive", IsActive = false });
+            await context.SaveChangesAsync();
+
+            var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), ["Location"]);
+            model.OperationType = nameof(OperationType.HSLOCMap);
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation([]));
+            OperationModel? original = null;
+            if (update)
+            {
+                var created = await manager.CreateOperation(model);
+                Assert.True(created.IsSuccess, created.ErrorMessage);
+                original = Assert.IsType<OperationModel>(created.ObjectResult);
+            }
+
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation(
+                [new CodeSystemMap("urn:local", MappingTargetSystems.HslocUrl, new Dictionary<string, CodeMap>
+                {
+                    ["valid"] = new CodeMap(prefix + "active", "Active"),
+                    ["candidate"] = new CodeMap(prefix + codeKind, "Candidate")
+                })]));
+            var result = update
+                ? await manager.UpdateOperation(new UpdateOperationModel
+                {
+                    Id = original!.Id, FacilityId = model.FacilityId, Name = model.Name,
+                    OperationJson = model.OperationJson, ResourceTypes = model.ResourceTypes
+                })
+                : await manager.CreateOperation(model);
+
+            Assert.Equal(expectedSuccess, result.IsSuccess);
+            if (!expectedSuccess)
+            {
+                Assert.Contains(prefix + codeKind, result.ErrorMessage);
+                var saved = await queries.Search(new OperationSearchModel { FacilityId = model.FacilityId });
+                if (update)
+                    Assert.Equal(original!.OperationJson, Assert.Single(saved.Records).OperationJson);
+                else
+                    Assert.Empty(saved.Records);
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task CreateOperation_DuplicateHSLOCMap_IsRejected(bool disabled)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            var queries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), ["Location"]);
+            model.OperationType = OperationType.HSLOCMap.ToString();
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation([]));
+            model.IsDisabled = disabled;
+
+            var first = await manager.CreateOperation(model);
+            Assert.True(first.IsSuccess, first.ErrorMessage);
+
+            model.IsDisabled = false;
+            var duplicate = await manager.CreateOperation(model);
+            Assert.False(duplicate.IsSuccess);
+            Assert.Equal("Only one HSLOC Map operation is allowed per facility.", duplicate.ErrorMessage);
+            var records = await queries.Search(new OperationSearchModel { FacilityId = model.FacilityId, IncludeDisabled = true });
+            Assert.Single(records.Records);
+
+            model.FacilityId = Guid.NewGuid().ToString();
+            var otherFacility = await manager.CreateOperation(model);
+            Assert.True(otherFacility.IsSuccess, otherFacility.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task UpdateOperation_HSLOCMap_AllowsSelfButRejectsOccupiedFacility()
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            var queries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), ["Location"]);
+            model.OperationType = OperationType.HSLOCMap.ToString();
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation([]));
+            var first = await manager.CreateOperation(model);
+            Assert.True(first.IsSuccess, first.ErrorMessage);
+            var original = Assert.IsType<OperationModel>(first.ObjectResult);
+
+            var update = new UpdateOperationModel
+            {
+                Id = original.Id,
+                FacilityId = model.FacilityId,
+                OperationJson = model.OperationJson,
+                ResourceTypes = model.ResourceTypes,
+                Name = "Updated HSLOC map",
+                IsDisabled = true
+            };
+            var selfUpdate = await manager.UpdateOperation(update);
+            Assert.True(selfUpdate.IsSuccess, selfUpdate.ErrorMessage);
+
+            model.FacilityId = Guid.NewGuid().ToString();
+            var second = await manager.CreateOperation(model);
+            Assert.True(second.IsSuccess, second.ErrorMessage);
+
+            update.FacilityId = model.FacilityId;
+            var duplicate = await manager.UpdateOperation(update);
+            Assert.False(duplicate.IsSuccess);
+            Assert.Equal("Only one HSLOC Map operation is allowed per facility.", duplicate.ErrorMessage);
+            var unchanged = await queries.Get(original.Id, original.FacilityId);
+            Assert.Equal(original.FacilityId, unchanged.FacilityId);
         }
 
         [Fact]
@@ -151,13 +271,10 @@ namespace IntegrationTests.Normalization
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
             var operationQueries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
 
-            var vendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-            Assert.NotNull(vendor);
-            var vendorIds = new List<Guid> { vendor.Id };
-            var model = GetValidCreateModelWithVendors(vendorIds, new List<string> { "Patient" });
+            var vendorVersionId = Guid.NewGuid();
+            var model = GetValidCreateModelWithVendorVersions([vendorVersionId], new List<string> { "Patient" });
 
             var result = await operationManager.CreateOperation(model);
 
@@ -165,7 +282,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result.ObjectResult);
 
             var created = (OperationModel)result.ObjectResult;
-            var searched = await operationQueries.Search(new OperationSearchModel { VendorId = vendorIds.First() });
+            var searched = await operationQueries.Search(new OperationSearchModel { VendorVersionId = vendorVersionId });
             Assert.Contains(searched.Records, o => o.Id == created.Id);
         }
 
@@ -176,7 +293,7 @@ namespace IntegrationTests.Normalization
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
 
             var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), new List<string> { "Patient" });
-            model.VendorIds = new List<Guid> { Guid.NewGuid() };
+            model.VendorVersionIds = new List<Guid> { Guid.NewGuid() };
 
             var result = await operationManager.CreateOperation(model);
             Assert.False(result.IsSuccess);
@@ -193,7 +310,7 @@ namespace IntegrationTests.Normalization
 
             var result = await operationManager.CreateOperation(model);
             Assert.False(result.IsSuccess);
-            Assert.Contains("one or more Vendor IDs", result.ErrorMessage);
+            Assert.Contains("one or more Vendor Version IDs", result.ErrorMessage);
         }
 
         [Fact]
@@ -259,7 +376,7 @@ namespace IntegrationTests.Normalization
             var updateModel = new UpdateOperationModel
             {
                 Id = opId,
-                VendorIds = new List<Guid> { Guid.NewGuid() },
+                VendorVersionIds = new List<Guid> { Guid.NewGuid() },
                 OperationJson = "{\"Name\": \"Test Copy\", \"Description\": \"Test Copy Description\", \"SourceFhirPath\": \"id\", \"TargetFhirPath\": \"meta.versionId\"}",
                 ResourceTypes = new List<string> { "Patient" }
             };
@@ -306,22 +423,16 @@ namespace IntegrationTests.Normalization
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
             var operationQueries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
 
-            // Create vendor
-            var vendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-            var vendorIds = new List<Guid> { vendor.Id };
+            var vendorVersionId = Guid.NewGuid();
 
-            // Create operation with vendors
-            var createModel = GetValidCreateModelWithVendors(vendorIds, new List<string> { "Patient" });
+            var createModel = GetValidCreateModelWithVendorVersions([vendorVersionId], new List<string> { "Patient" });
             var createResult = await operationManager.CreateOperation(createModel);
             var opId = ((OperationModel)createResult.ObjectResult).Id;
 
-            // Add another vendor
-            var newVendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-            var newVendorIds = new List<Guid> { vendor.Id, newVendor.Id };
-            await operationManager.UpdateVendorPresetsForOperation(opId, newVendorIds);
+            var newVendorVersionId = Guid.NewGuid();
+            await operationManager.UpdateVendorPresetsForOperation(opId, [vendorVersionId, newVendorVersionId]);
 
             var updated = await operationQueries.Get(opId, null);
             Assert.Equal(2, updated.VendorPresets.Count);
@@ -446,7 +557,7 @@ namespace IntegrationTests.Normalization
             var result = await operationManager.DeleteOperationSequence(deleteModel);
 
             Assert.True(result);
-            operationSequenceQueries.ClearCache(new OperationSequenceSearchModel { ResourceTypeId = opId, FacilityId = facilityId, ResourceType = "Patient" });
+            await operationSequenceQueries.ClearCache(new OperationSequenceSearchModel { ResourceTypeId = opId, FacilityId = facilityId, ResourceType = "Patient" });
             var searched = await operationSequenceQueries.Search(new OperationSequenceSearchModel { ResourceTypeId = opId, FacilityId = facilityId, ResourceType = "Patient" });
             Assert.Empty(searched);
         }

@@ -165,13 +165,130 @@ public class TailMessageRecoveryJobTests
         Assert.True(stillUnclaimed);
     }
 
+    [Fact]
+    public async Task Execute_ReclaimsStaleTailClaim_ProducesAndMarksSent()
+    {
+        _fixture.ResourcesAcquiredProducerMock.Reset();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailRecoveryFac_{tag}";
+        var correlation = $"Corr_{tag}";
+        var staleClaim = DateTime.UtcNow.Subtract(DataAcquisitionLog.TailClaimLease).AddMinutes(-1);
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+            await db.DataAcquisitionLogs
+                .Where(l => !l.TailSent)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.TailSent, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow));
+
+            await SeedTailGroupAsync(db, facilityId, correlation, siblingCount: 2, tailClaimedAt: staleClaim);
+        }
+
+        var settings = Options.Create(new TailMessageRecoveryJobSettings
+        {
+            MinAgeMinutes = 0,
+            MaxGroupsPerRun = 10,
+            TimeBudgetPerRunSeconds = 30
+        });
+
+        var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
+        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
+
+        var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
+
+        var jobContextMock = new Mock<IJobExecutionContext>();
+        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        await job.Execute(jobContextMock.Object);
+
+        _fixture.ResourcesAcquiredProducerMock.Verify(
+            p => p.ProduceAsync(
+                KafkaTopic.ResourcesAcquired.ToString(),
+                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var sent = await assertDb.DataAcquisitionLogs
+            .Where(l => l.FacilityId == facilityId && l.CorrelationId == correlation)
+            .AllAsync(l => l.TailSent);
+
+        Assert.True(sent);
+    }
+
+    [Fact]
+    public async Task Execute_SkipsInFlightTailClaim_DoesNotProduce()
+    {
+        _fixture.ResourcesAcquiredProducerMock.Reset();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TailRecoveryFac_{tag}";
+        var correlation = $"Corr_{tag}";
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+            await db.DataAcquisitionLogs
+                .Where(l => !l.TailSent)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.TailSent, true)
+                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow));
+
+            await SeedTailGroupAsync(db, facilityId, correlation, siblingCount: 2, tailClaimedAt: DateTime.UtcNow);
+        }
+
+        var settings = Options.Create(new TailMessageRecoveryJobSettings
+        {
+            MinAgeMinutes = 0,
+            MaxGroupsPerRun = 10,
+            TimeBudgetPerRunSeconds = 30
+        });
+
+        var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
+        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
+
+        var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
+
+        var jobContextMock = new Mock<IJobExecutionContext>();
+        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+        await job.Execute(jobContextMock.Object);
+
+        _fixture.ResourcesAcquiredProducerMock.Verify(
+            p => p.ProduceAsync(
+                KafkaTopic.ResourcesAcquired.ToString(),
+                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var stillUnsent = await assertDb.DataAcquisitionLogs
+            .Where(l => l.FacilityId == facilityId && l.CorrelationId == correlation)
+            .AllAsync(l => !l.TailSent);
+
+        Assert.True(stillUnsent);
+    }
+
     private static async Task SeedTailGroupAsync(
         DataAcquisitionDbContext db,
         string facilityId,
         string correlationId,
-        int siblingCount)
+        int siblingCount,
+        DateTime? tailClaimedAt = null)
     {
         var now = DateTime.UtcNow;
+        var modifyDate = tailClaimedAt ?? now.AddMinutes(-2);
 
         db.DataAcquisitionLogs.AddRange(
             new DataAcquisitionLog
@@ -181,10 +298,11 @@ public class TailMessageRecoveryJobTests
                 QueryPhase = QueryPhase.Initial,
                 Status = RequestStatus.Completed,
                 TailSent = false,
+                TailClaimedAt = tailClaimedAt,
                 SiblingCount = siblingCount,
                 PatientId = "Patient/1",
                 CreateDate = now.AddMinutes(-5),
-                ModifyDate = now.AddMinutes(-2)
+                ModifyDate = modifyDate
             },
             new DataAcquisitionLog
             {
@@ -193,10 +311,11 @@ public class TailMessageRecoveryJobTests
                 QueryPhase = QueryPhase.Initial,
                 Status = RequestStatus.Completed,
                 TailSent = false,
+                TailClaimedAt = tailClaimedAt,
                 SiblingCount = siblingCount,
                 PatientId = "Patient/1",
                 CreateDate = now.AddMinutes(-5),
-                ModifyDate = now.AddMinutes(-2)
+                ModifyDate = modifyDate
             }
         );
 

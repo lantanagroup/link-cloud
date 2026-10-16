@@ -6,6 +6,9 @@ export const testFacilities: IFacilityConfigModel[] = [
     facilityId: 'TestFacility01',
     facilityName: 'General Hospital One',
     timeZone: 'America/New_York',
+    // Epic on the first facility and none on the second, so the Vendor column is exercised
+    // both ways — a facility without a vendor is a supported state.
+    vendor: { id: 'epic-id', name: 'Epic' },
     scheduledReports: { daily: [], weekly: [], monthly: ['NHSNdQMAcuteCareHospitalInitialPopulation'] },
     isDeleted: false,
   },

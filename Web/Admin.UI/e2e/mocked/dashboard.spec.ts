@@ -6,9 +6,12 @@ test('dashboard renders the shell without any API calls', async ({ page, api }) 
   const nav = new NavPage(page);
   await nav.expectShellVisible();
 
-  // AdminDashboardComponent reads only session storage; hitting /api here would
-  // mean a regression (or a fixture gap elsewhere).
-  expect(api.calls).toHaveLength(0);
+  // AdminDashboardComponent reads only session storage, so the nav bar's DMRP status is the
+  // only /api call this screen should make. Anything else means a regression (or a fixture
+  // gap elsewhere).
+  expect(api.calls.map((c) => `${c.method} ${new URL(c.url).pathname}`)).toEqual([
+    'GET /api/dmrp/dmrp-status',
+  ]);
   expect(api.unmatched).toHaveLength(0);
 });
 

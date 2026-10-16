@@ -1,4 +1,4 @@
-﻿﻿﻿using Hl7.Fhir.Model;
+﻿﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
@@ -9,6 +9,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -27,24 +28,24 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
         private readonly IOperationSequenceQueries _operationSequenceQueries;
-        private readonly IVendorQueries _vendorQueries;
         private readonly ITenantApiService _tenantApiService;
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
+        private readonly HSLOCMapOperationService _hslocMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
         private readonly CopyLocationOperationService _copyLocationOperationService;
         private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
         private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, HSLOCMapOperationService hslocMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
             _operationSequenceQueries = operationSequenceQueries;
-            _vendorQueries = vendorQueries;
             _tenantApiService = tenantApiService;
             _copyPropertyOperationService = copyPropertyService;
             _codeMapOperationService = codeMapOperationService;
+            _hslocMapOperationService = hslocMapOperationService;
             _conditionalTransformOperationService = conditionalTransformOperationService;
             _copyLocationOperationService = copyLocationOperationService;
             _removeExtensionsOperationService = removeExtensionsOperationService;
@@ -53,19 +54,19 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorId = null,
-            string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorVersionId = null,
+            string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                     {
-                        return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
+                        return Problem(detail: $"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                     }
                 }
 
@@ -75,7 +76,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
                 {
-                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                    return Problem(detail: $"'{operationType.SanitizeAndRemove()}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel
@@ -83,16 +84,20 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = string.IsNullOrWhiteSpace(facilityId) ? null : facilityId,
-                    VendorId = vendorId,
+                    VendorVersionId = vendorVersionId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -102,22 +107,22 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpGet("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorId = null,
-            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorVersionId = null,
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (string.IsNullOrEmpty(facilityId))
                 {
-                    return BadRequest($"A faciityId must be provided");
+                    return Problem(detail: $"A faciityId must be provided", statusCode: StatusCodes.Status400BadRequest);
                 }
 
-                if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                 {
-                    return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
+                    return Problem(detail: $"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
@@ -126,7 +131,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
                 {
-                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                    return Problem(detail: $"'{operationType.SanitizeAndRemove()}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel
@@ -134,16 +139,20 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = string.IsNullOrEmpty(facilityId) ? null : facilityId,
-                    VendorId = vendorId,
+                    VendorVersionId = vendorVersionId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -151,50 +160,30 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpGet("vendor/{vendor}")]
+        [HttpGet("vendor-version/{vendorVersionId:guid}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetVendorOperations(string vendor, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
-            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetVendorVersionOperations(Guid vendorVersionId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
-                if (string.IsNullOrEmpty(vendor))
-                {
-                    return BadRequest($"A vendor Name or Id must be provided");
-                }
-
-                VendorModel? foundVendor;
-                if (Guid.TryParse(vendor, out var vendorId))
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendorId);
-                }
-                else
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendor);
-
-                    if (foundVendor == null)
-                    {
-                        return base.BadRequest($"No vendor by the name {vendor.Sanitize()} found.");
-                    }
-                }
-
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
 
                 OperationType operation = OperationType.None;
 
                 if (operationType != null && !Enum.TryParse(operationType, ignoreCase: true, out operation))
                 {
-                    return BadRequest($"'{operationType}' is not a valid OperationType.");
+                    return Problem(detail: $"'{operationType.SanitizeAndRemove()}' is not a valid OperationType.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _operationQueries.Search(new OperationSearchModel
                 {
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
-                    VendorId = foundVendor.Id,
+                    VendorVersionId = vendorVersionId,
                     FacilityId = null,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
@@ -202,9 +191,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -214,28 +207,34 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPost("")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(OperationModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PostOperation(PostOperationModel model)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> PostOperation(PostOperationModel model, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (model.Operation == null)
                 {
-                    return BadRequest("PostOperationModel.Operation cannot be null.");
+                    return Problem(detail: "PostOperationModel.Operation cannot be null.", statusCode: StatusCodes.Status400BadRequest);
+                }
+
+                if (model.Operation.OperationType == OperationType.HSLOCMap && model.VendorVersionIds?.Count > 0)
+                {
+                    return Problem(detail: "HSLOC Map operations cannot be assigned to vendors.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
                 {
-                    return BadRequest("PostOperationModel.ResourceTypes cannot be null or empty.");
+                    return Problem(detail: "PostOperationModel.ResourceTypes cannot be null or empty.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 if (!string.IsNullOrEmpty(model.FacilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId, cancellationToken))
                     {
-                        return BadRequest($"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist");
+                        return Problem(detail: $"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                     }
                 }
 
@@ -245,7 +244,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operationImplementation == null)
                 {
-                    return BadRequest("Operation did not match any existing Operation Types.");
+                    return Problem(detail: "Operation did not match any existing Operation Types.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
@@ -256,8 +255,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = model.FacilityId ?? string.Empty,
                     Name = model.Operation.Name,
                     Description = model.Operation.Description,
-                    VendorIds = model.VendorIds
-                });
+                    VendorVersionIds = model.VendorVersionIds
+                }, cancellationToken);
 
                 if (!taskResult.IsSuccess)
                 {
@@ -270,40 +269,15 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                     foreach (var resourceType in model.ResourceTypes)
                     {
-                        var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                        {
-                            ResourceType = resourceType,
-                            FacilityId = model.FacilityId
-                        }, false);
-
-                        int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
-
-                        List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
-
-                        if (results != null && results.Count() > 0)
-                        {
-                            foreach (var result in results)
-                            {
-                                createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
-                            }
-                        }
-
-                        createSequences.Add(new CreateOperationSequenceModel()
-                        {
-                            OperationId = operationModel.Id,
-                            Sequence = maxSequence
-                        });
-
-                        await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                        {
-                            FacilityId = model.FacilityId,
-                            ResourceType = resourceType,
-                            OperationSequences = createSequences,
-                        });
+                        await _operationManager.AppendOperationToSequence(model.FacilityId, resourceType, operationModel.Id, cancellationToken);
                     }
                 }
 
                 return Created("", taskResult.ObjectResult);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -313,33 +287,39 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPut("")]
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PutOperation(PutOperationModel model)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> PutOperation(PutOperationModel model, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (model.Id == null)
                 {
-                    return BadRequest("PutOperationModel.Id cannot be null.");
+                    return Problem(detail: "PutOperationModel.Id cannot be null.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 if (model.Operation == null)
                 {
-                    return BadRequest("PutOperationModel.Operation cannot be null.");
+                    return Problem(detail: "PutOperationModel.Operation cannot be null.", statusCode: StatusCodes.Status400BadRequest);
+                }
+
+                if (model.Operation.OperationType == OperationType.HSLOCMap && model.VendorVersionIds?.Count > 0)
+                {
+                    return Problem(detail: "HSLOC Map operations cannot be assigned to vendors.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
                 {
-                    return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
+                    return Problem(detail: "PutOperationModel.ResourceTypes cannot be null or empty.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 if (!string.IsNullOrEmpty(model.FacilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(model.FacilityId, cancellationToken))
                     {
-                        return BadRequest($"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist");
+                        return Problem(detail: $"Provided FacilityID {model.FacilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                     }
                 }
 
@@ -347,7 +327,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 if (operationImplementation == null)
                 {
-                    return BadRequest("Operation did not match any existing Operation Types.");
+                    return Problem(detail: "Operation did not match any existing Operation Types.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var taskResult = await _operationManager.UpdateOperation(new UpdateOperationModel()
@@ -359,8 +339,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     Name = model.Operation.Name,
                     Description = model.Operation.Description,
                     IsDisabled = model.IsDisabled,
-                    VendorIds = model.VendorIds
-                });
+                    VendorVersionIds = model.VendorVersionIds
+                }, cancellationToken);
 
                 if (!taskResult.IsSuccess)
                 {
@@ -368,6 +348,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
 
                 return Accepted("", taskResult.ObjectResult);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -377,20 +361,21 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
         [HttpPost("test")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest(TestOperationModel model)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> OperationTest(TestOperationModel model, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (model.Operation == null)
                 {
-                    return BadRequest("TestOperationModel.Operation cannot be null.");
+                    return Problem(detail: "TestOperationModel.Operation cannot be null.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 if (model.Resource == null)
                 {
-                    return BadRequest("TestOperationModel.Resource cannot be null.");
+                    return Problem(detail: "TestOperationModel.Resource cannot be null.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var operationType = model.Operation.OperationType;
@@ -398,19 +383,20 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
                 if (operationImplementation == null)
                 {
-                    return BadRequest("Operation did not match any existing Operation Types.");
+                    return Problem(detail: "Operation did not match any existing Operation Types.", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var domainResource = model.Resource;
 
                 var result = model.Operation.OperationType switch
                 {
-                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operationImplementation, domainResource),
-                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operationImplementation, domainResource),
-                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource),
-                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operationImplementation, domainResource),
-                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operationImplementation, domainResource),
-                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operationImplementation, domainResource),
+                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operationImplementation, domainResource, cancellationToken: cancellationToken),
                     _ => null
                 };
 
@@ -423,6 +409,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -432,13 +422,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("{id}/test")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OperationTest(Guid id, DomainResource domainResource, string? facilityId = null)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> OperationTest(Guid id, DomainResource domainResource, string? facilityId = null, CancellationToken cancellationToken = default)
         {
             try
             {
-                var dbEntity = await _operationQueries.Get(id, facilityId);
+                var dbEntity = await _operationQueries.Get(id, facilityId, cancellationToken);
 
                 if (dbEntity == null)
                 {
@@ -454,12 +445,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var result = operation.OperationType switch
                 {
-                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, domainResource),
-                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, domainResource),
-                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, domainResource),
-                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, domainResource),
-                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, domainResource),
-                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operation, domainResource),
+                    OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, domainResource, cancellationToken: cancellationToken),
+                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operation, domainResource, cancellationToken: cancellationToken),
                     _ => null
                 };
 
@@ -472,6 +464,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -481,15 +477,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpDelete("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
+         [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (string.IsNullOrEmpty(facilityId) && operationId == null)
                 {
-                    return BadRequest("Request must include a valid facilityId and/or operationId");
+                    return Problem(detail: "Request must include a valid facilityId and/or operationId", statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
@@ -497,7 +494,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = facilityId,
                     OperationId = operationId,
                     ResourceType = resourceType
-                });
+                }, cancellationToken);
 
                 if (result)
                 {
@@ -507,6 +504,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -514,36 +515,22 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpDelete("vendor/{vendor}")]
+        [HttpDelete("vendor-version/{vendorVersionId:guid}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeleteVendorOperations(string vendor, Guid? operationId = null, string? resourceType = null)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null, CancellationToken cancellationToken = default)
         {
             try
             {
-                VendorModel? foundVendor;
-                if (Guid.TryParse(vendor, out var vendorId))
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendorId);
-                }
-                else
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendor);
-
-                    if (foundVendor == null)
-                    {
-                        return base.BadRequest($"No vendor by the name {vendor.Sanitize()} found.");
-                    }
-                }
-
                 var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
                 {
-                    VendorId = foundVendor.Id,
+                    VendorVersionId = vendorVersionId,
                     OperationId = operationId,
                     ResourceType = resourceType
-                });
+                }, cancellationToken);
 
                 if (result)
                 {
@@ -553,6 +540,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

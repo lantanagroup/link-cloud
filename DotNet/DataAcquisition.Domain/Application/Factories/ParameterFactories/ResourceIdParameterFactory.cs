@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 using Microsoft.Extensions.Logging;
 
@@ -16,8 +17,16 @@ public class ResourceIdParameterFactory : IResourceIdParameterFactory
     }
     public async Task<ParameterFactoryResult?> Build(ResourceIdsParameter parameter, GetPatientDataRequest request, IDataAcquisitionLogQueries dataAcquisitionLogQueries)
     {
+        var reportTrackingId = request.ConsumeResult?.Message?.Value?.ScheduledReports
+            ?.Select(report => report.ReportTrackingId)
+            .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+
         List<string> resourceIds = await
-            dataAcquisitionLogQueries.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource);
+            dataAcquisitionLogQueries.GetResourceIdsForReportPatient(
+                request.CorrelationId,
+                request.FacilityId,
+                reportTrackingId,
+                parameter.Resource);
 
         if (resourceIds == null || !resourceIds.Any())
         {
@@ -25,9 +34,12 @@ public class ResourceIdParameterFactory : IResourceIdParameterFactory
             return null;
         }
 
-        Int32.TryParse(parameter.Paged, out int pageSize);
+        Int32.TryParse(parameter.Paged, out int configuredPageSize);
+        var pageSize = configuredPageSize > 0
+            ? configuredPageSize
+            : FhirSearchLimits.MaxIdsPerParameter;
 
-        if (!string.IsNullOrWhiteSpace(parameter.Paged) && pageSize > 0 && resourceIds.Count > pageSize)
+        if (resourceIds.Count > pageSize)
         {
             var pagedEntries = resourceIds.Chunk(pageSize).ToList();
             return new ParameterFactoryResult(parameter.Name, null, true, pagedEntries);

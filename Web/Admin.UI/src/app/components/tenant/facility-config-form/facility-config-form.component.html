@@ -59,10 +59,10 @@
 
     <mat-form-field appearance="outline">
       <mat-label>Vendor</mat-label>
-      <mat-select formControlName="vendor" [placeholder]="'Select a vendor'" [disabled]="viewOnly">
-        @for (vendor of vendors; track vendor) {
+      <mat-select formControlName="vendor" [placeholder]="'Select a vendor'" [disabled]="viewOnly" [compareWith]="compareVendors">
+        @for (vendor of vendors; track vendor.id) {
           <mat-option [disabled]="viewOnly" [value]="vendor">
-            {{ vendor }}
+            {{ vendor.vendorName }} - {{ vendor.version }}
           </mat-option>
         }
       </mat-select>
@@ -71,8 +71,25 @@
       }
     </mat-form-field>
 
+    <!-- With DMRP enabled the schedule comes from the facility's DMRP reporting plans, unless the Mock DMRP
+         API is switched on: then the pickers stay and Tenant writes the selection to the mock. -->
+    @if (!showReportPickers) {
+      <div class="scheduled-reports-container">
+        <span class="title">Scheduled Reports</span>
+        <p>
+          Scheduled reports for this facility are derived from its DMRP reporting plans and cannot be
+          set here.
+        </p>
+      </div>
+    } @else {
     <div class="scheduled-reports-container">
       <span class="title">Scheduled Reports</span>
+      @if (mockDmrpEnabled) {
+        <p>
+          Saving writes these reports to the Mock DMRP API as this facility's enrollment. Each one needs a
+          measure mapping at its frequency.
+        </p>
+      }
 
       <mat-form-field class="form-select" appearance="outline">
         <mat-label>Monthly</mat-label>
@@ -104,18 +121,11 @@
           }
         </mat-select>
       </mat-form-field>
+
+      @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
+        <mat-error class="reports-error">{{ reportsNotUniqueError }}</mat-error>
+      }
     </div>
-
-    @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
-      <div>
-        <small class="error">{{ reportsNotUniqueError }}</small>
-      </div>
-    }
-
-    @if (noReportsEntered && !viewOnly &&  (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
-      <div>
-        <small class="error">{{ noReportsEntered }}</small>
-      </div>
     }
 
   </form>

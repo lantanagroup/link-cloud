@@ -10,6 +10,8 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.shared.entities.ReportScheduleModel;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.services.ReportClient;
+import com.lantanagroup.link.shared.utils.LogUtils;
+import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Reference;
@@ -19,10 +21,10 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class BlobStorageService {
@@ -69,6 +71,10 @@ public class BlobStorageService {
     }
 
     public void storePatientInBlobStorage(PatientReportingEvaluationStatus status, PatientReportingEvaluationStatus.Report report, MeasureReport measureReport) {
+        storePatientInBlobStorage(status, report, measureReport, null);
+    }
+
+    public void storePatientInBlobStorage(PatientReportingEvaluationStatus status, PatientReportingEvaluationStatus.Report report, MeasureReport measureReport, org.apache.kafka.common.header.Headers inboundHeaders) {
         IParser jsonParser = this.fhirContext.newJsonParser()
                 //.setSuppressNarratives(true)    // consider this if narrative "text" fields aren't desired downstream
                 .setPrettyPrint(false);     // Ensure no tab delim so that it serializes to a single line per each resource
@@ -105,7 +111,7 @@ public class BlobStorageService {
         }
 
         // Produce MeasureReportGenerated event
-        this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport.getIdPart(), patientPayloadUri, blobName);
+        this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport.getIdPart(), patientPayloadUri, blobName, inboundHeaders);
     }
 
     private List<Resource> normalize(MeasureReport measureReport) {
@@ -114,9 +120,18 @@ public class BlobStorageService {
         }
 
         List<Resource> contained = measureReport.getContained();
-        Map<String, Resource> containedByIdPart = contained.stream().collect(Collectors.toMap(
-                resource -> stripHash(resource.getIdPart()),
-                Function.identity()));
+
+        // Contained resource IDs are only guaranteed unique within a resource type (e.g. Condition/A and
+        // Observation/A can legally coexist), so the primary lookup is type-qualified. A secondary,
+        // id-part-only index is kept to resolve untyped "#id" references, but only when unambiguous.
+        Map<String, Resource> containedByTypedId = new HashMap<>();
+        Map<String, List<Resource>> containedByIdPart = new HashMap<>();
+        for (Resource resource : contained) {
+            String idPart = stripHash(resource.getIdPart());
+            containedByTypedId.put(resource.getResourceType().name() + "/" + idPart, resource);
+            containedByIdPart.computeIfAbsent(idPart, key -> new ArrayList<>()).add(resource);
+        }
+
         measureReport.setContained(null);
         measureReport.setEvaluatedResource(null);
         for (Resource resource : contained) {
@@ -127,8 +142,26 @@ public class BlobStorageService {
         }
         for (Reference reference :
                 fhirContext.newTerser().getAllPopulatedChildElementsOfType(measureReport, Reference.class)) {
-            String idPart = stripHash(reference.getReferenceElement().getIdPart());
-            Resource resource = containedByIdPart.get(idPart);
+            IIdType referenceElement = reference.getReferenceElement();
+            String idPart = stripHash(referenceElement.getIdPart());
+            String resourceType = referenceElement.getResourceType();
+
+            Resource resource;
+            if (resourceType != null) {
+                resource = containedByTypedId.get(resourceType + "/" + idPart);
+            } else {
+                List<Resource> candidates = containedByIdPart.getOrDefault(idPart, List.of());
+                if (candidates.size() > 1) {
+                    String candidateTypes = candidates.stream()
+                            .map(candidate -> candidate.getResourceType().name())
+                            .collect(Collectors.joining(", "));
+                    logger.warn("Contained reference '#{}' is ambiguous between {} resources ({}); leaving reference unresolved",
+                            LogUtils.sanitize(idPart), candidates.size(), LogUtils.sanitize(candidateTypes));
+                    continue;
+                }
+                resource = candidates.isEmpty() ? null : candidates.get(0);
+            }
+
             if (resource == null) {
                 continue;
             }

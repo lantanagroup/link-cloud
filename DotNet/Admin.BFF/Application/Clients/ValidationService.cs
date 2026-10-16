@@ -1,9 +1,7 @@
 ﻿using System.Net.Http.Headers;
-using System.Text.Json;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
@@ -14,11 +12,9 @@ public class ValidationService
     private readonly ILogger<ValidationService> _logger;
     private readonly HttpClient _client;
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
-    private const string HealthUp = "UP";
-    private static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(5);
 
-
-    public ValidationService(ILogger<ValidationService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
+    public ValidationService(ILogger<ValidationService> logger, HttpClient client,
+        IOptions<ServiceRegistry> serviceRegistry)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _client = client ?? throw new ArgumentNullException(nameof(client));
@@ -41,84 +37,6 @@ public class ValidationService
         _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
-    public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
-    {
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(HealthCheckTimeout);
-
-        // HTTP GET
-
-        var report = new LinkServiceHealthReport
-        {
-            Service = "Validation"
-        };
-
-        try
-        {
-            var response = await _client.GetAsync($"health", timeoutCts.Token);
-
-            var content = await response.Content.ReadAsStringAsync();
-
-            HealthResponse? health = null;
-
-            try
-            {
-
-                health = JsonSerializer.Deserialize<HealthResponse>(content, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "Failed to deserialize health response from Validation service");
-                return new LinkServiceHealthReport { Service = "Validation", Status = HealthStatus.Unhealthy };
-            }
-
-            var status = health?.Status?.Equals(HealthUp, StringComparison.OrdinalIgnoreCase) == true
-                ? HealthStatus.Healthy
-                : HealthStatus.Unhealthy;
-
-            report.Status = status;
-
-            // Populate Entries based on components
-            if (health?.Components != null)
-            {
-                foreach (var component in health.Components)
-                {
-                    // Spring names the Mongo component "db" and the auto-configured Redis
-                    // component "redis"; map them to the Database/Cache entries the UI expects.
-                    var key = component.Key switch
-                    {
-                        var k when k.Equals("db", StringComparison.OrdinalIgnoreCase) => "Database",
-                        var k when k.Equals("redis", StringComparison.OrdinalIgnoreCase) => "Cache",
-                        _ => ToPascalCase(component.Key)
-                    };
-
-                    var componentStatus = component.Value?.Status?.ToUpperInvariant() == HealthUp
-                        ? HealthStatus.Healthy
-                        : HealthStatus.Unhealthy;
-
-                    report.Entries[key] = new LinkServiceHealthReportEntry
-                    {
-                        Status = componentStatus,
-                        Duration = TimeSpan.Zero
-                    };
-                }
-            }
-
-            return report;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Validation service health check failed");
-            return new LinkServiceHealthReport { Service = "Validation", Status = HealthStatus.Unhealthy };
-        }
-    }
-
-    private static string ToPascalCase(string input)
-    {
-        if (string.IsNullOrEmpty(input)) return input;
-        return char.ToUpperInvariant(input[0]) + input.Substring(1);
-    }
+    public Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken) =>
+        SpringServiceHealth.ReadAsync(_client, "Validation", SpringServiceHealth.Deadline, _logger, cancellationToken);
 }

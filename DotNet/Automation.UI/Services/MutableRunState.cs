@@ -17,6 +17,7 @@ namespace Automation.UI.Services;
 /// </summary>
 internal sealed class MutableRunState(
     Guid runId,
+    Guid? scenarioId,
     AutomationScenarioKind scenario,
     ResolvedRunOptions options,
     string? runNameOverride,
@@ -24,6 +25,7 @@ internal sealed class MutableRunState(
 {
     public object Sync { get; } = new();
     public Guid RunId { get; } = runId;
+    public Guid? ScenarioId { get; } = scenarioId;
     public AutomationScenarioKind Scenario { get; } = scenario;
     public ResolvedRunOptions Options { get; } = options;
     public string? RunNameOverride { get; } = runNameOverride;
@@ -32,6 +34,7 @@ internal sealed class MutableRunState(
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public string? FacilityId { get; set; }
+    public bool AutomationCreatedFacility { get; set; }
     public string? ReportId { get; set; }
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
     public string? Error { get; set; }
@@ -40,4 +43,11 @@ internal sealed class MutableRunState(
     public bool CancelRequested { get; set; }
     public Task? ExecutionTask { get; set; }
     public FhirDataLoader? FhirDataLoader { get; set; }
+    public Guid? GeneratedTemplateCacheVersionId { get; set; }
+    public int? GeneratedTemplateCacheVersionNumber { get; set; }
+    public string? GeneratedTemplateCacheScenarioKey { get; set; }
+    public string? GeneratedTemplateSetHash { get; set; }
+    public DateTimeOffset? LiveWindowStartUtc { get; set; }
+    public DateTimeOffset? LiveWindowEndUtc { get; set; }
+    public IReadOnlyList<string> LiveExpectedPopulation { get; set; } = [];
 }

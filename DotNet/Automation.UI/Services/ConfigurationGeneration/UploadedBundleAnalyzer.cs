@@ -1,0 +1,292 @@
+using Automation.UI.Models;
+using Hl7.Fhir.Model;
+
+namespace Automation.UI.Services.ConfigurationGeneration;
+
+public static class UploadedBundleAnalyzer
+{
+    public static BundleConfigFingerprint Analyze(IEnumerable<Resource> resources)
+    {
+        var fp = new BundleConfigFingerprint();
+        var seen = new HashSet<RawLocationHint>(RawSignatureComparer.Instance);
+        foreach (var resource in resources.Where(r => r != null))
+        {
+            var type = resource.TypeName;
+            fp.ResourceCounts[type] = fp.ResourceCounts.TryGetValue(type, out var c) ? c + 1 : 1;
+
+            if (resource is Patient)
+                fp.PatientCount++;
+
+            if (resource is Location location)
+                AddLocation(fp, location, seen);
+
+            CollectExtensions(fp, resource, type);
+            CollectCodings(fp, resource, type);
+        }
+
+        return fp;
+    }
+
+    public static BundleConfigFingerprint Merge(BundleConfigFingerprint left, BundleConfigFingerprint? right)
+    {
+        if (right == null)
+            return Clone(left);
+
+        var merged = Clone(left);
+        foreach (var (type, count) in right.ResourceCounts)
+            merged.ResourceCounts[type] = merged.ResourceCounts.TryGetValue(type, out var c) ? c + count : count;
+
+        merged.PatientCount += right.PatientCount;
+        merged.LocationCount += right.LocationCount;
+        merged.LocationsWithoutIdentifier += right.LocationsWithoutIdentifier;
+
+        foreach (var id in right.LocationIdentifiers)
+        {
+            if (!merged.LocationIdentifiers.Any(x => Same(x.System, id.System) && SameValue(x.Value, id.Value)))
+                merged.LocationIdentifiers.Add(id);
+        }
+
+        foreach (var t in right.LocationTypes)
+        {
+            if (!merged.LocationTypes.Any(x => Same(x.System, t.System) && SameCode(x.Code, t.Code)))
+                merged.LocationTypes.Add(t);
+        }
+
+        foreach (var alias in right.LocationAliases)
+        {
+            if (!merged.LocationAliases.Contains(alias))
+                merged.LocationAliases.Add(alias);
+        }
+
+        var seen = new HashSet<RawLocationHint>(merged.RawLocations, RawSignatureComparer.Instance);
+        foreach (var location in right.RawLocations)
+            AddRawLocation(merged, location, seen);
+
+        foreach (var ext in right.Extensions)
+        {
+            if (!merged.Extensions.Any(x => Same(x.Url, ext.Url) && Same(x.ResourceType, ext.ResourceType)))
+                merged.Extensions.Add(ext);
+        }
+
+        foreach (var coding in right.Codings)
+        {
+            if (!merged.Codings.Any(x =>
+                    Same(x.ResourceType, coding.ResourceType)
+                    && Same(x.Path, coding.Path)
+                    && Same(x.System, coding.System)
+                    && Same(x.Code, coding.Code)))
+            {
+                merged.Codings.Add(coding);
+            }
+        }
+
+        return merged;
+    }
+
+    public static BundleConfigFingerprint Clone(BundleConfigFingerprint source)
+        => new()
+        {
+            ResourceCounts = new Dictionary<string, int>(source.ResourceCounts, StringComparer.OrdinalIgnoreCase),
+            LocationIdentifiers = [.. source.LocationIdentifiers],
+            LocationTypes = [.. source.LocationTypes],
+            LocationAliases = [.. source.LocationAliases],
+            RawLocations = source.RawLocations.Select(CloneRawLocation).ToList(),
+            Extensions = [.. source.Extensions],
+            Codings = [.. source.Codings],
+            LocationCount = source.LocationCount,
+            PatientCount = source.PatientCount,
+            LocationsWithoutIdentifier = source.LocationsWithoutIdentifier
+        };
+
+    private static void AddLocation(BundleConfigFingerprint fp, Location location, HashSet<RawLocationHint> seen)
+    {
+        fp.LocationCount++;
+        var raw = new RawLocationHint();
+        var hasUsableIdentifier = false;
+        foreach (var identifier in location.Identifier ?? [])
+        {
+            var system = identifier.System?.Trim() ?? "";
+            // A system is required for the identifier to be usable. The value stays exact,
+            // including surrounding spaces, once that system is real.
+            var value = identifier.Value ?? "";
+            if (string.IsNullOrWhiteSpace(system))
+                continue;
+            hasUsableIdentifier = true;
+            if (fp.LocationIdentifiers.Any(x => Same(x.System, system) && SameValue(x.Value, value)))
+                continue;
+            fp.LocationIdentifiers.Add(new LocationIdentifierHint { System = system, Value = value });
+        }
+        if (!hasUsableIdentifier)
+            fp.LocationsWithoutIdentifier++;
+
+        foreach (var type in location.Type ?? [])
+        {
+            foreach (var coding in type.Coding ?? [])
+            {
+                var system = coding.System?.Trim() ?? "";
+                var code = coding.Code?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(system) && string.IsNullOrWhiteSpace(code))
+                    continue;
+                var hint = new LocationTypeHint { System = system, Code = code };
+                if (!raw.Types.Any(existing => Same(existing.System, system) && SameCode(existing.Code, code)))
+                    raw.Types.Add(hint);
+                if (fp.LocationTypes.Any(x => Same(x.System, system) && SameCode(x.Code, code)))
+                    continue;
+                fp.LocationTypes.Add(hint);
+            }
+        }
+
+        foreach (var alias in location.Alias ?? [])
+        {
+            if (string.IsNullOrEmpty(alias))
+                continue;
+            // Reuse matching uses the original alias. FHIRPath equality does not trim.
+            if (!raw.Aliases.Contains(alias))
+                raw.Aliases.Add(alias);
+            var hint = alias.Trim();
+            if (hint.Length == 0 || fp.LocationAliases.Contains(hint))
+                continue;
+            fp.LocationAliases.Add(hint);
+        }
+
+        AddRawLocation(fp, raw, seen);
+    }
+
+    private static void AddRawLocation(BundleConfigFingerprint fp, RawLocationHint raw, HashSet<RawLocationHint> seen)
+    {
+        if (raw.Types.Count == 0 && raw.Aliases.Count == 0)
+            return;
+        if (!seen.Add(raw))
+            return;
+        fp.RawLocations.Add(CloneRawLocation(raw));
+    }
+
+    private static RawLocationHint CloneRawLocation(RawLocationHint raw)
+        => new()
+        {
+            Types = raw.Types.Select(type => new LocationTypeHint { System = type.System, Code = type.Code }).ToList(),
+            Aliases = [.. raw.Aliases]
+        };
+
+    private static bool SameSignature(RawLocationHint left, RawLocationHint right)
+        => left.Aliases.Count == right.Aliases.Count
+           && right.Aliases.All(alias => left.Aliases.Contains(alias))
+           && left.Types.Count == right.Types.Count
+           && right.Types.All(type => left.Types.Any(existing => Same(existing.System, type.System) && SameCode(existing.Code, type.Code)));
+
+    private static void CollectExtensions(BundleConfigFingerprint fp, Resource resource, string resourceType)
+    {
+        if (resource is not DomainResource domain)
+            return;
+
+        foreach (var ext in (domain.Extension ?? []).Concat(domain.ModifierExtension ?? []))
+            AddExtension(fp, resourceType, ext);
+    }
+
+    private static void AddExtension(BundleConfigFingerprint fp, string resourceType, Extension? extension)
+    {
+        if (extension == null)
+            return;
+        var url = extension.Url?.Trim();
+        if (IsAbsoluteExtensionUrl(url)
+            && !fp.Extensions.Any(x => Same(x.Url, url) && Same(x.ResourceType, resourceType)))
+        {
+            fp.Extensions.Add(new ExtensionHint { Url = url!, ResourceType = resourceType });
+        }
+
+        foreach (var nested in extension.Extension ?? [])
+            AddExtension(fp, resourceType, nested);
+    }
+
+    private static void CollectCodings(BundleConfigFingerprint fp, Resource resource, string resourceType)
+    {
+        switch (resource)
+        {
+            case Location location:
+                foreach (var type in location.Type ?? [])
+                    AddCodings(fp, resourceType, "type.coding", type.Coding);
+                break;
+            case Encounter encounter:
+                AddCodings(fp, resourceType, "class", encounter.Class == null ? null : [encounter.Class]);
+                break;
+            case Condition condition:
+                AddCodings(fp, resourceType, "code.coding", condition.Code?.Coding);
+                break;
+            case Observation observation:
+                AddCodings(fp, resourceType, "code.coding", observation.Code?.Coding);
+                break;
+        }
+    }
+
+    private static void AddCodings(
+        BundleConfigFingerprint fp,
+        string resourceType,
+        string path,
+        IEnumerable<Coding>? codings)
+    {
+        foreach (var coding in codings ?? [])
+        {
+            var system = coding.System?.Trim() ?? "";
+            var code = coding.Code?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(system) || string.IsNullOrWhiteSpace(code))
+                continue;
+            if (fp.Codings.Any(x =>
+                    Same(x.ResourceType, resourceType)
+                    && Same(x.Path, path)
+                    && Same(x.System, system)
+                    && Same(x.Code, code)))
+            {
+                continue;
+            }
+
+            fp.Codings.Add(new CodingHint
+            {
+                ResourceType = resourceType,
+                Path = path,
+                System = system,
+                Code = code,
+                Display = coding.Display
+            });
+        }
+    }
+
+    public static bool IsAbsoluteExtensionUrl(string? url)
+        => !string.IsNullOrWhiteSpace(url)
+           && url == url.Trim()
+           && Uri.TryCreate(url, UriKind.Absolute, out _);
+
+    private sealed class RawSignatureComparer : IEqualityComparer<RawLocationHint>
+    {
+        public static readonly RawSignatureComparer Instance = new();
+
+        public bool Equals(RawLocationHint? x, RawLocationHint? y)
+            => x != null && y != null && SameSignature(x, y);
+
+        public int GetHashCode(RawLocationHint obj)
+        {
+            var hash = new HashCode();
+            hash.Add(obj.Aliases.Count);
+            foreach (var alias in obj.Aliases.OrderBy(alias => alias, StringComparer.Ordinal))
+                hash.Add(alias, StringComparer.Ordinal);
+            hash.Add(obj.Types.Count);
+            foreach (var type in obj.Types
+                         .OrderBy(type => type.System, StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(type => type.Code, StringComparer.Ordinal))
+            {
+                hash.Add(type.System?.Trim(), StringComparer.OrdinalIgnoreCase);
+                hash.Add(type.Code?.Trim(), StringComparer.Ordinal);
+            }
+
+            return hash.ToHashCode();
+        }
+    }
+
+    private static bool Same(string? left, string? right)
+        => string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool SameCode(string? left, string? right)
+        => string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal);
+
+    private static bool SameValue(string? left, string? right)
+        => string.Equals(left ?? "", right ?? "", StringComparison.Ordinal);
+}

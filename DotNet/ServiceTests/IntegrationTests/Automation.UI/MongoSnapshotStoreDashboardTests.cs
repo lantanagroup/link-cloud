@@ -86,6 +86,66 @@ public class MongoSnapshotStoreDashboardTests : IAsyncLifetime
     //  Helpers
     // ─────────────────────────────────────────────────────────────────────
 
+    [Fact]
+    public async Task Ownership_upsert_inserts_a_missing_run_and_a_later_false_summary_keeps_the_marker()
+    {
+        var store = _fixture.CreateStore();
+        var summary = MakeSummary(AutomationRunStatus.Running, createdAt: DateTimeOffset.UtcNow.AddMinutes(-5));
+        summary.FacilityId = Guid.NewGuid().ToString();
+        summary.AutomationCreatedFacility = true;
+
+        await store.MarkAutomationCreatedFacilityAsync(summary, summary.FacilityId, CancellationToken.None);
+
+        var stored = await store.GetRunSummaryAsync(summary.RunId, CancellationToken.None);
+        stored.Should().NotBeNull();
+        stored!.AutomationCreatedFacility.Should().BeTrue();
+        stored.FacilityId.Should().Be(summary.FacilityId);
+        stored.Status.Should().Be(AutomationRunStatus.Running);
+
+        summary.AutomationCreatedFacility = false;
+        summary.Status = AutomationRunStatus.Cancelled;
+        await store.UpsertRunSummaryAsync(summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
+
+        var after = await store.GetRunSummaryAsync(summary.RunId, CancellationToken.None);
+        after.Should().NotBeNull();
+        after!.AutomationCreatedFacility.Should().BeTrue();
+        after.Status.Should().Be(AutomationRunStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task Ownership_upsert_of_a_finished_run_is_not_left_active()
+    {
+        var store = _fixture.CreateStore();
+        var summary = MakeSummary(AutomationRunStatus.Succeeded, createdAt: DateTimeOffset.UtcNow.AddMinutes(-5));
+        summary.FacilityId = Guid.NewGuid().ToString();
+        summary.AutomationCreatedFacility = true;
+
+        await store.MarkAutomationCreatedFacilityAsync(summary, summary.FacilityId, CancellationToken.None);
+
+        var raw = await _fixture.RawRunsCollection
+            .Find(Builders<BsonDocument>.Filter.Eq("_id", summary.RunId.ToString()))
+            .FirstAsync();
+
+        raw["IsActive"].AsBoolean.Should().BeFalse();
+        raw["AutomationCreatedFacility"].AsBoolean.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Teardown_progress_can_be_read_after_it_is_recorded()
+    {
+        var store = _fixture.CreateStore();
+        var runId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+
+        await store.MarkFacilityTeardownProgressAsync(runId, facilityId, CancellationToken.None);
+
+        var ids = await store.GetFacilityTeardownProgressAsync(runId, CancellationToken.None);
+        ids.Should().Equal(facilityId);
+
+        await store.ClearFacilityTeardownProgressAsync(runId, CancellationToken.None);
+        (await store.GetFacilityTeardownProgressAsync(runId, CancellationToken.None)).Should().BeEmpty();
+    }
+
     private static AutomationRunSummary MakeSummary(AutomationRunStatus status, DateTimeOffset createdAt) => new()
     {
         RunId = Guid.NewGuid(),

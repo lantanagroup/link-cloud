@@ -15,9 +15,8 @@ public class PatientCohortDefinition
     public int PatientCount { get; set; }
 
     /// <summary>
-    /// Concrete cohort-level expected qualification outcome used by prediction logic.
-    /// This allows scenarios to explicitly mark a cohort as qualifying vs non-qualifying
-    /// independent of per-measure checkbox drift in UI editing.
+    /// Derived cohort-level qualification (any selected measure is IP-qualifying).
+    /// Stamped from <see cref="ConfigurationQualification"/>; not a user-facing switch.
     /// </summary>
     public MeasureEligibility CohortQualification { get; set; } = MeasureEligibility.Qualifying;
 
@@ -28,15 +27,30 @@ public class PatientCohortDefinition
     public ScheduledInpatientPattern? ScheduledInpatientPattern { get; set; }
 
     /// <summary>
-    /// Per-measure eligibility map. Every selected measure should have an entry.
-    /// Drives encounter type (inpatient vs ambulatory) and measure-specific
-    /// resource generation (e.g., diabetic medication for Hypo).
+    /// Derived per-measure IP prediction from the clinical shape. Generation reads
+    /// encounter class and insulin from <see cref="Intent"/> instead of this map.
     /// </summary>
     public Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities { get; set; } = new();
 
+    /// <summary>
+    /// Legacy pack-id list. Generation does not read this; clinical shape
+    /// comes from <see cref="Intent"/> / the referenced Patient Configuration.
+    /// </summary>
     public List<string> EligibleClinicalScenarioIds { get; set; } = [];
     public int ResourcesPerPatientMin { get; set; } = 50;
     public int ResourcesPerPatientMax { get; set; } = 100;
+
+    /// <summary>
+    /// Optional saved Patient Configuration this cohort uses. Live reference:
+    /// editing the configuration updates runs that point at it.
+    /// </summary>
+    public Guid? PatientConfigurationId { get; set; }
+
+    /// <summary>
+    /// Inline generation overlays. Applied after a referenced configuration.
+    /// Null / empty fields inherit the configuration intent, then fixture defaults.
+    /// </summary>
+    public PatientGenerationIntent? Intent { get; set; }
 
     /// <summary>
     /// Returns the eligibility for a specific measure.
@@ -72,22 +86,23 @@ public class PatientCohortDefinition
             var count = Math.Max(0, cohort.PatientCount);
             var min = Math.Max(1, cohort.ResourcesPerPatientMin);
             var max = Math.Max(min, cohort.ResourcesPerPatientMax);
-            var scenarios = cohort.EligibleClinicalScenarioIds is { Count: > 0 }
-                ? cohort.EligibleClinicalScenarioIds
-                : FhirGenerationCodes.ClinicalScenarios.Select(s => s.ScenarioId.ToString()).ToList();
 
             for (var i = 0; i < count; i++)
             {
                 var seedOffset = seedCursor;
-                var scenarioId = scenarios[seedCursor % scenarios.Count];
                 var resources = ComputeResourceTarget(seed, cohortIndex, i, min, max);
+                var intent = PatientGenerationIntent.Clone(cohort.Intent);
+                var prediction = ConfigurationQualification.Predict(
+                    intent,
+                    pattern: cohort.ScheduledInpatientPattern);
                 result.Add(new PatientProfile(
-                    new Dictionary<ProfiledMeasureType, MeasureEligibility>(cohort.MeasureEligibilities),
+                    prediction.MeasureEligibilities,
                     seedOffset,
-                    scenarioId,
+                    ClinicalScenarioId: null,
                     resources,
                     cohort.ScheduledInpatientPattern,
-                    cohort.CohortQualification));
+                    prediction.CohortQualification,
+                    intent));
                 seedCursor++;
             }
 

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 using Hl7.Fhir.Model;
 using System.Text.Json.Serialization;
@@ -18,7 +18,9 @@ public enum ImportedPatientSource
 /// <summary>
 /// Describes a single imported patient as configured on a scenario.
 /// One of <see cref="PatientId"/> (for <see cref="ImportedPatientSource.ExistingId"/>)
-/// or <see cref="BundleJson"/> (for <see cref="ImportedPatientSource.Bundle"/>) is required.
+/// or <see cref="UploadedBundleId"/> (for <see cref="ImportedPatientSource.Bundle"/>) is required.
+/// Raw <see cref="BundleJson"/> is an execution-only value populated after resolving the
+/// external bundle reference, with support retained for legacy inline inputs.
 /// </summary>
 public sealed class ImportedPatientInput
 {
@@ -38,18 +40,23 @@ public sealed class ImportedPatientInput
     /// </summary>
     public Guid? UploadedBundleId { get; set; }
 
-    /// <summary>For <see cref="ImportedPatientSource.Bundle"/>: the raw FHIR Bundle JSON.</summary>
+    /// <summary>
+    /// For <see cref="ImportedPatientSource.Bundle"/>: the raw FHIR Bundle JSON available
+    /// only to execution-time processing. New persisted models use <see cref="UploadedBundleId"/>
+    /// instead; this remains for legacy inline inputs and hydrated execution copies.
+    /// </summary>
     public string? BundleJson { get; set; }
 
     /// <summary>
-    /// When true, run the classifier on the patient's resources to seed <see cref="MeasureEligibilities"/>.
-    /// When false, <see cref="MeasureEligibilities"/> is taken as-is (manual override).
+    /// When true, run the classifier on the patient's resources to derive
+    /// <see cref="MeasureEligibilities"/>. Always true for new UI saves; kept for
+    /// older payloads.
     /// </summary>
     public bool AutoDetect { get; set; } = true;
 
     /// <summary>
-    /// Per-measure eligibility for this patient. Populated by the classifier when <see cref="AutoDetect"/>
-    /// is true and may be overridden by the user. Drives Q/NQ classification in the manifest.
+    /// Derived per-measure IP prediction from the imported resources. Display snapshot
+    /// only; the pipeline re-classifies from the bundle at run time.
     /// </summary>
     public Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities { get; set; } = [];
 
@@ -66,4 +73,12 @@ public sealed class ImportedPatientInput
     /// </summary>
     [JsonIgnore]
     public List<Bundle.EntryComponent>? PreLoadedEntries { get; set; }
+
+    /// <summary>
+    /// Transient: location logical ids referenced by this import whose read returned
+    /// 404 or 410. The organization-location hierarchy check does not treat these
+    /// as missing ancestors. Excluded from JSON / Mongo serialization.
+    /// </summary>
+    [JsonIgnore]
+    public HashSet<string> AbsentReferencedLocationIds { get; } = new(StringComparer.Ordinal);
 }

@@ -1,6 +1,7 @@
 ﻿using Automation.UI.Models;
-using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Validation;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
@@ -42,6 +43,13 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (model.ResourceTypes.Count == 0)
             return BadRequest("At least one resource type is required.");
 
+        var hslocError = GetHslocMapSaveError(model);
+        if (hslocError != null)
+            return BadRequest(hslocError);
+
+        if (string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
+            model.CodeMapFhirPath = HslocMappingDefaults.FhirPath;
+
         var existing = await store.GetOperationByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
             return StatusCode(StatusCodes.Status403Forbidden, "System operations cannot be modified.");
@@ -56,6 +64,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOperation([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var op = await store.GetOperationByIdAsync(request.Id, ct);
         if (op == null) return NotFound();
         if (op.IsSystem)
@@ -79,6 +90,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneOperation([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await store.GetOperationByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
@@ -105,6 +119,32 @@ public class NormalizationsController(INormalizationStore store) : Controller
         return Json(new { id = clone.Id });
     }
 
+    internal static string? GetHslocMapSaveError(NormalizationOperationDefinition model)
+    {
+        if (!string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (model.ResourceTypes is not { Count: 1 }
+            || !string.Equals(model.ResourceTypes[0], "Location", StringComparison.Ordinal))
+            return "HSLOCMap operations must target only the Location resource type.";
+
+        if (!string.IsNullOrWhiteSpace(model.CodeMapFhirPath)
+            && !string.Equals(model.CodeMapFhirPath.Trim(), HslocMappingDefaults.FhirPath, StringComparison.Ordinal))
+            return $"HSLOCMap FhirPath must be {HslocMappingDefaults.FhirPath}.";
+
+        if (model.CodeSystemMaps.Count == 0)
+            return "HSLOCMap requires at least one Code System Map.";
+
+        for (var i = 0; i < model.CodeSystemMaps.Count; i++)
+        {
+            var target = model.CodeSystemMaps[i].TargetSystem?.Trim() ?? string.Empty;
+            if (!string.Equals(target, MappingTargetSystems.HslocUrl, StringComparison.Ordinal))
+                return $"Code System Map #{i + 1} target system must be {MappingTargetSystems.HslocUrl}.";
+        }
+
+        return null;
+    }
+
     // ===== Sequences =====
 
     [HttpGet]
@@ -117,20 +157,60 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveSequence([FromBody] NormalizationSequenceDefinition model, CancellationToken ct)
+    public async Task<IActionResult> SaveSequence(
+    [FromBody] NormalizationSequenceDefinition model,
+    CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Sequence name is required.");
+
         if (model.Entries.Count == 0)
             return BadRequest("At least one operation entry is required.");
 
-        var existing = await store.GetSequenceByIdAsync(model.Id, ct);
+        if (model.Entries
+            .GroupBy(e => e.OperationId)
+            .Any(g => g.Count() > 1))
+        {
+            return BadRequest(
+                "A sequence cannot contain the same operation more than once.");
+        }
+
+        var existing = await store.GetSequenceByIdAsync(
+            model.Id,
+            ct);
+
         if (existing is { IsSystem: true })
-            return StatusCode(StatusCodes.Status403Forbidden, "System sequences cannot be modified.");
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                "System sequences cannot be modified.");
+
+        var suites = await store.GetAllSuitesAsync(ct);
+
+        var referencingSuites = suites
+            .Where(s => s.SequenceIds.Contains(model.Id))
+            .ToList();
+
+        foreach (var suite in referencingSuites)
+        {
+            var duplicateError =
+                await GetSuiteDuplicateOperationErrorAsync(
+                    suite,
+                    ct,
+                    model);
+
+            if (duplicateError is not null)
+            {
+                return BadRequest(
+                    $"Saving this sequence would make normalization suite " +
+                    $"'{suite.Name}' invalid. {duplicateError}");
+            }
+        }
 
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
+
         await store.UpsertSequenceAsync(model, ct);
+
         return Json(new { id = model.Id });
     }
 
@@ -138,6 +218,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSequence([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var seq = await store.GetSequenceByIdAsync(request.Id, ct);
         if (seq == null) return NotFound();
         if (seq.IsSystem)
@@ -156,6 +239,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloneSequence([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await store.GetSequenceByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
@@ -185,21 +271,36 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveSuite([FromBody] NormalizationSuiteDefinition model, CancellationToken ct)
+    public async Task<IActionResult> SaveSuite(
+    [FromBody] NormalizationSuiteDefinition model,
+    CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Suite name is required.");
 
         var existing = await store.GetSuiteByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
-            return StatusCode(StatusCodes.Status403Forbidden, "System suites cannot be modified.");
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                "System suites cannot be modified.");
+
+        var duplicateError = await GetSuiteDuplicateOperationErrorAsync(
+            model,
+            ct);
+
+        if (duplicateError is not null)
+        {
+            return BadRequest(duplicateError);
+        }
 
         // Existing suites preserve their current default flag. New suites may
         // carry an explicit initial IsDefault value from the caller.
         model.IsDefault = existing?.IsDefault ?? model.IsDefault;
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
+
         await store.UpsertSuiteAsync(model, ct);
+
         return Json(new { id = model.Id });
     }
 
@@ -207,6 +308,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteSuite([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var suite = await store.GetSuiteByIdAsync(request.Id, ct);
         if (suite == null) return NotFound();
         if (suite.IsSystem)
@@ -220,24 +324,40 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CloneSuite([FromBody] IdRequest request, CancellationToken ct)
+    public async Task<IActionResult> CloneSuite(
+    [FromBody] IdRequest request,
+    CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var source = await store.GetSuiteByIdAsync(request.Id, ct);
-        if (source == null) return NotFound();
+        if (source == null)
+            return NotFound();
 
         var clone = new NormalizationSuiteDefinition
         {
             Id = Guid.NewGuid(),
             Name = $"{source.Name} (Copy)",
             Description = source.Description,
-            OperationIds = [..source.OperationIds],
-            SequenceIds = [..source.SequenceIds],
+            OperationIds = [.. source.OperationIds],
+            SequenceIds = [.. source.SequenceIds],
             IsSystem = false,
             IsDefault = false,
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
+        var duplicateError = await GetSuiteDuplicateOperationErrorAsync(
+            clone,
+            ct);
+
+        if (duplicateError is not null)
+        {
+            return BadRequest(duplicateError);
+        }
+
         await store.UpsertSuiteAsync(clone, ct);
+
         return Json(new { id = clone.Id });
     }
 
@@ -245,6 +365,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetDefaultSuite([FromBody] IdRequest request, CancellationToken ct)
     {
+        if (!this.TryValidateIdRequest(request, out var badRequest))
+            return badRequest;
+
         var suite = await store.GetSuiteByIdAsync(request.Id, ct);
         if (suite == null) return NotFound();
 
@@ -252,8 +375,94 @@ public class NormalizationsController(INormalizationStore store) : Controller
         return Ok();
     }
 
-    public sealed class IdRequest
+    private async Task<string?> GetSuiteDuplicateOperationErrorAsync(
+    NormalizationSuiteDefinition suite,
+    CancellationToken ct,
+    NormalizationSequenceDefinition? sequenceOverride = null)
     {
-        public Guid Id { get; set; }
+        var sequences = await store.GetAllSequencesAsync(ct);
+        var sequencesById = sequences.ToDictionary(s => s.Id);
+
+        var operationOccurrences = new Dictionary<Guid, List<string>>();
+
+        void AddOperationOccurrence(Guid operationId, string source)
+        {
+            if (!operationOccurrences.TryGetValue(operationId, out var sources))
+            {
+                sources = [];
+                operationOccurrences[operationId] = sources;
+            }
+
+            sources.Add(source);
+        }
+
+        // Preserve every standalone occurrence, including duplicate IDs.
+        foreach (var operationId in suite.OperationIds)
+        {
+            AddOperationOccurrence(
+                operationId,
+                "Standalone Operations");
+        }
+
+        // Important: walk suite.SequenceIds directly and in order.
+        // Do not unique-ify the IDs.
+        foreach (var sequenceId in suite.SequenceIds)
+        {
+            NormalizationSequenceDefinition? sequence;
+
+            if (sequenceOverride is not null &&
+                sequenceOverride.Id == sequenceId)
+            {
+                sequence = sequenceOverride;
+            }
+            else
+            {
+                sequencesById.TryGetValue(
+                    sequenceId,
+                    out sequence);
+            }
+
+            if (sequence is null)
+                continue;
+
+            foreach (var entry in sequence.Entries)
+            {
+                AddOperationOccurrence(
+                    entry.OperationId,
+                    $"sequence '{sequence.Name}'");
+            }
+        }
+
+        var duplicateOperationIds = operationOccurrences
+            .Where(x => x.Value.Count > 1)
+            .Select(x => x.Key)
+            .ToList();
+
+        if (duplicateOperationIds.Count == 0)
+            return null;
+
+        var operations = await store.GetAllOperationsAsync(ct);
+
+        var operationNames = operations
+            .ToDictionary(o => o.Id, o => o.Name);
+
+        var duplicateMessages = duplicateOperationIds.Select(id =>
+        {
+            var name = operationNames.TryGetValue(
+                id,
+                out var operationName)
+                    ? operationName
+                    : id.ToString();
+
+            var sources = string.Join(
+                " and ",
+                operationOccurrences[id].Distinct());
+
+            return $"'{name}' ({sources})";
+        });
+
+        return
+            "Normalization suite cannot contain the same operation more than once. " +
+            $"Duplicate operation(s): {string.Join(", ", duplicateMessages)}.";
     }
 }

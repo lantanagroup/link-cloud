@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Report.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.25")
+                .HasAnnotation("ProductVersion", "8.0.27")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -727,6 +727,62 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.ToTable("ReportEntry");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.ReportEntryMappingOutcome", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AcquisitionDetails")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("AcquisitionEvaluatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EncounterMappingStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("HslocMappingStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LocationOrgStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NormalizationDetails")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("NormalizationEvaluatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PatientId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ReportScheduleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "FacilityId", "PatientId" }, "IX_ReportEntryMappingOutcomes_Facility_Patient");
+
+                    b.HasIndex(new[] { "ReportScheduleId", "PatientId" }, "IX_ReportEntryMappingOutcomes_Schedule_Patient")
+                        .IsUnique();
+
+                    b.ToTable("ReportEntryMappingOutcome");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.ReportPopulation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1027,6 +1083,17 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasForeignKey("ReportScheduleId")
                         .IsRequired()
                         .HasConstraintName("FK_ReportEntries_ReportSchedules");
+
+                    b.Navigation("ReportSchedule");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Report.Data.Entities.ReportEntryMappingOutcome", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Report.Data.Entities.ReportSchedule", "ReportSchedule")
+                        .WithMany()
+                        .HasForeignKey("ReportScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("ReportSchedule");
                 });

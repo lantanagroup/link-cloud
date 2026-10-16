@@ -1,8 +1,11 @@
-﻿namespace LantanaGroup.Automation.Generation;
+﻿using System.Reflection;
+
+namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Central catalog for measure metadata used by automation (bundle location,
-/// display name, and future profile strategy routing).
+/// Display names, bundle resource URIs, and embedded measure-definition JSON.
+/// ACH Daily/Monthly are Validation NHSN 2.0.0-cibuild; Hypoglycemic is the current
+/// NHSN hypoglycemic package (no 2.0 file in-repo).
 /// </summary>
 public static class ProfiledMeasureCatalog
 {
@@ -24,4 +27,29 @@ public static class ProfiledMeasureCatalog
             => "resource://LantanaGroup.Automation.measures.NHSNGlycemicControlHypoglycemicInitialPopulation.json",
         _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
     };
+
+    /// <summary>
+    /// Reads the embedded FHIR measure-bundle JSON used by MeasureEval and by
+    /// <see cref="CqlFilterSimulator"/> instance prediction.
+    /// </summary>
+    public static string ReadBundleJson(ProfiledMeasureType measure, Assembly? assembly = null)
+    {
+        var resourceName = measure switch
+        {
+            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
+                => "LantanaGroup.Automation.measures.NHSNAcuteCareHospitalMonthlyInitialPopulation.json",
+            ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation
+                => "LantanaGroup.Automation.measures.NHSNAcuteCareHospitalDailyInitialPopulation.json",
+            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+                => "LantanaGroup.Automation.measures.NHSNGlycemicControlHypoglycemicInitialPopulation.json",
+            _ => throw new ArgumentOutOfRangeException(nameof(measure), measure, null)
+        };
+
+        assembly ??= typeof(ProfiledMeasureCatalog).Assembly;
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new FileNotFoundException(
+                $"Embedded measure '{resourceName}' was not found in '{assembly.GetName().Name}'.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
 }
