@@ -671,6 +671,54 @@ public class FacilitySetupHelperTests
         Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
     }
 
+    /// <summary>
+    /// The measure's own row can sit past the first page of substring matches; paging continues until
+    /// it is found.
+    /// </summary>
+    [Fact]
+    public async Task Finds_the_exact_mapping_on_a_later_search_page()
+    {
+        GivenDmrpIsEnabled();
+        var firstPage = Enumerable.Range(0, 50)
+            .Select(i => new MeasureMappingModel { Id = $"other-{i}", Measure = $"{MeasureId}V{i}", DQM = MeasureId, Frequency = Frequency.Monthly })
+            .ToList();
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel> { Records = firstPage }));
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel>
+            {
+                Records = [new MeasureMappingModel { Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Monthly }]
+            }));
+
+        var id = await FacilitySetupHelper.EnsureDmrpMeasureMappingAsync(_dmrpClient.Object,
+            Mock.Of<IAutomationOutput>(), MeasureId, MeasureId, Frequency.Monthly);
+
+        Assert.Equal(MappingId, id);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()), Times.Never);
+        _dmrpClient.Verify(d => d.UpdateMeasureMappingAsync(It.IsAny<string>(), It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// A failed search surfaces as itself instead of being read as "no mapping" and attempting a create.
+    /// </summary>
+    [Fact]
+    public async Task Throws_when_the_measure_mapping_search_fails()
+    {
+        GivenDmrpIsEnabled();
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<PagedConfigModel<MeasureMappingModel>>(500, rawBody: "boom"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureDmrpMeasureMappingAsync(_dmrpClient.Object,
+                Mock.Of<IAutomationOutput>(), MeasureId, MeasureId, Frequency.Monthly));
+
+        Assert.Contains("HTTP 500", ex.Message);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task Derives_the_schedule_from_reporting_plans_when_tenant_reports_dmrp_without_the_mock()
     {
