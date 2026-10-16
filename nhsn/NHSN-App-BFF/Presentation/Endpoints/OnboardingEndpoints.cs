@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -10,7 +11,7 @@ public class OnboardingEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/onboarding")
             .WithTags("Onboarding")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapGet("/", async (IOnboardingReadService readService, CancellationToken cancellationToken) =>
             {
