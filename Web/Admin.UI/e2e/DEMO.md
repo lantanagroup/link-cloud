@@ -82,12 +82,15 @@ What it does, and what to say while it happens:
 | Tenant dashboard loads | Nothing is running but the UI. Every API response here is a fixture. |
 | Drills into a facility | These are the same page objects the real tests use — one selector contract. |
 | Filters reports by status, searches by id, toggles deleted | This is the behaviour we used to verify by hand every release. |
-| Locations / Encounters tabs | |
+| Org Locations / Encounters tabs | |
 | Opens configuration, expands each panel | |
 | Back, then **creates** "Riverside Demo Hospital" through the dialog | The payoff: it fills the real form, and the POST body is asserted field by field. |
 | The new facility appears in the list, and opens | The mocks are **stateful** — the POST writes into the same store the list reads. A static fixture would send the app to a facility the list never gained. |
 | Its census panel offers to create one | That prompt only appears because the mock 404s for a facility with no config — we exercise the empty path on purpose. |
 | Gives it a census cron and a dispatch schedule | End to end, through the UI, with the payloads checked. |
+| Back on the dashboard, both facilities listed | |
+| **Requests an ad-hoc report** for the new facility — report type, custom date range, census-based patient selection | The form the analysts actually use. The POST body is asserted field by field, same as the create dialog. |
+| Lands on the report it just created | The response carries `reportId`; reading the wrong field here is a bug the suite already caught once. |
 
 If you skipped the pacing in pre-flight, this is the moment you will regret it — set
 `E2E_SLOW_MO` and `E2E_STEP_PAUSE` as above. Measured durations, so you can pick a different
