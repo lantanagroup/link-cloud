@@ -476,6 +476,20 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      # The suite drives `ng serve`, which compiles each lazy route the first time a spec
+      # visits it. From a cold cache that is most of this job: the same specs run in ~18s
+      # locally against a warm dev server and ~2m here. Keyed on the lockfile rather than the
+      # commit, so one entry is written per dependency change instead of one per run — the
+      # vendor and framework chunks are the bulk of it and they only move when deps do.
+      # Angular hashes its own cache entries by content, so anything stale is simply rebuilt.
+      - name: Cache the Angular build cache
+        uses: actions/cache@v4
+        with:
+          path: Web/Admin.UI/.angular/cache
+          key: angular-cache-${{ runner.os }}-${{ hashFiles('Web/Admin.UI/package-lock.json') }}
+          restore-keys: |
+            angular-cache-${{ runner.os }}-
+
       # `npm run e2e` is --project=mocked; the config starts ng serve on 4200 itself.
       - name: Admin UI mocked e2e tests
         run: npm run e2e
