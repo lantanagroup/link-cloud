@@ -1,3 +1,5 @@
+import * as path from 'path';
+
 import { test, expect } from '../support/test';
 import { ApiMock } from '../support/api-mock';
 import { TenantDashboardPage } from '../support/pages/tenant-dashboard.page';
@@ -26,9 +28,9 @@ import { acquisitionLogStatistics, reportEntries, reportEntrySummary } from '../
 /**
  * A single, continuous session that walks the facility journey the way a person would:
  * tenant list → facility → filters → tabs → configuration → panels → back → create a new
- * facility → give it a census and a query dispatch configuration → request an ad-hoc report
- * against it → read the report back: measure reports per patient, and the data acquisition
- * statistics behind them.
+ * facility → give it a census, a query dispatch configuration, a FHIR query configuration
+ * and an imported query plan → request an ad-hoc report against it → read the report back:
+ * measure reports per patient, and the data acquisition statistics behind them.
  *
  * Unlike the specs in e2e/mocked, this exists to be *watched*. It runs in the `demo`
  * project (headed, slowMo-paced, no timeout) and holds the browser open at the end.
@@ -57,6 +59,9 @@ const newFacility = {
 };
 const newCensusTrigger = '0 0 6 * * ?';
 const newDispatchDuration = 'PT10S';
+const newFhirServerUrl = 'https://fhir.riverside.example.org/r4';
+/** The query plan Scripts/seed.py seeds environments with — a real one, not a toy. */
+const SEED_QUERY_PLAN = path.resolve(__dirname, '../../../../Scripts/seed_data/query_plan.json');
 
 /**
  * The ad-hoc report request. POST /Facility/{id}/AdHocReport answers with a
@@ -178,6 +183,37 @@ function mockQueryDispatchConfigs(api: ApiMock, seed: IQueryDispatchConfiguratio
   });
 }
 
+/**
+ * Data acquisition for the facility the walkthrough builds — stateful, like census and query
+ * dispatch: 404 until the dialog posts one, then the panel reads back what it just saved.
+ *
+ * mockFacilityDetail hands every facility a ready-made FHIR query config, so this has to be
+ * registered after it to win for the new facility. Without that the Add button never
+ * appears, because the panel thinks it is already configured.
+ */
+function mockDataAcquisitionConfigs(api: ApiMock, id: string): void {
+  let fhirQuery: Record<string, unknown> | null = null;
+  let queryPlan: Record<string, unknown> | null = null;
+
+  api.mock(`GET /api/data-acquisition/${id}/fhirQueryConfiguration`, (route) =>
+    fhirQuery ? route.fulfill({ status: 200, json: fhirQuery }) : route.fulfill(notConfigured),
+  );
+  api.mock('POST /api/data-acquisition/fhirQueryConfiguration', (route) => {
+    fhirQuery = { ...JSON.parse(route.request().postData() ?? '{}'), id: `fq-${id}` };
+    return route.fulfill({ status: 201, json: { id: `fq-${id}`, message: 'Configuration created' } });
+  });
+
+  // The panel asks per plan type (?type=Daily); the mock ignores the query string, so the
+  // one plan the walkthrough creates answers whichever type the tab asks for.
+  api.mock(`GET /api/data-acquisition/${id}/QueryPlan`, (route) =>
+    queryPlan ? route.fulfill({ status: 200, json: queryPlan }) : route.fulfill(notConfigured),
+  );
+  api.mock(`POST /api/data-acquisition/${id}/QueryPlan`, (route) => {
+    queryPlan = { ...JSON.parse(route.request().postData() ?? '{}'), id: `qp-${id}` };
+    return route.fulfill({ status: 201, json: queryPlan });
+  });
+}
+
 /** Everything the view and edit screens fetch for a single facility, census aside. */
 function mockFacilityDetail(
   api: ApiMock,
@@ -222,6 +258,7 @@ function mockEverything(api: ApiMock): void {
 
   mockFacilityDetail(api, facilityId);
   mockFacilityDetail(api, newFacility.facilityId, { locations: [], encounters: [] });
+  mockDataAcquisitionConfigs(api, newFacility.facilityId);
   mockAdHocReport(api, newFacility.facilityId);
 }
 
@@ -417,6 +454,74 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await expect(
       edit.queryDispatchPanel.getByRole('button', { name: 'Add query dispatch configuration' }),
     ).toHaveCount(0);
+  });
+
+  await stage('data acquisition is unconfigured too — give it a FHIR query configuration', async () => {
+    await edit.expand(edit.dataAcquisitionPanel);
+    await edit.dataAcquisitionPanel.getByRole('tab', { name: 'Fhir Query' }).click();
+    await edit.dataAcquisitionPanel
+      .getByRole('button', { name: 'Add Fhir Resource Query configuration' })
+      .click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Facility Id')).toHaveValue(newFacility.facilityId);
+    await dialog.getByLabel('Fhir Server Base Url').fill(newFhirServerUrl);
+    // Create mode renders this empty even though the form declares a default of 1, and it is
+    // required — the save button stays disabled until it has a value.
+    await dialog.getByRole('spinbutton', { name: 'Max Concurrent Requests' }).fill('4');
+    await dialog.getByRole('button', { name: /Create Fhir Query Configuration/ }).click();
+    await expect(dialog).toBeHidden();
+
+    const posts = api.callsTo('POST', '/api/data-acquisition/fhirQueryConfiguration');
+    expect(JSON.parse(posts[posts.length - 1].postData ?? '{}')).toMatchObject({
+      facilityId: newFacility.facilityId,
+      fhirServerBaseUrl: newFhirServerUrl,
+    });
+  });
+
+  await stage('import the real seed query plan rather than typing one', async () => {
+    await edit.dataAcquisitionPanel.getByRole('tab', { name: 'Query Plan' }).click();
+
+    // The plan type is chosen on the panel, not in the dialog: the panel's copy of the form
+    // is the type selector, and the dialog opens for whatever is selected there with its own
+    // Type field disabled. Discharge matches the seed file, so the import has nothing to
+    // override — picking a different type here makes the dialog warn and keep this one.
+    await edit.dataAcquisitionPanel.getByRole('combobox', { name: 'Type' }).click();
+    await page.getByRole('option', { name: 'Discharge', exact: true }).click();
+
+    await edit.dataAcquisitionPanel
+      .getByRole('button', { name: 'Add Query Plan configuration' })
+      .click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('input[type="file"]').setInputFiles(SEED_QUERY_PLAN);
+
+    // The file is a seed template, so its FacilityId is the literal "{{tenant-name}}".
+    // The dialog keeps the facility being configured and says so in a snackbar, which is
+    // the behaviour worth showing: you can import a shared plan without it dragging another
+    // facility's id along with it.
+    await expect(dialog.getByLabel('Plan Name')).toHaveValue('ach');
+    await expect(dialog.getByLabel('Facility Id')).toHaveValue(newFacility.facilityId);
+
+    await dialog.getByRole('button', { name: /Create Query Plan/ }).click();
+    await expect(dialog).toBeHidden();
+
+    const posts = api.callsTo('POST', `/api/data-acquisition/${newFacility.facilityId}/QueryPlan`);
+    const payload = JSON.parse(posts[posts.length - 1].postData ?? '{}');
+
+    // PascalCase, unlike every other POST in this app — the query plan model is serialised
+    // differently. Pinned because it is the sort of thing that gets 'tidied up' into
+    // camelCase and silently stops matching the backend.
+    expect(payload).toMatchObject({
+      FacilityId: newFacility.facilityId,
+      PlanName: 'ach',
+      Type: 'Discharge',
+    });
+
+    // Encounter and Location initially, ten supplemental resource types after them — proof
+    // the queries came across, not just the header fields.
+    expect(Object.keys(payload.InitialQueries ?? {})).toHaveLength(2);
+    expect(Object.keys(payload.SupplementalQueries ?? {})).toHaveLength(10);
   });
 
   await stage('finish on the tenant dashboard, now listing both facilities', async () => {
