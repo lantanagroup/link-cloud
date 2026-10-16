@@ -24,7 +24,7 @@ test('a facility created through the BFF appears in the UI and disappears after 
         facilityId,
         facilityName,
         timeZone: 'America/New_York',
-        vendor: 'Epic',
+        // No vendor — it is an optional object now, see api-contracts.live.spec.ts.
         scheduledReports: { daily: [], weekly: [], monthly: [] },
       },
     });
