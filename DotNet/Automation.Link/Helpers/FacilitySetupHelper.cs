@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -1135,6 +1135,15 @@ public static class FacilitySetupHelper
         {
             var search = await dmrpClient.SearchMeasureMappingsAsync(measure: nhsnMeasure,
                 pageSize: pageSize, pageNumber: pageNumber, cancellationToken: cancellationToken);
+
+            // A failed search is not the same as no mapping: carrying on would try a create that is
+            // refused as a duplicate and hide the real error behind it.
+            if (!search.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to search DMRP measure mappings for measure '{nhsnMeasure}'. " +
+                    $"HTTP {search.StatusCode}: {search.RawBody ?? "(no body)"}");
+            }
 
             var records = search.Body?.Records ?? [];
             var match = records.FirstOrDefault(m =>
