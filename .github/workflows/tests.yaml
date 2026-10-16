@@ -152,17 +152,15 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
       # ---- Admin UI live e2e (Playwright) ----
-      # Runs while the stack is otherwise idle — before the parallel dotnet categories
-      # mutate facilities/reports — so the UI roundtrip test cannot race them.
+      # The toolchain is installed here, ahead of the health wait, on purpose: none of it
+      # needs the stack, so it runs while the containers are still coming up and the wait
+      # below is shorter by however long this took. Measured on run #2525, this block cost
+      # 33s against 31s of pure waiting, so most of it now overlaps something the job was
+      # going to spend anyway.
+      #
+      # The tests themselves still run after the stack is healthy, and before the parallel
+      # dotnet categories mutate facilities/reports, so the UI roundtrip cannot race them.
 
       - name: Setup Node for Admin UI e2e
         uses: actions/setup-node@v4
@@ -192,6 +190,14 @@ jobs:
       - name: Install Playwright Chromium
         working-directory: Web/Admin.UI
         run: npx playwright install --with-deps chromium
+
+      - name: Wait for services to start
+        run: sleep 10
+
+      - name: Wait for Services to Become Healthy
+        run: |
+          chmod +x Scripts/check_health.sh
+          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
       # check_health.sh treats containers without a healthcheck (admin-ui) as healthy,
       # so wait for the UI to actually respond before pointing a browser at it.
