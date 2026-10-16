@@ -91,6 +91,8 @@ What it does, and what to say while it happens:
 | Back on the dashboard, both facilities listed | |
 | **Requests an ad-hoc report** for the new facility — report type, custom date range, census-based patient selection | The form the analysts actually use. The POST body is asserted field by field, same as the create dialog. |
 | Lands on the report it just created | The response carries `reportId`; reading the wrong field here is a bug the suite already caught once. |
+| Its measure reports: a row per patient, with resource counts and reporting/submission status | Fixture data, but the real shape — the table, the donut charts and the statuses all come from the interfaces the app itself uses. |
+| **Query Analysis** tab — total queries, per-resource timings, retries | The data acquisition logs behind that report: how many queries ran, how long each resource type took, what had to be retried. Only fetched when the tab is opened. |
 
 If you skipped the pacing in pre-flight, this is the moment you will regret it — set
 `E2E_SLOW_MO` and `E2E_STEP_PAUSE` as above. Measured durations, so you can pick a different

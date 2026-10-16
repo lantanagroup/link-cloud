@@ -21,13 +21,14 @@ import {
 } from '../../src/app/interfaces/data-acquisition/organization-location-mapping-model.interface';
 import { IFacilityConfigModel } from '../../src/app/interfaces/tenant/facility-config-model.interface';
 import { vendorVersions } from '../fixtures/vendors';
-import { IReportEntrySummary } from '../../src/app/interfaces/report/report-entry.interface';
+import { acquisitionLogStatistics, reportEntries, reportEntrySummary } from '../fixtures/report-detail';
 
 /**
  * A single, continuous session that walks the facility journey the way a person would:
  * tenant list → facility → filters → tabs → configuration → panels → back → create a new
  * facility → give it a census and a query dispatch configuration → request an ad-hoc report
- * against it.
+ * against it → read the report back: measure reports per patient, and the data acquisition
+ * statistics behind them.
  *
  * Unlike the specs in e2e/mocked, this exists to be *watched*. It runs in the `demo`
  * project (headed, slowMo-paced, no timeout) and holds the browser open at the end.
@@ -64,11 +65,6 @@ const newDispatchDuration = 'PT10S';
  */
 const GENERATED_REPORT_ID = 'cccccccc-0000-0000-0000-000000000001';
 
-const emptyEntrySummary: IReportEntrySummary = {
-  reportTypeCounts: {},
-  reportingStatusCounts: {},
-  submissionStatusCounts: {},
-};
 
 /**
  * Submitting the form routes straight to the new report's view page, so that page's own
@@ -82,11 +78,15 @@ function mockAdHocReport(api: ApiMock, id: string): void {
     id: GENERATED_REPORT_ID,
     facilityId: id,
   });
-  api.mock('GET /api/entries/search', {
-    records: [],
-    metadata: { pageSize: 10, pageNumber: 1, totalCount: 0, totalPages: 1 },
-  });
-  api.mock(`GET /api/entries/schedules/${GENERATED_REPORT_ID}/summary`, emptyEntrySummary);
+  api.mock('GET /api/entries/search', reportEntries(id, GENERATED_REPORT_ID));
+  api.mock(`GET /api/entries/schedules/${GENERATED_REPORT_ID}/summary`, reportEntrySummary);
+
+  // Only fetched when the Query Analysis tab is selected (onTabSelected, index 1), so an
+  // unmocked one would not 404 until someone clicked that tab mid-demo.
+  api.mock(
+    `GET /api/data-acquisition/acquisition-logs/report/${GENERATED_REPORT_ID}/statistics`,
+    acquisitionLogStatistics,
+  );
 }
 
 /** How long to linger on each finished stage before moving on, so it reads as steps. */
@@ -457,6 +457,17 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await expect(page).toHaveURL(
       new RegExp(`/tenant/facility/${newFacility.facilityId}/report/${GENERATED_REPORT_ID}$`),
     );
+  });
+
+  await stage('the report opens on its measure reports, one row per patient', async () => {
+    await expect(page.getByText('PAT-10431')).toBeVisible();
+    await expect(page.getByText('PAT-10588')).toBeVisible();
+  });
+
+  await stage('Query Analysis shows what data acquisition actually did', async () => {
+    await page.getByRole('tab', { name: 'Query Analysis' }).click();
+    await expect(page.getByText('Total Queries')).toBeVisible();
+    await expect(page.getByText('Average Query Time')).toBeVisible();
   });
 
   // Hold the window open on the finished state. `page.pause()` is not used here: under the
