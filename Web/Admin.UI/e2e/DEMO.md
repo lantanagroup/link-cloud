@@ -21,7 +21,7 @@ Leave `ng serve` up in its own terminal. `playwright.config.ts` sets
 pause from the middle of the demo. Then rehearse once:
 
 ```powershell
-$env:E2E_KEEP_OPEN='0'; npm run e2e:demo   # ~1 min at default pacing
+$env:E2E_KEEP_OPEN='0'; npm run e2e:demo   # ~1.4 min at default pacing
 npm run e2e                                # 64 tests, ~20s warm
 ```
 
@@ -30,7 +30,7 @@ the real demo holds the window open at the end.
 
 **Set the pacing before the meeting.** The defaults run the whole walkthrough in about a
 minute, which is far too fast to talk over — nine talking points in 59 seconds. These values
-stretch it to ~3.5 minutes, roughly 12 seconds a point (all timings measured 2026-10-16):
+stretch it to ~4 minutes, roughly 12 seconds a point (all timings measured 2026-10-16):
 
 ```powershell
 $env:E2E_SLOW_MO='2200'     # individual clicks (default 700)
@@ -57,7 +57,7 @@ The primary screen's origin is `0,0`; screens placed above or to the left of it 
 coordinates, which is normal. Re-run the command whenever you rearrange or reconnect
 displays — the numbers move.
 
-## Act 1 — watch it drive the app (~3.5 min at the pacing above)
+## Act 1 — watch it drive the app (~4 min at the pacing above)
 
 ```powershell
 npm run e2e:demo
@@ -88,6 +88,8 @@ What it does, and what to say while it happens:
 | The new facility appears in the list, and opens | The mocks are **stateful** — the POST writes into the same store the list reads. A static fixture would send the app to a facility the list never gained. |
 | Its census panel offers to create one | That prompt only appears because the mock 404s for a facility with no config — we exercise the empty path on purpose. |
 | Gives it a census cron and a dispatch schedule | End to end, through the UI, with the payloads checked. |
+| Adds a FHIR query configuration — the EHR endpoint it will query, and how hard | The facility goes from empty to fully configured on screen: census, dispatch, EHR connection, query plan. |
+| **Imports a query plan** from `Scripts/seed_data/query_plan.json` — the real plan `seed.py` uses | Not a toy plan: two initial queries and ten supplemental resource types. The file's FacilityId is the seed placeholder `{{tenant-name}}`, and the dialog keeps the facility you are configuring instead — so a shared plan cannot drag another facility's id in with it. |
 | Back on the dashboard, both facilities listed | |
 | **Requests an ad-hoc report** for the new facility — report type, custom date range, census-based patient selection | The form the analysts actually use. The POST body is asserted field by field, same as the create dialog. |
 | Lands on the report it just created | The response carries `reportId`; reading the wrong field here is a bug the suite already caught once. |
@@ -96,7 +98,7 @@ What it does, and what to say while it happens:
 
 If you skipped the pacing in pre-flight, this is the moment you will regret it — set
 `E2E_SLOW_MO` and `E2E_STEP_PAUSE` as above. Measured durations, so you can pick a different
-target: defaults ~1 min, `2200`/`4000` ~3.5 min, pacing off (`0`/`0`) ~8s.
+target: defaults ~1.4 min, `2200`/`4000` ~4 min, pacing off (`0`/`0`) ~11s.
 
 Close the browser window to end the run.
 
