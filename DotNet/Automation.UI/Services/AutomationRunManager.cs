@@ -334,9 +334,17 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default)
+    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default, DateTimeOffset? createdFromUtc = null, DateTimeOffset? createdBeforeUtc = null)
     {
-        var page = await _snapshotStore.GetRunsPageAsync(pageNumber, pageSize, sortBy, sortDescending, cancellationToken);
+        var page = await _snapshotStore.GetRunsPageAsync(
+            pageNumber,
+            pageSize,
+            sortBy,
+            sortDescending,
+            cancellationToken,
+            createdFromUtc,
+            createdBeforeUtc);
+
         return new AutomationRunIndexViewModel
         {
             Runs = page.Items,
