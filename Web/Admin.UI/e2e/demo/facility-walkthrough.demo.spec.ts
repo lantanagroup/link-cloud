@@ -286,7 +286,21 @@ function mockDataAcquisitionConfigs(api: ApiMock, id: string): void {
     queryPlan ? route.fulfill({ status: 200, json: queryPlan }) : route.fulfill(notConfigured),
   );
   api.mock(`POST /api/data-acquisition/${id}/QueryPlan`, (route) => {
-    queryPlan = { ...JSON.parse(route.request().postData() ?? '{}'), id: `qp-${id}` };
+    const posted = JSON.parse(route.request().postData() ?? '{}');
+    // This endpoint takes the plan's own fields PascalCase but serialises them back
+    // camelCase, which is what the panel reads. Echoing the POST body would hand the panel
+    // `PlanName` and `InitialQueries` and leave it rendering an empty plan — a mock that
+    // lies about the API's shape rather than a bug in the app.
+    queryPlan = {
+      id: `qp-${id}`,
+      planName: posted.PlanName,
+      facilityId: posted.FacilityId,
+      ehrDescription: posted.EHRDescription,
+      lookBack: posted.LookBack,
+      initialQueries: posted.InitialQueries,
+      supplementalQueries: posted.SupplementalQueries,
+      type: posted.Type,
+    };
     return route.fulfill({ status: 201, json: queryPlan });
   });
 }
@@ -584,16 +598,31 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     // Import the plan as this facility's, the way seed.py does it: one textual substitution
     // of {{tenant-name}} for the tenant being seeded. The file keeps its own formatting, so
     // what the dialog parses is the seed plan itself rather than a re-serialised copy.
-    // Uploaded from a buffer — no temp file to write, clean up, or leave behind in CI.
+    // Supplied from a buffer — no temp file to write, clean up, or leave behind in CI.
     const planForThisFacility = fs
       .readFileSync(SEED_QUERY_PLAN, 'utf8')
       .replace(SEED_PLAN_PLACEHOLDER, newFacility.facilityId);
 
-    await dialog.locator('input[type="file"]').setInputFiles({
+    // Click the dialog's own Import JSON button rather than filling its hidden file input.
+    // Setting the input directly works and asserts the same things, but nothing happens on
+    // screen — no click, no visible import — so the plan appeared out of nowhere and the
+    // import was the one step of the walkthrough an audience could not see. The button opens
+    // a native file picker, which Playwright intercepts as a filechooser event: the OS dialog
+    // never actually appears, so this stays deterministic.
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      dialog.getByRole('button', { name: 'Import JSON' }).click(),
+    ]);
+    await chooser.setFiles({
       name: 'query_plan.json',
       mimeType: 'application/json',
       buffer: Buffer.from(planForThisFacility),
     });
+
+    // Visible proof the file landed: the queries it brought with it are on screen, not just
+    // in an assertion on the payload.
+    await expect(dialog.getByRole('cell', { name: 'Encounter', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('cell', { name: 'Location', exact: true })).toBeVisible();
 
     // The plan now names the facility it is being created for, so the dialog has nothing to
     // correct: the id on screen came in with the file.
@@ -615,10 +644,25 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
       Type: 'Discharge',
     });
 
-    // Encounter and Location initially, ten supplemental resource types after them — proof
-    // the queries came across, not just the header fields.
+    // Encounter and Location initially, ten supplemental resource types after them. The
+    // counts alone are not proof: before the import normalised its nested keys, the right
+    // *number* of queries went up with every field inside them empty, which is precisely
+    // how the blank rows went unnoticed. Assert the contents.
     expect(Object.keys(payload.InitialQueries ?? {})).toHaveLength(2);
     expect(Object.keys(payload.SupplementalQueries ?? {})).toHaveLength(10);
+    expect(payload.InitialQueries['0']).toMatchObject({
+      resourceType: 'Encounter',
+      queryConfigType: 'Parameter',
+    });
+    expect(payload.InitialQueries['1']).toMatchObject({ resourceType: 'Location' });
+  });
+
+  await stage('the panel now shows the imported plan', async () => {
+    // Closing the dialog re-fetches, the same beat the census and dispatch panels get: the
+    // plan the walkthrough just imported is rendered read-only, and Add has become Edit.
+    await expect(edit.dataAcquisitionPanel.getByRole('cell', { name: 'Encounter', exact: true })).toBeVisible();
+    await expect(edit.dataAcquisitionPanel.getByRole('button', { name: 'Edit Query Plan configuration' })).toBeVisible();
+    await expect(edit.dataAcquisitionPanel.getByRole('button', { name: 'Add Query Plan configuration' })).toHaveCount(0);
   });
 
   await stage('finish on the tenant dashboard, now listing both facilities', async () => {

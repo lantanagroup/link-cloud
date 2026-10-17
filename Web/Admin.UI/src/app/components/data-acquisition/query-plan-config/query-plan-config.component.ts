@@ -464,6 +464,35 @@ export class QueryPlanConfigFormComponent {
     return 0;
   }
 
+  /**
+   * Lower-cases the leading letter of every key, recursively.
+   *
+   * Imported plans are PascalCase — both this form's own Export JSON and the files under
+   * Scripts/seed_data are — while the API serialises camelCase, and the tables, the ordering
+   * check and the location resolution guard all read camelCase. applyImportedPlan maps the
+   * plan's own fields by hand but passed the query records straight through, so an imported
+   * plan rendered a blank row per query with "Params: 0", and the two client-side checks saw
+   * no resourceType to check. Normalising here puts imported queries in the same shape as
+   * ones loaded from the API, which is what the rest of this component is written against.
+   *
+   * Safe for query configs and their parameters because none of those field names begin with
+   * an acronym. The plan's own EHRDescription is mapped explicitly above, not through this.
+   */
+  private camelCaseKeysDeep(value: any): any {
+    if (Array.isArray(value)) {
+      return value.map(entry => this.camelCaseKeysDeep(entry));
+    }
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [
+          key.charAt(0).toLowerCase() + key.slice(1),
+          this.camelCaseKeysDeep(entry)
+        ])
+      );
+    }
+    return value;
+  }
+
   private normalizeQueryConfig(cfg: QueryConfigModel): QueryConfigModel {
     if (!cfg) return cfg;
     const c: any = cfg as any;
@@ -542,8 +571,8 @@ export class QueryPlanConfigFormComponent {
       facilityId: facilityId ?? '',
       ehrDescription: plan.EHRDescription ?? plan.ehrDescription ?? '',
       lookBack: plan.LookBack ?? plan.lookBack ?? '',
-      initialQueries: incomingInitialQueries ?? {},
-      supplementalQueries: incomingSupplementalQueries ?? {},
+      initialQueries: this.camelCaseKeysDeep(incomingInitialQueries ?? {}),
+      supplementalQueries: this.camelCaseKeysDeep(incomingSupplementalQueries ?? {}),
       type: type ?? 'Discharge'
     } as IQueryPlanModel;
 
