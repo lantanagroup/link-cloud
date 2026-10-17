@@ -44,21 +44,24 @@ export default defineConfig({
   reporter: process.env['CI']
     ? [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/junit.xml' }]]
     : [['list'], ['html', { open: 'on-failure' }]],
+  // The Desktop Chrome preset is applied per project rather than here: it carries a
+  // deviceScaleFactor, and Playwright refuses that alongside the `viewport: null` the demo
+  // project needs. Setting it to undefined in the project does not help — the key is still
+  // present once the objects merge.
   use: {
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    ...devices['Desktop Chrome'],
   },
   projects: [
     {
       name: 'mocked',
       testDir: './e2e/mocked',
-      use: { baseURL: 'http://localhost:4200' },
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:4200' },
     },
     {
       name: 'live',
       testDir: './e2e/live',
-      use: { baseURL: liveBaseUrl },
+      use: { ...devices['Desktop Chrome'], baseURL: liveBaseUrl },
     },
     {
       // Not a verification tier — a guided walkthrough for watching the app drive itself.
@@ -84,17 +87,36 @@ export default defineConfig({
         // day either side of midnight. Matching the facility makes the dates on screen the
         // dates that were typed, wherever the demo is given from.
         timezoneId: 'America/Denver',
-        // Explicit viewport rather than `viewport: null` — null is rejected alongside the
-        // deviceScaleFactor that the Desktop Chrome preset brings in. Playwright sizes the
-        // real window to fit this, so --window-size is unnecessary; only position is passed.
-        viewport: { width: demoWidth, height: demoHeight },
+        // No viewport emulation: the page is whatever size the real window is.
+        //
+        // A fixed viewport also fakes `window.screen`, and the demo asks the browser which
+        // monitors exist in order to place itself. With emulation on, the screen it is
+        // currently displayed on comes back reporting the viewport's dimensions instead of
+        // the monitor's, so the window was sized and centred against 1600x1000 and landed
+        // small in the corner of the laptop. Switching it off is what makes the screen data
+        // true. deviceScaleFactor has to go with it — Playwright rejects the pair, and the
+        // Desktop Chrome preset supplies one — so the zoom is applied as a Chrome flag below.
+        viewport: null,
         launchOptions: {
           // Presentation pacing by default. This project exists to be watched by a room, so
           // the common case should need no environment variables at all; 700 was fast enough
           // that the walkthrough finished before anyone could talk over it. Drop it to 0 when
           // you only want to know whether the walkthrough still passes.
           slowMo: Number(process.env['E2E_SLOW_MO'] ?? 2200),
-          args: demoWindowPosition ? [`--window-position=${demoWindowPosition}`] : [],
+          args: [
+            // Zoom the whole browser, so the app is legible from the back of a room. A 27"
+            // 1440p monitor at 100% Windows scaling gives the page 2560 CSS pixels: the
+            // window fills the screen and everything in it is tiny. This enlarges the UI
+            // rather than the window — the screen API then reports the scaled size too, so
+            // the window still fills the monitor. Set E2E_ZOOM=1 to see it at native size.
+            `--force-device-scale-factor=${process.env['E2E_ZOOM'] ?? '1.5'}`,
+            // Born off the virtual desktop, then moved onto the chosen screen once the page
+            // can tell us where the screens are. The window cannot be launched in the right
+            // place, because the coordinate is not knowable until the browser is running —
+            // so the choice is a flash on the laptop or a moment of nothing. The helper
+            // always moves it somewhere visible, including when detection fails.
+            `--window-position=${demoWindowPosition ?? '-32000,-32000'}`,
+          ],
         },
         trace: 'off',
         video: 'off',
