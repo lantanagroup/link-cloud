@@ -230,7 +230,6 @@ export class FacilityEditComponent implements OnInit {
           censusConfig: this.censusConfig
         }
       }).afterClosed().subscribe(res => {
-      console.log(res)
       if (res) {
         this.censusService.getConfiguration(this.facilityId).subscribe((data: ICensusConfiguration) => {
           if (data) {

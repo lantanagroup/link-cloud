@@ -6,6 +6,7 @@ import { pagedFacilities, facilityLookup, testFacilities } from '../fixtures/fac
 import { censusConfiguration, pagedOperations } from '../fixtures/facility-detail';
 import { measureDefinitions } from '../fixtures/measure-defs';
 import { IFacilityConfigModel } from '../../src/app/interfaces/tenant/facility-config-model.interface';
+import { ICensusConfiguration } from '../../src/app/interfaces/census/census-config-model.interface';
 
 const facility = testFacilities[0];
 const facilityId = facility.facilityId;
@@ -93,6 +94,37 @@ test('a missing census configuration prompts the user to create one', async ({ p
   // The 404 branch opens the create dialog for the user rather than leaving a dead panel.
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toContainText('Census Configuration');
+});
+
+test('creating a census configuration reports the server message, not the response object', async ({ page, api }) => {
+  mockFacilityEdit(api);
+
+  // 404 until the POST lands, then serve what was saved: the dialog's afterClosed re-fetches,
+  // and that same handler is what raises the snackbar this test is about.
+  let saved: ICensusConfiguration | undefined;
+  api.mock(`GET ${CENSUS}`, (route) =>
+    saved ? route.fulfill({ status: 200, json: saved }) : route.fulfill({ status: 404, json: { detail: 'not found' } }),
+  );
+  api.mock('POST /api/census/config', (route) => {
+    saved = JSON.parse(route.request().postData() ?? '{}') as ICensusConfiguration;
+    return route.fulfill({ status: 201, json: { id: `census-${facilityId}`, message: 'Census Configuration Created' } });
+  });
+
+  const edit = new FacilityEditPage(page);
+  await edit.goto(facilityId);
+  await edit.expand(edit.censusPanel);
+
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('textbox', { name: 'Scheduled Trigger' }).fill('0 0 6 * * ?');
+  await dialog.getByRole('button', { name: /Create Facility Configuration/ }).click();
+  await expect(dialog).toBeHidden();
+
+  // The dialog closes with the server's message and the edit screen interpolates it into a
+  // snackbar. Closing with the whole IEntityCreatedResponse instead put "[object Object]" on
+  // screen after every successful save — a passing suite and a visibly broken app, because
+  // nothing here used to assert what the user was told.
+  await expect(page.getByText('Census Configuration Created')).toBeVisible();
+  await expect(page.getByText('[object Object]')).toHaveCount(0);
 });
 
 test('expanding data acquisition loads every configuration behind its tabs', async ({ page, api }) => {

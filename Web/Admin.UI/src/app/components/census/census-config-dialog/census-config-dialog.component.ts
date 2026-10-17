@@ -51,9 +51,13 @@ export class CensusConfigDialogComponent implements OnInit {
     this.formIsInvalid = formValidity;
   }
 
-  onSubmittedConfiguration(outcome: any) {
-    if (outcome)  {
-      this.dialogRef.close(outcome);
+  onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
+    // Close with the server's message, not the whole response. The facility edit screen
+    // interpolates this value straight into a snackbar, so closing with the object rendered
+    // "[object Object]" on every successful save. Every other configuration dialog in the
+    // app closes with outcome.message; this one had drifted to `any` and lost the field.
+    if (outcome?.message)  {
+      this.dialogRef.close(outcome.message);
     }
     else {
       this.snackBar.open(`Failed to create census configuration for the facility, see error for details.`, '', {
