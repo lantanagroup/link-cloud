@@ -434,7 +434,6 @@ export class FacilityEditComponent implements OnInit {
       if (res) {
         this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, this.dataAcqQueryPlanConfig.type).subscribe((data: IQueryPlanModel) => {
           if (data) {
-            console.log(data);
             this.showNoDataAcqQueryPlanConfigAlert = false;
             this.dataAcqQueryPlanConfig = data;
           }

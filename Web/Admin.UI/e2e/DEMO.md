@@ -89,7 +89,7 @@ What it does, and what to say while it happens:
 | Its census panel offers to create one | That prompt only appears because the mock 404s for a facility with no config — we exercise the empty path on purpose. |
 | Gives it a census cron and a dispatch schedule | End to end, through the UI, with the payloads checked. |
 | Adds a FHIR query configuration — the EHR endpoint it will query, and how hard | The facility goes from empty to fully configured on screen: census, dispatch, EHR connection, query plan. |
-| **Imports a query plan** from `Scripts/seed_data/query_plan.json` — the real plan `seed.py` uses | Not a toy plan: two initial queries and ten supplemental resource types. That file is the seeder's *template* — its FacilityId is the placeholder `{{tenant-name}}` — and the walkthrough makes the same one-line substitution `seed.py` makes, so the plan arrives as this facility's own rather than something the dialog had to correct. |
+| **Imports a query plan** — clicks **Import JSON** and picks `Scripts/seed_data/query_plan.json`, the real plan `seed.py` uses | Not a toy plan: two initial queries and ten supplemental resource types. That file is the seeder's *template* — its FacilityId is the placeholder `{{tenant-name}}` — and the walkthrough makes the same one-line substitution `seed.py` makes, so the plan arrives as this facility's own rather than something the dialog had to correct. |
 | Back on the dashboard, both facilities listed | |
 | Nav bar → **Reports**: every facility's reports in one table | Where an analyst actually starts, and the ad-hoc form is one button from here — the walkthrough reaches it the way the app does rather than by a URL typed from nowhere. |
 | **Requests an ad-hoc report** for the new facility — report type, custom date range, census-based patient selection | The form the analysts actually use. The POST body is asserted field by field, same as the create dialog. |
@@ -150,6 +150,18 @@ Three design decisions, each with a bug to show for it. For a mixed room, lead w
   the API returns `{ reportId }` (`GenerateAdhocReportResponse`), so the post-submit navigation
   routed to an `undefined` path segment. The spec's own payload assertions all passed; only the
   tripwire noticed. Fixed in `generate-report.spec.ts`, which now also asserts the redirect.
+- Saving a census configuration told the user `[object Object]`. The dialog closed with the
+  whole response while the edit screen interpolates that value into a snackbar; every other
+  configuration dialog closes with `outcome.message`, and this one had drifted to `any` and
+  lost the field. A console-error tripwire cannot catch this — `[object Object]` is a
+  successful render of the wrong thing. Commit `54b67a5c5`.
+- Importing a query plan produced the right *number* of queries with every field inside them
+  empty. The file format is PascalCase — it is what the form's own **Export JSON** writes —
+  while the API serialises camelCase, and the tables and both client-side checks read
+  camelCase. Import mapped the plan's own fields and passed the query records through
+  untouched, so Export → Import did not round-trip: blank rows, `Params: 0`, and an ordering
+  check that saw no `queryConfigType` to check. Found by asking what the demo *showed* rather
+  than what it asserted — the payload assertion counted keys and passed throughout.
 
 **The three mechanisms behind that**, for the engineers in the room:
 
