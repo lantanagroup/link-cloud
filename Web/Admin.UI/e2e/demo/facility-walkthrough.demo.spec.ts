@@ -1,10 +1,13 @@
+import * as fs from 'fs';
 import * as path from 'path';
 
 import { test, expect } from '../support/test';
 import { ApiMock } from '../support/api-mock';
+import { NavPage } from '../support/pages/nav.page';
 import { TenantDashboardPage } from '../support/pages/tenant-dashboard.page';
 import { FacilityViewPage } from '../support/pages/facility-view.page';
 import { FacilityEditPage } from '../support/pages/facility-edit.page';
+import { ReportsDashboardPage } from '../support/pages/reports-dashboard.page';
 import { facilityLookup, pagedFacilities, testFacilities } from '../fixtures/facilities';
 import { pagedReportSchedules, reportSchedules } from '../fixtures/report-summaries';
 import {
@@ -29,7 +32,8 @@ import { acquisitionLogStatistics, reportEntries, reportEntrySummary } from '../
  * A single, continuous session that walks the facility journey the way a person would:
  * tenant list → facility → filters → tabs → configuration → panels → back → create a new
  * facility → give it a census, a query dispatch configuration, a FHIR query configuration
- * and an imported query plan → request an ad-hoc report against it → read the report back:
+ * and an imported query plan → cross-facility report list → request an ad-hoc report against
+ * it → read the report back:
  * measure reports per patient, and the data acquisition statistics behind them.
  *
  * Unlike the specs in e2e/mocked, this exists to be *watched*. It runs in the `demo`
@@ -60,8 +64,13 @@ const newFacility = {
 const newCensusTrigger = '0 0 6 * * ?';
 const newDispatchDuration = 'PT10S';
 const newFhirServerUrl = 'https://fhir.riverside.example.org/r4';
-/** The query plan Scripts/seed.py seeds environments with — a real one, not a toy. */
+/**
+ * The query plan Scripts/seed.py seeds environments with — a real one, not a toy. It is a
+ * template: its FacilityId is the literal `{{tenant-name}}`, which the seeder replaces with
+ * the tenant it is seeding. The walkthrough performs the same substitution.
+ */
 const SEED_QUERY_PLAN = path.resolve(__dirname, '../../../../Scripts/seed_data/query_plan.json');
+const SEED_PLAN_PLACEHOLDER = '{{tenant-name}}';
 
 /**
  * The ad-hoc report request. POST /Facility/{id}/AdHocReport answers with a
@@ -187,12 +196,13 @@ function mockQueryDispatchConfigs(api: ApiMock, seed: IQueryDispatchConfiguratio
  * Data acquisition for the facility the walkthrough builds — stateful, like census and query
  * dispatch: 404 until the dialog posts one, then the panel reads back what it just saved.
  *
- * mockFacilityDetail hands every facility a ready-made FHIR query config, so this has to be
- * registered after it to win for the new facility. Without that the Add button never
+ * mockFacilityDetail hands every facility ready-made FHIR query and FHIR list configs, so this
+ * has to be registered after it to win for the new facility. Without that the Add button never
  * appears, because the panel thinks it is already configured.
  */
 function mockDataAcquisitionConfigs(api: ApiMock, id: string): void {
   let fhirQuery: Record<string, unknown> | null = null;
+  let fhirList: Record<string, unknown> | null = null;
   let queryPlan: Record<string, unknown> | null = null;
 
   api.mock(`GET /api/data-acquisition/${id}/fhirQueryConfiguration`, (route) =>
@@ -201,6 +211,20 @@ function mockDataAcquisitionConfigs(api: ApiMock, id: string): void {
   api.mock('POST /api/data-acquisition/fhirQueryConfiguration', (route) => {
     fhirQuery = { ...JSON.parse(route.request().postData() ?? '{}'), id: `fq-${id}` };
     return route.fulfill({ status: 201, json: { id: `fq-${id}`, message: 'Configuration created' } });
+  });
+
+  // The FHIR *list* configuration is the other acquisition mode — query by EHR patient list
+  // rather than by resource — and mockFacilityDetail hands every facility a ready-made one.
+  // Left inherited, a facility created sixty seconds ago would show an EHR list pointing at
+  // fhir.example.org, which quietly contradicts the empty-to-configured story the census,
+  // dispatch and FHIR query stages tell. The walkthrough creates no list config, so this
+  // stays 404: that path only raises a snackbar, unlike census, which opens a dialog.
+  api.mock(`GET /api/data-acquisition/${id}/fhirQueryList`, (route) =>
+    fhirList ? route.fulfill({ status: 200, json: fhirList }) : route.fulfill(notConfigured),
+  );
+  api.mock('POST /api/data-acquisition/fhirQueryList', (route) => {
+    fhirList = { ...JSON.parse(route.request().postData() ?? '{}'), id: `fl-${id}` };
+    return route.fulfill({ status: 201, json: { id: `fl-${id}`, message: 'Configuration created' } });
   });
 
   // The panel asks per plan type (?type=Daily); the mock ignores the query string, so the
@@ -265,9 +289,11 @@ function mockEverything(api: ApiMock): void {
 test('walkthrough: tenant list → facility → filters → tabs → configuration → create a facility → ad-hoc report', async ({ page, api }) => {
   mockEverything(api);
 
+  const nav = new NavPage(page);
   const tenants = new TenantDashboardPage(page);
   const view = new FacilityViewPage(page);
   const edit = new FacilityEditPage(page);
+  const reports = new ReportsDashboardPage(page);
 
   await stage('open the tenant dashboard', async () => {
     await tenants.goto();
@@ -479,7 +505,7 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     });
   });
 
-  await stage('import the real seed query plan rather than typing one', async () => {
+  await stage("import the real seed query plan, as this facility's own", async () => {
     await edit.dataAcquisitionPanel.getByRole('tab', { name: 'Query Plan' }).click();
 
     // The plan type is chosen on the panel, not in the dialog: the panel's copy of the form
@@ -494,12 +520,23 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
       .click();
 
     const dialog = page.getByRole('dialog');
-    await dialog.locator('input[type="file"]').setInputFiles(SEED_QUERY_PLAN);
 
-    // The file is a seed template, so its FacilityId is the literal "{{tenant-name}}".
-    // The dialog keeps the facility being configured and says so in a snackbar, which is
-    // the behaviour worth showing: you can import a shared plan without it dragging another
-    // facility's id along with it.
+    // Import the plan as this facility's, the way seed.py does it: one textual substitution
+    // of {{tenant-name}} for the tenant being seeded. The file keeps its own formatting, so
+    // what the dialog parses is the seed plan itself rather than a re-serialised copy.
+    // Uploaded from a buffer — no temp file to write, clean up, or leave behind in CI.
+    const planForThisFacility = fs
+      .readFileSync(SEED_QUERY_PLAN, 'utf8')
+      .replace(SEED_PLAN_PLACEHOLDER, newFacility.facilityId);
+
+    await dialog.locator('input[type="file"]').setInputFiles({
+      name: 'query_plan.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(planForThisFacility),
+    });
+
+    // The plan now names the facility it is being created for, so the dialog has nothing to
+    // correct: the id on screen came in with the file.
     await expect(dialog.getByLabel('Plan Name')).toHaveValue('ach');
     await expect(dialog.getByLabel('Facility Id')).toHaveValue(newFacility.facilityId);
 
@@ -531,8 +568,17 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await expect(tenants.rowFor(newFacility.facilityId)).toBeVisible();
   });
 
+  await stage('open the cross-facility report list from the nav bar', async () => {
+    await nav.clickNav('Reports');
+    await expect(reports.header).toHaveText('All Reports');
+    // Every facility's reports in one table — the screen an analyst starts from, and the
+    // reason the next click is where it is rather than a URL typed from nowhere.
+    await expect(reports.rows).toHaveCount(schedules.length);
+  });
+
   await stage('request an ad-hoc report for the facility we just built', async () => {
-    await page.goto('/reports/generate-report');
+    await reports.createAdHocButton.click();
+    await expect(page).toHaveURL(/\/reports\/generate-report$/);
 
     await page.getByLabel('Facility').fill(newFacility.facilityId);
     await page.getByRole('option', { name: newFacility.facilityId }).click();

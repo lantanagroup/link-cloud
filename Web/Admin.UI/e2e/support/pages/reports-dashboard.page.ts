@@ -9,6 +9,7 @@ export class ReportsDashboardPage {
   readonly table: Locator;
   readonly rows: Locator;
   readonly emptyState: Locator;
+  readonly createAdHocButton: Locator;
 
   readonly facilityFilter: Locator;
   readonly reportIdFilter: Locator;
@@ -23,6 +24,9 @@ export class ReportsDashboardPage {
     this.table = page.getByTestId('reports-table');
     this.rows = this.table.locator('tr[mat-row]');
     this.emptyState = page.getByTestId('reports-empty-state');
+    // The toolbar's mini-fab. It renders an icon and no text, so its aria-label is the only
+    // accessible name it has — this is the app's own route to the ad-hoc report form.
+    this.createAdHocButton = page.getByRole('button', { name: 'Create a new ad-hoc report' });
 
     // Material controls carry no testid; their mat-label is the accessible name. Report ID is
     // addressed by role because the "Clear report ID" suffix button shares the same label
