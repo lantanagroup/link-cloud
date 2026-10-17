@@ -104,12 +104,14 @@ export default defineConfig({
           // you only want to know whether the walkthrough still passes.
           slowMo: Number(process.env['E2E_SLOW_MO'] ?? 2200),
           args: [
-            // Zoom the whole browser, so the app is legible from the back of a room. A 27"
-            // 1440p monitor at 100% Windows scaling gives the page 2560 CSS pixels: the
-            // window fills the screen and everything in it is tiny. This enlarges the UI
-            // rather than the window — the screen API then reports the scaled size too, so
-            // the window still fills the monitor. Set E2E_ZOOM=1 to see it at native size.
-            `--force-device-scale-factor=${process.env['E2E_ZOOM'] ?? '1.5'}`,
+            // Browser zoom, off by default. It enlarges the UI rather than the window, and
+            // the screen API reports the scaled size too, so the window still fills the
+            // monitor. Tempting for a large room, but it costs vertical space where this
+            // app can least afford it: at 1.25 on a 27" 1440p screen the facility page ends
+            // at the Weekly field, with all four configuration panels — the things the
+            // walkthrough expands — pushed off the bottom. Raise it only if the room is big
+            // enough that legibility matters more than seeing a screen whole.
+            `--force-device-scale-factor=${process.env['E2E_ZOOM'] ?? '1'}`,
             // Born off the virtual desktop, then moved onto the chosen screen once the page
             // can tell us where the screens are. The window cannot be launched in the right
             // place, because the coordinate is not knowable until the browser is running —

@@ -62,10 +62,11 @@ are — it cannot be launched in the right spot, because the coordinate is not k
 the browser is running. A moment of nothing is better than the window appearing on your
 laptop and jumping.
 
-**The app is zoomed to 1.5x** so it is legible from the back of a room. A 27" 1440p monitor
-at 100% Windows scaling otherwise gives the page 2560 CSS pixels: the window fills the
-screen and everything in it is tiny. Set `E2E_ZOOM='1'` for native size, or higher if the
-room is large.
+**Zoom is available but off.** `E2E_ZOOM='1.25'` enlarges the whole UI for a large room —
+but it costs vertical space where this app can least afford it. On a 27" 1440p screen at
+1.25 the facility page ends at the Weekly field, with all four configuration panels, the
+things the walkthrough expands, pushed off the bottom. Prefer moving the monitor closer to
+the room over zooming past what fits.
 
 > **Do not hand it coordinates.** `E2E_WINDOW_POSITION` still works and still overrides
 > everything, but every obvious way of obtaining a coordinate gives a *different* answer, and
