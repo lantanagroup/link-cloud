@@ -1,0 +1,113 @@
+@page "/"
+@using Microsoft.Extensions.Options
+@inject OnboardingChatService ChatService
+@inject IOptions<ChatSettings> Settings
+@inject ILogger<Chat> Logger
+@implements IDisposable
+
+<PageTitle>Link Cloud Onboarding</PageTitle>
+<ChatHeader OnNewChat="ResetConversationAsync" Disabled="@isBusy" />
+<div class="page-width connection-info">Local POC · Read-only · Model: @Settings.Value.Model</div>
+
+<ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
+    <NoMessagesContent>
+        <h2>Configure a Link Cloud facility</h2>
+        <p>Explore the environments, vendors, and configuration choices available for onboarding.</p>
+        <button class="btn-default" @onclick="ShowOptionsAsync" disabled="@isBusy">Show onboarding options</button>
+    </NoMessagesContent>
+</ChatMessageList>
+
+<div class="chat-container">
+    @if (errorMessage is not null)
+    {
+        <div class="page-width chat-error" role="alert">@errorMessage</div>
+    }
+    @if (isBusy)
+    {
+        <div class="page-width response-status" role="status">
+            @responseStatus
+            <button class="btn-subtle" @onclick="StopResponse">Stop</button>
+        </div>
+    }
+    <ChatInput OnSend="AddUserMessageAsync" Disabled="@isBusy" @ref="chatInput" />
+</div>
+
+@code {
+    private readonly List<ChatMessage> messages = [];
+    private CancellationTokenSource? currentCancellation;
+    private ChatMessage? currentResponseMessage;
+    private ChatInput? chatInput;
+    private bool isBusy;
+    private bool disposed;
+    private string? errorMessage;
+    private string responseStatus = "Connecting to the onboarding assistant…";
+
+    private Task ShowOptionsAsync() => AddUserMessageAsync(new(ChatRole.User,
+        "Use get_onboarding_options for the local environment and explain what is available."));
+
+    private async Task AddUserMessageAsync(ChatMessage userMessage)
+    {
+        if (isBusy || string.IsNullOrWhiteSpace(userMessage.Text) || disposed) return;
+        isBusy = true;
+        errorMessage = null;
+        responseStatus = "Connecting to the onboarding assistant…";
+        using var cancellation = new CancellationTokenSource();
+        currentCancellation = cancellation;
+        var turnStart = messages.Count;
+        messages.Add(new(ChatRole.User, userMessage.Text));
+        var responseText = new TextContent("");
+        currentResponseMessage = new(ChatRole.Assistant, [responseText]);
+        List<ChatResponseUpdate> updates = [];
+        try
+        {
+            await foreach (var update in ChatService.ReplyAsync(messages.ToArray(), cancellation.Token))
+            {
+                updates.Add(update);
+                responseText.Text += update.Text;
+                responseStatus = update.Contents.OfType<FunctionCallContent>().Any()
+                    ? "Reading onboarding options…" : "Generating response…";
+                ChatMessageItem.NotifyChanged(currentResponseMessage);
+                await InvokeAsync(StateHasChanged);
+            }
+            // Preserve the full tool-call/result sequence for subsequent Ollama turns.
+            messages.AddMessages(updates);
+        }
+        catch (OperationCanceledException)
+        {
+            messages.RemoveRange(turnStart, messages.Count - turnStart);
+            errorMessage = cancellation.IsCancellationRequested
+                ? "Response stopped. You can send your question again."
+                : "The response timed out. Check Ollama and the MCP server, then try again.";
+        }
+        catch (Exception ex)
+        {
+            messages.RemoveRange(turnStart, messages.Count - turnStart);
+            // Do not log prompts, tool results, or upstream exception messages.
+            Logger.LogWarning("Onboarding chat failed ({ErrorType}).", ex.GetType().Name);
+            errorMessage = "Unable to complete the response. Check that Ollama and the onboarding MCP server are running, and that your selected model supports tools. You can try again.";
+        }
+        finally
+        {
+            currentResponseMessage = null;
+            currentCancellation = null;
+            isBusy = false;
+        }
+        if (!disposed && chatInput is not null) await chatInput.FocusAsync();
+    }
+
+    private void StopResponse() => currentCancellation?.Cancel();
+
+    private async Task ResetConversationAsync()
+    {
+        if (isBusy) return;
+        messages.Clear();
+        errorMessage = null;
+        if (chatInput is not null) await chatInput.FocusAsync();
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        currentCancellation?.Cancel();
+    }
+}

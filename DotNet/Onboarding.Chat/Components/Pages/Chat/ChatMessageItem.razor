@@ -1,0 +1,51 @@
+@using System.Runtime.CompilerServices
+@using System.Text.Json
+
+@if (Message.Role == ChatRole.User)
+{
+    <div class="user-message">@Message.Text</div>
+}
+else
+{
+    @foreach (var content in Message.Contents)
+    {
+        if (content is TextContent { Text.Length: > 0 } text && Message.Role == ChatRole.Assistant)
+        {
+            <div class="assistant-message">
+                <div></div>
+                <div class="assistant-message-header">Assistant</div>
+                <div class="assistant-message-text">
+                    <assistant-message markdown="@text.Text"></assistant-message>
+                </div>
+            </div>
+        }
+        else if (content is FunctionCallContent call)
+        {
+            <div class="assistant-search"><span>Called @call.Name</span></div>
+        }
+        else if (content is FunctionResultContent result)
+        {
+            <details class="tool-result">
+                <summary>Onboarding tool result</summary>
+                <pre>@JsonSerializer.Serialize(result.Result, new JsonSerializerOptions { WriteIndented = true })</pre>
+            </details>
+        }
+    }
+}
+
+@code {
+    private static readonly ConditionalWeakTable<ChatMessage, ChatMessageItem> SubscribersLookup = new();
+
+    [Parameter, EditorRequired]
+    public required ChatMessage Message { get; set; }
+
+    [Parameter]
+    public bool InProgress { get; set; }
+
+    protected override void OnInitialized() => SubscribersLookup.AddOrUpdate(Message, this);
+
+    public static void NotifyChanged(ChatMessage source)
+    {
+        if (SubscribersLookup.TryGetValue(source, out var subscriber)) subscriber.StateHasChanged();
+    }
+}

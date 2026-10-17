@@ -30,6 +30,8 @@
 ## tenant: 8074
 ## validation: 8075
 ## terminology: 8076
+## onboarding-mcp: 8090 (localhost only)
+## onboarding-chat: 8091 (localhost only)
 
 services:
   
@@ -1099,6 +1101,57 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8076/health"]
+
+  # Local AI onboarding POC. Ollama remains on the host; upstream catalogs are
+  # queried on demand, so Tenant/MeasureEval outages produce partial tool results.
+  onboarding-mcp:
+    image: link-onboarding-mcp
+    build:
+      context: .
+      dockerfile: DotNet/Onboarding.Mcp/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      AllowedHosts: localhost;127.0.0.1;onboarding-mcp
+      Onboarding__Environments__0__TenantApiBaseUrl: http://tenant:8074/api/
+      Onboarding__Environments__0__MeasureEvalApiBaseUrl: http://measureeval:8067/api/measureeval/
+      Onboarding__Environments__0__BearerToken: ${ONBOARDING_TENANT_BEARER_TOKEN:-}
+      Onboarding__Environments__0__MeasureEvalBearerToken: ${ONBOARDING_MEASUREEVAL_BEARER_TOKEN:-}
+    ports:
+      - "127.0.0.1:${ONBOARDING_MCP_PORT:-8090}:8080"
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  onboarding-chat:
+    image: link-onboarding-chat
+    build:
+      context: .
+      dockerfile: DotNet/Onboarding.Chat/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      OnboardingChat__OllamaEndpoint: http://host.docker.internal:11434
+      OnboardingChat__McpEndpoint: http://onboarding-mcp:8080/mcp
+      OnboardingChat__Model: ${ONBOARDING_CHAT_MODEL:-gemma4:e2b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${ONBOARDING_CHAT_PORT:-8091}:8080"
+    networks:
+      - link-nw
+    depends_on:
+      onboarding-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 networks:
   link-nw:

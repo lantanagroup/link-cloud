@@ -55,6 +55,33 @@ dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --logger "console;verbo
 
 Endpoints are read from env vars (see `Tests/BackendE2ETests/README.md` and `TestConfig.cs`); defaults match the local docker-compose ports. Each test seeds deterministic FHIR data and validates with **strict prediction-vs-actual reconciliation** — generated input drives an exact expected count for every downstream layer (manifest, ABS NDJSON, Report/DA/Normalization/Validation DBs), and a deviation in either direction fails the run.
 
+### Local onboarding AI POC
+
+`DotNet/Onboarding.Chat` is a Blazor chat generated from Microsoft's AI template.
+It requires the .NET 10 SDK, local Ollama with a tool-capable model, and the sibling
+`DotNet/Onboarding.Mcp` server (.NET 8). For native execution:
+
+```powershell
+dotnet run --project DotNet/Onboarding.Mcp/Onboarding.Mcp.csproj    # terminal 1
+dotnet run --project DotNet/Onboarding.Chat/Onboarding.Chat.csproj  # terminal 2
+dotnet test Tests/Onboarding.Chat.Tests/Onboarding.Chat.Tests.csproj
+```
+
+Open `http://127.0.0.1:8091`. See [Onboarding.Chat/README.md](DotNet/Onboarding.Chat/README.md)
+for model selection, configuration, and troubleshooting. The main solution now
+includes the .NET 10 chat/test projects; existing service project builds still use .NET 8.
+
+Alternatively, with Ollama running on the host, run both POCs in compose (no host
+.NET SDK required):
+
+```powershell
+docker compose up --build -d --wait onboarding-chat
+```
+
+Stop native POC processes first if they occupy ports 8090/8091, or override
+`ONBOARDING_MCP_PORT` / `ONBOARDING_CHAT_PORT`. The chat uses host Ollama through
+`host.docker.internal`; MCP uses Tenant/MeasureEval service names on `link-nw`.
+
 ### Java
 
 ```bash

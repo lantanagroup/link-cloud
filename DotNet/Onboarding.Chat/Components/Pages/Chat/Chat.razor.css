@@ -1,0 +1,14 @@
+.chat-container {
+    position: sticky; 
+    bottom: 0; 
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; 
+    padding-top: 0.75rem; 
+    padding-bottom: 1.5rem; 
+    border-top-width: 1px; 
+    background-color: #F3F4F6; 
+    border-color: #E5E7EB;
+}
+.connection-info { padding: 0.75rem 1.5rem; color: #526078; font-size: 0.875rem; }
+.chat-error { padding: 0.75rem; color: #991b1b; background: #fff1f2; border-radius: 0.5rem; }
+.response-status { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; }
