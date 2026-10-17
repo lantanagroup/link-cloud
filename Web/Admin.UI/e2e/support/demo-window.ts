@@ -51,9 +51,35 @@ export async function placeDemoWindow(page: Page): Promise<string> {
     await page.goto('/');
   }
 
-  // No grantPermissions call: this Playwright build rejects both 'window-management' and the
-  // older 'window-placement' as unknown permission names, and Chrome exposes the API to a
-  // focused top-level page on a secure origin regardless.
+  // Grant window management up front, through CDP. Without this Chrome puts up an "Allow
+  // this site to manage windows?" prompt: the presenter has to click it, and the window sits
+  // on the laptop until they do, so the demo opens on the wrong screen and then jumps.
+  // Playwright's own grantPermissions does not accept this one — it rejects both
+  // 'window-management' and the older 'window-placement' as unknown names — so go to the
+  // browser session directly. Chrome renamed the CDP permission too, hence both spellings.
+  const browser = context.browser();
+  if (browser) {
+    try {
+      // The browserContextId matters: Playwright runs its pages in a non-default browser
+      // context, and a grant sent without one lands on the default context, where nothing
+      // of ours is running. The prompt then appears exactly as if nothing had been granted.
+      const pageSession = await context.newCDPSession(page);
+      const { targetInfo } = await pageSession.send('Target.getTargetInfo');
+      await pageSession.detach().catch(() => undefined);
+
+      const browserSession = await browser.newBrowserCDPSession();
+      await browserSession.send('Browser.grantPermissions', {
+        origin: new URL(page.url()).origin,
+        browserContextId: targetInfo.browserContextId,
+        permissions: ['windowManagement'],
+      });
+    } catch {
+      // Older Chrome called this windowPlacement and newer protocol typings no longer list
+      // it. Not worth chasing: without the grant the presenter gets the prompt they would
+      // have got anyway, and declining it just leaves the window where Chromium put it.
+    }
+  }
+
   const screens = await page
     .evaluate(async () => {
       const api = (window as unknown as { getScreenDetails?: () => Promise<{ screens: ScreenLike[] }> })

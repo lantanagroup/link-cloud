@@ -21,20 +21,21 @@ Leave `ng serve` up in its own terminal. `playwright.config.ts` sets
 pause from the middle of the demo. Then rehearse once:
 
 ```powershell
-$env:E2E_KEEP_OPEN='0'; npm run e2e:demo   # ~1.4 min at default pacing
-npm run e2e                                # 64 tests, ~20s warm
+$env:E2E_SLOW_MO='0'; $env:E2E_STEP_PAUSE='0'; $env:E2E_KEEP_OPEN='0'; npm run e2e:demo  # ~15s
+npm run e2e                                                                              # 67 tests, ~20s warm
 ```
 
-Both should be green. Clear `E2E_KEEP_OPEN` afterwards (`Remove-Item Env:\E2E_KEEP_OPEN`) so
-the real demo holds the window open at the end.
+Both should be green. Then open a clean terminal for the demo itself, or clear those three
+(`Remove-Item Env:\E2E_SLOW_MO,Env:\E2E_STEP_PAUSE,Env:\E2E_KEEP_OPEN`) — left set, they
+make the real run sprint past and close itself at the end.
 
-**Set the pacing before the meeting.** The defaults run the whole walkthrough in well under
-two minutes, which is far too fast to talk over. These values stretch it to ~4.5 minutes
-(all timings measured 2026-10-17 on a 2400px-wide window):
+**The pacing needs no setting.** `npm run e2e:demo` paces itself for a room out of the box:
+~4.5 minutes, about eleven seconds a stage (measured 2026-10-17 on a 2400px-wide window).
+The knobs are there if you want them:
 
 ```powershell
-$env:E2E_SLOW_MO='2200'     # individual clicks (default 700)
-$env:E2E_STEP_PAUSE='2000'  # dwell between stages (default 1500)
+$env:E2E_STEP_PAUSE='3000'  # longer hold on each finished screen (default 2000)
+$env:E2E_SLOW_MO='1500'     # quicker clicks within a stage (default 2200)
 ```
 
 **You should not need to do anything about which monitor it opens on.** The walkthrough asks
@@ -209,6 +210,7 @@ tier proves the same page objects still work against a real BFF. The selector co
 | Demo browser opens on the wrong screen | Read its first line of output, which names the screen it chose. Pick another with `E2E_MONITOR=<part of the name>`. If it says "window left where Chromium put it", auto-detect found one screen or none, and a stale `E2E_WINDOW_POSITION` in that shell overrides everything. |
 | Window hangs off the edge of a screen | Something is passing `E2E_WINDOW_POSITION`. Clear it (`Remove-Item Env:\E2E_WINDOW_POSITION`) and let auto-detect place it. |
 | Window closes immediately at the end | `E2E_KEEP_OPEN=0` is still set from the rehearsal. |
+| An "Allow this site to manage windows?" prompt appears | The CDP permission grant did not take on this Chrome build. Click Allow once; the window then moves to the right screen. |
 | Window vanishes partway through, no error visible | The run was interrupted, not failed — something reaped the parent process. Check `test-results/`: a real failure leaves `test-failed-1.png`, an interruption leaves only an orphaned `.playwright-artifacts-0`. Re-run in the foreground, unpiped. |
 | It sits on one stage doing nothing | A selector stopped matching. The demo project caps actions at 30s (`actionTimeout`), so it now fails with the locator named instead of waiting forever — run `npm run e2e` to see whether it is a real break. |
 | Flaky "the click did nothing" in the mocked tier | Too many workers starving one `ng serve`; the config caps at 4 locally for this reason. |

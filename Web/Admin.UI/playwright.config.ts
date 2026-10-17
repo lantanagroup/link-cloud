@@ -89,7 +89,11 @@ export default defineConfig({
         // real window to fit this, so --window-size is unnecessary; only position is passed.
         viewport: { width: demoWidth, height: demoHeight },
         launchOptions: {
-          slowMo: Number(process.env['E2E_SLOW_MO'] ?? 700),
+          // Presentation pacing by default. This project exists to be watched by a room, so
+          // the common case should need no environment variables at all; 700 was fast enough
+          // that the walkthrough finished before anyone could talk over it. Drop it to 0 when
+          // you only want to know whether the walkthrough still passes.
+          slowMo: Number(process.env['E2E_SLOW_MO'] ?? 2200),
           args: demoWindowPosition ? [`--window-position=${demoWindowPosition}`] : [],
         },
         trace: 'off',
