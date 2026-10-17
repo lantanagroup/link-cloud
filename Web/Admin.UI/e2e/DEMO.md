@@ -7,27 +7,74 @@ real suite run, then why the results can be trusted.
 Everything runs from `Web/Admin.UI`. No backend, no Docker, no seeded data — the mocked tier
 intercepts every `/api` call and Playwright boots `ng serve` itself.
 
-## Pre-flight (do this before the meeting, not during)
+## The commands, in order
+
+Everything below runs from `Web/Admin.UI`. Two terminals: one holding `ng serve`, one you
+type in. This section is the whole demo — the rest of the file is why, and what to say.
+
+**Terminal A, before the meeting — leave it running, never touch it again:**
 
 ```powershell
 cd Web\Admin.UI
-npm ci                                  # only if node_modules is stale
-npx playwright install chromium         # only on a fresh machine
-npm start                               # leave ng serve running — see note below
+npm start
 ```
 
-Leave `ng serve` up in its own terminal. `playwright.config.ts` sets
-`reuseExistingServer: true`, so an already-warm dev server removes the 30-60s first-compile
-pause from the middle of the demo. Then rehearse once:
+**Terminal B, before the meeting — rehearse, then close it:**
 
 ```powershell
-$env:E2E_SLOW_MO='0'; $env:E2E_STEP_PAUSE='0'; $env:E2E_KEEP_OPEN='0'; npm run e2e:demo  # ~15s
-npm run e2e                                                                              # 67 tests, ~20s warm
+cd Web\Admin.UI
+$env:E2E_SLOW_MO='0'; $env:E2E_STEP_PAUSE='0'; $env:E2E_KEEP_OPEN='0'; npm run e2e:demo
+npm run e2e
 ```
 
-Both should be green. Then open a clean terminal for the demo itself, or clear those three
-(`Remove-Item Env:\E2E_SLOW_MO,Env:\E2E_STEP_PAUSE,Env:\E2E_KEEP_OPEN`) — left set, they
-make the real run sprint past and close itself at the end.
+Close that terminal afterwards. Those three variables are set for the rehearsal and would
+make the real run sprint past and close itself; a fresh terminal is the reliable way to be
+rid of them.
+
+**Terminal B, in the meeting — one command per act:**
+
+| Act | Type this | What happens |
+|---|---|---|
+| 1 | `npm run e2e:demo` | ~4.5 min. Opens on your largest external screen, paces itself, holds the window open at the end. **Close the window to finish.** |
+| 2 | `npm run e2e` | 67 tests, ~20s warm |
+| 2 | `npm run e2e:report` | Opens the HTML report in a browser |
+| 3 | — | Nothing to run; Act 3 is the report plus the three mechanisms |
+
+That is the whole set. No pacing variables, no window coordinates, no permission clicks.
+
+**Optional, only if you want a specific monitor** — by name, not coordinates, and it must be
+in the same terminal as the run:
+
+```powershell
+$env:E2E_MONITOR='<part of the monitor name>'; npm run e2e:demo
+```
+
+The walkthrough prints the screen it chose as its first line, so you can see before the
+browser appears whether it took the variable. Leave it unset and it picks the largest screen
+that is not your laptop.
+
+**Optional, for the typed-fixtures point in Act 3** — rename a field in an interface under
+`src/app/interfaces/`, then:
+
+```powershell
+npm run typecheck:e2e
+```
+
+One rename to `IReportSchedule.censusCount` produces three errors across the fixtures and the
+specs that read it. Undo the rename afterwards.
+
+## Pre-flight (do this before the meeting, not during)
+
+The commands are in the section above. Two more that only matter on a machine that has not
+run this before:
+
+```powershell
+npm ci                            # only if node_modules is stale
+npx playwright install chromium   # only on a fresh machine
+```
+
+`playwright.config.ts` sets `reuseExistingServer: true`, which is why Terminal A matters: an
+already-warm dev server removes the 30-60s first-compile pause from the middle of the demo.
 
 **The pacing needs no setting.** `npm run e2e:demo` paces itself for a room out of the box:
 ~4.5 minutes, about eleven seconds a stage (measured 2026-10-17 on a 2400px-wide window).
@@ -80,7 +127,7 @@ the room over zooming past what fits.
 Window size follows the chosen screen. `E2E_WINDOW_SIZE` overrides it if you want a specific
 size, and is ignored when auto-detect is doing the placing.
 
-## Act 1 — watch it drive the app (~4.5 min at the pacing above)
+## Act 1 — watch it drive the app (~4.5 min)
 
 ```powershell
 npm run e2e:demo
