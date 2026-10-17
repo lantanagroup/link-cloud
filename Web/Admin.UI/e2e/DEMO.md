@@ -89,12 +89,18 @@ What it does, and what to say while it happens:
 | Its census panel offers to create one | That prompt only appears because the mock 404s for a facility with no config — we exercise the empty path on purpose. |
 | Gives it a census cron and a dispatch schedule | End to end, through the UI, with the payloads checked. |
 | Adds a FHIR query configuration — the EHR endpoint it will query, and how hard | The facility goes from empty to fully configured on screen: census, dispatch, EHR connection, query plan. |
-| **Imports a query plan** from `Scripts/seed_data/query_plan.json` — the real plan `seed.py` uses | Not a toy plan: two initial queries and ten supplemental resource types. The file's FacilityId is the seed placeholder `{{tenant-name}}`, and the dialog keeps the facility you are configuring instead — so a shared plan cannot drag another facility's id in with it. |
+| **Imports a query plan** from `Scripts/seed_data/query_plan.json` — the real plan `seed.py` uses | Not a toy plan: two initial queries and ten supplemental resource types. That file is the seeder's *template* — its FacilityId is the placeholder `{{tenant-name}}` — and the walkthrough makes the same one-line substitution `seed.py` makes, so the plan arrives as this facility's own rather than something the dialog had to correct. |
 | Back on the dashboard, both facilities listed | |
+| Nav bar → **Reports**: every facility's reports in one table | Where an analyst actually starts, and the ad-hoc form is one button from here — the walkthrough reaches it the way the app does rather than by a URL typed from nowhere. |
 | **Requests an ad-hoc report** for the new facility — report type, custom date range, census-based patient selection | The form the analysts actually use. The POST body is asserted field by field, same as the create dialog. |
 | Lands on the report it just created | The response carries `reportId`; reading the wrong field here is a bug the suite already caught once. |
 | Its measure reports: a row per patient, with resource counts and reporting/submission status | Fixture data, but the real shape — the table, the donut charts and the statuses all come from the interfaces the app itself uses. |
 | **Query Analysis** tab — total queries, per-resource timings, retries | The data acquisition logs behind that report: how many queries ran, how long each resource type took, what had to be retried. Only fetched when the tab is opened. |
+
+**If someone asks about the tabs it does not fill in:** the new facility gets a census, a
+dispatch schedule, a FHIR query configuration and a query plan. SFTP, FHIR List and Reporting
+Organization are deliberately left empty — each shows its own "not configured" state, which is
+honest rather than incomplete, and filling them would add minutes without making a new point.
 
 If you skipped the pacing in pre-flight, this is the moment you will regret it — set
 `E2E_SLOW_MO` and `E2E_STEP_PAUSE` as above. Measured durations, so you can pick a different
