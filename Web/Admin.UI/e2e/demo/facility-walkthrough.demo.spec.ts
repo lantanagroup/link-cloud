@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import type { Page } from '@playwright/test';
+
 import { test, expect } from '../support/test';
 import { ApiMock } from '../support/api-mock';
 import { NavPage } from '../support/pages/nav.page';
@@ -170,6 +172,31 @@ async function stage(title: string, body: () => Promise<void>): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, STEP_PAUSE));
     }
   });
+}
+
+/**
+ * Scroll whatever is under the pointer, in steps, so the page is seen to move.
+ *
+ * Playwright scrolls only to the element it is about to interact with, and assertions do not
+ * scroll at all — so on a long screen the walkthrough silently works on things nobody in the
+ * room can see. These beats exist purely to show the rest of the screen; a single jump to the
+ * bottom reads as a glitch, where a few wheel steps read as someone scrolling.
+ */
+async function scrollThrough(page: Page, steps = 3, delta = 420): Promise<void> {
+  // Scaled off the stage pacing rather than fixed, so these beats slow down with the rest of
+  // the walkthrough for a presentation and cost nothing when the pacing is turned off.
+  const dwell = Math.min(600, Math.round(STEP_PAUSE / 4));
+  for (let i = 0; i < steps; i += 1) {
+    await page.mouse.wheel(0, delta);
+    if (dwell > 0) {
+      await page.waitForTimeout(dwell);
+    }
+  }
+}
+
+/** The same, back to the top, so the next stage starts where the audience expects. */
+async function scrollBack(page: Page, steps = 3, delta = 420): Promise<void> {
+  await scrollThrough(page, steps, -delta);
 }
 
 const notConfigured = { status: 404, json: { detail: 'not found' } };
@@ -380,6 +407,10 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await expect(view.title).toHaveText(facility.facilityName);
     await expect(view.cadenceRow('Monthly')).toContainText(facility.scheduledReports.monthly[0]);
     await expect(view.reportRows).toHaveCount(schedules.length);
+
+    // The scheduled reports sit below the fold on this screen.
+    await scrollThrough(page);
+    await scrollBack(page);
   });
 
   await stage('filter the report schedules by status, then clear', async () => {
@@ -433,6 +464,10 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     for (const label of ['Fhir List', 'SFTP Configuration', 'Query Plan', 'Fhir Query']) {
       await edit.dataAcquisitionPanel.getByRole('tab', { name: label }).click();
     }
+
+    // Four panels expanded makes this the longest screen in the walkthrough.
+    await scrollThrough(page, 4);
+    await scrollBack(page, 4);
   });
 
   await stage('head back to the tenant dashboard', async () => {
@@ -609,9 +644,17 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     // import was the one step of the walkthrough an audience could not see. The button opens
     // a native file picker, which Playwright intercepts as a filechooser event: the OS dialog
     // never actually appears, so this stays deterministic.
+    // Import JSON is a low-contrast stroked button in the dialog's bottom-left action bar,
+    // while every eye in the room is on the fields at the top. Hover it first so it lights
+    // up and the pointer is visibly parked on it for a beat before the click — otherwise the
+    // plan simply appears and the audience never sees where it came from.
+    const importButton = dialog.getByRole('button', { name: 'Import JSON' });
+    await importButton.scrollIntoViewIfNeeded();
+    await importButton.hover();
+
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      dialog.getByRole('button', { name: 'Import JSON' }).click(),
+      importButton.click(),
     ]);
     await chooser.setFiles({
       name: 'query_plan.json',
@@ -623,6 +666,15 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     // in an assertion on the payload.
     await expect(dialog.getByRole('cell', { name: 'Encounter', exact: true })).toBeVisible();
     await expect(dialog.getByRole('cell', { name: 'Location', exact: true })).toBeVisible();
+
+    // Ten supplemental queries arrived below the two initial ones, inside the dialog's own
+    // scrolling content — worth showing, since "a real plan, not a toy" is the whole point
+    // of importing this file. The wheel scrolls whatever is under the pointer, so park it
+    // over the dialog first.
+    await dialog.getByRole('heading', { name: 'Initial Queries' }).hover();
+    await scrollThrough(page, 4);
+    await expect(dialog.getByRole('cell', { name: 'MedicationRequest', exact: true })).toBeVisible();
+    await scrollBack(page, 4);
 
     // The plan now names the facility it is being created for, so the dialog has nothing to
     // correct: the id on screen came in with the file.
@@ -731,12 +783,20 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
   await stage('the report opens on its measure reports, one row per patient', async () => {
     await expect(page.getByText('PAT-10431')).toBeVisible();
     await expect(page.getByText('PAT-10588')).toBeVisible();
+
+    // The header fields are at the top and the patient table below them — on this screen the
+    // interesting half is the one you have to scroll to.
+    await scrollThrough(page);
+    await scrollBack(page);
   });
 
   await stage('Query Analysis shows what data acquisition actually did', async () => {
     await page.getByRole('tab', { name: 'Query Analysis' }).click();
     await expect(page.getByText('Total Queries')).toBeVisible();
     await expect(page.getByText('Average Query Time')).toBeVisible();
+
+    // The per-resource timings are under the totals.
+    await scrollThrough(page);
   });
 
   // Hold the window open on the finished state. `page.pause()` is not used here: under the
