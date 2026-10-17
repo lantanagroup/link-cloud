@@ -4,6 +4,10 @@
     <CentralPackageFloatingVersionsEnabled>false</CentralPackageFloatingVersionsEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.4.1" />
+    <PackageVersion Include="ModelContextProtocol" Version="1.4.1" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.11.0" />
+    <PackageVersion Include="OllamaSharp" Version="5.4.12" />
     <PackageVersion Include="AppAny.Quartz.EntityFrameworkCore.Migrations" Version="0.5.2" />
     <PackageVersion Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" Version="0.5.2" />
     <PackageVersion Include="AspNetCore.HealthChecks.Kafka" Version="8.0.1" />
