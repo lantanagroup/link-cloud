@@ -45,10 +45,14 @@ import { placeDemoWindow } from '../support/demo-window';
  * Unlike the specs in e2e/mocked, this exists to be *watched*. It runs in the `demo`
  * project (headed, slowMo-paced, no timeout) and holds the browser open at the end.
  *
- *   npm run e2e:demo                            # default pacing, stays open
- *   $env:E2E_SLOW_MO='1800'; npm run e2e:demo   # slower individual actions
- *   $env:E2E_STEP_PAUSE='3000'; npm run e2e:demo  # longer dwell between stages
- *   $env:E2E_KEEP_OPEN='0'; npm run e2e:demo    # run straight through and close
+ * Needs nothing set to be presentable: it paces itself for a room (~4.5 min), picks the
+ * largest screen that is not the laptop, and holds the window open at the end.
+ *
+ *   npm run e2e:demo                              # what you want in the meeting
+ *   $env:E2E_MONITOR='dell'; npm run e2e:demo     # a different screen, by name
+ *   $env:E2E_STEP_PAUSE='3000'; npm run e2e:demo  # longer hold on each finished screen
+ *   $env:E2E_SLOW_MO='0'; $env:E2E_STEP_PAUSE='0'; $env:E2E_KEEP_OPEN='0'; npm run e2e:demo
+ *                                                 # ~15s, closes itself: does it still pass?
  */
 
 const facility = testFacilities[0];
@@ -160,7 +164,7 @@ function mockAdHocReport(api: ApiMock, id: string): () => IReportSchedule | unde
 }
 
 /** How long to linger on each finished stage before moving on, so it reads as steps. */
-const STEP_PAUSE = Number(process.env['E2E_STEP_PAUSE'] ?? 1500);
+const STEP_PAUSE = Number(process.env['E2E_STEP_PAUSE'] ?? 2000);
 
 /**
  * test.step, plus a dwell afterwards. slowMo only spaces out individual actions — without
