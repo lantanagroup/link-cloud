@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 /**
  * Put the demo window on the best screen available, without anyone having to supply
@@ -99,11 +99,12 @@ export async function placeDemoWindow(page: Page): Promise<string> {
     })
     .catch(() => null);
 
+  // The window launched off the virtual desktop, so there is no "leave it where it is"
+  // option any more: if detection failed, put it somewhere visible on the primary screen
+  // or the demo runs against a window nobody can see.
   if (!screens || screens.length === 0) {
-    return 'window left where Chromium put it (no screen details available)';
-  }
-  if (screens.length === 1) {
-    return 'window left where Chromium put it (single screen)';
+    await moveWindow(context, page, { left: 60, top: 60 });
+    return 'window at 60,60 on the primary screen (no screen details available)';
   }
 
   // The biggest screen that is not the laptop. A presenter's external monitor is almost
@@ -126,30 +127,46 @@ export async function placeDemoWindow(page: Page): Promise<string> {
   }
   const target = named ?? biggest;
 
-  const viewportWidth = Math.min(MAX_WIDTH, target.availWidth - MARGIN * 2);
-  // Leave room for the window chrome; the exact height is measured and corrected below.
-  const viewportHeight = target.availHeight - MARGIN * 2 - 100;
-  await page.setViewportSize({ width: viewportWidth, height: viewportHeight });
+  // Size and position in one go. With no viewport emulation the page simply fills whatever
+  // window it is given, so the window is the only thing to set.
+  const width = Math.min(MAX_WIDTH, target.availWidth - MARGIN * 2);
+  const height = target.availHeight - MARGIN * 2;
+  const left = Math.round(target.availLeft + (target.availWidth - width) / 2);
+  const top = Math.round(target.availTop + (target.availHeight - height) / 2);
 
-  // Centre the *window*, not the viewport: the title bar and tab strip add height that
-  // varies by platform and theme, and guessing it is what leaves a window hanging off the
-  // bottom of a screen.
-  const outer = await page.evaluate(() => ({
-    width: window.outerWidth,
-    height: window.outerHeight,
-  }));
-  const left = Math.round(target.availLeft + (target.availWidth - outer.width) / 2);
-  const top = Math.round(target.availTop + (target.availHeight - outer.height) / 2);
+  await moveWindow(context, page, { left, top, width, height });
 
+  // Ask the browser which screen it actually ended up on, rather than trusting the maths.
+  // currentScreen is the one the window is displayed on, so this catches a coordinate space
+  // mismatch — the failure mode that put the window half onto the next monitor before.
+  const landedOn = await page
+    .evaluate(async () => {
+      const api = (window as unknown as { getScreenDetails?: () => Promise<{ currentScreen: { label: string } }> })
+        .getScreenDetails;
+      return typeof api === 'function' ? (await api.call(window)).currentScreen.label : null;
+    })
+    .catch(() => null);
+
+  const placement = `${width}x${height} at ${left},${top}`;
+  if (landedOn && landedOn !== target.label) {
+    return `window asked for ${target.label} but landed on ${landedOn} — ${placement}`;
+  }
+  return `window on ${target.label} (${target.availWidth}x${target.availHeight}), ${placement}`;
+}
+
+/** Move the real OS window. Playwright has no API for this; CDP does. */
+async function moveWindow(
+  context: BrowserContext,
+  page: Page,
+  bounds: { left: number; top: number; width?: number; height?: number },
+): Promise<void> {
   const cdp = await context.newCDPSession(page);
   try {
     const { windowId } = await cdp.send('Browser.getWindowForTarget');
-    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { left, top } });
+    await cdp.send('Browser.setWindowBounds', { windowId, bounds });
   } finally {
     await cdp.detach().catch(() => undefined);
   }
-
-  return `window on ${target.label} (${target.availWidth}x${target.availHeight}) at ${left},${top}, ${outer.width}x${outer.height}`;
 }
 
 /** The subset of the Window Management API's Screen this needs. */

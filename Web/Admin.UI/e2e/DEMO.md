@@ -54,7 +54,18 @@ $env:E2E_MONITOR='vx2718'      # or 'ultrawide', 'dell', whatever yours is calle
 ```
 
 Get a wrong name and it says so and lists the real ones, rather than putting the window
-somewhere you have to go and find it.
+somewhere you have to go and find it. After moving, it asks the browser which screen the
+window actually ended up on and tells you if that is not the one it aimed for.
+
+The window opens off-screen and moves into place once the page can report where the screens
+are — it cannot be launched in the right spot, because the coordinate is not knowable until
+the browser is running. A moment of nothing is better than the window appearing on your
+laptop and jumping.
+
+**The app is zoomed to 1.5x** so it is legible from the back of a room. A 27" 1440p monitor
+at 100% Windows scaling otherwise gives the page 2560 CSS pixels: the window fills the
+screen and everything in it is tiny. Set `E2E_ZOOM='1'` for native size, or higher if the
+room is large.
 
 > **Do not hand it coordinates.** `E2E_WINDOW_POSITION` still works and still overrides
 > everything, but every obvious way of obtaining a coordinate gives a *different* answer, and
