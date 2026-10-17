@@ -182,7 +182,7 @@ async function stage(title: string, body: () => Promise<void>): Promise<void> {
  * room can see. These beats exist purely to show the rest of the screen; a single jump to the
  * bottom reads as a glitch, where a few wheel steps read as someone scrolling.
  */
-async function scrollThrough(page: Page, steps = 3, delta = 420): Promise<void> {
+async function scrollThrough(page: Page, steps = 2, delta = 800): Promise<void> {
   // Scaled off the stage pacing rather than fixed, so these beats slow down with the rest of
   // the walkthrough for a presentation and cost nothing when the pacing is turned off.
   const dwell = Math.min(600, Math.round(STEP_PAUSE / 4));
@@ -195,7 +195,7 @@ async function scrollThrough(page: Page, steps = 3, delta = 420): Promise<void> 
 }
 
 /** The same, back to the top, so the next stage starts where the audience expects. */
-async function scrollBack(page: Page, steps = 3, delta = 420): Promise<void> {
+async function scrollBack(page: Page, steps = 2, delta = 800): Promise<void> {
   await scrollThrough(page, steps, -delta);
 }
 
@@ -390,6 +390,15 @@ function mockEverything(api: ApiMock): void {
 test('walkthrough: tenant list → facility → filters → tabs → configuration → create a facility → ad-hoc report', async ({ page, api }) => {
   mockEverything(api);
 
+  // Say where the window is going before it opens. E2E_WINDOW_POSITION is read from the
+  // environment of *this* process, so setting it in one terminal and running the demo in
+  // another silently falls back to the primary screen — which looks like the flag being
+  // ignored rather than never having arrived.
+  console.log(
+    `\n  Demo window: ${process.env['E2E_WINDOW_POSITION'] ?? 'default position (primary screen)'}` +
+      ` at ${process.env['E2E_WINDOW_SIZE'] ?? '1600,1000'}\n`,
+  );
+
   const nav = new NavPage(page);
   const tenants = new TenantDashboardPage(page);
   const view = new FacilityViewPage(page);
@@ -466,8 +475,8 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     }
 
     // Four panels expanded makes this the longest screen in the walkthrough.
-    await scrollThrough(page, 4);
-    await scrollBack(page, 4);
+    await scrollThrough(page, 3);
+    await scrollBack(page, 3);
   });
 
   await stage('head back to the tenant dashboard', async () => {
@@ -672,9 +681,9 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     // of importing this file. The wheel scrolls whatever is under the pointer, so park it
     // over the dialog first.
     await dialog.getByRole('heading', { name: 'Initial Queries' }).hover();
-    await scrollThrough(page, 4);
+    await scrollThrough(page, 3);
     await expect(dialog.getByRole('cell', { name: 'MedicationRequest', exact: true })).toBeVisible();
-    await scrollBack(page, 4);
+    await scrollBack(page, 3);
 
     // The plan now names the facility it is being created for, so the dialog has nothing to
     // correct: the id on screen came in with the file.
