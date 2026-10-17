@@ -77,6 +77,13 @@ export default defineConfig({
         // it — which has cost real time twice. Generous enough for a cold ng serve compiling
         // a route on first visit, short enough that a break is obvious.
         actionTimeout: 30_000,
+        // The demo facility is created in America/Denver, and the ad-hoc form converts the
+        // period the presenter types from the facility's zone into UTC. The report screen then
+        // renders it back in the *browser's* zone, so without pinning this the reporting
+        // period reads differently on every presenter's machine — and can land on the wrong
+        // day either side of midnight. Matching the facility makes the dates on screen the
+        // dates that were typed, wherever the demo is given from.
+        timezoneId: 'America/Denver',
         // Explicit viewport rather than `viewport: null` — null is rejected alongside the
         // deviceScaleFactor that the Desktop Chrome preset brings in. Playwright sizes the
         // real window to fit this, so --window-size is unnecessary; only position is passed.

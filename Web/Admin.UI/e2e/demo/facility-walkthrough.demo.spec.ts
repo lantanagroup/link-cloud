@@ -10,6 +10,9 @@ import { FacilityEditPage } from '../support/pages/facility-edit.page';
 import { ReportsDashboardPage } from '../support/pages/reports-dashboard.page';
 import { facilityLookup, pagedFacilities, testFacilities } from '../fixtures/facilities';
 import { pagedReportSchedules, reportSchedules } from '../fixtures/report-summaries';
+import { IReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+import { ScheduleStatus } from '../../src/app/interfaces/report/schedule-status';
+import { IAdHocReportRequest } from '../../src/app/interfaces/tenant/facility-config-model.interface';
 import {
   censusConfiguration,
   pagedEncounterMappings,
@@ -81,17 +84,65 @@ const GENERATED_REPORT_ID = 'cccccccc-0000-0000-0000-000000000001';
 
 
 /**
+ * The POST body, as it arrives over the wire: JSON has no Date, so the two dates the form
+ * sends as Date objects reach the mock as ISO strings.
+ */
+type AdHocPostBody = Omit<IAdHocReportRequest, 'startDate' | 'endDate'> & {
+  startDate: string;
+  endDate: string;
+};
+
+/**
  * Submitting the form routes straight to the new report's view page, so that page's own
  * fetches have to be answered too — the catch-all would 404 them and the walkthrough would
  * land on a broken screen in front of an audience.
+ *
+ * The summary is built from the request when it arrives, mirroring what Report itself builds
+ * for an ad-hoc run (DotNet/Report/Listeners/GenerateReportListener.cs): frequency `Adhoc`,
+ * `adHocType` Census when no patient ids were sent and Manual when they were,
+ * endOfReportPeriodJobHasRun true, submission enabled unless it was bypassed, and the period
+ * carried straight from the request. Serving a stock fixture instead put a *Monthly* report
+ * for *May* on screen seconds after the form asked for a custom range in June, which is the
+ * sort of detail an audience reads off the screen while you are talking about something else.
+ *
+ * Status and the two counts are a deliberate departure from that listener. Report creates the
+ * schedule as `New` with no counts and the pipeline fills them in later; this walkthrough
+ * opens a report that already has measure reports, so it reports `EndOfPeriod` with counts
+ * taken from the entries fixture. Otherwise the header claims nought patients directly above
+ * a table listing four.
+ *
+ * Returns a getter rather than taking the list mock's store, so the report can also appear in
+ * the report lists once it exists.
  */
-function mockAdHocReport(api: ApiMock, id: string): void {
-  api.mock(`POST /api/Facility/${id}/AdHocReport`, { reportId: GENERATED_REPORT_ID });
-  api.mock(`GET /api/aggregate/reports/summaries/${GENERATED_REPORT_ID}`, {
-    ...reportSchedules[0],
-    id: GENERATED_REPORT_ID,
-    facilityId: id,
+function mockAdHocReport(api: ApiMock, id: string): () => IReportSchedule | undefined {
+  let generated: IReportSchedule | undefined;
+
+  api.mock(`POST /api/Facility/${id}/AdHocReport`, (route) => {
+    const requested = JSON.parse(route.request().postData() ?? '{}') as AdHocPostBody;
+    const patientCount = reportEntries(id, GENERATED_REPORT_ID).metadata.totalCount;
+
+    generated = {
+      id: GENERATED_REPORT_ID,
+      facilityId: id,
+      createDate: new Date(),
+      reportStartDate: new Date(requested.startDate),
+      reportEndDate: new Date(requested.endDate),
+      reportTypes: requested.reportTypes,
+      frequency: 'Adhoc',
+      adHocType: requested.patientIds?.length ? 'Manual' : 'Census',
+      status: ScheduleStatus.EndOfPeriod,
+      enableSubmission: !requested.bypassSubmission,
+      endOfReportPeriodJobHasRun: true,
+      censusCount: patientCount,
+      initialPopulationCount: patientCount,
+    };
+
+    return route.fulfill({ status: 201, json: { reportId: GENERATED_REPORT_ID } });
   });
+
+  api.mock(`GET /api/aggregate/reports/summaries/${GENERATED_REPORT_ID}`, (route) =>
+    generated ? route.fulfill({ status: 200, json: generated }) : route.fulfill(notConfigured),
+  );
   api.mock('GET /api/entries/search', reportEntries(id, GENERATED_REPORT_ID));
   api.mock(`GET /api/entries/schedules/${GENERATED_REPORT_ID}/summary`, reportEntrySummary);
 
@@ -101,6 +152,8 @@ function mockAdHocReport(api: ApiMock, id: string): void {
     `GET /api/data-acquisition/acquisition-logs/report/${GENERATED_REPORT_ID}/statistics`,
     acquisitionLogStatistics,
   );
+
+  return () => generated;
 }
 
 /** How long to linger on each finished stage before moving on, so it reads as steps. */
@@ -273,17 +326,24 @@ function mockEverything(api: ApiMock): void {
   mockQueryDispatchConfigs(api, [queryDispatchConfiguration]);
   api.mock('GET /api/measureeval/measure-definition', measureDefinitions);
 
-  // The report table filters server-side, so answer per facility: the new one has no reports yet.
+  // Assigned below, declared here so the list handler can close over it: the ad-hoc report
+  // does not exist until the form is submitted, and from then on it belongs in the lists.
+  let adHocReport: () => IReportSchedule | undefined = () => undefined;
+
+  // The report table filters server-side, so answer per facility: the new one has no reports
+  // until it requests one, at which point it has exactly that one.
   api.mock('GET /api/aggregate/reports/summaries', (route) => {
     const wanted = new URL(route.request().url()).searchParams.get('facilityId');
-    const records = wanted ? schedules.filter((s) => s.facilityId === wanted) : schedules;
+    const generated = adHocReport();
+    const all = generated ? [...schedules, generated] : schedules;
+    const records = wanted ? all.filter((s) => s.facilityId === wanted) : all;
     return route.fulfill({ status: 200, json: pagedReportSchedules(records) });
   });
 
   mockFacilityDetail(api, facilityId);
   mockFacilityDetail(api, newFacility.facilityId, { locations: [], encounters: [] });
   mockDataAcquisitionConfigs(api, newFacility.facilityId);
-  mockAdHocReport(api, newFacility.facilityId);
+  adHocReport = mockAdHocReport(api, newFacility.facilityId);
 }
 
 test('walkthrough: tenant list → facility → filters → tabs → configuration → create a facility → ad-hoc report', async ({ page, api }) => {
@@ -608,6 +668,20 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await expect(page).toHaveURL(
       new RegExp(`/tenant/facility/${newFacility.facilityId}/report/${GENERATED_REPORT_ID}$`),
     );
+
+    // The report on screen is the one that was just asked for, not a stock fixture: an Adhoc
+    // cadence, Census as the source because the form sent no patient ids, and the reporting
+    // period the presenter typed. The browser's timezone is pinned to the facility's in
+    // playwright.config.ts so these dates read the same wherever the demo is given.
+    const field = (label: string) => page.locator('.data-label').filter({ hasText: label });
+    await expect(field('Cadence')).toContainText('Adhoc');
+    await expect(field('AdHoc Source')).toContainText('Census');
+    await expect(field('Reporting Period')).toContainText('6/1/26');
+    await expect(field('Reporting Period')).toContainText('6/30/26');
+
+    // And the header agrees with the table underneath it rather than quoting a stock census.
+    await expect(field('Patients in Census')).toContainText('4');
+    await expect(field('Patients in IP')).toContainText('4');
   });
 
   await stage('the report opens on its measure reports, one row per patient', async () => {
