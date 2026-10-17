@@ -32,6 +32,7 @@ import {
 import { IFacilityConfigModel } from '../../src/app/interfaces/tenant/facility-config-model.interface';
 import { vendorVersions } from '../fixtures/vendors';
 import { acquisitionLogStatistics, reportEntries, reportEntrySummary } from '../fixtures/report-detail';
+import { placeDemoWindow } from '../support/demo-window';
 
 /**
  * A single, continuous session that walks the facility journey the way a person would:
@@ -390,14 +391,10 @@ function mockEverything(api: ApiMock): void {
 test('walkthrough: tenant list → facility → filters → tabs → configuration → create a facility → ad-hoc report', async ({ page, api }) => {
   mockEverything(api);
 
-  // Say where the window is going before it opens. E2E_WINDOW_POSITION is read from the
-  // environment of *this* process, so setting it in one terminal and running the demo in
-  // another silently falls back to the primary screen — which looks like the flag being
-  // ignored rather than never having arrived.
-  console.log(
-    `\n  Demo window: ${process.env['E2E_WINDOW_POSITION'] ?? 'default position (primary screen)'}` +
-      ` at ${process.env['E2E_WINDOW_SIZE'] ?? '1600,1000'}\n`,
-  );
+  // Move to the largest external screen and say so. Without this the window opens wherever
+  // Chromium puts it, which is the laptop — and hand-copied coordinates land it half off
+  // the intended monitor, because Chrome's coordinate space is not the one Windows reports.
+  console.log(`\n  Demo ${await placeDemoWindow(page)}\n`);
 
   const nav = new NavPage(page);
   const tenants = new TenantDashboardPage(page);
