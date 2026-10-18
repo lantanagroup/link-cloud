@@ -188,7 +188,7 @@ Close the browser window to end the run.
 ## Act 2 — the real suite (~3 min)
 
 ```powershell
-npm run e2e          # 64 tests, 13 spec files, ~20s warm
+npm run e2e          # 71 tests, 14 spec files, ~25s warm
 npm run e2e:report   # opens the HTML report
 ```
 
@@ -208,6 +208,41 @@ and uploads its report as the `admin-ui-e2e-report` artifact. Both in
 `.github/workflows/tests.yaml`.
 
 ## Act 3 — why the results can be trusted (~3 min)
+
+**What to say, in this order.** The rest of this section is the material; this is the spoken
+shape of it.
+
+Open with the problem, in one sentence: *we had a UI nobody could verify without clicking
+through it by hand — now every PR clicks through it in 25 seconds, and it has already found
+five bugs that got past code review.*
+
+Then the defects, named, with the detail that makes each one land — they are the ROI, and
+they are checkable by SHA. Facility search is the one to lead with for a mixed room: broken
+in a way nobody had noticed, hidden by seeded data that used the same value for ID and name,
+and a *backend* bug found by a UI test. Then `[object Object]` shown to the user on save, the
+query plan import that produced blank rows, and the `TypeError` firing on every render while
+the suite sat green. The point to land is not that tests exist — it is that **none of these
+were caught by review, and all of them were visible to anyone actually using the app.**
+
+Then the three mechanisms, for the engineers: typed fixtures, the unmatched-API catch-all,
+the console-error tripwire. Frame them as *why it will keep working*, not as features. Three
+of the five defects above were found by the tripwire alone.
+
+Expect the question "then why the headed walkthrough at all, if Act 2 is what gates merges?"
+Two answers, and the second is the better one:
+
+1. It makes the suite legible to people who will never open a spec file. A green checkmark
+   persuades nobody; watching the app create a facility and request a report does.
+2. **It found a defect the assertions missed.** The query plan import bug was found by asking
+   what the demo *showed* rather than what it asserted — the payload assertion counted keys
+   and passed throughout. A person watching caught what a passing test did not.
+
+If someone pushes on coverage, concede the real limit before they find it: the mocked tier
+proves the UI behaves correctly *given* a contract; it cannot prove the backend honours that
+contract. That is what the live tier is for. Saying it unprompted buys more credibility than
+it costs.
+
+---
 
 Three design decisions, each with a bug to show for it. For a mixed room, lead with the bugs.
 
@@ -260,6 +295,44 @@ Three design decisions, each with a bug to show for it. For a mixed room, lead w
 Closing line: the mocked tier is fast and deterministic enough to run on every PR, and the live
 tier proves the same page objects still work against a real BFF. The selector contract lives in
 `e2e/support/pages/`, so adding a screen means adding a page object, not rewriting selectors.
+
+## If someone asks whether an AI is driving this
+
+They are two different things, and the distinction is worth getting right in the room —
+the credibility of Act 3 rests on it.
+
+**What you are showing is a script.** `e2e:demo` and `npm run e2e` are plain Playwright
+tests: a `.spec.ts` file, the same on every machine and in CI, no model and no agent in the
+loop. That is precisely why the results can be trusted and why the mocked tier can gate
+merges. If you call the walkthrough "the AI driving the app", the first person who knows the
+difference will ask, and the answer undercuts the point you just made.
+
+**The agent's role was authoring, not running.** Specs here are written against the app as it
+actually behaves: click through the running UI, watch what the network and the DOM do, then
+read the component to find out *why* it does it. The Playwright **MCP server** is one way to
+do that first half — an agent drives a real browser ad hoc, deciding what to click from what
+is on screen, with the console and network in view. `tools/capture-fixtures.md` describes the
+same loop for payloads. Nothing in the repo records which specs were authored that way, so
+claim it only for work you did that way.
+
+Both halves matter, and the shortest illustration is `mocked/account-create.spec.ts`:
+
+- Driving the live UI is what found the **empty Roles dropdown** — required, opens onto
+  nothing, leaves Create permanently disabled, with an empty `GET /api/account/role` behind
+  it and **no console error**, because an empty list is not a failure. No amount of reading
+  the component would have surfaced that; it depends on the state of the environment.
+- Reading the component is what found the **409 duplicate-email branch** and the fact that
+  the username is never typed — `account-config-form.component.ts:134` derives it as
+  `firstName + '.' + lastName`. Clicking would never have reached either.
+
+So: **the agent explores, the suite verifies.** One finds what is worth testing, the other
+proves it still works on every PR.
+
+**Do not run the walkthrough through an agent or tool.** Same reason it must not be
+backgrounded or piped (see Act 1): the headed browser is reaped mid-stage and it looks like
+the demo finishing early. Run `e2e:demo` in your own terminal. If you want to show live
+exploration, do it as a separate beat, against the running app, after Act 3 — and let it find
+something real rather than retracing a path the suite already covers.
 
 ## If something goes wrong mid-demo
 
