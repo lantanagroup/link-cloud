@@ -94,6 +94,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # .env is not committed (LEGLINK-912). Build one from the template, with a fresh random
+      # password for each CHANGE_ME value. The "Ci1-" prefix meets SQL Server's complexity rules.
+      - name: Create .env for the compose stack
+        shell: bash
+        run: |
+          if [ -f .env ]; then
+            exit 0
+          fi
+          cp .env.example .env
+          for name in $(grep -oE '^[A-Z_]+=CHANGE_ME$' .env.example | cut -d= -f1); do
+            value="Ci1-$(openssl rand -hex 16)"
+            echo "::add-mask::$value"
+            sed -i "s|^$name=CHANGE_ME\$|$name=$value|" .env
+          done
+
       - name: Build services with cache
         run: |
           docker buildx bake --file docker-compose.yml \
