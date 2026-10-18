@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -14,7 +15,7 @@ public class ReportingPlanEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/reporting-plan")
             .WithTags("ReportingPlan")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapGet("/measures", async (
                 IReportingPlanGateway gateway,

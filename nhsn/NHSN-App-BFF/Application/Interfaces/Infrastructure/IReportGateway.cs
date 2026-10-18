@@ -28,6 +28,12 @@ public interface IReportGateway
     /// <summary>Reads one report's full detail, or null when Report has no schedule for that id.</summary>
     Task<ReportDetail?> GetReportAsync(string reportId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reads the facility that owns a report schedule, or null when Report has no schedule for the id.
+    /// This is the BFF's object-level authorization lookup and must run before report-child reads.
+    /// </summary>
+    Task<string?> GetReportFacilityIdAsync(string reportId, CancellationToken cancellationToken = default);
+
     /// <summary>Reads the per-patient rows behind the Report Details patient table.</summary>
     Task<List<ReportPatientEntry>> GetReportPatientsAsync(string reportId, CancellationToken cancellationToken = default);
 
