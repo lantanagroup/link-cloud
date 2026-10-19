@@ -62,7 +62,10 @@ from the branch `automation/trufflehog-bump`. Before it does, it:
   the filesystem mode the hook uses, and confirms the results still carry the fields both read.
 
 If either step fails, no pull request is opened and the run fails. It can also be started by hand
-from the Actions tab.
+from the Actions tab, where `min_release_age_days` can be lowered; `0` takes the newest release.
+
+The bump commit is created through GitHub's API rather than pushed, so GitHub signs it. `dev`
+requires signed commits, and a commit made with `git commit` on the runner would be unsigned.
 
 The new binary runs only in a job whose token can read this repository and nothing more. The job
 that pushes the branch and opens the pull request never runs it. That job takes only the version

@@ -14,6 +14,11 @@ on:
   schedule:
     - cron: '17 6 * * *'
   workflow_dispatch:
+    inputs:
+      min_release_age_days:
+        description: Only take a release at least this many days old. 0 takes the newest one.
+        required: false
+        default: '3'
 
 permissions: {}
 
@@ -21,7 +26,7 @@ concurrency:
   group: trufflehog-bump
 
 env:
-  MIN_RELEASE_AGE_DAYS: '3'
+  MIN_RELEASE_AGE_DAYS: ${{ inputs.min_release_age_days || '3' }}
   BUMP_BRANCH: automation/trufflehog-bump
   # cosign v3.1.3.
   COSIGN_IMAGE: >-
@@ -51,6 +56,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          if ! printf '%s' "$MIN_RELEASE_AGE_DAYS" | grep -qxE '[0-9]+'; then
+            echo "::error::min_release_age_days must be a whole number of days."
+            exit 1
+          fi
           current=$(sed -n 's/^version=//p' .githooks/trufflehog.pins)
           cutoff=$(date -u -d "$MIN_RELEASE_AGE_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
           latest=$(gh api 'repos/trufflesecurity/trufflehog/releases?per_page=30' --jq \
@@ -155,10 +164,12 @@ jobs:
     env:
       VERSION: ${{ needs.check.outputs.version }}
     steps:
+      # The commit goes through the API below, so git itself never needs the token.
       - name: Check out dev
         uses: actions/checkout@v5
         with:
           ref: dev
+          persist-credentials: false
 
       # Takes only the version from the check job, which ran the new binary, and verifies the rest itself.
       - name: Verify the release's signature
@@ -215,11 +226,32 @@ jobs:
         run: |
           set -euo pipefail
           title="Bump TruffleHog to $VERSION"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -q -c "$BUMP_BRANCH"
-          git commit -q -am "$title"
-          git push -q --force origin "HEAD:$BUMP_BRANCH"
+          base=$(git rev-parse HEAD)
+
+          # Start the branch from dev's head, replacing any earlier bump.
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$BUMP_BRANCH" > /dev/null 2>&1; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/$BUMP_BRANCH" \
+              -f sha="$base" -F force=true > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$BUMP_BRANCH" -f sha="$base" > /dev/null
+          fi
+
+          # dev requires signed commits. GitHub signs a commit it creates through the API, which a
+          # `git commit` on this runner would not be.
+          jq -n --arg repo "$GITHUB_REPOSITORY" --arg branch "$BUMP_BRANCH" --arg head "$base" \
+            --arg headline "$title" --arg contents "$(base64 -w0 .githooks/trufflehog.pins)" '{
+              query: ("mutation($input: CreateCommitOnBranchInput!) "
+                + "{ createCommitOnBranch(input: $input) { commit { oid } } }"),
+              variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                expectedHeadOid: $head,
+                message: {headline: $headline},
+                fileChanges: {additions: [{path: ".githooks/trufflehog.pins", contents: $contents}]}
+              }}
+            }' > "$RUNNER_TEMP/commit.json"
+          commit=$(gh api graphql --input "$RUNNER_TEMP/commit.json" --jq '.data.createCommitOnBranch.commit.oid')
+          echo "Committed $commit to $BUMP_BRANCH."
 
           body=$(cat <<EOF
           Moves the TruffleHog pins in \`.githooks/trufflehog.pins\`, which the pre-commit hook and the
