@@ -166,6 +166,12 @@
           "OllamaSharp": "[5.4.12, )"
         }
       },
+      "onboarding.mcp": {
+        "type": "Project",
+        "dependencies": {
+          "ModelContextProtocol.AspNetCore": "[1.4.1, )"
+        }
+      },
       "Microsoft.Extensions.AI": {
         "type": "CentralTransitive",
         "requested": "[10.11.0, )",

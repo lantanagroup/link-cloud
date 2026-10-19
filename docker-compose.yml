@@ -1112,10 +1112,12 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       AllowedHosts: localhost;127.0.0.1;onboarding-mcp
-      Onboarding__Environments__0__TenantApiBaseUrl: http://tenant:8074/api/
-      Onboarding__Environments__0__MeasureEvalApiBaseUrl: http://measureeval:8067/api/measureeval/
-      Onboarding__Environments__0__BearerToken: ${ONBOARDING_TENANT_BEARER_TOKEN:-}
-      Onboarding__Environments__0__MeasureEvalBearerToken: ${ONBOARDING_MEASUREEVAL_BEARER_TOKEN:-}
+      Onboarding__TenantApiBaseUrl: http://tenant:8074/api/
+      Onboarding__MeasureEvalApiBaseUrl: http://measureeval:8067/api/measureeval/
+      Onboarding__BearerToken: ${ONBOARDING_TENANT_BEARER_TOKEN:-}
+      Onboarding__MeasureEvalBearerToken: ${ONBOARDING_MEASUREEVAL_BEARER_TOKEN:-}
+      Onboarding__DataAcquisitionApiBaseUrl: http://dataacq:8065/api/data/
+      Onboarding__DataAcquisitionBearerToken: ${ONBOARDING_DATA_ACQUISITION_BEARER_TOKEN:-}
     ports:
       - "127.0.0.1:${ONBOARDING_MCP_PORT:-8090}:8080"
     networks:
@@ -1136,7 +1138,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       OnboardingChat__OllamaEndpoint: http://host.docker.internal:11434
       OnboardingChat__McpEndpoint: http://onboarding-mcp:8080/mcp
-      OnboardingChat__Model: ${ONBOARDING_CHAT_MODEL:-gemma4:e2b}
+      OnboardingChat__Model: ${ONBOARDING_CHAT_MODEL:-gemma4:12b}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

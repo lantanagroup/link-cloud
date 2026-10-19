@@ -13,5 +13,6 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
     <ProjectReference Include="../../DotNet/Onboarding.Chat/Onboarding.Chat.csproj" />
+    <ProjectReference Include="../../DotNet/Onboarding.Mcp/Onboarding.Mcp.csproj" />
   </ItemGroup>
 </Project>

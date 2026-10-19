@@ -60,7 +60,7 @@ dotnet run --project DotNet/Onboarding.Chat/Onboarding.Chat.csproj
 
 Open **http://127.0.0.1:8091**. Click **Show onboarding options**, or ask:
 
-> Use get_onboarding_options for the local environment and explain what is available.
+> Use get_onboarding_options and explain what is available.
 
 The chat streams the model's answer, shows the tool call, and offers expandable
 tool results. Follow-up questions retain the full conversation and tool results.
@@ -72,7 +72,9 @@ Tenant supplies live vendor/version options; MeasureEval supplies live measure
 definitions (IDs and versions). Each source reports its own availability. Measure
 definitions are never manually configured. Connection/query-plan profiles are
 operator-maintained catalogs in the MCP configuration; initially they are empty.
-This POC cannot provision facilities.
+The chat can create a Tenant facility using `create_facility`. Ask it explicitly to
+create a facility with an ID, name, and IANA time zone. A vendor version is optional.
+Connections, query plans, and measure enrollment remain separate steps.
 
 ## Configuration
 
@@ -115,15 +117,18 @@ Browser -> Blazor Interactive Server
 ```
 
 Each response opens an MCP session, discovers tools, and exposes only
-`get_onboarding_options` to the model. Automatic function invocation is limited
+`get_onboarding_options`, `create_facility`, and
+`save_data_acquisition_configuration` to the model. Automatic function invocation is limited
 to six iterations. The MCP session stays alive for the entire tool/model loop and
-is disposed on completion, failure, or cancellation. A small adapter presents MCP's
-nullable `environmentId` schema as an optional string to OllamaSharp 5.x, which
-cannot serialize array-valued JSON Schema types. Execution still uses the real MCP tool.
+is disposed on completion, failure, or cancellation. The options tool takes no arguments
+and returns the deployment's onboarding options directly; no environment selection
+or schema compatibility adapter is needed.
 
 The local UI has no authentication. Use it on a trusted local machine. Do not put
 credentials or patient data in chat. The client does not log conversation/tool
-content. Production hosting and provisioning writes are outside this POC.
+content. Production hosting is outside this POC. Facility creation never updates existing
+records or automatically retries an uncertain write. Check Tenant before retrying
+a creation whose outcome is unknown.
 
 ## Verify
 
@@ -163,3 +168,17 @@ services, survey, and extra model-generated suggestions.
 
 References: [Microsoft AI template](https://learn.microsoft.com/dotnet/ai/quickstarts/ai-templates),
 [official C# MCP SDK](https://github.com/modelcontextprotocol/csharp-sdk).
+
+## Data acquisition settings
+
+Ask explicitly to add or update a facility's data acquisition configuration, for example:
+
+> Set facility 12345's FHIR base URL to http://ehr-test:8080/fhir with 2 concurrent requests and 3 retries.
+
+The tool requires an existing facility and a FHIR URL for new configurations.
+Optional pull-window limits use HH:mm:ss in the facility's local time zone.
+Omitted settings and existing authentication are preserved on update. Credentials
+remain in the admin workflow; query plans remain separate. After saving a supplied FHIR URL, the tool checks
+unauthenticated metadata connectivity and reports the result separately from the
+save. Failed validation does not undo or retry a successful save.
+An unknown write result must be checked in DataAcquisition before retrying.

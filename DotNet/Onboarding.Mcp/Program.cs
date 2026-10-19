@@ -15,23 +15,38 @@ builder.WebHost.UseUrls(inContainer ? "http://0.0.0.0:8080" : "http://127.0.0.1:
 builder.Services.AddHealthChecks();
 builder.Services.AddOptions<OnboardingOptions>()
     .Bind(builder.Configuration.GetSection("Onboarding"))
-    .Validate(_ => builder.Configuration.GetSection("Onboarding:Environments").GetChildren()
-        .SelectMany(environment => new[] { environment.GetSection("ConnectionProfiles"), environment.GetSection("QueryPlanProfiles") })
+    .Validate(_ => new[] { builder.Configuration.GetSection("Onboarding:ConnectionProfiles"), builder.Configuration.GetSection("Onboarding:QueryPlanProfiles") }
         .All(profiles => profiles.Value is null && profiles.GetChildren().All(profile =>
             profile.Value is null && !string.IsNullOrWhiteSpace(profile["Id"])
                 && !string.IsNullOrWhiteSpace(profile["DisplayName"]))),
         "ConnectionProfiles and QueryPlanProfiles must be arrays of JSON objects with non-empty Id and DisplayName fields, not JSON-encoded strings.")
-    .Validate(options => options.Environments.Length > 0
-        && options.Environments.All(e => !string.IsNullOrWhiteSpace(e.Id)
-            && IsLocalApiUrl(e.TenantApiBaseUrl, inContainer ? "tenant" : null)
-            && IsLocalApiUrl(e.MeasureEvalApiBaseUrl, inContainer ? "measureeval" : null))
-        && options.Environments.Select(e => e.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count()
-            == options.Environments.Length,
-        "Configure unique environment IDs and loopback HTTP (or designated Docker service) Tenant and MeasureEval API URLs ending in '/'.")
+    .Validate(options => IsLocalApiUrl(options.TenantApiBaseUrl, inContainer ? "tenant" : null)
+        && IsLocalApiUrl(options.MeasureEvalApiBaseUrl, inContainer ? "measureeval" : null)
+        && IsLocalApiUrl(options.DataAcquisitionApiBaseUrl, inContainer ? "dataacq" : null),
+        "Configure loopback HTTP (or designated Docker service) Tenant and MeasureEval API URLs ending in '/'.")
     .ValidateOnStart();
 builder.Services.AddHttpClient<OnboardingOptionsService>(client => client.Timeout = TimeSpan.FromSeconds(5))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddHttpClient<CreateFacilityService>(client => client.Timeout = TimeSpan.FromSeconds(5))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<OnboardingTools>();
+builder.Services.AddHttpClient("EpicEndpointDirectory", client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5);
+    // The Brands Bundle includes care-facility addresses and currently exceeds 90 MB.
+    client.MaxResponseContentBufferSize = 256 * 1024 * 1024;
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = false,
+    AutomaticDecompression = System.Net.DecompressionMethods.All
+});
+builder.Services.AddSingleton(provider => new EpicEndpointDirectory(
+    provider.GetRequiredService<IHttpClientFactory>().CreateClient("EpicEndpointDirectory"),
+    provider.GetRequiredService<ILogger<EpicEndpointDirectory>>()));
+builder.Services.AddHostedService(provider => provider.GetRequiredService<EpicEndpointDirectory>());
+// Allow the validation endpoint's 30-second metadata probe to finish.
+builder.Services.AddHttpClient<DataAcquisitionConfigurationService>(client => client.Timeout = TimeSpan.FromSeconds(35))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 var app = builder.Build();
 app.MapHealthChecks("/health");
 app.MapMcp("/mcp");

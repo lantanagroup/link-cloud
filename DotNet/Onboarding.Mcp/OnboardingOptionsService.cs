@@ -1,38 +1,29 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using ModelContextProtocol;
 
 namespace LantanaGroup.Link.Onboarding.Mcp;
 
 public sealed class OnboardingOptionsService(HttpClient httpClient, IOptions<OnboardingOptions> options)
 {
-    public async Task<OnboardingOptionsResult> GetAsync(string? environmentId, CancellationToken cancellationToken)
+    public async Task<OnboardingOptionsResult> GetOnboardingOptions(CancellationToken cancellationToken)
     {
-        var environments = options.Value.Environments
-            .Where(e => environmentId is null || string.Equals(e.Id, environmentId, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-        if (environments.Length == 0)
-            throw new McpException("Unknown environment ID. Omit environmentId to list configured environments.");
-
-        var results = new List<EnvironmentResult>();
-        foreach (var environment in environments)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var vendorsTask = FetchAsync(environment.TenantApiBaseUrl, environment.BearerToken,
-                "Vendor", "tenant_api", "Tenant", ParseVendor, cancellationToken);
-            var versionsTask = FetchAsync(environment.TenantApiBaseUrl, environment.BearerToken,
-                "VendorVersion", "tenant_api", "Tenant", ParseVersion, cancellationToken);
-            var definitionsTask = FetchAsync(environment.MeasureEvalApiBaseUrl, environment.MeasureEvalBearerToken,
-                "measure-definition", "measureeval_api", "MeasureEval", ParseMeasureDefinition, cancellationToken);
-            await Task.WhenAll(vendorsTask, versionsTask, definitionsTask);
-            results.Add(new(environment.Id, environment.DisplayName,
-                Configured(environment.ConnectionProfiles), Configured(environment.QueryPlanProfiles),
-                await definitionsTask, await vendorsTask, await versionsTask));
-        }
-        return new(results.All(e => e.Vendors.Status == "available" && e.VendorVersions.Status == "available"
-                && e.MeasureDefinitions.Status == "available")
-            ? "complete" : "partial", results.ToArray());
+        cancellationToken.ThrowIfCancellationRequested();
+        var configuration = options.Value;
+        var vendorsTask = FetchAsync(configuration.TenantApiBaseUrl, configuration.BearerToken,
+            "Vendor", "tenant_api", "Tenant", ParseVendor, cancellationToken);
+        var versionsTask = FetchAsync(configuration.TenantApiBaseUrl, configuration.BearerToken,
+            "VendorVersion", "tenant_api", "Tenant", ParseVersion, cancellationToken);
+        var definitionsTask = FetchAsync(configuration.MeasureEvalApiBaseUrl, configuration.MeasureEvalBearerToken,
+            "measure-definition", "measureeval_api", "MeasureEval", ParseMeasureDefinition, cancellationToken);
+        await Task.WhenAll(vendorsTask, versionsTask, definitionsTask);
+        var vendors = await vendorsTask;
+        var versions = await versionsTask;
+        var definitions = await definitionsTask;
+        var status = vendors.Status == "available" && versions.Status == "available" && definitions.Status == "available"
+            ? "complete" : "partial";
+        return new(status, Configured(configuration.ConnectionProfiles), Configured(configuration.QueryPlanProfiles),
+            definitions, vendors, versions);
     }
 
     private static SourceResult<T> Configured<T>(T[] values) => new(

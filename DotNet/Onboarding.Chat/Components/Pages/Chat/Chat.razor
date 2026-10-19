@@ -7,12 +7,12 @@
 
 <PageTitle>Link Cloud Onboarding</PageTitle>
 <ChatHeader OnNewChat="ResetConversationAsync" Disabled="@isBusy" />
-<div class="page-width connection-info">Local POC · Read-only · Model: @Settings.Value.Model</div>
+<div class="page-width connection-info">Local POC · Facility setup · Model: @Settings.Value.Model</div>
 
 <ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
     <NoMessagesContent>
         <h2>Configure a Link Cloud facility</h2>
-        <p>Explore the environments, vendors, and configuration choices available for onboarding.</p>
+        <p>Explore the vendors, measure definitions, and configuration choices available for onboarding.</p>
         <button class="btn-default" @onclick="ShowOptionsAsync" disabled="@isBusy">Show onboarding options</button>
     </NoMessagesContent>
 </ChatMessageList>
@@ -43,7 +43,7 @@
     private string responseStatus = "Connecting to the onboarding assistant…";
 
     private Task ShowOptionsAsync() => AddUserMessageAsync(new(ChatRole.User,
-        "Use get_onboarding_options for the local environment and explain what is available."));
+        "Use get_onboarding_options and explain what is available."));
 
     private async Task AddUserMessageAsync(ChatMessage userMessage)
     {
@@ -65,7 +65,7 @@
                 updates.Add(update);
                 responseText.Text += update.Text;
                 responseStatus = update.Contents.OfType<FunctionCallContent>().Any()
-                    ? "Reading onboarding options…" : "Generating response…";
+                    ? "Running onboarding tool…" : "Generating response…";
                 ChatMessageItem.NotifyChanged(currentResponseMessage);
                 await InvokeAsync(StateHasChanged);
             }
