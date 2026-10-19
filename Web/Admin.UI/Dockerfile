@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build Stage: Angular App
-FROM node:23-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,id=npm,sharing=locked,target=/root/.npm \
@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # Runtime Stage: Node.js Server
-FROM node:23-alpine AS runtime
+FROM node:25-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
