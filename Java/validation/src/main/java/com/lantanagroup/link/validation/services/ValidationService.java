@@ -11,7 +11,6 @@ import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
 import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.*;
-import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -105,9 +104,12 @@ public class ValidationService {
 
         // The chain caches internally; CachingValidationSupport is deprecated for removal and would only add a
         // second cache layer.
-        IValidatorModule validatorModule = new FhirInstanceValidator(validationSupportChain);
+        IValidatorModule validatorModule = new ProfileCapturingInstanceValidator(validationSupportChain);
         FhirValidator fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
+        // Required for profile attribution, not just throughput: concurrent validation validates each entry
+        // standalone, which is what keeps each message's validationContext accurate. Validating the bundle in one
+        // pass misattributes findings to whichever profile was evaluated last. See LEGLINK-1172.
         fhirValidator.setConcurrentBundleValidation(true);
         fhirValidator.setExecutorService(bundleValidationExecutor);
         return fhirValidator;
