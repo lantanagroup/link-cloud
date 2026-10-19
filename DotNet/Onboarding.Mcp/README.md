@@ -2,7 +2,7 @@
 
 .NET 8 MCP server, using the official C# MCP SDK and Streamable HTTP.
 It is standalone: no Docker, database, Ollama, or other Link projects are required
-to start it. Tenant supplies live vendors/versions; MeasureEval supplies live measure definitions.
+to start it.
 The create_facility tool creates a facility through the existing Tenant API.
 
 ## Run
@@ -33,12 +33,9 @@ Optional tokens come from `ONBOARDING_TENANT_BEARER_TOKEN` and
 
 ## Tool
 
-`get_onboarding_options` accepts `{}` and returns options for the single deployment.
-Results include structured content plus the SDK's text representation.
-
 `create_facility` requires `facilityId`, `facilityName`, and an IANA `timeZone`
 (for example `America/New_York`). Optional `vendorVersionId` is an existing UUID
-from onboarding options; omit it or pass an empty string for no vendor version.
+supplied by the user; omit it or pass an empty string for no vendor version.
 It calls Tenant's `POST /api/Facility` with empty reporting schedules. Tenant's
 DMRP scheduling behavior still applies. This creates the facility record only;
 connections, query plans, and measure enrollment require separate steps.
@@ -49,65 +46,41 @@ Only HTTP 201 with a valid response confirms creation. An uncertain POST outcome
 is never automatically retried; check Tenant before retrying manually.
 Credentials and upstream error bodies are excluded from tool results.
 
-- Connection/query-plan profiles come from the local `Onboarding` configuration.
-  They are catalog entries; provisioning templates are not applied.
-- Measure definitions are fetched live from MeasureEval's
-  `GET /api/measureeval/measure-definition` endpoint. `measureDefinitions` contains
-  definition IDs and versions from its summary response, with source `measureeval_api`.
-  They are never manually configured. FHIR Bundles are not included in tool results.
-- Vendors and vendor versions are read from Tenant's existing `GET /api/Vendor`
-  and `GET /api/VendorVersion` endpoints. Only IDs, names, and versions are returned;
-  upstream authentication settings are never exposed.
-- A successful empty Tenant catalog is `available` with empty `options`.
-  HTTP failures, timeouts, and invalid responses are `unavailable`, yielding an
-  overall `partial` result. A `complete` result means both Tenant reads and the MeasureEval read succeeded,
-  not that the facility is ready for onboarding.
-- Local catalogs start empty (`not_configured`) so there are no fabricated choices.
-
-Edit `appsettings.json` and rebuild to add approved local catalog entries:
-
-```json
-"ConnectionProfiles": [{"Id":"your-profile-id","DisplayName":"Your approved connection"}],
-"QueryPlanProfiles": [{"Id":"your-plan-id","DisplayName":"Your approved query plan"}]
-```
-
-Each entry must be a JSON object, not a string containing escaped JSON. Invalid
-entries now fail startup with a configuration validation error instead of silently
-appearing as an empty catalog. After changing the source file in Docker mode, run
-`docker compose up --build -d --wait onboarding-mcp` to rebuild and reload the MCP
-container. Start a new chat or request fresh onboarding options to see the update.
-
 The default Tenant URL is `http://localhost:8074/api/` (local compose).
 Override it with `Onboarding__TenantApiBaseUrl` if needed.
 Native runs accept only loopback HTTP URLs ending in `/`; redirects are disabled.
-MeasureEval defaults to `http://localhost:8067/api/measureeval/`; override with
-`Onboarding__MeasureEvalApiBaseUrl`. If authentication is enabled,
-set `Onboarding__MeasureEvalBearerToken` to an authorized token.
-MeasureEval failures are reported independently of Tenant failures; a successful
-empty list is `available` with empty `options`.
 For Tenant with authentication enabled, supply an authorized Link admin bearer
 token through `Onboarding__BearerToken` in the launching process
 environment. Never put tokens into the committed configuration or chatbot prompt.
 This POC does not mint tokens or use Azure App Configuration.
 Its optional local settings require no environment-store provisioning.
 
-## Look up Epic endpoints
+## Look up Luxera endpoints
 
-`lookup_epic_fhir_endpoints` accepts `search` (facility/health-system name, optionally
-city/state), `pageNumber` (default 1), and `pageSize` (default 10, maximum 50).
-All search words must match. Results include facility and brand names, city/state,
-FHIR base URLs, source, retrieval timestamp, and paging metadata. Confirm ambiguous
-matches before using the separate save tool. No settings are changed.
+`search_fhir_endpoints` searches [Luxera's API](https://fhir.luxera.io/docs/api/endpoints)
+with `vendor=epic`. `search` matches organization names; do not append city/state.
+`pageNumber` defaults to 1 and `pageSize` to 10 (maximum 25). Results include
+organization, URL, vendor, location, FHIR version, access types, upstream status and
+last-update timestamp, source, retrieval time, and paging metadata. Paging is limited
+to the API's first 100,000 matches. The directory is exposed exclusively through search.
 
-The server downloads [Epic's recommended R4 Brands Bundle](https://open.epic.com/MyApps/Endpoints)
-at startup and refreshes it every seven days, following Epic's guidance to cache the
-directory rather than query it during each lookup. Searches stay local. Failed refreshes
-retry after one minute and retain the last successful snapshot; copies older than seven days
-are marked `stale`. Before the first successful download, results are `unavailable`.
-The in-memory cache is rebuilt on restart. An `available` empty result means no match.
-The compressed download has a five-minute timeout because the full directory exceeds
-90 MB. Before it completes, the tool reports loading or the last failure with retry
-guidance; MCP logs include successful record counts and safe failure diagnostics.
+Following [Luxera's rate-limit guidance](https://fhir.luxera.io/docs/guides/rate-limits),
+the MCP process fetches 100 records per upstream page and serves small chat pages
+from a shared one-hour cache (up to 128 upstream pages; oldest entries are evicted
+at capacity). Identical concurrent searches share a request. Cache and quota state
+are process-local and reset on restart; multiple replicas sharing an IP must coordinate
+quota separately. Requests are serialized and paced using `RateLimit-Remaining` and
+the Unix timestamp in `RateLimit-Reset`, without assuming a fixed request quota.
+Cached pages can be served during a quota cooldown.
+
+On HTTP 429, `Retry-After` (seconds or HTTP date) and any later quota reset determine
+the shared cooldown; missing headers use a conservative 60-second pause. There is
+no automatic retry. The tool returns `rate_limited` with `retryAfterSeconds`; callers
+must wait before searching again. Timeouts, bad responses, and upstream failures
+return `unavailable`, distinct from an `available` empty search. Requests have a
+20-second timeout and propagate caller cancellation. No API key is required or sent.
+Outbound HTTPS access to `fhir-api.luxera.io` is required; the bundled snapshot has
+been removed.
 Published patient-access URLs do not establish backend-service access or connectivity;
 confirm suitability with the facility and use the connection-test tool separately.
 
@@ -174,7 +147,7 @@ npx @modelcontextprotocol/inspector
 ```
 
 Select Streamable HTTP, enter `http://127.0.0.1:8090/mcp`, connect, list tools,
-and call `get_onboarding_options` with no arguments. Inspector needs Node/npm
+and list the available tools. Inspector needs Node/npm
 and may download its package. See https://modelcontextprotocol.io/docs/tools/inspector.
 
 ## Where Ollama fits
@@ -197,3 +170,8 @@ projects separately; open the chat at `http://127.0.0.1:8091`.
 The local DataAcquisition image currently exposes `/api/data/`. Source builds
 with the newer routes use `/api/data-acquisition/`; set the API base URL to match
 the deployed version. An ambiguous route-level 404 never triggers creation.
+
+### Tenant vendor catalog
+
+The read-only `get_vendors` tool retrieves vendors and vendor versions through the configured Tenant API. It returns vendor IDs and names with nested version IDs and version names, including vendors without versions. Authentication settings are excluded. An empty catalog returns `available` with an empty array; failed requests return `unavailable` without partial results. The onboarding chat can use these version UUIDs for facility associations after the user selects a vendor/version.
+

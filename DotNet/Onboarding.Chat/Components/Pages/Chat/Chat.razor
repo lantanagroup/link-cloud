@@ -13,7 +13,7 @@
     <NoMessagesContent>
         <h2>Configure a Link Cloud facility</h2>
         <p>Explore the vendors, measure definitions, and configuration choices available for onboarding.</p>
-        <button class="btn-default" @onclick="ShowOptionsAsync" disabled="@isBusy">Show onboarding options</button>
+        <button class="btn-default" @onclick="OnboardFacility" disabled="@isBusy">Onboard a new facility</button>
     </NoMessagesContent>
 </ChatMessageList>
 
@@ -42,8 +42,8 @@
     private string? errorMessage;
     private string responseStatus = "Connecting to the onboarding assistant…";
 
-    private Task ShowOptionsAsync() => AddUserMessageAsync(new(ChatRole.User,
-        "Use get_onboarding_options and explain what is available."));
+    private Task OnboardFacility() => AddUserMessageAsync(new(ChatRole.User,
+        "Ask for the name of a healthcare facility to onboard. Search for it. If the search results are ambiguous, ask for clarification. Then, create a facility and data acquisition config for it. Create an ID based on the name. Infer the time zone from the location. Find the matching vendor and set it for the facility."));
 
     private async Task AddUserMessageAsync(ChatMessage userMessage)
     {

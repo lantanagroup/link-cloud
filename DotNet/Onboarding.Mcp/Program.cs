@@ -25,25 +25,18 @@ builder.Services.AddOptions<OnboardingOptions>()
         && IsLocalApiUrl(options.DataAcquisitionApiBaseUrl, inContainer ? "dataacq" : null),
         "Configure loopback HTTP (or designated Docker service) Tenant and MeasureEval API URLs ending in '/'.")
     .ValidateOnStart();
-builder.Services.AddHttpClient<OnboardingOptionsService>(client => client.Timeout = TimeSpan.FromSeconds(5))
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHttpClient<CreateFacilityService>(client => client.Timeout = TimeSpan.FromSeconds(5))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<OnboardingTools>();
-builder.Services.AddHttpClient("EpicEndpointDirectory", client =>
+builder.Services.AddHttpClient<TenantVendorService>(client => client.Timeout = TimeSpan.FromSeconds(5))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<LuxeraEndpointApi>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHttpClient(LuxeraEndpointApi.ClientName, client =>
 {
-    client.Timeout = TimeSpan.FromMinutes(5);
-    // The Brands Bundle includes care-facility addresses and currently exceeds 90 MB.
-    client.MaxResponseContentBufferSize = 256 * 1024 * 1024;
-}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-{
-    AllowAutoRedirect = false,
-    AutomaticDecompression = System.Net.DecompressionMethods.All
-});
-builder.Services.AddSingleton(provider => new EpicEndpointDirectory(
-    provider.GetRequiredService<IHttpClientFactory>().CreateClient("EpicEndpointDirectory"),
-    provider.GetRequiredService<ILogger<EpicEndpointDirectory>>()));
-builder.Services.AddHostedService(provider => provider.GetRequiredService<EpicEndpointDirectory>());
+    client.Timeout = TimeSpan.FromSeconds(20);
+    client.MaxResponseContentBufferSize = 2 * 1024 * 1024;
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 // Allow the validation endpoint's 30-second metadata probe to finish.
 builder.Services.AddHttpClient<DataAcquisitionConfigurationService>(client => client.Timeout = TimeSpan.FromSeconds(35))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });

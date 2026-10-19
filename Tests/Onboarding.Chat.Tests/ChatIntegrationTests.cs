@@ -28,12 +28,12 @@ public sealed class ChatIntegrationTests
         => Assert.Equal(expected, ChatSettings.IsAllowedHttpUrl(value, containerHost));
 
     [Theory]
-    [InlineData("get_onboarding_options")]
     [InlineData("create_facility")]
     [InlineData("save_data_acquisition_configuration")]
     [InlineData("validate_fhir_server_connection")]
     [InlineData("get_data_acquisition_configuration")]
-    [InlineData("lookup_epic_fhir_endpoints")]
+    [InlineData("search_fhir_endpoints")]
+    [InlineData("get_vendors")]
     public async Task OllamaAdapterExecutesDiscoveredMcpToolSchema(string toolName)
     {
         var builder = WebApplication.CreateBuilder();
@@ -55,14 +55,14 @@ public sealed class ChatIntegrationTests
                 ? new Dictionary<string, string> { ["fhirServerBaseUrl"] = "https://ehr.example/fhir" }
                 : toolName == "get_data_acquisition_configuration"
                 ? new Dictionary<string, string> { ["facilityId"] = "test" }
-                : toolName == "lookup_epic_fhir_endpoints"
-                ? new Dictionary<string, string> { ["search"] = "Example Hospital" }
+                : toolName == "search_fhir_endpoints"
+                ? new Dictionary<string, string> { ["search"] = "Orlando Health" }
                 : new Dictionary<string, string>();
             if (requests > 1)
-                Assert.Contains(toolName == "get_onboarding_options" ? "test-vendor" : "test-created-facility", request.RootElement.ToString());
+                Assert.Contains("test-created-facility", request.RootElement.ToString());
             object responseMessage = requests == 1
                 ? new { role = "assistant", content = "", tool_calls = new[] { new { function = new { name = toolName, arguments } } } }
-                : new { role = "assistant", content = "Found test-vendor" };
+                : new { role = "assistant", content = "Found test-created-facility" };
             context.Response.ContentType = "application/x-ndjson";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new { model = "test", message = responseMessage, done = true }) + "\n", context.RequestAborted);
         });
@@ -76,7 +76,7 @@ public sealed class ChatIntegrationTests
             var updates = new List<ChatResponseUpdate>();
             await foreach (var update in service.ReplyAsync([new(ChatRole.User, "Options")], timeout.Token)) updates.Add(update);
             Assert.Equal(2, requests);
-            Assert.Contains("Found test-vendor", string.Concat(updates.Select(u => u.Text)));
+            Assert.Contains("Found test-created-facility", string.Concat(updates.Select(u => u.Text)));
         }
         finally { await server.StopAsync(); }
     }
@@ -97,21 +97,21 @@ public sealed class ChatIntegrationTests
             using var client = model.AsBuilder().UseFunctionInvocation().Build();
             var settings = Options.Create(new ChatSettings { McpEndpoint = server.Urls.Single() + "/mcp" });
             var service = new OnboardingChatService(client, settings);
-            List<ChatMessage> history = [new(ChatRole.User, "Show onboarding options")];
+            List<ChatMessage> history = [new(ChatRole.User, "Show connection settings for facility test")];
             List<ChatResponseUpdate> updates = [];
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
             await foreach (var update in service.ReplyAsync(history, timeout.Token)) updates.Add(update);
             history.AddMessages(updates);
 
             Assert.Equal(2, model.Requests.Count);
-            Assert.All(model.ToolNames, names => Assert.Equal(["create_facility", "get_data_acquisition_configuration", "get_onboarding_options", "lookup_epic_fhir_endpoints", "save_data_acquisition_configuration", "validate_fhir_server_connection"], names.Order().ToArray()));
+            Assert.All(model.ToolNames, names => Assert.Equal(["create_facility", "get_data_acquisition_configuration", "get_vendors", "save_data_acquisition_configuration", "search_fhir_endpoints", "validate_fhir_server_connection"], names.Order().ToArray()));
             Assert.Contains(model.Requests[1].SelectMany(m => m.Contents), content =>
-                content is FunctionResultContent result && result.Result?.ToString()?.Contains("test-vendor") == true);
-            Assert.Contains("Available vendor: test-vendor", string.Concat(updates.Select(u => u.Text)));
+                content is FunctionResultContent result && result.Result?.ToString()?.Contains("test-created-facility") == true);
+            Assert.Contains("Configuration: test-created-facility", string.Concat(updates.Select(u => u.Text)));
             Assert.Contains(history.SelectMany(m => m.Contents), c => c is FunctionCallContent);
             Assert.Contains(history.SelectMany(m => m.Contents), c => c is FunctionResultContent);
 
-            history.Add(new(ChatRole.User, "Which vendor did you find?"));
+            history.Add(new(ChatRole.User, "Which configuration did you find?"));
             await foreach (var _ in service.ReplyAsync(history, timeout.Token)) { }
             Assert.Contains(model.Requests[2].SelectMany(m => m.Contents), c => c is FunctionResultContent);
         }
@@ -150,8 +150,8 @@ public sealed class ChatIntegrationTests
                 Role = ChatRole.Assistant,
                 MessageId = $"message-{Requests.Count}",
                 Contents = Requests.Count == 1
-                    ? [new FunctionCallContent("test-call", "get_onboarding_options", new Dictionary<string, object?>())]
-                    : [new TextContent("Available vendor: test-vendor")]
+                    ? [new FunctionCallContent("test-call", "get_data_acquisition_configuration", new Dictionary<string, object?> { ["facilityId"] = "test" })]
+                    : [new TextContent("Configuration: test-created-facility")]
             };
         }
 
@@ -164,8 +164,8 @@ public sealed class ChatIntegrationTests
     [McpServerToolType]
     public sealed class TestTools
     {
-        [McpServerTool(Name = "get_onboarding_options"), Description("Return test onboarding options")]
-        public static string GetOptions() => "test-vendor";
+        [McpServerTool(Name = "get_vendors"), Description("List Tenant vendors and versions")]
+        public static string GetVendors() => "test-created-facility";
 
         [McpServerTool(Name = "create_facility"), Description("Create a test facility")]
         public static string CreateFacility(string facilityId, string facilityName, string timeZone, string vendorVersionId = "")
@@ -182,8 +182,8 @@ public sealed class ChatIntegrationTests
         [McpServerTool(Name = "get_data_acquisition_configuration"), Description("Get acquisition settings")]
         public static string GetAcquisition(string facilityId) => "test-created-facility";
 
-        [McpServerTool(Name = "lookup_epic_fhir_endpoints"), Description("Look up Epic endpoints")]
-        public static string LookupEpicEndpoints(string search) => "test-created-facility";
+        [McpServerTool(Name = "search_fhir_endpoints"), Description("Look up Luxera endpoints")]
+        public static string SearchLuxeraEndpoints(string search) => "test-created-facility";
 
         [McpServerTool(Name = "delete_facility"), Description("Must never be offered to this POC model")]
         public static string DeleteFacility() => throw new InvalidOperationException("Forbidden tool executed");

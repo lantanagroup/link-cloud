@@ -22,9 +22,8 @@ or set `ONBOARDING_CHAT_PORT` / `ONBOARDING_MCP_PORT` to unused host ports.
 
 Ollama remains on the host at `host.docker.internal:11434`; the model defaults to
 `gemma4:e2b` and can be changed with `ONBOARDING_CHAT_MODEL`. The MCP container
-reads catalogs from `tenant:8074` and `measureeval:8067` on `link-nw`. Those services
-can be started with the full stack; the two onboarding containers also start alone
-and report unavailable catalog sources when upstream services are absent.
+uses Tenant and DataAcquisition on `link-nw`. Those services can be started with
+the full stack; the two onboarding containers also start alone.
 
 The health checks report application availability, not Ollama/upstream connectivity.
 Published ports bind only to host loopback. On Linux, Ollama must listen on an
@@ -58,20 +57,17 @@ If it is already running on port 8090, reuse that instance. In another terminal:
 dotnet run --project DotNet/Onboarding.Chat/Onboarding.Chat.csproj
 ```
 
-Open **http://127.0.0.1:8091**. Click **Show onboarding options**, or ask:
+Open **http://127.0.0.1:8091**. Click **Configure FHIR connection**, or ask:
 
-> Use get_onboarding_options and explain what is available.
+> Help me configure a facility’s FHIR connection.
 
 The chat streams the model's answer, shows the tool call, and offers expandable
 tool results. Follow-up questions retain the full conversation and tool results.
 **Stop** cancels the current response. **New chat** clears the in-memory conversation.
 Refreshing the page starts a new conversation; nothing is persisted to a database.
 
-Tenant on port 8074 and MeasureEval on port 8067 are optional for starting the POC.
-Tenant supplies live vendor/version options; MeasureEval supplies live measure
-definitions (IDs and versions). Each source reports its own availability. Measure
-definitions are never manually configured. Connection/query-plan profiles are
-operator-maintained catalogs in the MCP configuration; initially they are empty.
+Tenant and DataAcquisition are needed for their respective tool operations.
+Vendor, profile, and measure catalogs are not exposed by the MCP tools.
 The chat can create a Tenant facility using `create_facility`. Ask it explicitly to
 create a facility with an ID, name, and IANA time zone. A vendor version is optional.
 Connections, query plans, and measure enrollment remain separate steps.
@@ -117,12 +113,11 @@ Browser -> Blazor Interactive Server
 ```
 
 Each response opens an MCP session, discovers tools, and exposes only
-`get_onboarding_options`, `create_facility`, and
+`create_facility`, `get_data_acquisition_configuration`,
+`search_fhir_endpoints`, `validate_fhir_server_connection`, and
 `save_data_acquisition_configuration` to the model. Automatic function invocation is limited
 to six iterations. The MCP session stays alive for the entire tool/model loop and
-is disposed on completion, failure, or cancellation. The options tool takes no arguments
-and returns the deployment's onboarding options directly; no environment selection
-or schema compatibility adapter is needed.
+is disposed on completion, failure, or cancellation.
 
 The local UI has no authentication. Use it on a trusted local machine. Do not put
 credentials or patient data in chat. The client does not log conversation/tool

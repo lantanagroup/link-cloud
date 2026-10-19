@@ -277,24 +277,17 @@ class ProtocolTests(unittest.TestCase):
                 body = next(line[5:].strip() for line in body.splitlines() if line.startswith("data:"))
             return json.loads(body)
 
-    def call(self, arguments=None):
-        result = self.rpc("tools/call", {"name": "get_onboarding_options", "arguments": arguments or {}})
-        self.assertNotIn("error", result)
-        return result["result"]
-
     def test_discovery(self):
         tools = self.rpc("tools/list", {})["result"]["tools"]
         tools = {tool["name"]: tool for tool in tools}
-        self.assertEqual(set(tools), {"get_onboarding_options", "create_facility", "save_data_acquisition_configuration", "validate_fhir_server_connection", "get_data_acquisition_configuration", "lookup_epic_fhir_endpoints"})
-        self.assertTrue(tools["lookup_epic_fhir_endpoints"]["annotations"]["readOnlyHint"])
+        self.assertEqual(set(tools), {"create_facility", "save_data_acquisition_configuration", "validate_fhir_server_connection", "get_data_acquisition_configuration", "search_fhir_endpoints"})
+        self.assertTrue(tools["search_fhir_endpoints"]["annotations"]["readOnlyHint"])
         self.assertTrue(tools["get_data_acquisition_configuration"]["annotations"]["readOnlyHint"])
         connection_tool = tools["validate_fhir_server_connection"]
         self.assertTrue(connection_tool["annotations"]["readOnlyHint"])
         self.assertTrue(connection_tool["annotations"]["idempotentHint"])
         self.assertFalse(connection_tool["annotations"]["destructiveHint"])
         self.assertEqual(connection_tool["inputSchema"]["required"], ["fhirServerBaseUrl"])
-        self.assertTrue(tools["get_onboarding_options"]["annotations"]["readOnlyHint"])
-        self.assertEqual(tools["get_onboarding_options"]["inputSchema"].get("properties", {}), {})
         self.assertFalse(tools["create_facility"]["annotations"]["readOnlyHint"])
         self.assertFalse(tools["create_facility"]["annotations"]["idempotentHint"])
         self.assertEqual(tools["create_facility"]["inputSchema"]["properties"]["vendorVersionId"]["type"], "string")
@@ -511,59 +504,6 @@ class ProtocolTests(unittest.TestCase):
                 self.assertEqual(result["structuredContent"]["status"], status)
                 self.assertNotIn("must-never-reach-model", json.dumps(result))
                 self.assertEqual(len(Tenant.posts), 1)
-
-    def test_catalog_and_redaction(self):
-        Tenant.mode = "ok"
-        result = self.call()
-        self.assertNotIn("must-never-reach-model", json.dumps(result))
-        self.assertNotIn("obsolete-config-definition", json.dumps(result))
-        data = result["structuredContent"]
-        self.assertEqual(data["status"], "complete")
-        environment = data
-        self.assertNotIn("environments", data)
-        self.assertEqual(environment["vendors"]["options"][0]["name"], "Test vendor")
-        self.assertEqual(environment["vendorVersions"]["options"][0]["version"], "Test version")
-        self.assertEqual(environment["connectionProfiles"]["status"], "configured")
-        self.assertEqual(environment["connectionProfiles"]["options"][0], {"id": "test-connection", "displayName": "Test connection"})
-        self.assertEqual(environment["queryPlanProfiles"]["status"], "configured")
-        self.assertEqual(environment["queryPlanProfiles"]["options"][0], {"id": "test-query-plan", "displayName": "Test query plan"})
-        self.assertNotIn("measures", environment)
-        self.assertEqual(environment["measureDefinitions"], {
-            "status": "available", "source": "measureeval_api",
-            "options": [{"id": "test-definition", "version": 7}]})
-
-    def test_empty_is_available(self):
-        Tenant.mode = "empty"
-        environment = self.call()["structuredContent"]
-        self.assertEqual(environment["vendors"]["status"], "available")
-        self.assertEqual(environment["vendors"]["options"], [])
-
-    def test_failure_is_not_empty_success(self):
-        for mode in ["unauthorized", "invalid", "disconnected"]:
-            with self.subTest(mode=mode):
-                Tenant.mode = mode
-                data = self.call()["structuredContent"]
-                self.assertEqual(data["status"], "partial")
-                self.assertEqual(data["vendors"]["status"], "unavailable")
-                self.assertEqual(data["measureDefinitions"]["status"], "available")
-
-    def test_measureeval_empty_and_failures(self):
-        MeasureEval.mode = "empty"
-        data = self.call()["structuredContent"]
-        self.assertEqual(data["status"], "complete")
-        definitions = data["measureDefinitions"]
-        self.assertEqual(definitions["status"], "available")
-        self.assertEqual(definitions["options"], [])
-        for mode in ["unauthorized", "invalid", "disconnected"]:
-            with self.subTest(mode=mode):
-                MeasureEval.mode = mode
-                data = self.call()["structuredContent"]
-                self.assertEqual(data["status"], "partial")
-                environment = data
-                self.assertEqual(environment["vendors"]["status"], "available")
-                self.assertEqual(environment["measureDefinitions"]["status"], "unavailable")
-                self.assertEqual(environment["measureDefinitions"]["source"], "measureeval_api")
-
 
     def test_json_encoded_profile_strings_fail_at_startup(self):
         for section in ["ConnectionProfiles", "QueryPlanProfiles"]:

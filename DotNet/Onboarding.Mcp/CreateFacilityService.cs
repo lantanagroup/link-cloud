@@ -38,7 +38,7 @@ public sealed class CreateFacilityService(HttpClient httpClient, IOptions<Onboar
         if (vendorVersionId.Length > 0)
         {
             if (!Guid.TryParse(vendorVersionId, out var parsed) || parsed == Guid.Empty)
-                throw new McpException("vendorVersionId must be an existing vendor-version UUID from get_onboarding_options, or an empty string to omit it.");
+                throw new McpException("vendorVersionId must be an existing vendor-version UUID supplied by the user, or an empty string to omit it.");
             vendorId = parsed;
         }
 

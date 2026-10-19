@@ -4,15 +4,21 @@ using ModelContextProtocol.Server;
 namespace LantanaGroup.Link.Onboarding.Mcp;
 
 [McpServerToolType]
-public sealed class OnboardingTools(OnboardingOptionsService service, CreateFacilityService facilityService,
-    DataAcquisitionConfigurationService acquisitionService, EpicEndpointDirectory epicDirectory)
+public sealed class OnboardingTools(CreateFacilityService facilityService,
+    DataAcquisitionConfigurationService acquisitionService, LuxeraEndpointApi luxeraEndpointApi,
+    TenantVendorService tenantVendorService)
 {
-    [McpServerTool(Name = "lookup_epic_fhir_endpoints", ReadOnly = true, Destructive = false, Idempotent = true, UseStructuredContent = true)]
-    [Description("Find published Epic R4 FHIR base URL candidates by facility/health-system name and optional city/state words in the cached public Epic directory. Returns paged matches and source timestamp; available with empty records means no match. Stale or unavailable results are explicit. Does not save settings or test connectivity. Confirm ambiguous matches and intended integration; patient-access endpoints do not establish backend-service access.")]
-    public EpicEndpointLookupResult LookupEpicFhirEndpoints(
-        [Description("Facility or health-system name, optionally including city/state; 2–200 characters. All words must match.")] string search,
+    [McpServerTool(Name = "get_vendors", ReadOnly = true, Destructive = false, Idempotent = true, UseStructuredContent = true)]
+    [Description("List vendors and their versions stored in Tenant, including vendor UUIDs and vendor-version UUIDs for facility associations. Returns available (including an empty catalog) or unavailable. Authentication settings are excluded. Does not change data.")]
+    public Task<TenantVendorCatalogResult> GetVendors(CancellationToken cancellationToken = default) =>
+        tenantVendorService.GetAsync(cancellationToken);
+
+    [McpServerTool(Name = "search_fhir_endpoints", ReadOnly = true, Destructive = false, Idempotent = true, UseStructuredContent = true)]
+    [Description("Search Luxera's FHIR directory by organization name (filtered to Epic). Returns a small page with URLs, locations, FHIR versions, access types, source, retrieval time, and paging metadata. Cached for one hour. On rate_limited, wait retryAfterSeconds before another search. Does not test connectivity or change settings.")]
+    public Task<LuxeraEndpointSearchResult> SearchFhirEndpoints(
+        [Description("Organization or health-system name. Search matches organization names; do not append a city or state.")] string search,
         int pageNumber = 1, int pageSize = 10, CancellationToken cancellationToken = default) =>
-        epicDirectory.Lookup(search, pageNumber, pageSize, cancellationToken);
+        luxeraEndpointApi.SearchAsync(search, pageNumber, pageSize, cancellationToken);
 
     [McpServerTool(Name = "get_data_acquisition_configuration", ReadOnly = true, Destructive = false, Idempotent = true, UseStructuredContent = true)]
     [Description("Get a facility's current FHIR data acquisition connection settings without making changes. Returns available, not_found, or unavailable. Authentication details are excluded. Pull times are facility-local; this does not test connectivity or retrieve query plans.")]
@@ -39,18 +45,13 @@ public sealed class OnboardingTools(OnboardingOptionsService service, CreateFaci
         CancellationToken cancellationToken = default) => acquisitionService.SaveAsync(facilityId, fhirServerBaseUrl,
             maxConcurrentRequests, maxRetries, minAcquisitionPullTime, maxAcquisitionPullTime, cancellationToken);
 
-    [McpServerTool(Name = "get_onboarding_options", ReadOnly = true, Destructive = false, UseStructuredContent = true)]
-    [Description("List configured Link Cloud connection/query-plan profiles, live Tenant vendor/version choices, and live measure definitions from MeasureEval. No changes are made. Unavailable sources are explicit; only profiles are operator-maintained catalogs.")]
-    public Task<OnboardingOptionsResult> GetOnboardingOptions(
-        CancellationToken cancellationToken = default) => service.GetOnboardingOptions(cancellationToken);
-
     [McpServerTool(Name = "create_facility", ReadOnly = false, Destructive = false, Idempotent = false, UseStructuredContent = true)]
     [Description("Create a Tenant facility only when the user explicitly requests creation. First collect the ID, name, IANA time zone, and optional existing vendor-version UUID. Existing facilities are never updated. Sends empty reporting schedules; Tenant owns DMRP schedule derivation. Does not apply connection/query-plan profiles or enroll measures. Never automatically retry an unknown outcome; check Tenant first.")]
     public Task<CreateFacilityResult> CreateFacility(
         [Description("Facility identifier. Letters, digits, and hyphens only; Tenant may require a numeric identifier.")] string facilityId,
         [Description("Facility display name in plain text.")] string facilityName,
         [Description("IANA time zone ID, for example America/New_York.")] string timeZone,
-        [Description("Existing vendor-version UUID from get_onboarding_options. Empty string to omit the vendor association.")] string vendorVersionId = "",
+        [Description("Existing vendor-version UUID selected from get_vendors or supplied by the user. Empty string to omit the vendor association.")] string vendorVersionId = "",
         CancellationToken cancellationToken = default) =>
         facilityService.CreateAsync(facilityId, facilityName, timeZone, vendorVersionId, cancellationToken);
 }
