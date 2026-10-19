@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Report.Data.Entities;
 
+[Index("GroupPopulationId", "MeasureReportId", IsUnique = true, Name = "IX_MeasureReportPopulation_Group_MeasureReport")]
 public partial class MeasureReportPopulation
 {
     [Key]
