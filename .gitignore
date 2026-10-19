@@ -441,9 +441,13 @@ Scripts/AzureAppConfig/config-key-inventory.json
 
 # The per-environment App Configuration exports. LEGLINK-912 moved these to the private
 # link-cac repository; this entry keeps `git add .` from quietly re-adding a copy here. It is
-# a deterrent, not the control -- `git add -f` still works, and the server-side push rule and
-# .githooks/pre-push are what actually stop a reintroduction.
+# a deterrent, not the control -- `git add -f` still works, and .githooks/pre-push is what
+# stops a reintroduction.
 /Config/app-config.*.json
+
+# Local credentials for docker compose and locally run services. Copy .env.example to .env and
+# fill it in. Never commit it: LEGLINK-912 removed it from this repository's history.
+/.env
 
 # A local clone of the private link-cac repository, if one is put here. The tooling defaults
 # to a sibling ../link-cac instead; override with LINK_CAC_CONFIG_DIR or --config-dir.
