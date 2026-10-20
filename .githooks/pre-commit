@@ -150,6 +150,9 @@ scan_staged_secrets() {
 
     if [ -z "$PYTHON" ]; then
         echo "pre-commit: BLOCKED -- the secret scan needs a working python to read TruffleHog's results."
+        echo "pre-commit: Install Python 3 (https://www.python.org/downloads/; on Windows, not the Microsoft"
+        echo "pre-commit: Store alias) and commit again. To commit without the scan this once, use --no-verify;"
+        echo "pre-commit: the pull request check still scans it."
         return 1
     fi
     if ! install_trufflehog; then

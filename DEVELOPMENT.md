@@ -3,6 +3,14 @@
 Commands for the local docker-compose stack, the .NET and Java builds, the test suites and EF migrations. Referenced from `AGENTS.md`.
 
 
+### Git hooks
+
+```powershell
+git config core.hooksPath .githooks   # once per clone
+```
+
+The pre-commit hook scans what you stage for secrets with TruffleHog and blocks the commit if it finds one, or if it cannot run the scan. It needs Python 3 on `PATH` (on Windows, a real install, not the Microsoft Store alias) and `curl`, which Git Bash, macOS and Linux all include. The first commit downloads TruffleHog into `.git/tools/`. See [dev-docs/secret-scanning.md](dev-docs/secret-scanning.md).
+
 ### Local stack (required for E2E and most integration work)
 
 ```powershell

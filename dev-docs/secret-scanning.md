@@ -34,7 +34,8 @@ The hook fails closed. The commit is blocked when:
 - TruffleHog finds a likely secret on a line the commit adds or changes;
 - the staged files cannot be listed or copied out for scanning;
 - the pins file is missing a value, the download fails, or its hash does not match;
-- there is no working `python` to read TruffleHog's results;
+- there is no working `python` to read TruffleHog's results (install Python 3; on Windows, the
+  Microsoft Store alias does not count);
 - TruffleHog itself fails.
 
 To get past a false positive, commit with `git commit --no-verify`. The pull request check still
