@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  * The PING runs on a separate thread bounded by {@link #checkTimeoutMs}, so a down cache is reported
  * DOWN within the deadline.
  */
-@Component("Redis")
+@Component("Cache (Redis)")
 @ConditionalOnProperty(name = "cache.type", havingValue = "redis")
 public class RedisHealthIndicator extends TimedHealthIndicator {
 

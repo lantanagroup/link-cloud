@@ -185,7 +185,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck<AccountDbContext>>(HealthCheckNames.SqlServerDatabase)
-        .AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString())
+        .AddCheck<CacheHealthCheck>(HealthCheckNames.RedisCache)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Add tenant API service
