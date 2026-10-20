@@ -392,7 +392,7 @@ function mockEverything(api: ApiMock): void {
   adHocReport = mockAdHocReport(api, newFacility.facilityId);
 }
 
-test('walkthrough: tenant list → facility → filters → tabs → configuration → create a facility → ad-hoc report', async ({ page, api }) => {
+test('walkthrough: tenant list → create a facility → configure it → ad-hoc report', async ({ page, api }) => {
   mockEverything(api);
 
   // Move to the largest external screen and say so. Without this the window opens wherever
@@ -410,80 +410,6 @@ test('walkthrough: tenant list → facility → filters → tabs → configurati
     await tenants.goto();
     await expect(tenants.rows).toHaveCount(testFacilities.length);
     await expect(tenants.rowFor(facilityId)).toContainText(facility.facilityName);
-  });
-
-  await stage('drill into a facility', async () => {
-    await tenants.rowFor(facilityId).getByRole('link', { name: facilityId }).click();
-    await expect(view.title).toHaveText(facility.facilityName);
-    await expect(view.cadenceRow('Monthly')).toContainText(facility.scheduledReports.monthly[0]);
-    await expect(view.reportRows).toHaveCount(schedules.length);
-
-    // The scheduled reports sit below the fold on this screen.
-    await scrollThrough(page);
-    await scrollBack(page);
-  });
-
-  await stage('filter the report schedules by status, then clear', async () => {
-    await view.statusFilter.click();
-    await page.getByRole('option', { name: 'Submitted', exact: true }).click();
-    await page.keyboard.press('Escape');
-    await expect(view.clearFiltersButton).toBeVisible();
-
-    await view.clearFiltersButton.click();
-    await expect(view.clearFiltersButton).toHaveCount(0);
-  });
-
-  await stage('search by report id and toggle deleted reports', async () => {
-    await view.reportIdFilter.fill(schedules[0].id);
-    await expect(view.reportRows).toHaveCount(schedules.length);
-    await view.clearReportIdButton.click();
-    await expect(view.reportIdFilter).toHaveValue('');
-
-    await view.showDeletedCheckbox.check();
-    await expect(view.reportsTable.getByRole('columnheader', { name: 'Deleted' })).toBeVisible();
-    await view.showDeletedCheckbox.uncheck();
-  });
-
-  await stage('visit the Org Locations and Encounters tabs', async () => {
-    await view.tab('Org Locations').click();
-    await expect(page.getByRole('cell', { name: 'LOC-001', exact: true })).toBeVisible();
-
-    await view.tab('Encounters').click();
-    await expect(page.getByRole('cell', { name: 'ENC-5001', exact: true })).toBeVisible();
-
-    await view.tab('Facility Reports').click();
-    await expect(view.reportRows.first()).toBeVisible();
-  });
-
-  await stage('open the facility configuration', async () => {
-    await view.configurationButton.click();
-    await expect(edit.header).toHaveText(`Facility: ${facilityId}`);
-  });
-
-  await stage('expand each configuration panel', async () => {
-    await edit.expand(edit.censusPanel);
-    await expect(edit.censusPanel.getByRole('button', { name: 'Edit census configuration' })).toBeVisible();
-
-    await edit.expand(edit.queryDispatchPanel);
-    await expect(edit.queryDispatchPanel.getByLabel('Duration')).toHaveValue(
-      queryDispatchConfiguration.dispatchSchedules[0].duration,
-    );
-
-    await edit.expand(edit.dataAcquisitionPanel);
-
-    for (const label of ['Fhir List', 'SFTP Configuration', 'Query Plan', 'Fhir Query']) {
-      await edit.dataAcquisitionPanel.getByRole('tab', { name: label }).click();
-    }
-
-    // Four panels expanded makes this the longest screen in the walkthrough.
-    await scrollThrough(page, 3);
-    await scrollBack(page, 3);
-  });
-
-  await stage('head back to the tenant dashboard', async () => {
-    await edit.backButton.click();
-    await expect(page).toHaveURL(/\/tenant$/);
-    await expect(tenants.rowFor(facilityId)).toBeVisible();
   });
 
   await stage('create a new facility', async () => {

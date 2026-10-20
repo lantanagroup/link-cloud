@@ -56,7 +56,14 @@ export default defineConfig({
     {
       name: 'mocked',
       testDir: './e2e/mocked',
-      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:4200' },
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:4200',
+        // Unpaced by default, so this is a no-op for `npm run e2e` and for CI. Set
+        // E2E_SLOW_MO (with --headed) when you want to watch a single spec drive the app
+        // at human speed; around 800 is readable without being tedious.
+        launchOptions: { slowMo: Number(process.env['E2E_SLOW_MO'] ?? 0) },
+      },
     },
     {
       name: 'live',
