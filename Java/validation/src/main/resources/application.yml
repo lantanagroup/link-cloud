@@ -92,6 +92,10 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: false   # Drops Spring's camelCase livenessState/readinessState rows, and with
+                         # them /health/liveness and /health/readiness. No Link deployment probes
+                         # those paths; re-enable this if one ever does.
   health:
     diskspace:
       enabled: false
