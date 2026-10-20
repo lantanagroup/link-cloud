@@ -160,7 +160,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, DataAcquisitionConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<DataAcquisitionDbContext>>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<DataAcquisitionDbContext>>(HealthCheckNames.SqlServerDatabase)
         .AddCheck<ResourceCacheHealthCheck>(HealthCheckType.Cache.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
