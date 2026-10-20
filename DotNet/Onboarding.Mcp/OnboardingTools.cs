@@ -14,7 +14,7 @@ public sealed class OnboardingTools(CreateFacilityService facilityService,
         tenantVendorService.GetAsync(cancellationToken);
 
     [McpServerTool(Name = "search_fhir_endpoints", ReadOnly = true, Destructive = false, Idempotent = true, UseStructuredContent = true)]
-    [Description("Search Luxera's FHIR directory by organization name (filtered to Epic). Returns a small page with URLs, locations, FHIR versions, access types, source, retrieval time, and paging metadata. Cached for one hour. On rate_limited, wait retryAfterSeconds before another search. Does not test connectivity or change settings.")]
+    [Description("Search Luxera's FHIR directory by organization name. Returns a small page with URLs, locations, FHIR versions, access types, source, retrieval time, and paging metadata.")]
     public Task<LuxeraEndpointSearchResult> SearchFhirEndpoints(
         [Description("Organization or health-system name. Search matches organization names; do not append a city or state.")] string search,
         int pageNumber = 1, int pageSize = 10, CancellationToken cancellationToken = default) =>
