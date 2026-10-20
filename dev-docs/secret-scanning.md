@@ -38,9 +38,6 @@ The hook fails closed. The commit is blocked when:
   Microsoft Store alias does not count);
 - TruffleHog itself fails.
 
-To get past a false positive, commit with `git commit --no-verify`. The pull request check still
-runs.
-
 ## The pull request check
 
 Job **TruffleHog secret scan** scans the commits between the pull request's merge base and its head.
