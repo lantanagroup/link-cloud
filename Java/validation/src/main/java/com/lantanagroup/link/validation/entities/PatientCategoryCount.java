@@ -6,8 +6,9 @@ import lombok.Setter;
 
 /**
  * One patient's contribution to a report's category totals. A patient can be validated more than once for the same
- * report (redelivery, regenerate), so these rows let a repeat replace its earlier counts instead of adding to them.
- * They are only needed while the patient's findings exist, and are deleted with them.
+ * report (a redelivered message, for example), so these rows let a repeat replace its earlier counts instead of
+ * adding to them. They are only needed while the patient's findings exist, and are deleted with them.
+ * See dev-docs/validation-category-counts.md.
  */
 @Getter
 @Setter

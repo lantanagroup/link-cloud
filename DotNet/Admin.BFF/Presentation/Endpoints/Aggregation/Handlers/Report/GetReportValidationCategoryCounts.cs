@@ -8,6 +8,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Han
 
 /// <summary>
 /// Serves a report's stored validation counts per category, with each category's current guidance and severity.
+/// See dev-docs/validation-category-counts.md.
 /// </summary>
 public static class GetReportValidationCategoryCounts
 {

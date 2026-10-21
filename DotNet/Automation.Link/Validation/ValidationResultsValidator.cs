@@ -116,6 +116,7 @@ public class ValidationResultsValidator
     /// only when it has a submitted category, so a submitted category's stored total must equal its live count,
     /// while a non-submitted category's total also includes findings that weren't saved and can only be at least
     /// its live count. Uncategorized findings are never saved, so they have nothing to compare with.
+    /// See dev-docs/validation-category-counts.md.
     /// </summary>
     private async Task CheckCategoryCountsAsync(string facilityId,
                                                 string reportId,

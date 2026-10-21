@@ -30,6 +30,7 @@ import java.util.function.Function;
 
 /**
  * Keeps each report's per-category validation counts, which outlive the report's findings.
+ * See dev-docs/validation-category-counts.md.
  */
 @Service
 public class CategoryCountService {
@@ -53,9 +54,10 @@ public class CategoryCountService {
 
     /**
      * Replaces one patient's contribution to its report's category counts with the counts from {@code results}.
-     * Repeating it for the same patient (redelivery, regenerate) replaces the earlier counts rather than adding to
-     * them. A finding is counted once in each of its categories, whatever their submit flag, and as uncategorized
-     * when it has no category at all. Each total records its category's submit flag so readers can filter on it.
+     * Repeating it for the same patient (a redelivered message, for example) replaces the earlier counts rather
+     * than adding to them. A finding is counted once in each of its categories, whatever their submit flag, and as
+     * uncategorized when it has no category at all. Each total records its category's submit flag so readers can
+     * filter on it.
      */
     public void recordPatientCounts(String facilityId, String reportId, String patientId, List<Result> results) {
         Map<String, CategoryTally> tallies = countByCategory(results);
