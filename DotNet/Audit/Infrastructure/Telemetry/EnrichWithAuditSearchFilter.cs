@@ -14,6 +14,9 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
             activity.AddTag(DiagnosticNames.ServiceFilter, searchFilter.FilterServiceBy);
             activity.AddTag(DiagnosticNames.ActionFilter, searchFilter.FilterActionBy);
             activity.AddTag(DiagnosticNames.UserFilter, searchFilter.FilterUserBy);
+            activity.AddTag(DiagnosticNames.ResourceFilter, searchFilter.FilterResourceBy);
+            activity.AddTag(DiagnosticNames.ResourceIdFilter, searchFilter.FilterResourceIdBy);
+            //activity.AddTag(DiagnosticNames.PatientId, searchFilter.FilterPatientBy);
             activity.AddTag(DiagnosticNames.SortBy, searchFilter.SortBy);
             activity.AddTag(DiagnosticNames.SortOrder, searchFilter.SortOrder);
             activity.AddTag(DiagnosticNames.PageSize, searchFilter.PageSize);
