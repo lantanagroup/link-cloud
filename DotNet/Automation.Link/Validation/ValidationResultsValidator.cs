@@ -5,11 +5,19 @@ using Newtonsoft.Json.Linq;
 namespace LantanaGroup.Link.Automation.Link.Validation;
 
 /// <summary>
-/// Checks that the validation result summary endpoint succeeds and that Validation logs
-/// have no unhandled exceptions for the run.
+/// Checks that the validation result summary endpoint succeeds, that the report's stored category counts
+/// match its saved findings, and that Validation logs have no unhandled exceptions for the run.
 /// </summary>
 public class ValidationResultsValidator
 {
+    /// <summary>
+    /// Above this many saved findings the comparison with live category counts is skipped, because the
+    /// validation service loads every finding of the report to count them live.
+    /// </summary>
+    public const long CategoryCountComparisonLimit = 100_000;
+
+    private const string UncategorizedCategoryId = "uncategorized";
+
     private readonly LantanaGroup.Link.Sdk.Clients.IValidationServiceClient _validationClient;
     private readonly IAutomationOutput _output;
     private readonly LokiScraper? _lokiScraper;
@@ -53,6 +61,19 @@ public class ValidationResultsValidator
             errors.Add($"Validation API exception: {ex.Message}");
         }
 
+        try
+        {
+            await CheckCategoryCountsAsync(facilityId, reportId, errors, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"Validation category counts exception: {ex.Message}");
+        }
+
         // Exception-focused log check from Validation service.
         if (_lokiScraper != null)
         {
@@ -88,6 +109,207 @@ public class ValidationResultsValidator
         }
 
         throw new InvalidOperationException($"VALIDATION RESULTS (API) failed with {errors.Count} issue(s).");
+    }
+
+    /// <summary>
+    /// Compares the report's stored category counts with live counts of its saved findings. A finding is saved
+    /// only when it has a submitted category, so a submitted category's stored total must equal its live count,
+    /// while a non-submitted category's total also includes findings that weren't saved and can only be at least
+    /// its live count. Uncategorized findings are never saved, so they have nothing to compare with.
+    /// </summary>
+    private async Task CheckCategoryCountsAsync(string facilityId,
+                                                string reportId,
+                                                List<string> errors,
+                                                CancellationToken cancellationToken)
+    {
+        var summary = await _validationClient.GetValidationResultSummaryAsync(
+            facilityId, reportId, "INFORMATION", cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var savedFindings = ReadSummaryCount(summary.IsSuccessStatusCode ? summary.Body : null);
+        if (savedFindings is null)
+        {
+            errors.Add($"Validation category counts: the INFORMATION result summary returned HTTP " +
+                       $"{summary.StatusCode}: {Snippet(summary.Body ?? summary.RawBody)}");
+            return;
+        }
+
+        var countsResponse = await _validationClient.GetReportCategoryCountsAsync(
+            facilityId, reportId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (countsResponse.StatusCode == 404)
+        {
+            // Every validated patient writes the counts, so a report with saved findings must have them.
+            if (savedFindings > 0)
+            {
+                errors.Add($"Validation category counts are missing although the report has {savedFindings} " +
+                           "saved finding(s)");
+                return;
+            }
+
+            _output.WriteLine("VALIDATION CATEGORY COUNTS: none stored and no saved findings; nothing to compare");
+            return;
+        }
+
+        if (!countsResponse.IsSuccessStatusCode)
+        {
+            errors.Add($"Validation category counts returned HTTP {countsResponse.StatusCode}: " +
+                       Snippet(countsResponse.RawBody));
+            return;
+        }
+
+        var stored = ReadStoredCounts(countsResponse.Body);
+        if (stored is null)
+        {
+            errors.Add($"Validation category counts body was not a counts response: {Snippet(countsResponse.Body)}");
+            return;
+        }
+
+        if (savedFindings > CategoryCountComparisonLimit)
+        {
+            _output.WriteLine($"VALIDATION CATEGORY COUNTS: {stored.Count} categories stored; comparison with the " +
+                              $"{savedFindings} saved findings skipped above {CategoryCountComparisonLimit}");
+            return;
+        }
+
+        var liveResponse = await _validationClient.GetReportCategorySummariesAsync(
+            facilityId, reportId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var live = liveResponse.IsSuccessStatusCode ? ReadLiveCounts(liveResponse.Body) : null;
+        if (live is null)
+        {
+            errors.Add($"Validation live category counts returned HTTP {liveResponse.StatusCode}: " +
+                       Snippet(liveResponse.Body ?? liveResponse.RawBody));
+            return;
+        }
+
+        var mismatches = 0;
+        foreach (var (categoryId, total) in stored)
+        {
+            if (categoryId.Equals(UncategorizedCategoryId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            live.TryGetValue(categoryId, out var liveIssues);
+            if (total.Submit && total.Issues != liveIssues)
+            {
+                mismatches++;
+                errors.Add($"Validation category '{categoryId}' (submitted): stored count {total.Issues}, " +
+                           $"saved findings {liveIssues}");
+            }
+            else if (!total.Submit && total.Issues < liveIssues)
+            {
+                mismatches++;
+                errors.Add($"Validation category '{categoryId}' (not submitted): stored count {total.Issues} is " +
+                           $"below its {liveIssues} saved finding(s)");
+            }
+        }
+
+        foreach (var (categoryId, liveIssues) in live)
+        {
+            if (liveIssues == 0 ||
+                stored.ContainsKey(categoryId) ||
+                categoryId.Equals(UncategorizedCategoryId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            mismatches++;
+            errors.Add($"Validation category '{categoryId}' has {liveIssues} saved finding(s) but no stored count");
+        }
+
+        if (mismatches == 0)
+        {
+            _output.WriteLine($"VALIDATION CATEGORY COUNTS: {stored.Count} categories match the {savedFindings} " +
+                              "saved findings");
+        }
+    }
+
+    private static long? ReadSummaryCount(string? body)
+    {
+        if (!IsResultSummary(body))
+        {
+            return null;
+        }
+
+        return JObject.Parse(body!)["count"]!.Value<long>();
+    }
+
+    /// <summary>
+    /// Reads validation's stored counts, keyed by category id case-insensitively as validation compares them.
+    /// </summary>
+    private static Dictionary<string, (long Issues, bool Submit)>? ReadStoredCounts(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (JToken.Parse(body) is not JObject obj || obj["categories"] is not JArray categories)
+            {
+                return null;
+            }
+
+            var stored = new Dictionary<string, (long Issues, bool Submit)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var category in categories.OfType<JObject>())
+            {
+                var categoryId = category["categoryId"]?.Value<string>();
+                if (string.IsNullOrEmpty(categoryId))
+                {
+                    continue;
+                }
+
+                var issues = category["issues"]?.Value<long>() ?? 0;
+                var submit = category["submit"]?.Value<bool>() ?? false;
+                stored[categoryId] = (issues, submit);
+            }
+
+            return stored;
+        }
+        catch (JsonReaderException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads validation's live per-category counts, summing ids that differ only by case.
+    /// </summary>
+    private static Dictionary<string, long>? ReadLiveCounts(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (JToken.Parse(body) is not JArray categories)
+            {
+                return null;
+            }
+
+            var live = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var category in categories.OfType<JObject>())
+            {
+                var categoryId = category["categoryId"]?.Value<string>();
+                if (string.IsNullOrEmpty(categoryId))
+                {
+                    continue;
+                }
+
+                live.TryGetValue(categoryId, out var issues);
+                live[categoryId] = issues + (category["issues"]?.Value<long>() ?? 0);
+            }
+
+            return live;
+        }
+        catch (JsonReaderException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
