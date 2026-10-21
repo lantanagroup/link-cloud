@@ -54,6 +54,7 @@ public class ReadyForValidationConsumerTest {
     @Mock private ValidationService validationService;
     @Mock private CategorizationService categorizationService;
     @Mock private ResultRepository resultRepository;
+    @Mock private CategoryCountService categoryCountService;
     @Mock private KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     @Mock private ValidationMetrics validationMetrics;
     @Mock private BlobStorageService blobStorageService;
@@ -80,6 +81,7 @@ public class ReadyForValidationConsumerTest {
                 validationService,
                 categorizationService,
                 resultRepository,
+                categoryCountService,
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.of(blobStorageService),
@@ -93,6 +95,7 @@ public class ReadyForValidationConsumerTest {
                 validationService,
                 categorizationService,
                 resultRepository,
+                categoryCountService,
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.empty(),
@@ -325,6 +328,30 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
+    void process_recordsCountsFromEveryResult() throws Exception {
+        Result submittedResult = resultWithCategories(List.of(categoryWithSubmit(true)));
+        Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
+        Result uncategorizedResult = resultWithCategories(Collections.emptyList());
+        List<Result> results = List.of(submittedResult, nonSubmittedResult, uncategorizedResult);
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(results);
+
+        consumer.process(buildRecord(null));
+
+        verify(categoryCountService).recordPatientCounts(FACILITY_ID, REPORT_ID, PATIENT_ID, results);
+    }
+
+    @Test
+    void process_withNoResults_stillRecordsCounts() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null));
+
+        verify(categoryCountService).recordPatientCounts(FACILITY_ID, REPORT_ID, PATIENT_ID, Collections.emptyList());
+    }
+
+    @Test
     void process_withNoResults_stillCategorizesAndDoesNotPersistEmptyList() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
@@ -346,7 +373,7 @@ public class ReadyForValidationConsumerTest {
 
         ReadyForValidationConsumer consumerWithRealCategorization = new ReadyForValidationConsumer(
                 fhirContext, reportClient, validationService, realCategorizationService, resultRepository,
-                validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
+                categoryCountService, validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
                 preQualificationConfig, preQualOperationOutcomeBuilder, recoverer);
 
         Result inactiveResult = new Result();

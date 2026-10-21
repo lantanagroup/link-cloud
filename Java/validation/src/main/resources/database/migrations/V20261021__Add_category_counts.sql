@@ -11,6 +11,7 @@ begin
         category_id varchar(255)    not null,
         title       varchar(255)    not null,
         acceptable  bit             not null,
+        submit      bit             not null,
         issues      bigint          not null,
         primary key (id)
     );
@@ -34,11 +35,10 @@ if not exists (select 1 from sys.tables where name = 'report_category_count_stat
 begin
     create table report_category_count_status
     (
-        id               bigint identity   not null,
-        facility_id      varchar(255)      not null,
-        report_id        varchar(255)      not null,
-        patients_counted int               not null,
-        last_updated     datetimeoffset(6) not null,
+        id           bigint identity   not null,
+        facility_id  varchar(255)      not null,
+        report_id    varchar(255)      not null,
+        last_updated datetimeoffset(6) not null,
         primary key (id)
     );
 end;

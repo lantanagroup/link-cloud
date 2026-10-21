@@ -96,16 +96,16 @@ class CategoryCountJpaTest {
 
     @Test
     void statusIsUniquePerReport() {
-        testEntityManager.persistAndFlush(status("report-1", 1));
+        testEntityManager.persistAndFlush(status("report-1"));
 
         assertThrows(PersistenceException.class,
-                () -> testEntityManager.persistAndFlush(status("report-1", 2)));
+                () -> testEntityManager.persistAndFlush(status("report-1")));
     }
 
     @Test
     void lockedStatusLookupReturnsTheReportsRow() {
-        testEntityManager.persist(status("report-1", 12));
-        testEntityManager.persist(status("report-2", 3));
+        testEntityManager.persist(status("report-1"));
+        testEntityManager.persist(status("report-2"));
         testEntityManager.flush();
         testEntityManager.clear();
 
@@ -113,7 +113,7 @@ class CategoryCountJpaTest {
                 .findWithLockByFacilityIdAndReportId("facility", "report-1");
 
         assertTrue(status.isPresent());
-        assertEquals(12, status.get().getPatientsCounted());
+        assertEquals("report-1", status.get().getReportId());
     }
 
     @Test
@@ -145,11 +145,10 @@ class CategoryCountJpaTest {
         return count;
     }
 
-    private ReportCategoryCountStatus status(String reportId, int patientsCounted) {
+    private ReportCategoryCountStatus status(String reportId) {
         ReportCategoryCountStatus status = new ReportCategoryCountStatus();
         status.setFacilityId("facility");
         status.setReportId(reportId);
-        status.setPatientsCounted(patientsCounted);
         status.setLastUpdated(OffsetDateTime.now());
         return status;
     }

@@ -29,8 +29,5 @@ public class ReportCategoryCountStatus {
     private String reportId;
 
     @Column(nullable = false)
-    private int patientsCounted;
-
-    @Column(nullable = false)
     private OffsetDateTime lastUpdated;
 }

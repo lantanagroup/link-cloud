@@ -6,7 +6,7 @@ import lombok.Setter;
 
 /**
  * A report's total of validation findings in one category. It is kept after the report's findings are deleted, so
- * the title and acceptable flag are captured when the count is written rather than read from the category later.
+ * the category's title, acceptable and submit flags are captured when the count is written rather than read later.
  */
 @Getter
 @Setter
@@ -33,6 +33,9 @@ public class ReportCategoryCount {
 
     @Column(nullable = false)
     private boolean acceptable;
+
+    @Column(nullable = false)
+    private boolean submit;
 
     @Column(nullable = false)
     private long issues;

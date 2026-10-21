@@ -44,6 +44,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
     private final ResultRepository resultRepository;
+    private final CategoryCountService categoryCountService;
     private final KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     private final ValidationMetrics validationMetrics;
     private final BlobStorageService blobStorageService;
@@ -56,6 +57,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository,
+            CategoryCountService categoryCountService,
             @Qualifier("defaultKafkaTemplate") KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics,
             Optional<BlobStorageService> blobStorageService,
@@ -68,6 +70,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         this.validationService = validationService;
         this.categorizationService = categorizationService;
         this.resultRepository = resultRepository;
+        this.categoryCountService = categoryCountService;
         this.validationCompleteTemplate = validationCompleteTemplate;
         this.validationMetrics = validationMetrics;
         this.blobStorageService = blobStorageService.orElse(null);
@@ -247,6 +250,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                 resultRepository.saveAll(submittedResults);
             }
         }
+        // Pass every finding, not only the saved ones; unsaved findings (uncategorized or non-submit) are counted too.
+        categoryCountService.recordPatientCounts(facilityId, reportId, patientId, results);
         return results;
     }
 
