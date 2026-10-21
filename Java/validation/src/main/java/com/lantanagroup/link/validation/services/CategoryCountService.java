@@ -6,6 +6,8 @@ import com.lantanagroup.link.validation.entities.PatientCategoryCount;
 import com.lantanagroup.link.validation.entities.ReportCategoryCount;
 import com.lantanagroup.link.validation.entities.ReportCategoryCountStatus;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.models.CategoryCountModel;
+import com.lantanagroup.link.validation.models.ReportCategoryCountsModel;
 import com.lantanagroup.link.validation.repositories.PatientCategoryCountRepository;
 import com.lantanagroup.link.validation.repositories.ReportCategoryCountRepository;
 import com.lantanagroup.link.validation.repositories.ReportCategoryCountStatusRepository;
@@ -17,8 +19,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -62,6 +66,38 @@ public class CategoryCountService {
                 tallies.size(),
                 LogUtils.sanitize(facilityId),
                 LogUtils.sanitize(reportId));
+    }
+
+    /**
+     * Gets a report's stored category counts, most issues first, optionally only the categories with the given
+     * submit flag. Empty when the report's counts were never written, which is different from a report whose counts
+     * exist but list no categories.
+     */
+    public Optional<ReportCategoryCountsModel> getReportCounts(String facilityId, String reportId, Boolean submit) {
+        Optional<ReportCategoryCountStatus> status = reportCategoryCountStatusRepository
+                .findByFacilityIdAndReportId(facilityId, reportId);
+        if (status.isEmpty()) {
+            return Optional.empty();
+        }
+        List<ReportCategoryCount> totals = submit == null
+                ? reportCategoryCountRepository.findAllByFacilityIdAndReportId(facilityId, reportId)
+                : reportCategoryCountRepository.findAllByFacilityIdAndReportIdAndSubmit(facilityId, reportId, submit);
+        List<CategoryCountModel> categories = totals.stream()
+                .sorted(Comparator.comparingLong(ReportCategoryCount::getIssues)
+                        .reversed()
+                        .thenComparing(ReportCategoryCount::getCategoryId))
+                .map(total -> new CategoryCountModel(
+                        total.getCategoryId(),
+                        total.getTitle(),
+                        total.isAcceptable(),
+                        total.isSubmit(),
+                        total.getIssues()))
+                .toList();
+        return Optional.of(new ReportCategoryCountsModel(
+                facilityId,
+                reportId,
+                status.get().getLastUpdated(),
+                categories));
     }
 
     private static Map<String, CategoryTally> countByCategory(List<Result> results) {

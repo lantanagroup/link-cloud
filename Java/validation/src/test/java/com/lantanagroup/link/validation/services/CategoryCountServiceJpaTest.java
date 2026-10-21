@@ -5,6 +5,8 @@ import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.PatientCategoryCount;
 import com.lantanagroup.link.validation.entities.ReportCategoryCount;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.models.CategoryCountModel;
+import com.lantanagroup.link.validation.models.ReportCategoryCountsModel;
 import com.lantanagroup.link.validation.repositories.PatientCategoryCountRepository;
 import com.lantanagroup.link.validation.repositories.ReportCategoryCountRepository;
 import com.lantanagroup.link.validation.repositories.ReportCategoryCountStatusRepository;
@@ -195,6 +197,65 @@ class CategoryCountServiceJpaTest {
         }
 
         assertEquals(Map.of("category-a", (long) patients, "uncategorized", (long) patients), totals());
+    }
+
+    @Test
+    void getReportCounts_reportNeverCounted_isEmpty() {
+        assertTrue(categoryCountService.getReportCounts(FACILITY_ID, REPORT_ID, null).isEmpty());
+    }
+
+    @Test
+    void getReportCounts_returnsTotalsMostIssuesFirst() {
+        Category a = category("category-a", true, false);
+        Category n = category("category-n", false, true);
+        categoryCountService.recordPatientCounts(FACILITY_ID, REPORT_ID, "patient-1",
+                List.of(result(a), result(n), result(n), uncategorized(), uncategorized(), uncategorized()));
+
+        ReportCategoryCountsModel counts = categoryCountService.getReportCounts(FACILITY_ID, REPORT_ID, null)
+                .orElseThrow();
+
+        assertEquals(FACILITY_ID, counts.getFacilityId());
+        assertEquals(REPORT_ID, counts.getReportId());
+        assertNotNull(counts.getLastUpdated());
+        assertEquals(List.of("uncategorized", "category-n", "category-a"), counts.getCategories()
+                .stream()
+                .map(CategoryCountModel::getCategoryId)
+                .toList());
+        CategoryCountModel notSubmitted = counts.getCategories().get(1);
+        assertEquals("Title of category-n", notSubmitted.getTitle());
+        assertTrue(notSubmitted.isAcceptable());
+        assertFalse(notSubmitted.isSubmit());
+        assertEquals(2L, notSubmitted.getIssues());
+    }
+
+    @Test
+    void getReportCounts_filteredOnSubmit_returnsOnlyMatchingCategories() {
+        Category a = category("category-a", true, false);
+        Category n = category("category-n", false, false);
+        categoryCountService.recordPatientCounts(FACILITY_ID, REPORT_ID, "patient-1",
+                List.of(result(a), result(n), uncategorized()));
+
+        assertEquals(List.of("category-a", "uncategorized"), categoryIds(true));
+        assertEquals(List.of("category-n"), categoryIds(false));
+    }
+
+    @Test
+    void getReportCounts_countedReportWithNoFindings_isPresentWithNoCategories() {
+        categoryCountService.recordPatientCounts(FACILITY_ID, REPORT_ID, "patient-1", Collections.emptyList());
+
+        ReportCategoryCountsModel counts = categoryCountService.getReportCounts(FACILITY_ID, REPORT_ID, null)
+                .orElseThrow();
+
+        assertTrue(counts.getCategories().isEmpty());
+    }
+
+    private List<String> categoryIds(boolean submit) {
+        return categoryCountService.getReportCounts(FACILITY_ID, REPORT_ID, submit)
+                .orElseThrow()
+                .getCategories()
+                .stream()
+                .map(CategoryCountModel::getCategoryId)
+                .toList();
     }
 
     private Map<String, Long> totals() {

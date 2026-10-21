@@ -9,4 +9,9 @@ import java.util.List;
 @Repository
 public interface ReportCategoryCountRepository extends JpaRepository<ReportCategoryCount, Long> {
     List<ReportCategoryCount> findAllByFacilityIdAndReportId(String facilityId, String reportId);
+
+    List<ReportCategoryCount> findAllByFacilityIdAndReportIdAndSubmit(
+            String facilityId,
+            String reportId,
+            boolean submit);
 }
