@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Validation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Facility;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
 using LantanaGroup.Link.Shared.Application.Models.Report;
@@ -121,6 +122,28 @@ public static class AggregationMapping
             {
                 Summary = "Get Report Summary by ID",
                 Description = "Retrieves a single report summary by report schedule ID."
+            });
+
+        routes.MapGet("/reports/{reportScheduleId}/validation-category-counts",
+                      GetReportValidationCategoryCounts.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces<ReportValidationCategoryCounts>()
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Get Report Validation Category Counts",
+                Description = "Retrieves a report's stored validation counts per category, most issues first, " +
+                              "with each category's current guidance and severity. " +
+                              "Counts are written as each patient is validated and are kept after the report's " +
+                              "findings are deleted. Pass submit=true or submit=false to return only categories " +
+                              "with that submit flag. " +
+                              "Returns 404 if the report schedule does not exist, or if it has no stored counts " +
+                              "(for example, it was validated before counts were stored); " +
+                              "the problem detail says which."
             });
 
         return routes;
