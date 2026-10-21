@@ -239,6 +239,14 @@ check_catalog() {
         return 0
     fi
 
+    # Without PyYAML the validator crashes, which would read as a schema failure.
+    if ! "$PYTHON" -c "import yaml" >/dev/null 2>&1; then
+        echo "pre-commit: skipping the App Config catalog check: $PYTHON has no PyYAML."
+        echo "pre-commit: Install it with: $PYTHON -m pip install \"pyyaml==6.0.*\""
+        echo "pre-commit: CI will still run it."
+        return 0
+    fi
+
     # Materialize the staged blob so the check sees exactly what is being committed.
     catalog="$tmpdir/$(basename "$staged_catalog")"
     git show ":$staged_catalog" > "$catalog"
