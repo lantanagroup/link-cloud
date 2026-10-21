@@ -34,6 +34,10 @@ namespace LantanaGroup.Link.Audit.Persistance.Configurations
 
             builder.HasIndex(b => b.EventDate);
 
+            builder.HasIndex(b => b.PatientId);
+
+            builder.HasIndex(b => b.ResourceId);
+
             builder.HasIndex(b => b.CreatedOn);
 
             builder.Property(b => b.ServiceName)
