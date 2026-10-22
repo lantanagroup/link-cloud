@@ -3,7 +3,6 @@ package com.lantanagroup.link.validation.entities;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.OffsetDateTime;
 
@@ -23,14 +22,10 @@ public class ReportCategoryCountStatus {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // nvarchar, like the driver's string parameters, so SQL Server seeks instead of scanning.
-    // See dev-docs/validation-category-counts.md.
-    @Nationalized
     @Column(nullable = false)
     private String facilityId;
 
-    @Nationalized
-    @Column(nullable = false, length = 64)
+    @Column(nullable = false)
     private String reportId;
 
     @Column(nullable = false)

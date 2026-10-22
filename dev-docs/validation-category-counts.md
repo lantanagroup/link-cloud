@@ -32,19 +32,24 @@ The tables come from `V20261021__Add_category_counts.sql` in deployed environmen
 statement is guarded because the pipeline re-applies every script on each deploy. The docker
 profile creates them through Hibernate (`ddl-auto: update`).
 
-The id columns (`facility_id`, `report_id`, `patient_id`, `category_id`) are `nvarchar`, and the
-entity fields are `@Nationalized`. The SQL Server JDBC driver sends string parameters as
-`nvarchar`. Compared with a `varchar` column under the SQL collation, that makes SQL Server
-convert the column (`CONVERT_IMPLICIT`) and scan the whole index instead of seeking. For the
-locked status lookup, a scan would also range-lock every report's row, so one report's counts
-would block all the others. With matching types, every lookup and the lock seek on their unique
-index. `report_id` is `nvarchar(64)`, since report schedule ids are GUIDs, which keeps the
-four-column unique key on `patient_category_count` at 1,658 bytes, under SQL Server's 1,700-byte
-limit for an index key.
+Like the rest of validation's schema, the id columns are `varchar`. The SQL Server JDBC driver
+sends string parameters as `nvarchar` by default. Compared with a `varchar` column under the SQL
+collation, that makes SQL Server convert the column (`CONVERT_IMPLICIT`) and scan the whole index
+instead of seeking. It made validation's `result` queries scan: one patient's findings read about
+2,000 pages locally instead of 4. For these tables it would be worse, because the locked status
+lookup would range-lock every report's row, so one report's counts would block all the others.
 
-A local database that already has these tables as `varchar`, from an earlier build of this branch,
-keeps them that way: `ddl-auto: update` doesn't change column types. Drop the three tables once
-and let the docker profile recreate them.
+So validation's `application.yml` sets the driver's `sendStringParametersAsUnicode=false`, through
+`spring.datasource.hikari.data-source-properties`. String parameters are then sent as `varchar` and
+match the columns, and every lookup and the lock seek on their unique index. App Configuration
+defines only the datasource URL and credentials for validation, so the setting applies in every
+environment without provisioning. `DataSourceSettingsTest` fails if it is removed. A future
+`nvarchar` column must be mapped with `@Nationalized`, so its parameters are still sent as
+`nvarchar` and its non-Latin characters survive.
+
+A local database built from an earlier version of this branch may have these columns as
+`nvarchar`. That still seeks, so it needs no action; `ddl-auto: update` leaves existing column
+types alone, so drop the three tables if you want the local schema to match.
 
 ## What is counted
 
