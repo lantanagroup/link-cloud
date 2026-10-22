@@ -352,6 +352,20 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
+    void process_whenRecordingCountsFails_doesNotSaveResults() throws Exception {
+        Result submittedResult = resultWithCategories(List.of(categoryWithSubmit(true)));
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(submittedResult));
+        doThrow(new IllegalStateException("count write failed"))
+                .when(categoryCountService)
+                .recordPatientCounts(any(), any(), any(), anyList());
+
+        assertThrows(IllegalStateException.class, () -> consumer.process(buildRecord(null)));
+
+        verify(resultRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void process_withNoResults_stillCategorizesAndDoesNotPersistEmptyList() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());

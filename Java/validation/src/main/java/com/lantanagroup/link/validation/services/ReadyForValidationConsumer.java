@@ -236,6 +236,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             addIssueMetrics(results, attributes);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
+        // Before saving: a retry can record the counts again safely, but would save the results twice.
+        // Every result is passed, because unsaved ones (uncategorized or non-submit) are counted too.
+        categoryCountService.recordPatientCounts(facilityId, reportId, patientId, results);
         List<Result> submittedResults = results.stream()
                 .filter(result -> result.getCategories() != null
                         && result.getCategories().stream().anyMatch(Category::isSubmit))
@@ -250,8 +253,6 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                 resultRepository.saveAll(submittedResults);
             }
         }
-        // Pass every finding, not only the saved ones; unsaved findings (uncategorized or non-submit) are counted too.
-        categoryCountService.recordPatientCounts(facilityId, reportId, patientId, results);
         return results;
     }
 
