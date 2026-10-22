@@ -271,9 +271,22 @@ test('restore is enabled only for deleted reports that had not started or had fi
   }
 
   // The button itself is disabled, so the reason is a tooltip on the wrapper around it.
+  // The wrapper is in the tab order so a keyboard user can focus that reason.
   const blocked = reports.rows.filter({ hasText: 'RestoreAborted' }).getByRole('button', { name: RESTORE_BLOCKED });
-  await blocked.locator('xpath=..').hover();
+  const blockedWrapper = blocked.locator('xpath=..');
+  await expect(blockedWrapper).toHaveAttribute('tabindex', '0');
+  await expect(blockedWrapper).toHaveAttribute('aria-label', RESTORE_BLOCKED);
+  await blockedWrapper.hover();
   await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await page.locator('body').hover({ position: { x: 1, y: 1 } });
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveCount(0);
+  // Material shows this tooltip on keyboard focus only, so step away and tab back.
+  await blockedWrapper.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(blockedWrapper).toBeFocused();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await expect(scheduledRow.getByRole('button', { name: 'Restore this report' }).locator('xpath=..')).not.toHaveAttribute('tabindex');
 
   await scheduledRow.getByRole('button', { name: 'Restore this report' }).click();
   await expect(page.getByRole('dialog')).toContainText('Are you sure you want to restore this report');

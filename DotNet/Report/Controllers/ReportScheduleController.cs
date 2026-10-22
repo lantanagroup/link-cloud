@@ -220,7 +220,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains(ScheduleStatusExtensions.RestoreBlockedDetail))
             {
-                _logger.LogWarning(new EventId(ReportConstants.LoggingIds.UpdateItem, "Restore"), "Refused to restore report schedule {Id}: {Detail}", HtmlInputSanitizer.Sanitize(id), ex.Message);
+                _logger.LogWarning(new EventId(ReportConstants.LoggingIds.UpdateItem, "Restore"), "Refused to restore report schedule {Id}: {Detail}", HtmlInputSanitizer.Sanitize(id), HtmlInputSanitizer.Sanitize(ex.Message));
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
             catch (Exception ex)

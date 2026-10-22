@@ -117,8 +117,20 @@ test('restore is enabled only for deleted reports that had not started or had fi
     await expect(view.reportRow(row.id).getByRole('button', { name: RESTORE_BLOCKED })).toBeDisabled();
   }
 
-  await view.reportRow(rows[2].id).getByRole('button', { name: RESTORE_BLOCKED }).locator('xpath=..').hover();
+  const blockedWrapper = view.reportRow(rows[2].id).getByRole('button', { name: RESTORE_BLOCKED }).locator('xpath=..');
+  await expect(blockedWrapper).toHaveAttribute('tabindex', '0');
+  await expect(blockedWrapper).toHaveAttribute('aria-label', RESTORE_BLOCKED);
+  await blockedWrapper.hover();
   await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await page.locator('body').hover({ position: { x: 1, y: 1 } });
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveCount(0);
+  // Material shows this tooltip on keyboard focus only, so step away and tab back.
+  await blockedWrapper.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(blockedWrapper).toBeFocused();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await expect(view.reportRow(rows[0].id).getByRole('button', { name: 'Restore this report' }).locator('xpath=..')).not.toHaveAttribute('tabindex');
 });
 
 test('showing deleted reports refetches with includeDeleted and reveals the Deleted column', async ({ page, api }) => {
