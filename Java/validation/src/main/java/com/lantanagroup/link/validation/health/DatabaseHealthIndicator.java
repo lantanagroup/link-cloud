@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @see RedisHealthIndicator a bounded probe on the same reasoning, for Redis
  */
-@Component("Database")
+@Component("Database (SQL Server)")
 public class DatabaseHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseHealthIndicator.class);
