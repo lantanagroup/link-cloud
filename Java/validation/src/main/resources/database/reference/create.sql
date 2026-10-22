@@ -3,7 +3,13 @@ create table category (acceptable bit not null, submit bit not null default (1),
 create table category_rule (id bigint identity not null, timestamp datetimeoffset(6) not null, category_id varchar(255) not null, matcher varchar(max) not null, primary key (id));
 create table result (id bigint identity not null, expression varchar(1000), code varchar(255) not null check (code in ('INVALID','STRUCTURE','REQUIRED','VALUE','INVARIANT','SECURITY','LOGIN','UNKNOWN','EXPIRED','FORBIDDEN','SUPPRESSED','PROCESSING','NOTSUPPORTED','DUPLICATE','MULTIPLEMATCHES','NOTFOUND','DELETED','TOOLONG','CODEINVALID','EXTENSION','TOOCOSTLY','BUSINESSRULE','CONFLICT','TRANSIENT','LOCKERROR','NOSTORE','EXCEPTION','TIMEOUT','INCOMPLETE','THROTTLED','INFORMATIONAL','NULL')), facility_id varchar(255) not null, location varchar(255), message varchar(max) not null, patient_id varchar(255) not null, profile varchar(1000), report_id varchar(255) not null, severity varchar(255) not null check (severity in ('FATAL','ERROR','WARNING','INFORMATION','NULL')), primary key (id));
 create table result_category (result_id bigint not null, category_id varchar(255) not null);
+create table patient_category_count (id bigint identity not null, facility_id nvarchar(255) not null, report_id nvarchar(64) not null, patient_id nvarchar(255) not null, category_id nvarchar(255) not null, issues bigint not null, primary key (id));
+create table report_category_count (id bigint identity not null, facility_id nvarchar(255) not null, report_id nvarchar(64) not null, category_id nvarchar(255) not null, title varchar(255) not null, acceptable bit not null, submit bit not null, issues bigint not null, primary key (id));
+create table report_category_count_status (id bigint identity not null, facility_id nvarchar(255) not null, report_id nvarchar(64) not null, last_updated datetimeoffset(6) not null, primary key (id));
 alter table artifact add constraint uq_artifact_type_name unique (type, name);
+alter table patient_category_count add constraint uq_patient_category_count_facility_id_report_id_patient_id_category_id unique (facility_id, report_id, patient_id, category_id);
+alter table report_category_count add constraint uq_report_category_count_facility_id_report_id_category_id unique (facility_id, report_id, category_id);
+alter table report_category_count_status add constraint uq_report_category_count_status_facility_id_report_id unique (facility_id, report_id);
 create index ix_result_facility_id on result (facility_id);
 create index ix_result_facility_id_report_id on result (facility_id, report_id);
 create index ix_result_facility_id_report_id_patient_id on result (facility_id, report_id, patient_id);
