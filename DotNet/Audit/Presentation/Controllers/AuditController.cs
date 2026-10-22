@@ -75,9 +75,9 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             service = service.Sanitize();
             action = action.Sanitize();
             user = user.Sanitize();
-            patientId = (patientId ?? string.Empty).SanitizeAndRemove();
-            resource = (resource ?? string.Empty).SanitizeAndRemove();
-            resourceId = (resourceId ?? string.Empty).SanitizeAndRemove();
+            patientId = patientId.Sanitize();
+            resource = resource.Sanitize();
+            resourceId = resourceId.Sanitize();
             sortBy = sortBy.Sanitize();
 
             //capture audit search duration metric
