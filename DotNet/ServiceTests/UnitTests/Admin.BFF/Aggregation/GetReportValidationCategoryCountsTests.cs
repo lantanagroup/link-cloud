@@ -240,6 +240,76 @@ public class GetReportValidationCategoryCountsTests
         Assert.Equal(StatusCodes.Status401Unauthorized, await ExecuteResultAsync(result));
     }
 
+    [Fact]
+    public async Task Handle_ScheduleWithNoFacility_ReturnsBadGateway()
+    {
+        var handler = new MockHttpMessageHandler(request => request.RequestUri!.Host == "report"
+            ? OkJson("{\"id\":\"" + ReportId + "\",\"facilityId\":\"\"}")
+            : throw new InvalidOperationException($"Unexpected request: {request.RequestUri}"));
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        Assert.Equal(StatusCodes.Status502BadGateway, await ExecuteResultAsync(result));
+    }
+
+    [Fact]
+    public async Task Handle_ValidationReturnsNoCountsBody_ReturnsBadGateway()
+    {
+        var handler = new MockHttpMessageHandler(request => request.RequestUri!.Host == "report"
+            ? OkJson(ScheduleJson)
+            : OkJson("null"));
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        Assert.Equal(StatusCodes.Status502BadGateway, await ExecuteResultAsync(result));
+    }
+
+    [Fact]
+    public async Task Handle_ValidationForbidden_ReturnsForbid()
+    {
+        var handler = new MockHttpMessageHandler(request => request.RequestUri!.Host == "report"
+            ? OkJson(ScheduleJson)
+            : new HttpResponseMessage(HttpStatusCode.Forbidden));
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        Assert.IsType<ForbidHttpResult>(result);
+    }
+
+    [Fact]
+    public async Task Handle_ValidationUnavailable_PassesTheStatusThrough()
+    {
+        var handler = new MockHttpMessageHandler(request => request.RequestUri!.Host == "report"
+            ? OkJson(ScheduleJson)
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, await ExecuteResultAsync(result));
+    }
+
+    [Fact]
+    public async Task Handle_UnexpectedException_ReturnsInternalServerError()
+    {
+        var handler = new MockHttpMessageHandler(request => request.RequestUri!.Host == "report"
+            ? OkJson(ScheduleJson)
+            : throw new HttpRequestException("connection refused"));
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, await ExecuteResultAsync(result));
+    }
+
     private (ReportService report, ValidationService validation) BuildServices(MockHttpMessageHandler handler)
     {
         var report = new ReportService(

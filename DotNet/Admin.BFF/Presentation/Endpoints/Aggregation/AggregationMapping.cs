@@ -133,6 +133,7 @@ public static class AggregationMapping
             .Produces(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
             .WithOpenApi(x => new OpenApiOperation(x)
             {
                 Summary = "Get Report Validation Category Counts",
@@ -143,7 +144,8 @@ public static class AggregationMapping
                               "with that submit flag. " +
                               "Returns 404 if the report schedule does not exist, or if it has no stored counts " +
                               "(for example, it was validated before counts were stored); " +
-                              "the problem detail says which."
+                              "the problem detail says which. " +
+                              "Returns 502 if Report or Validation returns a response that breaks its contract."
             });
 
         return routes;

@@ -280,6 +280,34 @@ public class ValidationResultsValidatorTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task CategoryCounts_MissingWithNoSavedFindings_Passes()
+    {
+        var client = ClientWithCounts(savedFindings: 0, storedCounts: null, liveCounts: null);
+
+        var output = new CapturingOutput();
+        var sut = new ValidationResultsValidator(client.Object, output);
+
+        await sut.ValidateAllAsync("facility-1", "report-1", []);
+
+        output.Lines.Should().Contain("VALIDATION CATEGORY COUNTS: none stored and no saved findings; nothing to compare");
+        output.Lines.Should().Contain("VALIDATION RESULTS (API): Passed");
+    }
+
+    [Fact]
+    public async Task CategoryCounts_MalformedCountsBody_Fails()
+    {
+        var client = ClientWithCounts(savedFindings: 1, storedCounts: "[]", liveCounts: null);
+
+        var output = new CapturingOutput();
+        var sut = new ValidationResultsValidator(client.Object, output);
+
+        var act = () => sut.ValidateAllAsync("facility-1", "report-1", ["patient-1"]);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        output.Lines.Should().Contain(line => line.Contains("was not a counts response", StringComparison.Ordinal));
+    }
+
     /// <summary>
     /// A report with no saved findings and no stored counts, so the category count check has nothing to compare.
     /// </summary>

@@ -45,9 +45,11 @@ public static class GetReportValidationCategoryCounts
                 cancellationToken: context.RequestAborted);
             if (schedule is null || string.IsNullOrWhiteSpace(schedule.FacilityId))
             {
+                // Report answered but broke its contract, so this is an upstream failure rather than our own.
                 logger.LogError("Report schedule {ReportScheduleId} has no facility",
                     reportScheduleId.SanitizeForLog());
-                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
+                return Results.Problem("Report returned a report schedule with no facility.",
+                                       statusCode: StatusCodes.Status502BadGateway);
             }
 
             var countsResponse = await validationService.GetReportCategoryCounts(
@@ -69,7 +71,8 @@ public static class GetReportValidationCategoryCounts
             {
                 logger.LogError("Validation returned no counts body for report {ReportScheduleId}",
                     reportScheduleId.SanitizeForLog());
-                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
+                return Results.Problem("Validation returned no counts.",
+                                       statusCode: StatusCodes.Status502BadGateway);
             }
 
             await AddCategoryDetailsAsync(logger, context, validationService, counts.Categories, reportScheduleId);
