@@ -769,6 +769,32 @@ exit 0
     & $composeScript build | Out-Null
     Write-Result ($LASTEXITCODE -ne 0 -and $global:LinkCloudFeedTokenHooks['DockerCalls'].Count -eq 0) 'compose.ps1 stops before docker when the token cannot be fetched'
 
+    $global:LinkCloudFeedTokenHooks['Fetch'] = {
+        param($Root)
+        $global:LinkCloudFeedTokenHooks['FetchCalls'] = [int]$global:LinkCloudFeedTokenHooks['FetchCalls'] + 1
+        return 1
+    }
+    $global:LinkCloudFeedTokenHooks['FetchCalls'] = 0
+    $global:LinkCloudFeedTokenHooks['DockerCalls'].Clear()
+    $global:LinkCloudFeedTokenHooks['DockerSaw'] = ''
+    $global:LinkCloudFeedTokenHooks['Messages'].Clear()
+    $env:AZURE_ARTIFACTS_PAT = $sentinel
+    & $composeScript build automation-ui | Out-Null
+    $shellPatMessages = ($global:LinkCloudFeedTokenHooks['Messages'] -join "`n")
+    Write-Result ($LASTEXITCODE -eq 0 -and $global:LinkCloudFeedTokenHooks['FetchCalls'] -eq 0 -and $global:LinkCloudFeedTokenHooks['DockerSaw'] -eq 'match' -and $env:AZURE_ARTIFACTS_PAT -eq $sentinel -and -not $shellPatMessages.Contains($sentinel)) 'compose.ps1 uses a shell PAT and does not fetch'
+    Remove-Item Env:AZURE_ARTIFACTS_PAT
+
+    $dotenv = Join-Path $composeRepo '.env'
+    [System.IO.File]::WriteAllText($dotenv, "# keep`nAZURE_ARTIFACTS_PAT=$sentinel`n")
+    $global:LinkCloudFeedTokenHooks['FetchCalls'] = 0
+    $global:LinkCloudFeedTokenHooks['DockerCalls'].Clear()
+    $global:LinkCloudFeedTokenHooks['DockerSaw'] = ''
+    $global:LinkCloudFeedTokenHooks['Messages'].Clear()
+    & $composeScript build | Out-Null
+    $dotenvMessages = ($global:LinkCloudFeedTokenHooks['Messages'] -join "`n")
+    Write-Result ($LASTEXITCODE -eq 0 -and $global:LinkCloudFeedTokenHooks['FetchCalls'] -eq 1 -and $global:LinkCloudFeedTokenHooks['DockerSaw'] -eq 'match' -and -not (Test-Path Env:AZURE_ARTIFACTS_PAT) -and -not $dotenvMessages.Contains($sentinel)) 'compose.ps1 uses a .env PAT when the fetch fails'
+    Remove-Item -LiteralPath $dotenv -Force
+
     Write-TokenFile -Repo $composeRepo -Token $sentinel -Expires 1700003600
     Set-DockerHook -ExitCode 5
     & $composeScript ps

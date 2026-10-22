@@ -10,6 +10,7 @@ function global:Get-LinkCloudFeedTokenMissingMessage {
         'PowerShell profile line: . "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token'
         'Git Bash: bash ./Scripts/docker-compose.feed-token-install.sh'
         'Git Bash profile line: . "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token'
+        'A Packaging Read PAT in AZURE_ARTIFACTS_PAT, or in the root .env for docker compose, is used instead of Azure CLI. Do not commit it.'
     )
     return ($lines -join [Environment]::NewLine)
 }
@@ -172,6 +173,38 @@ function global:Test-LinkCloudFeedTokenUnexpired {
     return (([int64]$Read.Expires - $Now) -gt 0)
 }
 
+function global:Get-LinkCloudShellPat {
+    if (-not (Test-Path Env:AZURE_ARTIFACTS_PAT)) { return $null }
+    $trimmed = ([string]$env:AZURE_ARTIFACTS_PAT).Trim()
+    if ([string]::IsNullOrWhiteSpace($trimmed)) { return $null }
+    return $trimmed
+}
+
+function global:Read-LinkCloudDotEnvPat {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    $path = Join-Path $RepoRoot '.env'
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    foreach ($line in [System.IO.File]::ReadAllLines($path)) {
+        $trim = $line.Trim()
+        if ($trim.Length -eq 0 -or $trim.StartsWith('#')) { continue }
+        if ($trim.StartsWith('export ')) {
+            $trim = $trim.Substring(7).Trim()
+        }
+        $prefix = 'AZURE_ARTIFACTS_PAT='
+        if (-not $trim.StartsWith($prefix)) { continue }
+        $value = $trim.Substring($prefix.Length).Trim()
+        if ($value.Length -ge 2) {
+            $first = $value[0]
+            $last = $value[$value.Length - 1]
+            if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
+                $value = $value.Substring(1, $value.Length - 2).Trim()
+            }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+    }
+    return $null
+}
+
 function global:Invoke-LinkCloudCompose {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -181,29 +214,38 @@ function global:Invoke-LinkCloudCompose {
     if (-not $ComposeArguments) {
         $ComposeArguments = @()
     }
-    $envFile = Join-Path $RepoRoot '.azure-artifacts.env'
-    $now = Get-LinkCloudNowEpoch
-    $read = $null
-    if (Test-Path -LiteralPath $envFile) {
-        $read = Read-LinkCloudFeedTokenFile -Path $envFile
-    }
-    $fresh = Test-LinkCloudFeedTokenFresh -Read $read -Now $now
-    if (-not $fresh) {
-        $fetchCode = Invoke-LinkCloudFeedTokenFetch -Root $RepoRoot
+    $token = Get-LinkCloudShellPat
+    if (-not $token) {
+        $envFile = Join-Path $RepoRoot '.azure-artifacts.env'
+        $now = Get-LinkCloudNowEpoch
         $read = $null
-        if ($fetchCode -eq 0 -and (Test-Path -LiteralPath $envFile)) {
+        if (Test-Path -LiteralPath $envFile) {
             $read = Read-LinkCloudFeedTokenFile -Path $envFile
-            $now = Get-LinkCloudNowEpoch
         }
-        $fresh = ($fetchCode -eq 0) -and (Test-LinkCloudFeedTokenUnexpired -Read $read -Now $now)
+        $fresh = Test-LinkCloudFeedTokenFresh -Read $read -Now $now
         if (-not $fresh) {
-            Write-LinkCloudMessage (Get-LinkCloudFeedTokenMissingMessage)
-            $global:LASTEXITCODE = 1
-            return
+            $fetchCode = Invoke-LinkCloudFeedTokenFetch -Root $RepoRoot
+            $read = $null
+            if ($fetchCode -eq 0 -and (Test-Path -LiteralPath $envFile)) {
+                $read = Read-LinkCloudFeedTokenFile -Path $envFile
+                $now = Get-LinkCloudNowEpoch
+            }
+            $fresh = ($fetchCode -eq 0) -and (Test-LinkCloudFeedTokenUnexpired -Read $read -Now $now)
+            if ($fresh) {
+                $token = [string]$read.Token
+            } else {
+                $token = Read-LinkCloudDotEnvPat -RepoRoot $RepoRoot
+            }
+        } else {
+            $token = [string]$read.Token
         }
     }
-
-    $token = [string]$read.Token
+    if ([string]::IsNullOrWhiteSpace([string]$token)) {
+        Write-LinkCloudMessage (Get-LinkCloudFeedTokenMissingMessage)
+        $global:LASTEXITCODE = 1
+        return
+    }
+    $token = [string]$token
     $previousSet = Test-Path Env:AZURE_ARTIFACTS_PAT
     $previous = $env:AZURE_ARTIFACTS_PAT
     $savedCode = 1

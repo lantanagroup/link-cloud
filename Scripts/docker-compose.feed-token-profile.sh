@@ -10,6 +10,7 @@ link_cloud_missing_message() {
   printf '%s\n' 'PowerShell profile line: . "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token'
   printf '%s\n' 'Git Bash: bash ./Scripts/docker-compose.feed-token-install.sh'
   printf '%s\n' 'Git Bash profile line: . "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token'
+  printf '%s\n' 'A Packaging Read PAT in AZURE_ARTIFACTS_PAT, or in the root .env for docker compose, is used instead of Azure CLI. Do not commit it.'
 }
 
 find_link_cloud_root() {
@@ -130,6 +131,93 @@ link_cloud_is_compose() {
   return 1
 }
 
+link_cloud_trim() {
+  local value=$1
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+# Prints the shell PAT, or returns 1 when it is unset or blank. Does not echo it otherwise.
+link_cloud_shell_pat() {
+  local value
+  value=$(link_cloud_trim "${AZURE_ARTIFACTS_PAT-}")
+  [ -n "$value" ] || return 1
+  printf '%s' "$value"
+}
+
+# First non-empty AZURE_ARTIFACTS_PAT in a compose .env file. Does not echo it otherwise.
+link_cloud_dotenv_pat() {
+  local file=$1
+  local line value
+  [ -f "$file" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    line=$(link_cloud_trim "$line")
+    case "$line" in
+      ''|\#*) continue ;;
+    esac
+    case "$line" in
+      export[[:space:]]*)
+        line="${line#export}"
+        line=$(link_cloud_trim "$line")
+        ;;
+    esac
+    case "$line" in
+      AZURE_ARTIFACTS_PAT=*)
+        value=$(link_cloud_trim "${line#AZURE_ARTIFACTS_PAT=}")
+        case "$value" in
+          \"*\") value="${value#\"}"; value="${value%\"}" ;;
+          \'*\') value="${value#\'}"; value="${value%\'}" ;;
+        esac
+        value=$(link_cloud_trim "$value")
+        if [ -n "$value" ]; then
+          printf '%s' "$value"
+          return 0
+        fi
+        ;;
+    esac
+  done < "$file"
+  return 1
+}
+
+# Sets the global token. A shell PAT wins. Otherwise the Azure CLI file, then .env.
+link_cloud_resolve_token() {
+  local root=$1
+  local envfile now use_pat
+  envfile="$root/.azure-artifacts.env"
+  now=$(link_cloud_now)
+  token=""
+  expires=""
+  use_pat=$(link_cloud_shell_pat) || use_pat=""
+  if [ -n "$use_pat" ]; then
+    token="$use_pat"
+    return 0
+  fi
+  if [ -f "$envfile" ]; then
+    link_cloud_load_token "$envfile"
+  fi
+  if link_cloud_token_fresh "$token" "$expires" "$now"; then
+    return 0
+  fi
+  if link_cloud_fetch "$root" && [ -f "$envfile" ]; then
+    token=""
+    expires=""
+    link_cloud_load_token "$envfile"
+    now=$(link_cloud_now)
+    if link_cloud_token_unexpired "$token" "$expires" "$now"; then
+      return 0
+    fi
+  fi
+  use_pat=$(link_cloud_dotenv_pat "$root/.env") || use_pat=""
+  if [ -n "$use_pat" ]; then
+    token="$use_pat"
+    return 0
+  fi
+  token=""
+  return 1
+}
+
 link_cloud_launch() {
   # The subshell keeps the caller's set -x from printing the token, and from being turned off.
   (
@@ -138,30 +226,9 @@ link_cloud_launch() {
       printf '%s\n' "compose is only available inside the link-cloud repo." >&2
       exit 1
     }
-    envfile="$root/.azure-artifacts.env"
-    now=$(link_cloud_now)
-    token=""
-    expires=""
-    if [ -f "$envfile" ]; then
-      link_cloud_load_token "$envfile"
-    fi
-    if ! link_cloud_token_fresh "$token" "$expires" "$now"; then
-      if ! link_cloud_fetch "$root"; then
-        link_cloud_missing_message >&2
-        exit 1
-      fi
-      if [ ! -f "$envfile" ]; then
-        link_cloud_missing_message >&2
-        exit 1
-      fi
-      token=""
-      expires=""
-      link_cloud_load_token "$envfile"
-      now=$(link_cloud_now)
-      if ! link_cloud_token_unexpired "$token" "$expires" "$now"; then
-        link_cloud_missing_message >&2
-        exit 1
-      fi
+    if ! link_cloud_resolve_token "$root"; then
+      link_cloud_missing_message >&2
+      exit 1
     fi
     if [ -z "${LINK_CLOUD_DOCKER_EXE:-}" ]; then
       printf '%s\n' "docker was not found on PATH." >&2

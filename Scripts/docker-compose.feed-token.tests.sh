@@ -436,6 +436,31 @@ if [ "$wrap_code" -ne 0 ] && [ ! -s "$log" ] && grep -Fq 'Azure token missing' "
 else
   fail 'compose.sh stops before docker when the token cannot be fetched'
 fi
+export AZURE_ARTIFACTS_PAT="$sentinel"
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+: > "$log"
+set +e
+bash "$root/compose.sh" build >"$compose_root/out-pat.txt" 2>"$compose_root/err-pat.txt"
+pat_code=$?
+set -e
+if [ "$pat_code" -eq 0 ] && grep -Fxq 'TOKEN:match' "$log" && ! grep -Fq 'mock fetch failed' "$compose_root/err-pat.txt" && ! grep -Fq "$sentinel" "$compose_root/out-pat.txt" "$compose_root/err-pat.txt"; then
+  pass 'compose.sh uses a shell PAT and does not fetch'
+else
+  fail 'compose.sh uses a shell PAT and does not fetch'
+fi
+unset AZURE_ARTIFACTS_PAT
+printf '%s\n' '# keep' "AZURE_ARTIFACTS_PAT=${sentinel}" > "$compose_root/.env"
+: > "$log"
+set +e
+bash "$root/compose.sh" build >"$compose_root/out-dotenv.txt" 2>"$compose_root/err-dotenv.txt"
+dotenv_code=$?
+set -e
+if [ "$dotenv_code" -eq 0 ] && grep -Fxq 'TOKEN:match' "$log" && grep -Fq 'mock fetch failed' "$compose_root/err-dotenv.txt" && ! grep -Fq "$sentinel" "$compose_root/out-dotenv.txt" "$compose_root/err-dotenv.txt"; then
+  pass 'compose.sh uses a .env PAT when the fetch fails'
+else
+  fail 'compose.sh uses a .env PAT when the fetch fails'
+fi
+rm -f "$compose_root/.env"
 printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700003600' > "$compose_root/.azure-artifacts.env"
 export LINK_CLOUD_MOCK_EXIT=5
 set +e

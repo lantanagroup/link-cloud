@@ -13,6 +13,7 @@ print_missing() {
   printf '%s\n' 'PowerShell profile line: . "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token'
   printf '%s\n' 'Git Bash: bash ./Scripts/docker-compose.feed-token-install.sh'
   printf '%s\n' 'Git Bash profile line: . "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token'
+  printf '%s\n' 'A Packaging Read PAT in AZURE_ARTIFACTS_PAT, or in the root .env for docker compose, is used instead of Azure CLI. Do not commit it.'
 }
 
 if [ -z "$project" ]; then

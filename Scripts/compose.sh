@@ -1,7 +1,9 @@
 #!/bin/bash
-# Runs docker compose from this repo after making sure the Shared_BOTW_Feed token in
-# .azure-artifacts.env exists and has at least 10 minutes left. Every argument goes to
-# docker compose unchanged, for example: bash ./Scripts/compose.sh build automation-ui
+# Runs docker compose from this repo. A shell AZURE_ARTIFACTS_PAT is passed through and
+# Azure CLI is not called. Otherwise the token in .azure-artifacts.env is refreshed when
+# it has under 10 minutes left, and a root .env value is used if that fetch fails.
+# Every argument goes to docker compose unchanged, for example:
+# bash ./Scripts/compose.sh build automation-ui
 # AZURE_ARTIFACTS_PAT is set only for the docker process. The token is not printed.
 # No profile setup is needed.
 set +x
