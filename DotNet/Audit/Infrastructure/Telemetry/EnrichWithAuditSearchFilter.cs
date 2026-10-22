@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
             activity.AddTag(DiagnosticNames.UserFilter, searchFilter.FilterUserBy);
             activity.AddTag(DiagnosticNames.ResourceFilter, searchFilter.FilterResourceBy);
             activity.AddTag(DiagnosticNames.ResourceIdFilter, searchFilter.FilterResourceIdBy);
-            //activity.AddTag(DiagnosticNames.PatientId, searchFilter.FilterPatientBy);
+            //the patient filter is PHI and is deliberately not emitted as a span tag
             activity.AddTag(DiagnosticNames.SortBy, searchFilter.SortBy);
             activity.AddTag(DiagnosticNames.SortOrder, searchFilter.SortOrder);
             activity.AddTag(DiagnosticNames.PageSize, searchFilter.PageSize);
