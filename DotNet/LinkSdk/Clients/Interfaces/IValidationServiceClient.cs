@@ -18,10 +18,12 @@ public interface IValidationServiceClient
     Task<LinkApiResponse<string>> GetValidationResultSummaryAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a report's stored validation counts per category. Returns 404 when the report has no stored counts.
+    /// Gets a report's stored validation counts per category, optionally only the categories with the given submit
+    /// flag. Returns 404 when the report has no stored counts.
     /// </summary>
     Task<LinkApiResponse<string>> GetReportCategoryCountsAsync(string facilityId,
                                                               string reportId,
+                                                              bool? submit = null,
                                                               CancellationToken cancellationToken = default);
 
     /// <summary>

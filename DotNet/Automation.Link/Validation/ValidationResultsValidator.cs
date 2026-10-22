@@ -135,7 +135,7 @@ public class ValidationResultsValidator
         }
 
         var countsResponse = await _validationClient.GetReportCategoryCountsAsync(
-            facilityId, reportId, cancellationToken);
+            facilityId, reportId, submit: null, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (countsResponse.StatusCode == 404)
         {

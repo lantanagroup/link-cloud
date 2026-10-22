@@ -48,8 +48,10 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
 
     public Task<LinkApiResponse<string>> GetReportCategoryCountsAsync(string facilityId,
                                                                      string reportId,
+                                                                     bool? submit = null,
                                                                      CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"validation/facilities/{facilityId}/reports/{reportId}/category-counts")
+            .SetQueryParam("submit", submit.HasValue ? (submit.Value ? "true" : "false") : null)
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<string>> GetReportCategorySummariesAsync(

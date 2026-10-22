@@ -298,6 +298,7 @@ public class ValidationResultsValidatorTests
         client.Setup(c => c.GetReportCategoryCountsAsync(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
+                null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse<string> { StatusCode = 404, RawBody = "{}" });
     }
@@ -334,6 +335,7 @@ public class ValidationResultsValidatorTests
         client.Setup(c => c.GetReportCategoryCountsAsync(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
+                null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(storedCounts is null
                 ? new LinkApiResponse<string> { StatusCode = 404, RawBody = "{}" }
