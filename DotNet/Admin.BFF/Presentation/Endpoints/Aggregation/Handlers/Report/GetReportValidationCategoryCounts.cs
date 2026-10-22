@@ -32,7 +32,7 @@ public static class GetReportValidationCategoryCounts
 
         try
         {
-            var scheduleResponse = await reportService.GetReportScheduleById(
+            using var scheduleResponse = await reportService.GetReportScheduleById(
                 context.User,
                 context.RequestAborted,
                 reportScheduleId);
@@ -52,7 +52,7 @@ public static class GetReportValidationCategoryCounts
                                        statusCode: StatusCodes.Status502BadGateway);
             }
 
-            var countsResponse = await validationService.GetReportCategoryCounts(
+            using var countsResponse = await validationService.GetReportCategoryCounts(
                 context.User,
                 schedule.FacilityId,
                 reportScheduleId,
@@ -126,7 +126,7 @@ public static class GetReportValidationCategoryCounts
         Dictionary<string, ValidationCategory> categoriesById;
         try
         {
-            var categoriesResponse = await validationService.GetCategories(context.User, context.RequestAborted);
+            using var categoriesResponse = await validationService.GetCategories(context.User, context.RequestAborted);
             if (!categoriesResponse.IsSuccessStatusCode)
             {
                 logger.LogWarning(
