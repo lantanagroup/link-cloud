@@ -1,14 +1,17 @@
 -- LEGLINK-1313: per-category validation counts that outlive a report's findings. The pipeline re-applies every V*.sql
 -- on each deploy, so every statement is guarded. There is no foreign key to category: a count must survive the
 -- category being deleted.
+-- The id columns are nvarchar because the JDBC driver sends string parameters as nvarchar, and comparing those
+-- with a varchar column makes SQL Server convert the column and scan the index instead of seeking. report_id is
+-- nvarchar(64), since report schedule ids are GUIDs, to keep the four-column unique key under 1,700 bytes.
 if not exists (select 1 from sys.tables where name = 'report_category_count' and schema_id = schema_id('dbo'))
 begin
     create table report_category_count
     (
         id          bigint identity not null,
-        facility_id varchar(255)    not null,
-        report_id   varchar(255)    not null,
-        category_id varchar(255)    not null,
+        facility_id nvarchar(255)   not null,
+        report_id   nvarchar(64)    not null,
+        category_id nvarchar(255)   not null,
         title       varchar(255)    not null,
         acceptable  bit             not null,
         submit      bit             not null,
@@ -22,10 +25,10 @@ begin
     create table patient_category_count
     (
         id          bigint identity not null,
-        facility_id varchar(255)    not null,
-        report_id   varchar(255)    not null,
-        patient_id  varchar(255)    not null,
-        category_id varchar(255)    not null,
+        facility_id nvarchar(255)   not null,
+        report_id   nvarchar(64)    not null,
+        patient_id  nvarchar(255)   not null,
+        category_id nvarchar(255)   not null,
         issues      bigint          not null,
         primary key (id)
     );
@@ -36,8 +39,8 @@ begin
     create table report_category_count_status
     (
         id           bigint identity   not null,
-        facility_id  varchar(255)      not null,
-        report_id    varchar(255)      not null,
+        facility_id  nvarchar(255)     not null,
+        report_id    nvarchar(64)      not null,
         last_updated datetimeoffset(6) not null,
         primary key (id)
     );

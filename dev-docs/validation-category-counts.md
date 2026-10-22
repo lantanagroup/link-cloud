@@ -32,6 +32,20 @@ The tables come from `V20261021__Add_category_counts.sql` in deployed environmen
 statement is guarded because the pipeline re-applies every script on each deploy. The docker
 profile creates them through Hibernate (`ddl-auto: update`).
 
+The id columns (`facility_id`, `report_id`, `patient_id`, `category_id`) are `nvarchar`, and the
+entity fields are `@Nationalized`. The SQL Server JDBC driver sends string parameters as
+`nvarchar`. Compared with a `varchar` column under the SQL collation, that makes SQL Server
+convert the column (`CONVERT_IMPLICIT`) and scan the whole index instead of seeking. For the
+locked status lookup, a scan would also range-lock every report's row, so one report's counts
+would block all the others. With matching types, every lookup and the lock seek on their unique
+index. `report_id` is `nvarchar(64)`, since report schedule ids are GUIDs, which keeps the
+four-column unique key on `patient_category_count` at 1,658 bytes, under SQL Server's 1,700-byte
+limit for an index key.
+
+A local database that already has these tables as `varchar`, from an earlier build of this branch,
+keeps them that way: `ddl-auto: update` doesn't change column types. Drop the three tables once
+and let the docker profile recreate them.
+
 ## What is counted
 
 `CategoryCountService.recordPatientCounts` counts one patient's findings, after categorization:
