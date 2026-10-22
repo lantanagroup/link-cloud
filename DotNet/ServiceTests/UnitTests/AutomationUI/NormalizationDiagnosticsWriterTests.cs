@@ -78,6 +78,12 @@ public class NormalizationDiagnosticsWriterTests
         export.Should().Contain("Location#2 CopyLocationAliasToTypeIteratively");
         export.Should().Contain("Raw [NormalizationExecutionSummary] lines (1)");
         export.Should().Contain(logs[0]);
+        snapshot.EvidencePatientIds.Should().Equal("p1");
+        var slim = RunHistorySlim.SlimNormalizationEvidence(snapshot);
+        slim.ParsedSteps.Should().BeEmpty();
+        slim.SummaryLines.Should().BeEmpty();
+        slim.EvidencePatientIds.Should().Equal("p1");
+        slim.SuiteSequences.Should().NotBeEmpty();
     }
 
     [Fact]

@@ -314,16 +314,23 @@ public class RunsController(
 
         var suiteId = manifest?.AppliedNormalizationSuiteId
             ?? RunConfigurationReader.Read(run.RunConfigurationJson).SuiteId;
+        var hasRecordedSequences = evidence?.SuiteSequences is { Count: > 0 };
         NormalizationSuiteDefinition? suite = null;
         List<NormalizationOperationDefinition>? operations = null;
         List<NormalizationSequenceDefinition>? sequences = null;
-        if (suiteId.HasValue)
+        var suiteChangedAfterRun = false;
+        if (suiteId.HasValue && !hasRecordedSequences)
         {
             suite = await normalizationStore.GetSuiteByIdAsync(suiteId.Value, cancellationToken);
             if (suite != null)
             {
                 operations = await normalizationStore.GetAllOperationsAsync(cancellationToken);
                 sequences = await normalizationStore.GetAllSequencesAsync(cancellationToken);
+                suiteChangedAfterRun = NormalizationRunResultsBuilder.SuiteDefinitionChangedAfter(
+                    suite,
+                    operations,
+                    sequences,
+                    run.StartedAt ?? run.CreatedAt);
             }
         }
 
@@ -345,6 +352,7 @@ public class RunsController(
             Suite = suite,
             SuiteOperations = operations,
             SuiteSequences = sequences,
+            SuiteChangedAfterRun = suiteChangedAfterRun,
             OrganizationMap = organizationMap
         });
         return Json(results);

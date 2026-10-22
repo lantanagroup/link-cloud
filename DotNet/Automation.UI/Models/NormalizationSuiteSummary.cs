@@ -63,6 +63,12 @@ public sealed class NormalizationRunResults
     public string? SuiteName { get; init; }
     public NormalizationSuiteSummary? Suite { get; init; }
 
+    /// <summary>snapshot when the sequences were stored with the run; current when the live suite is shown.</summary>
+    public string SuiteDefinitionSource { get; init; } = string.Empty;
+
+    /// <summary>Short explanation of which suite definition is shown.</summary>
+    public string SuiteDefinitionNote { get; init; } = string.Empty;
+
     public string OrganizationMapState { get; init; } = "not-configured";
     public Guid? OrganizationMapId { get; init; }
     public string? OrganizationMapName { get; init; }

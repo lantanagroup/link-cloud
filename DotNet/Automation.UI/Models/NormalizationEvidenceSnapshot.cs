@@ -50,6 +50,12 @@ public sealed class NormalizationEvidenceSnapshot
     public bool EvidenceCollected { get; set; }
 
     /// <summary>
+    /// Patient ids named on the collected execution lines. Kept after the per-resource
+    /// steps are dropped so a later view can tell which patients the evidence covers.
+    /// </summary>
+    public List<string> EvidencePatientIds { get; set; } = [];
+
+    /// <summary>
     /// Short rollup of parsed execution steps. Kept when the per-resource steps are omitted.
     /// </summary>
     public List<string> EvidenceInventory { get; set; } = [];
@@ -99,6 +105,9 @@ public sealed class NormalizationEvidenceStep
 {
     public string ResourceType { get; set; } = string.Empty;
     public string ResourceId { get; set; } = string.Empty;
+
+    /// <summary>Patient the Normalization service named on the execution line. Empty on older snapshots.</summary>
+    public string PatientId { get; set; } = string.Empty;
     public int Sequence { get; set; }
     public string OperationType { get; set; } = string.Empty;
     public string OperationName { get; set; } = string.Empty;

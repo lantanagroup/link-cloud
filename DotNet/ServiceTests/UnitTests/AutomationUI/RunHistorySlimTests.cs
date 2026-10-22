@@ -330,7 +330,8 @@ public class RunHistorySlimTests
             UploadedPatientCount = 1,
             GeneratorAppliedSelectedSuite = true,
             EvidenceCollected = true,
-            EvidenceInventory = ["Encounter#1 CopyLocation 'Copy': Success=2"]
+            EvidenceInventory = ["Encounter#1 CopyLocation 'Copy': Success=2"],
+            EvidencePatientIds = ["uploaded-1", "generated-1"]
         });
 
         slim.SummaryLines.Should().BeEmpty();
@@ -341,6 +342,7 @@ public class RunHistorySlimTests
         slim.GeneratorAppliedSelectedSuite.Should().BeTrue();
         slim.EvidenceCollected.Should().BeTrue();
         slim.EvidenceInventory.Should().Equal("Encounter#1 CopyLocation 'Copy': Success=2");
+        slim.EvidencePatientIds.Should().Equal("uploaded-1", "generated-1");
 
         var export = NormalizationDiagnosticsWriter.FormatExportAppendix(slim);
         export.Should().Contain("Encounter#1 CopyLocation 'Copy': Success=2");

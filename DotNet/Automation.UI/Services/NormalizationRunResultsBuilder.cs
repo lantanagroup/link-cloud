@@ -18,11 +18,12 @@ public static class NormalizationRunResultsBuilder
         var patientSource = DescribeSource(generated, uploaded);
 
         var suiteId = source.Manifest?.AppliedNormalizationSuiteId ?? config.SuiteId;
-        var suiteName = FirstName(
-            source.Suite?.Name,
-            source.Manifest?.AppliedNormalizationSuiteName,
-            source.Evidence?.SuiteName);
-        var suiteState = ResolveArtifactState(suiteId, suiteName, source.Suite != null);
+        var evidence = source.Evidence;
+        var hasRecordedSequences = evidence?.SuiteSequences is { Count: > 0 };
+        var suiteName = hasRecordedSequences
+            ? FirstName(evidence?.SuiteName, source.Manifest?.AppliedNormalizationSuiteName, source.Suite?.Name)
+            : FirstName(source.Suite?.Name, source.Manifest?.AppliedNormalizationSuiteName, evidence?.SuiteName);
+        var suiteState = ResolveArtifactState(suiteId, suiteName, source.Suite != null || hasRecordedSequences);
 
         var mapId = source.Manifest?.AppliedOrganizationResourceMapTemplateId ?? config.OrganizationMapId;
         var mapName = FirstName(source.OrganizationMap?.Name, source.Manifest?.AppliedOrganizationResourceMapName);
@@ -31,7 +32,6 @@ public static class NormalizationRunResultsBuilder
         var displaySuite = suiteState == "not-configured"
             ? null
             : suiteName ?? "Selected suite";
-        var evidence = source.Evidence;
         var lineCount = evidence?.CollectedLineCount ?? 0;
         var parsedCount = evidence?.ParsedSteps?.Count ?? 0;
         if (parsedCount == 0)
@@ -87,26 +87,39 @@ public static class NormalizationRunResultsBuilder
             }
         }
 
+        var uploadedSpecific = evidenceFound && UploadedEvidenceIsSpecific(source.Manifest, evidence, generated);
         var uploadedState = "not-applicable";
         var uploadedMessage = "This run did not use uploaded patients.";
         if (uploaded > 0)
         {
-            if (evidenceFound && displaySuite != null)
+            if (uploadedSpecific && displaySuite != null)
             {
                 uploadedState = "confirmed";
-                uploadedMessage =
-                    $"The uploaded-patient workflow used normalization suite '{displaySuite}' during processing ({lineCount} summary log line(s)).";
+                uploadedMessage = generated == 0
+                    ? $"The uploaded-patient workflow used normalization suite '{displaySuite}' during processing ({lineCount} summary log line(s))."
+                    : $"Normalization evidence for the uploaded patients used suite '{displaySuite}'.";
             }
-            else if (evidenceFound)
+            else if (uploadedSpecific)
             {
                 uploadedState = "confirmed";
-                uploadedMessage =
-                    $"The uploaded-patient workflow used the selected normalization suite during processing ({lineCount} summary log line(s)).";
+                uploadedMessage = generated == 0
+                    ? $"The uploaded-patient workflow used the selected normalization suite during processing ({lineCount} summary log line(s))."
+                    : "Normalization evidence for the uploaded patients used the selected normalization suite.";
             }
             else if (!source.RunFinished && !evidencePresent)
             {
                 uploadedState = "pending";
                 uploadedMessage = "Normalization evidence has not been collected yet.";
+            }
+            else if (!source.RunFinished)
+            {
+                uploadedState = "pending";
+                uploadedMessage = "Normalization evidence for the uploaded patients is not confirmed yet.";
+            }
+            else if (evidenceFound)
+            {
+                uploadedState = "no-evidence";
+                uploadedMessage = "Normalization evidence was found, but none of it is tied to the uploaded patients.";
             }
             else
             {
@@ -116,12 +129,24 @@ public static class NormalizationRunResultsBuilder
         }
 
         NormalizationSuiteSummary? suiteSummary = null;
-        if (source.Suite != null)
+        var suiteDefinitionSource = string.Empty;
+        var suiteDefinitionNote = string.Empty;
+        if (hasRecordedSequences && evidence != null)
+        {
+            suiteSummary = BuildRecordedSuite(suiteId, displaySuite, evidence.SuiteSequences);
+            suiteDefinitionSource = "snapshot";
+            suiteDefinitionNote = "These sequences were stored with this run.";
+        }
+        else if (source.Suite != null)
         {
             suiteSummary = NormalizationSuiteSummaryBuilder.Build(
                 source.Suite,
                 source.SuiteOperations ?? [],
                 source.SuiteSequences ?? []);
+            suiteDefinitionSource = "current";
+            suiteDefinitionNote = source.SuiteChangedAfterRun
+                ? "This suite was modified after the run started. The sequences shown are the current definition, not what this run used."
+                : "This is the current suite definition, not a snapshot from this run.";
         }
 
         var operations = new List<NormalizationOperationSummaryLine>();
@@ -160,6 +185,8 @@ public static class NormalizationRunResultsBuilder
             SuiteId = suiteState == "not-configured" ? null : suiteId,
             SuiteName = displaySuite,
             Suite = suiteSummary,
+            SuiteDefinitionSource = suiteDefinitionSource,
+            SuiteDefinitionNote = suiteDefinitionNote,
             OrganizationMapState = mapState,
             OrganizationMapId = mapState == "not-configured" ? null : mapId,
             OrganizationMapName = mapState == "not-configured" ? null : mapName ?? "Selected organization map",
@@ -220,6 +247,164 @@ public static class NormalizationRunResultsBuilder
         return "unavailable";
     }
 
+    /// <summary>
+    /// A non-system suite, sequence, or operation saved after the run started means the
+    /// stored definition may differ from what ran. System records are rewritten on startup,
+    /// so their timestamps are not treated as an edit.
+    /// </summary>
+    public static bool SuiteDefinitionChangedAfter(
+        NormalizationSuiteDefinition suite,
+        IReadOnlyList<NormalizationOperationDefinition>? operations,
+        IReadOnlyList<NormalizationSequenceDefinition>? sequences,
+        DateTimeOffset runStarted)
+    {
+        if (!suite.IsSystem && suite.UpdatedAt > runStarted)
+            return true;
+
+        var operationIds = new HashSet<Guid>(suite.OperationIds);
+        if (sequences != null)
+        {
+            var sequenceIds = new HashSet<Guid>(suite.SequenceIds);
+            foreach (var sequence in sequences)
+            {
+                if (!sequenceIds.Contains(sequence.Id))
+                    continue;
+                if (!sequence.IsSystem && sequence.UpdatedAt > runStarted)
+                    return true;
+                foreach (var entry in sequence.Entries)
+                    operationIds.Add(entry.OperationId);
+            }
+        }
+
+        if (operations == null)
+            return false;
+
+        foreach (var operation in operations)
+        {
+            if (operationIds.Contains(operation.Id)
+                && !operation.IsSystem
+                && operation.UpdatedAt > runStarted)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool UploadedEvidenceIsSpecific(
+        GenerationManifestSnapshot? manifest,
+        NormalizationEvidenceSnapshot? evidence,
+        int generated)
+    {
+        if (generated == 0)
+            return true;
+        if (evidence == null)
+            return false;
+
+        var uploadedIds = new HashSet<string>(StringComparer.Ordinal);
+        if (manifest?.PatientOriginByPatient != null)
+        {
+            foreach (var pair in manifest.PatientOriginByPatient)
+            {
+                if (string.Equals(pair.Value, PatientOrigin.Uploaded, StringComparison.Ordinal)
+                    && !string.IsNullOrWhiteSpace(pair.Key))
+                    uploadedIds.Add(pair.Key);
+            }
+        }
+
+        if (uploadedIds.Count == 0)
+            return false;
+
+        if (ContainsUploadedPatient(evidence.EvidencePatientIds, uploadedIds))
+            return true;
+
+        if (evidence.ParsedSteps != null)
+        {
+            foreach (var step in evidence.ParsedSteps)
+            {
+                if (MatchesUploadedPatient(step.PatientId, step.ResourceType, step.ResourceId, uploadedIds))
+                    return true;
+            }
+        }
+
+        if (evidence.SummaryLines is { Count: > 0 })
+        {
+            foreach (var step in NormalizationExecutionSummaryParser.ParseAll(evidence.SummaryLines))
+            {
+                if (MatchesUploadedPatient(step.PatientId, step.ResourceType, step.ResourceId, uploadedIds))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsUploadedPatient(IEnumerable<string>? ids, HashSet<string> uploadedIds)
+    {
+        if (ids == null)
+            return false;
+        foreach (var id in ids)
+        {
+            if (!string.IsNullOrWhiteSpace(id) && uploadedIds.Contains(id.Trim()))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool MatchesUploadedPatient(
+        string? patientId,
+        string? resourceType,
+        string? resourceId,
+        HashSet<string> uploadedIds)
+    {
+        if (!string.IsNullOrWhiteSpace(patientId) && uploadedIds.Contains(patientId.Trim()))
+            return true;
+        return string.Equals(resourceType, "Patient", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(resourceId)
+            && uploadedIds.Contains(resourceId.Trim());
+    }
+
+    private static NormalizationSuiteSummary BuildRecordedSuite(
+        Guid? suiteId,
+        string? suiteName,
+        IReadOnlyList<NormalizationSuiteSequenceStep> steps)
+    {
+        var sequences = new List<NormalizationSuiteSummarySequence>();
+        var standalone = new List<NormalizationSuiteSummaryOperation>();
+        foreach (var group in steps.GroupBy(step => step.SequenceName ?? string.Empty))
+        {
+            var operations = group
+                .OrderBy(step => step.Sequence)
+                .Select(step => new NormalizationSuiteSummaryOperation
+                {
+                    Sequence = step.Sequence,
+                    Name = step.OperationName,
+                    OperationType = step.OperationType,
+                    ResourceTypes = step.ResourceTypes ?? []
+                })
+                .ToList();
+            if (string.Equals(group.Key, "(standalone)", StringComparison.OrdinalIgnoreCase))
+            {
+                standalone.AddRange(operations);
+                continue;
+            }
+
+            sequences.Add(new NormalizationSuiteSummarySequence
+            {
+                Name = string.IsNullOrWhiteSpace(group.Key) ? "Sequence" : group.Key,
+                Operations = operations
+            });
+        }
+
+        return new NormalizationSuiteSummary
+        {
+            Id = suiteId ?? Guid.Empty,
+            Name = suiteName ?? string.Empty,
+            Sequences = sequences,
+            Operations = standalone
+        };
+    }
+
     private static string? FirstName(params string?[] names)
     {
         foreach (var name in names)
@@ -243,6 +428,7 @@ public sealed class NormalizationRunResultsSource
     public IReadOnlyList<NormalizationOperationDefinition>? SuiteOperations { get; init; }
     public IReadOnlyList<NormalizationSequenceDefinition>? SuiteSequences { get; init; }
     public OrganizationResourceMapTemplate? OrganizationMap { get; init; }
+    public bool SuiteChangedAfterRun { get; init; }
 }
 
 internal static class RunConfigurationReader

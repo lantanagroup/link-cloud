@@ -2655,6 +2655,21 @@
             return '<span class="badge bg-secondary">No evidence found</span>';
         }
 
+        function suiteDefinitionBadge(data) {
+            const source = data.suiteDefinitionSource || '';
+            if (source === 'snapshot')
+                return '<span class="badge bg-secondary">Recorded for this run</span>';
+            if (source === 'current')
+                return '<span class="badge bg-warning text-dark">Current definition</span>';
+            return '';
+        }
+
+        function suiteDefinitionNote(data) {
+            const note = data.suiteDefinitionNote || '';
+            if (!note) return '';
+            return `<div class="small text-muted mt-1">${escapeHtml(note)}</div>`;
+        }
+
         function confirmationBadge(state) {
             if (state === 'confirmed') return '<span class="badge bg-success">Confirmed</span>';
             if (state === 'pending') return '<span class="badge bg-warning text-dark">Pending</span>';
@@ -2680,7 +2695,7 @@
                 : `<p class="text-muted mb-0">${escapeHtml(data.evidenceMessage || 'No evidence found.')}</p>`;
             body.innerHTML = `
                 <div class="row g-3 mb-3">
-                    <div class="col-md-4"><div class="small text-muted">Normalization Suite</div><div class="fw-semibold">${artifactText(data.suiteState, data.suiteName, 'Selected suite')}</div></div>
+                    <div class="col-md-4"><div class="small text-muted">Normalization Suite</div><div class="fw-semibold">${artifactText(data.suiteState, data.suiteName, 'Selected suite')}</div>${suiteDefinitionBadge(data)}${suiteDefinitionNote(data)}</div>
                     <div class="col-md-4"><div class="small text-muted">Organization Map</div><div class="fw-semibold">${artifactText(data.organizationMapState, data.organizationMapName, 'Selected organization map')}</div></div>
                     <div class="col-md-4"><div class="small text-muted">Patients</div><div>${patientSourceBadges(data)}</div></div>
                 </div>
@@ -2730,6 +2745,7 @@
             }).join('');
             const standalone = (suite.operations || []).map(operationStep).join('');
             body.innerHTML = `
+                <div class="mb-2">${suiteDefinitionBadge(data)}${suiteDefinitionNote(data)}</div>
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                     <div>
                         <div class="fw-semibold">${escapeHtml(suite.name || 'Selected suite')}</div>

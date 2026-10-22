@@ -60,6 +60,8 @@ public class NormalizationRunResultsBuilderTests
         results.Operations.Should().ContainSingle();
         results.Operations[0].Name.Should().Be("Copy location");
         results.PatientSource.Should().Be("generated");
+        results.SuiteDefinitionSource.Should().Be("current");
+        results.SuiteDefinitionNote.Should().Contain("current suite definition");
     }
 
     [Fact]
@@ -128,6 +130,33 @@ public class NormalizationRunResultsBuilderTests
     }
 
     [Fact]
+    public void Build_leaves_uploaded_confirmation_not_applicable_for_a_generated_only_run()
+    {
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = true,
+            Manifest = new GenerationManifestSnapshot
+            {
+                AppliedNormalizationSuiteName = "Epic",
+                GeneratedWithSelectedSuite = true,
+                PatientOriginByPatient = new Dictionary<string, string> { ["g1"] = "Generated" }
+            },
+            Evidence = new NormalizationEvidenceSnapshot
+            {
+                SuiteName = "Epic",
+                CollectedLineCount = 3,
+                EvidencePatientIds = ["g1"],
+                EvidenceInventory = ["Encounter#1 CopyLocation 'Copy': Success=1"]
+            }
+        });
+
+        results.PatientSource.Should().Be("generated");
+        results.GeneratedConfirmationState.Should().Be("confirmed");
+        results.UploadedConfirmationState.Should().Be("not-applicable");
+        results.EvidenceState.Should().Be("found");
+    }
+
+    [Fact]
     public void Build_confirms_uploaded_patients_from_summary_log_evidence()
     {
         var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
@@ -154,6 +183,151 @@ public class NormalizationRunResultsBuilderTests
         results.EvidenceState.Should().Be("found");
         results.EvidenceInventory.Should().Equal("Encounter#1 CopyLocation 'Copy': Success=2");
         results.ParsedStepCount.Should().Be(2);
+    }
+
+    [Fact]
+    public void Build_does_not_confirm_uploaded_patients_from_generated_evidence_in_a_mixed_run()
+    {
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = true,
+            Manifest = new GenerationManifestSnapshot
+            {
+                AppliedNormalizationSuiteName = "Epic",
+                PatientOriginByPatient = new Dictionary<string, string>
+                {
+                    ["g1"] = "Generated",
+                    ["u1"] = "Uploaded"
+                }
+            },
+            Evidence = new NormalizationEvidenceSnapshot
+            {
+                SuiteName = "Epic",
+                CollectedLineCount = 4,
+                EvidenceCollected = true,
+                EvidencePatientIds = ["g1"],
+                EvidenceInventory = ["Encounter#1 CopyLocation 'Copy': Success=2"]
+            }
+        });
+
+        results.PatientSource.Should().Be("mixed");
+        results.UploadedConfirmationState.Should().Be("no-evidence");
+        results.UploadedConfirmation.Should().Contain("none of it is tied to the uploaded patients");
+        results.EvidenceState.Should().Be("found");
+    }
+
+    [Fact]
+    public void Build_does_not_confirm_uploaded_patients_from_unattributed_evidence_in_a_mixed_run()
+    {
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = true,
+            Manifest = new GenerationManifestSnapshot
+            {
+                AppliedNormalizationSuiteName = "Epic",
+                PatientOriginByPatient = new Dictionary<string, string>
+                {
+                    ["g1"] = "Generated",
+                    ["u1"] = "Uploaded"
+                }
+            },
+            Evidence = new NormalizationEvidenceSnapshot
+            {
+                SuiteName = "Epic",
+                CollectedLineCount = 4,
+                EvidenceInventory = ["Encounter#1 CopyLocation 'Copy': Success=2"]
+            }
+        });
+
+        results.UploadedConfirmationState.Should().Be("no-evidence");
+        results.UploadedConfirmation.Should().Contain("none of it is tied");
+    }
+
+    [Fact]
+    public void Build_keeps_uploaded_confirmation_pending_while_a_mixed_run_is_still_going()
+    {
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = false,
+            Manifest = new GenerationManifestSnapshot
+            {
+                AppliedNormalizationSuiteName = "Epic",
+                PatientOriginByPatient = new Dictionary<string, string>
+                {
+                    ["g1"] = "Generated",
+                    ["u1"] = "Uploaded"
+                }
+            },
+            Evidence = new NormalizationEvidenceSnapshot
+            {
+                SuiteName = "Epic",
+                CollectedLineCount = 2,
+                EvidencePatientIds = ["g1"]
+            }
+        });
+
+        results.UploadedConfirmationState.Should().Be("pending");
+        results.UploadedConfirmation.Should().Contain("not confirmed yet");
+    }
+
+    [Fact]
+    public void Build_confirms_uploaded_patients_when_mixed_run_evidence_names_them()
+    {
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = true,
+            Manifest = new GenerationManifestSnapshot
+            {
+                AppliedNormalizationSuiteName = "Epic",
+                GeneratedWithSelectedSuite = true,
+                PatientOriginByPatient = new Dictionary<string, string>
+                {
+                    ["g1"] = "Generated",
+                    ["u1"] = "Uploaded"
+                }
+            },
+            Evidence = new NormalizationEvidenceSnapshot
+            {
+                SuiteName = "Epic",
+                CollectedLineCount = 6,
+                EvidencePatientIds = ["g1", "u1"]
+            }
+        });
+
+        results.PatientSource.Should().Be("mixed");
+        results.GeneratedConfirmationState.Should().Be("confirmed");
+        results.UploadedConfirmationState.Should().Be("confirmed");
+        results.UploadedConfirmation.Should().Contain("Epic");
+        results.UploadedConfirmation.Should().Contain("uploaded patients");
+    }
+
+    [Fact]
+    public void Build_confirms_uploaded_patients_from_a_summary_line_when_ids_were_not_stored()
+    {
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = true,
+            Manifest = new GenerationManifestSnapshot
+            {
+                AppliedNormalizationSuiteName = "Epic",
+                PatientOriginByPatient = new Dictionary<string, string>
+                {
+                    ["g1"] = "Generated",
+                    ["u1"] = "Uploaded"
+                }
+            },
+            Evidence = new NormalizationEvidenceSnapshot
+            {
+                SuiteName = "Epic",
+                CollectedLineCount = 1,
+                SummaryLines =
+                [
+                    "[NormalizationExecutionSummary] FacilityId=f1, PatientId=u1, CorrelationId=c1, ReportTrackingId=r1, ResourceType=Encounter, ResourceId=enc-1, Steps=[1:CopyLocation:Copy:Success]"
+                ]
+            }
+        });
+
+        results.UploadedConfirmationState.Should().Be("confirmed");
     }
 
     [Fact]
@@ -294,6 +468,138 @@ public class NormalizationRunResultsBuilderTests
         results.Operations.Should().ContainSingle();
         results.Operations[0].Name.Should().Be("Ran");
         results.Operations[0].ResourceTypes.Should().Equal("Encounter");
+    }
+
+    [Fact]
+    public void Build_uses_sequences_stored_with_the_run_instead_of_the_current_suite()
+    {
+        var suiteId = Guid.NewGuid();
+        var currentOperation = Operation("Current op", "CopyLocation", "Location");
+        var currentSequence = new NormalizationSequenceDefinition
+        {
+            Name = "Current sequence",
+            Entries = [new NormalizationSequenceEntry { OperationId = currentOperation.Id, Sequence = 1 }]
+        };
+        var currentSuite = new NormalizationSuiteDefinition
+        {
+            Id = suiteId,
+            Name = "Renamed suite",
+            SequenceIds = [currentSequence.Id],
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = true,
+            Suite = currentSuite,
+            SuiteOperations = [currentOperation],
+            SuiteSequences = [currentSequence],
+            SuiteChangedAfterRun = true,
+            Manifest = new GenerationManifestSnapshot
+            {
+                AppliedNormalizationSuiteId = suiteId,
+                AppliedNormalizationSuiteName = "Epic"
+            },
+            Evidence = new NormalizationEvidenceSnapshot
+            {
+                SuiteName = "Epic",
+                SuiteSequences =
+                [
+                    new NormalizationSuiteSequenceStep
+                    {
+                        SequenceName = "Recorded sequence",
+                        Sequence = 1,
+                        OperationName = "Recorded op",
+                        OperationType = "CodeMap",
+                        ResourceTypes = ["Encounter"]
+                    },
+                    new NormalizationSuiteSequenceStep
+                    {
+                        SequenceName = "(standalone)",
+                        OperationName = "Standalone op",
+                        OperationType = "RemoveExtensions",
+                        ResourceTypes = ["Patient"]
+                    }
+                ]
+            }
+        });
+
+        results.SuiteName.Should().Be("Epic");
+        results.SuiteDefinitionSource.Should().Be("snapshot");
+        results.SuiteDefinitionNote.Should().Contain("stored with this run");
+        results.Suite!.Sequences.Should().ContainSingle();
+        results.Suite.Sequences[0].Name.Should().Be("Recorded sequence");
+        results.Suite.Sequences[0].Operations[0].Name.Should().Be("Recorded op");
+        results.Suite.Operations.Should().ContainSingle();
+        results.Suite.Operations[0].Name.Should().Be("Standalone op");
+        results.Operations.Select(op => op.Name).Should().Equal("Recorded op", "Standalone op");
+    }
+
+    [Fact]
+    public void Build_notes_when_the_current_suite_changed_after_the_run()
+    {
+        var operation = Operation("Copy", "CopyLocation", "Location");
+        var sequence = new NormalizationSequenceDefinition
+        {
+            Name = "Locations",
+            Entries = [new NormalizationSequenceEntry { OperationId = operation.Id, Sequence = 1 }]
+        };
+        var suite = new NormalizationSuiteDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Epic",
+            SequenceIds = [sequence.Id]
+        };
+
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunFinished = true,
+            Suite = suite,
+            SuiteOperations = [operation],
+            SuiteSequences = [sequence],
+            SuiteChangedAfterRun = true,
+            Manifest = new GenerationManifestSnapshot { AppliedNormalizationSuiteId = suite.Id }
+        });
+
+        results.SuiteDefinitionSource.Should().Be("current");
+        results.SuiteDefinitionNote.Should().Contain("modified after the run started");
+        results.Suite!.Sequences[0].Name.Should().Be("Locations");
+    }
+
+    [Fact]
+    public void Suite_change_ignores_system_records_rewritten_on_startup()
+    {
+        var runStarted = DateTimeOffset.Parse("2026-10-01T00:00:00Z");
+        var later = runStarted.AddDays(1);
+        var systemOperation = Operation("System op", "CopyLocation", "Location");
+        systemOperation.IsSystem = true;
+        systemOperation.UpdatedAt = later;
+        var userOperation = Operation("User op", "CodeMap", "Encounter");
+        userOperation.UpdatedAt = runStarted.AddMinutes(-5);
+        var sequence = new NormalizationSequenceDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Locations",
+            IsSystem = true,
+            UpdatedAt = later,
+            Entries = [new NormalizationSequenceEntry { OperationId = systemOperation.Id, Sequence = 1 }]
+        };
+        var suite = new NormalizationSuiteDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "System",
+            IsSystem = true,
+            UpdatedAt = later,
+            SequenceIds = [sequence.Id],
+            OperationIds = [userOperation.Id]
+        };
+
+        NormalizationRunResultsBuilder.SuiteDefinitionChangedAfter(
+            suite, [systemOperation, userOperation], [sequence], runStarted).Should().BeFalse();
+
+        userOperation.UpdatedAt = later;
+        NormalizationRunResultsBuilder.SuiteDefinitionChangedAfter(
+            suite, [systemOperation, userOperation], [sequence], runStarted).Should().BeTrue();
     }
 
     [Fact]

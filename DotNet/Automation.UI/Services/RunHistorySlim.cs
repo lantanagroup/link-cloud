@@ -267,6 +267,7 @@ public static class RunHistorySlim
             GeneratorAppliedSelectedSuite = source.GeneratorAppliedSelectedSuite,
             EvidenceCollected = source.EvidenceCollected,
             EvidenceInventory = source.EvidenceInventory == null ? [] : [.. source.EvidenceInventory],
+            EvidencePatientIds = source.EvidencePatientIds == null ? [] : [.. source.EvidencePatientIds],
             RuntimeSequences = source.RuntimeSequences,
             SuiteSequences = source.SuiteSequences,
             OperationConfigs = (source.OperationConfigs ?? [])
