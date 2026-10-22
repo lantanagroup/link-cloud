@@ -472,6 +472,46 @@ public class ReportScheduledManagerTests
         Assert.True((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
     }
 
+    [Theory]
+    [InlineData(ScheduleStatus.Scheduled)]
+    [InlineData(ScheduleStatus.Submitted)]
+    public async Task RestoreByReportTrackingIdAsync_WithRestorableStatus_ClearsIsDeleted(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status, isDeleted: true);
+        await SeedAsync(context, report);
+
+        await sut.RestoreByReportTrackingIdAsync(report.Id);
+
+        context.ChangeTracker.Clear();
+        Assert.False((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
+    }
+
+    [Theory]
+    [InlineData(ScheduleStatus.New)]
+    [InlineData(ScheduleStatus.EndOfPeriod)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted)]
+    public async Task RestoreByReportTrackingIdAsync_WithNonRestorableStatus_ThrowsAndStaysDeleted(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status, isDeleted: true);
+        await SeedAsync(context, report);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.RestoreByReportTrackingIdAsync(report.Id));
+
+        Assert.Contains("cannot be restored", ex.Message);
+        Assert.Contains(status.ToString(), ex.Message);
+        context.ChangeTracker.Clear();
+        Assert.True((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
+    }
+
     #endregion
 
     private static ReportSchedule CreateReport(string facilityId, ScheduleStatus status, bool isDeleted = false)

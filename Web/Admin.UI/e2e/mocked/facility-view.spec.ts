@@ -5,7 +5,9 @@ import { testFacilities } from '../fixtures/facilities';
 import { pagedReportSchedules, reportSchedules } from '../fixtures/report-summaries';
 import { locationMappings, pagedLocationMappings, pagedOperations } from '../fixtures/facility-detail';
 import { measureDefinitions } from '../fixtures/measure-defs';
-import { IPagedReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+import { IPagedReportSchedule, IReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+
+const RESTORE_BLOCKED = 'Reports deleted mid flight cannot be restored.';
 
 const facility = testFacilities[0];
 const facilityId = facility.facilityId;
@@ -93,6 +95,30 @@ test('filtering by status refetches the schedules with that status', async ({ pa
 
   await expect.poll(() => api.callsTo('GET', SUMMARIES).length).toBe(2);
   expect(lastSummariesQuery(api).getAll('status')).toEqual(['Submitted']);
+});
+
+test('restore is enabled only for deleted reports that had not started or had finished', async ({ page, api }) => {
+  const rows: IReportSchedule[] = [
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000021', facilityId, status: 'Scheduled', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000022', facilityId, status: 'Submitted', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000023', facilityId, status: 'New', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000024', facilityId, status: 'EndOfPeriod', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000025', facilityId, status: 'CompletedNotSubmitted', isDeleted: true },
+  ];
+  mockFacilityView(api, pagedReportSchedules(rows));
+
+  const view = new FacilityViewPage(page);
+  await view.goto(facilityId);
+  await view.showDeletedCheckbox.check();
+
+  await expect(view.reportRow(rows[0].id).getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+  await expect(view.reportRow(rows[1].id).getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+  for (const row of rows.slice(2)) {
+    await expect(view.reportRow(row.id).getByRole('button', { name: RESTORE_BLOCKED })).toBeDisabled();
+  }
+
+  await view.reportRow(rows[2].id).getByRole('button', { name: RESTORE_BLOCKED }).locator('xpath=..').hover();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
 });
 
 test('showing deleted reports refetches with includeDeleted and reveals the Deleted column', async ({ page, api }) => {

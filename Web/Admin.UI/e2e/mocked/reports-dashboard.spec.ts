@@ -3,7 +3,13 @@ import { ApiMock } from '../support/api-mock';
 import { ReportsDashboardPage } from '../support/pages/reports-dashboard.page';
 import { pagedReportSchedules, reportSchedules } from '../fixtures/report-summaries';
 import { facilityLookup } from '../fixtures/facilities';
-import { IPagedReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+import { IPagedReportSchedule, IReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+
+const RESTORE_BLOCKED = 'Reports deleted mid flight cannot be restored.';
+
+function deletedReport(id: string, facilityId: string, status: string): IReportSchedule {
+  return { ...reportSchedules[0], id, facilityId, status, isDeleted: true };
+}
 
 const SUMMARIES = '/api/aggregate/reports/summaries';
 
@@ -241,4 +247,36 @@ test('a report that is still running cannot be deleted and says so', async ({ pa
   const alert = page.getByRole('dialog');
   await expect(alert).toContainText('Report In Progress');
   await expect(alert).toContainText('Report is currently in progress.');
+});
+
+test('restore is enabled only for deleted reports that had not started or had finished', async ({ page, api }) => {
+  const scheduled = deletedReport('aaaaaaaa-0000-0000-0000-000000000011', 'RestoreScheduled', 'Scheduled');
+  const submitted = deletedReport('aaaaaaaa-0000-0000-0000-000000000012', 'RestoreSubmitted', 'Submitted');
+  const aborted = deletedReport('aaaaaaaa-0000-0000-0000-000000000013', 'RestoreAborted', 'New');
+  const endOfPeriod = deletedReport('aaaaaaaa-0000-0000-0000-000000000014', 'RestoreEndOfPeriod', 'EndOfPeriod');
+  const skipped = deletedReport('aaaaaaaa-0000-0000-0000-000000000015', 'RestoreSkipped', 'CompletedNotSubmitted');
+  mockReports(api, pagedReportSchedules([scheduled, submitted, aborted, endOfPeriod, skipped]));
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+  await reports.showDeletedCheckbox.check();
+
+  const scheduledRow = reports.rows.filter({ hasText: 'RestoreScheduled' });
+  const submittedRow = reports.rows.filter({ hasText: 'RestoreSubmitted' });
+  await expect(scheduledRow.getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+  await expect(submittedRow.getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+
+  for (const facility of ['RestoreAborted', 'RestoreEndOfPeriod', 'RestoreSkipped']) {
+    await expect(reports.rows.filter({ hasText: facility }).getByRole('button', { name: RESTORE_BLOCKED })).toBeDisabled();
+  }
+
+  // The button itself is disabled, so the reason is a tooltip on the wrapper around it.
+  const blocked = reports.rows.filter({ hasText: 'RestoreAborted' }).getByRole('button', { name: RESTORE_BLOCKED });
+  await blocked.locator('xpath=..').hover();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+
+  await scheduledRow.getByRole('button', { name: 'Restore this report' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Are you sure you want to restore this report');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  expect(api.callsTo('PATCH', `/api/aggregate/reports/${scheduled.id}/restore`)).toHaveLength(0);
 });

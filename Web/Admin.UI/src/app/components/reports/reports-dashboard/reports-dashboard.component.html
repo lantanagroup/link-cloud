@@ -225,16 +225,20 @@
                     *ngIf="canCleanUp(element.status) && !element.isDeleted"
                     aria-label="Clean up this report"
                     matTooltip="Clean up this report"
-                    (click)="onSoftDeleteReport(element.id)">
+                    (click)="onSoftDeleteReport(element.id, element.status)">
               <mat-icon>delete</mat-icon>
             </button>
-            <button mat-icon-button color="accent"
-                    *ngIf="element.isDeleted"
-                    aria-label="Restore this report"
-                    matTooltip="Restore this report"
-                    (click)="onRestoreReport(element.id)">
-              <mat-icon>restore</mat-icon>
-            </button>
+            <!-- Disabled buttons do not receive pointer events, so the reason lives on the wrapper. -->
+            <span *ngIf="element.isDeleted"
+                  style="display: inline-block;"
+                  [matTooltip]="canRestore(element.status) ? 'Restore this report' : restoreBlockedReason">
+              <button mat-icon-button color="accent"
+                      [disabled]="!canRestore(element.status)"
+                      [attr.aria-label]="canRestore(element.status) ? 'Restore this report' : restoreBlockedReason"
+                      (click)="onRestoreReport(element.id)">
+                <mat-icon>restore</mat-icon>
+              </button>
+            </span>
           </td>
         </ng-container>
 
