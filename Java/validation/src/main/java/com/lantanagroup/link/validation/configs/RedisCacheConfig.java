@@ -59,7 +59,7 @@ public class RedisCacheConfig {
 
         // Bound Redis commands and socket connects so cache ops (and the health indicator that uses
         // this factory) fail fast when Redis is unreachable, instead of blocking on Lettuce's ~60s
-        // default. Keeps the BFF's 5s health-check window from timing out and showing every column N/A.
+        // default. Keeps the BFF's health-check window from timing out and showing every column N/A.
         SocketOptions socketOptions = SocketOptions.builder()
                 .connectTimeout(Duration.ofSeconds(1))
                 .build();

@@ -2,7 +2,7 @@
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
       @if (facilityConfig) {
-        <span>Facility: {{ facilityConfig.facilityId }}</span>
+        <span data-testid="facility-edit-header">Facility: {{ facilityConfig.facilityId }}</span>
       }
       <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard"
         [routerLink]="['/tenant']">
@@ -267,6 +267,10 @@
           <button mat-menu-item (click)="showOperationDialog(OperationType.CodeMap)">
             <mat-icon>code</mat-icon>
             <span>Add Code Map</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.HSLOCMap)">
+            <mat-icon>apartment</mat-icon>
+            <span>Add HSLOC Map</span>
           </button>
           <button mat-menu-item (click)="showOperationDialog(OperationType.ConditionalTransform)">
             <mat-icon>transform</mat-icon>

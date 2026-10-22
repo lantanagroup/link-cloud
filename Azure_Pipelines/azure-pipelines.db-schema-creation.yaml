@@ -19,6 +19,7 @@ parameters:
     - scale-test
     - scale-qa
     - scale-qa2
+    - scale-qa3
 
 - name: current_release
   displayName: "What is the Tag or Commit SHA of the Current Release? (i.e. : v0.2.0-beta.2)"
@@ -31,10 +32,10 @@ parameters:
       alias: account
       artifact: account-db
       file: accountDb.sql
-    - name: app-bff
-      alias: app_bff
-      artifact: app-bff-db
-      file: app-bffDb.sql
+    # - name: app-bff
+    #   alias: app_bff
+    #   artifact: app-bff-db
+    #   file: app-bffDb.sql
     - name: audit
       alias: audit
       artifact: audit-db
@@ -128,7 +129,7 @@ stages:
             # .Data project, and the previous plain pattern silently skipped Submission.
             $migrationPaths = [ordered]@{
               "Account"         = "DotNet/Account/Migrations"
-              "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
+              # "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
               "Audit"           = "DotNet/Audit/Migrations"
               "Census"          = "DotNet/Census/Migrations"
               "DataAcquisition" = "DotNet/DataAcquisition.Domain/Migrations"
@@ -206,39 +207,39 @@ stages:
          publishLocation: 'container'
         displayName: Publish Account SQL Script
   # App-BFF
-  - job: App_BFF
-    displayName: "Generate App-BFF Schema Script"
-    steps:
-      - checkout: self
-        fetchDepth: 0
-        fetchTags: true
-      - script: |
-          # The generated script is produced from the working tree, so the tree must be
-          # moved to current_release or the parameter is a label with no effect on output.
-          if [ -n "${{ parameters.current_release }}" ]; then
-            git checkout --detach "${{ parameters.current_release }}"
-          fi
-          echo "Generating schema from commit:"
-          git rev-parse HEAD
-        displayName: Check out current_release
-      - script: |
-          cd nhsn/NHSN-App-BFF
-          dotnet new tool-manifest --force
-          dotnet tool install dotnet-ef --version 8.0.22
-          dotnet tool restore
-          dotnet tool run dotnet-ef --version
-        displayName: Install dotnet-ef (local pinned)
-      - script: |
-          cd nhsn/NHSN-App-BFF
-          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
-          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
-        displayName: Generate App-BFF SQL Script
-      - task: PublishBuildArtifacts@1
-        inputs:
-         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
-         ArtifactName: 'app-bff-db'
-         publishLocation: 'container'
-        displayName: Publish App-BFF SQL Script  
+  # - job: App_BFF
+  #   displayName: "Generate App-BFF Schema Script"
+  #   steps:
+  #     - checkout: self
+  #       fetchDepth: 0
+  #       fetchTags: true
+  #     - script: |
+  #         # The generated script is produced from the working tree, so the tree must be
+  #         # moved to current_release or the parameter is a label with no effect on output.
+  #         if [ -n "${{ parameters.current_release }}" ]; then
+  #           git checkout --detach "${{ parameters.current_release }}"
+  #         fi
+  #         echo "Generating schema from commit:"
+  #         git rev-parse HEAD
+  #       displayName: Check out current_release
+  #     - script: |
+  #         cd nhsn/NHSN-App-BFF
+  #         dotnet new tool-manifest --force
+  #         dotnet tool install dotnet-ef --version 8.0.22
+  #         dotnet tool restore
+  #         dotnet tool run dotnet-ef --version
+  #       displayName: Install dotnet-ef (local pinned)
+  #     - script: |
+  #         cd nhsn/NHSN-App-BFF
+  #         mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+  #         dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
+  #       displayName: Generate App-BFF SQL Script
+  #     - task: PublishBuildArtifacts@1
+  #       inputs:
+  #        PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
+  #        ArtifactName: 'app-bff-db'
+  #        publishLocation: 'container'
+  #       displayName: Publish App-BFF SQL Script  
   ###
   # Audit
   - job: Audit
@@ -992,6 +993,143 @@ stages:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
         DatabaseName: 'link-qa2-botw-validation'
+        SqlUsername: '$(link-db_username)'
+        SqlPassword: '$(link-db_pass)'
+        deployType: 'SqlTask'
+        SqlFile: '$(Pipeline.Workspace)/validation-db/validationDb.sql'
+
+############################################################################################
+# SQL Script Apply QA3
+############################################################################################
+- stage: Apply_QA3_Update_SQL_DBs
+  displayName: Apply QA3 SQL Updates
+  # Azure DevOps rejects any run whose manually triggered stage also declares dependsOn, so
+  # this stage cannot be ordered behind Build and cannot inherit its failure. Verify_QA3 below
+  # re-runs Build's release-versus-deployed comparison inside this stage, and every update job
+  # depends on it, so a mismatch blocks the apply where the writing actually happens.
+  trigger: manual
+  condition: eq('${{ parameters.environment }}', 'scale-qa3')
+
+  pool:
+    vmImage: windows-latest
+
+  jobs:
+  - job: Verify_QA3
+    displayName: Verify release against deployed code
+    # Build runs on ubuntu; the update jobs need windows for SqlAzureDacpacDeployment, and a
+    # job-level pool overrides the stage's. Keep this check on the image it was written for.
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
+
+    - template: templates/verify-release-against-deployed.yml
+      parameters:
+        environment: ${{ parameters.environment }}
+        currentRelease: ${{ parameters.current_release }}
+
+  - ${{ each db in parameters.databases }}:
+
+    - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
+
+      - job: Update_${{ db.alias }}_QA3
+        displayName: Update ${{ db.alias }}
+        dependsOn: Verify_QA3
+
+        steps:
+        - download: current
+          artifact: ${{ db.artifact }}
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply ${{ db.alias }} DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-qa2-botw-${{ db.name }}'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+  - job: Update_validation_QA3
+    displayName: Update validation
+    dependsOn: Verify_QA3
+
+    steps:
+    - download: current
+      artifact: validation-db
+
+    - task: PowerShell@2
+      displayName: Combine Validation SQL Scripts
+      inputs:
+        targetType: inline
+        script: |
+
+          $path = "$(Pipeline.Workspace)/validation-db"
+          $outputFile = "$(Pipeline.Workspace)/validation-db/validationDb.sql"
+
+          # Find all Validation migration scripts
+          $files = Get-ChildItem `
+            -Path $path `
+            -Filter "V*.sql" `
+            -File |
+            Sort-Object Name
+
+          Write-Host ""
+          Write-Host "Validation SQL files found:"
+          Write-Host ""
+
+          foreach ($file in $files) 
+          {
+              Write-Host "  $($file.Name)"
+          }
+
+          Write-Host ""
+          Write-Host "Creating combined SQL file: $outputFile"
+
+          # Start with a clean file
+          New-Item `
+            -ItemType File `
+            -Path $outputFile `
+            -Force | Out-Null
+
+          foreach ($file in $files) 
+          {
+
+            Write-Host "Adding $($file.Name)"
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+            
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- Migration: $($file.Name)"
+
+            Add-Content `
+              -Path $outputFile `
+              -Value "-- ====================================================="
+
+            Get-Content $file.FullName |
+              Add-Content -Path $outputFile
+
+            Add-Content `
+              -Path $outputFile `
+              -Value ""
+          }
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: Apply validation DB Schema
+      inputs:
+        azureSubscription: "NHSNLink Resource Manager"
+        ServerName: '$(link-db_server)'
+        DatabaseName: 'link-qa3-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'

@@ -5,23 +5,22 @@ import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
 import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.*;
-import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Scope;
-import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,12 +30,30 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
+/**
+ * Holds a single {@link FhirValidator} (and the {@link ValidationSupportChain} whose cache backs it) across
+ * {@link #validate} calls, per HAPI's guidance to reuse validator instances. The validator is rebuilt only when
+ * {@link ArtifactService} hands back a different {@link ArtifactValidationSupport} -- which it does exactly when
+ * an artifact change has invalidated its memoized support -- so uploads and deletes still take effect on the
+ * next validation.
+ */
 @Service
-@Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class ValidationService {
     private static final Logger logger = LoggerFactory.getLogger(ValidationService.class);
-    private final FhirValidator fhirValidator;
+
+    // Raised from HAPI's default of 5000. validateCode results share this cache with the isCodeSystemSupported /
+    // isValueSetSupported / fetch entries, and the deployed terminology set carries 45k+ codes, so at 5000 the
+    // support checks were evicted even within a single large bundle. Entries are small result objects, so this
+    // costs tens of MB at most.
+    static final int CHAIN_CACHE_SIZE = 50_000;
+
+    private final FhirContext fhirContext;
+    private final ArtifactService artifactService;
+    private final LinkConfig linkConfig;
+    private final ValidationCacheService validationCacheService;
     private final ValidationResultIgnoreService validationResultIgnoreService;
+    private final ExecutorService bundleValidationExecutor;
+    private volatile ValidatorState validatorState;
 
     public ValidationService(
             FhirContext fhirContext,
@@ -44,21 +61,64 @@ public class ValidationService {
             LinkConfig linkConfig,
             ValidationCacheService validationCacheService,
             ValidationResultIgnoreService validationResultIgnoreService,
-            @Qualifier("bundleValidationExecutor") ExecutorService bundleValidationExecutor) throws IOException {
+            @Qualifier("bundleValidationExecutor") ExecutorService bundleValidationExecutor) {
+        this.fhirContext = fhirContext;
+        this.artifactService = artifactService;
+        this.linkConfig = linkConfig;
+        this.validationCacheService = validationCacheService;
         this.validationResultIgnoreService = validationResultIgnoreService;
+        this.bundleValidationExecutor = bundleValidationExecutor;
+    }
+
+    static ValidationSupportChain.CacheConfiguration chainCacheConfiguration() {
+        return ValidationSupportChain.CacheConfiguration.defaultValues()
+                .setCacheSize(CHAIN_CACHE_SIZE);
+    }
+
+    /**
+     * Returns the shared validator, rebuilding it if the artifact support has been invalidated since it was built.
+     * Validations already in flight keep the validator they started with.
+     */
+    FhirValidator getValidator() throws IOException {
+        ArtifactValidationSupport artifactSupport = artifactService.getValidationSupport();
+        ValidatorState state = validatorState;
+        if (state == null || state.artifactSupport() != artifactSupport) {
+            synchronized (this) {
+                artifactSupport = artifactService.getValidationSupport();
+                state = validatorState;
+                if (state == null || state.artifactSupport() != artifactSupport) {
+                    state = new ValidatorState(artifactSupport, buildValidator(artifactSupport));
+                    validatorState = state;
+                }
+            }
+        }
+        return state.validator();
+    }
+
+    private FhirValidator buildValidator(ArtifactValidationSupport artifactSupport) {
+        logger.info("Building FHIR validator");
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
+                chainCacheConfiguration(),
                 new DefaultProfileValidationSupport(fhirContext),
-                artifactService.getValidationSupport(),
+                artifactSupport,
                 new SnapshotGeneratingValidationSupport(fhirContext));
 
         loadTerminologyValidationSupport(fhirContext, linkConfig, validationSupportChain, validationCacheService);
 
-        CachingValidationSupport cachingValidationSupport = new CachingValidationSupport(validationSupportChain);
-        IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
-        fhirValidator = new FhirValidator(fhirContext);
+        // The chain caches internally; CachingValidationSupport is deprecated for removal and would only add a
+        // second cache layer.
+        IValidatorModule validatorModule = new ProfileCapturingInstanceValidator(validationSupportChain);
+        FhirValidator fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
+        // Required for profile attribution, not just throughput: concurrent validation validates each entry
+        // standalone, which is what keeps each message's validationContext accurate. Validating the bundle in one
+        // pass misattributes findings to whichever profile was evaluated last. See LEGLINK-1172.
         fhirValidator.setConcurrentBundleValidation(true);
         fhirValidator.setExecutorService(bundleValidationExecutor);
+        return fhirValidator;
+    }
+
+    private record ValidatorState(ArtifactValidationSupport artifactSupport, FhirValidator validator) {
     }
 
     // Public so FhirConfig can compose the rubric engine's chain from the same terminology
@@ -88,11 +148,25 @@ public class ValidationService {
     }
 
     public List<Result> validate(IBaseResource resource) {
+        return validate(resource, null, null);
+    }
+
+    public List<Result> validate(IBaseResource resource, String facilityId, String reportId) {
         try {
+            String detail = "FHIR resource";
             if (resource instanceof Bundle bundle) {
-                logger.info("Starting validation of Bundle with {} entries", bundle.getEntry().size());
+                detail = "FHIR bundle " + bundle.getEntry().size() + " entries";
+                logger.info("Starting validation of Bundle with {} entries facility={} report={}",
+                        bundle.getEntry().size(),
+                        LogUtils.sanitize(facilityId),
+                        LogUtils.sanitize(reportId));
             }
-            ValidationResult validationResult = fhirValidator.validateWithResult(resource);
+            ValidationResult validationResult;
+            try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(logger, detail, facilityId, reportId)) {
+                validationResult = getValidator().validateWithResult(resource);
+            } catch (IOException ex) {
+                throw new UncheckedIOException("Failed to load artifact validation support", ex);
+            }
             List<Result> results = validationResult.getMessages().stream()
                     .map(Result::fromMessage)
                     .toList();

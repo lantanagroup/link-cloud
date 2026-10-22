@@ -268,12 +268,29 @@ public class ReadyForValidationConsumerTest {
         when(parser.parseResource(eq(Bundle.class), (InputStream) any())).thenReturn(bundle);
         when(blobStorageService.download("myfile.ndjson"))
                 .thenReturn(BinaryData.fromBytes(new byte[0]));
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(PAYLOAD_URI));
 
         verify(blobStorageService).download("myfile.ndjson");
         verify(reportClient, never()).getSubmissionModel(any(), any(), any());
+        verify(validationMetrics, never()).recordReportFetchDuration(anyDouble(), any());
+    }
+
+    @Test
+    void process_withPerformanceHeader_recordsReportFetchDuration() throws Exception {
+        IParser parser = mock(IParser.class);
+        when(fhirContext.newNDJsonParser()).thenReturn(parser);
+        when(parser.parseResource(eq(Bundle.class), (InputStream) any())).thenReturn(bundle);
+        when(blobStorageService.download("myfile.ndjson"))
+                .thenReturn(BinaryData.fromBytes(new byte[0]));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(PAYLOAD_URI);
+        record.headers().add(Headers.METRICS_MODE, Headers.getBytes("performance"));
+        consumer.process(record);
+
+        verify(validationMetrics).recordReportFetchDuration(anyDouble(), any());
     }
 
     @Test
@@ -283,7 +300,7 @@ public class ReadyForValidationConsumerTest {
         when(parser.parseResource(eq(Bundle.class), (InputStream) any())).thenReturn(bundle);
         when(blobStorageService.download(anyString()))
                 .thenReturn(BinaryData.fromBytes(new byte[0]));
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(PAYLOAD_URI));
 
@@ -297,7 +314,7 @@ public class ReadyForValidationConsumerTest {
     @Test
     void process_withNullPayloadUri_fetchesBundleViaRest() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(null));
 
@@ -308,7 +325,7 @@ public class ReadyForValidationConsumerTest {
     @Test
     void process_withPayloadUriButNoBlobService_fetchesBundleViaRest() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumerWithoutBlobStorage.process(buildRecord(PAYLOAD_URI));
 
@@ -334,18 +351,18 @@ public class ReadyForValidationConsumerTest {
     @Test
     void process_callsValidationServiceWithBundle() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(null));
 
-        verify(validationService).validate(bundle);
+        verify(validationService).validate(bundle, FACILITY_ID, REPORT_ID);
     }
 
     @Test
     void process_setsContextFieldsOnEachResult() throws Exception {
         Result result = resultWithCategories(Collections.emptyList());
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(null));
 
@@ -358,7 +375,7 @@ public class ReadyForValidationConsumerTest {
     void process_callsCategorizationServiceWithResults() throws Exception {
         Result result = resultWithCategories(Collections.emptyList());
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(null));
 
@@ -371,7 +388,7 @@ public class ReadyForValidationConsumerTest {
         Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
         Result uncategorizedResult = resultWithCategories(Collections.emptyList());
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(submittedResult, nonSubmittedResult, uncategorizedResult));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(submittedResult, nonSubmittedResult, uncategorizedResult));
 
         consumer.process(buildRecord(null));
 
@@ -382,7 +399,7 @@ public class ReadyForValidationConsumerTest {
     void process_multiCategoryResultWithAnySubmitEnabledCategory_savesResult() throws Exception {
         Result result = resultWithCategories(List.of(categoryWithSubmit(false), categoryWithSubmit(true)));
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(null));
 
@@ -394,7 +411,7 @@ public class ReadyForValidationConsumerTest {
         Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
         Result uncategorizedResult = resultWithCategories(Collections.emptyList());
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(nonSubmittedResult, uncategorizedResult));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(nonSubmittedResult, uncategorizedResult));
 
         consumer.process(buildRecord(null));
 
@@ -404,7 +421,7 @@ public class ReadyForValidationConsumerTest {
     @Test
     void process_withNoResults_stillCategorizesAndDoesNotPersistEmptyList() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(null));
 
@@ -431,7 +448,7 @@ public class ReadyForValidationConsumerTest {
         inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
         inactiveResult.setExpression("Bundle.entry[0].resource.ofType(Encounter).type[0].coding[0]");
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(inactiveResult));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(inactiveResult));
 
         consumerWithRealCategorization.process(buildRecord(null));
 
@@ -450,7 +467,7 @@ public class ReadyForValidationConsumerTest {
     void process_allAcceptableCategories_producesValidationCompleteWithValidTrue() throws Exception {
         Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -468,7 +485,7 @@ public class ReadyForValidationConsumerTest {
     void process_anyUnacceptableCategory_producesValidationCompleteWithValidFalse() throws Exception {
         Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -485,7 +502,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_noResults_producesValidationCompleteWithValidTrue() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -502,7 +519,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_validationCompleteContainsPatientIdAndReportId() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -521,7 +538,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_validationCompleteKeyIsSetToFacilityId() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -538,7 +555,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_kafkaSendThrows_throwsRuntimeExceptionWithMessage() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
         when(validationCompleteTemplate.send(any(ProducerRecord.class))).thenReturn(future);
@@ -558,7 +575,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_withCorrelationId_includesCorrelationIdHeaderInProducedRecord() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -578,7 +595,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_withoutCorrelationId_doesNotIncludeCorrelationIdHeader() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -598,12 +615,49 @@ public class ReadyForValidationConsumerTest {
     @Test
     void process_alwaysRecordsMetrics() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(null));
 
         verify(validationMetrics).addToValidationCounter(any());
         verify(validationMetrics).recordValidationDuration(anyDouble(), any());
+    }
+
+    @Test
+    void process_recordsIssueMetricsAfterCategorize() throws Exception {
+        Result result = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+        doAnswer(invocation -> {
+            result.setCategories(List.of(categoryWithAcceptable(true)));
+            return null;
+        }).when(categorizationService).categorize(any());
+
+        consumer.process(buildRecord(null));
+
+        // addIssueMetrics always emits all three buckets; categorize makes this result acceptable.
+        verify(validationMetrics).addIssues(eq("acceptable"), eq(1L), any());
+        verify(validationMetrics).addIssues(eq("uncategorized"), eq(0L), any());
+        verify(validationMetrics).addIssues(eq("unacceptable"), eq(0L), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_nullCategories_stillProducesValidationComplete() throws Exception {
+        Result result = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+
+        ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+        CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
+        when(validationCompleteTemplate.send(captor.capture())).thenReturn(future);
+        when(future.get()).thenReturn(null);
+
+        consumer.process(buildRecord(null));
+
+        assertNotNull(captor.getValue().value());
+        assertTrue(captor.getValue().value().isValid());
     }
 
     // -------------------------------------------------------------------------
@@ -630,7 +684,7 @@ public class ReadyForValidationConsumerTest {
 
         Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
 
@@ -642,7 +696,7 @@ public class ReadyForValidationConsumerTest {
         stubBlobDownload(); // flag defaults to false
 
         Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
 
@@ -655,7 +709,7 @@ public class ReadyForValidationConsumerTest {
         stubBlobDownload();
 
         Result result = resultWithCategories(List.of(categoryWithSubmit(false)));
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
 
@@ -679,7 +733,7 @@ public class ReadyForValidationConsumerTest {
 
         Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
 
@@ -704,7 +758,7 @@ public class ReadyForValidationConsumerTest {
 
         Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(PAYLOAD_URI));
 
@@ -717,7 +771,7 @@ public class ReadyForValidationConsumerTest {
         stubRestRetrieval(); // no blob service -> bundle comes via REST, append is skipped
 
         Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumerWithoutBlobStorage.process(buildRecord(PAYLOAD_URI));
 
@@ -734,7 +788,7 @@ public class ReadyForValidationConsumerTest {
 
         Result result = resultWithCategories(List.of(categoryWithSubmit(true)));
         result.setMessage("Code is inactive.");
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         consumer.process(buildRecord(null));
 
@@ -765,7 +819,7 @@ public class ReadyForValidationConsumerTest {
         consumerWithBridgeEnabled.process(buildRecord(null));
 
         verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), isNull());
-        verify(validationService, never()).validate(any());
+        verify(validationService, never()).validate(any(), any(), any());
         verify(categorizationService, never()).categorize(any());
     }
 
@@ -877,7 +931,7 @@ public class ReadyForValidationConsumerTest {
     @Test
     void process_shadowDisabled_neverPublishesShadowCompareEvent() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(null));
 
@@ -889,7 +943,7 @@ public class ReadyForValidationConsumerTest {
     void process_shadowEnabledBridgeOff_publishesEventWithRanNewEngineFalse() throws Exception {
         Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(List.of(result));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
 
         ArgumentCaptor<ProducerRecord<String, ShadowCompareEvent>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -938,7 +992,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_shadowEventSendThrowsSynchronously_doesNotPropagateAndValidationCompleteAlreadySent() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
         when(shadowCompareEventTemplate.send(any(ProducerRecord.class)))
                 .thenThrow(new RuntimeException("broker unavailable"));
 
@@ -957,7 +1011,7 @@ public class ReadyForValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void process_shadowEventSendFailsAsynchronously_doesNotPropagate() throws Exception {
         stubRestRetrieval();
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
         CompletableFuture<SendResult<String, ShadowCompareEvent>> failed = new CompletableFuture<>();
         failed.completeExceptionally(new RuntimeException("send failed"));
         when(shadowCompareEventTemplate.send(any(ProducerRecord.class))).thenReturn(failed);

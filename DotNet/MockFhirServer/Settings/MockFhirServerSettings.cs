@@ -36,4 +36,5 @@ public class MockFhirServerSettings
     /// Example: "2024-12-31T23:59:59Z"
     /// </summary>
     public string? ClinicalPeriodEnd { get; set; }
+
 }

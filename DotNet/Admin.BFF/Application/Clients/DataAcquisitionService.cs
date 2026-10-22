@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
@@ -57,28 +58,44 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
         public async Task<HttpResponseMessage> RestoreLogsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
-            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data/acquisition-logs/facility/{Uri.EscapeDataString(facilityId)}/restore");
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data-acquisition/acquisition-logs/facility/{Uri.EscapeDataString(facilityId)}/restore");
                 await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> RestoreLogsByReportTrackingIdAsync(ClaimsPrincipal user, string reportTrackingId, CancellationToken cancellationToken)
         {
-            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}/restore");
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/data-acquisition/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}/restore");
+            await SetAuthHeaderAsync(user, request, cancellationToken);
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> CancelLogsByFilterAsync(
+            ClaimsPrincipal user,
+            object filter,
+            int minAgeHours,
+            CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"api/data-acquisition/acquisition-logs/cancel-by-filter?minAgeHours={minAgeHours}")
+            {
+                Content = JsonContent.Create(filter)
+            };
             await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> SoftDeleteLogsByReportTrackingIdAsync(ClaimsPrincipal user, string reportTrackingId, CancellationToken cancellationToken)
         {
-            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}");
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data-acquisition/acquisition-logs/report/{Uri.EscapeDataString(reportTrackingId)}");
             await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> SoftDeleteLogsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
-            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data/acquisition-logs/facility/{Uri.EscapeDataString(facilityId)}");
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/data-acquisition/acquisition-logs/facility/{Uri.EscapeDataString(facilityId)}");
             await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }

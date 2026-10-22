@@ -1,10 +1,12 @@
-﻿using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Moq;
 using Testcontainers.MsSql;
 using Task = System.Threading.Tasks.Task;
 
@@ -88,6 +90,7 @@ public class ReportSqlServerIntegrationTestFixture : IAsyncLifetime
         builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         builder.Services.AddDbContext<ReportDbContext>(options => options.UseSqlServer(connectionString));
         builder.Services.AddScoped<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
+        builder.Services.AddSingleton(Mock.Of<IReportServiceMetrics>());
         builder.Services.AddScoped<IReportEntryManager, ReportEntryManager>();
 
         _host = builder.Build();

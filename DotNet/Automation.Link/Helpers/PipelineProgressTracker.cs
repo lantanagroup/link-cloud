@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -70,7 +71,10 @@ public class PipelineProgressTracker
             {
                 completedUnits++;
 
-                if (string.Equals(schedule.Status, ScheduleStatus.Submitted.ToString(), StringComparison.OrdinalIgnoreCase))
+                // Any terminal status counts as finalized: a bypassed report ends on
+                // CompletedNotSubmitted rather than Submitted, and is just as finished.
+                if (Enum.TryParse<ScheduleStatus>(schedule.Status, ignoreCase: true, out var scheduleStatus)
+                    && scheduleStatus.IsTerminal())
                 {
                     completedUnits++;
                     stageDetails.Add("report=finalized");
@@ -116,7 +120,11 @@ public class PipelineProgressTracker
                     completedUnits++;
                 }
 
-                if (string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                // Any terminal submission state counts: a bypassed patient ends on NotSubmitted
+                // and is just as finished, so without this the report never reaches 100% and
+                // stall detection eventually fires on a run that completed correctly.
+                if (string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry.SubmissionStatus, "NotSubmitted", StringComparison.OrdinalIgnoreCase))
                 {
                     patientsSubmitted++;
                     completedUnits++;

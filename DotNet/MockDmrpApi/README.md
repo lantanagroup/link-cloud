@@ -301,25 +301,28 @@ facility enrolled in nothing (§4), and `401` without a valid token.
 
 Authenticated with **Link's** standard scheme (`IsLinkAdmin`).
 
-| Route | Purpose |
-|---|---|
-| `POST /api/mock-dmrp/oauth2/token` | Issues the third-party token the contract surface accepts |
-| `POST /api/mock-dmrp/entries` | Create an entry → `201` + `Location` |
-| `GET /api/mock-dmrp/entries/{id}` | One entry. `400` on a non-GUID, `404` if absent |
-| `PUT /api/mock-dmrp/entries/{id}` | Update → `202`. **Never creates**; `404` if absent |
-| `GET /api/mock-dmrp/facilities/{facilityId}/entries` | A facility's entries across both components, paged. Empty page when it has none |
-| `GET /api/mock-dmrp/entries/search` | Filtered search, paged. Empty page when none |
-| `DELETE /api/mock-dmrp/entries/{id}` | `204`, or `404` if absent |
-| `DELETE /api/mock-dmrp/facilities/{facilityId}/entries` | Idempotent `204` |
-| `DELETE /api/mock-dmrp/entries` | Removes **every** entry. No confirmation step |
-| `GET /api/mock-dmrp/delay` | The artificial delay currently in force |
-| `PUT /api/mock-dmrp/delay` | Sets an artificial delay on the contract endpoints. See §4.3 |
-| `DELETE /api/mock-dmrp/delay` | Removes it. Idempotent |
+Tenant writes here too. With the mock switched on, an Admin UI facility save writes the facility's
+selected reports to these routes as its enrollment. See `dev-docs/mock-dmrp-write-through.md`.
+
+| Route                                                   | Purpose                                                                         |
+|---------------------------------------------------------|---------------------------------------------------------------------------------|
+| `POST /api/mock-dmrp/oauth2/token`                      | Issues the third-party token the contract surface accepts                       |
+| `POST /api/mock-dmrp/entries`                           | Create an entry → `201` + `Location`                                            |
+| `GET /api/mock-dmrp/entries/{id}`                       | One entry. `400` on a non-GUID, `404` if absent                                 |
+| `PUT /api/mock-dmrp/entries/{id}`                       | Update → `202`. **Never creates**; `404` if absent                              |
+| `GET /api/mock-dmrp/facilities/{facilityId}/entries`    | A facility's entries across both components, paged. Empty page when it has none |
+| `GET /api/mock-dmrp/entries/search`                     | Filtered search, paged. Empty page when none                                    |
+| `DELETE /api/mock-dmrp/entries/{id}`                    | `204`, or `404` if absent                                                       |
+| `DELETE /api/mock-dmrp/facilities/{facilityId}/entries` | Idempotent `204`                                                                |
+| `DELETE /api/mock-dmrp/entries`                         | Removes **every** entry. No confirmation step                                   |
+| `GET /api/mock-dmrp/delay`                              | The artificial delay currently in force                                         |
+| `PUT /api/mock-dmrp/delay`                              | Sets an artificial delay on the contract endpoints. See §4.3                    |
+| `DELETE /api/mock-dmrp/delay`                           | Removes it. Idempotent                                                          |
 
 ### Unauthenticated
 
-| Route | Notes |
-|---|---|
+| Route                                    | Notes                                    |
+|------------------------------------------|------------------------------------------|
 | `GET /health`, `GET /api/mock-dmrp/info` | Answer even when the service is disabled |
 
 ⚠️ The token endpoint sits on the support surface but hands out a **contract-surface**
@@ -497,15 +500,15 @@ negative `Skip`.
 
 All under the `MockDmrpApi` section, or `MockDmrpApi__<Key>` as an environment variable.
 
-| Setting | Type | Default | Notes |
-|---|---|---|---|
-| `Enabled` | bool | `false` | Master switch, and it fails closed. See §6.1 |
-| `AuthClientId` | string | `link-cloud-dev` | |
-| `AuthClientSecret` | string | `link-cloud-dev-secret` | Published in docker-compose. Override anywhere deployed |
-| `SigningKey` | string | a local-dev key | **≥ 64 bytes** (HS512 needs 512 bits) or the service fails at startup. **Must be identical on every replica** |
-| `Issuer` | string | `link-mock-dmrp` | |
-| `Audience` | string | `dmrp-api` | |
-| `TokenLifetimeSeconds` | int | `3600` | |
+| Setting                | Type   | Default                 | Notes                                                                                                         |
+|------------------------|--------|-------------------------|---------------------------------------------------------------------------------------------------------------|
+| `Enabled`              | bool   | `false`                 | Master switch, and it fails closed. See §6.1                                                                  |
+| `AuthClientId`         | string | `link-cloud-dev`        |                                                                                                               |
+| `AuthClientSecret`     | string | `link-cloud-dev-secret` | Published in docker-compose. Override anywhere deployed                                                       |
+| `SigningKey`           | string | a local-dev key         | **≥ 64 bytes** (HS512 needs 512 bits) or the service fails at startup. **Must be identical on every replica** |
+| `Issuer`               | string | `link-mock-dmrp`        |                                                                                                               |
+| `Audience`             | string | `dmrp-api`              |                                                                                                               |
+| `TokenLifetimeSeconds` | int    | `3600`                  |                                                                                                               |
 
 Also read: `ConnectionStrings:DatabaseConnection`, `DatabaseProvider` (`SqlServer`),
 `AutoMigrate`, `EnableSwagger`, `ExternalConfigurationSource`.
@@ -549,12 +552,19 @@ The lower environments each need the row set to `true`, and `appsettings.Develop
 and `appsettings.Docker.json` carry it so a workstation and the local stack serve out of the
 box.
 
+⚠️ **Tenant reads the same switch**, to turn on the facility write-through
+(`dev-docs/mock-dmrp-write-through.md`). So the row must be **unlabeled**: a row labeled
+`MockDmrpApi` is invisible to Tenant. Locally, compose gives both containers
+`MOCK_DMRP_ENABLED` (default `true`).
+
 When disabled:
 
 - every route answers **`503`** with problem details carrying a `traceId`
 - `/health` and `/api/mock-dmrp/info` keep answering, so the container stays healthy rather
   than looking like an outage
-- **EF migration is skipped** — a dormant deployment has no business altering a schema
+- **EF migration still runs if a database connection string is configured**, so the schema
+  is ready before the mock is switched on; with no connection string it is skipped, and the
+  pod stays dormant rather than crash-looping
 - a warning is logged naming the environment, the key that decided it, and the routes that remain
 
 ### 6.2 Error responses
@@ -592,10 +602,10 @@ Two things worth knowing:
 
 They are separate on purpose, mirroring the real topology.
 
-| | Guards | Scheme |
-|---|---|---|
-| **Link's** | the support surface at `/api/mock-dmrp` | `AddLinkBearerServiceAuthentication` + `[Authorize(Policy = IsLinkAdmin)]`, exactly as Terminology, Census and Tenant do |
-| **The third party's** | `GET /msc`, `GET /ps/annual/mrp` | HS512 JWT minted by `POST /api/mock-dmrp/oauth2/token`, validated by `AuthTokenService` |
+|                       | Guards                                  | Scheme                                                                                                                   |
+|-----------------------|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| **Link's**            | the support surface at `/api/mock-dmrp` | `AddLinkBearerServiceAuthentication` + `[Authorize(Policy = IsLinkAdmin)]`, exactly as Terminology, Census and Tenant do |
+| **The third party's** | `GET /msc`, `GET /ps/annual/mrp`        | HS512 JWT minted by `POST /api/mock-dmrp/oauth2/token`, validated by `AuthTokenService`                                  |
 
 `DmrpController` carries `[AllowAnonymous]` so Link's middleware never sees it, and checks the
 third-party token itself. That is not a hole: those endpoints impersonate an external service,

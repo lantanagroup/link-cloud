@@ -8,7 +8,8 @@ public enum AutomationRunStatus
     Succeeded,
     Failed,
     LiveWindowOpen,
-    ReportFinalization
+    ReportFinalization,
+    CollectingMetrics
 }
 
 public static class AutomationRunStatusExtensions
@@ -22,10 +23,27 @@ public static class AutomationRunStatusExtensions
         => status is AutomationRunStatus.Queued
             or AutomationRunStatus.Running
             or AutomationRunStatus.LiveWindowOpen
-            or AutomationRunStatus.ReportFinalization;
+            or AutomationRunStatus.ReportFinalization
+            or AutomationRunStatus.CollectingMetrics;
+
+    /// <summary>
+    /// A second Cancel after the run is already Cancelled is success, not a failure.
+    /// </summary>
+    public static bool IsSuccessfulCancelTarget(this AutomationRunStatus status)
+        => status.IsCancellable() || status == AutomationRunStatus.Cancelled;
 
     public static bool IsInProgress(this AutomationRunStatus status)
         => status is AutomationRunStatus.Running
             or AutomationRunStatus.LiveWindowOpen
-            or AutomationRunStatus.ReportFinalization;
+            or AutomationRunStatus.ReportFinalization
+            or AutomationRunStatus.CollectingMetrics;
+
+    public static string ToDisplayName(this AutomationRunStatus status)
+        => status switch
+        {
+            AutomationRunStatus.CollectingMetrics => "Collecting",
+            AutomationRunStatus.ReportFinalization => "Finalizing",
+            AutomationRunStatus.LiveWindowOpen => "Live window",
+            _ => status.ToString()
+        };
 }

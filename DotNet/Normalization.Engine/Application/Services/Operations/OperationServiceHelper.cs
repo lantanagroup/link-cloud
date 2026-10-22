@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
@@ -39,6 +40,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 OperationType.CopyProperty => (object)(CopyPropertyOperation)operation,
                 OperationType.CodeMap => (object)(CodeMapOperation)operation,
+                OperationType.HSLOCMap => (object)(HSLOCMapOperation)operation,
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 OperationType.CopyLocation => (object)(CopyLocationOperation)operation,
                 OperationType.RemoveExtensions => (object)(RemoveExtensionsOperation)operation,
@@ -704,6 +706,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 var operation = OperationHelper.GetOperation(operationType, operationJson);
 
+                if (operation is HSLOCMapOperation &&
+                    (resources is not { Count: 1 } || resources[0] != nameof(Location)))
+                {
+                    return (false, "HSLOCMap operations must target only the Location resource type.");
+                }
+
                 if (operation is CopyPropertyOperation)
                 {
                     var op = (CopyPropertyOperation)operation;
@@ -746,6 +754,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         if (string.IsNullOrEmpty(map.TargetSystem))
                         {
                             builder.AppendLine($"CodeSystemMap.TargetSystem cannot be null or empty.");
+                        }
+
+                        if (operation is HSLOCMapOperation && map.TargetSystem != MappingTargetSystems.HslocUrl)
+                        {
+                            builder.AppendLine($"HSLOCMap target system must be {MappingTargetSystems.HslocUrl}.");
                         }
 
                         if (map.CodeMaps == null)

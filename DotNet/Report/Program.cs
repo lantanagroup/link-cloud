@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Extensions;
 using LantanaGroup.Link.Report.Application.Interfaces;
@@ -29,6 +28,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Swagger;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
@@ -47,7 +47,6 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
-ConfigureLogging(builder);
 RegisterServices(builder);
 var app = builder.Build();
 SetupMiddleware(app);
@@ -170,6 +169,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
     builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
 
+    builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     builder.Services.AddLinkBearerServiceAuthentication(options =>
     {
@@ -183,14 +184,14 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.ForFhir();
+        LinkFhirSerializerOptions.ConfigurePermissiveFhirDeserialization(options.JsonSerializerOptions);
         options.JsonSerializerOptions.Converters.Add(new JsonDateTimeConverter());
         options.JsonSerializerOptions.Converters.Add(new JsonNullableDateTimeConverter());
     });
 
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, serviceInformation.ServiceConfigName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<ReportDbContext>>(HealthCheckNames.SqlServerDatabase)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddEndpointsApiExplorer();
@@ -271,6 +272,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
+
+    ConfigureLogging(builder);
 
     builder.Services.AddLinkCorsService(options =>
     {

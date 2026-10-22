@@ -7,8 +7,10 @@ using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataA
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
@@ -20,7 +22,6 @@ public class FhirListConfigurationModel
     public string FacilityId { get; set; }
     [Required]
     public string FhirBaseServerUrl { get; set; }
-    public AuthenticationConfigurationModel? Authentication { get; set; }
     [Required]
     public List<EhrPatientListModel> EHRPatientLists { get; set; }
     [DataMember]
@@ -38,7 +39,6 @@ public class FhirListConfigurationModel
             Id = entity.Id.ToString(),
             FacilityId = entity.FacilityId,
             FhirBaseServerUrl = entity.FhirBaseServerUrl,
-            Authentication = entity.Authentication != null ? AuthenticationConfigurationModel.FromDomain(entity.Authentication) : null,
             EHRPatientLists = entity.EHRPatientLists?.Select(e => new EhrPatientListModel
             {
                 FhirId = e.FhirId,
@@ -106,6 +106,14 @@ public class EhrPatientListModel
     [Required]
     public string FhirId { get; set; }
 
+    /// <summary>
+    /// The patients present on this EHR List. Response-only: it is populated solely by
+    /// GET /api/data-acquisition/{facilityId}/fhirQueryList when includePatients=true, and is ignored on POST/PUT.
+    /// </summary>
+    [Description("A list of patients. Only populated in the response of GET /api/data-acquisition/{facilityId}/fhirQueryList when includePatients=true is passed.")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<EhrPatientListPatientModel>? Patients { get; set; }
+
     public ModelStateDictionary Validate(ModelStateDictionary? errors = default, FhirListSettings? listSettings = default)
     {
         if (errors == null)
@@ -118,4 +126,20 @@ public class EhrPatientListModel
 
         return errors;
     }
+}
+
+/// <summary>
+/// A patient appearing on an EHR List, projected from List.entry.item.
+/// </summary>
+public class EhrPatientListPatientModel
+{
+    /// <summary>
+    /// The FHIR Patient id, parsed from List.entry.item.reference.
+    /// </summary>
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// The patient name, taken from List.entry.item.display.
+    /// </summary>
+    public string? Name { get; set; }
 }

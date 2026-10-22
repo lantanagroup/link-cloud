@@ -2,6 +2,7 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -36,6 +37,9 @@ public class CodeMapOperationServiceTests
         Assert.Equal(2, outcome.MappedCount);
         Assert.Equal(0, outcome.UnmappedCount);
         Assert.Empty(outcome.UnmappedCodes);
+        Assert.Equal(
+            [new CodeMapping("ICU", "1027-4"), new CodeMapping("ER", "1108-0")],
+            outcome.MappedCodes);
     }
 
     [Fact]
@@ -53,6 +57,7 @@ public class CodeMapOperationServiceTests
         Assert.Equal(1, outcome.MappedCount);
         Assert.Equal(2, outcome.UnmappedCount);
         Assert.Equal(["ER", "PHARMACY"], outcome.UnmappedCodes.OrderBy(code => code));
+        Assert.Equal(new CodeMapping("ICU", "1027-4"), Assert.Single(outcome.MappedCodes));
     }
 
     [Fact]
@@ -143,6 +148,25 @@ public class CodeMapOperationServiceTests
         Assert.Equal(0, unmapped.MappedCount);
         Assert.Equal(1, unmapped.UnmappedCount);
         Assert.Equal("MISSING", Assert.Single(unmapped.UnmappedCodes));
+    }
+
+    [Fact]
+    public async Task RepeatedMappedCode_CountsEveryOccurrenceButListsThePairOnce()
+    {
+        var location = LocationWithTypeCodes(LocalSystem, "ICU", "ICU", "ICU");
+        var operation = Operation(Map(LocalSystem, HslocSystem, ("ICU", "1027-4")));
+
+        var result = await _service.ProcessOperationAsync(operation, location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        var outcome = Assert.Single(result.CodeMapping);
+        Assert.Equal(3, outcome.MappedCount);
+        Assert.Equal(new CodeMapping("ICU", "1027-4"), Assert.Single(outcome.MappedCodes));
+        Assert.All(location.Type.SelectMany(type => type.Coding), coding =>
+        {
+            Assert.Equal(HslocSystem, coding.System);
+            Assert.Equal("1027-4", coding.Code);
+        });
     }
 
     [Fact]

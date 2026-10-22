@@ -38,11 +38,17 @@ public sealed class KafkaErrorProbe : IBackgroundMonitorProbe
 
     public Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        // Only count errors keyed to THIS test's facility (or with no key at all). The
-        // KafkaErrorMonitor subscribes to every -Error / -Retry topic on the broker, so
-        // dead-letter traffic from a sibling test in the same sequential run would
-        // otherwise trigger a false-positive critical failure here.
-        var count = _kafkaMonitor.GetErrorCountForFacility(state.CorrelationId1);
+        // Only count messages belonging to THIS test's facility. The KafkaErrorMonitor
+        // subscribes to every -Error / -Retry topic on the broker, so dead-letter traffic
+        // from a sibling test in the same sequential run would otherwise trigger a
+        // false-positive critical failure here.
+        //
+        // -Error topics are terminal (.NET DeadLetterExceptionHandler, Java Spring DLT).
+        // -Retry topics are recoverable (.NET TransientExceptionHandler) and must not
+        // abort the run.
+        var deadLetterCount = _kafkaMonitor.GetDeadLetterCountForFacility(state.CorrelationId1);
+        var retryCount = _kafkaMonitor.GetRetryCountForFacility(state.CorrelationId1);
+        var count = deadLetterCount + retryCount;
 
         if (count <= 0)
             return Task.FromResult(new MonitorProbeResult { MessageBusErrorCount = 0 });
@@ -50,12 +56,25 @@ public sealed class KafkaErrorProbe : IBackgroundMonitorProbe
         var issues = new List<MonitorIssue>();
         if (count > _lastObservedCount)
         {
-            issues.Add(new MonitorIssue(
-                Key: $"kafka-errors-{count}",
-                Source: Name,
-                Message: $"Kafka error/retry messages detected for facility {state.CorrelationId1}: {count}",
-                Severity: MonitorIssueSeverity.Critical,
-                TimestampUtc: DateTime.UtcNow));
+            if (deadLetterCount > 0)
+            {
+                issues.Add(new MonitorIssue(
+                    Key: $"kafka-errors-{deadLetterCount}",
+                    Source: Name,
+                    Message: $"Kafka dead-letter messages detected for facility {state.CorrelationId1}: {deadLetterCount}",
+                    Severity: MonitorIssueSeverity.Critical,
+                    TimestampUtc: DateTime.UtcNow));
+            }
+
+            if (retryCount > 0)
+            {
+                issues.Add(new MonitorIssue(
+                    Key: $"kafka-retries-{retryCount}",
+                    Source: Name,
+                    Message: $"Kafka retry messages detected for facility {state.CorrelationId1}: {retryCount}",
+                    Severity: MonitorIssueSeverity.Warning,
+                    TimestampUtc: DateTime.UtcNow));
+            }
         }
 
         _lastObservedCount = count;
@@ -63,7 +82,7 @@ public sealed class KafkaErrorProbe : IBackgroundMonitorProbe
         return Task.FromResult(new MonitorProbeResult
         {
             MessageBusErrorCount = count,
-            HasCriticalFailure = true,
+            HasCriticalFailure = deadLetterCount > 0,
             Issues = issues
         });
     }
@@ -84,7 +103,10 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
 
     public async Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        var critical = await _progressMonitor.CheckProgressAsync(state.CorrelationId1, state.CorrelationId2);
+        var critical = await _progressMonitor.CheckProgressAsync(
+            state.CorrelationId1,
+            state.CorrelationId2,
+            cancellationToken);
 
         var issues = new List<MonitorIssue>();
         if (critical)
@@ -107,6 +129,8 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
                 : _progressMonitor.LastAcquisitionProgressUtc,
             AcquisitionResourcesAcquired = _progressMonitor.LastResourcesAcquired,
             AcquisitionInFlight = _progressMonitor.IsAcquisitionInFlight,
+            ValidationOngoing = _progressMonitor.IsValidationOngoing,
+            PendingValidationCount = _progressMonitor.PendingValidationCount,
             Issues = issues
         };
     }

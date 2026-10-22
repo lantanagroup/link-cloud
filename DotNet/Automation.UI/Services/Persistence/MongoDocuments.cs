@@ -12,7 +12,15 @@ public sealed class AutomationRunDocument
     public Guid RunId { get; set; }
 
     public string FacilityId { get; set; } = string.Empty;
+    /// <summary>True when this run created <see cref="FacilityId"/> rather than reusing a tenant.</summary>
+    public bool AutomationCreatedFacility { get; set; }
     public string ReportId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Older rows stored a report-generation counter here. This build does not
+    /// increment it. The property stays so those rows still deserialize.
+    /// </summary>
+    public long SnapshotEpoch { get; set; }
 
     public string RunName { get; set; } = string.Empty;
     public string Scenario { get; set; } = string.Empty;
@@ -20,6 +28,7 @@ public sealed class AutomationRunDocument
     public int PatientCount { get; set; }
     public int ResourcesPerPatient { get; set; }
     public int Seed { get; set; }
+    public bool IsMetricsRun { get; set; }
     public string? RunConfigurationJson { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? Error { get; set; }
@@ -49,6 +58,34 @@ public sealed class AutomationRunDocument
     public string? GeneratedTemplateSetHash { get; set; }
 }
 
+/// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>
+public sealed class OwnedFacilityTombstoneDocument
+{
+    [BsonId]
+    public string FacilityId { get; set; } = string.Empty;
+
+    public string RunId { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The deleted run's cleanup timestamp. Teardown waits until this is older than retention.</summary>
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset EligibleAt { get; set; }
+}
+
+/// <summary>Facility id already torn down for a run whose snapshot is still waiting to be purged.</summary>
+public sealed class FacilityTeardownProgressDocument
+{
+    [BsonId]
+    public ObjectId Id { get; set; }
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public string FacilityId { get; set; } = string.Empty;
+}
+
 /// <summary>MongoDB document for automation_run_inputs collection.</summary>
 public sealed class AutomationRunInputDocument
 {
@@ -72,7 +109,11 @@ public sealed class AutomationRunInputDocument
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-/// <summary>MongoDB document for automation_run_snapshots collection (one per run+domain).</summary>
+/// <summary>
+/// One row in automation_snapshots. A normal snapshot is a single document.
+/// A payload over the chunk size is a header (ChunkIndex -1) plus ordered
+/// chunk documents that share Revision.
+/// </summary>
 public sealed class DomainSnapshotDocument
 {
     [BsonId]
@@ -84,12 +125,29 @@ public sealed class DomainSnapshotDocument
     public string Domain { get; set; } = string.Empty;
 
     /// <summary>
-    /// Serialized domain payload as plain JSON text.
+    /// Serialized domain payload as plain JSON text, or one slice of it.
     /// Using plain JSON avoids Mongo extended-JSON date serialization
     /// surprises during round-trips through System.Text.Json.
     /// </summary>
     public string Data { get; set; } = string.Empty;
 
+    /// <summary>Null for a single document. -1 for a chunk header. 0+ for a slice.</summary>
+    [BsonIgnoreIfNull]
+    public int? ChunkIndex { get; set; }
+
+    [BsonIgnoreIfNull]
+    public int? ChunkCount { get; set; }
+
+    /// <summary>Shared by a header and its slices. Null on a single document.</summary>
+    [BsonIgnoreIfNull]
+    public string? Revision { get; set; }
+
+    /// <summary>
+    /// New writes use BSON ISODate. Older rows may still be the driver array
+    /// form [ticks, offsetMinutes]. The DateTimeOffset serializer reads both.
+    /// BSON dates are millisecond precision.
+    /// </summary>
+    [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset UpdatedAt { get; set; }
 }
 

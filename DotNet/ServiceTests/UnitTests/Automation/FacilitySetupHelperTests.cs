@@ -3,6 +3,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -35,6 +36,11 @@ public class FacilitySetupHelperTests
     {
         _output.Setup(o => o.WriteLine(It.IsAny<string>()));
 
+        // A Tenant that predates api/dmrp/dmrp-status, so DMRP is detected by its reporting-plans route
+        // and there is no Mock DMRP write-through. The tests about the write-through override this.
+        _dmrpClient.Setup(d => d.GetDmrpStatusAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<DmrpStatusModel>(404));
+
         // The facility does not exist until it is created, and reads back once it does.
         var exists = false;
 
@@ -57,6 +63,17 @@ public class FacilitySetupHelperTests
                 _updated.Add(model);
                 return Response(200, model);
             });
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CreateVendorModel model, CancellationToken _) =>
+                Response(201, new VendorModel { Id = Guid.NewGuid(), Name = model.Name }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>()));
+        _facilityClient.Setup(f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CreateVendorVersionModel model, CancellationToken _) =>
+                Response(201, new VendorVersionModel { Id = Guid.NewGuid(), VendorId = model.VendorId, Version = model.Version }));
     }
 
     [Fact]
@@ -68,7 +85,155 @@ public class FacilitySetupHelperTests
 
         var created = Assert.Single(_created);
         Assert.Equal([MeasureId], created.ScheduledReports.Monthly);
+        Assert.Equal("Epic", created.Vendor?.Name);
+        Assert.NotNull(created.VendorVersionId);
         Assert.Empty(_updated);
+    }
+
+    [Fact]
+    public async Task Posts_the_named_vendor_when_the_caller_sets_one()
+    {
+        GivenDmrpIsDisabled();
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: "Cerner",
+            vendorExplicit: true);
+
+        Assert.Equal("Cerner", Assert.Single(_created).Vendor?.Name);
+    }
+
+    [Fact]
+    public async Task Omits_the_vendor_when_the_caller_explicitly_leaves_it_blank()
+    {
+        GivenDmrpIsDisabled();
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: " ",
+            vendorExplicit: true);
+
+        Assert.Null(Assert.Single(_created).Vendor);
+    }
+
+    [Fact]
+    public async Task Updates_the_vendor_when_a_reused_facility_switches_template()
+    {
+        GivenDmrpIsDisabled();
+        var versionId = Guid.NewGuid();
+        var vendorId = Guid.NewGuid();
+
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel
+            {
+                FacilityId = FacilityId,
+                FacilityName = FacilityId,
+                TimeZone = "America/Chicago",
+                Vendor = new VendorModel { Name = "Epic" },
+                ScheduledReports = new TenantScheduledReportConfig { Monthly = [MeasureId], Daily = [], Weekly = [] }
+            }));
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorModel { Id = vendorId, Name = "Cerner" }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>()));
+        _facilityClient.Setup(f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorVersionModel { Id = versionId, VendorId = vendorId, Version = "automation" }));
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: "Cerner",
+            vendorExplicit: true);
+
+        var updated = Assert.Single(_updated);
+        Assert.Equal("Cerner", updated.Vendor?.Name);
+        Assert.Equal(versionId, updated.VendorVersionId);
+        Assert.Equal([MeasureId], updated.ScheduledReports.Monthly);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Refuses_to_create_a_vendor_when_the_vendor_list_fails()
+    {
+        GivenDmrpIsDisabled();
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<List<VendorModel>>(503, rawBody: "tenant down"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureFacilityAsync(
+                _facilityClient.Object, _dmrpClient.Object, _output.Object, FacilityId, [MeasureId]));
+
+        Assert.Contains("Failed to list vendors", exception.Message);
+        Assert.Contains("503", exception.Message);
+        _facilityClient.Verify(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Reuses_the_vendor_when_create_loses_a_race()
+    {
+        GivenDmrpIsDisabled();
+        var vendorId = Guid.NewGuid();
+        var versionId = Guid.NewGuid();
+        var lists = 0;
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                lists++;
+                return lists == 1
+                    ? Response(200, new List<VendorModel>())
+                    : Response(200, new List<VendorModel> { new() { Id = vendorId, Name = "Epic" } });
+            });
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<VendorModel>(409, rawBody: "already exists"));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>
+            {
+                new() { Id = versionId, VendorId = vendorId, Version = "default" }
+            }));
+
+        await EnsureFacilityAsync();
+
+        Assert.Equal(versionId, Assert.Single(_created).VendorVersionId);
+        _facilityClient.Verify(
+            f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Refuses_to_create_a_vendor_version_when_the_version_list_fails()
+    {
+        GivenDmrpIsDisabled();
+        var vendorId = Guid.NewGuid();
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorModel { Id = vendorId, Name = "Epic" }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<List<VendorVersionModel>>(500, rawBody: "versions down"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(EnsureFacilityAsync);
+
+        Assert.Contains("Failed to list vendor versions", exception.Message);
+        _facilityClient.Verify(
+            f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        Assert.Empty(_created);
     }
 
     [Fact]
@@ -142,12 +307,10 @@ public class FacilitySetupHelperTests
     {
         GivenDmrpIsEnabled();
 
-        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(MeasureId, MeasureId, It.IsAny<Frequency?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel>
-            {
-                Records = [new MeasureMappingModel { Id = MappingId, Measure = MeasureId, DQM = MeasureId }]
-            }));
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Monthly
+        });
 
         var plans = CaptureReportingPlans();
 
@@ -234,7 +397,428 @@ public class FacilitySetupHelperTests
         _dmrpClient.VerifyNoOtherCalls();
     }
 
-    private Task EnsureFacilityAsync() =>
+    [Fact]
+    public async Task Replaces_an_existing_query_plan_instead_of_keeping_it()
+    {
+        var createdTypes = new List<string>();
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 204 });
+        dataAcq.Setup(d => d.CreateQueryPlanAsync(FacilityId, It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, CreateQueryPlanRequestApiModel plan, CancellationToken _) =>
+            {
+                createdTypes.Add(plan.Type ?? "");
+                return new LinkApiResponse { StatusCode = 201 };
+            });
+
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner");
+
+        Assert.Equal(["Discharge", "Daily", "Monthly"], createdTypes);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Discharge", It.IsAny<CancellationToken>()), Times.Once);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Daily", It.IsAny<CancellationToken>()), Times.Once);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Monthly", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Creates_a_query_plan_when_delete_returns_not_found()
+    {
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 404 });
+        dataAcq.Setup(d => d.CreateQueryPlanAsync(FacilityId, It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 201 });
+
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner");
+
+        dataAcq.Verify(
+            d => d.CreateQueryPlanAsync(FacilityId, It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task Does_not_create_a_query_plan_when_the_old_plan_cannot_be_deleted()
+    {
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 500, RawBody = "down" });
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureQueryPlansAsync(
+                dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner"));
+
+        Assert.Contains("Failed to replace", exception.Message);
+        dataAcq.Verify(
+            d => d.CreateQueryPlanAsync(It.IsAny<string>(), It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Returns_false_when_the_facility_already_exists()
+    {
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel { FacilityId = FacilityId }));
+
+        var created = await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object, _dmrpClient.Object, _output.Object, FacilityId, [MeasureId]);
+
+        Assert.False(created);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Returns_true_only_after_it_creates_the_facility()
+    {
+        GivenDmrpIsDisabled();
+
+        var created = await EnsureFacilityAsync();
+
+        Assert.True(created);
+        Assert.Single(_created);
+    }
+
+    [Fact]
+    public async Task Empty_dmrp_setup_returns_false_when_the_facility_already_exists()
+    {
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel { FacilityId = FacilityId }));
+
+        var created = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+            _facilityClient.Object, _output.Object, FacilityId);
+
+        Assert.False(created);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Empty_dmrp_setup_reports_creation_before_the_read_back_can_cancel()
+    {
+        using var cts = new CancellationTokenSource();
+        var reported = false;
+        var gets = 0;
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .Returns((string _, CancellationToken token) =>
+            {
+                gets++;
+                if (gets == 1)
+                    return Task.FromResult(Response<FacilityModel>(404));
+
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(Response(200, new FacilityModel { FacilityId = FacilityId }));
+            });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+                _facilityClient.Object,
+                _output.Object,
+                FacilityId,
+                cts.Token,
+                onCreated: () =>
+                {
+                    reported = true;
+                    cts.Cancel();
+                    return Task.CompletedTask;
+                }));
+
+        Assert.True(reported);
+        Assert.Single(_created);
+    }
+
+    [Fact]
+    public async Task Empty_dmrp_setup_returns_true_only_after_it_creates_the_facility()
+    {
+        var created = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+            _facilityClient.Object, _output.Object, FacilityId);
+
+        Assert.True(created);
+        Assert.Single(_created);
+    }
+
+    /// <summary>
+    /// With the Mock DMRP write-through, Tenant turns the posted schedule into enrollment through the
+    /// measure mappings, so the schedule is posted as with DMRP off and no reporting plan is written directly.
+    /// </summary>
+    [Fact]
+    public async Task Posts_the_schedule_and_maps_each_measure_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        var plans = CaptureReportingPlans();
+
+        await EnsureFacilityAsync();
+
+        var created = Assert.Single(_created);
+        Assert.Equal([MeasureId], created.ScheduledReports.Monthly);
+        Assert.Empty(plans);
+        Assert.Empty(_updated);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(
+            It.Is<MeasureMappingModel>(m => m.Measure == MeasureId && m.DQM == MeasureId &&
+                                            m.Frequency == Frequency.Monthly),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Measure is unique on its own, so a mapping left with another frequency blocks creating the
+    /// Monthly one, and the write-through cannot enroll the Monthly schedule through it. It is corrected.
+    /// </summary>
+    [Fact]
+    public async Task Corrects_an_existing_mapping_with_the_wrong_frequency_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Adhoc
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        AssertCorrectedToMonthly(Assert.Single(updates));
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Corrects_an_existing_mapping_with_a_different_dqm_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = "SomeOtherDqm", Frequency = Frequency.Monthly
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        AssertCorrectedToMonthly(Assert.Single(updates));
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
+    /// <summary>
+    /// The search matches measure as a substring, so a mapping for a measure that only contains this
+    /// one's id is someone else's and must not be reused.
+    /// </summary>
+    [Fact]
+    public async Task Does_not_reuse_a_mapping_whose_measure_only_contains_the_measure_id()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = "other-mapping", Measure = MeasureId + "V2", DQM = MeasureId + "V2", Frequency = Frequency.Monthly
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        Assert.Empty(updates);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(
+            It.Is<MeasureMappingModel>(m => m.Measure == MeasureId && m.DQM == MeasureId &&
+                                            m.Frequency == Frequency.Monthly),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reuses_a_correct_mapping_without_updating_it_when_the_mock_write_through_is_on()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        GivenMeasureMappings(new MeasureMappingModel
+        {
+            Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Monthly
+        });
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        Assert.Empty(updates);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
+    /// <summary>
+    /// A create refused as a duplicate gets the same exact-match check and correction as a mapping
+    /// found up front.
+    /// </summary>
+    [Fact]
+    public async Task Corrects_the_mapping_found_after_a_duplicate_create_is_refused()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: true);
+        _dmrpClient.SetupSequence(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<PagedConfigModel<MeasureMappingModel>>(204))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel>
+            {
+                Records =
+                [
+                    new MeasureMappingModel { Id = "other-mapping", Measure = MeasureId + "V2", DQM = MeasureId + "V2", Frequency = Frequency.Monthly },
+                    new MeasureMappingModel { Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Adhoc }
+                ]
+            }));
+        _dmrpClient.Setup(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<MeasureMappingModel>(400, rawBody: "duplicate"));
+        var updates = CaptureMeasureMappingUpdates();
+
+        await EnsureFacilityAsync();
+
+        AssertCorrectedToMonthly(Assert.Single(updates));
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
+    /// <summary>
+    /// The measure's own row can sit past the first page of substring matches; paging continues until
+    /// it is found.
+    /// </summary>
+    [Fact]
+    public async Task Finds_the_exact_mapping_on_a_later_search_page()
+    {
+        GivenDmrpIsEnabled();
+        var firstPage = Enumerable.Range(0, 50)
+            .Select(i => new MeasureMappingModel { Id = $"other-{i}", Measure = $"{MeasureId}V{i}", DQM = MeasureId, Frequency = Frequency.Monthly })
+            .ToList();
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel> { Records = firstPage }));
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel>
+            {
+                Records = [new MeasureMappingModel { Id = MappingId, Measure = MeasureId, DQM = MeasureId, Frequency = Frequency.Monthly }]
+            }));
+
+        var id = await FacilitySetupHelper.EnsureDmrpMeasureMappingAsync(_dmrpClient.Object,
+            Mock.Of<IAutomationOutput>(), MeasureId, MeasureId, Frequency.Monthly);
+
+        Assert.Equal(MappingId, id);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()), Times.Never);
+        _dmrpClient.Verify(d => d.UpdateMeasureMappingAsync(It.IsAny<string>(), It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// A failed search surfaces as itself instead of being read as "no mapping" and attempting a create.
+    /// </summary>
+    [Fact]
+    public async Task Throws_when_the_measure_mapping_search_fails()
+    {
+        GivenDmrpIsEnabled();
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<PagedConfigModel<MeasureMappingModel>>(500, rawBody: "boom"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureDmrpMeasureMappingAsync(_dmrpClient.Object,
+                Mock.Of<IAutomationOutput>(), MeasureId, MeasureId, Frequency.Monthly));
+
+        Assert.Contains("HTTP 500", ex.Message);
+        _dmrpClient.Verify(d => d.CreateMeasureMappingAsync(It.IsAny<MeasureMappingModel>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Derives_the_schedule_from_reporting_plans_when_tenant_reports_dmrp_without_the_mock()
+    {
+        GivenDmrpIsEnabled();
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: false);
+        var plans = CaptureReportingPlans();
+
+        await EnsureFacilityAsync();
+
+        Assert.Empty(Assert.Single(_created).ScheduledReports.Monthly);
+        Assert.NotEmpty(plans);
+    }
+
+    [Fact]
+    public async Task Posts_the_schedule_when_tenant_reports_dmrp_off()
+    {
+        GivenDmrpStatus(dmrpEnabled: false, mockDmrpEnabled: false);
+
+        await EnsureFacilityAsync();
+
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+    }
+
+    /// <summary>
+    /// With the write-through an empty schedule un-enrolls the facility, so a vendor change sends back the
+    /// schedule the facility already has.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Sends_the_stored_schedule_with_a_vendor_change_unless_tenant_derives_it(
+        bool mockDmrpEnabled, bool expectEmpty)
+    {
+        GivenDmrpStatus(dmrpEnabled: true, mockDmrpEnabled: mockDmrpEnabled);
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel
+            {
+                FacilityId = FacilityId,
+                FacilityName = FacilityId,
+                TimeZone = "America/Chicago",
+                Vendor = new VendorModel { Name = "Epic" },
+                ScheduledReports = new TenantScheduledReportConfig { Monthly = [MeasureId], Daily = [], Weekly = [] }
+            }));
+
+        await FacilitySetupHelper.EnsureFacilityAsync(_facilityClient.Object, _dmrpClient.Object, _output.Object,
+            FacilityId, [MeasureId], vendorName: "Cerner", vendorExplicit: true);
+
+        var updated = Assert.Single(_updated);
+        Assert.Equal(expectEmpty, updated.ScheduledReports.Monthly.Length == 0);
+    }
+
+    [Fact]
+    public async Task Refuses_to_guess_when_the_status_route_fails()
+    {
+        _dmrpClient.Setup(d => d.GetDmrpStatusAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<DmrpStatusModel>(500, rawBody: "boom"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(EnsureFacilityAsync);
+
+        Assert.Contains("api/dmrp/dmrp-status", exception.Message);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Write_through_setup_creates_the_facility_with_its_schedule()
+    {
+        var created = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(_facilityClient.Object,
+            _output.Object, FacilityId, [MeasureId]);
+
+        Assert.True(created);
+        Assert.Equal([MeasureId], Assert.Single(_created).ScheduledReports.Monthly);
+        Assert.Empty(_updated);
+    }
+
+    /// <summary>
+    /// A reused facility is saved again with the run's schedule, since that save is what enrolls it.
+    /// </summary>
+    [Fact]
+    public async Task Write_through_setup_saves_an_existing_facility_with_its_schedule()
+    {
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel { FacilityId = FacilityId }));
+
+        var created = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(_facilityClient.Object,
+            _output.Object, FacilityId, [MeasureId]);
+
+        Assert.False(created);
+        Assert.Equal([MeasureId], Assert.Single(_updated).ScheduledReports.Monthly);
+        Assert.Empty(_created);
+    }
+
+    private void GivenDmrpStatus(bool dmrpEnabled, bool mockDmrpEnabled) =>
+        _dmrpClient.Setup(d => d.GetDmrpStatusAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new DmrpStatusModel
+            {
+                DmrpEnabled = dmrpEnabled,
+                MockDmrpEnabled = mockDmrpEnabled
+            }));
+
+    private Task<bool> EnsureFacilityAsync() =>
         FacilitySetupHelper.EnsureFacilityAsync(_facilityClient.Object, _dmrpClient.Object, _output.Object,
             FacilityId, [MeasureId]);
 
@@ -271,6 +855,34 @@ public class FacilitySetupHelperTests
                 Response(201, new FacilityReportingPlanModel { FacilityId = request.FacilityId }));
     }
 
+    private void GivenMeasureMappings(params MeasureMappingModel[] records) =>
+        _dmrpClient.Setup(d => d.SearchMeasureMappingsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<Frequency?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new PagedConfigModel<MeasureMappingModel> { Records = [.. records] }));
+
+    private List<(string Id, MeasureMappingModel Model)> CaptureMeasureMappingUpdates()
+    {
+        var updates = new List<(string Id, MeasureMappingModel Model)>();
+
+        _dmrpClient.Setup(d => d.UpdateMeasureMappingAsync(It.IsAny<string>(), It.IsAny<MeasureMappingModel>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string id, MeasureMappingModel model, CancellationToken _) =>
+            {
+                updates.Add((id, model));
+                return Response(200, model);
+            });
+
+        return updates;
+    }
+
+    private static void AssertCorrectedToMonthly((string Id, MeasureMappingModel Model) update)
+    {
+        Assert.Equal(MappingId, update.Id);
+        Assert.Equal(MeasureId, update.Model.Measure);
+        Assert.Equal(MeasureId, update.Model.DQM);
+        Assert.Equal(Frequency.Monthly, update.Model.Frequency);
+    }
+
     private List<FacilityReportingPlanRequest> CaptureReportingPlans()
     {
         var plans = new List<FacilityReportingPlanRequest>();
@@ -286,6 +898,6 @@ public class FacilitySetupHelperTests
         return plans;
     }
 
-    private static LinkApiResponse<T> Response<T>(int statusCode, T? body = default) =>
-        new() { StatusCode = statusCode, Body = body };
+    private static LinkApiResponse<T> Response<T>(int statusCode, T? body = default, string? rawBody = null) =>
+        new() { StatusCode = statusCode, Body = body, RawBody = rawBody };
 }

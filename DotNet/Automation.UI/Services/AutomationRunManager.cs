@@ -4,7 +4,10 @@ using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 
@@ -24,6 +27,9 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly DashboardStatsAggregator _dashboardAggregator;
     private readonly RunExecutor _runExecutor;
     private readonly ILivePatientEventInjector _liveInjector;
+    private readonly IPatientConfigurationStore _patientConfigurationStore;
+    private readonly IMeasureTemplateStore _measureTemplateStore;
+    private readonly IFacilityTemplateStore _facilityTemplateStore;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -40,7 +46,10 @@ public class AutomationRunManager : IAutomationRunManager
         ImportedBundleExecutionResolver importedBundleResolver,
         LantanaGroup.Automation.Generation.IGeneratedPatientTemplateCache generatedTemplateCache,
         GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
-        ILivePatientEventInjector liveInjector)
+        ILivePatientEventInjector liveInjector,
+        IPatientConfigurationStore patientConfigurationStore,
+        IMeasureTemplateStore measureTemplateStore,
+        IFacilityTemplateStore facilityTemplateStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -53,6 +62,9 @@ public class AutomationRunManager : IAutomationRunManager
         _organizationResourceMapResolver = new OrganizationResourceMapTemplateResolver(organizationResourceMapTemplateStore);
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
         _liveInjector = liveInjector;
+        _patientConfigurationStore = patientConfigurationStore;
+        _measureTemplateStore = measureTemplateStore;
+        _facilityTemplateStore = facilityTemplateStore;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -72,7 +84,13 @@ public class AutomationRunManager : IAutomationRunManager
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
-        var options = StartScenarioRequestResolver.Resolve(request);
+        var resolved = StartScenarioRequestResolver.Resolve(request);
+        resolved = await FacilityTemplateRunBinder.ApplyAsync(resolved, _facilityTemplateStore, cancellationToken);
+        resolved = await MeasureTemplateRunBinder.AttachBundlesAsync(resolved, _measureTemplateStore, cancellationToken);
+        var options = await PatientConfigurationHydrator.HydrateAsync(
+            resolved,
+            _patientConfigurationStore,
+            cancellationToken);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
@@ -90,7 +108,8 @@ public class AutomationRunManager : IAutomationRunManager
                 var callbacks = new RunExecutor.ExecutorCallbacks(
                     Output: output,
                     BroadcastStatus: () => BroadcastStatus(state),
-                    PersistRunSummary: () => PersistRunSummaryAsync(state));
+                    PersistRunSummary: () => PersistRunSummaryAsync(state),
+                    PersistOwnership: () => PersistOwnershipAsync(state));
 
                 await _runExecutor.ExecuteAsync(state, callbacks, state.RunCancellation.Token);
             }
@@ -147,26 +166,34 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // â”€â”€ Path 1: zombie run (exists in the store but no in-memory state) â”€â”€â”€â”€â”€â”€â”€â”€
-        // _runs is lost on every app restart, so any run that was Running when the
-        // previous process died is a zombie: still flagged Running in Mongo, but
-        // with no execution task to signal. Returning false here was the reason the
-        // UI's Cancel button appeared to do nothing after a docker restart.
+        // Path 1: zombie run (exists in the store but no in-memory state).
+        // _runs is lost on every app restart, so a run that was Running when the
+        // previous process died is still flagged Running in Mongo with no execution
+        // task to signal.
         if (!_runs.TryGetValue(runId, out var state))
             return await CancelZombieRunAsync(runId, cancellationToken);
 
-        if (!state.Status.IsCancellable())
-            return false;
+        bool queueCleanup;
+        lock (state.Sync)
+        {
+            if (!state.Status.IsSuccessfulCancelTarget())
+                return false;
 
-        // â”€â”€ Path 2: live in-process run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            if (state.Status == AutomationRunStatus.Cancelled)
+                return true;
+
+            state.CancelRequested = true;
+            state.Status = AutomationRunStatus.Cancelled;
+            state.Error = "Cancelled by user.";
+            state.FinishedAt = DateTimeOffset.UtcNow;
+            queueCleanup = true;
+        }
+
+        // Path 2: live in-process run.
         // Flip the in-memory state, broadcast, persist. BroadcastStatus calls
         // PersistRunSummaryAsync internally, so the row is marked Cancelled in Mongo
-        // before we return â€” the UI will see the updated status on its next refresh
-        // regardless of how long cleanup takes.
-        state.CancelRequested = true;
-        state.Status = AutomationRunStatus.Cancelled;
-        state.Error = "Cancelled by user.";
-        state.FinishedAt = DateTimeOffset.UtcNow;
+        // before we return. The UI will see the updated status on its next refresh
+        // regardless of how long abort/cleanup takes.
         _liveInjector.CloseSession(runId);
         await BroadcastStatus(state);
 
@@ -179,22 +206,24 @@ public class AutomationRunManager : IAutomationRunManager
             // best effort
         }
 
-        // Run the downstream cleanup workflow (FHIR purge, config teardown, report
-        // soft-delete) as a background task. Holding the HTTP request for 10s + N
-        // cross-service calls is what made Cancel feel hung to users; the run is
-        // already marked Cancelled at this point, so the UI doesn't need to wait.
-        _ = Task.Run(() => CleanupCancelledRunInBackgroundAsync(state));
+        if (queueCleanup)
+        {
+            QueueCancellationCleanup(
+                runId,
+                state.FacilityId,
+                state.ReportId,
+                state.FhirDataLoader,
+                state.ExecutionTask,
+                message => WriteLog(state, message));
+        }
 
         return true;
     }
 
     /// <summary>
     /// Cancels a run whose in-memory state no longer exists in this process.
-    /// Writes a minimal Cancelled summary directly through the snapshot store so
-    /// the dashboard updates correctly and the orchestrator stops polling.
-    /// Cleanup of downstream service state isn't attempted here because the facility
-    /// and report IDs captured on the persisted summary are the only handles we have
-    /// and may be missing if the run died before they were assigned.
+    /// Marks Cancelled immediately, then queues the same abort/quiesce/FHIR
+    /// cleanup as a live cancel. Downstream failures must not fail the HTTP cancel.
     /// </summary>
     private async Task<bool> CancelZombieRunAsync(Guid runId, CancellationToken cancellationToken)
     {
@@ -202,8 +231,11 @@ public class AutomationRunManager : IAutomationRunManager
         if (summary == null)
             return false;
 
-        if (!summary.Status.IsCancellable())
+        if (!summary.Status.IsSuccessfulCancelTarget())
             return false;
+
+        if (summary.Status == AutomationRunStatus.Cancelled)
+            return true;
 
         summary.Status = AutomationRunStatus.Cancelled;
         summary.Error = "Cancelled by user (no active execution in this process).";
@@ -213,68 +245,106 @@ public class AutomationRunManager : IAutomationRunManager
         await _snapshotStore.CompleteRunAsync(runId, duration: null, ct: cancellationToken);
         await _orchestrator.CompleteRunAsync(runId);
 
+        QueueCancellationCleanup(
+            runId,
+            summary.FacilityId,
+            summary.ReportId,
+            fhirDataLoader: null,
+            executionTask: null,
+            writeLog: null);
+
         await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
 
         _logger.LogInformation(
-            "Cancelled zombie run {RunId} (no in-memory state). Downstream service cleanup skipped; operator may need to reset facility {FacilityId} manually if it was partially provisioned.",
-            runId, summary.FacilityId);
+            "Cancelled zombie run {RunId}. Abort/quiesce queued for facility {FacilityId}.",
+            runId, summary.FacilityId.SanitizeForLog());
 
         return true;
     }
 
-    private async Task CleanupCancelledRunInBackgroundAsync(MutableRunState state)
+    private void QueueCancellationCleanup(
+        Guid runId,
+        string? facilityId,
+        string? reportId,
+        FhirDataLoader? fhirDataLoader,
+        Task? executionTask,
+        Action<string>? writeLog)
+    {
+        _ = Task.Run(() => CleanupCancelledRunInBackgroundAsync(
+            runId, facilityId, reportId, fhirDataLoader, executionTask, writeLog));
+    }
+
+    private async Task CleanupCancelledRunInBackgroundAsync(
+        Guid runId,
+        string? facilityId,
+        string? reportId,
+        FhirDataLoader? fhirDataLoader,
+        Task? executionTask,
+        Action<string>? writeLog)
     {
         try
         {
-            if (state.ExecutionTask != null)
+            if (executionTask != null)
             {
                 // Let the running pipeline observe the cancellation token and unwind
                 // cleanly before we start clawing back its outputs.
-                await Task.WhenAny(state.ExecutionTask, Task.Delay(TimeSpan.FromSeconds(10)));
+                await Task.WhenAny(executionTask, Task.Delay(TimeSpan.FromSeconds(10)));
             }
 
-            var output = new RunAutomationOutput(message => WriteLog(state, message));
-            output.WriteLine("Cancellation requested. Running cancellation cleanup workflow...");
+            IAutomationOutput output = writeLog != null
+                ? new RunAutomationOutput(writeLog)
+                : new RunAutomationOutput(message =>
+                    _logger.LogInformation("Cancel cleanup {RunId}: {Message}", runId, message.SanitizeForLog()));
+            output.WriteLine("Cancellation requested. Aborting pipeline work for this facility...");
 
             using var scope = _hostServices.CreateScope();
             var dataAcqClient = scope.ServiceProvider.GetRequiredService<IDataAcquisitionServiceClient>();
             var reportClient = scope.ServiceProvider.GetRequiredService<IReportServiceClient>();
-            var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();
-            var normalizationClient = scope.ServiceProvider.GetRequiredService<INormalizationServiceClient>();
-            var queryDispatchClient = scope.ServiceProvider.GetRequiredService<IQueryDispatchServiceClient>();
-            var fhirDataLoader = state.FhirDataLoader
+            var censusClient = scope.ServiceProvider.GetRequiredService<ICensusServiceClient>();
+            var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+            var settingsStore = scope.ServiceProvider.GetService<ICleanupSettingsStore>();
+            var abortTtl = settingsStore != null
+                ? (await settingsStore.GetEffectiveAsync(CancellationToken.None)).AbortTtl
+                : scope.ServiceProvider.GetService<IOptions<LeftoverRunCleanupOptions>>()?.Value.AbortTtl
+                  ?? TimeSpan.FromDays(14);
+            var loader = fhirDataLoader
                 ?? new FhirDataLoader(_automationConfig.FhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
 
             await RunCleanupHelper.CleanupCancelledRunAsync(
-                facilityClient,
-                normalizationClient,
                 dataAcqClient,
-                queryDispatchClient,
+                censusClient,
                 reportClient,
-                fhirDataLoader,
+                abortRegistry,
+                loader,
                 output,
-                state.FacilityId,
-                state.ReportId,
+                facilityId,
+                reportId,
+                abortTtl,
                 CancellationToken.None);
 
-            await _orchestrator.CompleteRunAsync(state.RunId);
-            await PersistRunSummaryAsync(state);
+            await _orchestrator.CompleteRunAsync(runId);
             output.WriteLine("Cancellation cleanup complete.");
         }
         catch (Exception ex)
         {
-            // A failure in background cleanup must never crash the host. The run is
-            // already marked Cancelled in the store from BroadcastStatus above; this
-            // only affects downstream service state that an operator may need to
-            // inspect/clean up manually.
-            _logger.LogError(ex, "Background cancellation cleanup failed for run {RunId}.", state.RunId);
+            // A failure in background cleanup must never fail Cancel or crash the host.
+            // The run is already marked Cancelled; leftover work can be retried from Cleanup.
+            _logger.LogError(ex, "Background cancellation cleanup failed for run {RunId}.", runId);
         }
     }
 
-    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default)
+    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default, DateTimeOffset? createdFromUtc = null, DateTimeOffset? createdBeforeUtc = null)
     {
-        var page = await _snapshotStore.GetRunsPageAsync(pageNumber, pageSize, sortBy, sortDescending, cancellationToken);
+        var page = await _snapshotStore.GetRunsPageAsync(
+            pageNumber,
+            pageSize,
+            sortBy,
+            sortDescending,
+            cancellationToken,
+            createdFromUtc,
+            createdBeforeUtc);
+
         return new AutomationRunIndexViewModel
         {
             Runs = page.Items,
@@ -335,7 +405,13 @@ public class AutomationRunManager : IAutomationRunManager
                 return false;
         }
 
-        await _snapshotStore.DeleteRunAsync(runId, cancellationToken);
+        // Stop the poller and remove the rows while holding the run gate.
+        // A write that already holds the gate finishes first. A write that
+        // arrives afterwards sees no run row and does not recreate the documents.
+        await _orchestrator.QuiesceForDeleteAsync(
+            runId,
+            token => _snapshotStore.DeleteRunAsync(runId, token),
+            cancellationToken);
         return true;
     }
 
@@ -373,17 +449,25 @@ public class AutomationRunManager : IAutomationRunManager
             return null;
         }
 
-        var isFinal = status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled;
+        var isFinal = status.IsTerminal();
 
         try
         {
             // Build snapshot from store-cached domain data (zero API calls).
+            AcquisitionLogChart? acquisitionChart = null;
             var builder = new PipelineSummarySnapshotBuilder(async (scheduleId, fId) =>
             {
                 var schedule = await SafeGetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule", cancellationToken);
-                var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
-                var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
+                var entryRollup = await SafeGetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, "entries", cancellationToken);
+                var entries = entryRollup == null
+                    ? await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? []
+                    : [];
+                var populationCounts = await ReadPopulationCountsAsync(runId, cancellationToken);
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
+                acquisitionChart = await SafeGetDomainAsync<AcquisitionLogChart>(runId, "acquisitionLogs", cancellationToken);
+                var acquisitionLogs = acquisitionChart == null
+                    ? await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? []
+                    : [];
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
                 var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
@@ -391,8 +475,8 @@ public class AutomationRunManager : IAutomationRunManager
                     "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}",
                     runId,
                     schedule != null,
-                    entries.Count,
-                    populations.Count,
+                    entryRollup?.EntryCount ?? entries.Count,
+                    populationCounts?.ReportTypeCount ?? 0,
                     acquisitionSummary != null,
                     acquisitionSummary?.TotalLogs ?? 0,
                     measureResources.Count);
@@ -401,14 +485,18 @@ public class AutomationRunManager : IAutomationRunManager
                 {
                     Schedule = schedule,
                     Entries = entries,
-                    Populations = populations,
+                    EntryRollup = entryRollup,
+                    PopulationCounts = populationCounts,
                     AcquisitionSummary = acquisitionSummary,
+                    AcquisitionLogs = acquisitionLogs,
                     MeasureEvalResourceCounts = measureResources,
                     ValidatorResults = validatorResults
                 };
             });
 
             var snapshot = await builder.BuildAsync(facilityId, reportId, logs, cancellationToken);
+            if (acquisitionChart != null)
+                acquisitionChart.Apply(snapshot.DataAcquisition, snapshot.DataAcquisition.ResourceCount, snapshot.GeneratedAt);
             snapshot.IsFinal = isFinal;
             return snapshot;
         }
@@ -511,19 +599,9 @@ public class AutomationRunManager : IAutomationRunManager
     {
         _ = source;
         EnsureLiveWindowOpen(runId);
-        try
-        {
-            return await _liveInjector.GeneratePoolPatientAsync(runId, source, cancellationToken);
-        }
-        catch (LiveInjectionException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Live generate failed for run {RunId}.", runId);
-            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
-        }
+        return await InvokeLivePoolAsync(
+            () => _liveInjector.GeneratePoolPatientAsync(runId, source, cancellationToken),
+            ex => _logger.LogError(ex, "Live generate failed for run {RunId}.", runId));
     }
 
     public async Task<LivePatientPoolEntry> UploadLivePoolPatientAsync(
@@ -535,19 +613,9 @@ public class AutomationRunManager : IAutomationRunManager
     {
         _ = source;
         EnsureLiveWindowOpen(runId);
-        try
-        {
-            return await _liveInjector.UploadPoolPatientAsync(runId, content, fileName, source, cancellationToken);
-        }
-        catch (LiveInjectionException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Live upload failed for run {RunId}.", runId);
-            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
-        }
+        return await InvokeLivePoolAsync(
+            () => _liveInjector.UploadPoolPatientAsync(runId, content, fileName, source, cancellationToken),
+            ex => _logger.LogError(ex, "Live upload failed for run {RunId}.", runId));
     }
 
     public async Task<LivePatientPoolEntry> ReferenceLivePoolPatientAsync(
@@ -558,17 +626,32 @@ public class AutomationRunManager : IAutomationRunManager
     {
         _ = source;
         EnsureLiveWindowOpen(runId);
+        return await InvokeLivePoolAsync(
+            () => _liveInjector.ReferencePoolPatientAsync(runId, patientId, source, cancellationToken),
+            ex => _logger.LogError(ex, "Live reference failed for run {RunId}.", runId));
+    }
+
+    /// <summary>
+    /// Live pool calls keep <see cref="LiveInjectionException"/> and cancellation.
+    /// Any other exception becomes a 500 <see cref="LiveInjectionException"/>.
+    /// </summary>
+    internal static async Task<T> InvokeLivePoolAsync<T>(Func<Task<T>> action, Action<Exception> logFault)
+    {
         try
         {
-            return await _liveInjector.ReferencePoolPatientAsync(runId, patientId, source, cancellationToken);
+            return await action().ConfigureAwait(false);
         }
         catch (LiveInjectionException)
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Live reference failed for run {RunId}.", runId);
+            logFault(ex);
             throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
         }
     }
@@ -609,23 +692,43 @@ public class AutomationRunManager : IAutomationRunManager
         await PersistRunSummaryAsync(state);
     }
 
+    private async Task PersistOwnershipAsync(MutableRunState state)
+    {
+        // Independent of run cancellation. CancelRunAsync persists a summary before it
+        // cancels the run token, and that write must not abort this marker.
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        const int attempts = 3;
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                var summary = ToSummary(state);
+                if (!summary.AutomationCreatedFacility)
+                    return;
+
+                await _snapshotStore.MarkAutomationCreatedFacilityAsync(
+                    summary, summary.FacilityId ?? string.Empty, budget.Token);
+                return;
+            }
+            catch (OperationCanceledException) when (budget.IsCancellationRequested)
+            {
+                throw new InvalidOperationException(
+                    $"Ownership summary persist timed out for {state.RunId}.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && attempt < attempts)
+            {
+                _logger.LogWarning(ex,
+                    "Ownership summary persist failed for {RunId}; retrying.", state.RunId);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), budget.Token);
+            }
+        }
+    }
+
     private async Task PersistRunSummaryAsync(MutableRunState state)
     {
         try
         {
-            AutomationRunSummary summary;
-            string? facilityId;
-            string? reportId;
-
-            lock (state.Sync)
-            {
-                summary = ToSummary(state);
-                facilityId = state.FacilityId;
-                reportId = state.ReportId;
-            }
-
-            summary.RunConfigurationJson = null;
-            await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId);
+            await WriteRunSummaryAsync(state, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -639,6 +742,35 @@ public class AutomationRunManager : IAutomationRunManager
                 "in the Recent Runs table until a successful upsert lands.",
                 state.RunId);
         }
+    }
+
+    private async Task WriteRunSummaryAsync(MutableRunState state, CancellationToken cancellationToken)
+    {
+        AutomationRunSummary summary;
+        string? facilityId;
+        string? reportId;
+
+        lock (state.Sync)
+        {
+            summary = ToSummary(state);
+            facilityId = state.FacilityId;
+            reportId = state.ReportId;
+        }
+
+        summary.RunConfigurationJson = null;
+        await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId, cancellationToken);
+    }
+
+    private async Task<PipelineDataReader.PopulationCountSnapshot?> ReadPopulationCountsAsync(
+        Guid runId,
+        CancellationToken cancellationToken)
+    {
+        var counts = await SafeGetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, "populations", cancellationToken);
+        if (counts != null)
+            return counts;
+
+        var legacy = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken);
+        return legacy == null ? null : RunHistorySlim.ToPopulationCounts(legacy);
     }
 
     /// <summary>
@@ -686,6 +818,7 @@ public class AutomationRunManager : IAutomationRunManager
                     + state.Options.ImportedPatientBundles.Count,
                 ResourcesPerPatient = state.Options.ResourcesPerPatient,
                 Seed = state.Options.Seed,
+                IsMetricsRun = state.Options.IsMetricsRun,
                 RunConfigurationJson = state.RunConfigurationJson,
                 Status = state.Status,
                 CreatedAt = state.CreatedAt,
@@ -693,6 +826,7 @@ public class AutomationRunManager : IAutomationRunManager
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
                 FacilityId = state.FacilityId,
+                AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,
                 GeneratedTemplateCacheVersionId = state.GeneratedTemplateCacheVersionId,
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,

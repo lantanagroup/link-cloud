@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
@@ -11,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
@@ -149,6 +151,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<string, ValidationCompleteValue> result, CancellationToken cancellationToken)
         {
+            using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
             using var scope = _serviceScopeFactory.CreateScope();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
@@ -156,6 +159,10 @@ namespace LantanaGroup.Link.Report.Listeners
             var facilityId = result.Message.Key;
             var value = result.Message.Value;
             var reportId = Guid.Parse(value.ReportTrackingId);
+
+            if (await PipelineAbortSkip.ShouldSkipAsync(
+                    scope.ServiceProvider, _logger, nameof(ValidationCompleteListener), facilityId, value.ReportTrackingId, cancellationToken))
+                return;
 
             var schedule = await reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
@@ -183,11 +190,35 @@ namespace LantanaGroup.Link.Report.Listeners
             // (pre-qualification.write-pre-qual-operation-outcome). Report only records
             // the validation result and forwards the patient payload for submission.
             reportEntry.ReportingStatus = value.IsValid ? ReportingStatus.PassedValidation : ReportingStatus.FailedValidation;
-            reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
 
-            await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+            if (schedule.EnableSubmission)
+            {
+                reportEntry.SubmissionStatus = SubmissionStatus.Submitting;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
+                
+                await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry,
+                    value.PatientId, correlationIdStr, reportEntry.AggregateReportUri, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers));
+            }
+            else
+            {
+                reportEntry.SubmissionStatus = SubmissionStatus.NotSubmitted;
+                await reportEntryManager.UpdateAsync(reportEntry, cancellationToken);
 
-            await _submitPayloadProducer.Produce(schedule, PayloadType.MeasureReportSubmissionEntry, value.PatientId, correlationIdStr, reportEntry.AggregateReportUri);
+                // The per-patient SubmitPayload we just skipped is normally what drives report
+                // completion: it comes back as PayloadSubmitted, and PayloadSubmittedListener
+                // calls ReportManifestProducer.Produce after each patient. With submission
+                // bypassed that event never exists, and the other callers cannot stand in for
+                // it -- MeasureReportGeneratedListener runs before validation, and an ad-hoc
+                // report never schedules EndOfReportPeriodJob. Without this call the manifest
+                // is never written to internal/ and the schedule sits at its pre-report status
+                // forever.
+                //
+                // Produce is gated on EndOfReportPeriodJobHasRun and AreAllEntriesCompleteAsync,
+                // so it is a no-op on every patient but the last, exactly as on the submitting
+                // path.
+                var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
+                await reportManifestProducer.Produce(schedule, correlationIdStr, cancellationToken);
+            }
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

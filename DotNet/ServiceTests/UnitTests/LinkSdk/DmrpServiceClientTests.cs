@@ -165,6 +165,25 @@ public class DmrpServiceClientTests
         Assert.False(response.IsSuccessStatusCode);
     }
 
+    /// <summary>
+    /// The one DMRP route Tenant serves with the module off, so it answers rather than 404s.
+    /// </summary>
+    [Fact]
+    public async System.Threading.Tasks.Task GetDmrpStatusAsync_ReadsTheStatusRoute()
+    {
+        using var server = new OneShotServer("{\"dmrpEnabled\":true,\"mockDmrpEnabled\":true}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetDmrpStatusAsync();
+        var request = await server.WaitForRequestAsync();
+        var response = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/dmrp/dmrp-status", request.Path);
+        Assert.True(response.Body?.DmrpEnabled);
+        Assert.True(response.Body?.MockDmrpEnabled);
+    }
+
     private static DmrpServiceClient CreateClient(string baseUrl)
     {
         return new DmrpServiceClient(

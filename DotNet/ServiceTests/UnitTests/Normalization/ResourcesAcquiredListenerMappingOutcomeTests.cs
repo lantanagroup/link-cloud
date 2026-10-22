@@ -8,16 +8,19 @@ using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Text;
 using System.Text.Json;
@@ -448,6 +451,7 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
 
         var services = new ServiceCollection();
         services.AddSingleton(sequenceQueries.Object);
+        services.AddScoped<IFacilityLocationLocalCodeMappingManager>(_ => Mock.Of<IFacilityLocationLocalCodeMappingManager>());
         var serviceProvider = services.BuildServiceProvider();
 
         var scope = new Mock<IServiceScope>();
@@ -463,6 +467,9 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
+        var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
+        telemetrySettings.SetupGet(x => x.CurrentValue).Returns(new TelemetrySettings { PatientTags = false });
+
         return new ResourcesAcquiredListener(
             Mock.Of<ILogger<ResourcesAcquiredListener>>(),
             new ServiceInformation { ServiceConfigName = "Normalization" },
@@ -475,12 +482,15 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
             normalizedProducer.Object,
             new CopyPropertyOperationService(Mock.Of<ILogger<CopyPropertyOperationService>>()),
             new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()),
+            new HSLOCMapOperationService(Mock.Of<ILogger<HSLOCMapOperationService>>(),
+                new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>())),
             new ConditionalTransformOperationService(Mock.Of<ILogger<ConditionalTransformOperationService>>()),
             new CopyLocationOperationService(Mock.Of<ILogger<CopyLocationOperationService>>()),
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
             Mock.Of<IResourceCachePurger>(),
+            telemetrySettings.Object,
             mappingOutcomeProducer.Object);
     }
 

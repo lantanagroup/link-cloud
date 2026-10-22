@@ -57,6 +57,7 @@ using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -96,6 +97,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterSecretManager(builder.Configuration);
 
         builder.RegisterCacheService();
+        builder.Services.AddPipelineAbortRegistry(builder.Configuration);
         builder.Services.RegisterHittpClient();
         builder.Services.RegisterFhirAuthHandlers();
         builder.Services.RegisterExceptionHandlers();
@@ -321,11 +323,13 @@ public static class GeneralStartupExtensions
         //Services
         services.AddTransient<ITenantApiService, TenantApiService>();
         services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
+        services.AddTransient<IValidateFhirServerConnectionService, ValidateFhirServerConnectionService>();
         services.AddTransient<IFhirApiService, FhirApiService>();
         services.AddTransient<ILocationMappingService, LocationMappingService>();
         services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
         services.AddTransient<IPatientDataService, PatientDataService>();
         services.AddTransient<IPatientCensusService, PatientCensusService>();
+        services.AddTransient<IEhrPatientListService, EhrPatientListService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
@@ -337,11 +341,15 @@ public static class GeneralStartupExtensions
 
         //SFTP Services
         services.AddTransient<ISftpClientService, SftpClientService>();
+        services.AddTransient<ISftpConnectionTestService, SftpConnectionTestService>();
         services.AddTransient<IFileParserFactory, FileParserFactory>();
         services.AddTransient<ISftpAcquisitionProcessorFactory, SftpAcquisitionProcessorFactory>();
+        services.AddTransient<IFhirAuthenticationConfigurationService, FhirAuthenticationConfigurationService>();
 
         //File Parsers
         services.AddTransient<IFileParser<CernerEncounters>, CernerCclExtractParser>();
+        // Concrete registration for the SFTP connection test's patient preview, which isn't part of IFileParser<T>
+        services.AddTransient<CernerCclExtractParser>();
 
         //SFTP Acquisition Processors
         services.AddTransient<ISftpAcquisitionProcessor, CernerCclExtractProcessor>();

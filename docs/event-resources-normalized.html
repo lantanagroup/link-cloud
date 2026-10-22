@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -513,15 +515,15 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nresources_normalized_47A49D1["Event: Resources Normalized"]
-  nNormalizationService_2861AAD1["Service: NormalizationService"] -->|produces| nresources_normalized_47A49D1
-  nresources_normalized_47A49D1 -->|consumed by| nMeasureEvalService_655B21CF["Service: MeasureEvalService"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nresources_normalized_47A49D1
+nresources_normalized_6C1D52A7["Event: Resources Normalized"]
+  nNormalizationService_78B0F5BC["Service: NormalizationService"] -->|produces| nresources_normalized_6C1D52A7
+  nresources_normalized_6C1D52A7 -->|consumed by| nMeasureEvalService_5AA5AF95["Service: MeasureEvalService"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nresources_normalized_6C1D52A7
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nMeasureEvalService_655B21CF
-    nNormalizationService_2861AAD1
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nMeasureEvalService_5AA5AF95
+    nNormalizationService_78B0F5BC
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

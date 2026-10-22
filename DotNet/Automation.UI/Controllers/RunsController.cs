@@ -1,9 +1,11 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace Automation.UI.Controllers;
 
@@ -14,8 +16,13 @@ public class RunsController(
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+    IPatientConfigurationStore patientConfigurationStore,
+    IMeasureTemplateStore measureTemplateStore,
+    IFacilityTemplateStore facilityTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
+    GeneratedTemplateCacheVersionStore templateCacheVersionStore,
+    MetricsRunPresenter metricsPresenter,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
@@ -24,23 +31,51 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         var descending = IsDescending(sortDir);
 
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
+        {
+            return BadRequest(dateError);
+        }
+
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        recentPage.CreatedFrom = createdFrom;
+        recentPage.CreatedTo = createdTo;
         var scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
             .OrderBy(s => s.IsSystemScenario)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var canReuseRecentPage =
+            !createdFrom.HasValue &&
+            !createdTo.HasValue &&
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(cancellationToken);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        ViewBag.MeasureTemplates = await measureTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.FacilityTemplates = await facilityTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {
@@ -56,6 +91,8 @@ public class RunsController(
             TotalPages = recentPage.TotalPages,
             SortBy = recentPage.SortBy,
             SortDescending = recentPage.SortDescending,
+            CreatedFrom = recentPage.CreatedFrom,
+            CreatedTo = recentPage.CreatedTo,
         };
 
         return View(vm);
@@ -67,7 +104,9 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         // Returns just the Recent Runs card markup so the dashboard can refresh
         // the table in place (sort / paginate / SignalR update) without a full
@@ -75,7 +114,20 @@ public class RunsController(
         // partial is reused by both this action and the initial server render
         // in Index.cshtml — there's no divergence between the two templates.
         var descending = IsDescending(sortDir);
-        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
+        {
+            return BadRequest(dateError);
+        }
+
+        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        page.CreatedFrom = createdFrom;
+        page.CreatedTo = createdTo;
         return PartialView("_RecentRunsTable", page);
     }
 
@@ -92,7 +144,15 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var canReuseRecentPage =
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         return Json(new
         {
@@ -131,9 +191,16 @@ public class RunsController(
 
             // Build the run request from the complete persisted scenario rather than
             // relying on the default hidden values submitted by the Quick Launch form.
-            await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
-
-            return RedirectToAction(nameof(Index));
+            try
+            {
+                var runId = await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+                return RedirectToAction(nameof(Details), new { id = runId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["RunStartError"] = $"Unable to start test: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         if (!ModelState.IsValid)
@@ -150,18 +217,47 @@ public class RunsController(
             return RedirectToAction(nameof(Index));
         }
 
-        await runManager.StartAsync(request, cancellationToken);
-        return RedirectToAction(nameof(Index));
+        try
+        {
+            var startedRunId = await runManager.StartAsync(request, cancellationToken);
+            return RedirectToAction(nameof(Details), new { id = startedRunId });
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["RunStartError"] = $"Unable to start test: {ex.Message}";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult CleanLeftovers()
+        => RedirectToAction("Index", "Cleanup");
+
     [HttpGet]
-    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Details(
+        Guid id,
+        CancellationToken cancellationToken)
     {
         var run = await runManager.GetRunAsync(id, cancellationToken);
         if (run == null)
             return NotFound();
 
+        ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        if (run.IsMetricsRun)
+            ViewBag.Performance = await metricsPresenter.GetCapturedAsync(id, cancellationToken);
         return View(run);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> PerformancePanel(Guid id, CancellationToken cancellationToken)
+    {
+        var detail = await metricsPresenter.GetCapturedAsync(id, cancellationToken);
+        if (detail == null)
+            return NoContent();
+
+        return PartialView("~/Views/Metrics/_AdvancedPerformance.cshtml", detail);
     }
 
     [HttpGet]
@@ -177,6 +273,11 @@ public class RunsController(
 
         ViewBag.Run = run;
         ViewBag.RunId = id;
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
+        ViewBag.TemplateCacheVersionNumber = run.GeneratedTemplateCacheVersionNumber;
+        ViewBag.LatestTemplateCacheVersionNumber = await GetLatestTemplateCacheVersionAsync(
+            run.GeneratedTemplateCacheScenarioKey,
+            cancellationToken);
         return View("Manifest", manifest);
     }
 
@@ -194,6 +295,42 @@ public class RunsController(
         var abs = await runManager.GetAbsUploadSnapshotAsync(id, cancellationToken);
         if (abs == null) return NoContent();
         return Json(abs);
+    }
+
+    /// <summary>
+    /// Replays a patient's generated FHIR collection from the ABS template cache
+    /// (the same templates used during the run), substituting this run's resource IDs.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> DownloadGeneratedBundle(
+        Guid id,
+        string patientId,
+        [FromServices] GeneratedPatientBundleReplayService replayService,
+        CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(patientId))
+            return BadRequest("Patient ID is required.");
+
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        var result = await replayService.ReplayAsync(run, manifest, patientId.Trim(), cancellationToken);
+        if (!result.Found || string.IsNullOrWhiteSpace(result.BundleJson))
+            return NotFound(result.Error ?? "Generated bundle is not available for this patient.");
+
+        if (result.RunCacheVersion.HasValue)
+            Response.Headers["X-Generation-Template-Version"] = result.RunCacheVersion.Value.ToString();
+        if (result.LatestCacheVersion.HasValue)
+            Response.Headers["X-Generation-Template-Latest"] = result.LatestCacheVersion.Value.ToString();
+        if (result.GenerationChanged)
+            Response.Headers["X-Generation-Template-Stale"] = "true";
+
+        return File(
+            Encoding.UTF8.GetBytes(result.BundleJson),
+            "application/fhir+json",
+            result.FileName);
     }
 
     [HttpGet]
@@ -225,7 +362,7 @@ public class RunsController(
         if (package == null)
             return NotFound();
 
-        return File(package.Content, "application/zip", package.FileName);
+        return new DeleteAfterSendFileResult(package.FilePath, "application/zip", package.FileName);
     }
 
     [HttpPost]
@@ -251,8 +388,25 @@ public class RunsController(
         if (request?.Id == null || request.Id == Guid.Empty)
             return BadRequest(new { success = false, error = "Missing run ID" });
 
-        var cancelled = await runManager.CancelRunAsync(request.Id, cancellationToken);
-        return Ok(new { success = cancelled });
+        try
+        {
+            var cancelled = await runManager.CancelRunAsync(request.Id, cancellationToken);
+            if (cancelled)
+                return Ok(new { success = true });
+
+            return Ok(new { success = false, error = "This run is not running." });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cancel failed for run {RunId}.", request.Id);
+            return Problem(
+                detail: "Cancel could not be completed. Refresh the page and check the run status.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
 
     [HttpPost]
@@ -467,9 +621,10 @@ public class RunsController(
                 normalizedSearchTerm,
                 cancellationToken);
 
-            if ((result?.Body?.Records?.Count ?? 0) == 0)
+            if ((result?.Body?.Records?.Count ?? 0) == 0
+                && (result?.Body != null || result?.IsSuccessStatusCode == true))
             {
-                result = await dataAcqClient.SearchAcquisitionLogsAsync(
+                var fallback = await dataAcqClient.SearchAcquisitionLogsAsync(
                     string.Empty,
                     reportId,
                     pageSize,
@@ -478,7 +633,18 @@ public class RunsController(
                     sortOrder,
                     normalizedSearchTerm,
                     cancellationToken);
+                if (AcquisitionLogAvailability.PreferFallback(
+                        result?.Body != null,
+                        fallback?.Body?.Records?.Count ?? 0,
+                        fallback?.Body != null))
+                    result = fallback;
             }
+
+            var read = AcquisitionLogAvailability.Classify(result?.StatusCode, result?.Body != null);
+            if (read.Unavailable)
+                return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 }, unavailable = true });
+            if (read.ErrorStatus is int status)
+                return StatusCode(status);
 
             var records = (result?.Body?.Records ?? [])
                 .Select(r => new
@@ -509,6 +675,10 @@ public class RunsController(
 
             return Json(new { records, metadata });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
@@ -517,7 +687,7 @@ public class RunsController(
                 facilityId,
                 reportId);
 
-            return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 } });
+            return StatusCode(StatusCodes.Status502BadGateway);
         }
     }
 
@@ -537,8 +707,12 @@ public class RunsController(
         try
         {
             var detailed = await dataAcqClient.GetAcquisitionLogByIdAsync(logId, cancellationToken);
-            if (detailed == null)
-                return NotFound();
+            var detailRead = AcquisitionLogAvailability.Classify(
+                detailed?.StatusCode, detailed?.Body != null, notFoundIsMissing: true);
+            if (detailRead.Unavailable)
+                return Json(new { unavailable = true });
+            if (detailRead.ErrorStatus is int detailStatus)
+                return StatusCode(detailStatus);
 
             // Fetch reference resources linked to this log.
             var referenceResourceIds = new List<string>();
@@ -625,34 +799,95 @@ public class RunsController(
                 Notes = detailed.Body?.Notes?.ToList() ?? new List<string>()
             });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load DA log detail for run {RunId}, log {LogId}", id, logId);
-            return NotFound();
+            return StatusCode(StatusCodes.Status502BadGateway);
         }
     }
 
     private static bool IsDescending(string sortDir)
         => !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(
-        AutomationRunIndexViewModel recentPage,
-        int pageSize,
-        CancellationToken cancellationToken)
+    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(int pageSize, CancellationToken cancellationToken, AutomationRunIndexViewModel? unfilteredFirstPage = null)
     {
         var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
-        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
-        var activeRunsSource = recentPage.PageNumber == 1
-            ? recentPage.Runs
-            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+
+        var activeRunSummaries = await Task.WhenAll(
+            activeRunMetas.Select(meta =>
+                runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
+        // Active Runs must remain independent of the Recent Runs date filter.
+        // Reuse the first page when possible; otherwise fetch an unfiltered page.
+        var unfilteredPage = unfilteredFirstPage
+            ?? await runManager.GetRunsPageAsync(
+                1,
+                pageSize,
+                "createdAt",
+                true,
+                cancellationToken);
+
+        var activeRunsSource = unfilteredPage.Runs;
 
         return activeRunSummaries
-            .Where(r => r is not null && (r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Where(r => r is not null &&
+                (r.Status.IsCancellable() || r.Status.IsInProgress()))
             .Select(r => r!)
-            .Concat(activeRunsSource.Where(r => r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Concat(activeRunsSource.Where(r =>
+                r.Status.IsCancellable() || r.Status.IsInProgress()))
             .GroupBy(r => r.RunId)
             .Select(g => g.First())
             .OrderByDescending(r => r.CreatedAt)
             .ToList();
+    }
+
+    private async Task<int?> GetLatestTemplateCacheVersionAsync(string? scenarioKey, CancellationToken cancellationToken)
+    {
+        var latest = await templateCacheVersionStore.GetLatestAsync(scenarioKey, cancellationToken);
+        return latest?.VersionNumber;
+    }
+
+    private static bool TryGetCreatedDateRange(
+        DateOnly? createdFrom,
+        DateOnly? createdTo,
+        out DateTimeOffset? createdFromUtc,
+        out DateTimeOffset? createdBeforeUtc,
+        out string? error)
+    {
+        createdFromUtc = null;
+        createdBeforeUtc = null;
+        error = null;
+
+        if (createdFrom.HasValue &&
+            createdTo.HasValue &&
+            createdFrom.Value > createdTo.Value)
+        {
+            error = "Created From must be on or before Created To.";
+            return false;
+        }
+
+        if (createdTo == DateOnly.MaxValue)
+        {
+            error = "Created To is outside the supported date range.";
+            return false;
+        }
+
+        createdFromUtc = createdFrom.HasValue
+            ? new DateTimeOffset(
+                createdFrom.Value.ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        createdBeforeUtc = createdTo.HasValue
+            ? new DateTimeOffset(
+                createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        return true;
     }
 }

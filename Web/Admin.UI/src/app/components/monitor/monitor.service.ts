@@ -25,6 +25,13 @@ export class MonitorService {
       );
   }
 
+  getServiceHealthCheck(service: string): Observable<ILinkServiceHealthSummary> {
+    return this.http.get<ILinkServiceHealthSummary>(`${this.baseApiPath}/monitor/health/${encodeURIComponent(service)}`)
+      .pipe(
+        catchError(this.handleError.bind(this))
+      );
+  }
+
   private handleError(err: HttpErrorResponse) {
     return this.errorHandler.handleError(err);
   }

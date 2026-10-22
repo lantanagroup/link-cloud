@@ -93,8 +93,10 @@ public static class TestConfig
     {
         return new TestScenarioConfig
         {
-            MeasureBundleLocation = Environment.GetEnvironmentVariable($"{prefix}_MEASURE_BUNDLE_PATH")
-                ?? ProfiledMeasureCatalog.GetBundleLocation(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation),
+            MeasureBundleJsons =
+            [
+                ProfiledMeasureCatalog.ReadBundleJson(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            ],
             StartDate = Environment.GetEnvironmentVariable($"{prefix}_START_DATE") ?? "2023-01-01T00:00:00Z",
             EndDate = Environment.GetEnvironmentVariable($"{prefix}_END_DATE") ?? "2023-12-31T23:59:59Z",
             PatientIds = Environment.GetEnvironmentVariable($"{prefix}_PATIENT_IDS")?.Split(',')?.ToList() ?? defaultPatientIds ?? ["207727"],

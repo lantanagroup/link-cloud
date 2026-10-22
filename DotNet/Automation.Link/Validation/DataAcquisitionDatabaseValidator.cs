@@ -33,6 +33,7 @@ public class DataAcquisitionDatabaseValidator
             await ValidateFhirQueryConfiguration(facilityId, errors);
             await ValidateQueryPlans(facilityId, expectedMeasureId, errors);
             await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors, expectDataAcquisitionData);
+            await ValidateExpectedResourcesWereAcquired(facilityId, reportId, errors, expectDataAcquisitionData, manifest);
             await ValidateFhirQueries(facilityId, reportId, errors, expectDataAcquisitionData);
             await ValidateReferenceResources(facilityId, reportId, errors, expectDataAcquisitionData);
             await ValidateOrganizationLocationTracking(
@@ -146,6 +147,50 @@ public class DataAcquisitionDatabaseValidator
 
         if (failedLogs.Count > 10)
             AddError(errors, $"Additional failed acquisition logs omitted: {failedLogs.Count - 10}");
+    }
+
+    private async Task ValidateExpectedResourcesWereAcquired(
+        string facilityId,
+        string reportId,
+        List<string> errors,
+        bool expectDataAcquisitionData,
+        GenerationManifest? manifest)
+    {
+        if (!expectDataAcquisitionData || manifest == null)
+            return;
+
+        const int maxAttempts = 6;
+        var delay = TimeSpan.FromSeconds(5);
+        IReadOnlyList<AcquisitionEmptyResultDetector.EmptyAcquisition> findings = [];
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+            var acquiredByPatient = await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(facilityId, reportId);
+            findings = AcquisitionEmptyResultDetector.Find(manifest, [], logs, acquiredByPatient);
+            if (findings.Count == 0)
+                return;
+
+            if (attempt < maxAttempts)
+            {
+                _output.WriteLine(
+                    $"  Data acquisition acquired=0 vs Generation Manifest for {findings.Count} patient/type pair(s); " +
+                    $"retrying in {delay.TotalSeconds:F0}s (attempt {attempt}/{maxAttempts}).");
+                await Task.Delay(delay);
+            }
+        }
+
+        const int maxEmptyErrors = 20;
+        foreach (var finding in findings.Take(maxEmptyErrors))
+        {
+            AddError(
+                errors,
+                $"Data acquisition completed with acquired=0 for {finding.ResourceType} on expected patient {finding.PatientId} " +
+                $"(manifest expected {finding.ExpectedCount}). This is an acquisition/FHIR-readiness failure, not generated-data variance.");
+        }
+
+        if (findings.Count > maxEmptyErrors)
+            AddError(errors, $"Additional empty-acquisition findings omitted: {findings.Count - maxEmptyErrors}");
     }
 
     private async Task ValidateFhirQueries(string facilityId, string reportId, List<string> errors, bool expectDataAcquisitionData)
@@ -287,8 +332,10 @@ public class DataAcquisitionDatabaseValidator
         if (expectDataAcquisitionData && activeMappings.All(m => !m.IsOrgLocation))
             AddError(errors, "OrganizationLocationMapping rows exist but none are marked IsOrgLocation=true.");
 
-        ValidateLocationHierarchy(activeMappings, errors);
-        await ValidateEncounterMappingTracking(facilityId, reportId, logs, activeMappings, errors, expectDataAcquisitionData, expectEncounterResources);
+        ValidateLocationHierarchy(activeMappings, errors, manifest?.AbsentReferencedLocationIds);
+        await ValidateEncounterMappingTracking(
+            facilityId, reportId, logs, activeMappings, errors,
+            expectDataAcquisitionData, expectEncounterResources, manifest);
     }
 
     private static bool ManifestExpectsLocationEvidence(GenerationManifest manifest)
@@ -315,9 +362,10 @@ public class DataAcquisitionDatabaseValidator
         "Location"
     ];
 
-    private static void ValidateLocationHierarchy(
+    internal static void ValidateLocationHierarchy(
         List<PipelineDataReader.OrganizationLocationMappingInfo> activeMappings,
-        List<string> errors)
+        List<string> errors,
+        IReadOnlySet<string>? absentReferencedLocationIds = null)
     {
         var byLocationId = activeMappings
             .Where(m => !string.IsNullOrWhiteSpace(m.LocationId))
@@ -328,9 +376,19 @@ public class DataAcquisitionDatabaseValidator
             if (string.IsNullOrWhiteSpace(mapping.LocationId) || string.IsNullOrWhiteSpace(mapping.PartOfValue))
                 continue;
 
-            if (!byLocationId.ContainsKey(mapping.PartOfValue))
-                AddError(errors,
-                    $"OrganizationLocationMapping hierarchy gap: Location '{mapping.LocationId}' references parent '{mapping.PartOfValue}', but no mapping row exists for that ancestor.");
+            if (byLocationId.ContainsKey(mapping.PartOfValue))
+                continue;
+
+            // Import already proved this parent is not on the FHIR server. There is
+            // no mapping row to find, and the gap is the dangling partOf itself.
+            if (absentReferencedLocationIds != null
+                && absentReferencedLocationIds.Contains(mapping.PartOfValue))
+            {
+                continue;
+            }
+
+            AddError(errors,
+                $"OrganizationLocationMapping hierarchy gap: Location '{mapping.LocationId}' references parent '{mapping.PartOfValue}', but no mapping row exists for that ancestor.");
         }
 
         foreach (var mapping in activeMappings.Where(m => m.IsOrgLocation && !string.IsNullOrWhiteSpace(m.LocationId)))
@@ -370,7 +428,8 @@ public class DataAcquisitionDatabaseValidator
         List<PipelineDataReader.OrganizationLocationMappingInfo> activeLocationMappings,
         List<string> errors,
         bool expectDataAcquisitionData,
-        bool expectEncounterResources)
+        bool expectEncounterResources,
+        GenerationManifest? manifest)
     {
         if (!expectDataAcquisitionData)
             return;
@@ -400,6 +459,10 @@ public class DataAcquisitionDatabaseValidator
             .Select(m => m.LocationId!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var submitted = manifest?.ExpectedSubmittedPatientIds()
+            ?? logs.Select(l => l.PatientId).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList()!;
+        var submittedSet = submitted.ToHashSet(StringComparer.Ordinal);
+
         foreach (var (patientId, patientLogRows) in patientLogs)
         {
             mappingsByPatient.TryGetValue(patientId, out var patientMappings);
@@ -407,6 +470,13 @@ public class DataAcquisitionDatabaseValidator
 
             if (expectEncounterResources && patientMappings.Count == 0)
             {
+                if (!submittedSet.Contains(patientId))
+                {
+                    _output.WriteLine(
+                        $"  Skipping EncounterMapping assertion for {patientId}: not expected in the report (out of window or non-qualifying).");
+                    continue;
+                }
+
                 AddError(errors,
                     $"No EncounterMapping rows found for patient {patientId} despite Encounter queries being present.");
                 continue;

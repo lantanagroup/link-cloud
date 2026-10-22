@@ -6,6 +6,7 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 
 public static class ApiEndPointLibrary
 {
+    public const string ServiceInfoGet200 = "Service Info GET → 200";
     private static readonly ConcurrentDictionary<string, IReadOnlyList<ApiEndpointDefinition>> _orderedByService = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, ApiEndpointDefinition>> _endpointByNameByService = new(StringComparer.OrdinalIgnoreCase);
 
@@ -173,7 +174,7 @@ public static class ApiEndPointLibrary
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildDataAcquisitionMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
     {
-        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data/info"),
+        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data-acquisition/info"),
         [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
     };
 
@@ -212,7 +213,9 @@ public static class ApiEndPointLibrary
             [DmrpSteps.MappingDelete204] = new EndpointMeta("Deletes a mapping once nothing references it.", $"DELETE {mappings}/{{id}}"),
             [DmrpSteps.MappingDelete404] = new EndpointMeta("Answers not-found when deleting a mapping twice.", $"DELETE {mappings}/{{id}}"),
             [DmrpSteps.FacilityPost400WithSchedule] = new EndpointMeta(
-                "Refuses a facility that carries its own schedule while DMRP is enabled; the schedule is derived from reporting plans.",
+                "Refuses a facility that carries its own schedule while DMRP is enabled, since the schedule is " +
+                "derived from reporting plans. With the Mock DMRP API switched on, refuses one naming a dQM no " +
+                "measure mapping covers.",
                 "POST /api/Facility")
         };
     }
@@ -230,6 +233,7 @@ public static class ApiEndPointLibrary
         [NormalizationSteps.LocationPost201] = new EndpointMeta("Creates a facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
         [NormalizationSteps.LocationPost400EmptyLocationId] = new EndpointMeta("Rejects a facility location with an empty location id.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
         [NormalizationSteps.LocationPost409Duplicate] = new EndpointMeta("Rejects a duplicate facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationsGet200] = new EndpointMeta("Lists a facility's locations.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations"),
         [NormalizationSteps.LocationGet200] = new EndpointMeta("Returns a facility location including LocationName and LocationAlias.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
         [NormalizationSteps.LocationGet400EmptyLocationId] = new EndpointMeta("Rejects a facility-location get with an empty location id.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
         [NormalizationSteps.LocationGet404] = new EndpointMeta("Returns 404 for a facility location that does not exist.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
@@ -249,7 +253,8 @@ public static class ApiEndPointLibrary
         [NormalizationSteps.MappingDelete204] = new EndpointMeta("Deletes an HSLOC mapping by id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
         [NormalizationSteps.MappingDelete400EmptyId] = new EndpointMeta("Rejects an HSLOC mapping delete with an empty id.", "DELETE /api/normalization/hsloc-mappings/{mappingId}"),
         [NormalizationSteps.MappingDeleteFacility204] = new EndpointMeta("Deletes HSLOC mappings for a facility.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}"),
-        [NormalizationSteps.MappingDeleteFacility400EmptyFacility] = new EndpointMeta("Rejects a facility mapping delete with an empty facility id.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}")
+        [NormalizationSteps.MappingDeleteFacility400EmptyFacility] = new EndpointMeta("Rejects a facility mapping delete with an empty facility id.", "DELETE /api/normalization/hsloc-mappings/facilities/{facilityId}"),
+        [NormalizationSteps.HslocGet200] = new EndpointMeta("Returns the NHSN HSLOC code set seeded for mapping.", "GET /api/normalization/HSLOC")
     };
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildQueryDispatchMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
@@ -337,7 +342,7 @@ public static class ApiEndPointLibrary
 
     public static class AdminBffSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string HealthGet200 = "Health GET → 200";
         public const string FacilityDelete200 = "Facility DELETE → 200";
         public const string FacilityDelete404 = "Facility DELETE → 404";
@@ -354,7 +359,7 @@ public static class ApiEndPointLibrary
 
     public static class AccountSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
@@ -373,13 +378,13 @@ public static class ApiEndPointLibrary
 
     public static class AuditSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
     public static class CensusSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string ConfigPost201 = "Config POST → 201";
         public const string ConfigPost400EmptyScheduledTrigger = "Config POST → 400 (empty ScheduledTrigger)";
@@ -418,7 +423,7 @@ public static class ApiEndPointLibrary
 
     public static class DataAcquisitionSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string FhirConfigPost201 = "FhirConfig POST → 201";
         public const string FhirConfigPost409 = "FhirConfig POST → 409";
@@ -482,7 +487,7 @@ public static class ApiEndPointLibrary
 
     public static class NormalizationSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Post201 = "POST → 201";
         public const string Post400InvalidOperationType = "POST → 400 (invalid operation type)";
@@ -503,6 +508,7 @@ public static class ApiEndPointLibrary
         public const string LocationPost201 = "LOCATION POST → 201";
         public const string LocationPost400EmptyLocationId = "LOCATION POST → 400 (empty locationId)";
         public const string LocationPost409Duplicate = "LOCATION POST → 409 (duplicate)";
+        public const string LocationsGet200 = "LOCATIONS GET → 200";
         public const string LocationGet200 = "LOCATION GET → 200";
         public const string LocationGet400EmptyLocationId = "LOCATION GET → 400 (empty locationId)";
         public const string LocationGet404 = "LOCATION GET → 404";
@@ -523,11 +529,12 @@ public static class ApiEndPointLibrary
         public const string MappingDelete400EmptyId = "MAPPING DELETE → 400 (empty id)";
         public const string MappingDeleteFacility204 = "MAPPING DELETE FACILITY → 204";
         public const string MappingDeleteFacility400EmptyFacility = "MAPPING DELETE FACILITY → 400 (empty facility)";
+        public const string HslocGet200 = "HSLOC GET → 200";
     }
 
     public static class QueryDispatchSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Post400NullModel = "POST → 400 (empty model)";
         public const string Post400EmptyFacilityId = "POST → 400 (empty facilityId)";
@@ -547,7 +554,7 @@ public static class ApiEndPointLibrary
 
     public static class ReportSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string GetSchedule200HasData = "Get Schedule → 200 (has data)";
         public const string GetSchedule404 = "Get Schedule → 404";
@@ -610,7 +617,7 @@ public static class ApiEndPointLibrary
 
     public static class TenantSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Create201 = "Create → 201";
         public const string Create400Duplicate = "Create → 400 (duplicate)";
@@ -652,7 +659,7 @@ public static class ApiEndPointLibrary
 
     public static class TerminologySteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
@@ -694,7 +701,7 @@ public static class ApiEndPointLibrary
 
     public static class MeasureEvalSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string GetAll200 = "GET ALL → 200";
         public const string Get200 = "GET → 200";
@@ -705,7 +712,7 @@ public static class ApiEndPointLibrary
 
     public static class SubmissionSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Get200 = "GET → 200";
         public const string Get400BadReportId = "GET → 400 (bad reportId)";
@@ -716,7 +723,7 @@ public static class ApiEndPointLibrary
 
     public static class ValidationSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string ArtifactsGet200 = "Artifacts GET → 200";
         public const string CategoriesGet200 = "Categories GET → 200";

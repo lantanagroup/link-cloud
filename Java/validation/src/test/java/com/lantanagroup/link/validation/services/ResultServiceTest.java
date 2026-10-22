@@ -1,9 +1,11 @@
 package com.lantanagroup.link.validation.services;
 
+import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.models.CategoryIssueModel;
 import com.lantanagroup.link.validation.models.CategorySummaryModel;
+import com.lantanagroup.link.validation.models.ResultSummaryModel;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +34,7 @@ public class ResultServiceTest {
     private static final String PATIENT_ID = "patient1";
     private static final String CATEGORY_ID1 = "category1";
     private static final String CATEGORY_ID2 = "category2";
+    private static final String PROFILE = "http://example.org/fhir/StructureDefinition/profile|1.0.0";
 
     @BeforeEach
     void setUp() {
@@ -58,6 +61,23 @@ public class ResultServiceTest {
         assertFalse(results.contains(result3)); // INFORMATION is less severe than WARNING
 
         verify(resultRepository).findAllByFacilityIdAndReportId(FACILITY_ID, REPORT_ID);
+    }
+
+    @Test
+    void summarizeReportResults_countsInTheDatabaseAndDoesNotLoadRows() {
+        when(resultRepository.countByFacilityIdAndReportIdAndSeverityIn(
+                eq(FACILITY_ID),
+                eq(REPORT_ID),
+                eq(IssueSeverityUtils.atLeastAsSevere(OperationOutcome.IssueSeverity.WARNING))))
+                .thenReturn(6010L);
+
+        ResultSummaryModel summary = resultService.summarizeReportResults(
+                FACILITY_ID, REPORT_ID, OperationOutcome.IssueSeverity.WARNING);
+
+        assertEquals(6010L, summary.getCount());
+        assertEquals("WARNING", summary.getSeverity());
+        verify(resultRepository, never()).findAllByFacilityIdAndReportId(any(), any());
+        verify(resultRepository, never()).findAllByFacilityIdAndReportIdAndPatientId(any(), any(), any());
     }
 
     @Test
@@ -148,6 +168,7 @@ public class ResultServiceTest {
             assertEquals("NULL", issue.getCode());
             assertEquals("expression", issue.getExpression());
             assertEquals(PATIENT_ID, issue.getPatientId());
+            assertEquals(PROFILE, issue.getProfile());
         }
 
         verify(resultRepository).findAllByFacilityIdAndReportId(FACILITY_ID, REPORT_ID);
@@ -177,6 +198,7 @@ public class ResultServiceTest {
             assertEquals("NULL", issue.getCode());
             assertEquals("expression", issue.getExpression());
             assertEquals(PATIENT_ID, issue.getPatientId());
+            assertEquals(PROFILE, issue.getProfile());
         }
 
         verify(resultRepository).findAllByFacilityIdAndReportId(FACILITY_ID, REPORT_ID);
@@ -190,6 +212,7 @@ public class ResultServiceTest {
         result.setMessage("message");
         result.setLocation("location");
         result.setExpression("expression");
+        result.setProfile(PROFILE);
         result.setPatientId(PATIENT_ID);
         result.setFacilityId(FACILITY_ID);
         result.setReportId(REPORT_ID);

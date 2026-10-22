@@ -161,6 +161,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
 
+    builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+
     // Add Secret Manager
     var secretManagerProvider = builder.Configuration.GetValue<string>("SecretManagement:Manager") ?? "Local";
     Log.Logger.Information("Registering Secret Manager with provider {provider} for the Link Admin API.", secretManagerProvider);
@@ -264,7 +266,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>(nameof(HealthCheckType.Cache));
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckNames.RedisCache);
     }
 
 
@@ -436,7 +438,7 @@ static void SetupMiddleware(WebApplication app)
         if (!string.IsNullOrEmpty(serviceRegistry.DataAcquisitionServiceApiUrl))
             tasks.Add(ServiceInformation.GetServiceInformation(client, "Data Acquisition", serviceRegistry.DataAcquisitionServiceApiUrl,
                 serviceRegistry.PublicDataAcquisitionServiceUrl,
-                "/data/info", logger));
+                "/data-acquisition/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
             tasks.Add(ServiceInformation.GetServiceInformation(client, "Measure Evaluation", serviceRegistry.MeasureServiceApiUrl,

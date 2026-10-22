@@ -8,7 +8,8 @@ public enum ResultField {
     SEVERITY,
     CODE,
     MESSAGE,
-    EXPRESSION;
+    EXPRESSION,
+    PROFILE;
 
     public String getValue(Result result) {
         return switch (this) {
@@ -20,6 +21,7 @@ public enum ResultField {
                     .orElse(null);
             case MESSAGE -> result.getMessage();
             case EXPRESSION -> result.getExpression();
+            case PROFILE -> result.getProfile();
         };
     }
 }
