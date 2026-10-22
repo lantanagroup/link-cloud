@@ -101,6 +101,10 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: false   # Drops Spring's camelCase livenessState/readinessState rows, and with
+                         # them /health/liveness and /health/readiness. No Link deployment probes
+                         # those paths; re-enable this if one ever does.
   health:
     diskspace:
       enabled: false
@@ -112,6 +116,16 @@ management:
       enabled: false     # Custom RedisHealthIndicator (bounded PING) is used instead of the auto one
       timeout-ms: 3000   # backstop deadline for the custom indicator's PING; the 2s command timeout
                          # (RedisCacheConfig commandTimeout) reports DOWN sooner in the common case
+    db:
+      enabled: false     # Custom DatabaseHealthIndicator (bounded probe) is used instead of the auto
+                         # one, which is bounded only by HikariCP's connectionTimeout -- 30s by
+                         # default, nearly four times the BFF's health-check deadline
+      timeout-ms: 2000   # backstop deadline for the probe
+    # Spring evaluates indicators sequentially on the request thread, so the budgets add up: 2s for
+    # the database, 3s for Redis, and 1.5s for Kafka (management.health.kafka.timeout-ms, defaulted
+    # in KafkaHealthCheckIndicator) -- 6.5s with all three backends down at once, inside the BFF's
+    # 8s deadline (SpringServiceHealth.Deadline). Keep the sum under it: exceeding it costs
+    # every row for this service, and the rows are what say which backend failed.
 
 logging:
   level:

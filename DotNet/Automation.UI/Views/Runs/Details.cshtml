@@ -33,7 +33,9 @@
                     <i class="bi bi-download me-1"></i>Export Diagnostics
                 </a>
             }
-            <a asp-action="Index" class="btn btn-sm btn-au-action"><i class="bi bi-arrow-left me-1"></i>Back</a>
+            <a asp-action="Index" class="btn btn-sm btn-au-action" id="backToRuns">
+                <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
         </div>
     </div>
 
@@ -537,6 +539,33 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
 <script>
     (function () {
+
+        // Restore the Runs dashboard sorting and pagination when returning.
+        const backToRuns = document.getElementById('backToRuns');
+        if (backToRuns) {
+            try {
+                const returnUrl = sessionStorage.getItem('runsReturnUrl');
+
+                if (returnUrl) {
+                    const parsedUrl = new URL(returnUrl);
+                    const runsIndexPath = new URL(
+                        '@Url.Action("Index", "Runs")',
+                        window.location.origin
+                    ).pathname;
+
+                    const savedPath = parsedUrl.pathname.replace(/\/$/, '') || '/';
+                    const indexPath = runsIndexPath.replace(/\/$/, '') || '/';
+
+                    if (parsedUrl.origin === window.location.origin &&
+                        (savedPath === indexPath || savedPath === '/')) {
+                        backToRuns.href = parsedUrl.toString();
+                    }
+                }
+            } catch (_) {
+                // Fall back to the default Runs homepage.
+            }
+        }
+
         const runId = '@Model.RunId';
         const isMetricsRun = @(Model.IsMetricsRun ? "true" : "false");
         const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RunConfigurationJson ?? string.Empty));

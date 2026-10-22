@@ -17,6 +17,7 @@ parameters:
     - TEST
     - QA
     - QA2
+    - QA3
 - name: growPartitions
   displayName: Increase partition counts up to topics.txt (never shrinks or deletes)
   type: boolean
@@ -44,6 +45,8 @@ variables:
     value:  '$(qa-rest-url)'
   ${{ if eq(parameters.environment, 'QA2') }}:
     value:  '$(qa2-rest-url)'
+  ${{ if eq(parameters.environment, 'QA3') }}:
+    value:  '$(qa3-rest-url)'
 
 stages:
 - stage: Sync_Kafka_Topics_${{ parameters.environment }}

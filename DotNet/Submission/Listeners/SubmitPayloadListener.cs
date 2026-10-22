@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
@@ -18,7 +16,6 @@ using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -26,9 +23,6 @@ namespace LantanaGroup.Link.Submission.Listeners
     public class SubmitPayloadListener : BackgroundService
     {
         private const string TopicName = nameof(KafkaTopic.SubmitPayload);
-
-        private static readonly JsonSerializerOptions lenientJsonOptions =
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector).UsingMode(DeserializationMode.Ostrich);
 
         private readonly ILogger<SubmitPayloadListener> _logger;
         private readonly KafkaAssignmentTracker _assignmentTracker = new();

@@ -1,5 +1,10 @@
 ﻿using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Sdk.DependencyInjection;
 
@@ -25,6 +30,31 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IValidationServiceClient, ValidationServiceClient>();
         services.AddSingleton<ISubmissionServiceClient, SubmissionServiceClient>();
         services.AddSingleton<ITerminologyServiceClient, TerminologyServiceClient>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="IMockDmrpServiceClient"/> unless one is already registered.
+    /// </summary>
+    /// <remarks>
+    /// Not part of <see cref="AddLinkSdk"/>: the mock's address is not in <c>ServiceRegistry</c> for
+    /// every caller, so each one says where it keeps it. <paramref name="baseUrl"/> runs when the client
+    /// is first resolved, so a caller that never uses the mock never needs the address configured.
+    /// </remarks>
+    /// <param name="baseUrl">
+    /// Returns the mock's root address. Throw from it, naming the setting, when the address is missing.
+    /// </param>
+    public static IServiceCollection AddMockDmrpServiceClient(this IServiceCollection services,
+                                                              Func<IServiceProvider, string> baseUrl)
+    {
+        ArgumentNullException.ThrowIfNull(baseUrl);
+
+        services.TryAddSingleton<IMockDmrpServiceClient>(sp => new MockDmrpServiceClient(
+            baseUrl(sp),
+            sp.GetRequiredService<IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>>(),
+            sp.GetRequiredService<IOptions<LinkTokenServiceSettings>>(),
+            sp.GetRequiredService<ICreateSystemToken>()));
 
         return services;
     }

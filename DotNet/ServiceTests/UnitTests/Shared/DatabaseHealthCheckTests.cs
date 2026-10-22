@@ -1,6 +1,8 @@
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Task = System.Threading.Tasks.Task;
 
@@ -44,6 +46,30 @@ public sealed class DatabaseHealthCheckTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             check.CheckHealthAsync(new HealthCheckContext(), cancellation.Token));
+    }
+
+    /// <summary>
+    /// The name a check is registered under is the label the Admin UI's Health Checks page renders
+    /// for the row, so a database row has to name the provider it reached rather than read
+    /// "Database" beside MeasureEval's MongoDB row and leave the two uncomparable.
+    /// </summary>
+    [Fact]
+    public async Task CheckHealthAsync_NamesTheDatabaseEntryForItsProvider()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<TestDbContext>(options => options.UseSqlite(connection));
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck<TestDbContext>>(HealthCheckNames.SqlServerDatabase);
+
+        await using var provider = services.BuildServiceProvider();
+
+        var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync();
+
+        Assert.Equal("Database (SQL Server)", Assert.Single(report.Entries).Key);
     }
 
     private static TestDbContext CreateContext(SqliteConnection connection) =>
