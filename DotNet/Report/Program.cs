@@ -191,7 +191,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, serviceInformation.ServiceConfigName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<ReportDbContext>>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<ReportDbContext>>(HealthCheckNames.SqlServerDatabase)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddEndpointsApiExplorer();
