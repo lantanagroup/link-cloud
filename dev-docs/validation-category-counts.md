@@ -80,8 +80,9 @@ saved findings and their category links, then saves the new list, in one transac
 even when the list is empty, so a patient validated again with no submitted findings keeps none.
 A retry of either step therefore leaves one set of counts and one set of findings, which keeps the
 stored counts and the drill-down in agreement. Validation runs one patient at a time and nothing
-marks a report as finished, so a report's totals fill in patient by patient and are complete once
-its last patient has been validated.
+in validation marks a report as finished, so a report's totals fill in patient by patient and are
+complete once its last patient has been validated. Whether that has happened is answered by the
+BFF's `inProgress` flag (see *Reading*), not by validation.
 
 A patient can be validated more than once for the same report: a Kafka redelivery, or the
 `MeasureReportGenerated` null-key race sending `ReadyForValidation` twice. Adding each patient's
@@ -124,7 +125,15 @@ per-patient rows, so a repeat of that patient can't be detected and would be cou
 
 The BFF looks up the report schedule's facility in Report, calls the validation endpoint, and adds
 each category's current `guidance` and `severity` from validation's category list, matched by id
-case-insensitively. A category that no longer exists, and `uncategorized`, keep their stored title
+case-insensitively.
+
+It also returns the schedule's `reportStatus` and an `inProgress` flag, because only Report knows
+when a report's last patient is done. `inProgress` is `true` until the schedule reaches `Submitted`
+or `CompletedNotSubmitted`, which Report sets once every entry is complete; a deleted schedule
+(including an aborted one) is not in progress. While it is `true`, the counts cover only the
+patients validated so far. An empty list then means no counts yet, not no findings: the status row
+is written just before the first patient's counts, and stays without totals if that patient's
+counts fail until the message is retried. A category that no longer exists, and `uncategorized`, keep their stored title
 and get no guidance. If the category list can't be read, the counts are still returned without
 guidance and a warning is logged. The handler returns `400` for an id that isn't a GUID, and `404`
 when the report schedule doesn't exist or has no stored counts, with the Problem detail saying

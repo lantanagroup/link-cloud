@@ -142,6 +142,8 @@ public static class AggregationMapping
                               "Counts are written as each patient is validated and are kept after the report's " +
                               "findings are deleted. Pass submit=true or submit=false to return only categories " +
                               "with that submit flag. " +
+                              "inProgress is true while the report is still running, so the counts cover only " +
+                              "the patients validated so far; reportStatus is the schedule's status in Report. " +
                               "Returns 404 if the report schedule does not exist, or if it has no stored counts " +
                               "(for example, it was validated before counts were stored); " +
                               "the problem detail says which. " +

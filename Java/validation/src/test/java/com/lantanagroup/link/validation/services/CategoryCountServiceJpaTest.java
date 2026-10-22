@@ -18,6 +18,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -202,6 +203,22 @@ class CategoryCountServiceJpaTest {
     @Test
     void getReportCounts_reportNeverCounted_isEmpty() {
         assertTrue(categoryCountService.getReportCounts(FACILITY_ID, REPORT_ID, null).isEmpty());
+    }
+
+    @Test
+    void recordPatientCounts_firstPatientsCountsFail_leavesTheReportWithNoCategories() {
+        // Longer than the category_id column, so applying the counts fails after the status row is created.
+        Category tooLong = category("c".repeat(300), true, false);
+
+        assertThrows(DataIntegrityViolationException.class, () -> categoryCountService.recordPatientCounts(
+                FACILITY_ID, REPORT_ID, "patient-1", List.of(result(tooLong))));
+
+        // Validation can't tell this from a report with no findings; the BFF's inProgress flag says it isn't final.
+        ReportCategoryCountsModel counts = categoryCountService.getReportCounts(FACILITY_ID, REPORT_ID, null)
+                .orElseThrow();
+        assertTrue(counts.getCategories().isEmpty());
+        assertTrue(totals().isEmpty());
+        assertTrue(patientCounts("patient-1").isEmpty());
     }
 
     @Test

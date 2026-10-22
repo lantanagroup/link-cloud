@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Validation;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+
+namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Validation;
 
 /// <summary>
 /// A report's stored validation counts per category, with each category's current guidance and severity.
@@ -19,6 +21,17 @@ public class ReportValidationCategoryCounts
     /// When the report's counts last changed.
     /// </summary>
     public DateTimeOffset LastUpdated { get; set; }
+
+    /// <summary>
+    /// The report schedule's status in Report. Null when Report gives none.
+    /// </summary>
+    public ScheduleStatus? ReportStatus { get; set; }
+
+    /// <summary>
+    /// True while the report is still running, so the counts cover only the patients validated so far.
+    /// False once the report has completed or been deleted.
+    /// </summary>
+    public bool InProgress { get; set; }
 
     /// <summary>
     /// The report's counts, most issues first.

@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Validation;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Net;
@@ -82,6 +83,8 @@ public static class GetReportValidationCategoryCounts
                 ReportScheduleId = reportScheduleId,
                 FacilityId = schedule.FacilityId,
                 LastUpdated = counts.LastUpdated,
+                ReportStatus = schedule.Status,
+                InProgress = IsInProgress(schedule),
                 Categories = counts.Categories
             });
         }
@@ -95,6 +98,20 @@ public static class GetReportValidationCategoryCounts
                 reportScheduleId.SanitizeForLog());
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
+    }
+
+    /// <summary>
+    /// Validation doesn't know when a report's last patient is done, but Report does: the schedule's status turns
+    /// terminal once every entry is complete. An aborted report is soft-deleted without reaching a terminal status.
+    /// </summary>
+    private static bool IsInProgress(ScheduledReportListSummary schedule)
+    {
+        if (schedule.IsDeleted == true)
+        {
+            return false;
+        }
+
+        return schedule.Status is not (ScheduleStatus.Submitted or ScheduleStatus.CompletedNotSubmitted);
     }
 
     private static IResult UpstreamFailure(HttpStatusCode statusCode, string notFoundDetail)

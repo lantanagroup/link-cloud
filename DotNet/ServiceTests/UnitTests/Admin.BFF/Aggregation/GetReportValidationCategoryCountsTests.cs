@@ -2,6 +2,7 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Validation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -297,6 +298,34 @@ public class GetReportValidationCategoryCountsTests
         var counts = Assert.IsType<Ok<ReportValidationCategoryCounts>>(result).Value!;
         Assert.Empty(counts.Categories);
         Assert.False(categoryListRequested);
+    }
+
+    [Theory]
+    [InlineData("\"status\":\"New\"", ScheduleStatus.New, true)]
+    [InlineData("\"status\":\"Scheduled\"", ScheduleStatus.Scheduled, true)]
+    [InlineData("\"status\":\"EndOfPeriod\"", ScheduleStatus.EndOfPeriod, true)]
+    [InlineData("\"status\":\"Submitted\"", ScheduleStatus.Submitted, false)]
+    [InlineData("\"status\":\"CompletedNotSubmitted\"", ScheduleStatus.CompletedNotSubmitted, false)]
+    [InlineData("\"status\":\"New\",\"isDeleted\":true", ScheduleStatus.New, false)]
+    [InlineData("\"isDeleted\":false", null, true)]
+    public async Task Handle_ScheduleStatus_SetsInProgressUntilTheReportCompletes(string scheduleFields,
+                                                                                  ScheduleStatus? expectedStatus,
+                                                                                  bool expectedInProgress)
+    {
+        var scheduleJson = "{\"id\":\"" + ReportId + "\",\"facilityId\":\"" + FacilityId + "\"," +
+                           scheduleFields + "}";
+        var handler = new MockHttpMessageHandler(request => request.RequestUri!.Host == "report"
+            ? OkJson(scheduleJson)
+            : OkJson("{\"facilityId\":\"" + FacilityId + "\",\"reportId\":\"" + ReportId + "\"," +
+                     "\"lastUpdated\":\"2026-10-21T12:00:00Z\",\"categories\":[]}"));
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        var counts = Assert.IsType<Ok<ReportValidationCategoryCounts>>(result).Value!;
+        Assert.Equal(expectedStatus, counts.ReportStatus);
+        Assert.Equal(expectedInProgress, counts.InProgress);
     }
 
     [Fact]
