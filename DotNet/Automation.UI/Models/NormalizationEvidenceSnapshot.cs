@@ -37,6 +37,23 @@ public sealed class NormalizationEvidenceSnapshot
     /// </summary>
     public string EvidenceAttemptId { get; set; } = string.Empty;
 
+    /// <summary>Patients the FHIR generator produced for this run. Zero on older snapshots.</summary>
+    public int GeneratedPatientCount { get; set; }
+
+    /// <summary>Uploaded (imported) patients for this run. Zero on older snapshots.</summary>
+    public int UploadedPatientCount { get; set; }
+
+    /// <summary>True when generated patients were produced with the selected suite.</summary>
+    public bool GeneratorAppliedSelectedSuite { get; set; }
+
+    /// <summary>True after a normalization-log scrape has been stored for this run.</summary>
+    public bool EvidenceCollected { get; set; }
+
+    /// <summary>
+    /// Short rollup of parsed execution steps. Kept when the per-resource steps are omitted.
+    /// </summary>
+    public List<string> EvidenceInventory { get; set; } = [];
+
     public static string ChunkDomain(int oneBasedIndex) => $"{Domain}-chunk-{oneBasedIndex}";
 
     public List<string> SummaryLines { get; set; } = [];

@@ -182,7 +182,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-gear me-2"></i>Test Configuration</span>
             <a href="#" class="btn btn-sm" id="btnViewManifest" style="display:none; background:var(--au-accent); color:#fff; font-weight:600;">
-                <i class="bi bi-card-checklist me-1"></i>Generation Manifest
+                <i class="bi bi-card-checklist me-1"></i>Patient Manifest
             </a>
         </div>
         <div class="card-body">
@@ -344,8 +344,38 @@
             </div>
 
             <div class="au-card">
-                <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Normalization</div>
+                <div class="card-header" role="button" data-bs-toggle="modal" data-bs-target="#normalizationResultsModal" style="cursor:pointer;">
+                    <i class="bi bi-arrow-repeat me-2"></i>Normalization
+                    <span class="ms-2" id="normalizationPatientBadge"><span class="badge bg-light text-dark">—</span></span>
+                    <span class="small ms-1" style="opacity:.7;">details (click to drill down)</span>
+                </div>
                 <div class="card-body">
+                    <div class="row g-3 mb-3" id="normalizationSummaryStrip">
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Normalization Suite</div>
+                                <div class="fw-semibold" id="normalizationSuiteValue">Loading…</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Organization Map</div>
+                                <div class="fw-semibold" id="normalizationOrmValue">Loading…</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Patients</div>
+                                <div id="normalizationPatientValue">Loading…</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Execution evidence</div>
+                                <div id="normalizationEvidenceValue">Loading…</div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="row g-3 mb-3">
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="normalizationResourceCount">0</div></div></div>
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="normalizationResPerSec">0.00</div></div></div>
@@ -534,6 +564,47 @@
     </div>
 </div>
 
+<div class="modal fade" id="normalizationResultsModal" tabindex="-1" aria-labelledby="normalizationResultsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span id="normalizationResultsModalLabel"><i class="bi bi-arrow-repeat me-2"></i>Normalization</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="normalizationResultsBody">
+                <p class="text-muted mb-0">Loading normalization details…</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="normalizationSuiteModal" tabindex="-1" aria-labelledby="normalizationSuiteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span id="normalizationSuiteModalLabel"><i class="bi bi-collection me-2"></i>Normalization Suite</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="normalizationSuiteBody">
+                <p class="text-muted mb-0">Loading suite…</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="normalizationOrmModal" tabindex="-1" aria-labelledby="normalizationOrmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span id="normalizationOrmModalLabel"><i class="bi bi-diagram-3 me-2"></i>Organization Map</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="normalizationOrmBody">
+                <p class="text-muted mb-0">Loading organization map…</p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
@@ -617,6 +688,9 @@
         if (isMetricsRun && !advancedPanelLoaded)
             startAdvancedPerformancePolling();
 
+        const normalizationResultsUrl = '@Url.Action("NormalizationResults", "Runs")';
+        let lastNormalizationResults = null;
+        let normalizationResultsRequest = null;
         const queryPlanGetJsonUrl = '@Url.Action("GetJson", "QueryPlans")';
         const normalizationSuiteGetJsonUrl = '@Url.Action("GetSuiteJson", "Normalizations")';
         const orgResourceMapGetJsonUrl = '@Url.Action("GetJson", "OrganizationResourceMaps")';
@@ -2126,6 +2200,7 @@
 
                 normalizationErrors = snapshot.normalization?.errors || [];
                 document.getElementById('normalizationErrorsBtn').style.display = normalizationErrors.length > 0 ? '' : 'none';
+                loadNormalizationResults();
 
                 document.getElementById('measureRate').textContent = formatNumber(snapshot.measureEval?.completionRatePerSecond);
                 document.getElementById('measureResourceCount').textContent = snapshot.measureEval?.resourceCount || 0;
@@ -2238,6 +2313,7 @@
             .catch(err => appendLog('[signalr] ' + err));
 
         renderConfigProperties(runConfigurationJson);
+        loadNormalizationResults();
         refreshSnapshot();
         refreshLiveSimulation();
         if (isCollectingMetrics(currentRunStatus)) {
@@ -2509,7 +2585,198 @@
             document.getElementById('daLogFlyout').style.right = '-720px';
         });
 
-        // --- Generation Manifest ---
+        // --- Normalization execution details ---
+        function loadNormalizationResults() {
+            if (normalizationResultsRequest) return;
+            normalizationResultsRequest = fetch(`${normalizationResultsUrl}?id=${encodeURIComponent(runId)}`, { headers: { 'Accept': 'application/json' } })
+                .then(response => response.ok ? response.json() : null)
+                .then(data => {
+                    if (!data) {
+                        if (!lastNormalizationResults) markNormalizationUnavailable();
+                        return;
+                    }
+                    lastNormalizationResults = data;
+                    renderNormalizationStrip(data);
+                    renderNormalizationModal(data);
+                })
+                .catch(() => {
+                    if (!lastNormalizationResults) markNormalizationUnavailable();
+                })
+                .finally(() => { normalizationResultsRequest = null; });
+        }
+
+        function markNormalizationUnavailable() {
+            const suite = document.getElementById('normalizationSuiteValue');
+            if (suite && suite.textContent === 'Loading…')
+                suite.innerHTML = '<span class="text-muted">Could not load normalization details.</span>';
+        }
+
+        function renderNormalizationStrip(data) {
+            const badge = document.getElementById('normalizationPatientBadge');
+            if (badge) badge.innerHTML = patientSourceBadges(data);
+            const suite = document.getElementById('normalizationSuiteValue');
+            if (suite) suite.innerHTML = artifactLink(data.suiteState, data.suiteName, !!data.suite, 'normalizationSuiteModal', 'Selected suite');
+            const orm = document.getElementById('normalizationOrmValue');
+            if (orm) orm.innerHTML = artifactLink(data.organizationMapState, data.organizationMapName, !!data.organizationMap, 'normalizationOrmModal', 'Selected organization map');
+            const patients = document.getElementById('normalizationPatientValue');
+            if (patients) patients.innerHTML = patientSourceBadges(data);
+            const evidence = document.getElementById('normalizationEvidenceValue');
+            if (evidence) evidence.innerHTML = evidenceLabel(data);
+        }
+
+        function patientSourceBadges(data) {
+            const source = data.patientSource || 'unknown';
+            const generated = Number(data.generatedPatientCount || 0);
+            const uploaded = Number(data.uploadedPatientCount || 0);
+            if (source === 'generated')
+                return `<span class="badge bg-primary">Generated</span> <span class="small">${generated}</span>`;
+            if (source === 'uploaded')
+                return `<span class="badge bg-secondary">Uploaded</span> <span class="small">${uploaded}</span>`;
+            if (source === 'mixed')
+                return `<span class="badge bg-primary">Generated</span> <span class="small me-1">${generated}</span><span class="badge bg-secondary">Uploaded</span> <span class="small">${uploaded}</span>`;
+            return '<span class="text-muted">Not recorded</span>';
+        }
+
+        function artifactLink(state, name, hasSummary, modalId, fallback) {
+            if (state === 'not-configured')
+                return '<span class="text-muted">Not configured</span>';
+            const label = escapeHtml(name || fallback);
+            if (state === 'unavailable' || !hasSummary)
+                return `${label} <span class="badge bg-warning text-dark">Unavailable</span>`;
+            return `<button type="button" class="btn btn-link p-0 fw-semibold text-start" data-bs-toggle="modal" data-bs-target="#${modalId}">${label}</button>`;
+        }
+
+        function evidenceLabel(data) {
+            const state = data.evidenceState || 'none';
+            if (state === 'found')
+                return `<span class="badge bg-success">Found</span> <span class="small text-muted">${escapeHtml(data.evidenceMessage || '')}</span>`;
+            if (state === 'pending')
+                return '<span class="badge bg-warning text-dark">Pending</span> <span class="small text-muted">Not collected yet</span>';
+            return '<span class="badge bg-secondary">No evidence found</span>';
+        }
+
+        function confirmationBadge(state) {
+            if (state === 'confirmed') return '<span class="badge bg-success">Confirmed</span>';
+            if (state === 'pending') return '<span class="badge bg-warning text-dark">Pending</span>';
+            if (state === 'not-recorded') return '<span class="badge bg-warning text-dark">Not recorded</span>';
+            if (state === 'no-evidence') return '<span class="badge bg-secondary">No evidence found</span>';
+            if (state === 'not-applicable') return '<span class="badge bg-light text-dark">Not applicable</span>';
+            return '';
+        }
+
+        function renderNormalizationModal(data) {
+            const body = document.getElementById('normalizationResultsBody');
+            if (!body) return;
+            const operations = data.operations || [];
+            const inventory = data.evidenceInventory || [];
+            const operationItems = operations.length
+                ? '<ul class="mb-0">' + operations.map(op => {
+                    const types = (op.resourceTypes || []).filter(Boolean).map(escapeHtml).join(', ');
+                    return `<li><strong>${escapeHtml(op.name || 'Operation')}</strong> <span class="text-muted">${escapeHtml(op.operationType || '')}</span>${types ? ` <span class="small">(${types})</span>` : ''}</li>`;
+                }).join('') + '</ul>'
+                : '<p class="text-muted mb-0">No operations were recorded for this run.</p>';
+            const inventoryItems = inventory.length
+                ? '<ul class="mb-0">' + inventory.map(line => `<li><code>${escapeHtml(line)}</code></li>`).join('') + '</ul>'
+                : `<p class="text-muted mb-0">${escapeHtml(data.evidenceMessage || 'No evidence found.')}</p>`;
+            body.innerHTML = `
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4"><div class="small text-muted">Normalization Suite</div><div class="fw-semibold">${artifactText(data.suiteState, data.suiteName, 'Selected suite')}</div></div>
+                    <div class="col-md-4"><div class="small text-muted">Organization Map</div><div class="fw-semibold">${artifactText(data.organizationMapState, data.organizationMapName, 'Selected organization map')}</div></div>
+                    <div class="col-md-4"><div class="small text-muted">Patients</div><div>${patientSourceBadges(data)}</div></div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted">Generated patients</div>
+                    <div>${confirmationBadge(data.generatedConfirmationState)}</div>
+                    <div>${escapeHtml(data.generatedConfirmation || '')}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted">Uploaded patients</div>
+                    <div>${confirmationBadge(data.uploadedConfirmationState)}</div>
+                    <div>${escapeHtml(data.uploadedConfirmation || '')}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted">Execution evidence</div>
+                    <div class="mb-1">${evidenceLabel(data)}</div>
+                    ${inventoryItems}
+                </div>
+                <div>
+                    <div class="small text-muted mb-1">Operations</div>
+                    ${operationItems}
+                </div>`;
+        }
+
+        function artifactText(state, name, fallback) {
+            if (state === 'not-configured') return '<span class="text-muted">Not configured</span>';
+            const label = escapeHtml(name || fallback);
+            if (state === 'unavailable') return `${label} <span class="badge bg-warning text-dark">Unavailable</span>`;
+            return label;
+        }
+
+        function renderSuiteSummary(data) {
+            const body = document.getElementById('normalizationSuiteBody');
+            if (!body) return;
+            const suite = data?.suite;
+            if (!suite) {
+                body.innerHTML = '<p class="text-muted mb-0">Not configured.</p>';
+                return;
+            }
+            const flags = [
+                suite.isSystem ? '<span class="badge bg-secondary">System</span>' : '',
+                suite.isDefault ? '<span class="badge bg-info text-dark">Default</span>' : ''
+            ].filter(Boolean).join(' ');
+            const sequences = (suite.sequences || []).map(sequence => {
+                const steps = (sequence.operations || []).map(operationStep).join('');
+                return `<div class="mb-3"><div class="fw-semibold">${escapeHtml(sequence.name || 'Sequence')}</div><ul class="mb-0">${steps || '<li class="text-muted">No operations</li>'}</ul></div>`;
+            }).join('');
+            const standalone = (suite.operations || []).map(operationStep).join('');
+            body.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold">${escapeHtml(suite.name || 'Selected suite')}</div>
+                        ${suite.description ? `<div class="small text-muted">${escapeHtml(suite.description)}</div>` : ''}
+                    </div>
+                    <div>${flags}</div>
+                </div>
+                ${sequences || '<p class="text-muted">No sequences.</p>'}
+                ${standalone ? `<div class="fw-semibold">Standalone operations</div><ul class="mb-0">${standalone}</ul>` : ''}`;
+        }
+
+        function renderOrganizationMapSummary(data) {
+            const body = document.getElementById('normalizationOrmBody');
+            if (!body) return;
+            const map = data?.organizationMap;
+            if (!map) {
+                body.innerHTML = '<p class="text-muted mb-0">Not configured.</p>';
+                return;
+            }
+            const flags = [
+                map.isSystem ? '<span class="badge bg-secondary">System</span>' : '',
+                map.isDefault ? '<span class="badge bg-info text-dark">Default</span>' : ''
+            ].filter(Boolean).join(' ');
+            const conditions = (map.conditions || []).map(condition =>
+                `<li><span class="text-muted">#${Number(condition.priority) || 0}</span> <code>${escapeHtml(condition.fhirPath || '')}</code></li>`
+            ).join('');
+            body.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold">${escapeHtml(map.name || 'Selected organization map')}</div>
+                        ${map.description ? `<div class="small text-muted">${escapeHtml(map.description)}</div>` : ''}
+                    </div>
+                    <div>${flags}</div>
+                </div>
+                ${conditions ? `<ul class="mb-0">${conditions}</ul>` : '<p class="text-muted mb-0">No conditions.</p>'}`;
+        }
+
+        function operationStep(op) {
+            const types = (op.resourceTypes || []).filter(Boolean).map(escapeHtml).join(', ');
+            const missing = op.missing ? ' <span class="badge bg-warning text-dark">Missing</span>' : '';
+            return `<li><strong>${escapeHtml(op.name || 'Operation')}</strong> <span class="text-muted">${escapeHtml(op.operationType || '')}</span>${types ? ` <span class="small">(${types})</span>` : ''}${missing}</li>`;
+        }
+
+        document.getElementById('normalizationSuiteModal')?.addEventListener('show.bs.modal', () => renderSuiteSummary(lastNormalizationResults));
+        document.getElementById('normalizationOrmModal')?.addEventListener('show.bs.modal', () => renderOrganizationMapSummary(lastNormalizationResults));
+
+        // --- Patient Manifest ---
         const manifestPageUrl = '@Url.Action("Manifest", "Runs")';
 
         function tryShowManifestButton() {

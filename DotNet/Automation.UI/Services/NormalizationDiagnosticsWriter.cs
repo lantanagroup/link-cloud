@@ -25,7 +25,8 @@ internal static class NormalizationDiagnosticsWriter
             RuntimeSequences = [.. runtimeSequences],
             SuiteSequences = BuildSuiteSequences(resolution),
             OperationConfigs = BuildOperationConfigs(resolution),
-            ParsedSteps = [.. parsed]
+            ParsedSteps = [.. parsed],
+            EvidenceInventory = [.. FormatEvidenceInventory(parsed)]
         };
     }
 
@@ -121,6 +122,8 @@ internal static class NormalizationDiagnosticsWriter
         sb.AppendLine();
         sb.AppendLine("-- Execution evidence inventory --");
         var inventory = FormatEvidenceInventory(snapshot.ParsedSteps);
+        if (inventory.Count == 0 && snapshot.EvidenceInventory is { Count: > 0 })
+            inventory = snapshot.EvidenceInventory;
         if (inventory.Count == 0 && snapshot.OmittedStepCount > 0)
             sb.AppendLine($"  ({snapshot.OmittedStepCount} execution step(s) omitted from this snapshot)");
         else if (inventory.Count == 0)
@@ -409,6 +412,11 @@ internal static class NormalizationDiagnosticsWriter
             OmittedStepCount = source.OmittedStepCount,
             EvidenceChunkCount = source.EvidenceChunkCount,
             EvidenceAttemptId = source.EvidenceAttemptId,
+            GeneratedPatientCount = source.GeneratedPatientCount,
+            UploadedPatientCount = source.UploadedPatientCount,
+            GeneratorAppliedSelectedSuite = source.GeneratorAppliedSelectedSuite,
+            EvidenceCollected = source.EvidenceCollected,
+            EvidenceInventory = source.EvidenceInventory == null ? [] : [.. source.EvidenceInventory],
             SummaryLines = [.. source.SummaryLines],
             RuntimeSequences = [.. source.RuntimeSequences],
             SuiteSequences = [.. source.SuiteSequences],
