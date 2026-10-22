@@ -99,7 +99,7 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
         }
 
         // The row has to exist before anything else is decided: the manager's own check fires too late,
-        // after the secrets are written. See docs/other-vendor-oauth-configuration.md.
+        // after the secrets are written. See dev-docs/other-vendor-oauth-configuration.md.
         var queryConfiguration = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityId, ct);
 
         if (queryConfiguration is null)
@@ -125,7 +125,7 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
             : storedSecretName!;
 
         // Secrets before the row, so the row never points at a name that was never written. The window
-        // this leaves on a repeat write is deliberate. See docs/other-vendor-oauth-configuration.md.
+        // this leaves on a repeat write is deliberate. See dev-docs/other-vendor-oauth-configuration.md.
         await WriteSecretAsync(clientIdName, request.ClientId.Trim(), ct);
 
         if (replacingSecret)

@@ -306,6 +306,8 @@
             TotalCount = Model.TotalCount,
             SortBy = Model.SortBy,
             SortDescending = Model.SortDescending,
+            CreatedFrom = Model.CreatedFrom,
+            CreatedTo = Model.CreatedTo,
         };
     }
     <div id="recentRunsHost">
@@ -487,6 +489,8 @@
         refreshRecentRunsCard();
     }
 
+    var recentRunsRequestController = null;
+
     // Replace the Recent Runs card in place by fetching the partial view and
     // swapping its HTML into the #recentRunsHost container. Keeps the user's
     // scroll position (no full navigation), keeps sort/page/size state inside
@@ -502,7 +506,9 @@
             pageNumber: (card && card.getAttribute('data-page-number')) || '1',
             pageSize:   (card && card.getAttribute('data-page-size'))   || '20',
             sortBy:     (card && card.getAttribute('data-sort-by'))     || 'createdAt',
-            sortDir:    (card && card.getAttribute('data-sort-dir'))    || 'desc',
+            sortDir: (card && card.getAttribute('data-sort-dir')) || 'desc',
+            createdFrom: (card && card.getAttribute('data-created-from')) || '',
+            createdTo:   (card && card.getAttribute('data-created-to'))   || '',
         };
         var merged = Object.assign({}, state, overrides || {});
 
@@ -513,22 +519,52 @@
         try {
             var here = new URL(window.location.href);
             here.searchParams.set('pageNumber', merged.pageNumber);
-            here.searchParams.set('pageSize',   merged.pageSize);
-            here.searchParams.set('sortBy',     merged.sortBy);
-            here.searchParams.set('sortDir',    merged.sortDir);
+            here.searchParams.set('pageSize', merged.pageSize);
+            here.searchParams.set('sortBy', merged.sortBy);
+            here.searchParams.set('sortDir', merged.sortDir);
+
+            if (merged.createdFrom) {
+                here.searchParams.set('createdFrom', merged.createdFrom);
+            } else {
+                here.searchParams.delete('createdFrom');
+            }
+
+            if (merged.createdTo) {
+                here.searchParams.set('createdTo', merged.createdTo);
+            } else {
+                here.searchParams.delete('createdTo');
+            }
+
             window.history.replaceState(null, '', here.toString());
         } catch (_) { /* URL API unavailable: non-fatal, just skip URL sync */ }
+
+        if (recentRunsRequestController) {
+            recentRunsRequestController.abort();
+        }
+
+        recentRunsRequestController = new AbortController();
+        var requestController = recentRunsRequestController;
 
         if (card) card.classList.add('au-card-loading');
 
         var qs = new URLSearchParams(merged).toString();
-        return fetch(recentRunsPartialUrl + '?' + qs)
+        return fetch(recentRunsPartialUrl + '?' + qs, { signal: requestController.signal })
             .then(function (r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.text();
             })
-            .then(function (html) { host.innerHTML = html; })
+            .then(function (html) {
+                if (requestController !== recentRunsRequestController ||
+                    requestController.signal.aborted) {
+                    return;
+                }
+
+                host.innerHTML = html;
+            })
             .catch(function (err) {
+                if (err.name === 'AbortError') return;
+                if (requestController !== recentRunsRequestController) return;
+
                 console.error('Recent runs refresh failed', err);
                 if (card) card.classList.remove('au-card-loading');
             });
@@ -1018,6 +1054,28 @@
             });
     }
 
+    // Remember the current Runs homepage URL when navigating to run details.
+    // This preserves sorting, pagination, and any URL-based filters.
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 ||
+            e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+
+        var link = e.target.closest('a[href]');
+
+        if (!link || !link.closest('#recentRunsHost, #activeRunsCard')) return;
+
+        var linkUrl = new URL(link.href, window.location.origin);
+
+        if (linkUrl.origin !== window.location.origin ||
+            !linkUrl.pathname.includes('/Details/')) return;
+
+        try {
+            sessionStorage.setItem('runsReturnUrl', window.location.href);
+        } catch (_) {
+            // Storage may be unavailable; normal navigation still works.
+        }
+    });
+
     // --- Recent Runs table: sort / page / size all go through the partial-view
     // AJAX path. Handlers are delegated on `document` so they keep working after
     // refreshRecentRunsCard replaces the #recentRunsHost contents.
@@ -1064,6 +1122,46 @@
         var sel = e.target.closest('#pageSizeSelect');
         if (!sel) return;
         refreshRecentRunsCard({ pageSize: sel.value, pageNumber: '1' });
+    });
+
+    // --- Recent Runs: Created Date filter ---
+
+    document.addEventListener('submit', function (e) {
+        var form = e.target.closest('#recentRunsDateFilter');
+        if (!form) return;
+
+        e.preventDefault();
+
+        var createdFrom = form.querySelector('#createdFromInput').value;
+        var createdTo = form.querySelector('#createdToInput').value;
+
+        if (createdFrom && createdTo && createdFrom > createdTo) {
+            alert('Created From must be on or before Created To.');
+            return;
+        }
+
+        refreshRecentRunsCard({
+            createdFrom: createdFrom,
+            createdTo: createdTo,
+            pageNumber: '1'
+        });
+    });
+
+    document.addEventListener('click', function (e) {
+        var clearLink = e.target.closest('#clearCreatedDateFilter');
+        if (!clearLink) return;
+
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) {
+            return;
+        }
+
+        e.preventDefault();
+
+        refreshRecentRunsCard({
+            createdFrom: '',
+            createdTo: '',
+            pageNumber: '1'
+        });
     });
 })();
 

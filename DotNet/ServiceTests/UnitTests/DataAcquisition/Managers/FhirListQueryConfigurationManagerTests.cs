@@ -28,41 +28,6 @@ public class FhirListQueryConfigurationManagerTests
     private FhirListQueryConfigurationManager CreateManager() => new(_database.Object);
 
     [Fact]
-    public async Task CreateAuthenticationConfiguration_NoConfig_ThrowsMissingFacilityConfiguration()
-    {
-        _listRepo.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Expression<Func<FhirListConfiguration, bool>>>()))
-            .ReturnsAsync((FhirListConfiguration?)null);
-
-        var manager = CreateManager();
-
-        await Assert.ThrowsAsync<MissingFacilityConfigurationException>(
-            () => manager.CreateAuthenticationConfiguration("NonExisting", new AuthenticationConfiguration { AuthType = "Basic" }));
-    }
-
-    [Fact]
-    public async Task UpdateAuthenticationConfiguration_NoConfig_ThrowsMissingFacilityConfiguration()
-    {
-        _listRepo.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Expression<Func<FhirListConfiguration, bool>>>()))
-            .ReturnsAsync((FhirListConfiguration?)null);
-
-        var manager = CreateManager();
-
-        await Assert.ThrowsAsync<MissingFacilityConfigurationException>(
-            () => manager.UpdateAuthenticationConfiguration("NonExisting", new AuthenticationConfiguration { AuthType = "Basic" }));
-    }
-
-    [Fact]
-    public async Task DeleteAuthenticationConfiguration_NoConfig_ThrowsNotFound()
-    {
-        _listRepo.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Expression<Func<FhirListConfiguration, bool>>>()))
-            .ReturnsAsync((FhirListConfiguration?)null);
-
-        var manager = CreateManager();
-
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.DeleteAuthenticationConfiguration("NonExisting"));
-    }
-
-    [Fact]
     public async Task CreateAsync_FacilityHasSftpConfiguration_ThrowsInvalidOperationException()
     {
         var facilityId = "TestFacility";

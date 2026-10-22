@@ -125,7 +125,8 @@ public class ResultService {
                             result.getMessage(),
                             result.getCode().toString(),
                             result.getExpression(),
-                            result.getPatientId()))
+                            result.getPatientId(),
+                            result.getProfile()))
                     .toList();
         }
 
@@ -138,7 +139,8 @@ public class ResultService {
                         result.getMessage(),
                         result.getCode().toString(),
                         result.getExpression(),
-                        result.getPatientId()))
+                        result.getPatientId(),
+                        result.getProfile()))
                 .toList();
     }
 }

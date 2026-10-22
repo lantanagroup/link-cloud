@@ -9,13 +9,14 @@ pool:
     
 parameters:
   - name: environment
-    displayName: Which environment is this for? (DEV | TEST | QA | QA2)
+    displayName: Which environment is this for? (DEV | TEST | QA | QA2 | QA3)
     type: string
     values:
       - dev-scale
       - scale-test
       - scale-qa
       - scale-qa2
+      - scale-qa3
 
 variables:
 - group: link-cloud-variables

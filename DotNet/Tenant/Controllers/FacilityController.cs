@@ -157,6 +157,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             {
                 FacilityId = facilityId,
                 FacilityName = facilityName,
+                // facilityName carries whatever the user typed into the search box, so match it
+                // as a fragment of either the name or the id — the same way the autocomplete
+                // endpoint below does. Without this the two disagreed: the dropdown offered a
+                // facility that the table underneath reported as "not found".
+                PartialMatch = true,
                 TimeZone = timeZone,
                 Vendor = vendor
             };
@@ -186,7 +191,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 if (!string.IsNullOrEmpty(search))
                 {
                     searchModel.FacilityName = search;
-                    searchModel.FacilityNameContains = true;
+                    searchModel.PartialMatch = true;
                     if (!includeDeleted)
                     {
                         searchModel.IsDeleted = false;
@@ -319,6 +324,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{facilityId}")]
         public async Task<ActionResult<FacilityModel>> PutFacility(string facilityId, FacilityModel facilityConfig, CancellationToken cancellationToken)
@@ -353,6 +359,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (ScheduledReportsNotAcceptedException ex)
             {
                 return BadRequestProblem(ex.Message);
+            }
+            catch (DmrpApiException ex)
+            {
+                return Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway, title: "DMRP could not be reached");
             }
             catch (ApplicationException ex)
             {
