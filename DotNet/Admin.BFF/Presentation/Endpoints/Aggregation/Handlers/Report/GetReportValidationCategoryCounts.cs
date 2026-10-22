@@ -123,23 +123,39 @@ public static class GetReportValidationCategoryCounts
             return;
         }
 
-        var categoriesResponse = await validationService.GetCategories(context.User, context.RequestAborted);
-        if (!categoriesResponse.IsSuccessStatusCode)
+        Dictionary<string, ValidationCategory> categoriesById;
+        try
         {
-            logger.LogWarning(
-                "Validation categories returned {StatusCode}; counts for report {ReportScheduleId} have no guidance",
-                (int)categoriesResponse.StatusCode,
+            var categoriesResponse = await validationService.GetCategories(context.User, context.RequestAborted);
+            if (!categoriesResponse.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "Validation categories returned {StatusCode}; " +
+                    "counts for report {ReportScheduleId} have no guidance",
+                    (int)categoriesResponse.StatusCode,
+                    reportScheduleId.SanitizeForLog());
+                return;
+            }
+
+            var categories = await categoriesResponse.Content.ReadFromJsonAsync<List<ValidationCategory>>(
+                cancellationToken: context.RequestAborted) ?? [];
+            // Validation compares category ids case-insensitively, so match them the same way.
+            categoriesById = categories
+                .Where(c => !string.IsNullOrEmpty(c.Id))
+                .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Reading validation categories failed; counts for report {ReportScheduleId} have no guidance",
                 reportScheduleId.SanitizeForLog());
             return;
         }
-
-        var categories = await categoriesResponse.Content.ReadFromJsonAsync<List<ValidationCategory>>(
-            cancellationToken: context.RequestAborted) ?? [];
-        // Validation compares category ids case-insensitively, so match them the same way.
-        var categoriesById = categories
-            .Where(c => !string.IsNullOrEmpty(c.Id))
-            .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         foreach (var count in counts)
         {

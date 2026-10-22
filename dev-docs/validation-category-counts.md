@@ -74,11 +74,14 @@ the current rules on each load, did move.
 ## Writing a patient's counts
 
 `ReadyForValidationConsumer.validate()` calls `recordPatientCounts` with every finding, saved or
-not, before saving the submitted ones. The order matters on a retry: recording a patient's counts
-again replaces them, but saving its findings again duplicates them. With the counts first, a
-failure in either step leaves nothing for the retry to duplicate. Validation runs one patient at a
-time and nothing marks a report as finished, so a report's totals fill in patient by patient and
-are complete once its last patient has been validated.
+not, and then `ResultService.replacePatientResults` with the submitted ones. Both replace the
+patient's earlier rows instead of adding to them: `replacePatientResults` deletes the patient's
+saved findings and their category links, then saves the new list, in one transaction. It runs
+even when the list is empty, so a patient validated again with no submitted findings keeps none.
+A retry of either step therefore leaves one set of counts and one set of findings, which keeps the
+stored counts and the drill-down in agreement. Validation runs one patient at a time and nothing
+marks a report as finished, so a report's totals fill in patient by patient and are complete once
+its last patient has been validated.
 
 A patient can be validated more than once for the same report: a Kafka redelivery, or the
 `MeasureReportGenerated` null-key race sending `ReadyForValidation` twice. Adding each patient's

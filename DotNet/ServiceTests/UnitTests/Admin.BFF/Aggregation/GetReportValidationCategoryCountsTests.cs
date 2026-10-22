@@ -198,6 +198,79 @@ public class GetReportValidationCategoryCountsTests
     }
 
     [Fact]
+    public async Task Handle_CategoryListThrows_StillReturnsCountsWithoutGuidance()
+    {
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.PathAndQuery;
+            if (request.RequestUri.Host == "report")
+            {
+                return OkJson(ScheduleJson);
+            }
+            return path.Contains("/category-counts")
+                ? OkJson(CountsJson)
+                : throw new HttpRequestException("connection refused");
+        });
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        var counts = Assert.IsType<Ok<ReportValidationCategoryCounts>>(result).Value!;
+        Assert.Equal(3, counts.Categories.Count);
+        Assert.All(counts.Categories, c => Assert.Null(c.Guidance));
+    }
+
+    [Fact]
+    public async Task Handle_CategoryListIsNotJson_StillReturnsCountsWithoutGuidance()
+    {
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.PathAndQuery;
+            if (request.RequestUri.Host == "report")
+            {
+                return OkJson(ScheduleJson);
+            }
+            return path.Contains("/category-counts")
+                ? OkJson(CountsJson)
+                : OkJson("not json");
+        });
+        var (report, validation) = BuildServices(handler);
+
+        var result = await GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, new DefaultHttpContext(), report, validation, ReportId);
+
+        var counts = Assert.IsType<Ok<ReportValidationCategoryCounts>>(result).Value!;
+        Assert.Equal(3, counts.Categories.Count);
+        Assert.All(counts.Categories, c => Assert.Null(c.Guidance));
+    }
+
+    [Fact]
+    public async Task Handle_RequestCancelledWhileReadingCategories_Throws()
+    {
+        using var cts = new CancellationTokenSource();
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.PathAndQuery;
+            if (request.RequestUri.Host == "report")
+            {
+                return OkJson(ScheduleJson);
+            }
+            if (path.Contains("/category-counts"))
+            {
+                return OkJson(CountsJson);
+            }
+            cts.Cancel();
+            throw new OperationCanceledException(cts.Token);
+        });
+        var (report, validation) = BuildServices(handler);
+        var context = new DefaultHttpContext { RequestAborted = cts.Token };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => GetReportValidationCategoryCounts.Handle(
+            _loggerFactory, context, report, validation, ReportId));
+    }
+
+    [Fact]
     public async Task Handle_NoCategories_DoesNotRequestTheCategoryList()
     {
         var categoryListRequested = false;

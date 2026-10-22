@@ -308,6 +308,29 @@ public class ValidationResultsValidatorTests
         output.Lines.Should().Contain(line => line.Contains("was not a counts response", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("""{"categoryId":"category-a","issues":7}""")]
+    [InlineData("""{"categoryId":"category-a","submit":true}""")]
+    [InlineData("""{"issues":7,"submit":true}""")]
+    [InlineData("""{"categoryId":"category-a","issues":null,"submit":true}""")]
+    [InlineData("""{"categoryId":"category-a","issues":7,"submit":"true"}""")]
+    [InlineData("""{"categoryId":"category-a","issues":"7","submit":true}""")]
+    public async Task CategoryCounts_CategoryMissingARequiredField_FailsAsMalformed(string category)
+    {
+        // With submit missing, stored 7 against saved 6 would otherwise pass the looser non-submitted rule.
+        var storedCounts = "{\"facilityId\":\"facility-1\",\"reportId\":\"report-1\"," +
+                           "\"lastUpdated\":\"2026-10-21T12:00:00Z\",\"categories\":[" + category + "]}";
+        var client = ClientWithCounts(savedFindings: 6, storedCounts: storedCounts, liveCounts: null);
+
+        var output = new CapturingOutput();
+        var sut = new ValidationResultsValidator(client.Object, output);
+
+        var act = () => sut.ValidateAllAsync("facility-1", "report-1", ["patient-1"]);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        output.Lines.Should().Contain(line => line.Contains("was not a counts response", StringComparison.Ordinal));
+    }
+
     /// <summary>
     /// A report with no saved findings and no stored counts, so the category count check has nothing to compare.
     /// </summary>

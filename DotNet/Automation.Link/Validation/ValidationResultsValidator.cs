@@ -238,6 +238,7 @@ public class ValidationResultsValidator
 
     /// <summary>
     /// Reads validation's stored counts, keyed by category id case-insensitively as validation compares them.
+    /// Null when the body is not a counts response, including any category without a categoryId, issues or submit.
     /// </summary>
     private static Dictionary<string, (long Issues, bool Submit)>? ReadStoredCounts(string? body)
     {
@@ -254,17 +255,19 @@ public class ValidationResultsValidator
             }
 
             var stored = new Dictionary<string, (long Issues, bool Submit)>(StringComparer.OrdinalIgnoreCase);
-            foreach (var category in categories.OfType<JObject>())
+            foreach (var entry in categories)
             {
-                var categoryId = category["categoryId"]?.Value<string>();
-                if (string.IsNullOrEmpty(categoryId))
+                // A missing field must fail the check: defaulting submit to false would apply the looser rule.
+                if (entry is not JObject category ||
+                    category["categoryId"] is not { Type: JTokenType.String } categoryId ||
+                    string.IsNullOrEmpty(categoryId.Value<string>()) ||
+                    category["issues"] is not { Type: JTokenType.Integer } issues ||
+                    category["submit"] is not { Type: JTokenType.Boolean } submit)
                 {
-                    continue;
+                    return null;
                 }
 
-                var issues = category["issues"]?.Value<long>() ?? 0;
-                var submit = category["submit"]?.Value<bool>() ?? false;
-                stored[categoryId] = (issues, submit);
+                stored[categoryId.Value<string>()!] = (issues.Value<long>(), submit.Value<bool>());
             }
 
             return stored;
