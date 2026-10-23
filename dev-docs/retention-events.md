@@ -7,7 +7,8 @@ the rules participants and Report follow, belongs in
 the ADR is updated, the approved version (2026-10-19) is the PDF attached to
 [LEGLINK-1242](https://lantana.atlassian.net/browse/LEGLINK-1242), "LEGLINK-1242 - Proposed Retention
 Event Contract". This page covers only where the types live and how to use them. The topics and types
-were added by [LEGLINK-1204](https://lantana.atlassian.net/browse/LEGLINK-1204).
+were added by story [LEGLINK-1204](https://lantana.atlassian.net/browse/LEGLINK-1204), in its Dev
+sub-task [LEGLINK-1205](https://lantana.atlassian.net/browse/LEGLINK-1205).
 
 ## Topics
 
@@ -92,10 +93,12 @@ To change a field, change both runtimes' types and the fixture together, and run
 ## Topic retention
 
 `RetentionCheckRequested` has to keep messages longer than the longest participant outage we expect;
-otherwise a request can expire before a participant reads it. Without a setting it gets the broker
-default, 7 days on the local stack.
+otherwise a request can expire before a participant reads it. Report re-sends a request that is still
+unanswered after `Retention:PendingResendAfter` (PT24H), at the start of each scheduled run, and gives up
+after `Retention:MaxPendingResends` (3) re-sends. On a daily schedule that is about four days, so the
+topic keeps requests for 7 days: `RetentionCheckRequested:3:1:retention.ms=604800000`. The value is set
+explicitly rather than left to each cluster's broker default, which is not in this repository.
 
-A row in `topics.txt` can carry a fourth field of topic configs, comma-separated `key=value` pairs, such
-as `RetentionCheckRequested:3:1:retention.ms=<milliseconds>`. The sync pipeline applies it to new and
-existing topics. Locally, `create-topics-rest.sh` does not send that field, so local topics keep the
-broker default.
+The fourth field of a `topics.txt` row holds topic configs, comma-separated `key=value` pairs. The sync
+pipeline applies them to new and existing topics. Locally, `create-topics-rest.sh` does not send that
+field, so local topics get the broker default, which is also 7 days.
