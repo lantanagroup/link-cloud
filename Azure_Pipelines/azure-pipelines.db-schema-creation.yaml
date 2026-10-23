@@ -1048,7 +1048,7 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-qa2-botw-${{ db.name }}'
+            DatabaseName: 'link-qa3-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
