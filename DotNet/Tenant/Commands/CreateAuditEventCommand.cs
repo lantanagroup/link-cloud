@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Services;
 using System.Text;
 
@@ -30,6 +31,11 @@ namespace LantanaGroup.Link.Tenant.Commands
                     // send the Audit Event to Auditing Kafka Topic
                     Headers headers = new Headers();
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(auditEvent.CorrelationId ?? Guid.NewGuid().ToString()));
+
+                    if (string.IsNullOrEmpty(auditEvent.FacilityId))
+                    {
+                        auditEvent.FacilityId = facilityId;
+                    }
 
                     await _producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
                     {

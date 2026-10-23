@@ -79,6 +79,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                     Headers = headers,
                     Value = new ReportScheduledMessage()
                     {
+                        FacilityId = facility.FacilityId,
                         ReportTypes = reportTypes,
                         Frequency = frequency,
                         StartDate = startDate,
