@@ -91,6 +91,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     PayloadRootUri = r.PayloadRootUri,
                     Status = r.Status,
                     IsDeleted = r.IsDeleted,
+                    CompletedDate = r.CompletedDate,
+                    SoftDeletedDate = r.SoftDeletedDate,
                     ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
                 })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -116,6 +118,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     PayloadRootUri = r.PayloadRootUri,
                     Status = r.Status,
                     IsDeleted = r.IsDeleted,
+                    CompletedDate = r.CompletedDate,
+                    SoftDeletedDate = r.SoftDeletedDate,
                     ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
                 })
                 .ToListAsync(cancellationToken);
@@ -147,6 +151,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     PayloadRootUri = r.PayloadRootUri,
                     Status = r.Status,
                     IsDeleted = r.IsDeleted,
+                    CompletedDate = r.CompletedDate,
+                    SoftDeletedDate = r.SoftDeletedDate,
                     ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
                 })
                 .SingleOrDefaultAsync(cancellationToken);
@@ -304,6 +310,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     PayloadRootUri = r.PayloadRootUri,
                     Status = r.Status,
                     IsDeleted = r.IsDeleted,
+                    CompletedDate = r.CompletedDate,
+                    SoftDeletedDate = r.SoftDeletedDate,
                     ReportTypes = r.ReportTypes.Select(rt => rt.ReportType).ToList()
                 });
 

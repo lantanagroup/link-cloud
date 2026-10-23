@@ -549,6 +549,9 @@ public class ReportScheduledManagerTests
         Assert.Equal(first, (await context.ReportSchedule.FindAsync(report.Id))!.CompletedDate);
     }
 
+    /// <summary>
+    /// Moving between in-progress statuses is not completion, so no date is recorded.
+    /// </summary>
     [Fact]
     public async Task UpdateAsync_StatusStaysInProgress_LeavesCompletedDateNull()
     {
@@ -565,6 +568,9 @@ public class ReportScheduledManagerTests
         Assert.Null((await context.ReportSchedule.FindAsync(report.Id))!.CompletedDate);
     }
 
+    /// <summary>
+    /// A report that has not finished gets its retention clock from the soft delete, in UTC.
+    /// </summary>
     [Theory]
     [InlineData(ScheduleStatus.Scheduled, false)]
     [InlineData(ScheduleStatus.New, true)]
@@ -612,6 +618,9 @@ public class ReportScheduledManagerTests
         Assert.Null(updated.SoftDeletedDate);
     }
 
+    /// <summary>
+    /// Restoring stops the clock that the soft delete started.
+    /// </summary>
     [Fact]
     public async Task RestoreByReportTrackingIdAsync_UnfinishedReport_ClearsSoftDeletedDate()
     {
@@ -629,6 +638,9 @@ public class ReportScheduledManagerTests
         Assert.Null((await context.ReportSchedule.FindAsync(report.Id))!.SoftDeletedDate);
     }
 
+    /// <summary>
+    /// A second soft delete after a restore records the new date, not the original one.
+    /// </summary>
     [Fact]
     public async Task SoftDeleteByReportTrackingIdAsync_AfterRestore_RecordsNewSoftDeletedDate()
     {
@@ -654,6 +666,9 @@ public class ReportScheduledManagerTests
         Assert.True(secondDelete > firstDelete);
     }
 
+    /// <summary>
+    /// Deleting a facility stamps its Scheduled reports; its finished reports age from CompletedDate.
+    /// </summary>
     [Fact]
     public async Task UpdateReportsDeletedStatusForFacility_WhenDeleted_StampsOnlyUnfinishedReports()
     {
@@ -679,6 +694,9 @@ public class ReportScheduledManagerTests
         Assert.Null((await context.ReportSchedule.FindAsync(bypassed.Id))!.SoftDeletedDate);
     }
 
+    /// <summary>
+    /// Restoring a facility clears the date on every report it touches.
+    /// </summary>
     [Fact]
     public async Task UpdateReportsDeletedStatusForFacility_WhenRestored_ClearsSoftDeletedDate()
     {
@@ -700,6 +718,44 @@ public class ReportScheduledManagerTests
         Assert.Null((await context.ReportSchedule.FindAsync(submitted.Id))!.SoftDeletedDate);
     }
 
+    /// <summary>
+    /// Every read path projects the model by hand, so each must carry the dates through to the API.
+    /// </summary>
+    [Fact]
+    public async Task ReadMethods_ReturnRetentionDates()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var finished = CreateReport(facilityId, ScheduleStatus.EndOfPeriod);
+        var deleted = CreateReport(facilityId, ScheduleStatus.Scheduled);
+        await SeedAsync(context, finished, deleted);
+
+        await sut.UpdateAsync(ToModel(finished, ScheduleStatus.Submitted), CancellationToken.None);
+        await sut.SoftDeleteByReportTrackingIdAsync(deleted.Id);
+        context.ChangeTracker.Clear();
+
+        var byId = await sut.GetReportSchedule(facilityId, finished.Id);
+        Assert.NotNull(byId!.CompletedDate);
+
+        var single = await sut.SingleOrDefaultAsync(r => r.Id == deleted.Id);
+        Assert.NotNull(single!.SoftDeletedDate);
+
+        var found = await sut.FindAsync(r => r.FacilityId == facilityId);
+        Assert.NotNull(found.Single(r => r.Id == finished.Id).CompletedDate);
+        Assert.NotNull(found.Single(r => r.Id == deleted.Id).SoftDeletedDate);
+
+        var searched = await sut.SearchAsync(facilityId, null, null, null, null, null, null,
+            includeDeleted: true, sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1);
+        Assert.NotNull(searched.Records.Single(r => r.Id == finished.Id).CompletedDate);
+        Assert.NotNull(searched.Records.Single(r => r.Id == deleted.Id).SoftDeletedDate);
+    }
+
+    /// <summary>
+    /// The update input for a seeded report, carrying only what UpdateAsync copies.
+    /// </summary>
     private static ReportScheduleModel ToModel(ReportSchedule report, ScheduleStatus status)
     {
         return new ReportScheduleModel
@@ -717,6 +773,9 @@ public class ReportScheduledManagerTests
 
     #endregion
 
+    /// <summary>
+    /// A minimal schedule row for one facility, never modified and not yet completed.
+    /// </summary>
     private static ReportSchedule CreateReport(string facilityId,
                                                ScheduleStatus status,
                                                bool isDeleted = false,

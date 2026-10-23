@@ -31,6 +31,9 @@ public class ReportRetentionDatesMigrationTests
         _scopeFactory = fixture.ScopeFactory;
     }
 
+    /// <summary>
+    /// One row per backfill case, inserted at the previous migration, read back after Up.
+    /// </summary>
     [Fact]
     public async Task Up_RowsFromBeforeTheMigration_GetDatesByTheApprovedRule()
     {
@@ -102,6 +105,9 @@ public class ReportRetentionDatesMigrationTests
         }
     }
 
+    /// <summary>
+    /// What a UTC datetime2 value becomes after SQL Server converts it to datetimeoffset.
+    /// </summary>
     private static DateTimeOffset Utc(DateTime value)
     {
         return new DateTimeOffset(value, TimeSpan.Zero);
