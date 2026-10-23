@@ -99,12 +99,39 @@ Taken from the CQL in `DotNet/Automation/measures/*.json` (decode the base64 `te
 - **Not qualifying**: `outpatient-visit` is class `AMB`, SNOMED `185349003`, no location, one to three
   hours long. It still goes through the census lists like everyone else.
 
+### Template reference
+
+A template is the clinical shape of one stay. Several cohorts can share one; `qualifiesFor` on the
+cohort is only a declaration for the manifest, the generator never reads it, so whether a template's
+patients land in a measure follows from these fields alone (`Scenario/ClinicalTemplate.cs`).
+
+| Field                  | What it produces                                                                                                                                                                                                                                    | Default |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| `description`          | Free text for people reading the scenario file.                                                                                                                                                                                                     |         |
+| `encounterClass`       | `Encounter.class` (v3-ActCode): `IMP`, `AMB`, `EMER`, `OBSENC`, `NONAC`, `ACUTE` or `SS`.                                                                                                                                                           | `IMP`   |
+| `encounterType`        | Optional `Encounter.type` coding (`system`, `code`, `display`).                                                                                                                                                                                     | none    |
+| `location`             | Optional unit (`name`, `hsloc`, `hslocDisplay`): a `Location` typed with the HSLOC code, referenced from `Encounter.location`. Omit for visits without a ward.                                                                                      | none    |
+| `lengthOfStayHours`    | `{ min, max }`, inclusive, hours from admission to discharge.                                                                                                                                                                                       | 24–96   |
+| `confineToMonth`       | When true, patients that are not forced cross-month are discharged before the month ends. Set false for stays longer than a month.                                                                                                                  | `true`  |
+| `ageRange`             | `{ min, max }` age in years at admission; drives `Patient.birthDate`.                                                                                                                                                                               | 18–90   |
+| `dischargeDisposition` | Coding on the finished encounter's `hospitalization.dischargeDisposition`.                                                                                                                                                                          | home    |
+| `conditions`           | Pool of codings; each stay picks `conditionsPerStay` distinct ones, recorded at admission as `encounter-diagnosis` `Condition`s with the encounter as onset.                                                                                        | `[]`    |
+| `conditionsPerStay`    | How many of the pool each stay records. Must not exceed the pool size.                                                                                                                                                                              | 1       |
+| `observations[]`       | `loinc`, `display`, `category` (`vital-signs` or `laboratory`), `unit` (UCUM), `min`, `max`, `everyHours`, `decimals`. One final `Observation` one hour after admission, then every `everyHours` until discharge, with a random value in the range. | `[]`    |
+| `medications[]`        | `rxNorm`, `display`, `doseValue`, `doseUnit` (UCUM), `route` coding, `everyHours`. One active `MedicationRequest` at admission, plus a completed `MedicationAdministration` two hours after admission and every `everyHours` until discharge.       | `[]`    |
+
+Every patient also gets a `Patient` (name, gender, birth date, MRN identifier, managing organization)
+and one `Encounter` per stay, written `in-progress` at admission and again `finished` at discharge.
+The four shipped templates are `acute-inpatient`, `acute-inpatient-insulin`, `outpatient-visit` and
+`ltc-resident`; the section above says which measure each one is built for.
+
 ## Running it
 
 ```powershell
 cd DotNet/PatientFlowSimulator
 dotnet run -- plan --month 2026-11                                   # roster and expected counts, writes nothing
 dotnet run -- generate --month 2026-11 --data ./data                 # write the month (add --force to replace it)
+dotnet run -- report --month 2026-11 --data ./data                   # Markdown report of the month (see below)
 dotnet run -- import --fhir http://localhost:6157/fhir --data ./data # one scheduled run
 dotnet run -- run --fhir http://localhost:6157/fhir --interval 60    # keep running (docker-compose style)
 ```
@@ -212,6 +239,21 @@ The calls it makes, for reference (payloads as `Automation.Link/Helpers/Facility
 their cohort, whether they cross the month boundary, and per facility the expected qualifying count
 per measure, with and without carry-overs. Compare it with the report Link produces for the month;
 the ids are the FHIR `Patient` ids.
+
+`report --month yyyy-MM` writes `data/yyyy-MM/patient-flow-yyyy-MM.md` (or `--out <path>`), a
+Markdown document with Mermaid Gantt charts that reads well in Obsidian, VS Code or GitHub.
+`--format html` writes `patient-flow-yyyy-MM.html` instead (`both` writes the two): the same
+content as a standalone page that loads Mermaid from a CDN and renders the charts itself, for
+viewers whose Markdown preview cannot. The report is built from the same plan as the files, so it
+describes the generated data exactly, and it generates the month's files first when that month has
+no directory yet:
+
+- a summary table per facility and an example chart of the six census lists a stay passes through;
+- per facility, a Gantt chart of every stay (red bars cross the month boundary, grey bars were
+  admitted in an earlier month) and a table of the six list sizes at the end of each day;
+- per patient, their cohort, demographics, admission and discharge, diagnoses, how many
+  observations and administrations they get, which hourly files admit and discharge them, and a
+  Gantt chart of the stay, the census list they are on at each point, and their clinical activity.
 
 ## Changing the simulation
 

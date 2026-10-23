@@ -2852,7 +2852,8 @@
       "patientflowsimulator": {
         "type": "Project",
         "dependencies": {
-          "Hl7.Fhir.R4": "[6.2.0, )"
+          "Hl7.Fhir.R4": "[6.2.0, )",
+          "Markdig": "[1.4.2, )"
         }
       },
       "querydispatch": {
@@ -3317,6 +3318,12 @@
         "requested": "[1.2.11, )",
         "resolved": "1.2.11",
         "contentHash": "jQXu7G9Ik6BDcS5506RV1CI184pG5eHwvqzrB5zEivciW7KiZ9iHM8ZTyu5o/TGt55woagJGUVsJYw4aBjRfEQ=="
+      },
+      "Markdig": {
+        "type": "CentralTransitive",
+        "requested": "[1.4.2, )",
+        "resolved": "1.4.2",
+        "contentHash": "C5jl2hFLK5KHxWWWO6JxfuQCRirW5DGnCn9IEhJ7xgBMVnd+PjRNdAKO2C6YHpkOtVvZMJ8Zbma7B+CDi+hl+g=="
       },
       "MediatR": {
         "type": "CentralTransitive",

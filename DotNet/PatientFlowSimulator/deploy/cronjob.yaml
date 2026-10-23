@@ -4,12 +4,18 @@
 #
 # Fill in the image, the namespace, the FHIR base URL and the secret for your environment. The real
 # deployment manifests for Link live in link-cac; this file is only a starting point.
+#
+# The volume is the only state the simulator keeps: data/<yyyy-MM>/ with the hourly bundles, the
+# .done markers, manifest.json and any reports (about 7 MB a month). On AKS the default storage
+# class gives an Azure Disk, which only the job's pod can mount; use Azure Files (azurefile-csi,
+# ReadWriteMany) if you want to browse the files or write reports from another pod.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: patient-flow-simulator-data
 spec:
   accessModes: ["ReadWriteOnce"]
+  # storageClassName: azurefile-csi   # with accessModes: ["ReadWriteMany"]
   resources:
     requests:
       storage: 2Gi

@@ -8,6 +8,8 @@ month with new names and ids.
 ```powershell
 dotnet run --project DotNet/PatientFlowSimulator -- plan --month 2026-11              # roster + expected counts
 dotnet run --project DotNet/PatientFlowSimulator -- generate --month 2026-11 --data ./data
+dotnet run --project DotNet/PatientFlowSimulator -- report --month 2026-11 --data ./data   # Markdown + Mermaid, one chart per patient
+dotnet run --project DotNet/PatientFlowSimulator -- report --month 2026-11 --data ./data --format html   # same, as a page that renders the charts
 dotnet run --project DotNet/PatientFlowSimulator -- import --fhir http://localhost:6157/fhir --data ./data
 dotnet run --project DotNet/PatientFlowSimulator -- run --fhir http://localhost:6157/fhir --interval 60
 ```
