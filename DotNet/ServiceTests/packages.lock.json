@@ -2849,6 +2849,12 @@
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
+      "patientflowsimulator": {
+        "type": "Project",
+        "dependencies": {
+          "Hl7.Fhir.R4": "[6.2.0, )"
+        }
+      },
       "querydispatch": {
         "type": "Project",
         "dependencies": {

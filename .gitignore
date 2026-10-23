@@ -455,3 +455,7 @@ Scripts/AzureAppConfig/config-key-inventory.json
 
 *.tf
 *.tfstate
+
+# Patient flow simulator output (DotNet/PatientFlowSimulator)
+/data/
+DotNet/PatientFlowSimulator/data/

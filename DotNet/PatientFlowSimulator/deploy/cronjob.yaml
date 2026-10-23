@@ -1,0 +1,60 @@
+# Sample Kubernetes deployment of the simulator as an hourly CronJob: the "lambda" shape.
+# Each run uploads every hourly file whose hour has elapsed, then exits. Generated files and
+# .done markers live on the persistent volume so a run knows what the previous ones uploaded.
+#
+# Fill in the image, the namespace, the FHIR base URL and the secret for your environment. The real
+# deployment manifests for Link live in link-cac; this file is only a starting point.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: patient-flow-simulator-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: patient-flow-simulator
+type: Opaque
+stringData:
+  # Leave the one you do not use empty. Both empty means an anonymous FHIR server.
+  SIM_FHIR_BEARER_TOKEN: ""
+  SIM_FHIR_BASIC_AUTH: ""
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: patient-flow-simulator
+spec:
+  schedule: "5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: simulator
+              image: <registry>/link-patient-flow-simulator:<tag>
+              args: ["import"]
+              env:
+                - name: SIM_DATA_DIR
+                  value: /data
+                - name: SIM_FHIR_BASE_URL
+                  value: https://<fhir-server>/fhir
+              envFrom:
+                - secretRef:
+                    name: patient-flow-simulator
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: patient-flow-simulator-data

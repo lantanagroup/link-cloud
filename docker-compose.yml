@@ -1038,6 +1038,31 @@ services:
       interval: 5s
       retries: 10
 
+  # Synthetic patient flow for three facilities, uploaded to the HAPI server one hour at a time.
+  # Opt in with: docker compose --profile simulator up -d patient-flow-simulator
+  # See dev-docs/patient-flow-simulator.md.
+  patient-flow-simulator:
+    image: link-patient-flow-simulator
+    container_name: link-patient-flow-simulator
+    profiles: ["simulator"]
+    environment:
+      SIM_FHIR_BASE_URL: http://fhir-server:8080/fhir
+      SIM_DATA_DIR: /data
+      SIM_INTERVAL_MINUTES: ${SIMULATOR_INTERVAL_MINUTES:-60}
+    command: ["run"]
+    volumes:
+      - simulator_data:/data
+    build:
+      context: .
+      dockerfile: DotNet/PatientFlowSimulator/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      fhir_server:
+        condition: service_healthy
+
   mock-dmrp-api:
     image: mock-dmrp-api
     container_name: mock-dmrp-api
@@ -1127,4 +1152,6 @@ volumes:
   sftp_data:
     driver: local
   automation_ui_keys:
+    driver: local
+  simulator_data:
     driver: local

@@ -1,0 +1,214 @@
+{
+  // Three facilities, 100 new patients a month, 20 qualifying per measure.
+  // Patients are regenerated every month with new names and ids; the mix below stays the same.
+  "name": "three-facility-monthly-flow",
+  "seed": "link-spike-2026",
+  "crossMonth": {
+    "admitWithinHoursOfMonthEnd": 72,
+    "dischargeWithinHoursOfMonthStart": 72
+  },
+  "facilities": [
+    {
+      "facilityId": "sim-mercy-general",
+      "name": "Mercy General Hospital",
+      "timeZone": "America/Chicago",
+      "patientIdPrefix": "MG",
+      "measures": [
+        "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+        "NHSNAcuteCareHospitalDailyInitialPopulation"
+      ],
+      "cohorts": [
+        {
+          "name": "acute-inpatients",
+          "template": "acute-inpatient",
+          "count": 20,
+          "crossMonthCount": 3,
+          "qualifiesFor": [
+            "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            "NHSNAcuteCareHospitalDailyInitialPopulation"
+          ]
+        },
+        {
+          "name": "clinic-visits",
+          "template": "outpatient-visit",
+          "count": 20,
+          "crossMonthCount": 0,
+          "qualifiesFor": []
+        }
+      ]
+    },
+    {
+      "facilityId": "sim-riverside-medical",
+      "name": "Riverside Medical Center",
+      "timeZone": "America/Chicago",
+      "patientIdPrefix": "RM",
+      "measures": [
+        "NHSNGlycemicControlHypoglycemicInitialPopulation"
+      ],
+      "cohorts": [
+        {
+          "name": "insulin-inpatients",
+          "template": "acute-inpatient-insulin",
+          "count": 20,
+          "crossMonthCount": 3,
+          "qualifiesFor": [
+            "NHSNGlycemicControlHypoglycemicInitialPopulation"
+          ]
+        },
+        {
+          "name": "inpatients-without-insulin",
+          "template": "acute-inpatient",
+          "count": 7,
+          "crossMonthCount": 1,
+          "qualifiesFor": []
+        },
+        {
+          "name": "clinic-visits",
+          "template": "outpatient-visit",
+          "count": 13,
+          "crossMonthCount": 0,
+          "qualifiesFor": []
+        }
+      ]
+    },
+    {
+      // The LTC initial population is every encounter overlapping the period, whatever its class, so
+      // this facility only gets qualifying residents: a clinic visit here would qualify as well.
+      "facilityId": "sim-lakeside-ltc",
+      "name": "Lakeside Long-Term Care",
+      "timeZone": "America/Chicago",
+      "patientIdPrefix": "LL",
+      "measures": [
+        "NHSNLongTermCareMonthlyInitialPopulation"
+      ],
+      "cohorts": [
+        {
+          "name": "residents",
+          "template": "ltc-resident",
+          "count": 20,
+          "crossMonthCount": 0,
+          "qualifiesFor": [
+            "NHSNLongTermCareMonthlyInitialPopulation"
+          ]
+        }
+      ]
+    }
+  ],
+  "templates": {
+    "acute-inpatient": {
+      "description": "Inpatient stay on a medical ward. Qualifies for the ACH monthly and daily initial populations (class IMP, hospital location, status in-progress/finished).",
+      "encounterClass": "IMP",
+      "encounterType": { "system": "http://snomed.info/sct", "code": "32485007", "display": "Hospital admission (procedure)" },
+      "location": { "name": "Medical Ward", "hsloc": "1060-3", "hslocDisplay": "Medical Ward" },
+      "lengthOfStayHours": { "min": 30, "max": 120 },
+      "confineToMonth": true,
+      "ageRange": { "min": 18, "max": 90 },
+      "dischargeDisposition": { "system": "http://terminology.hl7.org/CodeSystem/discharge-disposition", "code": "home", "display": "Home" },
+      "conditions": [
+        { "system": "http://snomed.info/sct", "code": "233604007", "display": "Pneumonia (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "84114007", "display": "Heart failure (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "13645005", "display": "Chronic obstructive lung disease (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "68566005", "display": "Urinary tract infectious disease (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "22298006", "display": "Myocardial infarction (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "230690007", "display": "Cerebrovascular accident (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "74400008", "display": "Appendicitis (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "10509002", "display": "Acute bronchitis (disorder)" }
+      ],
+      "conditionsPerStay": 2,
+      "observations": [
+        { "loinc": "8867-4", "display": "Heart rate", "category": "vital-signs", "unit": "/min", "min": 55, "max": 110, "everyHours": 8, "decimals": 0 },
+        { "loinc": "8310-5", "display": "Body temperature", "category": "vital-signs", "unit": "Cel", "min": 36.2, "max": 38.9, "everyHours": 8, "decimals": 1 },
+        { "loinc": "2708-6", "display": "Oxygen saturation in Arterial blood", "category": "vital-signs", "unit": "%", "min": 90, "max": 99, "everyHours": 8, "decimals": 0 },
+        { "loinc": "8480-6", "display": "Systolic blood pressure", "category": "vital-signs", "unit": "mm[Hg]", "min": 100, "max": 165, "everyHours": 8, "decimals": 0 }
+      ],
+      "medications": []
+    },
+    "acute-inpatient-insulin": {
+      "description": "Inpatient stay with insulin and metformin administered. Qualifies for the Glycemic Control Hypoglycemic initial population (inpatient class plus a Diabetes Medications value-set drug given during the stay). RxNorm 311036 and 860975 are both in that value set's expansion.",
+      "encounterClass": "IMP",
+      "encounterType": { "system": "http://snomed.info/sct", "code": "32485007", "display": "Hospital admission (procedure)" },
+      "location": { "name": "Medical Ward", "hsloc": "1060-3", "hslocDisplay": "Medical Ward" },
+      "lengthOfStayHours": { "min": 30, "max": 120 },
+      "confineToMonth": true,
+      "ageRange": { "min": 18, "max": 90 },
+      "dischargeDisposition": { "system": "http://terminology.hl7.org/CodeSystem/discharge-disposition", "code": "home", "display": "Home" },
+      "conditions": [
+        { "system": "http://snomed.info/sct", "code": "44054006", "display": "Diabetes mellitus type 2 (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "46635009", "display": "Diabetes mellitus type 1 (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "127013003", "display": "Disorder of kidney due to diabetes mellitus (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "421326000", "display": "Neurologic disorder associated with diabetes mellitus (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "4855003", "display": "Retinopathy due to diabetes mellitus (disorder)" }
+      ],
+      "conditionsPerStay": 2,
+      "observations": [
+        { "loinc": "41653-7", "display": "Glucose [Mass/volume] in Capillary blood by Glucometer", "category": "laboratory", "unit": "mg/dL", "min": 48, "max": 240, "everyHours": 6, "decimals": 0 },
+        { "loinc": "8867-4", "display": "Heart rate", "category": "vital-signs", "unit": "/min", "min": 55, "max": 110, "everyHours": 8, "decimals": 0 }
+      ],
+      "medications": [
+        {
+          "rxNorm": "311036",
+          "display": "insulin, regular, human 100 UNT/ML Injectable Solution [Humulin R]",
+          "doseValue": 6,
+          "doseUnit": "[IU]",
+          "route": { "system": "http://snomed.info/sct", "code": "34206005", "display": "Subcutaneous route" },
+          "everyHours": 8
+        },
+        {
+          "rxNorm": "860975",
+          "display": "24 HR metformin hydrochloride 500 MG Extended Release Oral Tablet",
+          "doseValue": 500,
+          "doseUnit": "mg",
+          "route": { "system": "http://snomed.info/sct", "code": "26643006", "display": "Oral route" },
+          "everyHours": 24
+        }
+      ]
+    },
+    "outpatient-visit": {
+      "description": "Clinic visit of a few hours. Class AMB and no ward, so it qualifies for none of the measures. The patient still goes through the census lists like everyone else.",
+      "encounterClass": "AMB",
+      "encounterType": { "system": "http://snomed.info/sct", "code": "185349003", "display": "Encounter for check up (procedure)" },
+      "lengthOfStayHours": { "min": 1, "max": 3 },
+      "confineToMonth": true,
+      "ageRange": { "min": 18, "max": 85 },
+      "dischargeDisposition": { "system": "http://terminology.hl7.org/CodeSystem/discharge-disposition", "code": "home", "display": "Home" },
+      "conditions": [
+        { "system": "http://snomed.info/sct", "code": "38341003", "display": "Hypertensive disorder, systemic arterial (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "55822004", "display": "Hyperlipidemia (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "195967001", "display": "Asthma (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "25064002", "display": "Headache (finding)" },
+        { "system": "http://snomed.info/sct", "code": "271737000", "display": "Anemia (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "64859006", "display": "Osteoporosis (disorder)" }
+      ],
+      "conditionsPerStay": 1,
+      "observations": [
+        { "loinc": "8480-6", "display": "Systolic blood pressure", "category": "vital-signs", "unit": "mm[Hg]", "min": 105, "max": 150, "everyHours": 1, "decimals": 0 },
+        { "loinc": "8867-4", "display": "Heart rate", "category": "vital-signs", "unit": "/min", "min": 58, "max": 95, "everyHours": 1, "decimals": 0 }
+      ],
+      "medications": []
+    },
+    "ltc-resident": {
+      "description": "Long-term care resident: non-acute inpatient class on a long term care facility nursing unit, staying 10 to 60 days so most stays cross a month boundary. NHSNLongTermCareMonthlyInitialPopulation 2.0.1 counts every Encounter whose period overlaps the measurement period, so class, type and location are for realism only.",
+      "encounterClass": "NONAC",
+      "location": { "name": "General Nursing Unit", "hsloc": "1258-3", "hslocDisplay": "Long Term Care Facility General Nursing Unit" },
+      "lengthOfStayHours": { "min": 240, "max": 1440 },
+      "confineToMonth": false,
+      "ageRange": { "min": 65, "max": 98 },
+      "dischargeDisposition": { "system": "http://terminology.hl7.org/CodeSystem/discharge-disposition", "code": "home", "display": "Home" },
+      "conditions": [
+        { "system": "http://snomed.info/sct", "code": "26929004", "display": "Alzheimer's disease (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "49436004", "display": "Atrial fibrillation (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "396275006", "display": "Osteoarthritis (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "35489007", "display": "Depressive disorder (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "38341003", "display": "Hypertensive disorder, systemic arterial (disorder)" },
+        { "system": "http://snomed.info/sct", "code": "13645005", "display": "Chronic obstructive lung disease (disorder)" }
+      ],
+      "conditionsPerStay": 2,
+      "observations": [
+        { "loinc": "8867-4", "display": "Heart rate", "category": "vital-signs", "unit": "/min", "min": 55, "max": 100, "everyHours": 24, "decimals": 0 },
+        { "loinc": "8310-5", "display": "Body temperature", "category": "vital-signs", "unit": "Cel", "min": 36.1, "max": 37.8, "everyHours": 24, "decimals": 1 },
+        { "loinc": "29463-7", "display": "Body weight", "category": "vital-signs", "unit": "kg", "min": 45, "max": 110, "everyHours": 168, "decimals": 1 }
+      ],
+      "medications": []
+    }
+  }
+}
