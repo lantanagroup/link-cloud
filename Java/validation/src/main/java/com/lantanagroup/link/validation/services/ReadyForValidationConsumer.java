@@ -16,7 +16,6 @@ import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
-import com.lantanagroup.link.validation.repositories.ResultRepository;
 import io.opentelemetry.api.common.Attributes;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -43,7 +42,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final ReportClient reportClient;
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
-    private final ResultRepository resultRepository;
+    private final ResultService resultService;
+    private final CategoryCountService categoryCountService;
     private final KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     private final ValidationMetrics validationMetrics;
     private final BlobStorageService blobStorageService;
@@ -55,7 +55,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             ReportClient reportClient,
             ValidationService validationService,
             CategorizationService categorizationService,
-            ResultRepository resultRepository,
+            ResultService resultService,
+            CategoryCountService categoryCountService,
             @Qualifier("defaultKafkaTemplate") KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics,
             Optional<BlobStorageService> blobStorageService,
@@ -67,7 +68,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         this.reportClient = reportClient;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
-        this.resultRepository = resultRepository;
+        this.resultService = resultService;
+        this.categoryCountService = categoryCountService;
         this.validationCompleteTemplate = validationCompleteTemplate;
         this.validationMetrics = validationMetrics;
         this.blobStorageService = blobStorageService.orElse(null);
@@ -233,6 +235,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             addIssueMetrics(results, attributes);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
+        // Counts and results both replace the patient's earlier ones, so validating it again leaves one set of each.
+        // Every result is passed, because unsaved ones (uncategorized or non-submit) are counted too.
+        categoryCountService.recordPatientCounts(facilityId, reportId, patientId, results);
         List<Result> submittedResults = results.stream()
                 .filter(result -> result.getCategories() != null
                         && result.getCategories().stream().anyMatch(Category::isSubmit))
@@ -242,10 +247,11 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                     submittedResults.size(),
                     LogUtils.sanitize(facilityId),
                     LogUtils.sanitize(reportId));
-            try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
-                    _logger, "persisting " + submittedResults.size() + " results", facilityId, reportId)) {
-                resultRepository.saveAll(submittedResults);
-            }
+        }
+        // Also when the list is empty, so a patient validated again with no submitted results keeps none.
+        try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
+                _logger, "persisting " + submittedResults.size() + " results", facilityId, reportId)) {
+            resultService.replacePatientResults(facilityId, reportId, patientId, submittedResults);
         }
         return results;
     }

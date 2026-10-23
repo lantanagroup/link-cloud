@@ -48,6 +48,14 @@ public sealed class AdminBffIntegrationClient : LinkApiClientBase, IAdminBffInte
     public Task<LinkApiResponse<string>> GetReportSummaryAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"/aggregate/reports/summaries/{reportScheduleId}").GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<string>> GetReportValidationCategoryCountsAsync(
+        string reportScheduleId,
+        bool? submit = null,
+        CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"/aggregate/reports/{reportScheduleId}/validation-category-counts")
+            .SetQueryParam("submit", submit.HasValue ? (submit.Value ? "true" : "false") : null)
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> DeleteAggregateReportAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"/aggregate/reports/{reportScheduleId}").DeleteAsync(cancellationToken: cancellationToken));
 
