@@ -77,9 +77,25 @@ fails a build:
 
 To change a field, change both runtimes' types and the fixture together, and run both test suites.
 
+## Creating the topics
+
+`topics.txt` is the source for every environment this repository deploys:
+
+- **Locally**, compose's `kafka_init` service creates any missing topic through the REST Proxy when the
+  stack comes up.
+- **DEV, TEST, QA, QA2 and QA3** are synced by `Azure_Pipelines/kafka-topics-sync.yaml`, which is run by
+  hand once per environment and reads `topics.txt` from the branch it runs on. It creates missing topics,
+  applies their configs, and deletes any topic the file doesn't list. The topics exist in an environment
+  only after someone has run it there, so new topics go in the release notes.
+- **CDC environments** are deployed from a separate repository and need the topics there too.
+
 ## Topic retention
 
 `RetentionCheckRequested` has to keep messages longer than the longest participant outage we expect;
-otherwise a request can expire before a participant reads it. `topics.txt` can't set this: it only
-creates topics for the local stack. The value is set where each environment's topics are provisioned,
-and has to be in the release notes.
+otherwise a request can expire before a participant reads it. Without a setting it gets the broker
+default, 7 days on the local stack.
+
+A row in `topics.txt` can carry a fourth field of topic configs, comma-separated `key=value` pairs, such
+as `RetentionCheckRequested:3:1:retention.ms=<milliseconds>`. The sync pipeline applies it to new and
+existing topics. Locally, `create-topics-rest.sh` does not send that field, so local topics keep the
+broker default.
