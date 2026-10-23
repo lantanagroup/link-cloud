@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Sdk.ApiClient;
+﻿using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Terminology;
 
