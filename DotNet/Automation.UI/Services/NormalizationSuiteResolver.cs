@@ -88,7 +88,10 @@ public sealed class NormalizationSuiteResolver
             }
         }
 
-        return new NormalizationSuiteResolution(suite.Name, resolvedOps, resolvedSequences, standaloneOperations);
+        return new NormalizationSuiteResolution(suite.Name, resolvedOps, resolvedSequences, standaloneOperations)
+        {
+            SuiteId = suite.Id
+        };
     }
 }
 
@@ -99,7 +102,10 @@ public record NormalizationSuiteResolution(
     string SuiteName,
     List<NormalizationOperationDefinition> Operations,
     List<NormalizationSuiteSequenceResolution> Sequences,
-    List<NormalizationOperationDefinition> StandaloneOperations);
+    List<NormalizationOperationDefinition> StandaloneOperations)
+{
+    public Guid? SuiteId { get; init; }
+}
 
 public record NormalizationSuiteSequenceResolution(
     string SequenceName,
