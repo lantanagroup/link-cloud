@@ -470,6 +470,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (entity == null)
                 throw new InvalidOperationException($"Soft-deleted report schedule with ID '{reportTrackingId}' not found.");
 
+            if (!entity.Status.CanRestore())
+                throw new InvalidOperationException(
+                    $"{ScheduleStatusExtensions.RestoreBlockedDetail} Report schedule '{reportTrackingId}' is {entity.Status}.");
+
             if (entity.Status == ScheduleStatus.Scheduled)
             {
                 if (entity.ReportEndDate > DateTime.UtcNow)

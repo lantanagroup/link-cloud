@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
@@ -190,12 +191,15 @@ namespace LantanaGroup.Link.Report.Controllers
 
         /// <summary>
         /// Restores a single soft-deleted report schedule by its ID.
+        /// Only a schedule that had not started (Scheduled) or had finished submission
+        /// (Submitted) can be restored. Any other status returns 409.
         /// </summary>
         /// <param name="id">The ID of the report schedule to restore.</param>
         [HttpPatch("{id}/restore")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Restore(string id)
         {
@@ -213,6 +217,11 @@ namespace LantanaGroup.Link.Report.Controllers
             catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
             {
                 return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains(ScheduleStatusExtensions.RestoreBlockedDetail))
+            {
+                _logger.LogWarning(new EventId(ReportConstants.LoggingIds.UpdateItem, "Restore"), "Refused to restore report schedule {Id}: {Detail}", HtmlInputSanitizer.Sanitize(id), HtmlInputSanitizer.Sanitize(ex.Message));
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
             catch (Exception ex)
             {
