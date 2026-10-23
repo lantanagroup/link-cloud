@@ -43,6 +43,12 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ''
+  datasource:
+    hikari:
+      data-source-properties:
+        # Send strings as varchar so they match the varchar columns and SQL Server can seek.
+        # See dev-docs/validation-category-counts.md.
+        sendStringParametersAsUnicode: false
   #datasource:
   #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
   #  username: link-user
