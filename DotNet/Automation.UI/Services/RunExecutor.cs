@@ -895,6 +895,13 @@ internal sealed class RunExecutor
                 scenarioConfig.IsMetricsRun,
                 scenarioConfig.PatientIds.Count);
 
+            if (!string.IsNullOrWhiteSpace(_terminologyHealthUrl))
+            {
+                diagnosticsPollInterval = diagnosticsPollInterval <= _serviceHealthInterval
+                    ? diagnosticsPollInterval
+                    : _serviceHealthInterval;
+            }
+
             using var healthClient = services.GetRequiredService<IHttpClientFactory>()
                 .CreateClient();
 

@@ -373,7 +373,16 @@ public class ReportApiHelper
         // -------------------------------------------------------------------
         if (diagnostics?.HasReachedMilestone("SubmissionCompleted") == true)
         {
-            _output.WriteLine("Submission milestone already reached. Skipping schedule polling.");
+            if (diagnostics.HasCriticalFailure)
+            {
+                _output.WriteLine(
+                    "[EARLY EXIT] Background diagnostics detected a critical failure.");
+                return false;
+            }
+
+            _output.WriteLine(
+                "Submission milestone already reached. Skipping schedule polling.");
+
             return true;
         }
 
@@ -429,8 +438,18 @@ public class ReportApiHelper
 
                 if (string.Equals(currentStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (diagnostics?.HasCriticalFailure == true)
+                    {
+                        _output.WriteLine(
+                            "[EARLY EXIT] Background diagnostics detected a critical failure.");
+                        return false;
+                    }
+
                     var elapsed = (DateTime.UtcNow - submissionPhaseStart).TotalSeconds;
-                    _output.WriteLine($"Report submitted (after {elapsed:F0}s of status polling).");
+
+                    _output.WriteLine(
+                        $"Report submitted (after {elapsed:F0}s of status polling).");
+
                     return true;
                 }
             }
