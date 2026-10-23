@@ -14,6 +14,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -462,7 +463,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         {
             _logger.LogWarning(
                 "Discarding currentView for facility {FacilityId}: it names step {ViewStepId} but the save is for {StepId}.",
-                facilityId, currentView.StepId, stepId ?? "none");
+                HtmlInputSanitizer.SanitizeAndRemove(facilityId), HtmlInputSanitizer.SanitizeAndRemove(currentView.StepId), HtmlInputSanitizer.SanitizeAndRemove(stepId ?? "") ?? "none");
             currentView = null;
         }
 

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Session;
@@ -56,7 +57,7 @@ public sealed class LocalizationResourceService : ILocalizationResourceService
             var filePath = BuildFilePath(resourceDirectory, candidateLocale, namespaceName);
             if (filePath is null || !File.Exists(filePath))
             {
-                _logger.LogDebug("Localization resource not found for locale/namespace. Locale={Locale}; Namespace={Namespace}", candidateLocale, namespaceName);
+                _logger.LogDebug("Localization resource not found for locale/namespace. Locale={Locale}; Namespace={Namespace}", HtmlInputSanitizer.SanitizeAndRemove(candidateLocale), HtmlInputSanitizer.SanitizeAndRemove(namespaceName));
                 continue;
             }
 
@@ -66,7 +67,7 @@ public sealed class LocalizationResourceService : ILocalizationResourceService
                 var rootNode = JsonNode.Parse(json) as JsonObject;
                 if (rootNode is null)
                 {
-                    _logger.LogWarning("Localization resource file does not contain a JSON object. File={File}", filePath);
+                    _logger.LogWarning("Localization resource file does not contain a JSON object. File={File}", HtmlInputSanitizer.SanitizeAndRemove(filePath));
                     return new LocalizationResourceResult(LocalizationResourceStatus.MalformedJson, Message: "Localization JSON payload must be an object.");
                 }
 
@@ -75,19 +76,19 @@ public sealed class LocalizationResourceService : ILocalizationResourceService
             }
             catch (JsonException ex)
             {
-                _logger.LogWarning(ex, "Localization resource JSON is malformed. File={File}", filePath);
+                _logger.LogWarning(ex, "Localization resource JSON is malformed. File={File}", HtmlInputSanitizer.SanitizeAndRemove(filePath));
                 return new LocalizationResourceResult(LocalizationResourceStatus.MalformedJson, Message: "Localization JSON payload is malformed.");
             }
             catch (IOException ex)
             {
-                _logger.LogError(ex, "Localization resource file could not be read. File={File}", filePath);
+                _logger.LogError(ex, "Localization resource file could not be read. File={File}", HtmlInputSanitizer.SanitizeAndRemove(filePath));
                 return new LocalizationResourceResult(LocalizationResourceStatus.DirectoryUnavailable, Message: "Localization resource file could not be read.");
             }
         }
 
         if (!resourceByLocale.ContainsKey(DefaultLocale))
         {
-            _logger.LogError("Default English localization was not found for namespace. Namespace={Namespace}", namespaceName);
+            _logger.LogError("Default English localization was not found for namespace. Namespace={Namespace}", HtmlInputSanitizer.SanitizeAndRemove(namespaceName));
             return new LocalizationResourceResult(LocalizationResourceStatus.NotFound, Message: "Default localization resources are unavailable.");
         }
 
