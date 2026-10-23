@@ -10,9 +10,12 @@ namespace LantanaGroup.Link.Audit.Application.Models
         public string? CorrelationId { get; set; }
         public string? ServiceName { get; set; }
         public DateTime? EventDate { get; set; }
+        public string? UserId { get; set; }
         public string? User { get; set; }
         public string? Action { get; set; }
         public string? Resource { get; set; }
+        public string? ResourceId { get; set; }
+        public string? PatientId { get; set; }
         public List<PropertyChangeModel>? PropertyChanges { get; set; }
         public string? Notes { get; set; }
 
@@ -25,9 +28,12 @@ namespace LantanaGroup.Link.Audit.Application.Models
                 CorrelationId = log.CorrelationId,
                 ServiceName = log.ServiceName,
                 EventDate = log.EventDate,
+                UserId = log.UserId,
                 User = log.User,
                 Action = log.Action,
                 Resource = log.Resource,
+                ResourceId = log.ResourceId,
+                PatientId = log.PatientId,
                 PropertyChanges = log.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
                 Notes = log.Notes
             };
@@ -41,9 +47,12 @@ namespace LantanaGroup.Link.Audit.Application.Models
                 CorrelationId = message.CorrelationId,
                 ServiceName = message.ServiceName,
                 EventDate = message.EventDate,
+                UserId = message.UserId,
                 User = message.User,
                 Action = message.Action.ToString(),
                 Resource = message.Resource,
+                ResourceId = message.ResourceId,
+                PatientId = message.PatientId,
                 Notes = message.Notes
             };
 
@@ -69,9 +78,12 @@ namespace LantanaGroup.Link.Audit.Application.Models
                 CorrelationId = model.CorrelationId,
                 ServiceName = model.ServiceName,
                 EventDate = model.EventDate,
+                UserId = model.UserId,
                 User = model.User,
                 Action = model.Action,
                 Resource = model.Resource,
+                ResourceId = model.ResourceId,
+                PatientId = model.PatientId,
                 PropertyChanges = model.PropertyChanges?.Select(p => new EntityPropertyChange { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
                 Notes = model.Notes
             };
