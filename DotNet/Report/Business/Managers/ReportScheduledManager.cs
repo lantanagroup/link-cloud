@@ -161,7 +161,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (entity == null)
                 throw new InvalidOperationException($"ReportSchedule with Id {model.Id} not found");
 
-            entity.ModifyDate = DateTime.UtcNow;
+            var now = DateTimeOffset.UtcNow;
+
+            entity.ModifyDate = now.UtcDateTime;
             entity.FacilityId = model.FacilityId;
             entity.ReportStartDate = model.ReportStartDate;
             entity.ReportEndDate = model.ReportEndDate;
@@ -173,6 +175,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entity.PayloadRootUri = model.PayloadRootUri;
             entity.Status = model.Status;
             entity.IsDeleted = model.IsDeleted;
+            StampCompletedDate(entity, now);
 
             var existingTypes = entity.ReportTypes.ToList();
 
@@ -341,7 +344,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (string.IsNullOrWhiteSpace(facilityId))
                 throw new ArgumentException("facilityId is required", nameof(facilityId));
 
-            var now = DateTime.UtcNow;
+            var now = DateTimeOffset.UtcNow;
             var quartzFailedIds = new HashSet<Guid>();
 
             // Quartz handling for Scheduled reports
@@ -396,7 +399,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             foreach (var r in scheduledToUpdate)
             {
                 r.IsDeleted = deleted;
-                r.ModifyDate = now;
+                r.ModifyDate = now.UtcDateTime;
+                // Scheduled reports have not finished, so the delete date is their retention clock.
+                r.SoftDeletedDate = deleted ? now : null;
             }
 
             if (scheduledToUpdate.Count > 0)
@@ -423,7 +428,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 foreach (var r in batch)
                 {
                     r.IsDeleted = deleted;
-                    r.ModifyDate = now;
+                    r.ModifyDate = now.UtcDateTime;
+                    // A finished report ages from CompletedDate, so deleting it records no date, and restoring clears any.
+                    if (!deleted)
+                    {
+                        r.SoftDeletedDate = null;
+                    }
                 }
 
                 _context.ReportSchedule.UpdateRange(batch);
@@ -456,8 +466,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
             }
 
+            var now = DateTimeOffset.UtcNow;
+
             entity.IsDeleted = true;
-            entity.ModifyDate = DateTime.UtcNow;
+            entity.ModifyDate = now.UtcDateTime;
+            StampSoftDeletedDate(entity, now);
             _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);
         }
@@ -506,6 +519,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             entity.IsDeleted = false;
             entity.ModifyDate = DateTime.UtcNow;
+            entity.SoftDeletedDate = null;
             _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);
         }
@@ -589,6 +603,34 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             .Count(),
                             LastUpdatedDate = reportSchedule.ModifyDate ?? reportSchedule.CreateDate
                     });
+        }
+
+        /// <summary>
+        /// Records the first time a report reaches a terminal status. A regenerate or any later write
+        /// never moves it. See dev-docs/report-retention-dates.md.
+        /// </summary>
+        private static void StampCompletedDate(ReportSchedule entity, DateTimeOffset now)
+        {
+            if (!entity.Status.IsTerminal() || entity.CompletedDate.HasValue)
+            {
+                return;
+            }
+
+            entity.CompletedDate = now;
+        }
+
+        /// <summary>
+        /// Records when a report that had not finished was soft-deleted. A finished report ages from
+        /// <see cref="ReportSchedule.CompletedDate"/> instead, so its delete leaves no date.
+        /// </summary>
+        private static void StampSoftDeletedDate(ReportSchedule entity, DateTimeOffset now)
+        {
+            if (entity.Status.IsTerminal())
+            {
+                return;
+            }
+
+            entity.SoftDeletedDate = now;
         }
     }
 }
