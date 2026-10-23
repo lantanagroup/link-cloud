@@ -7,6 +7,7 @@
         Delete,
         Query,
         Submit,
-        Restore
+        Restore,
+        SoftDelete
     }
 }
