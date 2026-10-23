@@ -262,6 +262,12 @@ public static class RunHistorySlim
             StepsCollapsed = false,
             OmittedStepCount = source.ParsedSteps?.Count ?? 0,
             EvidenceChunkCount = 0,
+            GeneratedPatientCount = source.GeneratedPatientCount,
+            UploadedPatientCount = source.UploadedPatientCount,
+            GeneratorAppliedSelectedSuite = source.GeneratorAppliedSelectedSuite,
+            EvidenceCollected = source.EvidenceCollected,
+            EvidenceInventory = source.EvidenceInventory == null ? [] : [.. source.EvidenceInventory],
+            EvidencePatientIds = source.EvidencePatientIds == null ? [] : [.. source.EvidencePatientIds],
             RuntimeSequences = source.RuntimeSequences,
             SuiteSequences = source.SuiteSequences,
             OperationConfigs = (source.OperationConfigs ?? [])
