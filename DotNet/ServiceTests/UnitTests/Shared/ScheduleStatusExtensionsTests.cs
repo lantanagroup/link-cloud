@@ -67,4 +67,35 @@ public class ScheduleStatusExtensionsTests
             Enum.GetNames<ScheduleStatus>(),
             name => name.Contains("Cancel", StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>
+    /// Restore is an allow-list: only a schedule that had not started, or one that
+    /// finished submission, can come back. A new member must be classified here or
+    /// this test fails, so it cannot become restorable by default.
+    /// </summary>
+    [Fact]
+    public void CanRestore_ClassifiesEveryDeclaredStatus()
+    {
+        var expected = new Dictionary<ScheduleStatus, bool>
+        {
+            [ScheduleStatus.New] = false,
+            [ScheduleStatus.Scheduled] = true,
+            [ScheduleStatus.EndOfPeriod] = false,
+            [ScheduleStatus.Submitted] = true,
+            [ScheduleStatus.CompletedNotSubmitted] = false
+        };
+
+        var declared = Enum.GetValues<ScheduleStatus>();
+
+        var unclassified = declared.Where(status => !expected.ContainsKey(status)).ToList();
+        Assert.True(
+            unclassified.Count == 0,
+            $"ScheduleStatus gained {string.Join(", ", unclassified)} without deciding whether a soft-deleted report in that status can be restored. " +
+            "Add it to this test and to ScheduleStatusExtensions.CanRestore.");
+
+        foreach (var status in declared)
+        {
+            Assert.Equal(expected[status], status.CanRestore());
+        }
+    }
 }
