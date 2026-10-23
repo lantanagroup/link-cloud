@@ -25,7 +25,9 @@ internal static class NormalizationDiagnosticsWriter
             RuntimeSequences = [.. runtimeSequences],
             SuiteSequences = BuildSuiteSequences(resolution),
             OperationConfigs = BuildOperationConfigs(resolution),
-            ParsedSteps = [.. parsed]
+            ParsedSteps = [.. parsed],
+            EvidenceInventory = [.. FormatEvidenceInventory(parsed)],
+            EvidencePatientIds = CollectEvidencePatientIds(parsed)
         };
     }
 
@@ -121,6 +123,8 @@ internal static class NormalizationDiagnosticsWriter
         sb.AppendLine();
         sb.AppendLine("-- Execution evidence inventory --");
         var inventory = FormatEvidenceInventory(snapshot.ParsedSteps);
+        if (inventory.Count == 0 && snapshot.EvidenceInventory is { Count: > 0 })
+            inventory = snapshot.EvidenceInventory;
         if (inventory.Count == 0 && snapshot.OmittedStepCount > 0)
             sb.AppendLine($"  ({snapshot.OmittedStepCount} execution step(s) omitted from this snapshot)");
         else if (inventory.Count == 0)
@@ -399,6 +403,29 @@ internal static class NormalizationDiagnosticsWriter
 
     private static int StepWeight(NormalizationEvidenceStep step) => step.Count > 0 ? step.Count : 1;
 
+    private static List<string> CollectEvidencePatientIds(IEnumerable<NormalizationEvidenceStep> steps)
+    {
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var step in steps)
+        {
+            Add(step.PatientId);
+            if (string.Equals(step.ResourceType, "Patient", StringComparison.OrdinalIgnoreCase))
+                Add(step.ResourceId);
+        }
+
+        return ids;
+
+        void Add(string? id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return;
+            var trimmed = id.Trim();
+            if (seen.Add(trimmed))
+                ids.Add(trimmed);
+        }
+    }
+
     private static NormalizationEvidenceSnapshot Copy(NormalizationEvidenceSnapshot source)
         => new()
         {
@@ -409,6 +436,12 @@ internal static class NormalizationDiagnosticsWriter
             OmittedStepCount = source.OmittedStepCount,
             EvidenceChunkCount = source.EvidenceChunkCount,
             EvidenceAttemptId = source.EvidenceAttemptId,
+            GeneratedPatientCount = source.GeneratedPatientCount,
+            UploadedPatientCount = source.UploadedPatientCount,
+            GeneratorAppliedSelectedSuite = source.GeneratorAppliedSelectedSuite,
+            EvidenceCollected = source.EvidenceCollected,
+            EvidenceInventory = source.EvidenceInventory == null ? [] : [.. source.EvidenceInventory],
+            EvidencePatientIds = source.EvidencePatientIds == null ? [] : [.. source.EvidencePatientIds],
             SummaryLines = [.. source.SummaryLines],
             RuntimeSequences = [.. source.RuntimeSequences],
             SuiteSequences = [.. source.SuiteSequences],
