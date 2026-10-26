@@ -11,6 +11,10 @@
         public const string ReportTrackingId = "report.tracking.id";
         public const string FacilityId = "facility.id";
         public const string PatientId = "patient.id";
+        public const string NotificationId = "notification.id";
+        public const string NotificationType = "notification.type";
+        public const string RecipientCount = "recipient.count";
+        public const string NotificationChannel = "notification.channel";
         public const string PatientEvent = "patient.event";
         public const string Phase = "phase";
         public const string Resource = "resource";

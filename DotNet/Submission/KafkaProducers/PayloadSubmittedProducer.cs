@@ -6,39 +6,37 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Submission.KafkaProducers;
 
-public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubmittedValue> producer)
+public class PayloadSubmittedProducer(IProducer<string, PayloadSubmittedValue> producer)
 {
-    public void Produce(string? correlationId, string facilityId, Guid reportScheduleId, PayloadType payloadType, string? patientId = null)
+    public async Task ProduceAsync(
+        string? correlationId,
+        string facilityId,
+        Guid reportScheduleId,
+        PayloadType payloadType,
+        string? patientId,
+        CancellationToken cancellationToken)
     {
         if (correlationId == null)
             correlationId = Guid.NewGuid().ToString();
 
-        try
+        var key = KafkaKeys.ForReport(facilityId, reportScheduleId);
+
+        // ProduceAsync throws if the broker rejects the record or the delivery times out.
+        // The caller leaves the source offset uncommitted so the completion is retried.
+        await producer.ProduceAsync(nameof(KafkaTopic.PayloadSubmitted), new Message<string, PayloadSubmittedValue>
         {
-            producer.Produce(nameof(KafkaTopic.PayloadSubmitted), new Message<PayloadSubmittedKey, PayloadSubmittedValue>
+            Key = key,
+            Value = new PayloadSubmittedValue()
             {
-                Key = new PayloadSubmittedKey()
-                {
-                    FacilityId = facilityId,
-                    ReportScheduleId = reportScheduleId,
-
-                },
-                Value = new PayloadSubmittedValue()
-                {
-                    PayloadType = payloadType,
-                    PatientId = patientId
-                },
-                Headers = new Headers()
-                {
-                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) }
-                }
-            });
-
-            producer.Flush();
-        }
-        catch (ProduceException<PayloadSubmittedKey, PayloadSubmittedValue> ex)
-        {
-            throw new Exception($"Failed to produce PayloadSubmitted message for facility: {facilityId}: {ex.Message}");
-        }
+                PayloadType = payloadType,
+                FacilityId = facilityId,
+                ReportScheduleId = reportScheduleId,
+                PatientId = patientId
+            },
+            Headers = new Headers()
+            {
+                { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) }
+            }
+        }, cancellationToken);
     }
 }

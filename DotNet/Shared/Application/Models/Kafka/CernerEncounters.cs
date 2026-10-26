@@ -8,6 +8,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
 {
     public class CernerPatientsAcquired
     {
+        public string? FacilityId { get; set; }
         public List<CernerEncounters> PatientEncounters { get; set; }
     }
     public class CernerEncounters

@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -81,6 +82,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
                     {
                         LogId = log.Id,
                         FacilityId = log.FacilityId,
+                        PatientId = log.PatientId,
                         ReportTrackingId = log.ReportTrackingId ?? string.Empty
                     },
                     Headers = headers
@@ -90,7 +92,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
         }
         catch (Exception ex)
         {
-            if (transaction != null && ex is ProduceException<string, ReadyToAcquire>)
+            if (transaction != null && ex is ProduceException<long, ReadyToAcquire>)
             {
                 //ensure that db update is rolled back
                 request.Status = RequestStatus.Failed;
@@ -143,4 +145,5 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
             _logger.LogInformation("Bulk retrieval process completed successfully for all {successCount} logs.", successCount);
         }
     }
+
 }

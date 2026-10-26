@@ -51,12 +51,12 @@ namespace IntegrationTests.Normalization
     {
         public IServiceProvider ServiceProvider { get; private set; }
         public IServiceScopeFactory ScopeFactory { get; private set; } = null!;
-        public Mock<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredConsumerFactoryMock { get; } = new();
-        public Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredTransientHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredDeadLetterHandlerMock { get; } = new();
-        public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> ConsumeExceptionHandlerMock { get; } = new();
-        public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; } = new();
-        public Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> MappingOutcomeProducerMock { get; } = new();
+        public Mock<IKafkaConsumerFactory<string, ResourcesAcquiredValue>> ResourcesAcquiredConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>> ResourcesAcquiredTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>> ResourcesAcquiredDeadLetterHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, string>> ConsumeExceptionHandlerMock { get; } = new();
+        public Mock<IProducer<string, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; } = new();
+        public Mock<IProducer<string, MappingOutcomeEvaluatedValue>> MappingOutcomeProducerMock { get; } = new();
         public Mock<IVendorVersionResolver> VendorVersionResolverMock { get; } = new();
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
