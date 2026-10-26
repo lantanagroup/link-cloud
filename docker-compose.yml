@@ -1034,6 +1034,7 @@ services:
       # limit in deployed environments). Do not set -Xmx here; it would cap production.
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0"
       spring.datasource.password: ${LINK_DB_PASS}
+      spring.kafka.producer.properties.max.request.size: "10485760" # 10 MiB, matching the broker limit
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
@@ -1043,7 +1044,6 @@ services:
       pre-qualification.write-expressions-in-operation-outcome: ${VALIDATION_WRITE_OO_EXPRESSIONS:-true}
     ports:
       - "8075:8075"
-    mem_limit: 3g
     build:
       context: Java/
       dockerfile: validation/Dockerfile
