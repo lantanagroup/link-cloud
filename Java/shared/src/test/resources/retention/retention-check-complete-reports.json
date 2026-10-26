@@ -1,0 +1,20 @@
+{
+  "retentionCleanupId": "6f1c2a9e-4b7d-4c1e-9a53-2d8e7f0b1c34",
+  "serviceName": "MeasureEval",
+  "completedDateTime": "2026-10-01T06:12:30Z",
+  "reports": [
+    {
+      "reportScheduleId": "0b7e3f52-9c1d-4e8a-b2f6-71a4c5d9e803",
+      "status": "Completed",
+      "recordsAffected": 3000000000,
+      "completedDateTime": "2026-10-01T06:10:05Z"
+    },
+    {
+      "reportScheduleId": "c3d94a17-5e2b-4f60-8d1a-9b7e2f4c6a05",
+      "status": "Failed",
+      "recordsAffected": 5000,
+      "errorMessage": "Deleting the report's resources failed: MongoTimeoutException",
+      "completedDateTime": "2026-10-01T06:12:30Z"
+    }
+  ]
+}

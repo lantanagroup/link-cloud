@@ -1,0 +1,14 @@
+{
+  "name": "nhsn-app-ui-server",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@azure/app-configuration-provider": "2.6.0",
+    "@azure/identity": "4.13.3",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.3"
+  }
+}
