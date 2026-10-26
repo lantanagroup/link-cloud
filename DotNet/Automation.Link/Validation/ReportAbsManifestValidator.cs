@@ -17,6 +17,8 @@ public class ReportAbsManifestValidator
     // (Report.ReportConstants.BundleSettings). Asserted here so a regression that drops
     // meta.profile fails the automation suite rather than the downstream IG validator.
     private const string DeviceProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/nhsn-submitting-device";
+    private const string DeviceNameTypeCode = "user-friendly-name";
+    private static readonly string[] DeviceVersionCodes = ["version", "build", "commit"];
     private const string PatientListProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/poi-list";
 
     /// <summary>
@@ -384,7 +386,7 @@ public class ReportAbsManifestValidator
         if (listResources.Count != 1) AddError(errors, $"Manifest should contain exactly one List resource. Actual={listResources.Count}");
 
         foreach (var device in deviceResources)
-            ValidateMetaProfile(device, "Device", DeviceProfileUrl, errors);
+            ValidateManifestDevice(device, errors);
 
         foreach (var list in listResources)
             ValidateMetaProfile(list, "List", PatientListProfileUrl, errors);
@@ -887,6 +889,69 @@ public class ReportAbsManifestValidator
 
         if (!profiles.Contains(expectedProfileUrl, StringComparer.Ordinal))
             AddError(errors, $"Manifest {resourceType} meta.profile mismatch. Expected '{expectedProfileUrl}', actual [{string.Join(", ", profiles)}].");
+    }
+
+    /// <summary>
+    /// The submitting Device must carry a typed deviceName and typed, non-empty version entries (LEGLINK-1420).
+    /// Build and commit are injected by CI, so a local stack legitimately has only the "version" entry;
+    /// this asserts the shape of whatever is present, not a count.
+    /// </summary>
+    private static void ValidateManifestDevice(JsonElement device, List<string> errors)
+    {
+        ValidateMetaProfile(device, "Device", DeviceProfileUrl, errors);
+
+        if (!device.TryGetProperty("deviceName", out var deviceNames) ||
+            deviceNames.ValueKind != JsonValueKind.Array ||
+            deviceNames.GetArrayLength() == 0)
+        {
+            AddError(errors, "Manifest Device is missing deviceName.");
+        }
+        else
+        {
+            var nameType = GetString(deviceNames[0], "type");
+            if (!string.Equals(nameType, DeviceNameTypeCode, StringComparison.Ordinal))
+                AddError(errors, $"Manifest Device deviceName[0].type mismatch. Expected '{DeviceNameTypeCode}', actual '{nameType ?? "(null)"}'.");
+        }
+
+        if (!device.TryGetProperty("version", out var versions) ||
+            versions.ValueKind != JsonValueKind.Array ||
+            versions.GetArrayLength() == 0)
+        {
+            AddError(errors, "Manifest Device has no version entries.");
+            return;
+        }
+
+        var codes = new List<string>();
+        foreach (var version in versions.EnumerateArray())
+        {
+            var code = GetDeviceVersionCode(version);
+            var label = code ?? "(untyped)";
+
+            if (code == null || !DeviceVersionCodes.Contains(code, StringComparer.Ordinal))
+                AddError(errors, $"Manifest Device version entry type must be one of [{string.Join(", ", DeviceVersionCodes)}]. Actual '{label}'.");
+            else
+                codes.Add(code);
+
+            if (string.IsNullOrWhiteSpace(GetString(version, "value")))
+                AddError(errors, $"Manifest Device version entry '{label}' has an empty value.");
+
+            if (string.IsNullOrWhiteSpace(GetNestedString(version, "component", "value")))
+                AddError(errors, $"Manifest Device version entry '{label}' is missing component.value.");
+        }
+
+        if (!codes.Contains("version", StringComparer.Ordinal))
+            AddError(errors, "Manifest Device is missing the 'version' version entry.");
+    }
+
+    private static string? GetDeviceVersionCode(JsonElement version)
+    {
+        if (!version.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.Object)
+            return null;
+
+        if (!type.TryGetProperty("coding", out var codings) || codings.ValueKind != JsonValueKind.Array || codings.GetArrayLength() == 0)
+            return null;
+
+        return GetString(codings[0], "code");
     }
 
     private static List<string> GetMetaProfiles(JsonElement resource)

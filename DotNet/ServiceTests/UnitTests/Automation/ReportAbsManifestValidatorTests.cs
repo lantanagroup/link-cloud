@@ -18,6 +18,8 @@ public class ReportAbsManifestValidatorTests
     private const string ExpectedEnd = "2025-01-31T23:59:59Z";
     private const string DeviceProfile = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/nhsn-submitting-device";
     private const string PatientListProfile = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/poi-list";
+    private const string DeviceNameType = "user-friendly-name";
+    private const string DeviceVersionValue = "1.2.3";
 
     [Fact]
     public async Task ValidateAllAsync_WithMockExternalAbsFromGeneratedData_Passes()
@@ -394,6 +396,60 @@ public class ReportAbsManifestValidatorTests
             line.Contains("Manifest Device is missing meta.profile", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// LEGLINK-1420: deviceName.type is 1..1 in base R4 and was never written.
+    /// </summary>
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceNameTypeIsMissing_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-6", ExpectedStart, ExpectedEnd, deviceNameType: null);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-6",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device deviceName[0].type mismatch", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// LEGLINK-1420: the shipped bug wrote version.value as "", which is not valid FHIR.
+    /// </summary>
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceVersionValueIsEmpty_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-7", ExpectedStart, ExpectedEnd, deviceVersionValue: "");
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-7",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device version entry 'version' has an empty value", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public async Task ValidateAllAsync_WhenPatientListProfileIsWrong_Fails()
     {
@@ -430,7 +486,9 @@ public class ReportAbsManifestValidatorTests
         string start,
         string end,
         string? deviceProfile = DeviceProfile,
-        string? patientListProfile = PatientListProfile)
+        string? patientListProfile = PatientListProfile,
+        string? deviceNameType = DeviceNameType,
+        string deviceVersionValue = DeviceVersionValue)
     {
         var generatedPatientJson = ExtractGeneratedPatientJson(patientId, bundles);
 
@@ -449,7 +507,9 @@ public class ReportAbsManifestValidatorTests
             SerializeWithOptionalProfile(deviceProfile, new Dictionary<string, object>
             {
                 ["resourceType"] = "Device",
-                ["id"] = deviceId
+                ["id"] = deviceId,
+                ["deviceName"] = DeviceNameJson(deviceNameType),
+                ["version"] = DeviceVersionJson(deviceVersionValue)
             }),
             SerializeWithOptionalProfile(patientListProfile, new Dictionary<string, object>
             {
@@ -529,7 +589,14 @@ public class ReportAbsManifestValidatorTests
         var manifestNdjson = string.Join("\n", new[]
         {
             JsonSerializer.Serialize(new { resourceType = "Organization", id = "Org-UT" }),
-            JsonSerializer.Serialize(new { resourceType = "Device", id = "Device-UT", meta = new { profile = new[] { DeviceProfile } } }),
+            JsonSerializer.Serialize(new
+            {
+                resourceType = "Device",
+                id = "Device-UT",
+                meta = new { profile = new[] { DeviceProfile } },
+                deviceName = DeviceNameJson(DeviceNameType),
+                version = DeviceVersionJson(DeviceVersionValue)
+            }),
             JsonSerializer.Serialize(new
             {
                 resourceType = "List",
@@ -597,6 +664,20 @@ public class ReportAbsManifestValidatorTests
     /// Serializes a manifest resource, adding meta.profile only when a profile is supplied so
     /// tests can model a resource that is missing it entirely.
     /// </summary>
+    /// <summary>
+    /// A Device.deviceName list as the Report service writes it; a null type models the pre-LEGLINK-1420 output.
+    /// </summary>
+    private static object[] DeviceNameJson(string? type) =>
+        type == null
+            ? [new { name = "NHSNLink" }]
+            : [new { name = "NHSNLink", type }];
+
+    /// <summary>
+    /// The one "version" entry a local stack writes; build and commit only appear when CI injects them.
+    /// </summary>
+    private static object[] DeviceVersionJson(string value) =>
+        [new { type = new { coding = new[] { new { code = "version" } } }, component = new { value = "api" }, value }];
+
     private static string SerializeWithOptionalProfile(string? profile, Dictionary<string, object> resource)
     {
         if (profile != null)
@@ -642,7 +723,14 @@ public class ReportAbsManifestValidatorTests
         var manifestNdjson = string.Join("\n", new[]
         {
             JsonSerializer.Serialize(new { resourceType = "Organization", id = "Org-UT" }),
-            JsonSerializer.Serialize(new { resourceType = "Device", id = "Device-UT", meta = new { profile = new[] { DeviceProfile } } }),
+            JsonSerializer.Serialize(new
+            {
+                resourceType = "Device",
+                id = "Device-UT",
+                meta = new { profile = new[] { DeviceProfile } },
+                deviceName = DeviceNameJson(DeviceNameType),
+                version = DeviceVersionJson(DeviceVersionValue)
+            }),
             JsonSerializer.Serialize(new
             {
                 resourceType = "List",

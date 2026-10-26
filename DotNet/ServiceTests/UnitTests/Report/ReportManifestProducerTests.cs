@@ -105,6 +105,94 @@ public class ReportManifestProducerTests
             resources.OfType<List>().Single().Meta?.Profile);
     }
 
+    #region Submitting Device detail (LEGLINK-1420)
+
+    /// <summary>
+    /// deviceName.type is 1..1 in base R4, so without it the Device fails before the profile is applied.
+    /// </summary>
+    [Fact]
+    public async Task Generate_Device_DeviceNameTypeIsUserFriendlyName()
+    {
+        var harness = new Harness();
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var deviceName = Assert.Single(Assert.Single(resources.OfType<Device>()).DeviceName);
+        Assert.Equal(ReportConstants.BundleSettings.DeviceName, deviceName.Name);
+        Assert.Equal(DeviceNameType.UserFriendlyName, deviceName.Type);
+    }
+
+    /// <summary>
+    /// The same three typed entries MVP Link submitted, in the same order, each with component "api".
+    /// </summary>
+    [Fact]
+    public async Task Generate_Device_EmitsTypedVersionBuildAndCommitEntries()
+    {
+        var harness = new Harness(serviceInformation: new ServiceInformation
+        {
+            ServiceConfigName = "Report",
+            Version = "1.2.3",
+            Build = "20261026.1",
+            Commit = "abc1234"
+        });
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var versions = Assert.Single(resources.OfType<Device>()).Version;
+        Assert.Collection(versions,
+            v => AssertDeviceVersion(v, "version", null, "1.2.3"),
+            v => AssertDeviceVersion(v, "build", ReportConstants.BundleSettings.LinkDeviceVersionCodeSystem, "20261026.1"),
+            v => AssertDeviceVersion(v, "commit", ReportConstants.BundleSettings.LinkDeviceVersionCodeSystem, "abc1234"));
+    }
+
+    [Fact]
+    public async Task Generate_Device_ProductVersionSet_IsPreferredOverVersion()
+    {
+        var harness = new Harness(serviceInformation: new ServiceInformation
+        {
+            ServiceConfigName = "Report",
+            Version = "1.2.3",
+            ProductVersion = "0.9.0"
+        });
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var version = Assert.Single(Assert.Single(resources.OfType<Device>()).Version);
+        AssertDeviceVersion(version, "version", null, "0.9.0");
+    }
+
+    /// <summary>
+    /// Build and commit are injected by CI, so a local stack has neither. An empty string is not valid
+    /// FHIR, so the entry is left out rather than written empty, which is what the bug shipped.
+    /// </summary>
+    [Fact]
+    public async Task Generate_Device_BuildAndCommitEmpty_OmitsThoseEntries()
+    {
+        var harness = new Harness(serviceInformation: new ServiceInformation
+        {
+            ServiceConfigName = "Report",
+            Version = "1.2.3"
+        });
+
+        var resources = await harness.Producer.Generate(harness.Schedule);
+
+        var device = Assert.Single(resources.OfType<Device>());
+        var version = Assert.Single(device.Version);
+        AssertDeviceVersion(version, "version", null, "1.2.3");
+        Assert.DoesNotContain(device.Version, v => string.IsNullOrEmpty(v.Value));
+    }
+
+    private static void AssertDeviceVersion(Device.VersionComponent actual, string code, string? system, string value)
+    {
+        var coding = Assert.Single(actual.Type.Coding);
+        Assert.Equal(code, coding.Code);
+        Assert.Equal(system, coding.System);
+        Assert.Equal(ReportConstants.BundleSettings.DeviceVersionComponent, actual.Component.Value);
+        Assert.Equal(value, actual.Value);
+    }
+
+    #endregion
+
     #region Submission gating (LEGLINK-1083)
 
     /// <summary>
@@ -291,10 +379,15 @@ public class ReportManifestProducerTests
         /// <param name="allEntriesComplete">
         /// The second gate Produce checks. False models patients still in flight.
         /// </param>
+        /// <param name="serviceInformation">
+        /// What SetupServiceInformation registers at startup. Defaults to a CI-shaped one with all three
+        /// version values present.
+        /// </param>
         public Harness(
             bool enableSubmission = true,
             bool endOfReportPeriodJobHasRun = true,
-            bool allEntriesComplete = true)
+            bool allEntriesComplete = true,
+            ServiceInformation? serviceInformation = null)
         {
             Schedule = new ReportScheduleModel
             {
@@ -410,7 +503,14 @@ public class ReportManifestProducerTests
                 submitPayloadProducer,
                 auditableEventOccurredProducer,
                 EntryManager.Object,
-                ScheduleManager.Object);
+                ScheduleManager.Object,
+                serviceInformation ?? new ServiceInformation
+                {
+                    ServiceConfigName = "Report",
+                    Version = "1.2.3",
+                    Build = "20261026.1",
+                    Commit = "abc1234"
+                });
         }
     }
 }
