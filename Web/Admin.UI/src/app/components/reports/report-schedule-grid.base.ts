@@ -4,7 +4,7 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSort, Sort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
-import { faBan, faRotate } from '@fortawesome/free-solid-svg-icons';
+import { faBan, faRotate, faRotateRight } from '@fortawesome/free-solid-svg-icons';
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, take } from 'rxjs/operators';
 
@@ -51,6 +51,7 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
   protected readonly snackBar = inject(MatSnackBar);
 
   faRotate = faRotate;
+  faRotateRight = faRotateRight;
   faBan = faBan;
 
   defaultPageNumber = 0;
@@ -278,7 +279,7 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
       this.tenantService.regenerateReport(facilityId, resubmitReportId, bypassSubmission)
         .subscribe({
           next: () => {
-            this.snackBar.open('Report resubmitted. The list will refresh in 3 seconds…', '', {
+            this.snackBar.open('Report rerun requested. The list will refresh in 3 seconds…', '', {
               duration: 3000,
               horizontalPosition: 'end',
               verticalPosition: 'top',
@@ -299,8 +300,8 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
             }, 3000);
           },
           error: err => {
-            console.error('Resubmit failed', err);
-            this.snackBar.open('Failed to resubmit report. Please try again.', '', {
+            console.error('Rerun failed', err);
+            this.snackBar.open('Failed to rerun report. Please try again.', '', {
               duration: 3500,
               horizontalPosition: 'end',
               verticalPosition: 'top',
