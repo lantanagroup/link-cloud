@@ -300,7 +300,8 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
             }, 3000);
           },
           error: err => {
-            console.error('Rerun failed', err);
+            // The tenant service already ran this through ErrorHandlingService, so message is sanitized.
+            console.error('Rerun failed:', err?.message ?? 'unknown error');
             this.snackBar.open('Failed to rerun report. Please try again.', '', {
               duration: 3500,
               horizontalPosition: 'end',
