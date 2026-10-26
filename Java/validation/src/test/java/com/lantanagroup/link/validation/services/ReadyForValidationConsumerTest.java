@@ -139,7 +139,8 @@ public class ReadyForValidationConsumerTest {
                 reportClient,
                 validationService,
                 categorizationService,
-                resultRepository,
+                resultService,
+                categoryCountService,
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.of(blobStorageService),
@@ -159,7 +160,8 @@ public class ReadyForValidationConsumerTest {
                 reportClient,
                 validationService,
                 categorizationService,
-                resultRepository,
+                resultService,
+                categoryCountService,
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.of(blobStorageService),
@@ -179,7 +181,8 @@ public class ReadyForValidationConsumerTest {
                 reportClient,
                 validationService,
                 categorizationService,
-                resultRepository,
+                resultService,
+                categoryCountService,
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.of(blobStorageService),
@@ -884,7 +887,7 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_bridgeEnabled_savesMappedResultsToRepository() throws Exception {
+    void process_bridgeEnabled_replacesMappedPatientResults() throws Exception {
         stubRestRetrieval();
         stubBundleJsonEncoding();
         Result mapped = resultWithCategories(List.of(categoryWithAcceptable(true)));
@@ -896,7 +899,7 @@ public class ReadyForValidationConsumerTest {
 
         consumerWithBridgeEnabled.process(buildRecord(null));
 
-        verify(resultRepository).saveAll(List.of(mapped));
+        verify(resultService).replacePatientResults(FACILITY_ID, REPORT_ID, PATIENT_ID, List.of(mapped));
     }
 
     // -------------------------------------------------------------------------

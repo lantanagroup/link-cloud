@@ -387,7 +387,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
         }
 
-        resultRepository.saveAll(outcome.results());
+        resultService.replacePatientResults(facilityId, reportId, patientId, outcome.results());
         return new RubricEngineResult(outcome.results(), outcome.status(), envelope.getRequestId());
     }
 
