@@ -1,0 +1,14 @@
+{
+  "RetentionCleanupId": "a8e5d2c1-7f3b-4a96-8e0d-5c2b1f9a7e46",
+  "InitiatedBy": "SingleReport",
+  "InitiatedDateTime": "2026-10-22T15:30:00+00:00",
+  "Mode": "Purge",
+  "CutoffDateTime": "2026-10-22T15:30:00+00:00",
+  "Reports": [
+    {
+      "FacilityId": "Hospital1",
+      "ReportScheduleId": "0b7e3f52-9c1d-4e8a-b2f6-71a4c5d9e803",
+      "CutoffDateTime": "2026-10-22T15:30:00+00:00"
+    }
+  ]
+}

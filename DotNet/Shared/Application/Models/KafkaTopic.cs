@@ -69,4 +69,14 @@ public enum KafkaTopic
     MappingOutcomeEvaluated,
     [StringValue("MappingOutcomeEvaluated-Retry")]
     MappingOutcomeEvaluatedRetry,
+    RetentionCheckRequested,
+    [StringValue("RetentionCheckRequested-Retry")]
+    RetentionCheckRequestedRetry,
+    [StringValue("RetentionCheckRequested-Error")]
+    RetentionCheckRequestedError,
+    RetentionCheckComplete,
+    [StringValue("RetentionCheckComplete-Retry")]
+    RetentionCheckCompleteRetry,
+    [StringValue("RetentionCheckComplete-Error")]
+    RetentionCheckCompleteError,
 }
