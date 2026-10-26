@@ -79,7 +79,7 @@ public static class AggregationMapping
                 Summary = "Abort In-Progress Report",
                 Description = "Stops an in-progress report (New or EndOfPeriod) without affecting other reports for the facility. " +
                               "Queued Data Acquisition and Normalization work for this report is dropped; census jobs are left running. " +
-                              "The report schedule is then soft-deleted so it can be restored later. " +
+                              "The report schedule is then soft-deleted. Reports deleted mid flight cannot be restored. " +
                               "Returns 409 if the report is not in progress."
             });
 
@@ -89,11 +89,14 @@ public static class AggregationMapping
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status500InternalServerError)
             .WithOpenApi(x => new OpenApiOperation(x)
             {
                 Summary = "Restore Report Schedule",
-                Description = "Restores a soft-deleted report schedule and its associated acquisition logs. " +
+                Description = "Restores a soft-deleted report schedule and its associated acquisition logs " +
+                              "when the schedule had not started (Scheduled) or had finished submission (Submitted). " +
+                              "Returns 409 when the report was deleted in any other status. " +
                               "Returns 404 if the report schedule does not exist. " +
                               "If the acquisition log restore fails, the report restore is rolled back and 500 is returned."
             });
