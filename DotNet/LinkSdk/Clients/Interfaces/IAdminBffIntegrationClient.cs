@@ -33,6 +33,16 @@ public interface IAdminBffIntegrationClient
         string reportScheduleId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Gets a report's stored validation counts per category, with each category's current guidance and severity,
+    /// optionally only the categories with the given submit flag. Returns 404 when the report schedule doesn't exist
+    /// or has no stored counts.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetReportValidationCategoryCountsAsync(
+        string reportScheduleId,
+        bool? submit = null,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse> DeleteAggregateReportAsync(
         string reportScheduleId,
         CancellationToken cancellationToken = default);

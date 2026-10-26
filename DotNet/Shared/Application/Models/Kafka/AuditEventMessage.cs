@@ -25,6 +25,8 @@ public class AuditEventMessage
     public string? User { get; set; }
     public AuditEventType? Action { get; set; }
     public string? Resource { get; set; }
+    public string? ResourceId { get; set; }
+    public string? PatientId { get; set; }
     public List<PropertyChangeModel>? PropertyChanges { get; set; }
     public string? Notes { get; set; }
 }

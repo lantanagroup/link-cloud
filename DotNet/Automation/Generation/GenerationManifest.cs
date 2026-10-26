@@ -161,6 +161,27 @@ public sealed class GenerationManifest
         = new HashSet<string>(StringComparer.Ordinal);
 
     /// <summary>
+    /// Suite the FHIR generator was given for this run. Null when no suite was selected.
+    /// </summary>
+    public Guid? AppliedNormalizationSuiteId { get; set; }
+
+    /// <summary>Display name of <see cref="AppliedNormalizationSuiteId"/>.</summary>
+    public string? AppliedNormalizationSuiteName { get; set; }
+
+    /// <summary>
+    /// True when generation was invoked with the selected suite's requirements plan.
+    /// The snapshot turns this into <see cref="GenerationManifestSnapshot.GeneratedWithSelectedSuite"/>
+    /// only when at least one patient was actually generated.
+    /// </summary>
+    public bool NormalizationSuiteAppliedToGenerator { get; set; }
+
+    /// <summary>Organization resource map applied for this run. Null when none was selected.</summary>
+    public Guid? AppliedOrganizationResourceMapTemplateId { get; set; }
+
+    /// <summary>Display name of <see cref="AppliedOrganizationResourceMapTemplateId"/>.</summary>
+    public string? AppliedOrganizationResourceMapName { get; set; }
+
+    /// <summary>
     /// Location logical ids referenced by an import and proven absent (HTTP 404 or 410).
     /// An organization-location mapping whose parent id is in this set is a dangling
     /// <c>partOf</c>, not a hierarchy gap. Empty for generated patients and for manifests
@@ -703,6 +724,8 @@ public sealed class GenerationManifest
             }
         }
 
+        var patientOrigins = PatientOrigin.Resolve(PatientIds, PreExistingPatientIds, TemplateCacheKeyByPatient);
+
         return new GenerationManifestSnapshot
         {
             PatientCount = PatientIds.Count,
@@ -728,7 +751,14 @@ public sealed class GenerationManifest
             ExpectedAbsTotalCountsByType = expectedAbsTotals,
             TemplateCacheKeyByPatient = TemplateCacheKeyByPatient
                 .Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
-                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal)
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
+            PatientOriginByPatient = patientOrigins,
+            AppliedNormalizationSuiteId = AppliedNormalizationSuiteId,
+            AppliedNormalizationSuiteName = AppliedNormalizationSuiteName,
+            AppliedOrganizationResourceMapTemplateId = AppliedOrganizationResourceMapTemplateId,
+            AppliedOrganizationResourceMapName = AppliedOrganizationResourceMapName,
+            GeneratedWithSelectedSuite = NormalizationSuiteAppliedToGenerator
+                && patientOrigins.Values.Any(origin => origin == PatientOrigin.Generated)
         };
     }
 

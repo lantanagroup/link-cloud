@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Validation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Facility;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
 using LantanaGroup.Link.Shared.Application.Models.Report;
@@ -78,7 +79,7 @@ public static class AggregationMapping
                 Summary = "Abort In-Progress Report",
                 Description = "Stops an in-progress report (New or EndOfPeriod) without affecting other reports for the facility. " +
                               "Queued Data Acquisition and Normalization work for this report is dropped; census jobs are left running. " +
-                              "The report schedule is then soft-deleted so it can be restored later. " +
+                              "The report schedule is then soft-deleted. Reports deleted mid flight cannot be restored. " +
                               "Returns 409 if the report is not in progress."
             });
 
@@ -88,11 +89,14 @@ public static class AggregationMapping
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status500InternalServerError)
             .WithOpenApi(x => new OpenApiOperation(x)
             {
                 Summary = "Restore Report Schedule",
-                Description = "Restores a soft-deleted report schedule and its associated acquisition logs. " +
+                Description = "Restores a soft-deleted report schedule and its associated acquisition logs " +
+                              "when the schedule had not started (Scheduled) or had finished submission (Submitted). " +
+                              "Returns 409 when the report was deleted in any other status. " +
                               "Returns 404 if the report schedule does not exist. " +
                               "If the acquisition log restore fails, the report restore is rolled back and 500 is returned."
             });
@@ -121,6 +125,32 @@ public static class AggregationMapping
             {
                 Summary = "Get Report Summary by ID",
                 Description = "Retrieves a single report summary by report schedule ID."
+            });
+
+        routes.MapGet("/reports/{reportScheduleId}/validation-category-counts",
+                      GetReportValidationCategoryCounts.Handle)
+            .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
+            .Produces<ReportValidationCategoryCounts>()
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status500InternalServerError)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Summary = "Get Report Validation Category Counts",
+                Description = "Retrieves a report's stored validation counts per category, most issues first, " +
+                              "with each category's current guidance and severity. " +
+                              "Counts are written as each patient is validated and are kept after the report's " +
+                              "findings are deleted. Pass submit=true or submit=false to return only categories " +
+                              "with that submit flag. " +
+                              "inProgress is true while the report is still running, so the counts cover only " +
+                              "the patients validated so far; reportStatus is the schedule's status in Report. " +
+                              "Returns 404 if the report schedule does not exist, or if it has no stored counts " +
+                              "(for example, it was validated before counts were stored); " +
+                              "the problem detail says which. " +
+                              "Returns 502 if Report or Validation returns a response that breaks its contract."
             });
 
         return routes;

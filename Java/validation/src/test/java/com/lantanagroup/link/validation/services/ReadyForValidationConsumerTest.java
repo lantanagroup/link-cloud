@@ -60,6 +60,8 @@ public class ReadyForValidationConsumerTest {
     @Mock private ValidationService validationService;
     @Mock private CategorizationService categorizationService;
     @Mock private ResultRepository resultRepository;
+    @Mock private ResultService resultService;
+    @Mock private CategoryCountService categoryCountService;
     @Mock private KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     @Mock private ValidationMetrics validationMetrics;
     @Mock private BlobStorageService blobStorageService;
@@ -95,7 +97,8 @@ public class ReadyForValidationConsumerTest {
                 reportClient,
                 validationService,
                 categorizationService,
-                resultRepository,
+                resultService,
+                categoryCountService,
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.of(blobStorageService),
@@ -115,7 +118,8 @@ public class ReadyForValidationConsumerTest {
                 reportClient,
                 validationService,
                 categorizationService,
-                resultRepository,
+                resultService,
+                categoryCountService,
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.empty(),
@@ -392,7 +396,7 @@ public class ReadyForValidationConsumerTest {
 
         consumer.process(buildRecord(null));
 
-        verify(resultRepository).saveAll(List.of(submittedResult));
+        verify(resultService).replacePatientResults(FACILITY_ID, REPORT_ID, PATIENT_ID, List.of(submittedResult));
     }
 
     @Test
@@ -403,11 +407,11 @@ public class ReadyForValidationConsumerTest {
 
         consumer.process(buildRecord(null));
 
-        verify(resultRepository).saveAll(List.of(result));
+        verify(resultService).replacePatientResults(FACILITY_ID, REPORT_ID, PATIENT_ID, List.of(result));
     }
 
     @Test
-    void process_noSubmitEnabledCategories_doesNotSaveResults() throws Exception {
+    void process_noSubmitEnabledCategories_replacesWithNoResults() throws Exception {
         Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
         Result uncategorizedResult = resultWithCategories(Collections.emptyList());
         stubRestRetrieval();
@@ -415,32 +419,70 @@ public class ReadyForValidationConsumerTest {
 
         consumer.process(buildRecord(null));
 
-        verify(resultRepository, never()).saveAll(anyList());
+        verify(resultService).replacePatientResults(FACILITY_ID, REPORT_ID, PATIENT_ID, List.of());
     }
 
     @Test
-    void process_withNoResults_stillCategorizesAndDoesNotPersistEmptyList() throws Exception {
+    void process_recordsCountsFromEveryResult() throws Exception {
+        Result submittedResult = resultWithCategories(List.of(categoryWithSubmit(true)));
+        Result nonSubmittedResult = resultWithCategories(List.of(categoryWithSubmit(false)));
+        Result uncategorizedResult = resultWithCategories(Collections.emptyList());
+        List<Result> results = List.of(submittedResult, nonSubmittedResult, uncategorizedResult);
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(results);
+
+        consumer.process(buildRecord(null));
+
+        verify(categoryCountService).recordPatientCounts(FACILITY_ID, REPORT_ID, PATIENT_ID, results);
+    }
+
+    @Test
+    void process_withNoResults_stillRecordsCounts() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null));
+
+        verify(categoryCountService).recordPatientCounts(FACILITY_ID, REPORT_ID, PATIENT_ID, Collections.emptyList());
+    }
+
+    @Test
+    void process_whenRecordingCountsFails_doesNotSaveResults() throws Exception {
+        Result submittedResult = resultWithCategories(List.of(categoryWithSubmit(true)));
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(submittedResult));
+        doThrow(new IllegalStateException("count write failed"))
+                .when(categoryCountService)
+                .recordPatientCounts(any(), any(), any(), anyList());
+
+        assertThrows(IllegalStateException.class, () -> consumer.process(buildRecord(null)));
+
+        verify(resultService, never()).replacePatientResults(any(), any(), any(), anyList());
+    }
+
+    @Test
+    void process_withNoResults_stillCategorizesAndReplacesWithNoResults() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         consumer.process(buildRecord(null));
 
         verify(categorizationService).categorize(Collections.emptyList());
-        verify(resultRepository, never()).saveAll(anyList());
+        verify(resultService).replacePatientResults(FACILITY_ID, REPORT_ID, PATIENT_ID, Collections.emptyList());
     }
 
     @Test
     void process_inactiveCodeResult_isCategorizedAsInactiveCodeAndPersisted() throws Exception {
         // Wire a real CategorizationService backed by the shipped categories.json so this exercises the
-        // actual message -> inactive_code category -> saveAll path for an inactive-code finding.
+        // actual message -> inactive_code category -> persistence path for an inactive-code finding.
         CategoryRepository categoryRepository = mock(CategoryRepository.class);
         when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
         CategorizationService realCategorizationService = new CategorizationService(
                 new ObjectMapper(), categoryRepository, mock(CategoryRuleRepository.class), resultRepository);
 
         ReadyForValidationConsumer consumerWithRealCategorization = new ReadyForValidationConsumer(
-                fhirContext, reportClient, validationService, realCategorizationService, resultRepository,
-                validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
+                fhirContext, reportClient, validationService, realCategorizationService, resultService,
+                categoryCountService, validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
                 preQualificationConfig, preQualOperationOutcomeBuilder, rubricExecutionService,
                 legacyResultMapper, objectMapper, shadowCompareEventTemplate, false, RUBRIC_ID, false, recoverer);
 
@@ -455,7 +497,7 @@ public class ReadyForValidationConsumerTest {
         assertTrue(
                 inactiveResult.getCategories().stream().anyMatch(c -> "missing_active_encounter_type_code".equals(c.getId())),
                 "Inactive-code result should be categorized as inactive_code");
-        verify(resultRepository).saveAll(List.of(inactiveResult));
+        verify(resultService).replacePatientResults(FACILITY_ID, REPORT_ID, PATIENT_ID, List.of(inactiveResult));
     }
 
     // -------------------------------------------------------------------------
