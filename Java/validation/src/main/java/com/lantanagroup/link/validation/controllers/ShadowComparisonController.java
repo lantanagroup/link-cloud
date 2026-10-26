@@ -1,0 +1,102 @@
+package com.lantanagroup.link.validation.controllers;
+
+import com.lantanagroup.link.validation.models.ShadowComparisonDetailDto;
+import com.lantanagroup.link.validation.models.ShadowComparisonResultDto;
+import com.lantanagroup.link.validation.services.LegacyShadowResultQueryService;
+import com.lantanagroup.link.validation.services.RubricResultQueryService;
+import com.lantanagroup.link.validation.services.ShadowComparisonQueryService;
+import com.lantanagroup.link.validation.services.ShadowCsvReportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Temporary ADR-0003 shadow-run controller for inspecting a comparison's diff (added, missing,
+ * or severity-changed findings) by rubric request id, alongside the rubric and legacy results
+ * used to compute it. Also provides access to {@link ShadowComparisonDailyReportJob}'s daily
+ * CSV report without querying {@code shadow_comparison_result}, {@code rubric_result}, or
+ * {@code legacy_shadow_result} directly.
+ * <p>Remove this controller, {@link ShadowComparisonQueryService},
+ * {@link LegacyShadowResultQueryService}, {@link ShadowComparisonResultDto} and its sibling
+ * DTOs, and the report-download plumbing in {@link ShadowCsvReportService} when the shadow
+ * period ends and ADR-0003 cuts over.
+ */
+@RestController
+@RequestMapping("/api/validation/shadow/comparisons")
+@RequiredArgsConstructor
+@Tag(name = "Shadow Comparisons (temporary)", description = "ADR-0003 shadow-run: inspect parallel-run diffs; removed once shadow ends")
+public class ShadowComparisonController {
+
+    private static final MediaType CSV_MEDIA_TYPE = MediaType.parseMediaType("text/csv");
+
+    private final ShadowComparisonQueryService shadowComparisonQueryService;
+    private final RubricResultQueryService rubricResultQueryService;
+    private final LegacyShadowResultQueryService legacyShadowResultQueryService;
+    private final ShadowCsvReportService shadowCsvReportService;
+
+    @Operation(summary = "Fetch shadow comparison results for a rubric request id, alongside the rubric and "
+            + "legacy engine results they were diffed from (temporary, ADR-0003 shadow-run)")
+    @GetMapping("/{requestId}")
+    public ResponseEntity<ShadowComparisonDetailDto> getByRequestId(@PathVariable UUID requestId) {
+        List<ShadowComparisonResultDto> comparisons = shadowComparisonQueryService.findByRequestId(requestId);
+        if (comparisons.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        ShadowComparisonDetailDto detail = ShadowComparisonDetailDto.builder()
+                .rubricResult(rubricResultQueryService.findByRequestId(requestId).orElse(null))
+                .legacyResult(legacyShadowResultQueryService.findByRequestId(requestId).orElse(null))
+                .comparisons(comparisons)
+                .build();
+        return ResponseEntity.ok(detail);
+    }
+
+    @Operation(summary = "Downloads the daily shadow comparison CSV report for a date, "
+            + "defaulting to yesterday (UTC) -- the window ShadowComparisonDailyReportJob last ran for "
+            + "(temporary, ADR-0003 shadow-run)")
+    @GetMapping("/daily-report")
+    public ResponseEntity<byte[]> getDailyReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        LocalDate reportDate = date != null ? date : LocalDate.now(ZoneOffset.UTC).minusDays(1);
+        byte[] content = shadowCsvReportService.downloadDailyReport(reportDate);
+        if (content == null) {
+            return ResponseEntity.notFound().build();
+        }
+        String filename = "shadow-comparison-daily-report-" + reportDate + ".csv";
+        return ResponseEntity.ok()
+                .contentType(CSV_MEDIA_TYPE)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(content);
+    }
+
+    @Operation(summary = "Generates the shadow comparison CSV report on demand for a [startDate, endDate] "
+            + "range (both inclusive, UTC calendar days), in the same format as "
+            + "ShadowComparisonDailyReportJob's daily report -- queried live from shadow_comparison_result "
+            + "rather than a pre-built blob, so any date range can be requested (temporary, ADR-0003 shadow-run)")
+    @GetMapping("/report")
+    public ResponseEntity<byte[]> getReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        if (endDate.isBefore(startDate)) {
+            return ResponseEntity.badRequest().build();
+        }
+        OffsetDateTime start = startDate.atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+        OffsetDateTime end = endDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+        byte[] content = shadowCsvReportService.generateReport(start, end);
+        String filename = "shadow-comparison-report-" + startDate + "-to-" + endDate + ".csv";
+        return ResponseEntity.ok()
+                .contentType(CSV_MEDIA_TYPE)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(content);
+    }
+}

@@ -3,6 +3,9 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
@@ -14,8 +17,16 @@ import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
+import com.lantanagroup.link.validation.exceptions.PayloadParseException;
+import com.lantanagroup.link.validation.models.EvaluateRequestDto;
+import com.lantanagroup.link.validation.models.SubjectDto;
+import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
+import com.lantanagroup.link.validation.records.ShadowCompareEvent;
+import com.lantanagroup.link.validation.records.ShadowFindingDto;
 import com.lantanagroup.link.validation.records.ValidationComplete;
+import com.lantanagroup.link.validation.records.BridgeOutcome;
 import io.opentelemetry.api.common.Attributes;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -25,6 +36,7 @@ import org.hl7.fhir.r4.model.OperationOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
@@ -33,7 +45,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForValidation.Key, ReadyForValidation> {
@@ -49,6 +62,19 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final BlobStorageService blobStorageService;
     private final PreQualificationConfig preQualificationConfig;
     private final PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder;
+    private final RubricExecutionService rubricExecutionService;
+    private final LegacyResultMapper legacyResultMapper;
+    private final ObjectMapper objectMapper;
+    private final KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
+    private final boolean bridgeEnabled;
+    private final boolean shadowEnabled;
+    private final String rubricId;
+
+    private static final Set<RubricResultStatus> VALID_STATUSES = Set.of(
+            RubricResultStatus.ACCEPTABLE,
+            RubricResultStatus.ACCEPTABLE_WITH_WARNINGS,
+            RubricResultStatus.INCONCLUSIVE
+    );
 
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
@@ -62,7 +88,16 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             Optional<BlobStorageService> blobStorageService,
             PreQualificationConfig preQualificationConfig,
             PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder,
-            @Qualifier("readyForValidationRecoverer") ConsumerRecordRecoverer recoverer)  {
+            RubricExecutionService rubricExecutionService,
+            LegacyResultMapper legacyResultMapper,
+            ObjectMapper objectMapper,
+            @Qualifier("defaultKafkaTemplate") KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate,
+            @Value("${vaas.bridge.enabled:false}") boolean bridgeEnabled,
+            // ADR-0003 M1: the MeasureReport submission path always evaluates this rubric; see "Rubric selection".
+            @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,
+            // ADR-0003 shadow-run: independent of bridgeEnabled -- works in either direction.
+            @Value("${vaas.bridge.shadow-enabled:false}") boolean shadowEnabled,
+            @Qualifier("readyForValidationRecoverer") ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
@@ -75,6 +110,13 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         this.blobStorageService = blobStorageService.orElse(null);
         this.preQualificationConfig = preQualificationConfig;
         this.preQualOperationOutcomeBuilder = preQualOperationOutcomeBuilder;
+        this.rubricExecutionService = rubricExecutionService;
+        this.legacyResultMapper = legacyResultMapper;
+        this.objectMapper = objectMapper;
+        this.shadowCompareEventTemplate = shadowCompareEventTemplate;
+        this.bridgeEnabled = bridgeEnabled;
+        this.shadowEnabled = shadowEnabled;
+        this.rubricId = rubricId;
     }
 
     @KafkaListener(topics = Topics.READY_FOR_VALIDATION, containerFactory = "manualAckListenerContainerFactory")
@@ -113,9 +155,67 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                 validationMetrics.recordReportFetchDuration(fetchTimer.getMilliseconds(), fetchAttributes);
             }
         }
-        List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
+        // Only set when the rubric engine runs, using the ID already created for its rubric_result.
+        // It is passed to the shadow run so the legacy comparison can share the same ID.
+        List<Result> results;
+        RubricResultStatus rubricStatus = null;
+        UUID requestId = null;
+        if (bridgeEnabled) {
+            RubricEngineResult engineResult = evaluateViaRubricEngine(correlationId, facilityId, patientId, reportId, bundle);
+            results = engineResult.results();
+            rubricStatus = engineResult.status();
+            requestId = engineResult.requestId();
+        } else {
+            results = validate(correlationId, facilityId, patientId, reportId, bundle);
+        }
         appendPreQualOperationOutcome(bundle, results, payloadUri);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results, record.headers());
+        boolean isValid = checkIsValid(results, rubricStatus);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid, record.headers());
+
+        if (shadowEnabled) {
+            try {
+                publishShadowCompareEvent(requestId, correlationId, facilityId, patientId, reportId, payloadUri,
+                        bridgeEnabled, results);
+            } catch (Exception e) {
+                _logger.warn("Failed to publish ShadowCompareEvent for report {}; skipping shadow comparison",
+                        LogUtils.sanitize(reportId), e);
+            }
+        }
+    }
+
+    /** Pairs the rubric engine's output with the rubric status (for the isValid gate) and the request id
+     * already minted for its rubric_result row, so it can be forwarded on {@link ShadowCompareEvent}. */
+    private record RubricEngineResult(List<Result> results, RubricResultStatus status, UUID requestId) {}
+
+    /**
+     * Sends the already-computed result to {@code ShadowValidationConsumer}, which runs the other
+     * engine and compares the results. This is asynchronous so shadow failures never affect validation.
+     */
+    private void publishShadowCompareEvent(
+            UUID requestId, String correlationId, String facilityId, String patientId, String reportId,
+            String payloadUri, boolean ranNewEngine, List<Result> results) {
+        ShadowCompareEvent event = new ShadowCompareEvent();
+        event.setRequestId(requestId);
+        event.setCorrelationId(correlationId);
+        event.setFacilityId(facilityId);
+        event.setPatientId(patientId);
+        event.setReportId(reportId);
+        event.setPayloadUri(payloadUri);
+        event.setRanNewEngine(ranNewEngine);
+        event.setAuthoritativeResult(results.stream().map(ShadowFindingDto::from).toList());
+
+        org.apache.kafka.common.header.Headers headers = new RecordHeaders();
+        if (correlationId != null) {
+            headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
+        }
+        shadowCompareEventTemplate
+                .send(new ProducerRecord<>(ShadowCompareEvent.TOPIC, null, facilityId, event, headers))
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        _logger.warn("Failed to send ShadowCompareEvent for report {}",
+                                LogUtils.sanitize(reportId), ex);
+                    }
+                });
     }
 
     /**
@@ -256,6 +356,50 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         return results;
     }
 
+    /**
+     * Evaluates the rubric engine in-process, same as the $rubric-validate REST endpoint, and maps its result
+     * back into the legacy {@link Result} shape so the rest of {@code process()} doesn't care which
+     * engine ran.
+     */
+    private RubricEngineResult evaluateViaRubricEngine(
+            String correlationId, String facilityId, String patientId, String reportId, Bundle bundle) {
+        Attributes attributes;
+        BridgeOutcome outcome;
+        ValidationResultEnvelope envelope;
+
+        try (Timer timer = Timer.start()) {
+            EvaluateRequestDto request = EvaluateRequestDto.builder()
+                    .subject(SubjectDto.builder()
+                            .facilityId(facilityId)
+                            .patientId(patientId)
+                            .reportId(reportId)
+                            .build())
+                    .payload(bundleToJsonNode(bundle))
+                    .build();
+            envelope = rubricExecutionService.evaluate(rubricId, null, request, true, correlationId);
+            outcome = legacyResultMapper.toResults(envelope, facilityId, patientId, reportId);
+            _logger.debug("Rubric evaluation completed with {} results (interpretation {}) in {} seconds",
+                    outcome.results().size(), outcome.status(), String.format("%.2f", timer.getSeconds()));
+
+            attributes = buildMetricAttributes(outcome.results(), facilityId);
+            validationMetrics.addToValidationCounter(attributes);
+            addIssueMetrics(outcome.results(), attributes);
+            validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
+        }
+
+        resultService.replacePatientResults(facilityId, reportId, patientId, outcome.results());
+        return new RubricEngineResult(outcome.results(), outcome.status(), envelope.getRequestId());
+    }
+
+    private JsonNode bundleToJsonNode(Bundle bundle) {
+        try {
+            String json = fhirContext.newJsonParser().encodeResourceToString(bundle);
+            return objectMapper.readTree(json);
+        } catch (JsonProcessingException e) {
+            throw new PayloadParseException("Failed to convert bundle to JSON for rubric evaluation", e);
+        }
+    }
+
     private Attributes buildMetricAttributes(List<Result> results, String facilityId) {
         int[] counts = countIssuesBySeverity(results);
         String validationOutcome = (counts[0] == 0 && counts[1] == 0) ? "Passed" : "Failed";
@@ -297,26 +441,13 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             String facilityId,
             String patientId,
             String reportId,
-            List<Result> results) {
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results, null);
-    }
-
-    private void produceValidationCompleteRecord(
-            String correlationId,
-            String facilityId,
-            String patientId,
-            String reportId,
-            List<Result> results,
+            boolean isValid,
             org.apache.kafka.common.header.Headers inboundHeaders) {
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
-        value.setValid(results.stream()
-                .flatMap(result -> {
-                    List<Category> categories = result.getCategories();
-                    return categories == null ? Stream.empty() : categories.stream();
-                })
-                .allMatch(Category::isAcceptable));
+        value.setValid(isValid);
+
         org.apache.kafka.common.header.Headers headers = new RecordHeaders();
         if (correlationId != null) {
             headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
@@ -332,5 +463,20 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             // (e.g., sending the source record to the Error topic)
             throw new RuntimeException("Failed to produce ValidationComplete message", e);
         }
+    }
+    /**
+     * Determines the ValidationComplete validity gate. On the bridge path, the rubric status is used:
+     * ACCEPTABLE, ACCEPTABLE_WITH_WARNINGS, and INCONCLUSIVE pass; UNACCEPTABLE fails. This also avoids
+     * the legacy behavior where uncategorized findings could pass. Otherwise, validity uses the legacy
+     * category rollup.
+     */
+    boolean checkIsValid(List<Result> results, RubricResultStatus status) {
+        if (bridgeEnabled && status != null) {
+            return VALID_STATUSES.contains(status);
+        }
+        return results.stream()
+                .flatMap(res -> res.getCategories() == null
+                        ? java.util.stream.Stream.empty() : res.getCategories().stream())
+                .allMatch(Category::isAcceptable);
     }
 }
