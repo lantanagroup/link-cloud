@@ -270,15 +270,22 @@
             <button mat-icon-button color="warn"
                     *ngIf="canCleanUp(element.status) && !element.isDeleted"
                     matTooltip="Clean up this report"
-                    (click)="onSoftDeleteReport(element.id)">
+                    (click)="onSoftDeleteReport(element.id, element.status)">
               <mat-icon>delete</mat-icon>
             </button>
-            <button mat-icon-button color="accent"
-                    *ngIf="element.isDeleted"
-                    matTooltip="Restore this report"
-                    (click)="onRestoreReport(element.id)">
-              <mat-icon>restore</mat-icon>
-            </button>
+            <!-- A disabled button leaves the tab order, so the wrapper takes focus when restore is blocked. -->
+            <span *ngIf="element.isDeleted"
+                  style="display: inline-block;"
+                  [attr.tabindex]="canRestore(element.status) ? null : '0'"
+                  [attr.aria-label]="canRestore(element.status) ? null : restoreBlockedReason"
+                  [matTooltip]="canRestore(element.status) ? 'Restore this report' : restoreBlockedReason">
+              <button mat-icon-button color="accent"
+                      [disabled]="!canRestore(element.status)"
+                      [attr.aria-label]="canRestore(element.status) ? 'Restore this report' : restoreBlockedReason"
+                      (click)="onRestoreReport(element.id)">
+                <mat-icon>restore</mat-icon>
+              </button>
+            </span>
           </td>
         </ng-container>
 

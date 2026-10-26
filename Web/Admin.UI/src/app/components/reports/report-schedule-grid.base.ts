@@ -13,8 +13,10 @@ import { DeleteConfirmationDialogComponent } from '../core/delete-confirmation-d
 import { ResubmitDialogComponent } from '../tenant/facility-view/resubmit-dialog.component';
 import { IReportSchedule } from '../../interfaces/report/report-schedule.interface';
 import {
+  RESTORE_BLOCKED_REASON,
   SCHEDULE_STATUS_OPTIONS,
   canCleanUpScheduleStatus,
+  canRestoreScheduleStatus,
   isInProgressScheduleStatus,
   scheduleStatusBadgeClass,
   scheduleStatusLabel
@@ -75,6 +77,8 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
   readonly statusBadgeClass = scheduleStatusBadgeClass;
   readonly isInProgressStatus = isInProgressScheduleStatus;
   readonly canCleanUp = canCleanUpScheduleStatus;
+  readonly canRestore = canRestoreScheduleStatus;
+  readonly restoreBlockedReason = RESTORE_BLOCKED_REASON;
   readonly frequencyOptions = ['Monthly', 'Weekly', 'Daily', 'Adhoc'];
 
   currentSortBy = 'CreateDate';
@@ -312,7 +316,7 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
       width: '480px',
       data: {
         title: 'Abort In-Progress Report',
-        message: 'Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.',
+        message: 'Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted. Reports deleted mid flight cannot be restored.',
         icon: 'cancel',
         iconColor: 'warn',
         confirmButtonText: 'Abort report'
@@ -348,12 +352,15 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
     });
   }
 
-  onSoftDeleteReport(reportScheduleId: string): void {
+  onSoftDeleteReport(reportScheduleId: string, status: string): void {
+    const restoreNote = this.canRestore(status)
+      ? 'It can be restored later.'
+      : RESTORE_BLOCKED_REASON;
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
         title: 'Clean Up Report',
-        message: 'Remove this report and its associated acquisition logs? It can be restored later.',
+        message: `Remove this report and its associated acquisition logs? ${restoreNote}`,
         confirmButtonText: 'Clean up'
       }
     });

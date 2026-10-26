@@ -1,0 +1,326 @@
+{
+  "tzSelect": {
+    "service": "Tenant",
+    "method": "POST",
+    "url": "/api/Facility",
+    "description": "In the request body. Example: \"TimeZone\": \"America/Chicago\""
+  },
+  "vendorSelect": {
+    "service": "Tenant",
+    "method": "POST",
+    "url": "/api/Facility",
+    "description": "In the request body. Example: \"Vendor\" : \"Epic\""
+  },
+  "fhirBaseUrl": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryConfiguration",
+    "description": "In the request body. Example: \"FhirServerBaseUrl\": \"https://ehr-test.nhsnlink.org/fhir\""
+  },
+  "maxConcurrent": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryConfiguration",
+    "description": "\"MaxConcurrentRequests\": 2"
+  },
+  "minPullTime": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryConfiguration",
+    "description": "\"MinAcquisitionPullTime\": \"1:00:00\""
+  },
+  "maxPullTime": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryConfiguration",
+    "description": "\"MaxAcquisitionPullTime\": \"23:59:59\""
+  },
+  "lagDuration": {
+    "service": "Query Dispatch",
+    "method": "POST",
+    "url": "/api/querydispatch/configuration",
+    "description": "\"DispatchSchedules\": [     {       \"Event\": \"Discharge\",       \"Duration\": \"PT10S\"     }   ]"
+  },
+  "censusEDischargeGt48": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryList",
+    "description": ""
+  },
+  "censusEDischarge24to48": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryList",
+    "description": ""
+  },
+  "censusEDischargeLt24": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryList",
+    "description": ""
+  },
+  "censusEAdmitGt48": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryList",
+    "description": ""
+  },
+  "censusEAdmit24to48": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryList",
+    "description": ""
+  },
+  "censusEAdmitLt24": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryList",
+    "description": ""
+  },
+  "censusCHost": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/{organizationId}/sftp-configurations",
+    "description": ""
+  },
+  "censusCPort": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/{organizationId}/sftp-configurations",
+    "description": ""
+  },
+  "censusCRemoteDir": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/{organizationId}/sftp-configurations",
+    "description": ""
+  },
+  "censusCRemove": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/{organizationId}/sftp-configurations",
+    "description": ""
+  },
+  "censusFreq": {
+    "service": "Census",
+    "method": "POST",
+    "url": "/api/census/config",
+    "description": "\"scheduledTrigger\":\"0 0 */4 * * ?\""
+  },
+  "hslocMappingList": {
+    "service": "Normalization",
+    "method": "",
+    "url": "",
+    "description": "In development for PI 2: https://lantana.atlassian.net/browse/LEGPROG-180"
+  },
+  "encounterCodeSystems": {
+    "service": "Normalization",
+    "method": "POST",
+    "url": "/api/normalization/operations",
+    "description": "Code Map operation supports this"
+  },
+  "measuresSelect": {
+    "service": "Tenant",
+    "method": "POST",
+    "url": "/api/Facility/{{facility-id}}/AdHocReport",
+    "description": ""
+  },
+  "reportStartDate": {
+    "service": "Tenant",
+    "method": "POST",
+    "url": "/api/Facility/{{facility-id}}/AdHocReport",
+    "description": ""
+  },
+  "reportEndDate": {
+    "service": "Tenant",
+    "method": "POST",
+    "url": "/api/Facility/{{facility-id}}/AdHocReport",
+    "description": ""
+  },
+  "patientIds": {
+    "service": "Tenant",
+    "method": "POST",
+    "url": "/api/Facility/{{facility-id}}/AdHocReport",
+    "description": ""
+  },
+  "reportResultsReportId": {
+    "service": "Report",
+    "method": "GET",
+    "url": "api/schedules/{{id}}",
+    "description": ""
+  },
+  "reportResultsMeasures": {
+    "service": "Report",
+    "method": "GET",
+    "url": "api/schedules/{{id}}",
+    "description": ""
+  },
+  "reportResultsCreateDate": {
+    "service": "Report",
+    "method": "GET",
+    "url": "api/schedules/{{id}}",
+    "description": ""
+  },
+  "reportResultsEndDate": {
+    "service": "Report",
+    "method": "GET",
+    "url": "api/schedules/{{id}}",
+    "description": ""
+  },
+  "reportResultsStartDate": {
+    "service": "Report",
+    "method": "GET",
+    "url": "api/schedules/{{id}}",
+    "description": ""
+  },
+  "reportResultsStatus": {
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "More statuses needed for a user to follow patient reporting statuses: https://keystone.lantanagroup.com/Proposals/Details/03-report-state-machine-enhancement"
+  },
+  "reportResultsPatientCount": {
+    "service": "Report",
+    "method": "GET",
+    "url": "api/entries/schedules/{reportScheduleId}",
+    "description": "The patient count can be derived by this. A new request endpoint or an update to an existing one would need to be created if we exclusively want to return the count"
+  },
+  "rdReportId": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
+  },
+  "rdPeriod": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
+  },
+  "rdCreateDate": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
+  },
+  "rdPatientCount": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": "The patient count can be derived by this. A new request endpoint or an update to an existing one would need to be created if we exclusively want to return the count"
+  },
+  "rdStatus": {
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "More statuses needed for a user to follow patient reporting statuses: https://keystone.lantanagroup.com/Proposals/Details/03-report-state-machine-enhancement"
+  },
+  "rdMeasureMapping": {
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "In development: https://keystone.lantanagroup.com/Proposals/Details/DMRP#measure-mappings"
+  },
+  "rdColPatientId": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
+  },
+  "rdColReportStatus": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
+  },
+  "reportingPlanMonth": {
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "Scheduled for PI2 development: https://keystone.lantanagroup.com/Proposals/Details/DMRP"
+  },
+  "reportingPlanYear": {
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "Scheduled for PI2 development: https://keystone.lantanagroup.com/Proposals/Details/DMRP"
+  },
+  "reportingPlanMeasures": {
+    "service": "",
+    "method": "",
+    "url": "",
+    "description": "Scheduled for PI2 development: https://keystone.lantanagroup.com/Proposals/Details/DMRP"
+  },
+  "rdColResourceCount": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
+  },
+  "rdColPreQual": {
+    "service": "Validation",
+    "method": "GET",
+    "url": "/api/validation/result/{facilityId}/{reportId}/{patientId}",
+    "description": ""
+  },
+  "locOrgMethod": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "locTypeList": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "locIdentifierList": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "managingOrgList": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "customFhirPath": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/location-config/facility/{facilityId}",
+    "description": "The configuration supports generic FHIR Path settings. The UI will need to construct the FHIR path to support the different available options (Example: Managing Org, Identifier, etc)"
+  },
+  "otherTokenUrl": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "otherClientId": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "otherClientSecret": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "otherScope": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "api/data/{facilityId}/fhirQueryConfiguration/authentication",
+    "description": ""
+  },
+  "maxRetries": {
+    "service": "Data Acquisition",
+    "method": "POST",
+    "url": "/api/data/fhirQueryConfiguration",
+    "description": ""
+  }
+}

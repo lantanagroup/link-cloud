@@ -402,6 +402,8 @@ internal sealed class RunExecutor
 
             patientIds = pipelineResult.PatientIds;
             generationManifest = pipelineResult.Manifest;
+            StampManifestNormalization(generationManifest, normalizationResolution, organizationResourceMapTemplate);
+            WritePatientSourceLog(output, generationManifest);
             generationDurationMs = (long)Math.Max(0, (DateTimeOffset.UtcNow - generationStarted).TotalMilliseconds);
             await BindGeneratedTemplateCacheAsync(state, pipelineResult.GeneratedTemplateKeys, output);
 
@@ -995,6 +997,19 @@ internal sealed class RunExecutor
                 output.WriteLine("Regenerated report submitted successfully.");
             }
 
+            await TryPublishNormalizationEvidenceAsync(
+                state.RunId,
+                output,
+                lokiScraper,
+                facilityId,
+                normalizationEvidenceReportId,
+                normalizationResolution,
+                runtimeNormalizationSequences,
+                generationManifest,
+                state.StartedAt ?? state.CreatedAt,
+                scenarioConfig.LokiScrapeWindow,
+                cancellationToken);
+
             await pipelineSnapshot.WriteFullSnapshotAsync(
                 output,
                 facilityId,
@@ -1156,7 +1171,6 @@ internal sealed class RunExecutor
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
 
-            var normalizationSummaryMarker = "[NormalizationExecutionSummary]";
             var evidenceRequiredResourceTypes = normalizationResolution.Sequences
                 .SelectMany(s => s.Operations)
                 .SelectMany(s => s.Operation.ResourceTypes)
@@ -1168,65 +1182,15 @@ internal sealed class RunExecutor
             var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
             var acquiredResourceTypesForEvidence = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
 
-            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback, CancellationToken queryToken)
-            {
-                var logs = new List<string>();
-
-                // Each Loki call stamps its own end time. Refresh coverage here so a
-                // later resource type does not start after the run began.
-                TimeSpan LookbackForThisRequest() =>
-                    LokiEvidenceQuery.LookbackForRequest(
-                        lookback,
-                        LokiEvidenceQuery.CoverageSince(
-                            state.StartedAt ?? state.CreatedAt,
-                            DateTimeOffset.UtcNow));
-
-                Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
-                    lokiScraper.QueryServiceLogsAsync(
-                        LokiScraper.Components.Normalization,
-                        normalizationSummaryMarker,
-                        LookbackForThisRequest(),
-                        additionalContainsFilters: filters,
-                        limit: limit,
-                        maxPages: maxPages,
-                        cancellationToken: queryToken);
-
-                if (evidenceRequiredResourceTypes.Count > 0)
-                {
-                    foreach (var resourceType in evidenceRequiredResourceTypes)
-                    {
-                        queryToken.ThrowIfCancellationRequested();
-                        var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
-                        var logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 5000, maxPages: 20);
-
-                        if (logsForResourceType.Count == 0)
-                        {
-                            queryToken.ThrowIfCancellationRequested();
-                            output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
-                            logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 500, maxPages: 40);
-                        }
-
-                        output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
-                        logs.AddRange(logsForResourceType);
-                    }
-
-                    if (logs.Count == 0)
-                    {
-                        output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
-                        queryToken.ThrowIfCancellationRequested();
-                        logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
-                    }
-                }
-                else
-                {
-                    queryToken.ThrowIfCancellationRequested();
-                    logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
-                }
-
-                return logs
-                    .Distinct(StringComparer.Ordinal)
-                    .ToList();
-            }
+            Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback, CancellationToken queryToken)
+                => QueryNormalizationSummaryLinesAsync(
+                    lokiScraper,
+                    output,
+                    runScopeFilters,
+                    evidenceRequiredResourceTypes,
+                    state.StartedAt ?? state.CreatedAt,
+                    lookback,
+                    queryToken);
 
             async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
             {
@@ -1274,6 +1238,10 @@ internal sealed class RunExecutor
                         normalizationResolution,
                         runtimeNormalizationSequences,
                         normalizationSummaryLogs);
+                    NormalizationEvidenceRunContext.Apply(
+                        normalizationEvidence,
+                        generationManifest,
+                        generationManifest?.NormalizationSuiteAppliedToGenerator == true);
                     NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
                     await PersistNormalizationEvidenceAsync(normalizationEvidence, cancellationToken);
 
@@ -2343,6 +2311,177 @@ internal sealed class RunExecutor
                 out var dto))
             return dto.UtcDateTime;
         return null;
+    }
+
+    private async Task TryPublishNormalizationEvidenceAsync(
+        Guid runId,
+        IAutomationOutput output,
+        LokiScraper lokiScraper,
+        string facilityId,
+        string reportId,
+        NormalizationSuiteResolution normalizationResolution,
+        IReadOnlyList<NormalizationRuntimeSequenceStep> runtimeNormalizationSequences,
+        GenerationManifest? generationManifest,
+        DateTimeOffset startedAt,
+        TimeSpan lookback,
+        CancellationToken cancellationToken)
+    {
+        // One scrape, before the report download and the later validators, so the
+        // run log and the details page can show execution evidence while the
+        // authoritative suite validation still retries Loki on its own.
+        try
+        {
+            var evidenceRequiredResourceTypes = EvidenceResourceTypes(normalizationResolution);
+            var logs = await QueryNormalizationSummaryLinesAsync(
+                lokiScraper,
+                output,
+                [facilityId, reportId],
+                evidenceRequiredResourceTypes,
+                startedAt,
+                lookback,
+                cancellationToken);
+            output.WriteLine($"[Normalization Suite] Collected {logs.Count} normalization summary log line(s) before validation.");
+
+            var evidence = NormalizationDiagnosticsWriter.Build(
+                normalizationResolution,
+                runtimeNormalizationSequences,
+                logs);
+            NormalizationEvidenceRunContext.Apply(
+                evidence,
+                generationManifest,
+                generationManifest?.NormalizationSuiteAppliedToGenerator == true);
+            NormalizationDiagnosticsWriter.WriteInventory(output, evidence);
+            await _orchestrator.WriteDomainAsync(
+                runId,
+                NormalizationEvidenceSnapshot.Domain,
+                RunHistorySlim.SlimNormalizationEvidence(evidence),
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            output.WriteLine($"[Normalization Suite] Evidence collection before validation failed: {ex.Message}. Suite validation will query again.");
+        }
+    }
+
+    private static List<string> EvidenceResourceTypes(NormalizationSuiteResolution resolution)
+        => resolution.Sequences
+            .SelectMany(s => s.Operations)
+            .SelectMany(s => s.Operation.ResourceTypes)
+            .Concat(resolution.StandaloneOperations.SelectMany(o => o.ResourceTypes))
+            .Where(rt => !string.IsNullOrWhiteSpace(rt))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static async Task<List<string>> QueryNormalizationSummaryLinesAsync(
+        LokiScraper lokiScraper,
+        IAutomationOutput output,
+        IReadOnlyList<string> runScopeFilters,
+        IReadOnlyList<string> evidenceRequiredResourceTypes,
+        DateTimeOffset startedAt,
+        TimeSpan lookback,
+        CancellationToken queryToken)
+    {
+        const string normalizationSummaryMarker = "[NormalizationExecutionSummary]";
+        var logs = new List<string>();
+
+        // Each Loki call stamps its own end time. Refresh coverage here so a
+        // later resource type does not start after the run began.
+        TimeSpan LookbackForThisRequest() =>
+            LokiEvidenceQuery.LookbackForRequest(
+                lookback,
+                LokiEvidenceQuery.CoverageSince(startedAt, DateTimeOffset.UtcNow));
+
+        Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
+            lokiScraper.QueryServiceLogsAsync(
+                LokiScraper.Components.Normalization,
+                normalizationSummaryMarker,
+                LookbackForThisRequest(),
+                additionalContainsFilters: filters,
+                limit: limit,
+                maxPages: maxPages,
+                cancellationToken: queryToken);
+
+        if (evidenceRequiredResourceTypes.Count > 0)
+        {
+            foreach (var resourceType in evidenceRequiredResourceTypes)
+            {
+                queryToken.ThrowIfCancellationRequested();
+                var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
+                var logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 5000, maxPages: 20);
+
+                if (logsForResourceType.Count == 0)
+                {
+                    queryToken.ThrowIfCancellationRequested();
+                    output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
+                    logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 500, maxPages: 40);
+                }
+
+                output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
+                logs.AddRange(logsForResourceType);
+            }
+
+            if (logs.Count == 0)
+            {
+                output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
+                queryToken.ThrowIfCancellationRequested();
+                logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
+            }
+        }
+        else
+        {
+            queryToken.ThrowIfCancellationRequested();
+            logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
+        }
+
+        return logs
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static void StampManifestNormalization(
+        GenerationManifest manifest,
+        NormalizationSuiteResolution resolution,
+        OrganizationResourceMapTemplate? organizationResourceMapTemplate)
+    {
+        var suiteConfigured = resolution.SuiteId.HasValue
+            && !string.Equals(resolution.SuiteName, "None", StringComparison.OrdinalIgnoreCase);
+        manifest.AppliedNormalizationSuiteId = suiteConfigured ? resolution.SuiteId : null;
+        manifest.AppliedNormalizationSuiteName = suiteConfigured ? resolution.SuiteName : null;
+        manifest.NormalizationSuiteAppliedToGenerator = suiteConfigured;
+        if (organizationResourceMapTemplate == null || organizationResourceMapTemplate.Id == Guid.Empty)
+        {
+            manifest.AppliedOrganizationResourceMapTemplateId = null;
+            manifest.AppliedOrganizationResourceMapName = null;
+            return;
+        }
+
+        manifest.AppliedOrganizationResourceMapTemplateId = organizationResourceMapTemplate.Id;
+        manifest.AppliedOrganizationResourceMapName = string.IsNullOrWhiteSpace(organizationResourceMapTemplate.Name)
+            ? null
+            : organizationResourceMapTemplate.Name;
+    }
+
+    private static void WritePatientSourceLog(IAutomationOutput output, GenerationManifest manifest)
+    {
+        var origins = PatientOrigin.Resolve(
+            manifest.PatientIds,
+            manifest.PreExistingPatientIds,
+            manifest.TemplateCacheKeyByPatient);
+        var generated = origins.Values.Count(value => value == PatientOrigin.Generated);
+        var uploaded = origins.Values.Count(value => value == PatientOrigin.Uploaded);
+        var suiteName = string.IsNullOrWhiteSpace(manifest.AppliedNormalizationSuiteName)
+            ? null
+            : manifest.AppliedNormalizationSuiteName;
+
+        if (generated > 0 && suiteName != null)
+            output.WriteLine($"[Normalization Suite] FHIR generator produced {generated} patient(s) with normalization suite '{suiteName}'.");
+        else if (generated > 0)
+            output.WriteLine("[Normalization Suite] Generated patients were produced without a selected normalization suite.");
+
+        if (uploaded > 0 && suiteName != null)
+            output.WriteLine($"[Normalization Suite] {uploaded} uploaded patient(s) are associated with normalization suite '{suiteName}'.");
+        else if (uploaded > 0)
+            output.WriteLine($"[Normalization Suite] {uploaded} uploaded patient(s); no normalization suite is configured.");
     }
 
     private static PipelineSnapshot.NormalizationSuiteSnapshot BuildNormalizationSuiteSnapshot(NormalizationSuiteResolution resolution)
