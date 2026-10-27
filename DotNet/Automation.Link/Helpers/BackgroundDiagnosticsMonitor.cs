@@ -33,6 +33,15 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     /// </summary>
     public bool HasCriticalFailure => _monitor.State.HasCriticalFailure;
 
+    public string? ServiceHealthFailureMessage =>
+    _monitor.State.Issues
+        .FirstOrDefault(issue =>
+            issue.Severity == MonitorIssueSeverity.Critical &&
+            issue.Key.StartsWith(
+                "service-health-timeout:",
+                StringComparison.OrdinalIgnoreCase))
+        ?.Message;
+
     /// <summary>
     /// All Kafka error messages captured during monitoring.
     /// </summary>

@@ -42,17 +42,26 @@ public class ServiceHealthProbeTests
     public async Task UnhealthyAtThreshold_TriggersCriticalFailure()
     {
         var clock = new TestTimeProvider();
-        var probe = CreateProbe(() => false, clock);
 
+        bool? healthy = true;
+        var probe = CreateProbe(() => healthy, clock);
+
+        // Establish that the service was initially healthy.
         await ExecuteAsync(probe);
 
+        // Simulate the service becoming unavailable.
+        healthy = false;
+        await ExecuteAsync(probe);
+
+        // Advance to the configured outage threshold.
         clock.Advance(OutageThreshold);
 
         var result = await ExecuteAsync(probe);
 
         result.HasCriticalFailure.Should().BeTrue();
+
         result.Issues.Should().ContainSingle(issue =>
-            issue.Key == "service-health-timeout" &&
+            issue.Key == "service-health-timeout:Terminology" &&
             issue.Source == "ServiceHealth" &&
             issue.Severity == MonitorIssueSeverity.Critical);
     }
@@ -153,7 +162,11 @@ public class ServiceHealthProbeTests
     public void ZeroCheckInterval_ThrowsArgumentOutOfRangeException()
     {
         var action = () => new ServiceHealthProbe(
-            _ => Task.FromResult<bool?>(true),
+            [
+                new MonitoredService(
+                    "Terminology",
+                    _ => Task.FromResult<bool?>(true))
+            ],
             TimeSpan.Zero,
             OutageThreshold);
 
@@ -164,19 +177,71 @@ public class ServiceHealthProbeTests
     public void ZeroOutageThreshold_ThrowsArgumentOutOfRangeException()
     {
         var action = () => new ServiceHealthProbe(
-            _ => Task.FromResult<bool?>(true),
+            [
+                new MonitoredService(
+                    "Terminology",
+                    _ => Task.FromResult<bool?>(true))
+            ],
             CheckInterval,
             TimeSpan.Zero);
 
         action.Should().Throw<ArgumentOutOfRangeException>();
     }
 
-    private static ServiceHealthProbe CreateProbe(
-        Func<bool?> healthCheck,
-        TimeProvider clock)
+    [Fact]
+    public async Task ValidationServiceOutage_TriggersCriticalFailureWhileTerminologyIsHealthy()
+    {
+        var clock = new TestTimeProvider();
+
+        bool? validationHealthy = true;
+
+        var probe = new ServiceHealthProbe(
+            [
+                new MonitoredService(
+                "Terminology",
+                _ => Task.FromResult<bool?>(true)),
+
+            new MonitoredService(
+                "Validation",
+                _ => Task.FromResult(validationHealthy))
+            ],
+            CheckInterval,
+            OutageThreshold,
+            clock);
+
+        // Both services are initially healthy.
+        await ExecuteAsync(probe);
+
+        // Simulate Validation becoming unavailable.
+        // Terminology remains healthy.
+        validationHealthy = false;
+
+        var initialResult = await ExecuteAsync(probe);
+
+        initialResult.HasCriticalFailure.Should().BeFalse();
+
+        // Advance to the configured outage threshold.
+        clock.Advance(OutageThreshold);
+
+        var result = await ExecuteAsync(probe);
+
+        result.HasCriticalFailure.Should().BeTrue();
+
+        result.Issues.Should().ContainSingle(issue =>
+            issue.Key == "service-health-timeout:Validation" &&
+            issue.Source == "ServiceHealth" &&
+            issue.Severity == MonitorIssueSeverity.Critical &&
+            issue.Message.Contains("Validation"));
+    }
+
+    private static ServiceHealthProbe CreateProbe(Func<bool?> healthCheck, TimeProvider clock)
     {
         return new ServiceHealthProbe(
-            _ => Task.FromResult(healthCheck()),
+            [
+                new MonitoredService(
+                "Terminology",
+                _ => Task.FromResult(healthCheck()))
+            ],
             CheckInterval,
             OutageThreshold,
             clock);

@@ -11,15 +11,16 @@ using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace Automation.UI.Services;
@@ -58,7 +59,7 @@ internal sealed class RunExecutor
     private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
     private readonly ILivePatientEventInjector _liveInjector;
-    private readonly string? _terminologyHealthUrl;
+    private readonly IReadOnlyList<(string Name, string Url)> _monitoredServiceHealthUrls;
     private readonly TimeSpan _serviceHealthInterval;
     private readonly TimeSpan _serviceOutageThreshold;
 
@@ -84,7 +85,33 @@ internal sealed class RunExecutor
         ILivePatientEventInjector liveInjector)
     {
         _automationConfig = automationConfig;
-        _terminologyHealthUrl = configuration["ServiceHealth:TerminologyHealthUrl"];
+
+        var monitoredServices = new List<(string Name, string Url)>();
+
+        void AddMonitoredService(string name, string configurationKey)
+        {
+            var serviceUrl = configuration[configurationKey];
+
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                return;
+
+            if (!Uri.TryCreate(serviceUrl.TrimEnd('/'), UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp &&
+                 uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new ArgumentException(
+                    $"{configurationKey} must be an absolute HTTP or HTTPS URL.",
+                    nameof(configuration));
+            }
+
+            monitoredServices.Add((name, $"{serviceUrl.TrimEnd('/')}/health"));
+        }
+
+        AddMonitoredService("Terminology", "ServiceRegistry:TerminologyServiceUrl");
+        AddMonitoredService("Validation", "ServiceRegistry:ValidationServiceUrl");
+
+        _monitoredServiceHealthUrls = monitoredServices;
+
         _serviceHealthInterval = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:CheckIntervalSeconds") ?? 5);
         _serviceOutageThreshold = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:OutageThresholdSeconds") ?? 120);
 
@@ -97,16 +124,6 @@ internal sealed class RunExecutor
             throw new ArgumentOutOfRangeException(
                 nameof(configuration),
                 "ServiceHealth:OutageThresholdSeconds must be greater than zero.");
-
-        if (!string.IsNullOrWhiteSpace(_terminologyHealthUrl) &&
-            (!Uri.TryCreate(_terminologyHealthUrl, UriKind.Absolute, out var healthUri) ||
-             (healthUri.Scheme != Uri.UriSchemeHttp &&
-              healthUri.Scheme != Uri.UriSchemeHttps)))
-        {
-            throw new ArgumentException(
-                "ServiceHealth:TerminologyHealthUrl must be an absolute HTTP or HTTPS URL.",
-                nameof(configuration));
-        }
 
         _hostServices = hostServices;
         _snapshotStore = snapshotStore;
@@ -895,13 +912,6 @@ internal sealed class RunExecutor
                 scenarioConfig.IsMetricsRun,
                 scenarioConfig.PatientIds.Count);
 
-            if (!string.IsNullOrWhiteSpace(_terminologyHealthUrl))
-            {
-                diagnosticsPollInterval = diagnosticsPollInterval <= _serviceHealthInterval
-                    ? diagnosticsPollInterval
-                    : _serviceHealthInterval;
-            }
-
             using var healthClient = services.GetRequiredService<IHttpClientFactory>()
                 .CreateClient();
 
@@ -909,11 +919,17 @@ internal sealed class RunExecutor
 
             IBackgroundMonitorProbe? CreateServiceHealthProbe()
             {
-                if (string.IsNullOrWhiteSpace(_terminologyHealthUrl))
+                if (_monitoredServiceHealthUrls.Count == 0)
                     return null;
 
+                var monitoredServices = _monitoredServiceHealthUrls
+                    .Select(service => new MonitoredService(
+                        service.Name,
+                        ct => CheckHealthAsync(healthClient, service.Url, ct)))
+                    .ToList();
+
                 return new ServiceHealthProbe(
-                    ct => CheckHealthAsync(healthClient, _terminologyHealthUrl, ct),
+                    monitoredServices,
                     _serviceHealthInterval,
                     _serviceOutageThreshold);
             }
@@ -936,11 +952,10 @@ internal sealed class RunExecutor
 
                 await diagnostics.StopAsync();
 
-                if (diagnostics.HasCriticalFailure)
+                if (diagnostics.ServiceHealthFailureMessage is { } healthFailure)
                 {
                     throw new InvalidOperationException(
-                        $"Report {reportId} failed because a critical monitoring condition was detected. " +
-                        "Check the run diagnostics for the underlying issue.");
+                        $"Report {reportId} failed: {healthFailure}");
                 }
 
                 if (!submitted)
@@ -1058,11 +1073,10 @@ internal sealed class RunExecutor
 
                 await regenDiagnostics.StopAsync();
 
-                if (regenDiagnostics.HasCriticalFailure)
+                if (regenDiagnostics.ServiceHealthFailureMessage is { } healthFailure)
                 {
                     throw new InvalidOperationException(
-                        $"Regenerated report {reportId} failed because a critical monitoring condition was detected. " +
-                        "Check the run diagnostics for the underlying issue.");
+                        $"Regenerated report {reportId} failed: {healthFailure}");
                 }
 
                 if (!regenSubmitted)
