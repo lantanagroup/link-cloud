@@ -23,6 +23,22 @@ public interface ResultRepository extends JpaRepository<Result, Long> {
 
     long deleteByFacilityIdAndReportIdAndPatientId(String facilityId, String reportId, String patientId);
 
+    @Modifying
+    @Query(value = "DELETE FROM result_category WHERE result_id IN (SELECT id FROM result"
+            + " WHERE facility_id = :facilityId AND report_id = :reportId AND patient_id = :patientId)",
+            nativeQuery = true)
+    void deletePatientResultCategories(@Param("facilityId") String facilityId,
+                                       @Param("reportId") String reportId,
+                                       @Param("patientId") String patientId);
+
+    @Modifying
+    @Query(value = "DELETE FROM result"
+            + " WHERE facility_id = :facilityId AND report_id = :reportId AND patient_id = :patientId",
+            nativeQuery = true)
+    void deletePatientResults(@Param("facilityId") String facilityId,
+                              @Param("reportId") String reportId,
+                              @Param("patientId") String patientId);
+
     List<Result> findAllByFacilityIdAndReportId(String facilityId, String reportId);
 
     List<Result> findAllByFacilityIdAndReportIdAndPatientId(String facilityId, String reportId, String patientId);

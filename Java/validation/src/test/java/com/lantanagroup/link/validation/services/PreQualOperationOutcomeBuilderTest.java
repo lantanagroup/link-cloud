@@ -3,7 +3,9 @@ package com.lantanagroup.link.validation.services;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.CanonicalType;
 import org.hl7.fhir.r4.model.CodeType;
+import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.IntegerType;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.OperationOutcome;
@@ -144,6 +146,66 @@ class PreQualOperationOutcomeBuilderTest {
         OperationOutcome oo = builder.build(List.of(r), MEASURE_REPORT, true).orElseThrow();
 
         assertEquals(2, oo.getIssue().size());
+    }
+
+    // -------------------------------------------------------------------------
+    // Grouping by source profile (LEGLINK-1172)
+    // -------------------------------------------------------------------------
+
+    private static final String LAB_PROFILE = "http://example.org/StructureDefinition/observation-lab|2.0.0";
+    private static final String VITALS_PROFILE = "http://example.org/StructureDefinition/observation-vitals|2.0.0";
+
+    private Result result(String message, String expression, String profile, Category... categories) {
+        Result result = result(message, expression, categories);
+        result.setProfile(profile);
+        return result;
+    }
+
+    private String profileOf(OperationOutcome.OperationOutcomeIssueComponent issue) {
+        Extension extension = issue.getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_ISSUE_PROFILE_URL);
+        return extension == null ? null : ((CanonicalType) extension.getValue()).getValue();
+    }
+
+    @Test
+    void build_sameCategoryDifferentProfiles_producesAnIssuePerProfile() {
+        Category shared = category("missing_interpretation", false);
+        Result lab1 = result("lab message 1", "expr1", LAB_PROFILE, shared);
+        Result vitals = result("vitals message", "expr2", VITALS_PROFILE, shared);
+        Result lab2 = result("lab message 2", "expr3", LAB_PROFILE, shared);
+
+        OperationOutcome oo = builder.build(List.of(lab1, vitals, lab2), MEASURE_REPORT, true).orElseThrow();
+
+        assertEquals(2, oo.getIssue().size());
+        int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
+        assertEquals(2, total);
+
+        OperationOutcome.OperationOutcomeIssueComponent labIssue = oo.getIssue().get(0);
+        assertEquals(LAB_PROFILE, profileOf(labIssue));
+        assertEquals("lab message 1", labIssue.getDetails().getText());
+        assertTrue(expressionStrings(labIssue).containsAll(List.of("expr1", "expr3")));
+        assertFalse(expressionStrings(labIssue).contains("expr2"));
+
+        OperationOutcome.OperationOutcomeIssueComponent vitalsIssue = oo.getIssue().get(1);
+        assertEquals(VITALS_PROFILE, profileOf(vitalsIssue));
+        assertEquals("vitals message", vitalsIssue.getDetails().getText());
+        assertEquals("missing_interpretation",
+                ((CodeType) vitalsIssue.getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_ISSUE_CAT_URL).getValue()).getValue());
+    }
+
+    @Test
+    void build_findingsWithNoProfile_areEmittedWithoutProfileExtension() {
+        Category shared = category("inactive_code", false);
+        Result noProfile1 = result("no profile 1", "expr1", (String) null, shared);
+        Result lab = result("lab", "expr2", LAB_PROFILE, shared);
+        Result noProfile2 = result("no profile 2", "expr3", (String) null, shared);
+
+        OperationOutcome oo = builder.build(List.of(noProfile1, lab, noProfile2), MEASURE_REPORT, true).orElseThrow();
+
+        assertEquals(2, oo.getIssue().size());
+        OperationOutcome.OperationOutcomeIssueComponent noProfileIssue = oo.getIssue().get(0);
+        assertNull(profileOf(noProfileIssue));
+        assertTrue(expressionStrings(noProfileIssue).containsAll(List.of("expr1", "expr3")));
+        assertEquals(LAB_PROFILE, profileOf(oo.getIssue().get(1)));
     }
 
     @Test

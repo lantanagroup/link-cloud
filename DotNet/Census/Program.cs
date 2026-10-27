@@ -192,7 +192,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Health Checks
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, CensusConstants.ServiceName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<CensusContext>>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<CensusContext>>(HealthCheckNames.SqlServerDatabase)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Swagger

@@ -38,7 +38,7 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|Web/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
             echo "run_job=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_job=false" >> "$GITHUB_OUTPUT"
@@ -91,8 +91,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - name: Download NHSN React Core package from Azure Repos
+        shell: bash
+        env:
+          AZDO_PAT: ${{ secrets.AZDO_PAT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AZDO_PAT}" ]]; then
+            echo "AZDO_PAT repository secret is required to download the NHSN React Core package." >&2
+            exit 1
+          fi
+
+          package_directory="nhsn/NHSN-App-UI/packages"
+          package_path="${package_directory}/nhsn-react-core-2.4.1.tgz"
+
+          mkdir -p "${package_directory}"
+          curl --fail --show-error --silent --location \
+            --user ":${AZDO_PAT}" \
+            --output "${package_path}" \
+            "https://dev.azure.com/lantanagroup/nhsnlink/_apis/git/repositories/nhsnlink/items?path=/nhsn-app-ui/nhsn-react-core-2.4.1.tgz&download=true&api-version=7.1"
+
+          test -s "${package_path}"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      # .env is not committed (LEGLINK-912). Build one from the template, with a fresh random
+      # password for each CHANGE_ME value. The "Ci1-" prefix meets SQL Server's complexity rules.
+      - name: Create .env for the compose stack
+        shell: bash
+        run: |
+          if [ -f .env ]; then
+            exit 0
+          fi
+          cp .env.example .env
+          for name in $(grep -oE '^[A-Z_]+=CHANGE_ME$' .env.example | cut -d= -f1); do
+            value="Ci1-$(openssl rand -hex 16)"
+            echo "::add-mask::$value"
+            sed -i "s|^$name=CHANGE_ME\$|$name=$value|" .env
+          done
 
       - name: Build services with cache
         run: |
