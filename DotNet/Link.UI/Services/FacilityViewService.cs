@@ -243,7 +243,7 @@ public sealed class FacilityViewService
             {
                 return Fail(read.IsTest
                     ? AutomationMarkRules.AdHocReportBlocked
-                    : "Only a submitted report can be resubmitted.");
+                    : "Only a submitted or completed report can be rerun.");
             }
 
             var response = await _facilities.RegenerateReportAsync(id, new RegenerateReportRequest
@@ -253,7 +253,7 @@ public sealed class FacilityViewService
             }, cancellationToken);
 
             return response.IsSuccessStatusCode
-                ? Done("Report resubmitted.")
+                ? Done("Report rerun requested.")
                 : Fail(FacilityFormRules.ServiceMessage("Tenant", response.StatusCode, response.RawBody));
         });
 

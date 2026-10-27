@@ -144,7 +144,7 @@
                                             <partial name="_ViewReturnFields" model="Model.Query" />
                                             <input type="hidden" name="targetId" value="@report.Id" />
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-au-execute lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@Model.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Resubmit" aria-label="Resubmit"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><span class="ms-1">Resubmit</span></button>
+                                        <button type="button" class="btn btn-sm btn-au-execute lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@Model.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Rerun this report: re-evaluate, re-validate and regenerate it from cached data" aria-label="Rerun"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span class="ms-1">Rerun…</span></button>
                                     </div>
                                 }
                                 @if (report.CanAbort)
@@ -194,16 +194,17 @@
     <div class="modal-dialog modal-dialog-centered">
         <form method="post" id="resubmitForm" class="modal-content" data-au-save asp-action="ResubmitReport" asp-route-id="@Model.FacilityId">
             <div class="modal-header">
-                <h2 class="modal-title h5" id="resubmitTitle">Resubmit report</h2>
+                <h2 class="modal-title h5" id="resubmitTitle">Rerun report</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
             </div>
             <div class="modal-body">
-                <p id="resubmitSummary" class="mb-0"></p>
+                <p id="resubmitSummary"></p>
+                <p class="mb-0" data-rerun-explain>A rerun re-evaluates and re-validates this report and regenerates it from the cached EHR data. <strong>Rerun and submit</strong> sends the regenerated report to NHSN Azure Blob Storage (ABS). <strong>Rerun without submitting</strong> bypasses submission, so nothing is sent to NHSN ABS.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-au-execute" name="bypassSubmission" data-hold="@Hold.Of("Regenerate without submitting", "Regenerate this report and do not submit it.", "The report is regenerated. Nothing is copied to the submission container.", "Hold to regenerate")" value="true">Regenerate without submitting</button>
-                <button data-hold="@Hold.Of("Resubmit this report", "Regenerate this report and submit it.", "The report is regenerated and sent downstream.", "Hold to resubmit")" type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Resubmit</button>
+                <button type="submit" class="btn btn-au-execute" name="bypassSubmission" data-hold="@Hold.Of("Rerun without submitting", "Re-evaluate, re-validate and regenerate this report from cached data. Submission is bypassed.", "The report is regenerated. Nothing is sent to NHSN Azure Blob Storage (ABS).", "Hold to rerun")" value="true">Rerun without submitting</button>
+                <button data-hold="@Hold.Of("Rerun and submit this report", "Re-evaluate, re-validate and regenerate this report from cached data, then submit it.", "The regenerated report is sent to NHSN Azure Blob Storage (ABS).", "Hold to rerun")" type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Rerun and submit</button>
             </div>
         </form>
     </div>

@@ -37,9 +37,9 @@ public class LabeledIdTests
         {
             var text = File.ReadAllText(Repo(relative));
             text.Should().Contain("lu-row-actions");
-            text.Should().Contain("bi-arrow-repeat");
-            text.Should().Contain("title=\"Resubmit\"");
-            text.Should().Contain("aria-label=\"Resubmit\"");
+            text.Should().Contain("bi-arrow-clockwise");
+            text.Should().Contain("title=\"Rerun this report: re-evaluate, re-validate and regenerate it from cached data\"");
+            text.Should().Contain("aria-label=\"Rerun\"");
             text.Should().Contain("bi-trash");
             text.Should().Contain("aria-label=\"Delete report @report.Id\"");
             text.Should().Contain("data-hold=\"@Hold.Of(");

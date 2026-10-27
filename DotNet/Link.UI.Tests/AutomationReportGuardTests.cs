@@ -46,7 +46,7 @@ public class AutomationReportGuardTests
         var result = await service.ResubmitAsync(FacilityId, ReportId.ToString(), bypassSubmission: false, CancellationToken.None);
 
         result.Succeeded.Should().BeTrue();
-        result.Message.Should().Be("Report resubmitted.");
+        result.Message.Should().Be("Report rerun requested.");
         regenerated.Should().Be(1);
     }
 
@@ -186,7 +186,7 @@ public class AutomationReportGuardTests
         {
             var text = File.ReadAllText(RepoFile(relative));
             text.Should().Contain("Model.Reports.Any(report => report.CanResubmit)");
-            text.Should().Contain("Regenerate without submitting");
+            text.Should().Contain("Rerun without submitting");
         }
 
         var reports = File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/ReportsController.cs"));
