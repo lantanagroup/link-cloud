@@ -241,7 +241,7 @@ stages:
       - script: |
           cd nhsn/NHSN-App-BFF
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
-          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c NhsnAppDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
         displayName: Generate App-BFF SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
