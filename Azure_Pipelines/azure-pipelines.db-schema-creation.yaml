@@ -241,7 +241,7 @@ stages:
       - script: |
           cd nhsn/NHSN-App-BFF
           mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
-          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c NhsnAppDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
         displayName: Generate App-BFF SQL Script
       - task: PublishBuildArtifacts@1
         inputs:
@@ -633,7 +633,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_test
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_TEST
 
@@ -646,13 +646,13 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_${{ parameters.environment }}
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_TEST
 
@@ -727,7 +727,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -770,7 +770,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_qa
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA
 
@@ -783,13 +783,13 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_QA
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_QA
 
@@ -864,7 +864,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -907,7 +907,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_qa2
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA2
 
@@ -920,13 +920,13 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_${{ parameters.environment }}
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_QA2
 
@@ -1001,7 +1001,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -1044,7 +1044,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_qa3
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA3
 
@@ -1057,13 +1057,13 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_QA3
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_QA3
 
@@ -1138,7 +1138,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
