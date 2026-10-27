@@ -1092,6 +1092,7 @@ services:
       sensitive: true
   # No service-specific required config: this service reads only global keys. An explicit
   # empty list keeps it paired with its serviceMeta entry.
+  Operations: []
   QueryDispatch: []
   Report:
     - key: "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging"
@@ -1209,6 +1210,79 @@ services:
       description: "Cap in seconds on a single Validation blob network attempt; the SDK default is effectively unbounded. Defaults to 10."
       required: false
       defaultValue: "10"
+    # VaaS defaults below reflect Java property-binding fallbacks, which can differ
+    # from application.yml. Omit defaultValue when the bound property has no default.
+    # These keys do not require an App Configuration row.
+    - key: "cache.rubric.ttl"
+      description: "Resolved-rubric cache TTL in seconds. A backstop against missed invalidation; registering, publishing and retiring rubrics explicitly evict the cache."
+      required: false
+      defaultValue: "3600"
+    - key: "link.rubric.max-payload-bytes"
+      description: "Maximum rubric-definition upload size in bytes (256 KiB). Enforced for both Content-Length and streamed bodies; does not limit the FHIR payload sent for rubric validation."
+      required: false
+      defaultValue: "262144"
+    - key: "link.rubric.dry-run.required-for-publish"
+      description: "Whether publishing a rubric version requires a completed dry run with status ACCEPTABLE or ACCEPTABLE_WITH_WARNINGS."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.checks.parallel"
+      description: "Whether independent rubric checks run concurrently on a dedicated executor, with results merged in rubric order. Shipped as true; the code fallback is false."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.checks.core-pool-size"
+      description: "Core thread count for parallel rubric checks. Shipped as 4; 0 (the code fallback) auto-sizes to the CPU count bounded between 2 and 8. Must be non-negative."
+      required: false
+      defaultValue: "0"
+    - key: "vaas.checks.max-pool-size"
+      description: "Maximum parallel rubric-check thread count, raised to at least the core size. Shipped as 8; 0 (the code fallback) derives twice the core size. Saturation runs excess checks on the caller thread. Must be non-negative."
+      required: false
+      defaultValue: "0"
+    - key: "vaas.checks.queue-capacity"
+      description: "Parallel rubric-check queue capacity. Zero uses direct hand-off so the pool can grow to its maximum; a positive queue must fill before the pool grows beyond its core size. Must be non-negative."
+      required: false
+      defaultValue: "0"
+    - key: "vaas.checks.keep-alive-seconds"
+      description: "Seconds idle non-core rubric-check threads remain alive before being reclaimed. Must be non-negative."
+      required: false
+      defaultValue: "60"
+    # The bridge and shadow comparison both need the configured rubric registered
+    # and PUBLISHED in each environment before either path evaluates it.
+    - key: "vaas.bridge.enabled"
+      description: "Whether ReadyForValidation events use the rubric engine for live validation instead of the legacy validator. Register and publish vaas.bridge.rubric-id in each environment before enabling."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.bridge.rubric-id"
+      description: "Rubric ID evaluated for pipeline validation and shadow comparisons. Must exactly match a rubric registered and published in the environment's registry."
+      required: false
+      defaultValue: "measure-report-submission-v1"
+    - key: "vaas.bridge.shadow-enabled"
+      description: "Whether to publish ShadowCompareEvent messages for asynchronous comparison of the rubric and legacy engines, without changing live results. Independent of vaas.bridge.enabled; requires the configured rubric to be published. Shipped as true; the code fallback is false."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.bridge.shadow-report.daily-blob-path"
+      description: "Blob path template for the daily shadow-comparison CSV report."
+      required: false
+      defaultValue: "shadow-reports/shadow-comparison-daily-report.csv"
+    - key: "vaas.bridge.shadow-report.daily-cron"
+      description: "Six-field Spring cron expression, evaluated in UTC, for generating the previous day's shadow-comparison report. Defaults to 00:15 UTC daily."
+      required: false
+      defaultValue: "0 15 0 * * *"
+    - key: "validation.categoryOverride.enabled"
+      description: "Whether category overrides change findings' effective severity and acceptability before scoring. Shipped as true; the code fallback is false."
+      required: false
+      defaultValue: "false"
+    - key: "validation.scoring.rollup"
+      description: "Fallback roll-up strategy when a rubric version declares none. Values: WORST_OF, BEST_OF, PASS_FAIL, MAJORITY, ALL_MUST_PASS. The bound property defaults to null (no defaultValue); the scoring resolver uses WORST_OF when unset."
+      required: false
+      defaultValue: "WORST_OF"
+    - key: "validation.response.includeOriginalSeverity"
+      description: "Whether responses include originalSeverity and overriddenSeverity for findings whose severity was changed by a category override."
+      required: false
+      defaultValue: "true"
+    - key: "validation.response.includeCategoryIds"
+      description: "Whether responses include categoryIds and governingCategoryId for categorized findings, allowing callers to trace the categories behind the verdict."
+      required: false
+      defaultValue: "true"
 $defs:
   serviceMetaEntry:
     type: "object"

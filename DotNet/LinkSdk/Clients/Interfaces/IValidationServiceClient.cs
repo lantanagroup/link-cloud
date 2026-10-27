@@ -57,4 +57,21 @@ public interface IValidationServiceClient
     /// instead of the issue list.
     /// </summary>
     Task<LinkApiResponse<string>> CategorizeResultsAsync(string resultsJson, bool summarize = true, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a report's stored validation counts per category, optionally only the categories with the given submit
+    /// flag. Returns 404 when the report has no stored counts.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetReportCategoryCountsAsync(string facilityId,
+                                                              string reportId,
+                                                              bool? submit = null,
+                                                              CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a report's categories with their finding counts, counted live from the saved findings. The validation
+    /// service loads every finding of the report to answer it, so avoid it for very large reports.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetReportCategorySummariesAsync(string facilityId,
+                                                                 string reportId,
+                                                                 CancellationToken cancellationToken = default);
 }

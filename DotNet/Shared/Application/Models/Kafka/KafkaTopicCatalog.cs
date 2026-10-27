@@ -32,6 +32,8 @@ public static class KafkaTopicCatalog
     public const string PatientOrFacilityJsonShape = "{\"facilityId\":\"...\"} or {\"facilityId\":\"...\",\"patientId\":\"...\"}";
     public const string AuditShape = "patient JSON, facility JSON, or {serviceName}";
     public const string ServiceShape = "{serviceName}";
+    public const string FacilityIdShape = "{facilityId}";
+    public const string RetentionCleanupShape = "{retentionCleanupId}";
 
     public static IReadOnlyList<string> Slice1Topics { get; } =
     [
@@ -88,7 +90,10 @@ public static class KafkaTopicCatalog
         Entry("ResourcesAcquired", KafkaTopicKeyClass.Patient, true, false, PatientJsonShape, "", "Normalization"),
         Entry("ResourcesNormalized", KafkaTopicKeyClass.Patient, true, false, PatientJsonShape, "", "measureeval", "measureeval-events"),
         Entry("RetentionCheckScheduled", KafkaTopicKeyClass.Facility, true, false, FacilityJsonShape, ""),
+        Entry("RetentionCheckRequested", KafkaTopicKeyClass.Correlation, false, false, RetentionCleanupShape, ""),
+        Entry("RetentionCheckComplete", KafkaTopicKeyClass.Correlation, false, false, RetentionCleanupShape, ""),
         Entry("Service-Healthcheck", KafkaTopicKeyClass.Health, false, false, ServiceShape, ""),
+        Entry("ShadowCompareEvent", KafkaTopicKeyClass.Facility, false, false, FacilityIdShape, "", "validation-shadow"),
         Entry("SubmitPayload", KafkaTopicKeyClass.Patient, true, false, PatientOrFacilityJsonShape, "", "Submission"),
         Entry("ValidationComplete", KafkaTopicKeyClass.Patient, true, false, PatientJsonShape, "", "Report")
     ];
@@ -316,6 +321,17 @@ public static class KafkaTopicCatalog
         Add(map, "Service-Healthcheck", false, "Health checks are not migrated.", false, "", "",
             Producers(Site("shared", "Java/shared/src/main/java/com/lantanagroup/link/shared/health/KafkaHealthCheckIndicator.java")),
             Consumers());
+        Add(map, "RetentionCheckRequested", false, "This topic has no producer or consumer yet.", false, "", "",
+            Producers(),
+            Consumers());
+        Add(map, "RetentionCheckComplete", false, "This topic has no producer or consumer yet.", false, "", "",
+            Producers(),
+            Consumers());
+        Add(map, "ShadowCompareEvent", false, "Validation produces and consumes this topic. Slice 2.", false, "", "",
+            Producers(Site("validation", "Java/validation/src/main/java/com/lantanagroup/link/validation/services/ReadyForValidationConsumer.java")),
+            Consumers(
+                Site("validation", "Java/validation/src/main/java/com/lantanagroup/link/validation/services/ShadowValidationConsumer.java"),
+                Site("validation", "Java/validation/src/main/java/com/lantanagroup/link/validation/configs/KafkaConfig.java")));
         Add(map, "SubmitPayload", true, "", false, "Submission", "",
             Producers(Site("Report", "DotNet/Report/KafkaProducers/SubmitPayLoadProducer.cs")),
             Consumers(

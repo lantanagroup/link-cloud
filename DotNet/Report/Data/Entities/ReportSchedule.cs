@@ -59,6 +59,18 @@ public partial class ReportSchedule
 
     public bool? IsDeleted { get; set; }
 
+    /// <summary>
+    /// When the report first reached a terminal status, in UTC. Set once; later writes never move it.
+    /// See dev-docs/report-retention-dates.md.
+    /// </summary>
+    public DateTimeOffset? CompletedDate { get; set; }
+
+    /// <summary>
+    /// When a report that had not finished was soft-deleted, in UTC. Cleared on restore.
+    /// See dev-docs/report-retention-dates.md.
+    /// </summary>
+    public DateTimeOffset? SoftDeletedDate { get; set; }
+
     [InverseProperty("ReportSchedule")]
     public virtual ICollection<ReportEntry> ReportEntries { get; set; } = new List<ReportEntry>();
 

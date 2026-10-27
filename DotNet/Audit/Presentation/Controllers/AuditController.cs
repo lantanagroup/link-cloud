@@ -8,6 +8,7 @@ using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,6 +47,9 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="service"></param>
         /// <param name="action"></param>
         /// <param name="user"></param>
+        /// <param name="patientId">Exact match on the patient the event relates to</param>
+        /// <param name="resource">Exact match on the resource type the event relates to</param>
+        /// <param name="resourceId">Exact match on the record the event changed. Null for actions affecting every record of a type</param>
         /// <param name="sortBy">Options: FacilityId, Action, ServiceName, Resource, CreatedOn</param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
@@ -53,20 +57,30 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
         /// <returns>
         ///     Success: 200
-        ///     NoContent: 204
         ///     Unauthorized: 401
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedAuditModel))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedAuditModel>> ListAuditEvents(string? searchText, string? facility, string? correlationId, string? service, string?
-            action, string? user, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
+            action, string? user, string? patientId, string? resource, string? resourceId, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {
+            //sanitize every string input before it reaches the repository or the logger
+            searchText = searchText.Sanitize();
+            facility = facility.Sanitize();
+            correlationId = correlationId.Sanitize();
+            service = service.Sanitize();
+            action = action.Sanitize();
+            user = user.Sanitize();
+            patientId = patientId.Sanitize();
+            resource = resource.Sanitize();
+            resourceId = resourceId.Sanitize();
+            sortBy = sortBy.Sanitize();
+
             //capture audit search duration metric
             using var _ = _auditServiceMetrics.MeasureAuditSearchDuration([
                 new KeyValuePair<string, object?>(DiagnosticNames.PageSize, pageSize)
@@ -78,7 +92,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 if (pageSize > _maxAuditEventsPageSize) { pageSize = _maxAuditEventsPageSize; }
                 if (pageNumber < 1) { pageNumber = 1; }
 
-                AuditSearchFilterRecord searchFilter = new(searchText, facility, correlationId, service, action, user, sortBy, sortOrder, pageSize, pageNumber);
+                AuditSearchFilterRecord searchFilter = new(searchText, facility, correlationId, service, action, user, patientId, resource, resourceId, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQuery(searchFilter);
 
                 using var activity = ServiceActivitySource.Instance.StartActivity("Search Audit Events");
@@ -86,7 +100,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
                 //Get list of audit events using supplied filters and pagination              
                 var (res, metadata) = await _searchRepository.SearchAsync(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy,
-                    searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder,
+                    searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.FilterPatientBy,
+                    searchFilter.FilterResourceBy, searchFilter.FilterResourceIdBy, searchFilter.SortBy, searchFilter.SortOrder,
                     searchFilter.PageSize, searchFilter.PageNumber, HttpContext.RequestAborted);
 
                 var auditLogs = res as AuditLog[] ?? res.ToArray();
@@ -104,7 +119,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 Activity.Current?.AddException(ex);
-                AuditSearchFilterRecord searchFilter = new(searchText, facility, correlationId, service, action, user, sortBy, sortOrder, pageSize, pageNumber);
+                AuditSearchFilterRecord searchFilter = new(searchText, facility, correlationId, service, action, user, patientId, resource, resourceId, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 throw;
             }
@@ -199,19 +214,21 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="pageSize"></param>
         /// <returns>
         ///     Success: 200
-        ///     NoContent: 204
         ///     Unauthorized: 401
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
         [HttpGet("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedAuditModel))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedAuditModel>> GetFacilityAuditEvents(string facilityId, string? sortBy, SortOrder? sortOrder, int pageNumber = 1, int pageSize = 10)
         {
+            //sanitize every string input before it reaches the repository or the logger
+            facilityId = facilityId.Sanitize();
+            sortBy = sortBy.Sanitize();
+
             try
             {
                 //make sure page size does not exceed the max page size allowed

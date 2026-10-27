@@ -21,8 +21,8 @@
 #  1. Target environment
 #     - Set the "Target environment" parameter at queue time.
 #     - Available values match the Kubernetes namespaces used by Deploy All
-#       Services:  dev-scale | scale-test | scale-qa
-#     - These are normalized internally to canonical keys (dev / test / qa)
+#       Services:  dev-scale | scale-test | scale-qa | scale-qa2 | scale-qa3
+#     - These are normalized internally to canonical keys (dev / test / qa / qa2 / qa3)
 #       for base-URL lookup. To add a new environment:
 #         a. Add LINK_UI_BASE_URL_<canonical> under variables.
 #         b. Add the K8s-style name to the targetEnvironment values list.
@@ -94,6 +94,8 @@ parameters:
       - "dev-scale"
       - "scale-test"
       - "scale-qa"
+      - "scale-qa2"
+      - "scale-qa3"
 
   - name: runApiStabilitySuite
     displayName: "Run API Stability Suite"
@@ -132,7 +134,7 @@ parameters:
 
 variables:
   # Link.UI base URL. Canonical env keys come from Normalize-EnvironmentName
-  # (dev-scale → dev, scale-test → test, scale-qa → qa).
+  # (dev-scale → dev, scale-test → test, scale-qa → qa, scale-qa2 → qa2, scale-qa3 → qa3).
   #
   # Precedence, first non-empty wins. The resolve step reads these before it
   # publishes anything, then sets LINK_UI_BASE_URL to the winner for later
@@ -169,6 +171,8 @@ variables:
   LINK_UI_BASE_URL_test: "https://test-link.nhsnlink.org"
   LINK_UI_BASE_URL_dev:  "https://dev-link.nhsnlink.org"
   LINK_UI_BASE_URL_qa:   "https://qa-link.nhsnlink.org"
+  LINK_UI_BASE_URL_qa2:  "https://qa2-link.nhsnlink.org"
+  LINK_UI_BASE_URL_qa3:  "https://qa3-link.nhsnlink.org"
 
   # Previous Automation.UI hosts. Resolution does not read these names.
   # They remain so an older variable group that still sets them has the
@@ -176,6 +180,8 @@ variables:
   AUTOMATION_UI_BASE_URL_test: "https://test-automation.nhsnlink.org"
   AUTOMATION_UI_BASE_URL_dev:  "https://dev-automation.nhsnlink.org"
   AUTOMATION_UI_BASE_URL_qa:   "https://qa-automation.nhsnlink.org"
+  AUTOMATION_UI_BASE_URL_qa2:  "https://qa2-automation.nhsnlink.org"
+  AUTOMATION_UI_BASE_URL_qa3:  "https://qa3-automation.nhsnlink.org"
 
   # Audience used when LINK_UI_API_AUDIENCE is not set. The acquire step
   # requests an app-only token for "{audience}/.default".
@@ -227,11 +233,13 @@ stages:
                   $v = $value.Trim().ToLowerInvariant()
                   if ($v -eq "scale-test" -or $v -eq "test-scale" -or $v -eq "test") { return "test" }
                   if ($v -eq "dev-scale"  -or $v -eq "scale-dev"  -or $v -eq "dev")  { return "dev" }
+                  if ($v -eq "scale-qa2"  -or $v -eq "qa2-scale"  -or $v -eq "qa2")  { return "qa2" }
+                  if ($v -eq "scale-qa3"  -or $v -eq "qa3-scale"  -or $v -eq "qa3")  { return "qa3" }
                   if ($v -eq "scale-qa"   -or $v -eq "qa-scale"   -or $v -eq "qa")   { return "qa" }
                   return $v
                 }
 
-                # Canonical key used for base-URL variable lookup (dev / test / qa)
+                # Canonical key used for base-URL variable lookup (dev / test / qa / qa2 / qa3)
                 $envName = Normalize-EnvironmentName $envNameRaw
                 Write-Host "Selected environment : $envNameRaw  (canonical: $envName)"
 

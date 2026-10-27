@@ -57,7 +57,7 @@ public interface ISnapshotStore
     Task UpsertRunInputAsync(AutomationRunInputSnapshot input, CancellationToken ct = default);
     Task<AutomationRunSummary?> GetRunSummaryAsync(Guid runId, CancellationToken ct = default);
     Task<AutomationRunInputSnapshot?> GetRunInputAsync(Guid runId, CancellationToken ct = default);
-    Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default);
+    Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default, DateTimeOffset? createdFromUtc = null, DateTimeOffset? createdBeforeUtc = null);
     Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default);
     Task<IReadOnlyDictionary<Guid, ImportedBundleSnapshot>> GetImportedBundlesByIdsAsync(IEnumerable<Guid> bundleIds, CancellationToken ct = default);
     Task DeleteRunAsync(Guid runId, CancellationToken ct = default);

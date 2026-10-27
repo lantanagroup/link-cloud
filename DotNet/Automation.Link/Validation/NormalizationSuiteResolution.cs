@@ -9,7 +9,10 @@ public record NormalizationSuiteResolution(
     string SuiteName,
     List<NormalizationOperationDefinition> Operations,
     List<NormalizationSuiteSequenceResolution> Sequences,
-    List<NormalizationOperationDefinition> StandaloneOperations);
+    List<NormalizationOperationDefinition> StandaloneOperations)
+{
+    public Guid? SuiteId { get; init; }
+}
 
 public record NormalizationSuiteSequenceResolution(
     string SequenceName,

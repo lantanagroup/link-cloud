@@ -20,6 +20,16 @@ public class ReportScheduleApiModel
     public bool EnableSubmission { get; set; }
     public string? PayloadRootUri { get; set; }
     public bool? IsDeleted { get; set; }
+
+    /// <summary>
+    /// When the report first reached Submitted or CompletedNotSubmitted, in UTC. Never moves afterwards.
+    /// </summary>
+    public DateTimeOffset? CompletedDate { get; set; }
+
+    /// <summary>
+    /// When a report that had not finished was soft-deleted, in UTC. Null once restored.
+    /// </summary>
+    public DateTimeOffset? SoftDeletedDate { get; set; }
 }
 
 public class ReportEntryApiModel

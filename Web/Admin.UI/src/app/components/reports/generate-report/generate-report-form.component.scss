@@ -235,3 +235,17 @@ button[color="warn"] {
   margin-top: 4px;
   margin-bottom: 4px;
 }
+
+.bypass-checkbox {
+  display: block;
+  margin-bottom: 12px;
+}
+
+// The bypass label wraps, so pin the box to its first line instead of the middle.
+.bypass-checkbox ::ng-deep .mdc-form-field {
+  align-items: flex-start;
+}
+
+.bypass-checkbox ::ng-deep .mdc-form-field > label {
+  padding-top: 8px;
+}

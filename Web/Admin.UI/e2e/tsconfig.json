@@ -1,0 +1,24 @@
+/**
+ * Typecheck-only config for the Playwright suite.
+ *
+ * Playwright transpiles specs with esbuild, which strips types without checking them, so
+ * nothing here is used to run the tests. Its job is to make the fixtures' typing mean
+ * something in CI: `e2e/fixtures/*` is written against the app's own interfaces under
+ * `src/app/interfaces/...`, and without a `tsc` pass a renamed or retyped backend field
+ * leaves a stale fixture that still transpiles and still passes.
+ *
+ * Run it with `npm run typecheck:e2e`. It is a separate config rather than an entry in the
+ * root `references` list because those are Angular project configs built by `ng`, and this
+ * one must never emit.
+ */
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // `process.env` is read for the demo project's pacing knobs. @types/node is a direct
+    // devDependency for this reason — it used to arrive only transitively, which would have
+    // made this typecheck fail the day an unrelated dependency was dropped.
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

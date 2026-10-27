@@ -1,11 +1,14 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.AdminBFF;
@@ -210,7 +213,11 @@ public class JavaServiceHealthTests
         return measureEval
             ? await new MeasureEvalService(NullLogger<MeasureEvalService>.Instance, client, registry)
                 .LinkServiceHealthCheck(CancellationToken.None)
-            : await new ValidationService(NullLogger<ValidationService>.Instance, client, registry)
+            : await new ValidationService(NullLogger<ValidationService>.Instance,
+                                          client,
+                                          registry,
+                                          Options.Create(new AuthenticationSchemaConfig()),
+                                          new Mock<IServiceScopeFactory>().Object)
                 .LinkServiceHealthCheck(CancellationToken.None);
     }
 

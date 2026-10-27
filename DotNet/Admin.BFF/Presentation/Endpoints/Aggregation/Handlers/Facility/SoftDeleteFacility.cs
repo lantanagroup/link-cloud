@@ -22,7 +22,7 @@ public static class SoftDeleteFacility
         // Pre-check: block if the facility has reports currently running (New or EndOfPeriod)
         try
         {
-            var activeResponse = await reportService.GetActiveReportSchedulesAsync(context.User, facilityId, context.RequestAborted);
+            using var activeResponse = await reportService.GetActiveReportSchedulesAsync(context.User, facilityId, context.RequestAborted);
             if (activeResponse.IsSuccessStatusCode)
             {
                 var body = await activeResponse.Content.ReadAsStringAsync(context.RequestAborted);
@@ -54,6 +54,9 @@ public static class SoftDeleteFacility
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
+        // Each response is assigned inside a try that covers only the call, so it is disposed through an alias.
+        using var tenantResponseScope = tenantResponse;
+
         if (!tenantResponse.IsSuccessStatusCode)
         {
             var tenantDetail = await ReadDetailAsync(tenantResponse);
@@ -74,6 +77,7 @@ public static class SoftDeleteFacility
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete report schedules. Tenant soft-delete has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
+        using var reportResponseScope = reportResponse;
         if (!reportResponse.IsSuccessStatusCode)
         {
             logger.LogWarning("Report schedule soft-delete failed for facility {FacilityId} with status {StatusCode} — rolling back step 1", facilityId.SanitizeForLog(), reportResponse.StatusCode);
@@ -95,6 +99,7 @@ public static class SoftDeleteFacility
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
+        using var daResponseScope = daResponse;
         if (!daResponse.IsSuccessStatusCode)
         {
             logger.LogWarning("Acquisition log soft-delete failed for facility {FacilityId} with status {StatusCode} — rolling back steps 1 and 2", facilityId.SanitizeForLog(), daResponse.StatusCode);
@@ -118,6 +123,7 @@ public static class SoftDeleteFacility
             return ProblemDetailsExtension.UserFacingProblem("Failed to delete census jobs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
+        using var censusResponseScope = censusResponse;
         if (!censusResponse.IsSuccessStatusCode)
         {
             logger.LogWarning("Census job deletion failed for facility {FacilityId} with status {StatusCode} — rolling back steps 1, 2 and 3", facilityId.SanitizeForLog(), censusResponse.StatusCode);
@@ -155,7 +161,7 @@ public static class SoftDeleteFacility
     {
         try
         {
-            var response = await tenantService.RestoreFacilityAsync(context.User, facilityId, context.RequestAborted);
+            using var response = await tenantService.RestoreFacilityAsync(context.User, facilityId, context.RequestAborted);
             if (!response.IsSuccessStatusCode)
                 logger.LogError("Rollback failed: could not restore tenant for facility {FacilityId} (status {StatusCode})", facilityId.SanitizeForLog(), response.StatusCode);
         }
@@ -169,7 +175,7 @@ public static class SoftDeleteFacility
     {
         try
         {
-            var response = await reportService.RestoreReportSchedulesAsync(context.User, facilityId, context.RequestAborted);
+            using var response = await reportService.RestoreReportSchedulesAsync(context.User, facilityId, context.RequestAborted);
             if (!response.IsSuccessStatusCode)
                 logger.LogError("Rollback failed: could not restore report schedules for facility {FacilityId} (status {StatusCode})", facilityId.SanitizeForLog(), response.StatusCode);
         }
@@ -183,7 +189,7 @@ public static class SoftDeleteFacility
     {
         try
         {
-            var response = await dataAcquisitionService.RestoreLogsAsync(context.User, facilityId, context.RequestAborted);
+            using var response = await dataAcquisitionService.RestoreLogsAsync(context.User, facilityId, context.RequestAborted);
             if (!response.IsSuccessStatusCode)
                 logger.LogError("Rollback failed: could not restore acquisition logs for facility {FacilityId} (status {StatusCode})", facilityId.SanitizeForLog(), response.StatusCode);
         }
