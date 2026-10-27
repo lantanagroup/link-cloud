@@ -76,7 +76,7 @@ public class AggregateCountClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/counts", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/counts", request.Path);
         Assert.Equal(14, JsonDocument.Parse(request.Body).RootElement.GetProperty("Days").GetInt32());
         Assert.Equal(6, result.Body!.FailedTotal);
     }

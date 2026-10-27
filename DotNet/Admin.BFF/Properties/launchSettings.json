@@ -22,7 +22,7 @@
         "ServiceRegistry__QueryDispatchServiceUrl": "http://localhost:8071",
         "ServiceRegistry__TerminologyServiceUrl": "http://localhost:8076",
         "ServiceRegistry__ValidationServiceUrl": "http://localhost:8075",
-        "ServiceRegistry__OperationsServiceUrl": "http://localhost:8079",
+        "ServiceRegistry__OperationsServiceUrl": "http://localhost:8091",
 
         "ReverseProxy__Clusters__AccountService__Destinations__destination1__Address": "http://localhost:8060",
         "ReverseProxy__Clusters__AuditService__Destinations__destination1__Address": "http://localhost:8062",
@@ -36,7 +36,7 @@
         "ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address": "http://localhost:8071",
         "ReverseProxy__Clusters__ValidationService__Destinations__destination1__Address": "http://localhost:8075",
         "ReverseProxy__Clusters__TerminologyService__Destinations__destination1__Address": "http://localhost:8076",
-        "ReverseProxy__Clusters__OperationsService__Destinations__destination1__Address": "http://localhost:8079"
+        "ReverseProxy__Clusters__OperationsService__Destinations__destination1__Address": "http://localhost:8091"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:8063"

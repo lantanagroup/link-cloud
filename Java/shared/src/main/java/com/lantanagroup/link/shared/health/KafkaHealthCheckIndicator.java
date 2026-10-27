@@ -1,4 +1,4 @@
-﻿package com.lantanagroup.link.shared.health;
+package com.lantanagroup.link.shared.health;
 
 import com.lantanagroup.link.shared.kafka.KafkaKeys;
 import com.lantanagroup.link.shared.kafka.Properties;
