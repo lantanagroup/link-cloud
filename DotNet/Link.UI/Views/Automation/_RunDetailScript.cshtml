@@ -1906,7 +1906,10 @@
                 : '<p class="text-muted mb-0">No operations were recorded for this run.</p>';
             const inventoryItems = inventory.length
                 ? '<ul class="mb-0">' + inventory.map(line => `<li><code class="text-break">${escapeHtml(line)}</code></li>`).join('') + '</ul>'
-                : `<p class="text-muted mb-0">${escapeHtml(data.evidenceMessage || 'No evidence found.')}</p>`;
+                : (data.evidenceState === 'found'
+                    // The Found label already carries the evidence message.
+                    ? ''
+                    : `<p class="text-muted mb-0">${escapeHtml(data.evidenceMessage || 'No evidence found.')}</p>`);
             body.innerHTML = `
                 <div class="row g-3 mb-3">
                     <div class="col-md-4"><div class="small text-muted">Normalization Suite</div><div class="fw-semibold text-break">${normalizationArtifactText(data.suiteState, data.suiteName, 'Selected suite')}</div>${suiteDefinitionBadge(data)}${suiteDefinitionNote(data)}</div>
