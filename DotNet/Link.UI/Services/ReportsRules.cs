@@ -21,7 +21,7 @@ public static class ReportsRules
     public static readonly string[] Cadences = ["Daily", "Monthly", "Custom"];
     public static readonly int[] LogPageSizes = [10, 20, 50];
     public static readonly int[] IssuePageSizes = [10, 25, 50, 100];
-    public static readonly string[] IssueSorts = ["severity", "code", "patient", "message", "location"];
+    public static readonly string[] IssueSorts = ["severity", "code", "patient", "message", "location", "profile"];
 
     public static bool CanDownload(bool deleted, string? payloadRootUri) =>
         !deleted && !string.IsNullOrWhiteSpace(payloadRootUri);
@@ -157,6 +157,23 @@ public static class ReportsRules
         return true;
     }
 
+    /// <summary>
+    /// Short name for a profile canonical: the last path segment, keeping any |version.
+    /// Empty when the finding belongs to no profile.
+    /// </summary>
+    public static string ProfileLabel(string? profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile))
+            return string.Empty;
+        var value = profile.Trim();
+        var bar = value.IndexOf('|');
+        var url = bar >= 0 ? value[..bar] : value;
+        var version = bar >= 0 ? value[bar..] : string.Empty;
+        var slash = url.TrimEnd('/').LastIndexOf('/');
+        var name = slash >= 0 ? url.TrimEnd('/')[(slash + 1)..] : url;
+        return name.Length == 0 ? value : name + version;
+    }
+
     public static IReadOnlyList<ValidationIssueRow> ParseIssues(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -182,6 +199,7 @@ public static class ReportsRules
                     Message = Text(item, "message"),
                     Location = Text(item, "location"),
                     Expression = Text(item, "expression"),
+                    Profile = Text(item, "profile"),
                     Categories = Categories(item)
                 });
             }
@@ -365,7 +383,8 @@ public static class ReportsRules
             filtered = filtered.Where(issue =>
                 issue.Message.Contains(query.Text, StringComparison.OrdinalIgnoreCase)
                 || issue.Code.Contains(query.Text, StringComparison.OrdinalIgnoreCase)
-                || issue.PatientId.Contains(query.Text, StringComparison.OrdinalIgnoreCase));
+                || issue.PatientId.Contains(query.Text, StringComparison.OrdinalIgnoreCase)
+                || issue.Profile.Contains(query.Text, StringComparison.OrdinalIgnoreCase));
         }
 
         filtered = query.Sort switch
@@ -374,6 +393,7 @@ public static class ReportsRules
             "patient" => Order(filtered, issue => issue.PatientId, query.Descending),
             "message" => Order(filtered, issue => issue.Message, query.Descending),
             "location" => Order(filtered, issue => issue.Location, query.Descending),
+            "profile" => Order(filtered, issue => issue.Profile, query.Descending),
             _ => query.Descending
                 ? filtered.OrderByDescending(issue => SeverityRank(issue.Severity)).ThenBy(issue => issue.Code, StringComparer.OrdinalIgnoreCase)
                 : filtered.OrderBy(issue => SeverityRank(issue.Severity)).ThenBy(issue => issue.Code, StringComparer.OrdinalIgnoreCase)
