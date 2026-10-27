@@ -79,6 +79,16 @@ public class NormalizationResultsTests
     }
 
     [Fact]
+    public void Details_popup_does_not_repeat_the_found_evidence_message()
+    {
+        var script = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Automation/_RunDetailScript.cshtml"));
+
+        // The Found label shows the evidence message, so the empty-inventory fallback stays blank for it.
+        script.Should().Contain("? '<ul class=\"mb-0\">' + inventory.map(");
+        script.Should().Contain(": (data.evidenceState === 'found'");
+    }
+
+    [Fact]
     public void Manifest_rows_carry_the_recorded_patient_source()
     {
         var snapshot = new GenerationManifestSnapshot
