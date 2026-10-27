@@ -42,6 +42,45 @@ public static class AutomationRules
 
     public static int NormalizePageNumber(int pageNumber) => Math.Max(1, pageNumber);
 
+    public const string CreatedRangeOrderError = "Created From must be on or before Created To.";
+    public const string CreatedRangeLimitError = "Created To is outside the supported date range.";
+
+    /// <summary>
+    /// Turns the Created Date inputs into a UTC range, matching the Engine: both are UTC calendar days,
+    /// From starts at midnight and To is inclusive (the bound is the next midnight, exclusive).
+    /// </summary>
+    public static bool TryCreatedRange(
+        DateOnly? createdFrom,
+        DateOnly? createdTo,
+        out DateTimeOffset? createdFromUtc,
+        out DateTimeOffset? createdBeforeUtc,
+        out string? error)
+    {
+        createdFromUtc = null;
+        createdBeforeUtc = null;
+        error = null;
+
+        if (createdFrom.HasValue && createdTo.HasValue && createdFrom.Value > createdTo.Value)
+        {
+            error = CreatedRangeOrderError;
+            return false;
+        }
+
+        if (createdTo == DateOnly.MaxValue)
+        {
+            error = CreatedRangeLimitError;
+            return false;
+        }
+
+        createdFromUtc = createdFrom.HasValue
+            ? new DateTimeOffset(createdFrom.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : null;
+        createdBeforeUtc = createdTo.HasValue
+            ? new DateTimeOffset(createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : null;
+        return true;
+    }
+
     public static int NormalizePageSize(int pageSize) =>
         pageSize <= 0 ? DefaultPageSize : Math.Min(pageSize, MaxPageSize);
 
