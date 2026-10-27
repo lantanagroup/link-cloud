@@ -230,6 +230,7 @@ public sealed class FacilityReportRow
     public bool CanResubmit { get; set; }
     public bool CanAbort { get; init; }
     public bool CanCleanUp { get; init; }
+    /// <summary>Deleted and restorable. A deleted row that is not restorable shows Restore disabled.</summary>
     public bool CanRestore { get; init; }
     public bool CanDownload { get; init; }
     public bool IsTest { get; set; }

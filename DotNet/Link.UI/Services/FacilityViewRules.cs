@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
@@ -191,7 +192,18 @@ public static class FacilityViewRules
     public static bool CanCleanUp(ScheduleStatus status, bool deleted) =>
         !deleted && status is ScheduleStatus.Submitted or ScheduleStatus.CompletedNotSubmitted or ScheduleStatus.Scheduled;
 
-    public static bool CanRestore(bool deleted) => deleted;
+    /// <summary>
+    /// A deleted report can be restored only if it had not started or had finished submission.
+    /// The status list lives in <see cref="ScheduleStatusExtensions.CanRestore"/>.
+    /// </summary>
+    public static bool CanRestore(ScheduleStatus status, bool deleted) => deleted && status.CanRestore();
+
+    /// <summary>Why Restore is disabled on a deleted report that cannot come back.</summary>
+    public const string RestoreBlockedReason = ScheduleStatusExtensions.RestoreBlockedDetail;
+
+    /// <summary>The restore line on the delete and abort confirmations.</summary>
+    public static string RestoreNote(ScheduleStatus status) =>
+        status.CanRestore() ? "The report is soft-deleted and can be restored later." : "The report is soft-deleted. " + RestoreBlockedReason;
 
     public static IReadOnlyList<EnrolledCadence> Enrolled(TenantScheduledReportConfig? schedule)
     {

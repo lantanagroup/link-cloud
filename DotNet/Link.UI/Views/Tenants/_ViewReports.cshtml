@@ -152,7 +152,7 @@
                                     <form method="post" data-au-save asp-action="AbortReport" asp-route-id="@Model.FacilityId">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-warning lu-icon-btn" title="Abort" aria-label="Abort" data-hold="@Hold.Of("Stop this report", "Stop this in-progress report. Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The report is soft-deleted and can be restored later." }, "", "Hold to stop")"><i class="bi bi-stop-fill" aria-hidden="true"></i><span class="ms-1">Abort</span></button>
+                                        <button type="submit" class="btn btn-sm btn-warning lu-icon-btn" title="Abort" aria-label="Abort" data-hold="@Hold.Of("Stop this report", "Stop this in-progress report. Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { FacilityViewRules.RestoreNote(report.Status) }, "", "Hold to stop")"><i class="bi bi-stop-fill" aria-hidden="true"></i><span class="ms-1">Abort</span></button>
                                     </form>
                                 }
                                 @if (report.CanCleanUp)
@@ -160,16 +160,21 @@
                                     <form method="post" data-au-save asp-action="CleanUpReport" asp-route-id="@Model.FacilityId">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete report @report.Id" data-hold="@Hold.Of("Delete this report", "Remove this report and its associated acquisition logs.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The report is soft-deleted and can be restored later.", "Acquisition logs for this report are removed with it." }, "", "Hold to delete")"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete report @report.Id" data-hold="@Hold.Of("Delete this report", "Remove this report and its associated acquisition logs.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { FacilityViewRules.RestoreNote(report.Status), "Acquisition logs for this report are removed with it." }, "", "Hold to delete")"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 }
-                                @if (report.CanRestore)
+                                @if (report.Deleted && report.CanRestore)
                                 {
                                     <form method="post" data-au-save asp-action="RestoreReport" asp-route-id="@Model.FacilityId">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
                                         <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore" data-hold="@Hold.Of("Restore this report", "Restore this report and its acquisition logs.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The report and its acquisition logs come back onto the active lists." }, "", "Hold to restore")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
                                     </form>
+                                }
+                                else if (report.Deleted)
+                                {
+                                    @* A disabled button leaves the tab order, so the wrapper takes focus and carries the reason. *@
+                                    <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" title="@FacilityViewRules.RestoreBlockedReason" aria-label="Restore unavailable. @FacilityViewRules.RestoreBlockedReason" data-restore-blocked><button type="button" class="btn btn-sm btn-success lu-icon-btn" disabled aria-hidden="true" tabindex="-1"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button></span>
                                 }
                                 </div>
                             </td>

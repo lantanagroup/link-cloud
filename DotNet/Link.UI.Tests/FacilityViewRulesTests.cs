@@ -100,8 +100,8 @@ public class FacilityViewRulesTests
         FacilityViewRules.CanCleanUp(ScheduleStatus.New, deleted: false).Should().BeFalse();
         FacilityViewRules.CanCleanUp(ScheduleStatus.Submitted, deleted: true).Should().BeFalse();
 
-        FacilityViewRules.CanRestore(deleted: true).Should().BeTrue();
-        FacilityViewRules.CanRestore(deleted: false).Should().BeFalse();
+        FacilityViewRules.CanRestore(ScheduleStatus.Submitted, deleted: true).Should().BeTrue();
+        FacilityViewRules.CanRestore(ScheduleStatus.Submitted, deleted: false).Should().BeFalse();
     }
 
     [Fact]
