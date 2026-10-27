@@ -8,7 +8,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:8079"
+      "applicationUrl": "http://localhost:8091"
     },
     "http-docker": {
       "commandName": "Project",
@@ -21,7 +21,7 @@
         "Telemetry__OtelCollectorEndpoint": "http://localhost:4317"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:8079"
+      "applicationUrl": "http://localhost:8091"
     }
   }
 }

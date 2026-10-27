@@ -25,6 +25,7 @@ public final class KafkaKeyLegacy {
             "MockDmrpApi",
             "Normalization",
             "Notification",
+            "Operations",
             "QueryDispatch",
             "Report",
             "Submission",

@@ -20,6 +20,7 @@ public static class KafkaKeyLegacy
         "MockDmrpApi",
         "Normalization",
         "Notification",
+        "Operations",
         "QueryDispatch",
         "Report",
         "Submission",

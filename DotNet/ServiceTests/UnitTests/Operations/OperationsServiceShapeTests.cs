@@ -92,7 +92,7 @@ public sealed class OperationsServiceShapeTests
     {
         var compose = File.ReadAllText(Path.Combine(DotNet(), "..", "docker-compose.yml")).Replace("\r\n", "\n");
         Assert.Contains("  operations:\n    image: link-operations\n    container_name: link-operations\n", compose, StringComparison.Ordinal);
-        Assert.Contains("      - \"8079:8079\"", compose, StringComparison.Ordinal);
+        Assert.Contains("      - \"8091:8079\"", compose, StringComparison.Ordinal);
         Assert.Contains("http://localhost:8079/health", compose, StringComparison.Ordinal);
         Assert.Contains("ServiceRegistry__OperationsServiceUrl: http://operations:8079", compose, StringComparison.Ordinal);
         Assert.Contains("Initial Catalog=link-operations;", compose, StringComparison.Ordinal);

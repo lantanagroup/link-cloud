@@ -220,7 +220,8 @@ public static class KafkaTopicCatalog
                 Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/ScheduledReportManager.cs"),
                 Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/QueryDispatchConfigurationManager.cs"),
                 Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/PatientDispatchManager.cs"),
-                Site("Admin.BFF", "DotNet/Admin.BFF/Application/KafkaOps/KafkaOpsService.cs", control: true)),
+                Site("Operations", "DotNet/Operations/Application/KafkaOps/KafkaOpsService.cs", control: true),
+                Site("Operations", "DotNet/Operations/Application/KafkaOps/Browse/KafkaMessageBrowser.cs", control: true)),
             Consumers(Site("Audit", "DotNet/Audit/Listeners/AuditEventListener.cs")));
         Add(map, "CernerPatientsAcquired", true, "", false, "Census", "",
             Producers(Site("DataAcquisition", "DotNet/DataAcquisition.Domain/Application/Services/Sftp/Processors/CernerCCLExtractProcessor.cs")),
