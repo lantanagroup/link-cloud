@@ -27,15 +27,23 @@ public class ServiceHealthProbeTests
     public async Task UnhealthyBelowThreshold_DoesNotTriggerCriticalFailure()
     {
         var clock = new TestTimeProvider();
-        var probe = CreateProbe(() => false, clock);
 
-        (await ExecuteAsync(probe)).HasCriticalFailure.Should().NotBe(true);
+        bool? healthy = true;
+        var probe = CreateProbe(() => healthy, clock);
 
-        clock.Advance(TimeSpan.FromSeconds(119));
+        // Establish initial healthy state.
+        await ExecuteAsync(probe);
+
+        // Begin the outage.
+        healthy = false;
+        await ExecuteAsync(probe);
+
+        // Remain just below the configured threshold.
+        clock.Advance(OutageThreshold - TimeSpan.FromSeconds(1));
 
         var result = await ExecuteAsync(probe);
 
-        result.HasCriticalFailure.Should().NotBe(true);
+        result.HasCriticalFailure.Should().BeFalse();
     }
 
     [Fact]
@@ -70,43 +78,80 @@ public class ServiceHealthProbeTests
     public async Task RecoveryBeforeThreshold_ResetsOutageTimer()
     {
         var clock = new TestTimeProvider();
-        bool? healthy = false;
+
+        bool? healthy = true;
         var probe = CreateProbe(() => healthy, clock);
 
+        // Establish initial healthy state.
+        await ExecuteAsync(probe);
+
+        // First outage begins.
+        healthy = false;
         await ExecuteAsync(probe);
 
         clock.Advance(TimeSpan.FromSeconds(100));
+
+        // Service recovers before reaching the threshold.
         healthy = true;
-        (await ExecuteAsync(probe)).HasCriticalFailure.Should().NotBe(true);
 
+        var recoveryResult = await ExecuteAsync(probe);
+
+        recoveryResult.HasCriticalFailure.Should().BeFalse();
+
+        recoveryResult.Issues.Should().ContainSingle(issue =>
+            issue.Key == "service-health-recovered:Terminology");
+
+        // Start a second outage.
         clock.Advance(TimeSpan.FromSeconds(30));
-        healthy = false;
-        (await ExecuteAsync(probe)).HasCriticalFailure.Should().NotBe(true);
 
+        healthy = false;
+        await ExecuteAsync(probe);
+
+        // The second outage must have its own threshold window.
         clock.Advance(TimeSpan.FromSeconds(100));
-        (await ExecuteAsync(probe)).HasCriticalFailure.Should().NotBe(true);
+
+        var result = await ExecuteAsync(probe);
+
+        result.HasCriticalFailure.Should().BeFalse();
     }
 
     [Fact]
     public async Task SecondOutage_UsesNewThresholdWindow()
     {
         var clock = new TestTimeProvider();
-        bool? healthy = false;
+
+        bool? healthy = true;
         var probe = CreateProbe(() => healthy, clock);
 
+        // Establish initial healthy state.
         await ExecuteAsync(probe);
 
-        clock.Advance(TimeSpan.FromSeconds(100));
-        healthy = true;
-        await ExecuteAsync(probe);
-
-        clock.Advance(TimeSpan.FromSeconds(5));
+        // First outage.
         healthy = false;
         await ExecuteAsync(probe);
 
+        clock.Advance(TimeSpan.FromSeconds(100));
+
+        // Recover before the first outage reaches the threshold.
+        healthy = true;
+        await ExecuteAsync(probe);
+
+        // Begin a second outage.
+        clock.Advance(TimeSpan.FromSeconds(5));
+
+        healthy = false;
+        await ExecuteAsync(probe);
+
+        // The second outage should reach the threshold independently.
         clock.Advance(OutageThreshold);
 
-        (await ExecuteAsync(probe)).HasCriticalFailure.Should().BeTrue();
+        var result = await ExecuteAsync(probe);
+
+        result.HasCriticalFailure.Should().BeTrue();
+
+        result.Issues.Should().ContainSingle(issue =>
+            issue.Key == "service-health-timeout:Terminology" &&
+            issue.Severity == MonitorIssueSeverity.Critical);
     }
 
     [Fact]
@@ -129,22 +174,35 @@ public class ServiceHealthProbeTests
     public async Task UnknownHealth_ResetsPreviousOutageWindow()
     {
         var clock = new TestTimeProvider();
-        bool? healthy = false;
+
+        bool? healthy = true;
         var probe = CreateProbe(() => healthy, clock);
 
+        // Establish initial healthy state.
         await ExecuteAsync(probe);
 
-        clock.Advance(TimeSpan.FromSeconds(100));
-        healthy = null;
-        await ExecuteAsync(probe);
-
-        clock.Advance(TimeSpan.FromSeconds(30));
+        // Start an outage.
         healthy = false;
         await ExecuteAsync(probe);
 
         clock.Advance(TimeSpan.FromSeconds(100));
 
-        (await ExecuteAsync(probe)).HasCriticalFailure.Should().NotBe(true);
+        // Health becomes unknown, clearing the outage window.
+        healthy = null;
+        await ExecuteAsync(probe);
+
+        clock.Advance(TimeSpan.FromSeconds(30));
+
+        // Start a new outage.
+        healthy = false;
+        await ExecuteAsync(probe);
+
+        clock.Advance(TimeSpan.FromSeconds(100));
+
+        // The new outage has not reached its threshold.
+        var result = await ExecuteAsync(probe);
+
+        result.HasCriticalFailure.Should().BeFalse();
     }
 
     [Fact]
@@ -198,8 +256,8 @@ public class ServiceHealthProbeTests
         var probe = new ServiceHealthProbe(
             [
                 new MonitoredService(
-                "Terminology",
-                _ => Task.FromResult<bool?>(true)),
+                    "Terminology",
+                    _ => Task.FromResult<bool?>(true)),
 
             new MonitoredService(
                 "Validation",
@@ -234,13 +292,75 @@ public class ServiceHealthProbeTests
             issue.Message.Contains("Validation"));
     }
 
+    [Fact]
+    public async Task RegenerationPhase_PreservesHealthHistoryAcrossMonitorPhases()
+    {
+        var clock = new TestTimeProvider();
+
+        bool? healthy = true;
+        var probe = CreateProbe(() => healthy, clock);
+
+        // Initial report phase: service is healthy.
+        var initialResult = await ExecuteAsync(probe);
+
+        initialResult.HasCriticalFailure.Should().BeFalse();
+
+        // The service becomes unavailable before regeneration.
+        healthy = false;
+
+        // Regeneration phase reuses the same probe.
+        var regenInitialResult = await ExecuteAsync(probe);
+
+        regenInitialResult.HasCriticalFailure.Should().BeFalse();
+
+        regenInitialResult.Issues.Should().ContainSingle(issue =>
+            issue.Key == "service-health-outage:Terminology" &&
+            issue.Severity == MonitorIssueSeverity.Warning);
+
+        // The outage persists throughout the configured threshold.
+        clock.Advance(OutageThreshold);
+
+        var regenResult = await ExecuteAsync(probe);
+
+        regenResult.HasCriticalFailure.Should().BeTrue();
+
+        regenResult.Issues.Should().ContainSingle(issue =>
+            issue.Key == "service-health-timeout:Terminology" &&
+            issue.Severity == MonitorIssueSeverity.Critical);
+    }
+
+    [Fact]
+    public async Task NeverHealthyService_DoesNotStartOutageTimer()
+    {
+        var clock = new TestTimeProvider();
+
+        var probe = CreateProbe(() => false, clock);
+
+        // Service is unhealthy from the very first check.
+        var initialResult = await ExecuteAsync(probe);
+
+        initialResult.HasCriticalFailure.Should().BeFalse();
+
+        // Advance well beyond the configured outage threshold.
+        clock.Advance(OutageThreshold + TimeSpan.FromMinutes(5));
+
+        var result = await ExecuteAsync(probe);
+
+        // An outage is not counted until the service
+        // has been observed healthy at least once.
+        result.HasCriticalFailure.Should().BeFalse();
+
+        result.Issues.Should().NotContain(issue =>
+            issue.Key == "service-health-timeout:Terminology");
+    }
+
     private static ServiceHealthProbe CreateProbe(Func<bool?> healthCheck, TimeProvider clock)
     {
         return new ServiceHealthProbe(
             [
                 new MonitoredService(
-                "Terminology",
-                _ => Task.FromResult(healthCheck()))
+                    "Terminology",
+                    _ => Task.FromResult(healthCheck()))
             ],
             CheckInterval,
             OutageThreshold,

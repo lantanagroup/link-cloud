@@ -85,33 +85,7 @@ internal sealed class RunExecutor
         ILivePatientEventInjector liveInjector)
     {
         _automationConfig = automationConfig;
-
-        var monitoredServices = new List<(string Name, string Url)>();
-
-        void AddMonitoredService(string name, string configurationKey)
-        {
-            var serviceUrl = configuration[configurationKey];
-
-            if (string.IsNullOrWhiteSpace(serviceUrl))
-                return;
-
-            if (!Uri.TryCreate(serviceUrl.TrimEnd('/'), UriKind.Absolute, out var uri) ||
-                (uri.Scheme != Uri.UriSchemeHttp &&
-                 uri.Scheme != Uri.UriSchemeHttps))
-            {
-                throw new ArgumentException(
-                    $"{configurationKey} must be an absolute HTTP or HTTPS URL.",
-                    nameof(configuration));
-            }
-
-            monitoredServices.Add((name, $"{serviceUrl.TrimEnd('/')}/health"));
-        }
-
-        AddMonitoredService("Terminology", "ServiceRegistry:TerminologyServiceUrl");
-        AddMonitoredService("Validation", "ServiceRegistry:ValidationServiceUrl");
-
-        _monitoredServiceHealthUrls = monitoredServices;
-
+        _monitoredServiceHealthUrls = BuildMonitoredServiceHealthUrls(configuration);
         _serviceHealthInterval = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:CheckIntervalSeconds") ?? 5);
         _serviceOutageThreshold = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:OutageThresholdSeconds") ?? 120);
 
@@ -143,6 +117,45 @@ internal sealed class RunExecutor
         _operationOutcomeExpectationSource = ooExpectations.Source;
         _logger = logger;
         _liveInjector = liveInjector;
+    }
+
+    internal static IReadOnlyList<(string Name, string Url)>
+    BuildMonitoredServiceHealthUrls(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var monitoredServices = new List<(string Name, string Url)>();
+
+        void AddMonitoredService(string name, string configurationKey)
+        {
+            var serviceUrl = configuration[configurationKey];
+
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                return;
+
+            serviceUrl = serviceUrl.Trim().TrimEnd('/');
+
+            if (!Uri.TryCreate(serviceUrl, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp &&
+                 uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new ArgumentException(
+                    $"{configurationKey} must be an absolute HTTP or HTTPS URL.",
+                    nameof(configuration));
+            }
+
+            monitoredServices.Add((name, $"{serviceUrl}/health"));
+        }
+
+        AddMonitoredService(
+            "Terminology",
+            "ServiceRegistry:TerminologyServiceUrl");
+
+        AddMonitoredService(
+            "Validation",
+            "ServiceRegistry:ValidationServiceUrl");
+
+        return monitoredServices;
     }
 
     private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
@@ -934,6 +947,9 @@ internal sealed class RunExecutor
                     _serviceOutageThreshold);
             }
 
+            // Preserve service health history across the initial and regenerated reports.
+            var serviceHealthProbe = CreateServiceHealthProbe();
+
             await using (var diagnostics = new BackgroundDiagnosticsMonitor(
                 output,
                 lokiScraper,
@@ -944,7 +960,7 @@ internal sealed class RunExecutor
                 forwardInternalLogsToOutput: true,
                 pipelineReader: services.GetRequiredService<PipelineDataReader>(),
                 scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun),
-                serviceHealthProbe: CreateServiceHealthProbe()))
+                serviceHealthProbe: serviceHealthProbe))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
                 var submitted = await reportHelper.CheckSubmissionStatusAsync(
@@ -1064,7 +1080,7 @@ internal sealed class RunExecutor
                     pipelineReader: services.GetRequiredService<PipelineDataReader>(),
                     expectsDataAcquisition: false,
                     scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun),
-                    serviceHealthProbe: CreateServiceHealthProbe());
+                    serviceHealthProbe: serviceHealthProbe);
 
                 await regenDiagnostics.StartAsync(facilityId, reportId);
 
@@ -1524,7 +1540,7 @@ internal sealed class RunExecutor
         }
     }
 
-    private static async Task<bool?> CheckHealthAsync(
+    internal static async Task<bool?> CheckHealthAsync(
     HttpClient client,
     string healthUrl,
     CancellationToken cancellationToken)
