@@ -633,7 +633,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_test
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_TEST
 
@@ -652,7 +652,7 @@ stages:
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_${{ parameters.environment }}
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_TEST
 
@@ -770,7 +770,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_qa
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA
 
@@ -789,7 +789,7 @@ stages:
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_QA
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_QA
 
@@ -907,7 +907,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_qa2
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA2
 
@@ -926,7 +926,7 @@ stages:
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_${{ parameters.environment }}
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_QA2
 
@@ -1044,7 +1044,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_${{ parameters.environment }}
+      - job: Update_${{ db.alias }}_qa3
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA3
 
@@ -1063,7 +1063,7 @@ stages:
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_QA3
+  - job: Update_validation
     displayName: Update validation
     dependsOn: Verify_QA3
 
