@@ -467,10 +467,15 @@ internal sealed class RunExecutor
             }
 
             state.FacilityId = facilityId;
-            await ClearStaleFacilityAbortAsync(facilityId, output, cancellationToken);
+            var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
 
-            using var facilitySetupLock = await FacilitySetupGate.AcquireAsync(
+            // Success-path quiesce sets the facility abort while it still holds this gate.
+            // Clear only after this run owns the facility, so a second DMRP run cannot
+            // drop that flag out from under the run that is still quiescing.
+            using var facilitySetupLock = await AcquireFacilityAndClearStaleAbortAsync(
                 facilityId,
+                abortRegistry,
+                output,
                 message => output.WriteLine(message),
                 cancellationToken);
 
@@ -808,22 +813,26 @@ internal sealed class RunExecutor
             string normalizationEvidenceReportId;
             if (isLiveSimulation)
             {
-                await ClearStaleFacilityAbortAsync(facilityId, output, cancellationToken);
-                var scheduledWorkflowState = await ExecuteLiveScheduledReportWorkflowAsync(
-                    state,
-                    callbacks,
-                    reportHelper,
-                    output,
+                var scheduledWorkflowState = await InvokeAfterClearingStaleFacilityAbortAsync(
+                    abortRegistry,
                     facilityId,
-                    measureIds,
-                    scenarioConfig,
-                    patientIds,
-                    profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
-                    generationManifest,
-                    fhirDataLoader,
-                    generationConfig,
-                    generationRequirementsPlan,
-                    acquisitionSimulation,
+                    output,
+                    ct => ExecuteLiveScheduledReportWorkflowAsync(
+                        state,
+                        callbacks,
+                        reportHelper,
+                        output,
+                        facilityId,
+                        measureIds,
+                        scenarioConfig,
+                        patientIds,
+                        profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                        generationManifest,
+                        fhirDataLoader,
+                        generationConfig,
+                        generationRequirementsPlan,
+                        acquisitionSimulation,
+                        ct),
                     cancellationToken);
 
                 reportId = scheduledWorkflowState.ReportTrackingId;
@@ -840,16 +849,20 @@ internal sealed class RunExecutor
             }
             else if (usesScheduledWorkflow)
             {
-                await ClearStaleFacilityAbortAsync(facilityId, output, cancellationToken);
-                var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
-                    reportHelper,
-                    output,
+                var scheduledWorkflowState = await InvokeAfterClearingStaleFacilityAbortAsync(
+                    abortRegistry,
                     facilityId,
-                    measureIds,
-                    state.Options.SelectedMeasures,
-                    scenarioConfig,
-                    patientIds,
-                    profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                    output,
+                    ct => ExecuteScheduledReportWorkflowAsync(
+                        reportHelper,
+                        output,
+                        facilityId,
+                        measureIds,
+                        state.Options.SelectedMeasures,
+                        scenarioConfig,
+                        patientIds,
+                        profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                        ct),
                     cancellationToken);
 
                 reportId = scheduledWorkflowState.ReportTrackingId;
@@ -1759,16 +1772,56 @@ internal sealed class RunExecutor
         => value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
     /// <summary>
+    /// Takes the facility gate, then drops a stale facility-wide abort.
+    /// Success-path quiesce sets that flag while it still holds the gate, so the
+    /// clear has to wait until this run is the one inside the gate.
+    /// </summary>
+    internal static async Task<IDisposable> AcquireFacilityAndClearStaleAbortAsync(
+        string facilityId,
+        IPipelineAbortRegistry? abortRegistry,
+        IAutomationOutput output,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        var gate = await FacilitySetupGate.AcquireAsync(facilityId, log, cancellationToken);
+        try
+        {
+            await ClearStaleFacilityAbortAsync(abortRegistry, facilityId, output, cancellationToken);
+            return gate;
+        }
+        catch
+        {
+            gate.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Clears a stale facility abort and then runs the scheduled workflow that
+    /// produces ReportScheduled. The caller already holds <see cref="FacilitySetupGate"/>.
+    /// </summary>
+    internal static async Task<T> InvokeAfterClearingStaleFacilityAbortAsync<T>(
+        IPipelineAbortRegistry? abortRegistry,
+        string facilityId,
+        IAutomationOutput output,
+        Func<CancellationToken, Task<T>> next,
+        CancellationToken cancellationToken)
+    {
+        await ClearStaleFacilityAbortAsync(abortRegistry, facilityId, output, cancellationToken);
+        return await next(cancellationToken);
+    }
+
+    /// <summary>
     /// A previous run quiesces the facility id for the abort TTL. DMRP runs reuse the
     /// NHSN org id, so that flag is still set when the next run schedules a report and
     /// Report then drops the ReportScheduled event. Report-id flags are left in place.
     /// </summary>
-    private async Task ClearStaleFacilityAbortAsync(
+    internal static async Task ClearStaleFacilityAbortAsync(
+        IPipelineAbortRegistry? abortRegistry,
         string facilityId,
         IAutomationOutput output,
         CancellationToken cancellationToken)
     {
-        var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
         if (abortRegistry == null
             || !await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
             return;
