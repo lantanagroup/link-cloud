@@ -646,7 +646,7 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment_alias }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
@@ -727,7 +727,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment_alias }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -783,7 +783,7 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment_alias }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
@@ -864,7 +864,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment_alias }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -920,7 +920,7 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment_alias }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
@@ -1001,7 +1001,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment_alias }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -1057,7 +1057,7 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-${{ parameters.environment_alias }}-botw-${{ db.name }}'
+            DatabaseName: 'link-$(environment_alias)-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
@@ -1138,7 +1138,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-${{ parameters.environment_alias }}-botw-validation'
+        DatabaseName: 'link-$(environment_alias)-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
