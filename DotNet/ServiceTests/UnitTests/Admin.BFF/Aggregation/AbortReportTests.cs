@@ -85,12 +85,16 @@ public class AbortReportTests
         var deleteScheduleCalled = false;
         var deleteLogsCalled = false;
         string? deleteSchedulePath = null;
+        string? getSchedulePath = null;
 
         var handler = new MockHttpMessageHandler(request =>
         {
             var path = request.RequestUri!.PathAndQuery;
             if (request.Method == HttpMethod.Get && path.Contains($"api/schedules/{ReportId}"))
+            {
+                getSchedulePath = path;
                 return OkJson("{\"status\":\"New\"}");
+            }
             if (request.Method == HttpMethod.Post && path.Contains("cancel-by-filter"))
             {
                 cancelCalled = true;
@@ -120,6 +124,8 @@ public class AbortReportTests
         Assert.True(deleteScheduleCalled);
         Assert.Contains("allowInProgress=true", deleteSchedulePath, StringComparison.OrdinalIgnoreCase);
         Assert.True(deleteLogsCalled);
+        // An already-deleted schedule must still look missing to abort, so the pre-check doesn't ask for deleted ones.
+        Assert.DoesNotContain("includeDeleted", getSchedulePath, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

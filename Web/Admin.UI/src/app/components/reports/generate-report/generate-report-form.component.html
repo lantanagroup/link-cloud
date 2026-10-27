@@ -62,7 +62,10 @@
       }
     </mat-form-field>
 
-    <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+    <mat-checkbox formControlName="bypassSubmission" class="bypass-checkbox">
+      Bypass submission - the generated report will NOT be submitted to NHSN Azure Blob Storage (ABS).
+      When it is left unchecked, the generated report WILL be submitted to NHSN ABS.
+    </mat-checkbox>
     <br>
 
     <div class="row">
