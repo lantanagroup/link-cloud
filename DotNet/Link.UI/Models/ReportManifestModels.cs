@@ -42,6 +42,9 @@ public sealed class ManifestPatientRow
     public string? Pattern { get; init; }
     public string? Configuration { get; init; }
     public bool HasBundle { get; init; }
+
+    /// <summary>Generated or Uploaded for a run's patient; null when the run did not record it.</summary>
+    public string? Origin { get; init; }
     public string? Href { get; init; }
     public string Submission { get; init; } = string.Empty;
     public string Updated { get; init; } = string.Empty;
@@ -264,6 +267,9 @@ public sealed class ReportManifestModel
     public string? PatientNote { get; init; }
     public bool ShowComparison { get; init; }
     public bool ShowGeneration { get; init; }
+
+    /// <summary>True when the run recorded whether each patient was generated or uploaded.</summary>
+    public bool OriginRecorded { get; init; }
     public bool ShowShared { get; init; }
     public bool ShowSplit { get; init; }
     public bool ShowTotals { get; init; }

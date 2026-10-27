@@ -395,10 +395,18 @@
                 }
                 else
                 {
+                    @if (Model.ShowGeneration && !Model.OriginRecorded)
+                    {
+                        <p class="small text-muted mb-2" data-origin-note>Patient source was not recorded for this run.</p>
+                    }
                     <table class="au-table table table-sm mb-0">
                         <thead>
                             <tr>
                                 <th><a class="text-white" href="@Model.Href(sort: "id", descending: Model.Query.Sort == "id" ? !Model.Query.Descending : false)">Patient</a></th>
+                                @if (Model.ShowGeneration)
+                                {
+                                    <th>Source <span class="au-info-icon" data-bs-toggle="tooltip" title="Generated means the FHIR generator produced the patient. Uploaded means the patient was supplied or already existed." aria-label="About the source column"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
+                                }
                                 <th>
                                     @if (Model.ShowGeneration)
                                     {
@@ -457,6 +465,19 @@
                             patientIndex++;
                             <tr>
                                 <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = row.Href })" /></td>
+                                @if (Model.ShowGeneration)
+                                {
+                                    <td data-patient-origin>
+                                        @if (row.Origin is { } origin)
+                                        {
+                                            <span class="badge @ReportManifestRules.PatientOriginBadge(origin)">@origin</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted" title="Not recorded for this run">—</span>
+                                        }
+                                    </td>
+                                }
                                 <td data-nocopy><span class="badge @row.BadgeClass">@row.Status</span></td>
                                 @if (showSubmission)
                                 {

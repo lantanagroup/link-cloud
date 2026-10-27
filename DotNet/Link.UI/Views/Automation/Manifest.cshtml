@@ -1,11 +1,11 @@
 @model ReportManifestModel
 @{
-    ViewData["Title"] = "Generation manifest";
+    ViewData["Title"] = "Patient manifest";
     ViewData["AutomationSection"] = "runs";
 }
 @await Html.PartialAsync("_Nav")
 <div class="mb-3">
     <partial name="_BackButton" model="@(new BackLink(Url.Action("Run", "Automation", new { id = Model.RunId })!, "Back to run"))" />
 </div>
-<h1 class="h3 mb-3">Generation manifest</h1>
+<h1 class="h3 mb-3">Patient manifest</h1>
 @await Html.PartialAsync("_ReportManifest", Model)

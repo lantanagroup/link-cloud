@@ -199,7 +199,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-gear me-2"></i>Test Configuration</span>
             <a href="#" class="btn btn-sm btn-au-link" id="btnViewManifest" style="display:none;">
-                <i class="bi bi-card-checklist me-1"></i>Generation Manifest
+                <i class="bi bi-card-checklist me-1"></i>Patient Manifest
             </a>
         </div>
         <div class="card-body">
@@ -363,8 +363,37 @@
             </div>
 
             <div class="au-card">
-                <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Normalization</div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-arrow-repeat me-2"></i>Normalization</span>
+                    <button type="button" class="btn btn-sm btn-au-link lu-icon-btn" id="normalizationResultsBtn" data-bs-toggle="modal" data-bs-target="#normalizationResultsModal" title="Normalization details" aria-label="Normalization details"><i class="bi bi-list-check" aria-hidden="true"></i><span class="ms-1">Details</span></button>
+                </div>
                 <div class="card-body">
+                    <div class="row g-3 mb-3" id="normalizationSummaryStrip" data-normalization-results>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Normalization Suite</div>
+                                <div class="fw-semibold text-break" id="normalizationSuiteValue">Loading…</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Organization Map</div>
+                                <div class="fw-semibold text-break" id="normalizationOrmValue">Loading…</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Patients</div>
+                                <div id="normalizationPatientValue">Loading…</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Execution evidence</div>
+                                <div id="normalizationEvidenceValue">Loading…</div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="row g-3 mb-3">
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="normalizationResourceCount">0</div></div></div>
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="normalizationResPerSec">0.00</div></div></div>
@@ -477,6 +506,48 @@
         <button class="btn btn-sm btn-warning" id="closeFlyout">Close</button>
     </div>
     <div class="p-3" id="errorFlyoutBody" style="overflow:auto; height: calc(100% - 60px);"></div>
+</div>
+
+<div class="modal fade" id="normalizationResultsModal" tabindex="-1" aria-labelledby="normalizationResultsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width:900px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title mb-0" id="normalizationResultsModalLabel">Normalization details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="normalizationResultsBody">
+                <p class="text-muted mb-0">Loading normalization details…</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="normalizationSuiteModal" tabindex="-1" aria-labelledby="normalizationSuiteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title mb-0" id="normalizationSuiteModalLabel">Normalization Suite</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="normalizationSuiteBody">
+                <p class="text-muted mb-0">Loading suite…</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="normalizationOrmModal" tabindex="-1" aria-labelledby="normalizationOrmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title mb-0" id="normalizationOrmModalLabel">Organization Map</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="normalizationOrmBody">
+                <p class="text-muted mb-0">Loading organization map…</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="serviceExceptionModal" tabindex="-1" aria-labelledby="serviceExceptionModalLabel" aria-hidden="true">
