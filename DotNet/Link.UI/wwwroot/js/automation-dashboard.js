@@ -206,6 +206,10 @@
         params.set("pageSize", card ? (card.getAttribute("data-page-size") || "20") : "20");
         params.set("sortBy", card ? (card.getAttribute("data-sort-by") || "createdAt") : "createdAt");
         params.set("sortDir", card ? (card.getAttribute("data-sort-dir") || "desc") : "desc");
+        var createdFrom = card ? (card.getAttribute("data-created-from") || "") : "";
+        var createdTo = card ? (card.getAttribute("data-created-to") || "") : "";
+        if (createdFrom) params.set("createdFrom", createdFrom);
+        if (createdTo) params.set("createdTo", createdTo);
         return params;
     }
 
@@ -213,6 +217,8 @@
         if (key === "pageNumber") return "data-page-number";
         if (key === "pageSize") return "data-page-size";
         if (key === "sortBy") return "data-sort-by";
+        if (key === "createdFrom") return "data-created-from";
+        if (key === "createdTo") return "data-created-to";
         return "data-sort-dir";
     }
 
@@ -220,7 +226,7 @@
         var card = recentCard();
         if (!card) return;
         var current = new URL(window.location.href);
-        ["pageNumber", "pageSize", "sortBy", "sortDir"].forEach(function (key) {
+        ["pageNumber", "pageSize", "sortBy", "sortDir", "createdFrom", "createdTo"].forEach(function (key) {
             var value = current.searchParams.get(key);
             if (value) card.setAttribute(recentAttr(key), value);
         });
@@ -230,12 +236,28 @@
         if (!recentCard()) return;
         var params = recentQuery();
         var url = new URL(window.location.href);
-        ["pageNumber", "pageSize", "sortBy", "sortDir"].forEach(function (key) {
-            url.searchParams.set(key, params.get(key));
+        ["pageNumber", "pageSize", "sortBy", "sortDir", "createdFrom", "createdTo"].forEach(function (key) {
+            var value = params.get(key);
+            if (value) url.searchParams.set(key, value);
+            else url.searchParams.delete(key);
         });
         var next = url.pathname + "?" + url.searchParams.toString() + url.hash;
         var now = window.location.pathname + window.location.search + window.location.hash;
         if (next !== now) history.replaceState(null, "", next);
+    }
+
+    // A live refresh must not wipe dates the user has picked but not applied yet.
+    function typedCreatedDates(host) {
+        var from = host.querySelector("#createdFromInput");
+        var to = host.querySelector("#createdToInput");
+        return { from: from ? from.value : null, to: to ? to.value : null };
+    }
+
+    function keepTypedCreatedDates(host, typed) {
+        var from = host.querySelector("#createdFromInput");
+        var to = host.querySelector("#createdToInput");
+        if (from && typed.from !== null) from.value = typed.from;
+        if (to && typed.to !== null) to.value = typed.to;
     }
 
     function refreshRecent() {
@@ -246,7 +268,9 @@
             .then(function (response) { return response.ok ? response.text() : null; })
             .then(function (html) {
                 if (ticket !== recentTicket || html == null) return;
+                var typed = typedCreatedDates(host);
                 host.innerHTML = html;
+                keepTypedCreatedDates(host, typed);
                 if (window.luPaintTimes) window.luPaintTimes(host);
                 tick();
                 requestAnimationFrame(fitRecentRuns);
@@ -365,6 +389,43 @@
                         });
                 });
             }
+        });
+
+        document.addEventListener("submit", function (event) {
+            var filter = event.target && event.target.closest ? event.target.closest("#recentRunsDateFilter") : null;
+            if (!filter) return;
+            event.preventDefault();
+            var from = filter.querySelector("#createdFromInput").value || "";
+            var to = filter.querySelector("#createdToInput").value || "";
+            if (from && to && from > to) {
+                alert("Created From must be on or before Created To.");
+                return;
+            }
+            var card = recentCard();
+            if (card) {
+                card.setAttribute("data-created-from", from);
+                card.setAttribute("data-created-to", to);
+                card.setAttribute("data-page-number", "1");
+            }
+            refresh();
+        });
+
+        document.addEventListener("click", function (event) {
+            var clear = event.target && event.target.closest ? event.target.closest("#clearCreatedDateFilter") : null;
+            if (!clear) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+            event.preventDefault();
+            ["createdFromInput", "createdToInput"].forEach(function (id) {
+                var input = document.getElementById(id);
+                if (input) input.value = "";
+            });
+            var card = recentCard();
+            if (card) {
+                card.setAttribute("data-created-from", "");
+                card.setAttribute("data-created-to", "");
+                card.setAttribute("data-page-number", "1");
+            }
+            refresh();
         });
 
         document.addEventListener("change", function (event) {

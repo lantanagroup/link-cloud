@@ -11,6 +11,12 @@ public sealed class AutomationRunQuery
     public string? SortBy { get; set; }
 
     public string? SortDir { get; set; }
+
+    /// <summary>First created day to include, as a UTC calendar day (inclusive).</summary>
+    public DateOnly? CreatedFrom { get; set; }
+
+    /// <summary>Last created day to include, as a UTC calendar day (inclusive).</summary>
+    public DateOnly? CreatedTo { get; set; }
 }
 
 public sealed class AutomationRunRow
@@ -117,6 +123,16 @@ public sealed class AutomationDashboardPage
     public string SortBy { get; init; } = "createdAt";
 
     public string SortDir { get; init; } = "desc";
+
+    /// <summary>Created Date filter echoed back so the inputs, sort, pager and return links keep it.</summary>
+    public DateOnly? CreatedFrom { get; init; }
+
+    public DateOnly? CreatedTo { get; init; }
+
+    /// <summary>Set when the Created Date range was rejected; the filter is not applied.</summary>
+    public string? CreatedRangeError { get; init; }
+
+    public bool CreatedFiltered => CreatedRangeError is null && (CreatedFrom.HasValue || CreatedTo.HasValue);
 
     public bool EngineReady { get; set; }
 

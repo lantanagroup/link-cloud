@@ -1,14 +1,16 @@
 @model AutomationDashboardPage
 @using Link.UI.Services
 @{
+    var createdFrom = Model.CreatedFrom?.ToString("yyyy-MM-dd");
+    var createdTo = Model.CreatedTo?.ToString("yyyy-MM-dd");
     string SortDirFor(string column) =>
         Model.SortBy == column && Model.SortDir == "desc" ? "asc" : "desc";
     string SortMark(string column) =>
         Model.SortBy != column ? "" : Model.SortDir == "asc" ? " ▲" : " ▼";
     string Header(string column, string label) =>
-        $"<a class=\"au-sort-header\" data-sort-col=\"{column}\" href=\"{Url.Action("Index", new { pageNumber = 1, pageSize = Model.PageSize, sortBy = column, sortDir = SortDirFor(column) })}\">{label}{SortMark(column)}</a>";
+        $"<a class=\"au-sort-header\" data-sort-col=\"{column}\" href=\"{Url.Action("Index", new { pageNumber = 1, pageSize = Model.PageSize, sortBy = column, sortDir = SortDirFor(column), createdFrom, createdTo })}\">{label}{SortMark(column)}</a>";
     string PageHref(int page) =>
-        Url.Action("Index", new { pageNumber = page, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir }) ?? "#";
+        Url.Action("Index", new { pageNumber = page, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir, createdFrom, createdTo }) ?? "#";
     string Badge(AutomationRunRow run) => StatusPills.ForRun(run.Status);
 }
 <div class="au-card"
@@ -16,6 +18,8 @@
      data-page-size="@Model.PageSize"
      data-sort-by="@Model.SortBy"
      data-sort-dir="@Model.SortDir"
+     data-created-from="@createdFrom"
+     data-created-to="@createdTo"
      id="recentRunsCard">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-clock-history me-2"></i>Recent Runs</span>
@@ -23,6 +27,26 @@
             @Model.TotalCount run@(Model.TotalCount == 1 ? "" : "s") &middot; page @Model.PageNumber of @Model.TotalPages
         </span>
     </div>
+    <form id="recentRunsDateFilter" method="get" action="@Url.Action("Index", "Automation")" class="d-flex flex-wrap align-items-end gap-2 px-3 py-2 border-bottom" data-created-filter>
+        <div>
+            <label for="createdFromInput" class="form-label small mb-1">Created from (UTC)</label>
+            <input type="date" id="createdFromInput" name="createdFrom" class="form-control form-control-sm" value="@createdFrom" />
+        </div>
+        <div>
+            <label for="createdToInput" class="form-label small mb-1">Created to (UTC)</label>
+            <input type="date" id="createdToInput" name="createdTo" class="form-control form-control-sm" value="@createdTo" />
+        </div>
+        <input type="hidden" name="pageNumber" value="1" />
+        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+        <input type="hidden" name="sortDir" value="@Model.SortDir" />
+        <button type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
+        <a id="clearCreatedDateFilter" class="btn btn-sm btn-warning" href="@Url.Action("Index", "Automation", new { pageNumber = 1, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir })">Clear</a>
+        @if (Model.CreatedRangeError is not null)
+        {
+            <div class="text-danger small w-100" role="alert" data-created-error>@Model.CreatedRangeError</div>
+        }
+    </form>
     <div data-au-table>
         <div class="table-responsive">
             <table class="table au-table table-sm align-middle mb-0">
@@ -42,7 +66,7 @@
                 @if (Model.RecentRuns.Count == 0)
                 {
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">No runs yet. Pick a scenario in Quick Launch to start one.</td>
+                        <td colspan="8" class="text-center text-muted py-4">@(Model.CreatedFiltered ? "No runs found for the selected Created Date range." : "No runs yet. Pick a scenario in Quick Launch to start one.")</td>
                     </tr>
                 }
                 @foreach (var run in Model.RecentRuns)

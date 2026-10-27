@@ -114,10 +114,11 @@ public sealed class AutomationRunReader
         var pageSize = AutomationRules.NormalizePageSize(query.PageSize);
         var sortBy = AutomationRules.NormalizeSortBy(query.SortBy);
         var descending = AutomationRules.IsDescending(query.SortDir);
+        var created = CreatedFilter.Of(query);
 
         if (_runs is null)
         {
-            return EmptyDashboard(pageNumber, pageSize, sortBy, descending, configured: false, reachable: false, _unavailableMessage);
+            return EmptyDashboard(pageNumber, pageSize, sortBy, descending, configured: false, reachable: false, _unavailableMessage, created);
         }
 
         try
@@ -135,12 +136,14 @@ public sealed class AutomationRunReader
                 limit: null,
                 token);
 
+            // The Created Date filter narrows Recent Runs and its count only. Stats and active runs stay whole.
+            var recentFilter = created.Filter();
             var total = await _runs.CountDocumentsAsync(
-                FilterDefinition<AutomationRunDocument>.Empty,
+                recentFilter,
                 cancellationToken: token);
 
             var recent = await FindRowsAsync(
-                FilterDefinition<AutomationRunDocument>.Empty,
+                recentFilter,
                 Sort(sortBy, descending),
                 (pageNumber - 1) * pageSize,
                 pageSize,
@@ -163,12 +166,15 @@ public sealed class AutomationRunReader
                 TotalCount = total,
                 TotalPages = AutomationRules.TotalPages(total, pageSize),
                 SortBy = sortBy,
-                SortDir = AutomationRules.SortDir(descending)
+                SortDir = AutomationRules.SortDir(descending),
+                CreatedFrom = created.From,
+                CreatedTo = created.To,
+                CreatedRangeError = created.Error
             };
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return EmptyDashboard(pageNumber, pageSize, sortBy, descending, configured: true, reachable: false, UnreachableMessage);
+            return EmptyDashboard(pageNumber, pageSize, sortBy, descending, configured: true, reachable: false, UnreachableMessage, created);
         }
         catch (OperationCanceledException)
         {
@@ -179,7 +185,35 @@ public sealed class AutomationRunReader
             _logger.LogWarning(
                 "Automation run storage could not be read ({ExceptionType}).",
                 ex.GetType().Name);
-            return EmptyDashboard(pageNumber, pageSize, sortBy, descending, configured: true, reachable: false, UnreachableMessage);
+            return EmptyDashboard(pageNumber, pageSize, sortBy, descending, configured: true, reachable: false, UnreachableMessage, created);
+        }
+    }
+
+    /// <summary>The Mongo filter Recent Runs and its count use for this query, rendered for checks.</summary>
+    internal static BsonDocument RenderRecentFilter(AutomationRunQuery query)
+    {
+        var registry = MongoDB.Bson.Serialization.BsonSerializer.SerializerRegistry;
+        return CreatedFilter.Of(query).Filter().Render(
+            new RenderArgs<AutomationRunDocument>(registry.GetSerializer<AutomationRunDocument>(), registry));
+    }
+
+    /// <summary>The Created Date filter for Recent Runs, as entered and as a Mongo range.</summary>
+    private sealed record CreatedFilter(DateOnly? From, DateOnly? To, DateTimeOffset? FromUtc, DateTimeOffset? BeforeUtc, string? Error)
+    {
+        public static CreatedFilter Of(AutomationRunQuery query) =>
+            AutomationRules.TryCreatedRange(query.CreatedFrom, query.CreatedTo, out var fromUtc, out var beforeUtc, out var error)
+                ? new CreatedFilter(query.CreatedFrom, query.CreatedTo, fromUtc, beforeUtc, null)
+                : new CreatedFilter(query.CreatedFrom, query.CreatedTo, null, null, error);
+
+        public FilterDefinition<AutomationRunDocument> Filter()
+        {
+            var builder = Builders<AutomationRunDocument>.Filter;
+            var filter = FilterDefinition<AutomationRunDocument>.Empty;
+            if (FromUtc is { } from)
+                filter &= builder.Gte(row => row.CreatedAt, from);
+            if (BeforeUtc is { } before)
+                filter &= builder.Lt(row => row.CreatedAt, before);
+            return filter;
         }
     }
 
@@ -375,7 +409,8 @@ public sealed class AutomationRunReader
         bool descending,
         bool configured,
         bool reachable,
-        string? message) =>
+        string? message,
+        CreatedFilter? created = null) =>
         new()
         {
             StorageConfigured = configured,
@@ -387,7 +422,10 @@ public sealed class AutomationRunReader
             PageSize = pageSize,
             TotalPages = 1,
             SortBy = sortBy,
-            SortDir = AutomationRules.SortDir(descending)
+            SortDir = AutomationRules.SortDir(descending),
+            CreatedFrom = created?.From,
+            CreatedTo = created?.To,
+            CreatedRangeError = created?.Error
         };
 
     public async Task<AutomationOwnershipLoad> LoadOwnershipAsync(CancellationToken cancellationToken)
