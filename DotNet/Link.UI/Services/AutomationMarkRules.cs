@@ -15,9 +15,9 @@ public static class AutomationMarkRules
     public const string OwnedFacilityNote = "That facility is an automation facility. Choose All or Automation to see it.";
     public const string HiddenNote = "Automation facilities are hidden. Choose All to include them.";
     public const string AdHocReportBlocked =
-        "Reports for an automation facility cannot be resubmitted, regenerated, or generated from here.";
+        "Reports for an automation facility cannot be rerun, regenerated, or generated from here.";
     public const string OwnershipUnreachable =
-        "Automation ownership could not be read. Resubmit and ad-hoc generate stay closed until it can.";
+        "Automation ownership could not be read. Rerun and ad-hoc generate stay closed until it can.";
 
     public static bool IsAutomation(string? scope) =>
         string.Equals(scope?.Trim(), Automation, StringComparison.OrdinalIgnoreCase);
