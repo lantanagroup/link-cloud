@@ -290,6 +290,8 @@ public sealed class FacilityViewService
         {
             if (schedule.IsDeleted != true)
                 return Fail("That report is not deleted.");
+            if (!FacilityViewRules.CanRestore(schedule.Status, deleted: true))
+                return Fail(FacilityViewRules.RestoreBlockedReason);
             if (_admin is null)
                 return Fail(AdminNotConfigured);
 
@@ -654,7 +656,7 @@ public sealed class FacilityViewService
             CanResubmit = FacilityViewRules.CanResubmit(schedule.Status, deleted),
             CanAbort = FacilityViewRules.CanAbort(schedule.Status, deleted),
             CanCleanUp = FacilityViewRules.CanCleanUp(schedule.Status, deleted),
-            CanRestore = FacilityViewRules.CanRestore(deleted),
+            CanRestore = FacilityViewRules.CanRestore(schedule.Status, deleted),
             CanDownload = ReportsRules.CanDownload(deleted, schedule.PayloadRootUri)
         };
     }
