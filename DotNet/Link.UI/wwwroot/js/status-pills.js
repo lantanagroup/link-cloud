@@ -141,6 +141,14 @@
         return ready ? "au-badge-success" : "au-badge-warning";
     }
 
+    function forNormalization(state) {
+        var s = norm(state);
+        if (s === "confirmed" || s === "found") return "au-badge-success";
+        if (s === "pending" || s === "notrecorded" || s === "unavailable" || s === "missing" || s === "current") return "au-badge-warning";
+        if (s === "notapplicable") return "au-badge-skip";
+        return "au-badge-muted";
+    }
+
     function hollowFromClass(className) {
         var name = String(className || "");
         if (name.indexOf("au-badge-success") >= 0 || name.indexOf("border-success") >= 0)
@@ -192,6 +200,7 @@
         forPeriod: forPeriod,
         forAccepting: forAccepting,
         forReadiness: forReadiness,
+        forNormalization: forNormalization,
         hollowFromClass: hollowFromClass,
         solidFromClass: solidFromClass
     };

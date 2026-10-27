@@ -576,6 +576,15 @@ public static partial class ReportManifestRules
         };
     }
 
+    /// <summary>The stored patient origin as shown, or null when it is not one the engine writes.</summary>
+    public static string? PatientOriginLabel(string? origin) =>
+        string.Equals(origin, PatientOrigin.Generated, StringComparison.OrdinalIgnoreCase) ? PatientOrigin.Generated
+        : string.Equals(origin, PatientOrigin.Uploaded, StringComparison.OrdinalIgnoreCase) ? PatientOrigin.Uploaded
+        : null;
+
+    public static string PatientOriginBadge(string? origin) =>
+        origin == PatientOrigin.Generated ? "au-badge-automation" : "au-badge-active";
+
     public static ReportManifestModel FromGeneration(
         GenerationManifestSnapshot snapshot,
         AbsUploadSnapshot? actual,
@@ -596,6 +605,7 @@ public static partial class ReportManifestRules
         var patterns = snapshot.PatientInpatientPatterns ?? new Dictionary<string, string>();
         var eligibility = snapshot.PatientEligibility ?? new Dictionary<string, List<string>>();
         var templates = snapshot.TemplateCacheKeyByPatient ?? new Dictionary<string, string>();
+        var origins = snapshot.PatientOriginByPatient;
         var ids = PatientIds(snapshot, byPatient);
         var names = configurationNames ?? new Dictionary<string, string>();
         var cohort = CohortMap(ids, runConfigurationJson, names);
@@ -694,7 +704,8 @@ public static partial class ReportManifestRules
                 Membership = membership,
                 Pattern = ShortPattern(string.IsNullOrWhiteSpace(pattern) ? fallbackPattern : pattern),
                 Configuration = string.IsNullOrWhiteSpace(configuration) ? "No configuration" : configuration,
-                HasBundle = templates.ContainsKey(id)
+                HasBundle = templates.ContainsKey(id),
+                Origin = origins is not null && origins.TryGetValue(id, out var origin) ? PatientOriginLabel(origin) : null
             };
         }
 
@@ -751,6 +762,7 @@ public static partial class ReportManifestRules
             Notice = null,
             ShowComparison = showComparison,
             ShowGeneration = true,
+            OriginRecorded = origins is not null,
             ShowShared = true,
             ShowSplit = true,
             ShowTotals = true,

@@ -55,7 +55,7 @@ public sealed partial class AutomationController
         var fixture = _services.GetService<KafkaOpsFixture>();
         if (id == ReportManifestRules.SampleId && (!_engine.Ready || _manager is null) && fixture?.Active == true)
         {
-            ViewData["Title"] = "Generation manifest";
+            ViewData["Title"] = "Patient manifest";
             ViewData["AutomationSection"] = "runs";
             return View(
                 "~/Views/Automation/Manifest.cshtml",
@@ -93,7 +93,7 @@ public sealed partial class AutomationController
             latest);
         await ApplyInteractiveAsync(model, run, cancellationToken);
 
-        ViewData["Title"] = "Generation manifest";
+        ViewData["Title"] = "Patient manifest";
         ViewData["AutomationSection"] = "runs";
         return View("~/Views/Automation/Manifest.cshtml", model);
     }
