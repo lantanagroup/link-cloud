@@ -195,6 +195,7 @@ else
                                     <th scope="col"><a href="@Href(1, "code", ReportsRules.NextIssueDir(query.Sort, query.Descending, "code"))">Code@(Mark("code"))</a></th>
                                     <th scope="col"><a href="@Href(1, "message", ReportsRules.NextIssueDir(query.Sort, query.Descending, "message"))">Message@(Mark("message"))</a></th>
                                     <th scope="col"><a href="@Href(1, "location", ReportsRules.NextIssueDir(query.Sort, query.Descending, "location"))">Location@(Mark("location"))</a></th>
+                                    <th scope="col"><a href="@Href(1, "profile", ReportsRules.NextIssueDir(query.Sort, query.Descending, "profile"))">Profile@(Mark("profile"))</a> <span class="au-info-icon" data-bs-toggle="tooltip" title="The profile the finding was validated against. Empty for base FHIR and best-practice checks." aria-label="About the profile column"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -206,6 +207,16 @@ else
                                     <td style="white-space:normal;overflow:visible;max-width:none;text-overflow:clip;overflow-wrap:anywhere;min-width:7rem">@issue.Code</td>
                                     <td class="w-100" style="white-space:normal;overflow:visible;max-width:none;text-overflow:clip;overflow-wrap:anywhere"><div class="lu-clamp-3" title="@issue.Message" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">@issue.Message</div></td>
                                     <td style="white-space:normal;overflow:visible;max-width:none;text-overflow:clip;overflow-wrap:anywhere;min-width:8rem;max-width:16rem"><partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = issue.Location, Compact = true, CopyLabel = "Copy location" })" /></td>
+                                    <td data-issue-profile style="white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;min-width:7rem;max-width:14rem">
+                                        @if (string.IsNullOrWhiteSpace(issue.Profile))
+                                        {
+                                            <span class="text-muted" title="No profile: base FHIR or best-practice check">—</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="small" title="@issue.Profile">@ReportsRules.ProfileLabel(issue.Profile)</span>
+                                        }
+                                    </td>
                                 </tr>
                             }
                             </tbody>

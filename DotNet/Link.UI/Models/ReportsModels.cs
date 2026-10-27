@@ -203,6 +203,9 @@ public sealed class ValidationIssueRow
     public string Message { get; init; } = string.Empty;
     public string Location { get; init; } = string.Empty;
     public string Expression { get; init; } = string.Empty;
+
+    /// <summary>Versioned canonical of the profile that produced the finding; empty for base-FHIR and best-practice checks.</summary>
+    public string Profile { get; init; } = string.Empty;
     public IReadOnlyList<ValidationCategoryRow> Categories { get; init; } = [];
 }
 
