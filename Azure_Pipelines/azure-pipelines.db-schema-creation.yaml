@@ -10,6 +10,15 @@ pool:
 variables:
 - group: 'MSSQL_DBCreation'
 - group: link-cloud-variables
+- name: environment_alias
+  ${{ if eq(parameters.environment, 'scale-test') }}:
+    value:  'test'
+  ${{ if eq(parameters.environment, 'scale-qa') }}:
+    value:  'qa'
+  ${{ if eq(parameters.environment, 'scale-qa2') }}:
+    value:  'qa2'
+  ${{ if eq(parameters.environment, 'scale-qa3') }}:
+    value:  'qa3'
 
 parameters:
 - name: environment
@@ -32,10 +41,10 @@ parameters:
       alias: account
       artifact: account-db
       file: accountDb.sql
-    # - name: app-bff
-    #   alias: app_bff
-    #   artifact: app-bff-db
-    #   file: app-bffDb.sql
+    - name: app-bff
+      alias: app_bff
+      artifact: app-bff-db
+      file: app-bffDb.sql
     - name: audit
       alias: audit
       artifact: audit-db
@@ -129,7 +138,7 @@ stages:
             # .Data project, and the previous plain pattern silently skipped Submission.
             $migrationPaths = [ordered]@{
               "Account"         = "DotNet/Account/Migrations"
-              # "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
+              "App-BFF"         = "nhsn/NHSN-App-BFF/Migrations"
               "Audit"           = "DotNet/Audit/Migrations"
               "Census"          = "DotNet/Census/Migrations"
               "DataAcquisition" = "DotNet/DataAcquisition.Domain/Migrations"
@@ -207,39 +216,39 @@ stages:
          publishLocation: 'container'
         displayName: Publish Account SQL Script
   # App-BFF
-  # - job: App_BFF
-  #   displayName: "Generate App-BFF Schema Script"
-  #   steps:
-  #     - checkout: self
-  #       fetchDepth: 0
-  #       fetchTags: true
-  #     - script: |
-  #         # The generated script is produced from the working tree, so the tree must be
-  #         # moved to current_release or the parameter is a label with no effect on output.
-  #         if [ -n "${{ parameters.current_release }}" ]; then
-  #           git checkout --detach "${{ parameters.current_release }}"
-  #         fi
-  #         echo "Generating schema from commit:"
-  #         git rev-parse HEAD
-  #       displayName: Check out current_release
-  #     - script: |
-  #         cd nhsn/NHSN-App-BFF
-  #         dotnet new tool-manifest --force
-  #         dotnet tool install dotnet-ef --version 8.0.22
-  #         dotnet tool restore
-  #         dotnet tool run dotnet-ef --version
-  #       displayName: Install dotnet-ef (local pinned)
-  #     - script: |
-  #         cd nhsn/NHSN-App-BFF
-  #         mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
-  #         dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
-  #       displayName: Generate App-BFF SQL Script
-  #     - task: PublishBuildArtifacts@1
-  #       inputs:
-  #        PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
-  #        ArtifactName: 'app-bff-db'
-  #        publishLocation: 'container'
-  #       displayName: Publish App-BFF SQL Script  
+  - job: App_BFF
+    displayName: "Generate App-BFF Schema Script"
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - script: |
+          # The generated script is produced from the working tree, so the tree must be
+          # moved to current_release or the parameter is a label with no effect on output.
+          if [ -n "${{ parameters.current_release }}" ]; then
+            git checkout --detach "${{ parameters.current_release }}"
+          fi
+          echo "Generating schema from commit:"
+          git rev-parse HEAD
+        displayName: Check out current_release
+      - script: |
+          cd nhsn/NHSN-App-BFF
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-ef --version 8.0.22
+          dotnet tool restore
+          dotnet tool run dotnet-ef --version
+        displayName: Install dotnet-ef (local pinned)
+      - script: |
+          cd nhsn/NHSN-App-BFF
+          mkdir -p $(build.artifactstagingdirectory)/DatabaseScripts
+          dotnet tool run dotnet-ef migrations script --idempotent --verbose -c App-BFFDbContext -s $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -p $(build.sourcesdirectory)/nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/app-bffDb.sql
+        displayName: Generate App-BFF SQL Script
+      - task: PublishBuildArtifacts@1
+        inputs:
+         PathtoPublish: '$(Build.ArtifactStagingDirectory)/DatabaseScripts/app-bffDb.sql'
+         ArtifactName: 'app-bff-db'
+         publishLocation: 'container'
+        displayName: Publish App-BFF SQL Script  
   ###
   # Audit
   - job: Audit
@@ -624,7 +633,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_TEST
+      - job: Update_${{ db.alias }}_${{ parameters.environment }}
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_TEST
 
@@ -637,13 +646,13 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-test-botw-${{ db.name }}'
+            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_TEST
+  - job: Update_validation_${{ parameters.environment }}
     displayName: Update validation
     dependsOn: Verify_TEST
 
@@ -718,7 +727,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-test-botw-validation'
+        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -761,7 +770,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_QA
+      - job: Update_${{ db.alias }}_${{ parameters.environment }}
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA
 
@@ -774,7 +783,7 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-qa-botw-${{ db.name }}'
+            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
@@ -855,7 +864,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-qa-botw-validation'
+        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -898,7 +907,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_QA2
+      - job: Update_${{ db.alias }}_${{ parameters.environment }}
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA2
 
@@ -911,13 +920,13 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-qa2-botw-${{ db.name }}'
+            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
 
-  - job: Update_validation_QA2
+  - job: Update_validation_${{ parameters.environment }}
     displayName: Update validation
     dependsOn: Verify_QA2
 
@@ -992,7 +1001,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-qa2-botw-validation'
+        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
@@ -1035,7 +1044,7 @@ stages:
 
     - ${{ if ne(db.name, 'validation') }}: # Excludes Validation database
 
-      - job: Update_${{ db.alias }}_QA3
+      - job: Update_${{ db.alias }}_${{ parameters.environment }}
         displayName: Update ${{ db.alias }}
         dependsOn: Verify_QA3
 
@@ -1048,7 +1057,7 @@ stages:
           inputs:
             azureSubscription: "NHSNLink Resource Manager"
             ServerName: '$(link-db_server)'
-            DatabaseName: 'link-qa3-botw-${{ db.name }}'
+            DatabaseName: 'link-${{ parameters.environment }}-botw-${{ db.name }}'
             SqlUsername: '$(link-db_username)'
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
@@ -1129,7 +1138,7 @@ stages:
       inputs:
         azureSubscription: "NHSNLink Resource Manager"
         ServerName: '$(link-db_server)'
-        DatabaseName: 'link-qa3-botw-validation'
+        DatabaseName: 'link-${{ parameters.environment }}-botw-validation'
         SqlUsername: '$(link-db_username)'
         SqlPassword: '$(link-db_pass)'
         deployType: 'SqlTask'
