@@ -376,6 +376,36 @@ public class RunCleanupHelperTests
     }
 
     [Fact]
+    public async Task ClearFacilityAbortForNewRun_clears_facility_and_keeps_the_previous_report()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        var facilityId = "10765";
+        var previousReportId = Guid.NewGuid().ToString();
+
+        await registry.AbortAsync(facilityId, reportId: null, TimeSpan.FromDays(14));
+        await registry.AbortAsync(facilityId: null, previousReportId, TimeSpan.FromDays(14));
+
+        (await registry.IsAbortedAsync(facilityId, reportId: null)).Should().BeTrue();
+
+        await RunCleanupHelper.ClearFacilityAbortForNewRunAsync(registry, facilityId);
+
+        (await registry.IsAbortedAsync(facilityId, reportId: null)).Should().BeFalse();
+        (await registry.IsAbortedAsync(facilityId: null, previousReportId)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ClearFacilityAbortForNewRun_ignores_a_missing_registry_or_facility()
+    {
+        var act = async () =>
+        {
+            await RunCleanupHelper.ClearFacilityAbortForNewRunAsync(null, "10765");
+            await RunCleanupHelper.ClearFacilityAbortForNewRunAsync(new InMemoryPipelineAbortRegistry(), " ");
+        };
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
     public void IsAutomationFacilityId_accepts_guids_only()
     {
         RunCleanupHelper.IsAutomationFacilityId(Guid.NewGuid().ToString()).Should().BeTrue();

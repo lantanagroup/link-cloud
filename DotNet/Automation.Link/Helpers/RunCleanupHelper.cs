@@ -135,6 +135,23 @@ public static class RunCleanupHelper
     }
 
     /// <summary>
+    /// Drops the facility-wide pipeline abort so a new run can publish work.
+    /// A previous run's quiesce sets that flag for the abort TTL. Listeners then
+    /// skip the facility, and a new scheduled report is never stored.
+    /// Report-id flags stay so leftovers for the previous report are still dropped.
+    /// </summary>
+    public static async Task ClearFacilityAbortForNewRunAsync(
+        IPipelineAbortRegistry? abortRegistry,
+        string facilityId,
+        CancellationToken cancellationToken = default)
+    {
+        if (abortRegistry == null || string.IsNullOrWhiteSpace(facilityId))
+            return;
+
+        await abortRegistry.ClearAsync(facilityId, reportId: null, cancellationToken);
+    }
+
+    /// <summary>
     /// Cancellation: abort and quiesce immediately, expunge FHIR so the server
     /// does not keep mega-patient volume, but leave facility configs for the 14-day tail.
     /// </summary>

@@ -11,6 +11,7 @@ using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -466,6 +467,8 @@ internal sealed class RunExecutor
             }
 
             state.FacilityId = facilityId;
+            await ClearStaleFacilityAbortAsync(facilityId, output, cancellationToken);
+
             using var facilitySetupLock = await FacilitySetupGate.AcquireAsync(
                 facilityId,
                 message => output.WriteLine(message),
@@ -805,6 +808,7 @@ internal sealed class RunExecutor
             string normalizationEvidenceReportId;
             if (isLiveSimulation)
             {
+                await ClearStaleFacilityAbortAsync(facilityId, output, cancellationToken);
                 var scheduledWorkflowState = await ExecuteLiveScheduledReportWorkflowAsync(
                     state,
                     callbacks,
@@ -836,6 +840,7 @@ internal sealed class RunExecutor
             }
             else if (usesScheduledWorkflow)
             {
+                await ClearStaleFacilityAbortAsync(facilityId, output, cancellationToken);
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
                     reportHelper,
                     output,
@@ -1752,6 +1757,26 @@ internal sealed class RunExecutor
 
     private static string ToZulu(DateTimeOffset value)
         => value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    /// <summary>
+    /// A previous run quiesces the facility id for the abort TTL. DMRP runs reuse the
+    /// NHSN org id, so that flag is still set when the next run schedules a report and
+    /// Report then drops the ReportScheduled event. Report-id flags are left in place.
+    /// </summary>
+    private async Task ClearStaleFacilityAbortAsync(
+        string facilityId,
+        IAutomationOutput output,
+        CancellationToken cancellationToken)
+    {
+        var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
+        if (abortRegistry == null
+            || !await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
+            return;
+
+        await RunCleanupHelper.ClearFacilityAbortForNewRunAsync(abortRegistry, facilityId, cancellationToken);
+        output.WriteLine(
+            $"Cleared pipeline abort flag for facility '{facilityId}' so this run can schedule a report.");
+    }
 
     private readonly record struct ScheduledReportWindow(DateTimeOffset Start, TimeSpan Duration);
     private readonly record struct ScheduledWorkflowState(string ReportTrackingId, Frequency Frequency);
