@@ -37,6 +37,29 @@ public sealed class NormalizationEvidenceSnapshot
     /// </summary>
     public string EvidenceAttemptId { get; set; } = string.Empty;
 
+    /// <summary>Patients the FHIR generator produced for this run. Zero on older snapshots.</summary>
+    public int GeneratedPatientCount { get; set; }
+
+    /// <summary>Uploaded (imported) patients for this run. Zero on older snapshots.</summary>
+    public int UploadedPatientCount { get; set; }
+
+    /// <summary>True when generated patients were produced with the selected suite.</summary>
+    public bool GeneratorAppliedSelectedSuite { get; set; }
+
+    /// <summary>True after a normalization-log scrape has been stored for this run.</summary>
+    public bool EvidenceCollected { get; set; }
+
+    /// <summary>
+    /// Patient ids named on the collected execution lines. Kept after the per-resource
+    /// steps are dropped so a later view can tell which patients the evidence covers.
+    /// </summary>
+    public List<string> EvidencePatientIds { get; set; } = [];
+
+    /// <summary>
+    /// Short rollup of parsed execution steps. Kept when the per-resource steps are omitted.
+    /// </summary>
+    public List<string> EvidenceInventory { get; set; } = [];
+
     public static string ChunkDomain(int oneBasedIndex) => $"{Domain}-chunk-{oneBasedIndex}";
 
     public List<string> SummaryLines { get; set; } = [];
@@ -82,6 +105,9 @@ public sealed class NormalizationEvidenceStep
 {
     public string ResourceType { get; set; } = string.Empty;
     public string ResourceId { get; set; } = string.Empty;
+
+    /// <summary>Patient the Normalization service named on the execution line. Empty on older snapshots.</summary>
+    public string PatientId { get; set; } = string.Empty;
     public int Sequence { get; set; }
     public string OperationType { get; set; } = string.Empty;
     public string OperationName { get; set; } = string.Empty;

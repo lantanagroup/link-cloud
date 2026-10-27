@@ -88,6 +88,9 @@ public sealed class NormalizationSuiteResolver
             }
         }
 
-        return new NormalizationSuiteResolution(suite.Name, resolvedOps, resolvedSequences, standaloneOperations);
+        return new NormalizationSuiteResolution(suite.Name, resolvedOps, resolvedSequences, standaloneOperations)
+        {
+            SuiteId = suite.Id
+        };
     }
 }

@@ -248,8 +248,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<NormalizationDbContext>>(HealthCheckType.Database.ToString())
-        .AddCheck<ResourceCacheHealthCheck>(HealthCheckType.Cache.ToString())
+        .AddCheck<DatabaseHealthCheck<NormalizationDbContext>>(HealthCheckNames.SqlServerDatabase)
+        .AddCheck<ResourceCacheHealthCheck>(HealthCheckNames.ResourceCache)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddEndpointsApiExplorer();

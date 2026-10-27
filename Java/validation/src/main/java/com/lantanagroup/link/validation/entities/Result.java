@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.entities;
 import ca.uhn.fhir.validation.ResultSeverityEnum;
 import ca.uhn.fhir.validation.SingleValidationMessage;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.lantanagroup.link.validation.services.ProfileAttributedValidationMessage;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -55,6 +56,13 @@ public class Result {
 
     @Column(length = 1000)
     private String expression;
+
+    /**
+     * The versioned canonical of the profile that produced this finding, or null for findings that belong to no
+     * profile (base-FHIR and best-practice checks). See LEGLINK-1172.
+     */
+    @Column(length = 1000)
+    private String profile;
 
     @ManyToMany
     @JoinTable(
@@ -478,6 +486,9 @@ public class Result {
         result.setMessage(message.getMessage());
         result.setLocation(getLocation(message));
         result.setExpression(message.getLocationString());
+        if (message instanceof ProfileAttributedValidationMessage attributedMessage) {
+            result.setProfile(attributedMessage.getProfile());
+        }
         return result;
     }
 

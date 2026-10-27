@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public async Task<(IEnumerable<AuditLog>, PaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<(IEnumerable<AuditLog>, PaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? filterPatientBy, string? filterResourceBy, string? filterResourceIdBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             IEnumerable<AuditLog> logs;
             var query = _dbContext.AuditLogs.AsNoTracking().AsQueryable();
@@ -60,6 +60,21 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             if (filterUserBy is not null && filterUserBy.Length > 0)
             {
                 query = query.Where(x => x.User == filterUserBy);
+            }
+
+            if (filterPatientBy is not null && filterPatientBy.Length > 0)
+            {
+                query = query.Where(x => x.PatientId == filterPatientBy);
+            }
+
+            if (filterResourceBy is not null && filterResourceBy.Length > 0)
+            {
+                query = query.Where(x => x.Resource == filterResourceBy);
+            }
+
+            if (filterResourceIdBy is not null && filterResourceIdBy.Length > 0)
+            {
+                query = query.Where(x => x.ResourceId == filterResourceIdBy);
             }
 
             #endregion

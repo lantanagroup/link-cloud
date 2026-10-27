@@ -120,6 +120,8 @@ public partial class ReportDbContext : DbContext
 
             entity.Property(e => e.ReportStartDate).HasColumnType("datetimeoffset(7)");
             entity.Property(e => e.ReportEndDate).HasColumnType("datetimeoffset(7)");
+            entity.Property(e => e.CompletedDate).HasColumnType("datetimeoffset(7)");
+            entity.Property(e => e.SoftDeletedDate).HasColumnType("datetimeoffset(7)");
 
             entity.Property(e => e.AdHocType).HasConversion<string>().HasMaxLength(50);
             entity.Property(e => e.Frequency).HasConversion<string>().HasMaxLength(50);

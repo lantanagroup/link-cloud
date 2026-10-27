@@ -85,6 +85,37 @@ public class CategorizationServiceTest {
     }
 
     @Test
+    void categorizeMatchesOnProfileIgnoringVersion() {
+        // LEGLINK-1172: a rule can select findings by the profile that produced them. Canonicals arrive
+        // versioned, so the rule tolerates any version.
+        Category category = new Category();
+        category.setId("lab_only");
+
+        RegexMatcher matcher = new RegexMatcher();
+        matcher.setField(ResultField.PROFILE);
+        matcher.setRegex("^http://example\\.org/StructureDefinition/observation-lab(\\|.*)?$");
+
+        CategoryRule rule = new CategoryRule();
+        rule.setCategory(category);
+        rule.setMatcher(matcher);
+        category.setRules(List.of(rule));
+
+        when(categoryRepository.findAll()).thenReturn(List.of(category));
+
+        Result lab = new Result();
+        lab.setProfile("http://example.org/StructureDefinition/observation-lab|2.0.0");
+        Result vitals = new Result();
+        vitals.setProfile("http://example.org/StructureDefinition/observation-vitals|2.0.0");
+        Result noProfile = new Result();
+
+        categorizationService.categorize(List.of(lab, vitals, noProfile));
+
+        assertTrue(lab.getCategories().contains(category));
+        assertFalse(vitals.getCategories().contains(category));
+        assertFalse(noProfile.getCategories().contains(category), "a null profile must not match");
+    }
+
+    @Test
     void categorizeDoesNotAssignCategoryWhenRegexDoesNotMatch() {
         Category category = new Category();
         category.setId("Incorrect_display_value_for_code");

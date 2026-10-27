@@ -189,7 +189,7 @@ namespace Tenant
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
 
             var healthChecks = builder.Services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck<TenantDbContext>>(HealthCheckType.Database.ToString())
+                .AddCheck<DatabaseHealthCheck<TenantDbContext>>(HealthCheckNames.SqlServerDatabase)
                 .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
             if (dmrpEnabled)

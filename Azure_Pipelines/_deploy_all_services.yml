@@ -9,13 +9,14 @@ pool:
     
 parameters:
   - name: environment
-    displayName: Which environment is this for? (DEV | TEST | QA | QA2)
+    displayName: Which environment is this for? (DEV | TEST | QA | QA2 | QA3)
     type: string
     values:
       - dev-scale
       - scale-test
       - scale-qa
       - scale-qa2
+      - scale-qa3
 
 variables:
 - group: link-cloud-variables
@@ -36,6 +37,8 @@ variables:
     value:  'qa'
   ${{ if eq(parameters.environment, 'scale-qa2') }}:
     value:  'qa2'
+  ${{ if eq(parameters.environment, 'scale-qa3') }}:
+    value:  'qa3'
 
 jobs:
 
@@ -264,6 +267,16 @@ jobs:
         repoName: measureeval
         containerName: measure
         healthUrl: https://$(env)-measure.nhsnlink.org/health
+      nhsn-app-bff:
+        serviceName: nhsn-app-bff
+        repoName: nhsn-app-bff
+        containerName: nhsn-app-bff
+        healthUrl: https://$(env)-nhsn-app-bff.nhsnlink.org/health
+      nhsn-app-ui:
+        serviceName: nhsn-app-ui
+        repoName: nhsn-app-ui
+        containerName: nhsn-app-ui
+        healthUrl: https://$(env)-nhsn-app-ui.nhsnlink.org/health
       normalization:
         serviceName: normalization
         repoName: normalization

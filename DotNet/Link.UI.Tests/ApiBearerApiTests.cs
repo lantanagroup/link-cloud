@@ -747,7 +747,7 @@ internal static class ApiRunsFakes
             });
 
         public Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default, DateTimeOffset? createdFromUtc = null, DateTimeOffset? createdBeforeUtc = null) => throw new NotSupportedException();
         public Task<AutomationRunSummary?> GetRunForDisplayAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> DeleteRunAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<LantanaGroup.Link.Automation.Link.Helpers.PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default) => throw new NotSupportedException();

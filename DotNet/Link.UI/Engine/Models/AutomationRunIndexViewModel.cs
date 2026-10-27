@@ -7,6 +7,12 @@ public class AutomationRunIndexViewModel
     public int PageSize { get; set; } = 20;
     public long TotalCount { get; set; }
 
+    /// <summary>Inclusive starting date for the Created Date filter.</summary>
+    public DateOnly? CreatedFrom { get; set; }
+
+    /// <summary>Inclusive ending date for the Created Date filter.</summary>
+    public DateOnly? CreatedTo { get; set; }
+
     /// <summary>Normalized sort token (camelCase). Defaults to "createdAt".</summary>
     public string SortBy { get; set; } = "createdAt";
 
