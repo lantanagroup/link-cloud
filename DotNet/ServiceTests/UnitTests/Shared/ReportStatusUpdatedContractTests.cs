@@ -16,6 +16,35 @@ public class ReportStatusUpdatedContractTests
 {
     private static readonly SerializationContext Context = new(MessageComponentType.Value, "ReportStatusUpdated");
 
+    [Fact]
+    public void Key_SerializedBytesMatchJavaFixture_AndRoundTrip()
+    {
+        var key = new ReportStatusUpdatedKey
+        {
+            ReportId = "0b7e3f52-9c1d-4e8a-b2f6-71a4c5d9e803",
+            PatientId = "patient-123"
+        };
+        var context = new SerializationContext(MessageComponentType.Key, "ReportStatusUpdated");
+        var bytes = new JsonWithFhirMessageSerializer<ReportStatusUpdatedKey>().Serialize(key, context);
+        // Compare exact bytes, including property order, because Kafka hashes bytes rather than JSON values.
+        Assert.Equal(Encoding.UTF8.GetBytes(File.ReadAllText(FixturePath("key")).Trim()), bytes);
+        var consumed = new JsonWithFhirMessageDeserializer<ReportStatusUpdatedKey>().Deserialize(bytes, false, context);
+        Assert.Equal(key.ReportId, consumed.ReportId);
+        Assert.Equal(key.PatientId, consumed.PatientId);
+    }
+
+    [Theory]
+    [InlineData("reportId")]
+    [InlineData("patientId")]
+    public void Key_MissingRequiredField_Throws(string property)
+    {
+        var json = JsonNode.Parse(File.ReadAllText(FixturePath("key")))!.AsObject();
+        json.Remove(property);
+        var context = new SerializationContext(MessageComponentType.Key, "ReportStatusUpdated");
+        Assert.Throws<JsonException>(() => new JsonWithFhirMessageDeserializer<ReportStatusUpdatedKey>()
+            .Deserialize(Encoding.UTF8.GetBytes(json.ToJsonString()), false, context));
+    }
+
     [Theory]
     [InlineData("validation")]
     [InlineData("not-reportable")]

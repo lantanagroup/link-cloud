@@ -9,9 +9,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,6 +25,27 @@ class ReportStatusUpdatedContractTest {
                     MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
             .featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .build();
+
+    @Test
+    void key_serializedBytesMatchDotNetFixture_andRoundTrip() throws IOException {
+        ReportStatusUpdatedKey key = ReportStatusUpdatedKey.builder()
+                .reportId("0b7e3f52-9c1d-4e8a-b2f6-71a4c5d9e803")
+                .patientId("patient-123")
+                .build();
+        byte[] bytes;
+        try (JsonSerializer<ReportStatusUpdatedKey> serializer = new JsonSerializer<ReportStatusUpdatedKey>(mapper).forKeys()) {
+            bytes = serializer.serialize(Topics.REPORT_STATUS_UPDATED, key);
+        }
+        try (InputStream stream = getClass().getResourceAsStream("/report-status/key.json")) {
+            assertNotNull(stream);
+            // Kafka hashes bytes, so JSON structural equality alone is insufficient here.
+            assertArrayEquals(new String(stream.readAllBytes(), StandardCharsets.UTF_8).trim()
+                    .getBytes(StandardCharsets.UTF_8), bytes);
+        }
+        ReportStatusUpdatedKey consumed = mapper.readValue(bytes, ReportStatusUpdatedKey.class);
+        assertEquals(key.getReportId(), consumed.getReportId());
+        assertEquals(key.getPatientId(), consumed.getPatientId());
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"validation", "not-reportable", "failure", "minimal"})
