@@ -1,7 +1,19 @@
 package com.lantanagroup.link.validation.configs;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
+import ca.uhn.fhir.context.support.IValidationSupport;
+import ca.uhn.fhir.fhirpath.IFhirPath;
 import ca.uhn.fhir.rest.client.api.IRestfulClientFactory;
+import ca.uhn.fhir.validation.FhirValidator;
+import com.lantanagroup.link.validation.providers.ValidationCacheService;
+import com.lantanagroup.link.validation.services.ArtifactService;
+import com.lantanagroup.link.validation.services.ValidationService;
+import com.lantanagroup.link.validation.services.execution.ThreadLocalFhirPath;
+import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
+import org.hl7.fhir.common.hapi.validation.support.SnapshotGeneratingValidationSupport;
+import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
+import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpRequestRetryHandler;
 import org.apache.http.client.ServiceUnavailableRetryStrategy;
@@ -10,6 +22,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.HttpContext;
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +31,8 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
 
@@ -39,6 +54,140 @@ public class FhirConfig {
         logger.info("FHIR REST clients configured with transient-error retry: max {} attempts, {} ms backoff",
                 maxAttempts, backoffMillis);
         return fhirContext;
+    }
+
+    /**
+     * FHIRPath engine used by custom checks (e.g. {@code future-date}, {@code numeric-range})
+     * to evaluate expressions against resources. Derived from the shared {@link FhirContext}.
+     *
+     * <p>FHIRPath is evaluated concurrently by the rubric check pool, and HAPI's engine is not
+     * thread-safe, so each thread gets its own instance.
+     */
+    @Bean
+    public IFhirPath fhirPath(FhirContext fhirContext,
+                              ValidationSupportChain validationSupportChain,
+                              com.lantanagroup.link.validation.services.execution.BundleReferenceResolver bundleReferenceResolver) {
+        // Must happen before ThreadLocalFhirPath is constructed: its constructor eagerly builds one
+        // engine via fhirContext.newFhirPath(), which reads whatever validation support is attached
+        // to fhirContext at that moment. Without this, memberOf() and other terminology-aware FHIRPath
+        // functions always see HAPI's default empty support and fail closed.
+        fhirContext.setValidationSupport(validationSupportChain);
+        IFhirPath fhirPath = new ThreadLocalFhirPath(fhirContext);
+        fhirPath.setEvaluationContext(bundleReferenceResolver);
+        return fhirPath;
+    }
+    /**
+     * Validation support chain used by FHIR-conformance, terminology, and value-set checks.
+     *
+     * <p>Composed to be identical to the legacy validator's chain ({@link ValidationService}) so
+     * both engines produce the same findings for the same payload: base FHIR definitions, the
+     * artifact registry's IG packages (US Core, QI-Core, ...), snapshot generation, then the same
+     * terminology supports via {@link ValidationService#loadTerminologyValidationSupport} — the
+     * existence-gated remote terminology support (resolved from {@code link.fhir-terminology-service-url}
+     * or {@code link.terminology-service-url}) followed by the in-memory fallbacks.
+     */
+    @Bean
+    public ValidationSupportChain validationSupportChain(FhirContext fhirContext, LinkConfig linkConfig,
+            ArtifactService artifactService, ValidationCacheService validationCacheService) {
+        ValidationSupportChain chain = new ValidationSupportChain(
+                new DefaultProfileValidationSupport(fhirContext),
+                new LazyArtifactValidationSupport(fhirContext, artifactService),
+                new SnapshotGeneratingValidationSupport(fhirContext)
+        );
+
+        ValidationService.loadTerminologyValidationSupport(fhirContext, linkConfig, chain, validationCacheService);
+        logger.info("Rubric-engine validation support chain composed to match legacy: DefaultProfile -> Artifacts(IG packages) -> SnapshotGenerating -> [RemoteTerminology] -> CommonCodeSystems -> InMemoryTerminology");
+        return chain;
+    }
+
+    /**
+     * Delegates conformance-resource lookups to {@link ArtifactService#getValidationSupport()}
+     * at call time. Artifact support is rebuilt when artifacts are saved, deleted, or re-initialized
+     * ({@code POST /api/validation/artifact/$initialize}), so holding a fixed instance in the
+     * singleton chain could become stale. Resolving per call ensures the latest packages are used
+     * while still benefiting from ArtifactService's internal caching.
+     *
+     * <p>Terminology questions ({@code isCodeSystemSupported}/{@code isValueSetSupported}) retain
+     * the interface default of {@code false}, matching
+     * {@link com.lantanagroup.link.validation.services.ArtifactValidationSupport}.
+     */
+    // Package-private for testing.
+    static class LazyArtifactValidationSupport implements IValidationSupport {
+        private final FhirContext fhirContext;
+        private final ArtifactService artifactService;
+
+        LazyArtifactValidationSupport(FhirContext fhirContext, ArtifactService artifactService) {
+            this.fhirContext = fhirContext;
+            this.artifactService = artifactService;
+        }
+
+        private IValidationSupport delegate() {
+            try {
+                return artifactService.getValidationSupport();
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to load artifact validation support", e);
+            }
+        }
+
+        @Override
+        public FhirContext getFhirContext() {
+            return fhirContext;
+        }
+
+        @Override
+        public String getName() {
+            return "LazyArtifactValidationSupport";
+        }
+
+        @Override
+        public IBaseResource fetchCodeSystem(String theSystem) {
+            return delegate().fetchCodeSystem(theSystem);
+        }
+
+        @Override
+        public IBaseResource fetchValueSet(String theValueSetUrl) {
+            return delegate().fetchValueSet(theValueSetUrl);
+        }
+
+        @Override
+        public IBaseResource fetchStructureDefinition(String theUrl) {
+            return delegate().fetchStructureDefinition(theUrl);
+        }
+
+        @Override
+        public <T extends IBaseResource> T fetchResource(Class<T> theClass, String theUri) {
+            return delegate().fetchResource(theClass, theUri);
+        }
+
+        @Override
+        public List<IBaseResource> fetchAllConformanceResources() {
+            return delegate().fetchAllConformanceResources();
+        }
+
+        @Override
+        public <T extends IBaseResource> List<T> fetchAllStructureDefinitions() {
+            return delegate().fetchAllStructureDefinitions();
+        }
+
+        @Override
+        public <T extends IBaseResource> List<T> fetchAllNonBaseStructureDefinitions() {
+            return delegate().fetchAllNonBaseStructureDefinitions();
+        }
+    }
+
+    /**
+     * FHIR instance validator used by the rubric execution engine's FHIR-conformance check executor.
+     */
+    @Bean
+    public FhirValidator fhirValidator(FhirContext fhirContext, ValidationSupportChain validationSupportChain) {
+        CachingValidationSupport cachingSupport = new CachingValidationSupport(validationSupportChain);
+        FhirInstanceValidator instanceValidator = new FhirInstanceValidator(cachingSupport);
+        instanceValidator.setAnyExtensionsAllowed(true);
+        FhirValidator validator = fhirContext.newValidator();
+        validator.registerValidatorModule(instanceValidator);
+        validator.setConcurrentBundleValidation(true);
+        validator.setExecutorService(ForkJoinPool.commonPool());
+        return validator;
     }
 
     /**

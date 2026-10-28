@@ -11,15 +11,17 @@ using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace Automation.UI.Services;
@@ -58,6 +60,9 @@ internal sealed class RunExecutor
     private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
     private readonly ILivePatientEventInjector _liveInjector;
+    private readonly IReadOnlyList<(string Name, string Url)> _monitoredServiceHealthUrls;
+    private readonly TimeSpan _serviceHealthInterval;
+    private readonly TimeSpan _serviceOutageThreshold;
 
     internal sealed record GenerationPipelineRequest(
         IReadOnlyList<ProfiledMeasureType> SelectedMeasures,
@@ -81,6 +86,20 @@ internal sealed class RunExecutor
         ILivePatientEventInjector liveInjector)
     {
         _automationConfig = automationConfig;
+        _monitoredServiceHealthUrls = BuildMonitoredServiceHealthUrls(configuration);
+        _serviceHealthInterval = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:CheckIntervalSeconds") ?? 5);
+        _serviceOutageThreshold = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:OutageThresholdSeconds") ?? 120);
+
+        if (_serviceHealthInterval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(
+                nameof(configuration),
+                "ServiceHealth:CheckIntervalSeconds must be greater than zero.");
+
+        if (_serviceOutageThreshold <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(
+                nameof(configuration),
+                "ServiceHealth:OutageThresholdSeconds must be greater than zero.");
+
         _hostServices = hostServices;
         _snapshotStore = snapshotStore;
         _orchestrator = orchestrator;
@@ -99,6 +118,45 @@ internal sealed class RunExecutor
         _operationOutcomeExpectationSource = ooExpectations.Source;
         _logger = logger;
         _liveInjector = liveInjector;
+    }
+
+    internal static IReadOnlyList<(string Name, string Url)>
+    BuildMonitoredServiceHealthUrls(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var monitoredServices = new List<(string Name, string Url)>();
+
+        void AddMonitoredService(string name, string configurationKey)
+        {
+            var serviceUrl = configuration[configurationKey];
+
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                return;
+
+            serviceUrl = serviceUrl.Trim().TrimEnd('/');
+
+            if (!Uri.TryCreate(serviceUrl, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp &&
+                 uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new ArgumentException(
+                    $"{configurationKey} must be an absolute HTTP or HTTPS URL.",
+                    nameof(configuration));
+            }
+
+            monitoredServices.Add((name, $"{serviceUrl}/health"));
+        }
+
+        AddMonitoredService(
+            "Terminology",
+            "ServiceRegistry:TerminologyServiceUrl");
+
+        AddMonitoredService(
+            "Validation",
+            "ServiceRegistry:ValidationServiceUrl");
+
+        return monitoredServices;
     }
 
     private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
@@ -466,8 +524,15 @@ internal sealed class RunExecutor
             }
 
             state.FacilityId = facilityId;
-            using var facilitySetupLock = await FacilitySetupGate.AcquireAsync(
+            var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
+
+            // Success-path quiesce sets the facility abort while it still holds this gate.
+            // Clear only after this run owns the facility, so a second DMRP run cannot
+            // drop that flag out from under the run that is still quiescing.
+            using var facilitySetupLock = await AcquireFacilityAndClearStaleAbortAsync(
                 facilityId,
+                abortRegistry,
+                output,
                 message => output.WriteLine(message),
                 cancellationToken);
 
@@ -805,21 +870,26 @@ internal sealed class RunExecutor
             string normalizationEvidenceReportId;
             if (isLiveSimulation)
             {
-                var scheduledWorkflowState = await ExecuteLiveScheduledReportWorkflowAsync(
-                    state,
-                    callbacks,
-                    reportHelper,
-                    output,
+                var scheduledWorkflowState = await InvokeAfterClearingStaleFacilityAbortAsync(
+                    abortRegistry,
                     facilityId,
-                    measureIds,
-                    scenarioConfig,
-                    patientIds,
-                    profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
-                    generationManifest,
-                    fhirDataLoader,
-                    generationConfig,
-                    generationRequirementsPlan,
-                    acquisitionSimulation,
+                    output,
+                    ct => ExecuteLiveScheduledReportWorkflowAsync(
+                        state,
+                        callbacks,
+                        reportHelper,
+                        output,
+                        facilityId,
+                        measureIds,
+                        scenarioConfig,
+                        patientIds,
+                        profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                        generationManifest,
+                        fhirDataLoader,
+                        generationConfig,
+                        generationRequirementsPlan,
+                        acquisitionSimulation,
+                        ct),
                     cancellationToken);
 
                 reportId = scheduledWorkflowState.ReportTrackingId;
@@ -836,15 +906,20 @@ internal sealed class RunExecutor
             }
             else if (usesScheduledWorkflow)
             {
-                var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
-                    reportHelper,
-                    output,
+                var scheduledWorkflowState = await InvokeAfterClearingStaleFacilityAbortAsync(
+                    abortRegistry,
                     facilityId,
-                    measureIds,
-                    state.Options.SelectedMeasures,
-                    scenarioConfig,
-                    patientIds,
-                    profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                    output,
+                    ct => ExecuteScheduledReportWorkflowAsync(
+                        reportHelper,
+                        output,
+                        facilityId,
+                        measureIds,
+                        state.Options.SelectedMeasures,
+                        scenarioConfig,
+                        patientIds,
+                        profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                        ct),
                     cancellationToken);
 
                 reportId = scheduledWorkflowState.ReportTrackingId;
@@ -868,6 +943,31 @@ internal sealed class RunExecutor
                 scenarioConfig.IsMetricsRun,
                 scenarioConfig.PatientIds.Count);
 
+            using var healthClient = services.GetRequiredService<IHttpClientFactory>()
+                .CreateClient();
+
+            healthClient.Timeout = TimeSpan.FromSeconds(5);
+
+            IBackgroundMonitorProbe? CreateServiceHealthProbe()
+            {
+                if (_monitoredServiceHealthUrls.Count == 0)
+                    return null;
+
+                var monitoredServices = _monitoredServiceHealthUrls
+                    .Select(service => new MonitoredService(
+                        service.Name,
+                        ct => CheckHealthAsync(healthClient, service.Url, ct)))
+                    .ToList();
+
+                return new ServiceHealthProbe(
+                    monitoredServices,
+                    _serviceHealthInterval,
+                    _serviceOutageThreshold);
+            }
+
+            // Preserve service health history across the initial and regenerated reports.
+            var serviceHealthProbe = CreateServiceHealthProbe();
+
             await using (var diagnostics = new BackgroundDiagnosticsMonitor(
                 output,
                 lokiScraper,
@@ -877,14 +977,26 @@ internal sealed class RunExecutor
                 pollInterval: diagnosticsPollInterval,
                 forwardInternalLogsToOutput: true,
                 pipelineReader: services.GetRequiredService<PipelineDataReader>(),
-                scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun)))
+                scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun),
+                serviceHealthProbe: serviceHealthProbe))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
-                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics, cancellationToken);
+                var submitted = await reportHelper.CheckSubmissionStatusAsync(
+                    reportId, scenarioConfig, diagnostics, cancellationToken);
+
                 await diagnostics.StopAsync();
 
+                if (diagnostics.ServiceHealthFailureMessage is { } healthFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Report {reportId} failed: {healthFailure}");
+                }
+
                 if (!submitted)
-                    throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
+                {
+                    throw new InvalidOperationException(
+                        $"Expected report with id {reportId} to be submitted but it was not.");
+                }
             }
 
             if (usesScheduledWorkflow)
@@ -985,14 +1097,27 @@ internal sealed class RunExecutor
                     forwardInternalLogsToOutput: true,
                     pipelineReader: services.GetRequiredService<PipelineDataReader>(),
                     expectsDataAcquisition: false,
-                    scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun));
+                    scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun),
+                    serviceHealthProbe: serviceHealthProbe);
 
                 await regenDiagnostics.StartAsync(facilityId, reportId);
-                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics, cancellationToken);
+
+                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(
+                    reportId, scenarioConfig, regenDiagnostics, cancellationToken);
+
                 await regenDiagnostics.StopAsync();
 
+                if (regenDiagnostics.ServiceHealthFailureMessage is { } healthFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Regenerated report {reportId} failed: {healthFailure}");
+                }
+
                 if (!regenSubmitted)
-                    throw new InvalidOperationException($"Expected regenerated report with id {reportId} to be submitted but it was not.");
+                {
+                    throw new InvalidOperationException(
+                        $"Expected regenerated report with id {reportId} to be submitted but it was not.");
+                }
 
                 output.WriteLine("Regenerated report submitted successfully.");
             }
@@ -1433,6 +1558,29 @@ internal sealed class RunExecutor
         }
     }
 
+    internal static async Task<bool?> CheckHealthAsync(
+    HttpClient client,
+    string healthUrl,
+    CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await client.GetAsync(
+                healthUrl,
+                cancellationToken);
+
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// The facility's mock entries for one period, as the run summary records them.
     /// </summary>
@@ -1752,6 +1900,66 @@ internal sealed class RunExecutor
 
     private static string ToZulu(DateTimeOffset value)
         => value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    /// <summary>
+    /// Takes the facility gate, then drops a stale facility-wide abort.
+    /// Success-path quiesce sets that flag while it still holds the gate, so the
+    /// clear has to wait until this run is the one inside the gate.
+    /// </summary>
+    internal static async Task<IDisposable> AcquireFacilityAndClearStaleAbortAsync(
+        string facilityId,
+        IPipelineAbortRegistry? abortRegistry,
+        IAutomationOutput output,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        var gate = await FacilitySetupGate.AcquireAsync(facilityId, log, cancellationToken);
+        try
+        {
+            await ClearStaleFacilityAbortAsync(abortRegistry, facilityId, output, cancellationToken);
+            return gate;
+        }
+        catch
+        {
+            gate.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Clears a stale facility abort and then runs the scheduled workflow that
+    /// produces ReportScheduled. The caller already holds <see cref="FacilitySetupGate"/>.
+    /// </summary>
+    internal static async Task<T> InvokeAfterClearingStaleFacilityAbortAsync<T>(
+        IPipelineAbortRegistry? abortRegistry,
+        string facilityId,
+        IAutomationOutput output,
+        Func<CancellationToken, Task<T>> next,
+        CancellationToken cancellationToken)
+    {
+        await ClearStaleFacilityAbortAsync(abortRegistry, facilityId, output, cancellationToken);
+        return await next(cancellationToken);
+    }
+
+    /// <summary>
+    /// A previous run quiesces the facility id for the abort TTL. DMRP runs reuse the
+    /// NHSN org id, so that flag is still set when the next run schedules a report and
+    /// Report then drops the ReportScheduled event. Report-id flags are left in place.
+    /// </summary>
+    internal static async Task ClearStaleFacilityAbortAsync(
+        IPipelineAbortRegistry? abortRegistry,
+        string facilityId,
+        IAutomationOutput output,
+        CancellationToken cancellationToken)
+    {
+        if (abortRegistry == null
+            || !await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
+            return;
+
+        await RunCleanupHelper.ClearFacilityAbortForNewRunAsync(abortRegistry, facilityId, cancellationToken);
+        output.WriteLine(
+            $"Cleared pipeline abort flag for facility '{facilityId}' so this run can schedule a report.");
+    }
 
     private readonly record struct ScheduledReportWindow(DateTimeOffset Start, TimeSpan Duration);
     private readonly record struct ScheduledWorkflowState(string ReportTrackingId, Frequency Frequency);

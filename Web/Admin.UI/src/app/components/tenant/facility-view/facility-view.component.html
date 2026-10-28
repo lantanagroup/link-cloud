@@ -249,9 +249,10 @@
             <button type="button"
                     *ngIf="element.status === 'Submitted' || element.status === 'CompletedNotSubmitted'"
                     class="link-button secondary" [disabled]="element.isDeleted"
+                    matTooltip="Rerun this report: re-evaluate, re-validate and regenerate it from cached data"
                     (click)="onResubmit(element.id, element.facilityId)">
-              <fa-icon [icon]="faRotate"></fa-icon>
-              Resubmit...
+              <fa-icon [icon]="faRotateRight"></fa-icon>
+              Rerun...
             </button>
             <button type="button"
                     *ngIf="isInProgressStatus(element.status) && !element.isDeleted"

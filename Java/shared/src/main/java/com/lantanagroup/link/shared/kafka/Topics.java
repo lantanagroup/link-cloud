@@ -21,4 +21,5 @@ public class Topics {
     public static final String RETENTION_CHECK_COMPLETE_RETRY = "RetentionCheckComplete-Retry";
     public static final String RETENTION_CHECK_COMPLETE_ERROR = "RetentionCheckComplete-Error";
     public static final String SERVICE_HEALTH_CHECK = "Service-Healthcheck";
+    public static final String SHADOW_COMPARE_EVENT = "ShadowCompareEvent";
 }

@@ -33,10 +33,12 @@ public static class GetReportValidationCategoryCounts
 
         try
         {
+            // A deleted or aborted report keeps its counts, so ask Report for deleted schedules too.
             using var scheduleResponse = await reportService.GetReportScheduleById(
                 context.User,
                 context.RequestAborted,
-                reportScheduleId);
+                reportScheduleId,
+                includeDeleted: true);
             if (!scheduleResponse.IsSuccessStatusCode)
             {
                 return UpstreamFailure(scheduleResponse.StatusCode, $"Report schedule '{reportScheduleId}' not found.");
