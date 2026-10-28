@@ -23,6 +23,16 @@ public class ServiceActivitySourceTests
     }
 
     [Fact]
+    public void Initialize_ConfigVersionWhitespace_FallsBackToAssemblyVersion()
+    {
+        var serviceInfo = new ServiceInformation { Version = "   " };
+
+        ServiceActivitySource.Initialize("9.9.9-assembly", serviceInfo);
+
+        Assert.Equal("9.9.9-assembly", ServiceActivitySource.Version);
+    }
+
+    [Fact]
     public void Initialize_ConfigVersionSet_UsesConfigVersion()
     {
         var serviceInfo = new ServiceInformation { Version = "1.2.3" };

@@ -108,7 +108,7 @@ public static class ExternalConfigurationExtension
             serviceInformation!.ServiceConfigName = serviceName;
 
             // Keep the injected singleton in step with /api/info, which already falls back this way.
-            if (string.IsNullOrEmpty(serviceInformation.Version))
+            if (string.IsNullOrWhiteSpace(serviceInformation.Version))
             {
                 serviceInformation.Version = assemblyVersion;
             }

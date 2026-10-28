@@ -450,6 +450,156 @@ public class ReportAbsManifestValidatorTests
             line.Contains("Manifest Device version entry 'version' has an empty value", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// The profile requires Device.deviceName 1..1.
+    /// </summary>
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceNameIsMissing_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-8", ExpectedStart, ExpectedEnd, deviceNames: []);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-8",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device is missing deviceName", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceHasTwoDeviceNames_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-9", ExpectedStart, ExpectedEnd, deviceNames: [new { name = "NHSNLink", type = DeviceNameType }, new { name = "Link", type = DeviceNameType }]);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-9",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device should contain exactly one deviceName", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The profile requires Device.deviceName.name 1..1.
+    /// </summary>
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceNameIsBlank_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-10", ExpectedStart, ExpectedEnd, deviceNames: [new { name = " ", type = DeviceNameType }]);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-10",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device deviceName[0].name is empty", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceHasNoVersionEntries_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-11", ExpectedStart, ExpectedEnd, deviceVersions: []);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-11",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device has no version entries", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceVersionCodeIsUnsupported_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-12", ExpectedStart, ExpectedEnd, deviceVersions: [new { type = new { coding = new[] { new { code = "release" } } }, component = new { value = "api" }, value = DeviceVersionValue }]);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-12",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device version entry type must be one of", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ValidateAllAsync_WhenDeviceVersionIsMissingComponent_Fails()
+    {
+        var output = new BufferingAutomationOutput();
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
+        var patientId = patientIds.Single();
+
+        var mockExternalAbsResources = BuildMockExternalAbsResources(
+            patientId, bundles, "MEASURE-UT-13", ExpectedStart, ExpectedEnd, deviceVersions: [new { type = new { coding = new[] { new { code = "version" } } }, value = DeviceVersionValue }]);
+
+        var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                mockExternalAbsResources,
+                new[] { patientId },
+                "MEASURE-UT-13",
+                ExpectedStart,
+                ExpectedEnd));
+
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Manifest Device version entry 'version' is missing component.value", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public async Task ValidateAllAsync_WhenPatientListProfileIsWrong_Fails()
     {
@@ -488,7 +638,9 @@ public class ReportAbsManifestValidatorTests
         string? deviceProfile = DeviceProfile,
         string? patientListProfile = PatientListProfile,
         string? deviceNameType = DeviceNameType,
-        string deviceVersionValue = DeviceVersionValue)
+        string deviceVersionValue = DeviceVersionValue,
+        object[]? deviceNames = null,
+        object[]? deviceVersions = null)
     {
         var generatedPatientJson = ExtractGeneratedPatientJson(patientId, bundles);
 
@@ -508,8 +660,8 @@ public class ReportAbsManifestValidatorTests
             {
                 ["resourceType"] = "Device",
                 ["id"] = deviceId,
-                ["deviceName"] = DeviceNameJson(deviceNameType),
-                ["version"] = DeviceVersionJson(deviceVersionValue)
+                ["deviceName"] = deviceNames ?? DeviceNameJson(deviceNameType),
+                ["version"] = deviceVersions ?? DeviceVersionJson(deviceVersionValue)
             }),
             SerializeWithOptionalProfile(patientListProfile, new Dictionary<string, object>
             {

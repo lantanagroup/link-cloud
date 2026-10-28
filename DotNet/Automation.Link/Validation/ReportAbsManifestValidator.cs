@@ -892,9 +892,9 @@ public class ReportAbsManifestValidator
     }
 
     /// <summary>
-    /// The submitting Device must carry a typed deviceName and typed, non-empty version entries (LEGLINK-1420).
-    /// Build and commit are injected by CI, so a local stack legitimately has only the "version" entry;
-    /// this asserts the shape of whatever is present, not a count.
+    /// The submitting Device must carry exactly one named, typed deviceName and typed, non-empty version
+    /// entries (LEGLINK-1420). Build and commit are injected by CI, so a local stack legitimately has only
+    /// the "version" entry; the version check asserts the shape of whatever is present, not a count.
     /// </summary>
     private static void ValidateManifestDevice(JsonElement device, List<string> errors)
     {
@@ -906,8 +906,15 @@ public class ReportAbsManifestValidator
         {
             AddError(errors, "Manifest Device is missing deviceName.");
         }
+        else if (deviceNames.GetArrayLength() != 1)
+        {
+            AddError(errors, $"Manifest Device should contain exactly one deviceName. Actual={deviceNames.GetArrayLength()}");
+        }
         else
         {
+            if (string.IsNullOrWhiteSpace(GetString(deviceNames[0], "name")))
+                AddError(errors, "Manifest Device deviceName[0].name is empty.");
+
             var nameType = GetString(deviceNames[0], "type");
             if (!string.Equals(nameType, DeviceNameTypeCode, StringComparison.Ordinal))
                 AddError(errors, $"Manifest Device deviceName[0].type mismatch. Expected '{DeviceNameTypeCode}', actual '{nameType ?? "(null)"}'.");

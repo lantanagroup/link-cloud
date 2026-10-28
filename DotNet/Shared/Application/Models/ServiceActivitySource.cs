@@ -27,7 +27,7 @@ public static class ServiceActivitySource
         ProductVersion = serviceInfo?.ProductVersion ?? string.Empty;
 
         // A ServiceInformation section without a Version used to leave this empty (LEGLINK-1420).
-        Version = string.IsNullOrEmpty(serviceInfo?.Version) ? assemblyVersion : serviceInfo.Version;
+        Version = string.IsNullOrWhiteSpace(serviceInfo?.Version) ? assemblyVersion : serviceInfo.Version;
 
         Instance = new ActivitySource(ServiceName, Version);
     }
