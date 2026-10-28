@@ -12,15 +12,16 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace Automation.UI.Services;
@@ -59,6 +60,9 @@ internal sealed class RunExecutor
     private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
     private readonly ILivePatientEventInjector _liveInjector;
+    private readonly IReadOnlyList<(string Name, string Url)> _monitoredServiceHealthUrls;
+    private readonly TimeSpan _serviceHealthInterval;
+    private readonly TimeSpan _serviceOutageThreshold;
 
     internal sealed record GenerationPipelineRequest(
         IReadOnlyList<ProfiledMeasureType> SelectedMeasures,
@@ -82,6 +86,20 @@ internal sealed class RunExecutor
         ILivePatientEventInjector liveInjector)
     {
         _automationConfig = automationConfig;
+        _monitoredServiceHealthUrls = BuildMonitoredServiceHealthUrls(configuration);
+        _serviceHealthInterval = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:CheckIntervalSeconds") ?? 5);
+        _serviceOutageThreshold = TimeSpan.FromSeconds(configuration.GetValue<int?>("ServiceHealth:OutageThresholdSeconds") ?? 120);
+
+        if (_serviceHealthInterval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(
+                nameof(configuration),
+                "ServiceHealth:CheckIntervalSeconds must be greater than zero.");
+
+        if (_serviceOutageThreshold <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(
+                nameof(configuration),
+                "ServiceHealth:OutageThresholdSeconds must be greater than zero.");
+
         _hostServices = hostServices;
         _snapshotStore = snapshotStore;
         _orchestrator = orchestrator;
@@ -100,6 +118,45 @@ internal sealed class RunExecutor
         _operationOutcomeExpectationSource = ooExpectations.Source;
         _logger = logger;
         _liveInjector = liveInjector;
+    }
+
+    internal static IReadOnlyList<(string Name, string Url)>
+    BuildMonitoredServiceHealthUrls(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var monitoredServices = new List<(string Name, string Url)>();
+
+        void AddMonitoredService(string name, string configurationKey)
+        {
+            var serviceUrl = configuration[configurationKey];
+
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                return;
+
+            serviceUrl = serviceUrl.Trim().TrimEnd('/');
+
+            if (!Uri.TryCreate(serviceUrl, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp &&
+                 uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new ArgumentException(
+                    $"{configurationKey} must be an absolute HTTP or HTTPS URL.",
+                    nameof(configuration));
+            }
+
+            monitoredServices.Add((name, $"{serviceUrl}/health"));
+        }
+
+        AddMonitoredService(
+            "Terminology",
+            "ServiceRegistry:TerminologyServiceUrl");
+
+        AddMonitoredService(
+            "Validation",
+            "ServiceRegistry:ValidationServiceUrl");
+
+        return monitoredServices;
     }
 
     private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
@@ -886,6 +943,31 @@ internal sealed class RunExecutor
                 scenarioConfig.IsMetricsRun,
                 scenarioConfig.PatientIds.Count);
 
+            using var healthClient = services.GetRequiredService<IHttpClientFactory>()
+                .CreateClient();
+
+            healthClient.Timeout = TimeSpan.FromSeconds(5);
+
+            IBackgroundMonitorProbe? CreateServiceHealthProbe()
+            {
+                if (_monitoredServiceHealthUrls.Count == 0)
+                    return null;
+
+                var monitoredServices = _monitoredServiceHealthUrls
+                    .Select(service => new MonitoredService(
+                        service.Name,
+                        ct => CheckHealthAsync(healthClient, service.Url, ct)))
+                    .ToList();
+
+                return new ServiceHealthProbe(
+                    monitoredServices,
+                    _serviceHealthInterval,
+                    _serviceOutageThreshold);
+            }
+
+            // Preserve service health history across the initial and regenerated reports.
+            var serviceHealthProbe = CreateServiceHealthProbe();
+
             await using (var diagnostics = new BackgroundDiagnosticsMonitor(
                 output,
                 lokiScraper,
@@ -895,14 +977,26 @@ internal sealed class RunExecutor
                 pollInterval: diagnosticsPollInterval,
                 forwardInternalLogsToOutput: true,
                 pipelineReader: services.GetRequiredService<PipelineDataReader>(),
-                scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun)))
+                scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun),
+                serviceHealthProbe: serviceHealthProbe))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
-                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics, cancellationToken);
+                var submitted = await reportHelper.CheckSubmissionStatusAsync(
+                    reportId, scenarioConfig, diagnostics, cancellationToken);
+
                 await diagnostics.StopAsync();
 
+                if (diagnostics.ServiceHealthFailureMessage is { } healthFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Report {reportId} failed: {healthFailure}");
+                }
+
                 if (!submitted)
-                    throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
+                {
+                    throw new InvalidOperationException(
+                        $"Expected report with id {reportId} to be submitted but it was not.");
+                }
             }
 
             if (usesScheduledWorkflow)
@@ -1003,14 +1097,27 @@ internal sealed class RunExecutor
                     forwardInternalLogsToOutput: true,
                     pipelineReader: services.GetRequiredService<PipelineDataReader>(),
                     expectsDataAcquisition: false,
-                    scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun));
+                    scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun),
+                    serviceHealthProbe: serviceHealthProbe);
 
                 await regenDiagnostics.StartAsync(facilityId, reportId);
-                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics, cancellationToken);
+
+                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(
+                    reportId, scenarioConfig, regenDiagnostics, cancellationToken);
+
                 await regenDiagnostics.StopAsync();
 
+                if (regenDiagnostics.ServiceHealthFailureMessage is { } healthFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Regenerated report {reportId} failed: {healthFailure}");
+                }
+
                 if (!regenSubmitted)
-                    throw new InvalidOperationException($"Expected regenerated report with id {reportId} to be submitted but it was not.");
+                {
+                    throw new InvalidOperationException(
+                        $"Expected regenerated report with id {reportId} to be submitted but it was not.");
+                }
 
                 output.WriteLine("Regenerated report submitted successfully.");
             }
@@ -1448,6 +1555,29 @@ internal sealed class RunExecutor
                 _liveInjector.CloseSession(state.RunId);
 
             runServices?.Dispose();
+        }
+    }
+
+    internal static async Task<bool?> CheckHealthAsync(
+    HttpClient client,
+    string healthUrl,
+    CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await client.GetAsync(
+                healthUrl,
+                cancellationToken);
+
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
         }
     }
 
