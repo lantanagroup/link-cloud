@@ -106,6 +106,13 @@ public static class ExternalConfigurationExtension
         if (serviceInformation != null)
         {
             serviceInformation!.ServiceConfigName = serviceName;
+
+            // Keep the injected singleton in step with /api/info, which already falls back this way.
+            if (string.IsNullOrWhiteSpace(serviceInformation.Version))
+            {
+                serviceInformation.Version = assemblyVersion;
+            }
+
             builder.Services.AddSingleton<ServiceInformation>(serviceInformation);
             ServiceActivitySource.Initialize(assemblyVersion, serviceInformation);
         }

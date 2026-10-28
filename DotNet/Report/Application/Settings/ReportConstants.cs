@@ -18,8 +18,15 @@
             public const string CensusProfileUrl = "http://hl7.org/fhir/us/nhsn-dqm/StructureDefinition/poi-list";
             public const string DataAbsentReasonExtensionUrl = "http://hl7.org/fhir/StructureDefinition/data-absent-reason";
             public const string DataAbsentReasonUnknownCode = "unknown";
+            public const string DeviceName = "NHSNLink";
+            public const string DeviceNameType = "user-friendly-name";
+            public const string DeviceVersionBuildCode = "build";
+            public const string DeviceVersionCode = "version";
+            public const string DeviceVersionCommitCode = "commit";
+            public const string DeviceVersionComponent = "api";
             public const string IdentifierSystem = "urn:ietf:rfc:3986";
             public const string IndividualMeasureReportProfileUrl = "http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/indv-measurereport-deqm";
+            public const string LinkDeviceVersionCodeSystem = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/CodeSystem/codesystem-link-device-version";
             public const string MainSystem = "https://nhsnlink.org";
             public const string NationalProviderIdentifierSystemUrl = "http://hl7.org.fhir/sid/us-npi";
             public const string OrganizationTypeSystem = "http://terminology.hl7.org/CodeSystem/organization-type";

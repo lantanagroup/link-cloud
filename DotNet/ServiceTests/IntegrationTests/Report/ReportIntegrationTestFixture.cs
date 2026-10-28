@@ -164,7 +164,8 @@ namespace IntegrationTests.Report
                     sp.GetRequiredService<SubmitPayloadProducer>(),
                     sp.GetRequiredService<AuditableEventOccurredProducer>(),
                     sp.GetRequiredService<IReportEntryManager>(),
-                    sp.GetRequiredService<IReportScheduledManager>()));
+                    sp.GetRequiredService<IReportScheduledManager>(),
+                    sp.GetRequiredService<ServiceInformation>()));
 
             builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);

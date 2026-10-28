@@ -19,17 +19,15 @@ public static class ServiceActivitySource
 
     public static void Initialize(string assemblyVersion, ServiceInformation? serviceInfo)
     {
-        if (serviceInfo != null)
+        if (!string.IsNullOrEmpty(serviceInfo?.ServiceConfigName))
         {
-            if (!string.IsNullOrEmpty(serviceInfo.ServiceConfigName))
-                ServiceName = serviceInfo.ServiceConfigName;
-            if (!string.IsNullOrEmpty(serviceInfo.Version))
-                Version = serviceInfo.Version;
+            ServiceName = serviceInfo.ServiceConfigName;
         }
-        else
-        {
-            Version = assemblyVersion;
-        }
+
+        ProductVersion = serviceInfo?.ProductVersion ?? string.Empty;
+
+        // A ServiceInformation section without a Version used to leave this empty (LEGLINK-1420).
+        Version = string.IsNullOrWhiteSpace(serviceInfo?.Version) ? assemblyVersion : serviceInfo.Version;
 
         Instance = new ActivitySource(ServiceName, Version);
     }
