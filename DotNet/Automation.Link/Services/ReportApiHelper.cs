@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Net;
 using Task = System.Threading.Tasks.Task;
 
@@ -198,6 +199,8 @@ public class ReportApiHelper
         var effectiveTimeout = timeout ?? TimeSpan.FromMinutes(2);
         var pollingInterval = TimeSpan.FromSeconds(2);
         var start = DateTime.UtcNow;
+        int? lastStatusCode = null;
+        string? lastBody = null;
 
         _output.WriteLine($"Waiting for scheduled report {reportTrackingId} to be persisted before publishing census snapshots...");
 
@@ -213,12 +216,49 @@ public class ReportApiHelper
                 return response.Body;
             }
 
+            lastStatusCode = response.StatusCode;
+            lastBody = response.RawBody;
+
             await Task.Delay(pollingInterval, cancellationToken);
         }
 
         throw new TimeoutException(
-            $"Scheduled report {reportTrackingId} was not persisted within {effectiveTimeout.TotalSeconds:F0}s. " +
-            "Census snapshots were not published to avoid a 'No Scheduled Reports found' race.");
+            DescribeScheduledReportNotPersisted(reportTrackingId, effectiveTimeout, lastStatusCode, lastBody));
+    }
+
+    /// <summary>
+    /// Explains a schedule lookup that never succeeded. The id is the schedule id
+    /// the Report service stores when it consumes ReportScheduled.
+    /// </summary>
+    internal static string DescribeScheduledReportNotPersisted(
+        string reportTrackingId,
+        TimeSpan timeout,
+        int? lastStatusCode,
+        string? lastBody)
+    {
+        var status = lastStatusCode.HasValue ? $"HTTP {lastStatusCode.Value}" : "no response";
+        var detail = SummarizeLookupBody(lastBody);
+        var bodyClause = string.IsNullOrEmpty(detail) ? string.Empty : $" Response: {detail}.";
+
+        return
+            $"Scheduled report {reportTrackingId} was not persisted within {timeout.TotalSeconds:F0}s. " +
+            "Census snapshots were not published to avoid a 'No Scheduled Reports found' race. " +
+            $"Checked GET /api/schedules/{reportTrackingId}; last response was {status}.{bodyClause} " +
+            "The Report service creates that row when it consumes the ReportScheduled event. " +
+            "It skips the event when that facility or that report id is aborted, and it does not store an invalid event or an id that already exists (those go to the ReportScheduled error topic). " +
+            "Check Report service logs for ReportScheduledListener and that error topic.";
+    }
+
+    private static string SummarizeLookupBody(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody))
+            return string.Empty;
+
+        var sanitized = HtmlInputSanitizer.Sanitize(rawBody).ReplaceLineEndings(" ").Trim();
+        if (sanitized.Length <= 180)
+            return sanitized;
+
+        return sanitized[..180];
     }
 
     public async Task PublishPatientListAcquiredAsync(
