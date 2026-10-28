@@ -1,0 +1,13 @@
+{
+  "reportScheduleId": "0b7e3f52-9c1d-4e8a-b2f6-71a4c5d9e803",
+  "patientId": "patient-123",
+  "status": "Validation",
+  "isSuccess": true,
+  "correlationId": "684e43c1-415b-4d85-9a55-cc9905ddcb63",
+  "timestamp": "2026-10-28T13:30:00Z",
+  "processingTime": 3000000000,
+  "validationResult": {
+    "passed": false,
+    "messageCount": 4000000000
+  }
+}

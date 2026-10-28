@@ -166,6 +166,13 @@
     </None>
   </ItemGroup>
 
+  <!-- Both runtimes verify ReportStatusUpdated against the same wire contract. -->
+  <ItemGroup>
+    <None Include="..\..\Java\shared\src\test\resources\report-status\*.json" Link="Resources\ReportStatus\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="IntegrationTests\DataAcquisition\Controllers\" />
   </ItemGroup>

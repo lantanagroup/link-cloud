@@ -1,0 +1,24 @@
+{
+  "patientReportingStatuses": [
+    "PatientIdentified",
+    "InitialAcquisition",
+    "InitialNormalization",
+    "InitialEvaluation",
+    "SupplementalAcquisition",
+    "SupplementalNormalization",
+    "SupplementalEvaluation",
+    "Validation",
+    "Submission",
+    "Submitted",
+    "Failed",
+    "NotReportable",
+    "NotSubmitted"
+  ],
+  "reportStatuses": [
+    "Pending",
+    "Completed",
+    "CompletedNotSubmitted",
+    "Failure",
+    "Canceled"
+  ]
+}
