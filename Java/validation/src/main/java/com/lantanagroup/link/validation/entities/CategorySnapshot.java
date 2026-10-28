@@ -1,0 +1,71 @@
+package com.lantanagroup.link.validation.entities;
+
+import com.lantanagroup.link.validation.matchers.Matcher;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class CategorySnapshot {
+    private String id;
+    private String title;
+    private CategorySeverity severity;
+    private boolean acceptable;
+    private boolean submit = true;
+    private boolean review = true;
+    private String guidance;
+    private Matcher matcher;
+
+    public CategorySnapshot() {
+    }
+
+    public CategorySnapshot(Category category) {
+        id = category.getId();
+        title = category.getTitle();
+        severity = category.getSeverity();
+        acceptable = category.isAcceptable();
+        submit = category.isSubmit();
+        review = category.isReview();
+        guidance = category.getGuidance();
+        CategoryRule latestRule = category.getLatestRule();
+        if (latestRule != null) {
+            matcher = latestRule.getMatcher();
+        }
+    }
+
+    public Category toCategory() {
+        return toCategory(new Category());
+    }
+
+    public Category toCategory(Category category) {
+        category.setId(id);
+        return applyTo(category);
+    }
+
+    /**
+     * Copies the snapshot's mutable fields onto an existing category, leaving its identifier alone.
+     * Assigning the ID of an already-persisted category is not safe: under a case-insensitive collation
+     * the stored ID may differ from this snapshot's ID only by case, and writing it would alter the
+     * identifier of a managed entity.
+     */
+    public Category applyTo(Category category) {
+        category.setTitle(title);
+        category.setSeverity(severity);
+        category.setAcceptable(acceptable);
+        category.setSubmit(submit);
+        category.setReview(review);
+        category.setGuidance(guidance);
+        return category;
+    }
+
+    public CategoryRule toCategoryRule() {
+        return toCategoryRule(toCategory());
+    }
+
+    public CategoryRule toCategoryRule(Category category) {
+        CategoryRule categoryRule = new CategoryRule();
+        categoryRule.setCategory(category);
+        categoryRule.setMatcher(matcher);
+        return categoryRule;
+    }
+}

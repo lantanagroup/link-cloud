@@ -1,29 +1,133 @@
+service-information:
+  service-name: Link Measure Evaluation Service
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    discover-composite:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
+    diskspace:
+      enabled: false
+    mongo:
+      enabled: false
+    redis:
+      enabled: false     # auto Redis indicator disabled; ResourceCacheHealthIndicator checks Redis + ABS
+    resource-cache:
+      timeout-ms: 3000   # backstop deadline for the combined Redis+ABS check; the 2s Redis command
+                         # timeout (spring.data.redis.timeout) reports DOWN sooner in the common case,
+                         # and this stays below the BFF's 5s health-check timeout
+    kafka:
+      enabled: true  # Ensures Kafka health is checked
+
+logging:
+  level:
+    com.lantanagroup.link: debug
+    com.lantanagroup.link.performance: info
+
+server:
+  port: 5135
+
+telemetry:
+  exporterEndpoint: http://localhost:55690
+
+loki:
+  enabled: true
+  url: http://localhost:3100
+  app: link-cloud
+
 springdoc:
   api-docs:
-    path: /api-docs
+    enabled: false
   swagger-ui:
-    path: /swagger-ui.html
+    enabled: false
+
 spring:
+
+  cloud:
+    discovery:
+      enabled: false
+
   application:
     name: measureeval
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:7080/realms/master
-  main:
-    allow-bean-definition-overriding: true
+
   data:
     mongodb:
-      uri: mongodb://localhost:27017/measureeval
+      uri: mongodb://localhost:27017/${spring.application.name}?serverSelectionTimeoutMS=4000
+      database: ${spring.application.name}
+
+    redis:
+      timeout: 2000ms            # command timeout — bounds the health-check PING (default is 60s)
+      connect-timeout: 1000ms    # socket connect timeout — bounds the "Redis unreachable" case
+      lettuce:
+        shutdown-timeout: 100ms
+
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
+      accept-case-insensitive-properties: true
+
   kafka:
     bootstrap-servers: localhost:9092
+
     consumer:
-      group-id: measureeval
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: ${spring.application.name}
+
     producer:
-      client-id: measureeval
-    properties:
-      security.protocol: SASL_SSL
-      sasl.mechanism: PLAIN
-      #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";
+      client-id: ${spring.application.name}
+      properties:
+        max.request.size: 10485760
+
+    retry:
+      # consumer-retry-duration is the single source of truth for retry depth and timing: each entry is
+      # the delay before that retry, and the attempt count is the list size + 1 (then dead-lettered).
+      consumer-retry-duration:
+        - PT20S
+        - PT60S
+        - PT120S
+      disable-retry-consumer: false
+
+link:
+  info-route: /api/measureeval/info
+  reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
+  cql-debug: false
+
+  report:
+    base-url: http://localhost:5110
+    routes:
+      submission-model:
+        path: /api/Report/Bundle/Patient
+        query:
+          - facilityId={facilityId}
+          - patientId={patientId}
+          - reportScheduleId={reportId}
+      report-schedules:
+        path: /api/schedules/{reportId}
+
+secret-management:
+  key-vault-uri: ''
+
+authentication:
+  anonymous: false
+  authority: 'https://localhost:7004'
+  signing-key: ''
+
+internal-blob-storage:
+  connection-string: ''
+  blob-container-name: ''
+
+resource-cache:
+  blob-storage:
+    connection-string: ''
+    blob-container-name: ''
+    blob-root: ''

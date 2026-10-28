@@ -1,0 +1,103 @@
+@use '../../../../../styles/core.scss';
+@use '../../../../../styles/link-table.scss';
+
+.operation-card {
+  flex: 1;
+  padding: 32px;
+  border-radius: 12px;
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.operation-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  gap: 16px;
+  padding-right: 24px;
+}
+
+.section-title {
+  margin-top: 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #3f51b5;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 4px;
+}
+
+.full-width {
+  width: 100%;
+  min-width: 200px;
+}
+
+.empty-state {
+  text-align: center;
+  font-style: italic;
+  color: #888;
+  margin-top: 24px;
+}
+
+.inline-error-message {
+  color: red;
+  font-size: 0.85em;
+  margin-top: 4px;
+  display: block;
+}
+
+.error-message {
+  color: red;
+  font-weight: 600;
+  margin-top: 8px;
+  font-size: 0.9em;
+}
+
+.sequence-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .sequence-input {
+    flex: 1 0 90px;
+    height: 36px;
+    font-size: 1rem;
+    padding: 6px 10px;
+    box-sizing: border-box;
+    line-height: 1;
+  }
+
+  button.mat-icon-button.clear-sequence-btn {
+    height: 36px;
+    width: 36px;
+    min-width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    line-height: 1;
+  }
+}
+
+.expanded-row {
+  background-color: #f5f5f5;
+  font-size: 13px;
+  padding: 8px;
+}
+
+.operation-json {
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.sequence-input.ng-invalid.ng-touched {
+  border-color: red;
+  outline: none;
+}
+

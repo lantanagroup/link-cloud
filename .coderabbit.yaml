@@ -1,0 +1,63 @@
+language: "en-US"
+early_access: false
+knowledge_base: 
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - AGENTS.md
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  auto_review:
+    auto_incremental_review: false
+    base_branches:
+      - "main"
+      - "dev"
+      - "release/.*"
+  path_instructions:
+    - path: "**/*.cs"
+      instructions: |
+        The `HtmlInputSanitizer` class's `Sanitize()` and `SanitizeAndRemove()` methods should be used when dealing with `string` query parameters from REST requests.
+    - path: "**/*.cs"
+      instructions: |
+        Double-check `CancellationToken` plumbing. Flag any of the following:
+        - An `async` method that does not accept a `CancellationToken` parameter when one is reasonably available from the caller (HTTP endpoints, Kafka consumers/listeners,
+          Quartz jobs via `IJobExecutionContext.CancellationToken`, background services' `stoppingToken`, `ExecuteAsync` overrides, etc.).
+        - A method that accepts a `CancellationToken` but does not forward it to every call it makes that has a `CancellationToken` overload
+          (e.g., `HttpClient.GetAsync`/`PostAsync`/`SendAsync`, `HttpContent.ReadAsStringAsync`/`ReadAsStreamAsync`, `DbContext.SaveChangesAsync`,
+          EF Core async LINQ operators `ToListAsync`/`FirstOrDefaultAsync`/`AnyAsync`/`CountAsync`, `Stream.ReadAsync`/`WriteAsync`, `Task.Delay`,
+          `SemaphoreSlim.WaitAsync`, `Channel`/`BlockingCollection` async APIs, `IProducer.Flush`, Polly policies, MediatR `Send`/`Publish`, gRPC client calls, etc.).
+        - Use of `CancellationToken.None` or `default` inside a method that already has a `CancellationToken` in scope — call it out and ask why the ambient token is not used.
+        - A timeout-only `CancellationTokenSource` (e.g., `new CancellationTokenSource(TimeSpan.FromSeconds(...))`) whose token is passed to downstream calls without being
+          linked to the caller's `CancellationToken` via `CancellationTokenSource.CreateLinkedTokenSource(callerToken, timeoutCts.Token)`. Either signal should be honored.
+        - A long-running loop (per-patient, per-row, per-batch) that does not at least call `cancellationToken.ThrowIfCancellationRequested()` per iteration when the inner
+          operation has no `CancellationToken` overload (e.g., `IProducer<K,V>.Produce`).
+        - Public APIs on services/managers/repositories where adding an optional `CancellationToken cancellationToken = default` parameter would improve cooperative
+          cancellation without breaking existing callers — suggest adding it.
+        When flagging, prefer concrete suggestions showing how to thread the token through rather than generic comments.
+    - path: "**"
+      instructions: |
+        Pull requests that have "TECH_DEBT" in the title should only contain changes related to typos, unused code, linter/IDE suggestions, swagger specification updates,
+        and logging improvements. These TECH_DEBT PRs must not affect core functionality. All PRs that are not considered technical debt must include information on what 
+        testing was performed in the description of the PR. If it does not, ask the author to provide details on what testing was performed.
+        If a service REST controller is changed, ensure the `LinkSdk` is updated to reflect the controller changes.
+        When reviewing code, suggest unit tests using XUnit in the following scenarios:
+        - If/Else or Switch/Case blocks are introduced or modified — ensure each branch has a corresponding unit test.
+        - Logic that depends on service or interface configuration — suggest tests to validate different implementations are correctly resolved.
+        - No network activity (HTTP calls, sockets, etc.) should appear in unit tests. Recommend using mocks (via Moq) for any external communication.
+        Large unit tests should be avoided; keeping unit tests small and focused on targeted business logic (i.e. string sanitization)
+        All logging message arguments must be sanitized before they are passed to logger methods to avoid static code scanning security/vulnerability findings.
+        
+        **App Config Check**:
+        If new required configuration keys (that don't have default values) are introduced, verify if new configuration keys have been added. If new required configuration keys are introduced, ensure that the
+        root-level `/app-config.yaml` file has been updated to include these new keys with appropriate descriptions. If `/app-config.yaml` is not updated
+        when new configuration is added, flag this as a required change and recommend blocking the PR until the configuration is documented in `/app-config.yaml`.
+        The catalog is curated, not exhaustive: a key belongs in it only if it is provisioned per environment, has no safe default, or is a documented
+        operational knob. A key with a working default in `appsettings.json` or `application.yml` should be `required: false` with that value recorded in
+        `defaultValue`, because `required: true` obligates a row in all three environment stores. The exhaustive list of every key the code reads is the
+        generated `docs/config-key-inventory.md`, not this catalog.
+        Schema conformance and required-key presence are enforced mechanically by
+        `.github/workflows/appconfig-catalog-check.yml`, so review effort here is better spent on whether an entry's `required` flag and description are
+        right than on whether the key is present.

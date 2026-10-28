@@ -1,40 +1,56 @@
-using Azure.Identity;
-using Confluent.Kafka.Extensions.OpenTelemetry;
+﻿using System.Reflection;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.DMRP.Config;
+using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
+using LantanaGroup.Link.Sdk.DependencyInjection;
+using LantanaGroup.Link.Tenant.Business;
+using LantanaGroup.Link.Tenant.Business.Managers;
+using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
+using LantanaGroup.Link.Tenant.Data.Repository;
+using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Extensions;
+using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
-using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Serilog;
+using Serilog.Debugging;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using System.Diagnostics;
-using System.Reflection;
 
 namespace Tenant
 {
     public class Program
     {
-
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddStandardEnvironmentConfiguration();
 
             RegisterServices(builder);
 
@@ -43,83 +59,81 @@ namespace Tenant
             SetupMiddleware(app);
 
             app.Run();
-
         }
-
-
 
         #region Register Services
 
         static void RegisterServices(WebApplicationBuilder builder)
         {
-            //load external configuration source if specified
-            var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+            // load external configuration source (if specified)
+            builder.AddExternalConfiguration(TenantConstants.ServiceName);
 
-            if (!string.IsNullOrEmpty(externalConfigurationSource))
+            // Add Link Security
+            bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+            builder.Services.AddLinkBearerServiceAuthentication(options =>
             {
-                switch (externalConfigurationSource)
-                {
-                    case ("AzureAppConfiguration"):
-                        builder.Configuration.AddAzureAppConfiguration(options =>
-                        {
-                            options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                                    // Load configuration values with no label
-                                    .Select("*", LabelFilter.Null)
-                                    // Load configuration values for service name
-                                    .Select("*", TenantConstants.ServiceName)
-                                    // Load configuration values for service name and environment
-                                    .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+                options.Environment = builder.Environment;
+                options.AllowAnonymous = allowAnonymousAccess;
+                options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+                options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+                options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+                options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+            });
 
-                            options.ConfigureKeyVault(kv =>
-                            {
-                                kv.SetCredential(new DefaultAzureCredential());
-                            });
+            var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-                        });
-                        break;
-                }
-            }
-
-
-            var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-            if (serviceInformation != null)
-            {
-                ServiceActivitySource.Initialize(serviceInformation);
-                Counters.Initialize(serviceInformation);
-            }
-            else
-            {
-                throw new NullReferenceException("Service Information was null.");
-            }
+            var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
 
             // Add services to the container.
-            builder.Services.AddGrpc();
-            builder.Services.AddGrpcReflection();
-            builder.Services.AddHostedService<ScheduleService>();
+            builder.Services.AddSingleton<ScheduleService>();
 
-            builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.KafkaConnection));
+            builder.Services.Configure<FacilityIdSettings>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.FacilityIdSettings));
+            builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
 
-            builder.Services.Configure<MeasureApiConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MeasureApiConfig));
 
-            builder.Services.AddScoped<FacilityConfigurationService>();
+            builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
+            builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+            var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+            builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
+            builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+            builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
-            builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
+            //Entity Repositories
+            builder.Services.AddScoped<IEntityRepository<Facility>, FacilityRepository>();
+
+            //Managers and Queries
+            builder.Services.AddScoped<IFacilityManager, FacilityManager>();
+            builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
+            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+            builder.Services.AddLinkSdk();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
-            //Add database context
-            builder.Services.AddDbContext<FacilityDbContext>((sp, options) =>
-            {
+            var dbProvider = builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider);
+            string? databaseConnectionString = null;
 
+            if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+            {
+                databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+                if (string.IsNullOrEmpty(databaseConnectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                // Add Quartz scheduler with SQL persistence
+                builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+            }
+
+            //Add database context
+            builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
+            {
                 var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
 
-                switch (builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider))
+                switch (dbProvider)
                 {
-                    case "SqlServer":
-                        options.UseSqlServer(
-                            builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseConnectionString))
+                    case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                        options.UseSqlServer(databaseConnectionString)
                            .AddInterceptors(updateBaseEntityInterceptor);
                         break;
                     default:
@@ -127,45 +141,61 @@ namespace Tenant
                 }
             });
 
-
-
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, object>>();
-
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaConsumerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaConsumerFactory<string, object>>();
-
+            builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
+            builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+            var producer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(new ProducerConfig());
+            builder.Services.AddSingleton(producer);
 
             builder.Services.AddHttpClient();
 
-            builder.Services.AddControllers();
+            var mvcBuilder = builder.Services.AddControllers();
+
+            // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
+            // enabled, and is inert otherwise. Its entities live in TenantDbContext.
+            builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
+            builder.Services.AddScoped<TenantFacilityDirectory>();
+            builder.Services.AddScoped<IFacilityTimeZoneSource>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
+            builder.Services.AddScoped<IFacilityDirectory>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
+
+            // The facility endpoints resolve this rather than calling the manager, so the DMRP module
+            // can put its own behavior in front of it when enabled.
+            builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
+
+            var dmrpEnabled = builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(
+                mvcBuilder, ReportSchedulingJobs.ClassicJobGroup);
+
+            if (!dmrpEnabled)
+            {
+                // Only one owner of the shared Quartz scheduler at a time. With DMRP on,
+                // DmrpNightlyScheduleHostedService - registered above, inside AddDmrpModule - sweeps the
+                // classic jobs, reconciles its own, and starts and shuts the scheduler down; hosting
+                // ScheduleService alongside it would mean two starts and two shutdowns.
+                //
+                // ScheduleService stays registered as a singleton either way, because
+                // TenantFacilityOperations calls its per-facility Add/Update/Delete methods on every
+                // facility save. Those return early while the flag is on.
+                //
+                // Keep this registration after the AddDmrpModule call above: hosted services start in
+                // registration order, and DmrpNightlyScheduleCleanupService - registered inside that
+                // call when the flag is off - has to sweep the module's zone jobs before ScheduleService
+                // starts the shared scheduler, or a zone job could fire with its services long gone.
+                builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
+            }
 
             //Add problem details
-            builder.Services.AddProblemDetails(options =>
-            {
-                options.CustomizeProblemDetails = ctx =>
-                {
-                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-                    if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-                    {
-                        string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                        ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-                    }
-
-                    if (builder.Environment.IsDevelopment())
-                    {
-                        ctx.ProblemDetails.Extensions.Add("service", "Tenant");
-                    }
-                    else
-                    {
-                        ctx.ProblemDetails.Extensions.Remove("exception");
-                    }
-
-                };
-            });
-
+            builder.Services.AddTenantProblemDetails(builder.Environment);
 
             //Add health checks
-            builder.Services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck>("Database");
+            var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
+
+            var healthChecks = builder.Services.AddHealthChecks()
+                .AddCheck<DatabaseHealthCheck<TenantDbContext>>(HealthCheckType.Database.ToString())
+                .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
+
+            if (dmrpEnabled)
+            {
+                healthChecks.AddCheck<DmrpHealthCheck>("DMRP", failureStatus: HealthStatus.Degraded);
+            }
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -174,77 +204,49 @@ namespace Tenant
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 c.IncludeXmlComments(xmlPath);
+
+                // Document the DMRP module's controllers alongside this service's own.
+                var dmrpXmlPath = Path.Combine(AppContext.BaseDirectory,
+                    $"{typeof(DmrpModuleExtensions).Assembly.GetName().Name}.xml");
+                if (File.Exists(dmrpXmlPath))
+                    c.IncludeXmlComments(dmrpXmlPath);
+
+                c.DocumentFilter<HealthChecksFilter>();
             });
 
             // Logging using Serilog
             builder.Logging.AddSerilog();
-
             var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
-                            .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                                        .Filter.ByExcluding("RequestPath like '/health%'")
-                                        .Filter.ByExcluding("RequestPath like '/swagger%'")
-                                        .Enrich.WithExceptionDetails()
-                                        .Enrich.FromLogContext()
-                                        .Enrich.WithSpan()
-                                        .Enrich.With<ActivityEnricher>()
-                                        .Enrich.FromLogContext()
-                                        .CreateLogger();
+                .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                .Filter.ByExcluding("RequestPath like '/health%' and @l in ['Verbose', 'Debug', 'Information']")
+                .Filter.ByExcluding("RequestPath like '/swagger%'")
+                .Enrich.WithExceptionDetails()
+                .Enrich.FromLogContext()
+                .Enrich.WithSpan()
+                .Enrich.With<ActivityEnricher>()
+                .Enrich.FromLogContext()
+                .CreateLogger();
 
-
-            builder.Services.AddSingleton<IJobFactory, JobFactory>();
-
-            builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+            SelfLog.Enable(Console.Error);
 
             builder.Services.AddSingleton<ReportScheduledJob>();
 
-            builder.Services.AddSingleton<RetentionCheckScheduledJob>();
-
-            var telemetryConfig = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-            if (telemetryConfig != null)
+            //Add CORS
+            builder.Services.AddLinkCorsService(options =>
             {
-                var otel = builder.Services.AddOpenTelemetry();
+                options.Environment = builder.Environment;
+            });
 
-                //configure OpenTelemetry resources with application name
-                otel.ConfigureResource(resource => resource
-                    .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
+            //Add telemetry if enabled
+            builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+            {
+                options.Environment = builder.Environment;
+                options.ServiceName = TenantConstants.ServiceName;
+                options.ServiceVersion = serviceInformation.Version;
+            });
 
-                otel.WithTracing(tracerProviderBuilder =>
-                        tracerProviderBuilder
-                            .AddSource(ServiceActivitySource.Instance.Name)
-                            .AddAspNetCoreInstrumentation(options =>
-                            {
-                                options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                            })
-                            .AddConfluentKafkaInstrumentation()
-                            .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-
-                otel.WithMetrics(metricsProviderBuilder =>
-                        metricsProviderBuilder
-                            .AddAspNetCoreInstrumentation()
-                            .AddMeter(Counters.meter.Name)
-                            .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-                if (telemetryConfig.EnableRuntimeInstrumentation)
-                {
-                    otel.WithMetrics(metricsProviderBuilder =>
-                        metricsProviderBuilder
-                            .AddRuntimeInstrumentation());
-                }
-
-                if (builder.Environment.IsDevelopment())
-                {
-                    otel.WithTracing(tracerProviderBuilder =>
-                        tracerProviderBuilder
-                        .AddConsoleExporter());
-
-                    //metrics are very verbose, only enable console exporter if you really want to see metric details
-                    //otel.WithMetrics(metricsProviderBuilder =>
-                    //    metricsProviderBuilder
-                    //        .AddConsoleExporter());                
-                }
-            }
+            builder.Services.AddSingleton<ITenantServiceMetrics, TenantServiceMetrics>();
         }
 
         #endregion
@@ -254,40 +256,56 @@ namespace Tenant
         static void SetupMiddleware(WebApplication app)
         {
             // Configure the HTTP request pipeline.
-            if (app.Configuration.GetValue<bool>(TenantConstants.AppSettingsSectionNames.EnableSwagger))
+            app.ConfigureSwagger();
+
+            // The DMRP module changes which routes this service serves, so record the flag's state.
+            var dmrpSettings = app.Services.GetRequiredService<IOptions<DmrpSettings>>().Value;
+            app.Logger.LogInformation("DMRP module enabled: {DmrpEnabled}", dmrpSettings.Enabled);
+
+            app.AutoMigrateEF<TenantDbContext>();
+
+            app.UseStatusCodePages();
+
+            // Without a handler an unhandled exception never reaches the problem-details
+            // pipeline, so it answers with an empty body instead of a traceable problem
+            // response. The developer page only outside deployment, as Terminology does: it
+            // renders the stack trace, which is what you want on a workstation and never what
+            // a caller should receive.
+            if (app.Environment.IsDevelopment())
             {
-                app.UseSwagger();
-                app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Tenant Service v1"));
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseExceptionHandler();
             }
 
             app.UseRouting();
+            app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+            //check for anonymous access
+            var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+            if (!allowAnonymousAccess)
+            {
+                app.UseAuthentication();
+                app.UseMiddleware<UserScopeMiddleware>();
+            }
+            app.UseAuthorization();
+
             app.MapControllers();
 
-            //map health check middleware
+            //map health check middleware and info endpoint
             app.MapHealthChecks("/health", new HealthCheckOptions
             {
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
+            app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "facility");
 
-            if (app.Configuration.GetValue<bool>("AllowReflection"))
-            {
-                app.MapGrpcReflectionService();
-            }
-
-            // Ensure database created
-            using (var scope = app.Services.CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
-                context.Database.EnsureCreated();
-
-            }
             // Configure the HTTP request pipeline.
             //app.MapGrpcService<TenantService>();
             //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
         }
 
         #endregion
-
     }
-
 }

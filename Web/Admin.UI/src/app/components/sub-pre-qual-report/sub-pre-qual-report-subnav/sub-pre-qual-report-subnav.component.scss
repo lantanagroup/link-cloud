@@ -1,0 +1,30 @@
+@use '../../../../styles/validation-theme.scss' as vt;
+
+.sub-pre-qual-report-subnav {
+  margin-top: .25rem;
+  background-color: vt.$vd-primary-800;
+  padding: 0 vt.$vd-container-margin-x;
+
+  .subnav-menu {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .subnav-item {
+    @include vt.vd-nav-secondary();
+    position: relative;
+    background: transparent;
+    color: vt.$vd-neutral-50;
+    display: block;
+    padding: 1rem 1.25rem;
+
+    &:hover,
+    &:focus-visible,
+    &.active {
+      background: vt.$vd-primary-50;
+      color: vt.$vd-neutral-900;
+    }
+  }
+}

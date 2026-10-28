@@ -1,0 +1,190 @@
+trigger: none
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+# Account
+##############
+
+parameters:
+- name: tag
+  type: object
+  default:
+  - Account
+  - Audit
+#  - Bff
+  - Census
+  - DataAcquisition
+#  - Demo-app
+#  - Measureeval
+  - Normalization
+  - Notification
+  - QueryDispatch
+  - Report
+  - Submission
+  - Tenant
+#  - Validation
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'DotNet/Account/Account.csproj'
+- name: testProject
+  value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
+# - name: dockerPath
+#   value: '**/DotNet/Account/Dockerfile'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'  
+
+jobs:
+- job: Job1
+  steps:
+  - ${{ each value in parameters.tag }}:
+    - task: GetRevision@1
+      displayName: 'Get Revision - ${{ value }}'
+      inputs:
+        VariableName: Revision
+
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          echo "GIT_COMMIT: ${GIT_COMMIT}"
+          echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+  
+  # - task: DotNetCoreCLI@2
+  #   displayName: Restore
+  #   inputs:
+  #     command: restore
+  #     projects: '$(project)'
+  
+  # - task: DotNetCoreCLI@2
+  #   displayName: Build
+  #   inputs:
+  #     command: build
+  #     projects: '$(project)'
+
+  # - task: DotNetCoreCLI@2
+  #   inputs:
+  #     command: 'test'
+  #     projects: $(testProject)'
+  #   displayName: 'Run Tests'
+  
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: |
+          if ("$(Build.SourceBranch)" -like "*release/*") {
+          $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          }
+          else { 
+          $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          }
+          Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+          Write-Host "Set MyTag to: $myTag1"
+
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry) # Variable Group
+        repository: link-${{ value }}
+        command: 'buildAndPush'
+        Dockerfile: '**/DotNet/${{ value }}/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifact: 'manifest'
+  
+  # - task: Kubernetes@1
+  #   inputs:
+  #     connectionType: 'Azure Resource Manager'
+  #     azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
+  #     azureResourceGroup: 'nhsnlink-rg'
+  #     kubernetesCluster: 'nhsnlink-aks'
+  #     namespace: 'scale-test'
+  #     command: 'set'
+  #     arguments: 'image -n scale-test deployment ${{ value }} ${{ value }}=nhsnlinkprem.azurecr.io/link-${{ value }}:$(tag_value)'
+  #     secretType: 'dockerRegistry'
+  #     containerRegistryType: 'Azure Container Registry'
+
+- job: Job2
+  steps:
+    - task: GetRevision@1
+      displayName: 'Get Revision'
+      inputs:
+        VariableName: Revision
+
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          echo "GIT_COMMIT: ${GIT_COMMIT}"
+          echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: |
+          if ("$(Build.SourceBranch)" -like "*release/*") {
+          $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          }
+          else { 
+          $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          }
+          Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+          Write-Host "Set MyTag to: $myTag1"
+
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image - BFF"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry) # Variable Group
+        repository: 'link-bff'
+        command: 'buildAndPush'
+        Dockerfile: '**/DotNet/LinkAdmin.BFF/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image - DEMO"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry) # Variable Group
+        repository: 'link-demo'
+        command: 'buildAndPush'
+        Dockerfile: '**/Web/DemoApp/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image - MeasureEval"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry) # Variable Group
+        repository: 'link-measureeval'
+        command: 'buildAndPush'
+        Dockerfile: 'Java/measureeval/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image - Validation"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry) # Variable Group
+        repository: 'link-validation'
+        command: 'buildAndPush'
+        Dockerfile: 'Java/validation/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+
+# Next Service
+##############

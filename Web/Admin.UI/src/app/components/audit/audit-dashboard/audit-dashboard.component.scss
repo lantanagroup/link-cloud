@@ -1,0 +1,14 @@
+@use '../../../../styles/core.scss';
+@use '../../../../styles/link-table.scss';
+
+.icon-right::before {
+  content: '▶'; 
+}
+.icon-down::before {
+  content: '▼'; 
+}
+
+.note-row {
+  background-color: #f9f9f9;
+  font-style: italic;
+}

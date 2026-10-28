@@ -1,132 +1,163 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
-namespace LantanaGroup.Link.Shared.Application.Error.Handlers
+namespace LantanaGroup.Link.Shared.Application.Error.Handlers;
+
+public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T, K, V>
 {
-    public class DeadLetterExceptionHandler<K, V> : IDeadLetterExceptionHandler<K, V>
+    protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
+    protected readonly IKafkaProducerFactory<string, string> NullConsumeResultProducerFactory;
+    protected readonly ServiceInformation ServiceInformation;
+    private readonly IExceptionLogger<T> _exceptionHandler;
+
+    public string Topic { get; set; } = string.Empty;
+
+    protected string ServiceName { get; set; } = string.Empty;
+
+    public DeadLetterExceptionHandler(
+        IKafkaProducerFactory<K, V> producerFactory,
+        IKafkaProducerFactory<string, string> nullConsumeResultProducerFactory,
+        ServiceInformation serviceInformation,
+        IExceptionLogger<T> exceptionHandler)
     {
-        protected readonly ILogger<DeadLetterExceptionHandler<K, V>> Logger;
-        protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
-        protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
+        ProducerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
+        NullConsumeResultProducerFactory = nullConsumeResultProducerFactory ?? throw new ArgumentNullException(nameof(nullConsumeResultProducerFactory));
+        ServiceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
+        _exceptionHandler = exceptionHandler ?? throw new ArgumentNullException(nameof(exceptionHandler));
 
-        public string Topic { get; set; } = string.Empty;
+        ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
+    }
 
-        public string ServiceName { get; set; } = string.Empty;
-
-        public DeadLetterExceptionHandler(ILogger<DeadLetterExceptionHandler<K, V>> logger, 
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory,
-            IKafkaProducerFactory<K, V> producerFactory)
+    public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
+    {
+        try
         {
-            Logger = logger;
-            AuditProducerFactory = auditProducerFactory;
-            ProducerFactory = producerFactory;
+            var ex = new Exception(message);
+            _exceptionHandler.Handle(ex, "Failed to process event", LogLevel.Error, facilityId,
+                new { Service = ServiceName, Topic = Topic, Partition = consumeResult.Partition.Value, Offset = consumeResult.Offset.Value });
+
+            ProduceDeadLetter(consumeResult, message);
+        }
+        catch (Exception e)
+        {
+            _exceptionHandler.Handle(e, "Error in HandleException", LogLevel.Error);
+        }
+    }
+
+    public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
+    {
+        var dlEx = new DeadLetterException(ex.Message, ex);
+        HandleException(consumeResult, dlEx, facilityId);
+    }
+
+    public virtual void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId)
+    {
+        try
+        {
+            Activity.Current?.SetStatus(ActivityStatusCode.Error);
+            Activity.Current?.AddException(ex);
+
+            _exceptionHandler.Handle(ex, "Failed to process event", LogLevel.Error, facilityId,
+                new { Service = ServiceName, Topic = Topic, Partition = consumeResult.Partition.Value, Offset = consumeResult.Offset.Value });
+
+            ProduceDeadLetter(consumeResult, ex.Message);
+        }
+        catch (Exception e)
+        {
+            _exceptionHandler.Handle(e, "Error in HandleException", LogLevel.Error);
+        }
+    }
+
+    public virtual void ProduceDeadLetter(ConsumeResult<K, V> consumeResult, string exceptionMessage)
+    {
+        if (string.IsNullOrWhiteSpace(Topic))
+        {
+            throw new Exception("Topic has not been configured. Cannot Produce Dead Letter Event.");
         }
 
-        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, AuditEventType auditEventType, string message = "")
+        if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
         {
-            try
-            {
-                message = message ?? "";
-                if (consumeResult == null)
-                {
-                    Logger.LogError($"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or DeadLetter events: " + message);
-                    return;
-                }
-
-                Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
-
-                var auditValue = new AuditEventMessage
-                {
-                    FacilityId = facilityId,
-                    Action = auditEventType,
-                    ServiceName = ServiceName,
-                    EventDate = DateTime.UtcNow,
-                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {message}",
-                };
-
-                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                throw;
-            }
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
         }
 
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, AuditEventType auditEventType, string facilityId)
+        consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionPartition, Encoding.UTF8.GetBytes(consumeResult.Partition.Value.ToString()));
+        consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionOffset, Encoding.UTF8.GetBytes(consumeResult.Offset.Value.ToString()));
+        consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
+
+        using var producer = ProducerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd });
+        producer.Produce(Topic, new Message<K, V>
         {
-            var dlEx = new DeadLetterException(ex.Message, auditEventType, ex.InnerException);
-            HandleException(consumeResult, dlEx, facilityId);
-        }
+            Key = consumeResult.Message.Key,
+            Value = consumeResult.Message.Value,
+            Headers = consumeResult.Message.Headers
+        });
 
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId)
+        producer.Flush();
+    }
+
+    public virtual void HandleConsumeException(ConsumeException ex, string facilityId)
+    {
+        try
         {
-            try
+            Activity.Current?.SetStatus(ActivityStatusCode.Error);
+            Activity.Current?.AddException(ex);
+
+            if (ex?.ConsumerRecord?.Message == null)
             {
-                if (consumeResult == null)
-                {
-                    Logger.LogError(message: $"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or DeadLetter events", exception: ex);
-                    return;
-                }
-
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
-
-                var auditValue = new AuditEventMessage
-                {
-                    FacilityId = facilityId,
-                    Action = ex.AuditEventType,
-                    ServiceName = ServiceName,
-                    EventDate = DateTime.UtcNow,
-                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {ex.Message}",
-                };
-
-                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                throw;
-            }
-        }
-
-        public virtual void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
-        {
-            using var producer = AuditProducerFactory.CreateAuditEventProducer();
-            producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-            {
-                Value = auditValue,
-                Headers = headers
-            });
-            producer.Flush();
-        }
-
-        public virtual void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
-        {
-            if (string.IsNullOrWhiteSpace(Topic))
-            {
-                throw new Exception(
-                    $"{GetType().Name}.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
+                throw new Exception("Error in HandleConsumeException: ex.ConsumerRecord.Message contains null properties");
             }
 
-            headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
-
-            using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
-            producer.Produce(Topic, new Message<K, V>
+            var message = new Message<string, string>()
             {
-                Key = key,
-                Value = value,
-                Headers = headers
-            });
+                Headers = ex.ConsumerRecord.Message.Headers,
+                Key = ex.ConsumerRecord.Message.Key != null
+                    ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
+                    : string.Empty,
+                Value = ex.ConsumerRecord.Message.Value != null
+                    ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                    : string.Empty
+            };
 
-            producer.Flush();
+            _exceptionHandler.Handle(ex, "Error consuming message", LogLevel.Error, facilityId,
+                new { Topic = Topic });
+
+            ProduceConsumeExceptionDeadLetter(message.Key, message.Value, message.Headers, ex.Message);
         }
+        catch (Exception e)
+        {
+            _exceptionHandler.Handle(e, "Error in HandleConsumeException", LogLevel.Error);
+        }
+    }
+
+    protected void ProduceConsumeExceptionDeadLetter(string key, string value, Headers headers, string exceptionMessage)
+    {
+        if (string.IsNullOrWhiteSpace(Topic))
+        {
+            throw new Exception("Topic has not been configured. Cannot Produce Dead Letter Event.");
+        }
+
+        if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
+        {
+            headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
+        }
+
+        headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
+
+        using var producer = NullConsumeResultProducerFactory.CreateProducer(new ProducerConfig());
+        producer.Produce(Topic, new Message<string, string>
+        {
+            Key = key,
+            Value = value,
+            Headers = headers
+        });
+
+        producer.Flush();
     }
 }

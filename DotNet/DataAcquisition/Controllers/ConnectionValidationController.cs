@@ -1,21 +1,33 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Validate;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using MediatR;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/connectionValidation")]
+[Route("api/data/connectionValidation")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class ConnectionValidationController : Controller
 {
     private readonly ILogger<ConnectionValidationController> _logger;
-    private readonly IMediator _mediator;
+    private readonly IValidateFacilityConnectionService _validateFacilityConnectionService;
+    private readonly IValidateFhirServerConnectionService _validateFhirServerConnectionService;
 
-    public ConnectionValidationController(ILogger<ConnectionValidationController> logger, IMediator mediator)
+    public ConnectionValidationController(
+        ILogger<ConnectionValidationController> logger,
+        IValidateFacilityConnectionService validateFacilityConnectionService,
+        IValidateFhirServerConnectionService validateFhirServerConnectionService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _validateFacilityConnectionService = validateFacilityConnectionService ?? throw new ArgumentNullException(nameof(validateFacilityConnectionService));
+        _validateFhirServerConnectionService = validateFhirServerConnectionService ?? throw new ArgumentNullException(nameof(validateFhirServerConnectionService));
     }
 
     /// <summary>
@@ -24,66 +36,144 @@ public class ConnectionValidationController : Controller
     /// <param name="facilityId"></param>
     /// <param name="patientId"></param>
     /// <param name="patientIdentifier"></param>
+    /// <param name="measureId"></param>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
     /// <param name="cancellationToken"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     MissingFacilityId: 400
+    ///     Missing Patient Information: 400
+    ///     Missing Measure ID: 400
+    ///     Missing Start Date: 400
+    ///     Missing End Date: 400
+    ///     Fhir Endpoint Connection Error: 424
+    ///     Server Error: 500
+    /// </returns>
     [HttpGet("{facilityId}/$validate")]
-    public async Task<IActionResult> ValidateFacilityConnection(
-        string facilityId, 
-        [FromQuery] string? patientId = default, 
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status424FailedDependency)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<FacilityConnectionResult>> ValidateFacilityConnection(
+        string facilityId,
+        [FromQuery] string? patientId = default,
         [FromQuery] string? patientIdentifier = default,
+        [FromQuery] string? measureId = default,
+        [FromQuery] DateTime? start = default,
+        [FromQuery] DateTime? end = default,
         CancellationToken cancellationToken = default)
     {
-        if(string.IsNullOrWhiteSpace(patientId) && string.IsNullOrWhiteSpace(patientIdentifier))
+        if (!ConnectionValidationRequestValidator.ValidateRequest(facilityId, patientId, patientIdentifier, measureId, start, end, out var errorMessage))
         {
-            return BadRequest("No Patient ID or Patient Identifier was provided. One is required to validate.");
+            return Problem(errorMessage, statusCode: StatusCodes.Status400BadRequest);
         }
 
         try
         {
-            var result = await _mediator.Send(new ValidateFacilityConnectionQuery
+            var result = await _validateFacilityConnectionService.ValidateConnection(new ValidateFacilityConnectionRequest
             {
                 FacilityId = facilityId,
                 PatientId = patientId,
-                PatientIdentifier = patientIdentifier
+                PatientIdentifier = patientIdentifier,
+                MeasureId = measureId,
+                Start = start.Value,
+                End = end.Value
             }, cancellationToken);
 
-            if(!result.IsConnected)
+            if (!result.IsConnected)
             {
-                _logger.LogError("Connection validation failed for facility {FacilityId}", facilityId);
-                return BadRequest("Connection validation failed.");
+                return Problem(result.ErrorMessage, statusCode: StatusCodes.Status400BadRequest);
             }
 
-            if(result.IsConnected && !result.IsPatientFound)
+            if (result.IsConnected && !result.IsPatientFound)
             {
-                _logger.LogError("Patient not found for facility {FacilityId}", facilityId);
-                return NotFound("Patient not found.");
+                return Problem("Patient not found for provided facilityId." + (string.IsNullOrEmpty(result.ErrorMessage) ? "" : " Error Message: " + result.ErrorMessage), statusCode: StatusCodes.Status404NotFound);
             }
 
             if (result.IsConnected && result.IsPatientFound)
             {
-                return Ok();
+                return Ok(result);
             }
         }
         catch (MissingFacilityIdException ex)
         {
-            _logger.LogError(ex, "Facility ID is required to validate connection.");
-            return BadRequest("Facility ID is required to validate connection.");
+            return Problem("Facility ID is required to validate connection.", statusCode: StatusCodes.Status400BadRequest);
         }
-        catch(MissingPatientIdOrPatientIdentifierException ex)
+        catch (MissingFacilityConfigurationException ex)
         {
-            _logger.LogError(ex, "No Patient ID or Patient Identifier was provided. One is required to validate.");
-            return BadRequest("No Patient ID or Patient Identifier was provided. One is required to validate.");
+            return Problem($"No configuration found for Facility ID {facilityId}.", statusCode: StatusCodes.Status400BadRequest);
         }
-        catch(FhirConnectionFailedException ex)
+        catch (MissingPatientIdOrPatientIdentifierException ex)
         {
-            _logger.LogError(ex, "Error connecting to FHIR server for facility {FacilityId}", facilityId);
-            return StatusCode(424, "An error occurred while connecting to the FHIR server. Please review your query connection configuration.");
+            return Problem("No Patient ID or Patient Identifier was provided. One is required to validate.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (FhirConnectionFailedException ex)
+        {
+            return Problem($"An error occurred while connecting to the FHIR server. Please review your query connection configuration.\nerrorMessage: {ex.Message}\ninnerException:\n{ex.InnerException}", statusCode: StatusCodes.Status424FailedDependency);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error validating connection for facility {FacilityId}", facilityId);
-            return StatusCode(500, "An error occurred while validating the connection.");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "ValidateFacilityConnection"), ex, "An exception occurred in ValidateFacilityConnection");
+            return Problem($"An error occurred while validating the connection.\nerror:\n{ex.Message}\nInnerException:\n{ex.InnerException}", statusCode: StatusCodes.Status500InternalServerError);
         }
-        return StatusCode(500, "Something went wrong. Please contact an administrator.");
+
+        return Problem("Something went wrong. Please contact an administrator.", statusCode: StatusCodes.Status500InternalServerError);
+    }
+
+    /// <summary>
+    /// Validates connectivity to a FHIR server using only a server URL, without requiring an existing facility configuration.
+    /// </summary>
+    /// <param name="fhirServerUrl">The base URL of the FHIR server to validate connectivity against.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Missing or invalid fhirServerUrl: 400
+    ///     Unable to connect to the provided FHIR server URL: 502
+    ///     Server Error: 500
+    /// </returns>
+    [HttpGet("$validate")]
+    [ProducesResponseType(typeof(FhirServerConnectionResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult<FhirServerConnectionResult>> ValidateFhirServerConnection(
+        [FromQuery] string fhirServerUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var sanitizedFhirServerUrl = fhirServerUrl.Sanitize();
+
+        if (!ConnectionValidationRequestValidator.ValidateFhirServerUrl(sanitizedFhirServerUrl, out var errorMessage))
+        {
+            return Problem(errorMessage, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var result = await _validateFhirServerConnectionService.ValidateConnection(new ValidateFhirServerConnectionRequest
+            {
+                FhirServerUrl = sanitizedFhirServerUrl
+            }, cancellationToken);
+
+            return Ok(result);
+        }
+        catch (BadRequestException ex)
+        {
+            return Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (FhirConnectionFailedException ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "ValidateFhirServerConnection"), ex, "Unable to connect to FHIR server {FhirServerUrl}", sanitizedFhirServerUrl.SanitizeForLog());
+            return Problem($"Unable to connect to the provided FHIR server URL.\nerrorMessage: {ex.Message}", statusCode: StatusCodes.Status502BadGateway);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(new EventId(LoggingIds.GetItem, "ValidateFhirServerConnection"), ex, "An exception occurred in ValidateFhirServerConnection");
+            return Problem($"An error occurred while validating the connection.\nerror:\n{ex.Message}\nInnerException:\n{ex.InnerException}", statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
 }

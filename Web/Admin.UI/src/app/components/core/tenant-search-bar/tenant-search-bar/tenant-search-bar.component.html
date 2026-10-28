@@ -1,0 +1,21 @@
+<div class="tenant-search-bar">
+  <span class="search-icon"><fa-icon [icon]="faSearch"></fa-icon></span>
+  <input
+    type="text"
+    [value]="searchTerm"
+    (input)="onInput($event)"
+    (focus)="showDropdown = facilities.length > 0"
+    (blur)="onBlur()"
+    placeholder="Search facilities"
+    autocomplete="off"
+    />
+    @if (showDropdown) {
+      <ul class="autocomplete-list">
+        @for (facility of facilities; track facility) {
+          <li (mousedown)="selectFacility(facility)">
+            {{ facility.facilityId }}
+          </li>
+        }
+      </ul>
+    }
+  </div>

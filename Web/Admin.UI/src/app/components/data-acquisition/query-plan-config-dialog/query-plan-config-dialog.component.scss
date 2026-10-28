@@ -1,0 +1,22 @@
+@use '../../../../styles/core.scss';
+
+.textarea {
+  width: 100%;
+  height: 450px;
+  resize: both; /* Options: none, horizontal, vertical, both */
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dialog-actions-left,
+.dialog-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

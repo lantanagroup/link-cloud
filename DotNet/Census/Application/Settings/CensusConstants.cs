@@ -6,12 +6,7 @@ public static class CensusConstants
     public static class AppSettings
     {
         public const string ServiceInformation = "ServiceInformation";
-        public const string Kafka = "KafkaConnection";
-        public const string SqlServer = "SqlServer";
         public const string DatabaseProvider = "DatabaseProvider";
-        public const string Telemetry = "TelemetryConfig";
-        public const string TenantApiSettings = "TenantApiSettings";
-        public const string ExternalConfigurationSource = "ExternalConfigurationSource";
     }
 
     public static class Scheduler
@@ -24,12 +19,6 @@ public static class CensusConstants
     public static class HeaderNames
     {
         public const string CorrelationId = "X-Correlation-Id";
-    }
-
-    public static class MessageNames
-    {
-        public const string PatientIDsAcquired = "PatientIDsAcquired";
-        public const string PatientIDsAcquiredError = "PatientIDsAcquired-Error";
     }
 
     public static class CensusLoggingIds

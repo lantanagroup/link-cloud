@@ -1,0 +1,24 @@
+@use "@angular/material" as mat;
+
+.mat-toolbar {
+  background:#00455D;
+}
+
+.toolbar-icon {
+  height: 24px;
+  margin-right: .5em;
+  width: 24px;
+  vertical-align: middle;
+}
+
+.profile-name {
+  vertical-align: super;
+}
+
+.profile-icon {
+  color: #fff;
+}
+
+.example-spacer {
+  flex: 1 1 auto;
+}

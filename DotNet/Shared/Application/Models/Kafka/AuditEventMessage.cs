@@ -1,6 +1,15 @@
 ﻿namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 public class PropertyChangeModel
 {
+    public PropertyChangeModel() : this(string.Empty, string.Empty, string.Empty) { }
+
+    public PropertyChangeModel(string name, string InitValue, string newValue)
+    {
+        PropertyName = name;
+        InitialPropertyValue = InitValue;
+        NewPropertyValue = newValue;
+    }
+
     public string PropertyName { get; set; } = string.Empty;
     public string InitialPropertyValue { get; set; } = string.Empty;
     public string NewPropertyValue { get; set; } = string.Empty;

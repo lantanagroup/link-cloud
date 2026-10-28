@@ -1,0 +1,39 @@
+﻿<h2 mat-dialog-title>Related Artifacts for {{data.id}}</h2>
+<mat-dialog-content>
+  <div *ngIf="loading" class="spinner-container">
+    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  </div>
+
+  <table mat-table [dataSource]="relatedArtifacts" *ngIf="!loading" class="mat-elevation-z8">
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef> Name </th>
+      <td mat-cell *matCellDef="let artifact" [matTooltip]="getLibraryList(artifact.libraries)" [class.not-found]="!artifact.found">
+        {{artifact.name}}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="version">
+      <th mat-header-cell *matHeaderCellDef> Version </th>
+      <td mat-cell *matCellDef="let artifact" [class.not-found]="!artifact.found"> {{artifact.version}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="url">
+      <th mat-header-cell *matHeaderCellDef> URL </th>
+      <td mat-cell *matCellDef="let artifact" [class.not-found]="!artifact.found"> {{artifact.url}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="found">
+      <th mat-header-cell *matHeaderCellDef> Found </th>
+      <td mat-cell *matCellDef="let artifact" [class.not-found]="!artifact.found">
+        <mat-icon *ngIf="artifact.found">check_circle</mat-icon>
+        <mat-icon *ngIf="!artifact.found" color="warn">error</mat-icon>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  </table>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

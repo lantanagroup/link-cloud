@@ -1,0 +1,41 @@
+trigger:
+  paths:
+    include:
+    - DotNet/Submission/*
+    - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/Submission/*
+    - DotNet/Shared/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  project: 'DotNet/Submission/Submission.csproj'
+  testProject: 'DotNet/SubmissionTests/SubmissionTests.csproj' 
+  serviceName: 'Submission'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)
+      arguments: --collect "Code coverage"
+    displayName: 'Run Tests'
+
+

@@ -1,0 +1,171 @@
+<form [formGroup]="eventForm">
+
+  <div class="content">
+    <mat-toolbar class="page-header-bar" color="primary">
+      <span>Link Integration Testing</span>
+    </mat-toolbar>
+
+    <mat-card class="resource-card">
+      <mat-card-content>
+        <div class="input-container">
+          <mat-form-field class="form-select" appearance="outline">
+            <span matPrefix><fa-icon [icon]="faSearch" class="fa-lg"></fa-icon></span>
+            <mat-label>Facility</mat-label>
+            <input
+              matInput
+              formControlName="facilityInput"
+              [matAutocomplete]="auto"
+              (blur)="onFacilityInputBlur()"
+              >
+              @if (facilityInputControl.value) {
+                <button matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
+                  (click)="clearSearchInput()" class="clear-btn">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+              <mat-autocomplete #auto="matAutocomplete"
+                (optionSelected)="onFacilitySelected($event.option.value)">
+                @for (fac of filteredFacilities | async; track fac) {
+                  <mat-option [value]="fac.facilityId">
+                    {{ fac.facilityId }}
+                  </mat-option>
+                }
+              </mat-autocomplete>
+            </mat-form-field>
+            <!-- Facility error messages -->
+            <div class="facility-errors-container">
+              @if (facilityIdControl.touched && facilityIdControl.hasError('required')) {
+                <div
+                  class="facility-error">
+                  Facility is <strong>required</strong>
+                </div>
+              }
+              @if (facilityIdControl.touched && facilityIdControl.hasError('notFound')) {
+                <div
+                  class="facility-error">
+                  Facility <strong>not found</strong>
+                </div>
+              }
+            </div>
+          </div>
+          @if (isLoading) {
+            <div class="spinner-container">
+              <mat-progress-spinner
+                color="primary"
+                mode="indeterminate"
+                diameter="50">
+              </mat-progress-spinner>
+            </div>
+          } @else {
+            <button mat-raised-button
+              color="primary"
+              (click)="onToggleTest()"
+              [disabled]="isLoading || eventForm.invalid">
+              {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
+            </button>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      @if (isTestRunning && consumersDataOutput.size > 0) {
+        <mat-card class="resource-card">
+          <mat-card-content>
+            <div class="table-container">
+              <table class="table" border="1" cellspacing="0" cellpadding="4">
+                <thead>
+                  <tr>
+                    <th>Topic</th>
+                    <th>Correlation ID</th>
+                    <th>Patient ID</th>
+                    @if (hasAnyError(displayedEntries)) {
+                      <th>Trace ID</th>
+                    }
+                    @if (hasAnyError(displayedEntries)) {
+                      <th>Error Message</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (entry of displayedEntries; track entry) {
+                    @if (entry[1]?.length > 0) {
+                      @for (item of entry[1]; track item; let i = $index) {
+                        <tr>
+                          <!-- Topic column rowspan -->
+                          @if (i === 0) {
+                            <td [attr.rowspan]="entry[1].length"
+                              [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">
+                              {{ entry[0] }}
+                            </td>
+                          }
+                          <!-- Correlation ID always -->
+                          <td>{{ item.CorrelationId }}</td>
+                          <!-- Patient ID always -->
+                          <td>{{ item.PatientId }}</td>
+                          <!-- Trace ID only if error exists -->
+                          @if (item.ErrorMessage) {
+                            <td>{{ item.TraceId }}</td>
+                          }
+                          <!-- Error Message only if present -->
+                          @if (item.ErrorMessage) {
+                            <td class="error-message">
+                              <mat-expansion-panel class="error-panel"
+                                [expanded]="isPanelOpen(item.CorrelationId)"
+                                (opened)="togglePanel(item.CorrelationId, true)"
+                                (closed)="togglePanel(item.CorrelationId, false)">
+                                <mat-expansion-panel-header>
+                                  <mat-panel-title class="error-text">
+                                    {{ item.ErrorMessage | slice:0:100 }}
+                                    @if (item.ErrorMessage.length > 100) {
+                                      <span>...</span>
+                                    }
+                                  </mat-panel-title>
+                                </mat-expansion-panel-header>
+                                <p class="error-text">{{ item.ErrorMessage }}</p>
+                              </mat-expansion-panel>
+                            </td>
+                          }
+                        </tr>
+                      }
+                    } @else {
+                      <tr>
+                        <td [style.color]="hasErrorInTopic(entry[0]) ? 'red' : 'black'">{{ entry[0] }}</td>
+                        <td></td> <!-- Correlation ID blank -->
+                        <td></td> <!-- Patient blank -->
+                        @if (hasAnyError(displayedEntries)) {
+                          <td></td>
+                        }
+                        @if (hasAnyError(displayedEntries)) {
+                          <td></td>
+                        }
+                      </tr>
+                    }
+                    <!-- Topic row when no items -->
+                  }
+                </tbody>
+              </table>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+
+
+      @if (isTestRunning && consumersDataOutput.size > 0) {
+        <mat-card class="resource-card">
+          <mat-card-content>
+            <!-- Event Forms -->
+            @if (showReportScheduledForm) {
+              <app-report-scheduled-form [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
+                (eventGenerated)="onEventGenerated($event)"
+              ></app-report-scheduled-form>
+            }
+            @if (showPatientsAcquiredForm) {
+              <app-patient-lists [facilityId]="facilityId" [reportTrackingId]="reportTrackingId"
+                (eventGenerated)="onEventGenerated($event)"
+              ></app-patient-lists>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+
+    </div>
+  </form>

@@ -1,6 +1,5 @@
-﻿using LantanaGroup.Link.QueryDispatch;
+﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-using MongoDB.Bson;
 using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
@@ -10,13 +9,10 @@ namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
     {
         [BsonRepresentation(BsonType.String)]
         public QueryDispatchConstants.EventType Event { get; set; }
-        
-        /// <summary>
-        /// The duration of time before a DataAcquisitionRequested event is triggered.
-        /// </summary>
-        public int Duration { get; set; }
 
-        [BsonRepresentation(BsonType.String)]
-        public QueryDispatchConstants.DurationType DurationType { get; set; }
+        /// <summary>
+        /// The ISO-8601 formatted trigger time to generate a DataAcquisitionRequested event.
+        /// </summary>
+        public string Duration { get; set; }
     }
 }

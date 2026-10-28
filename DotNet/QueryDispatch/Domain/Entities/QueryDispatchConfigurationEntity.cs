@@ -1,7 +1,9 @@
-﻿namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
 {
-    [BsonCollection("queryDispatchConfigurations")]
-    public class QueryDispatchConfigurationEntity : BaseQueryEntity 
+    [Table("queryDispatchConfigurations")]
+    public class QueryDispatchConfigurationEntity : BaseQueryEntity
     {
         public List<DispatchSchedule> DispatchSchedules { get; set; }
     }

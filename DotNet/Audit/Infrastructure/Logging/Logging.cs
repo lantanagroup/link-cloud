@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Audit.Application.Commands;
-using LantanaGroup.Link.Audit.Application.Models;
+﻿using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
@@ -16,19 +15,37 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         public static partial void LogConsumerStarted(this ILogger logger, string topic, DateTime timestamp);
 
         [LoggerMessage(
-            AuditLoggingIds.EventConsumerObserved, 
-            LogLevel.Information, 
+            AuditLoggingIds.EventConsumerObserved,
+            LogLevel.Information,
             "New auditable event observed for facility {facility} from service {serviceName}.")]
-        public static partial void LogAuditableEventConsumption(this ILogger logger, string facility, string serviceName, [LogProperties]CreateAuditEventModel auditEvent);
-        
-        [LoggerMessage(
-            AuditLoggingIds.GenerateItems, 
-            LogLevel.Information, 
-            "New audit event created")]
-        public static partial void LogAuditEventCreation(this ILogger logger, [LogProperties]AuditLog auditEvent);
+        public static partial void LogAuditableEventConsumption(this ILogger logger, string facility, string serviceName, [LogProperties] AuditModel auditEvent);
 
         [LoggerMessage(
-            AuditLoggingIds.EventConsumerException, 
+            AuditLoggingIds.DeadLetterException,
+            LogLevel.Error,
+            "Dead lettered Exception - {message}")]
+        public static partial void LogDeadLetterException(this ILogger logger, string message);
+
+        [LoggerMessage(
+            AuditLoggingIds.TransientException,
+            LogLevel.Error,
+            "Transient Consumer Exception - {message}.")]
+        public static partial void LogTransientException(this ILogger logger, string message);
+
+        [LoggerMessage(
+            AuditLoggingIds.InsertItem,
+            LogLevel.Error,
+            "Failed to create retry entity: {message}.")]
+        public static partial void LogRetryEntityCreationException(this ILogger logger, string message);
+
+        [LoggerMessage(
+            AuditLoggingIds.GenerateItems,
+            LogLevel.Information,
+            "New audit event created")]
+        public static partial void LogAuditEventCreation(this ILogger logger, [LogProperties] AuditLog auditEvent);
+
+        [LoggerMessage(
+            AuditLoggingIds.EventConsumerException,
             LogLevel.Critical,
             "Consumer Exception for topic {topic}: {exceptionMessage}")]
         public static partial void LogConsumerException(this ILogger logger, string topic, string exceptionMessage);
@@ -43,13 +60,13 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
             AuditLoggingIds.SearchPerformed,
             LogLevel.Information,
             "A search was generated for audit events.")]
-        public static partial void LogAuditEventListQuery(this ILogger logger, [LogProperties]AuditSearchFilterRecord filter);
-        
+        public static partial void LogAuditEventListQuery(this ILogger logger, [LogProperties] AuditSearchFilterRecord filter);
+
         [LoggerMessage(
             AuditLoggingIds.SearchException,
             LogLevel.Error,
             "An exception occurred while attempting to perform a search for audit events: {exceptionMessage}")]
-        public static partial void LogAuditEventListQueryException(this ILogger logger, string exceptionMessage, [LogProperties]AuditSearchFilterRecord filter);
+        public static partial void LogAuditEventListQueryException(this ILogger logger, string exceptionMessage, [LogProperties] AuditSearchFilterRecord filter);
 
         [LoggerMessage(
             AuditLoggingIds.GetFacilityAuditEventsQuery,

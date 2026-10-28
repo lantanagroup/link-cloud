@@ -1,0 +1,92 @@
+﻿using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore.Storage;
+
+namespace LantanaGroup.Link.Normalization.Domain
+{
+    public interface IDatabase
+    {
+        Task SaveChangesAsync();
+        Task SaveChangesAsync(CancellationToken cancellationToken);
+        IEntityRepository<Operation> Operations { get; set; }
+        IEntityRepository<OperationSequence> OperationSequences { get; set; }
+        IEntityRepository<ResourceType> ResourceTypes { get; set; }
+        IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
+        IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
+
+        bool HasActiveTransaction { get; }
+        void ClearChanges();
+        Task<IDbContextTransaction> BeginTransactionAsync();
+        Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
+        Task RollbackTransactionAsync();
+        Task RollbackTransactionAsync(CancellationToken cancellationToken);
+        Task CommitTransactionAsync();
+    }
+
+    public class Database : IDatabase
+    {
+        private readonly NormalizationDbContext _dbContext;
+        public IEntityRepository<Operation> Operations { get; set; }
+        public IEntityRepository<OperationSequence> OperationSequences { get; set; }
+        public IEntityRepository<ResourceType> ResourceTypes { get; set; }
+        public IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
+        public IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
+
+        public Database(NormalizationDbContext dbContext,
+            IEntityRepository<Operation> operations,
+            IEntityRepository<OperationSequence> operationSequences,
+            IEntityRepository<ResourceType> resourceTypes,
+            IEntityRepository<OperationResourceType> operationResourceTypeMaps,
+            IEntityRepository<VendorVersionOperationPreset> vendorOperationPresets)
+        {
+            _dbContext = dbContext;
+            Operations = operations;
+            OperationSequences = operationSequences;
+            ResourceTypes = resourceTypes;
+            OperationResourceTypes = operationResourceTypeMaps;
+            VendorVersionOperationPresets = vendorOperationPresets;
+        }
+
+        public bool HasActiveTransaction => _dbContext.Database.CurrentTransaction != null;
+
+        public void ClearChanges()
+        {
+            _dbContext.ChangeTracker.Clear();
+        }
+
+        public Task<IDbContextTransaction> BeginTransactionAsync()
+        {
+            return BeginTransactionAsync(CancellationToken.None);
+        }
+
+        public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+        {
+            return await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        }
+
+        public Task RollbackTransactionAsync()
+        {
+            return RollbackTransactionAsync(CancellationToken.None);
+        }
+
+        public async Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
+        }
+
+        public async Task CommitTransactionAsync()
+        {
+            await _dbContext.Database.CommitTransactionAsync();
+        }
+
+        public Task SaveChangesAsync()
+        {
+            return SaveChangesAsync(CancellationToken.None);
+        }
+
+        public async Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+}

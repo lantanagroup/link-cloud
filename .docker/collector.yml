@@ -1,0 +1,41 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4417
+    tls:
+      insecure: true
+      
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+
+processors:
+  # Required for docker-compose parity with QA/prod collector-svc.monitoring.
+  # Limits collector RSS so a metrics flood cannot OOM the sidecar.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 400
+    spike_limit_mib: 100
+  batch:
+
+extensions:
+  health_check:
+  pprof:
+    endpoint: :1888
+  zpages:
+    endpoint: :55679
+
+service:
+  extensions: [pprof, zpages, health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

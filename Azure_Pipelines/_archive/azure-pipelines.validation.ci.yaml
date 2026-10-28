@@ -1,0 +1,32 @@
+trigger:
+  paths:
+    include:
+    - Java/shared/*
+    - Java/validation/*
+    
+pr:
+  paths:
+    include:
+    - Java/shared/*
+    - Java/validation/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+  
+variables:
+- group: link-cloud-variables
+
+steps:
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  - task: Maven@2
+    displayName: Maven Install
+    inputs:
+      mavenPomFile: 'Java/pom.xml'
+      goals: install
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      options: '-pl validation -am'

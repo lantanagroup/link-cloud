@@ -1,0 +1,37 @@
+@use 'sass:map';
+@use '@angular/material' as mat;
+
+@include mat.core();
+
+html {
+  @include mat.theme((
+    color: (
+      theme-type: light,
+      primary: mat.$violet-palette,
+      tertiary: mat.$green-palette,
+    ),
+    typography: Roboto,
+    density: 0
+  ));
+}
+
+*.purple-green {
+  @include mat.theme(
+      (
+        color: (
+          theme-type: dark,
+          primary: mat.$violet-palette,
+          tertiary: mat.$green-palette,
+        ),
+        typography: Roboto,
+        density: 0
+     ),
+    $overrides: (
+      "background" : #24292e
+    )
+  );
+/*  @include mat.theme-overrides((
+      "background" : #24292e
+    ));*/
+}
+

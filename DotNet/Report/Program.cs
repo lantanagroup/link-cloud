@@ -1,38 +1,51 @@
-using Azure.Identity;
-using Confluent.Kafka.Extensions.OpenTelemetry;
+﻿using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Report.Application.Factory;
-using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.Application.Core;
+using LantanaGroup.Link.Report.Application.Extensions;
+using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Application.Options;
+using LantanaGroup.Link.Report.Application.Serialization;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
-using LantanaGroup.Link.Report.Repositories;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Swagger;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -40,224 +53,273 @@ SetupMiddleware(app);
 
 app.Run();
 
-#region Register Services
-
-static void RegisterServices(WebApplicationBuilder builder)
+static void ConfigureLogging(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(ReportConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                            // Load configuration values with no label
-                            .Select("*", LabelFilter.Null)
-                            // Load configuration values for service name
-                            .Select("*", ReportConstants.ServiceName)
-                            // Load configuration values for service name and environment
-                            .Select("*", ReportConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
-    }
-
-    var serviceInformation = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
-
-    // Add configuration settings
-    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka).Get<KafkaConnection>() ?? new KafkaConnection());
-    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka));
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
-    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
-
-
-    // Add services to the container.
-    builder.Services.AddHttpClient();
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));                 
-
-    // Add factories
-    builder.Services.AddTransient<IKafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>, KafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
-
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientsToQueryValue>, KafkaConsumerFactory<string, PatientsToQueryValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-
-    //Producers
-    builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>, KafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-
-    //Producers for Retry/Deadletter
-    builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientsToQueryValue>, KafkaProducerFactory<string, PatientsToQueryValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>, KafkaProducerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
-
-    // Add repositories
-    builder.Services.AddSingleton<MeasureReportConfigRepository>();
-    builder.Services.AddSingleton<MeasureReportScheduleRepository>();
-    builder.Services.AddSingleton<MeasureReportSubmissionRepository>();
-    builder.Services.AddSingleton<MeasureReportSubmissionEntryRepository>();
-    builder.Services.AddSingleton<ReportRepository>();
-    builder.Services.AddSingleton<PatientsToQueryRepository>();
-    builder.Services.AddSingleton<RetryRepository>();
-
-    // Add controllers
-    builder.Services.AddControllers();
-
-    //Add health checks
-    builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
-
-    // Add swagger
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(c =>
-    {
-        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-        c.IncludeXmlComments(xmlPath);
-    });
-
-    // Add kafka wrappers
-    //builder.Services.AddSingleton<IKafkaWrapper<Ignore, MeasureReportCreatedMessage, Null, Ignore>, KafkaWrapper<Ignore, MeasureReportCreatedMessage, Null, Ignore>>();
-    //builder.Services.AddSingleton<IKafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>, KafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-
-    // Add quartz scheduler
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<RetryJob>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<GenerateDataAcquisitionRequestsForPatientsToQuery>();
-
-    // Add hosted services
-    builder.Services.AddHostedService<MeasureEvaluatedListener>();
-    builder.Services.AddHostedService<ReportScheduledListener>();
-    builder.Services.AddHostedService<ReportSubmittedListener>();
-    builder.Services.AddHostedService<PatientsToQueryListener>();
-    builder.Services.AddHostedService<MeasureReportScheduleService>();
-    builder.Services.AddHostedService<RetryListener>();
-    builder.Services.AddHostedService<RetryScheduleService>();
-
-    builder.Services.AddTransient<MeasureReportSubmissionBundler>();
-    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
-
-    #region Exception Handling
-    //Report Scheduled Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, DeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, TransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
-
-    //Report Submitted Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, DeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, TransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
-
-    //Patients To Query Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientsToQueryValue>, DeadLetterExceptionHandler<string, PatientsToQueryValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientsToQueryValue>, TransientExceptionHandler<string, PatientsToQueryValue>>();
-
-    //Measure Evaluated Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, DeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, TransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
-
-    //Retry Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    #endregion
-
-    // Logging using Serilog
-    builder.Logging.AddSerilog();
-    Log.Logger = new LoggerConfiguration()
+    var loggerConfig = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
+        .Filter.ByExcluding("RequestPath like '/health%'")
+        .Filter.ByExcluding("RequestPath like '/swagger%'")
         .Enrich.WithExceptionDetails()
         .Enrich.FromLogContext()
         .Enrich.WithSpan()
-        .Enrich.With<ActivityEnricher>()
-        .CreateLogger();
+        .Enrich.With<ActivityEnricher>();
 
-    Serilog.Debugging.SelfLog.Enable(Console.Error);
-
-    var telemetryConfig = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
-    {
-        var otel = builder.Services.AddOpenTelemetry();
-
-        //configure OpenTelemetry resources with application name
-        otel.ConfigureResource(resource => resource
-            .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
-
-        otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                    .AddSource(ServiceActivitySource.Instance.Name)
-                    .AddAspNetCoreInstrumentation(options =>
-                    {
-                        options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                    })
-                    .AddConfluentKafkaInstrumentation()
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        otel.WithMetrics(metricsProviderBuilder =>
-                metricsProviderBuilder
-                    .AddAspNetCoreInstrumentation()
-                    .AddRuntimeInstrumentation()
-                    .AddMeter(Counters.meter.Name)
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        if (builder.Environment.IsDevelopment())
-        {
-            otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                .AddConsoleExporter());
-
-            //metrics are very verbose, only enable console exporter if you really want to see metric details
-            //otel.WithMetrics(metricsProviderBuilder =>
-            //    metricsProviderBuilder
-            //        .AddConsoleExporter());                
-        }
-    }
+    Log.Logger = loggerConfig.CreateLogger();
+    builder.Logging.AddSerilog();
 }
 
-#endregion
+static void RegisterServices(WebApplicationBuilder builder)
+{
 
-#region Set up middleware
+
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion);
+
+    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
+
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
+    });
+
+    builder.Services.AddProblemDetailsService(options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = serviceInformation.ServiceConfigName;
+        options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
+    });
+
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
+    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
+    builder.Services.Configure<PatientAggregatorSettings>(builder.Configuration.GetSection(PatientAggregatorSettings.Key));
+
+    string? connectionString = builder.Configuration.GetConnectionString("DatabaseConnection");
+
+    builder.Services.AddDbContext<ReportDbContext>((sp, options) =>
+    {
+        var querySettings = builder.Configuration.GetRequiredSection(nameof(EnhancedQueryLoggingSettings)).Get<EnhancedQueryLoggingSettings>();
+
+        if (string.IsNullOrEmpty(connectionString))
+            throw new InvalidOperationException("Database connection string is null or empty.");
+
+        if (querySettings != null && querySettings.EnableEnhancedQueryLogging)
+        {
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            options.UseSqlServer(connectionString)
+                   .UseLoggerFactory(loggerFactory)
+                   .EnableSensitiveDataLogging();
+        }
+        else
+        {
+            options.UseSqlServer(connectionString);
+        }
+    });
+
+    builder.Services.RegisterQuartzDatabase(connectionString);
+    builder.Services.AddSingleton<IQuartzJobHelper, QuartzJobHelper>();
+
+    builder.Services.AddHttpClient();
+
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>, KafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
+
+    builder.Services.RegisterKafkaProducers(kafkaConnection);
+
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<Null, MeasureReportGeneratedValue>, KafkaProducerFactory<Null, MeasureReportGeneratedValue>>();
+
+    // The MappingOutcomeEvaluated dead-letter handler republishes with the consumed key type.
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
+
+    // Required by the typed dead-letter and transient handlers on MappingOutcomeListener: both take an
+    // IKafkaProducerFactory<K, V> to republish onto the -Error and -Retry topics. Without it the listener
+    // cannot be constructed and the service fails at startup.
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+
+    builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<GroupPopulation>, EntityRepository<GroupPopulation, ReportDbContext>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportPopulation>, EntityRepository<MeasureReportPopulation, ReportDbContext>>();
+    builder.Services.AddTransient<IDatabase, Database>();
+
+    builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
+    builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
+    builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
+    builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
+    builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
+
+    builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+    });
+
+    builder.Services.AddControllers().AddJsonOptions(options =>
+    {
+        LinkFhirSerializerOptions.ConfigurePermissiveFhirDeserialization(options.JsonSerializerOptions);
+        options.JsonSerializerOptions.Converters.Add(new JsonDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new JsonNullableDateTimeConverter());
+    });
+
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, serviceInformation.ServiceConfigName).GetHealthCheckOptions();
+    builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck<ReportDbContext>>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
+
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(c =>
+    {
+        if (!allowAnonymousAccess)
+        {
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Description = $"Authorization using JWT",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Scheme = JwtBearerDefaults.AuthenticationScheme
+            });
+
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Id = "Bearer",
+                            Type = ReferenceType.SecurityScheme
+                        }
+                    },
+                    new List<string>()
+                }
+            });
+        }
+
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
+
+        // IncludeXmlComments documents types, methods and properties but never enum members, so an enum
+        // reaches the spec as a bare list of integers. This adds their names and documentation.
+        c.SchemaFilter<EnumDescriptionSchemaFilter>();
+    });
+
+
+    builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceConfigName, [
+            KafkaTopic.ReportScheduledRetry.GetStringValue(),
+            KafkaTopic.MeasureReportGeneratedRetry.GetStringValue(),
+            KafkaTopic.PatientEventRetry.GetStringValue(),
+            KafkaTopic.GenerateReportRequestedRetry.GetStringValue(),
+            KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
+            KafkaTopic.ValidationCompleteRetry.GetStringValue(),
+            KafkaTopic.MappingOutcomeEvaluatedRetry.GetStringValue(),
+        ]));
+
+    builder.Services.AddHostedService<RetryScheduleService>();
+    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<GenerateReportListener>();
+    builder.Services.AddHostedService<ReportScheduledListener>();
+    builder.Services.AddHostedService<PatientEventListener>();
+    builder.Services.AddHostedService<ValidationCompleteListener>();
+    builder.Services.AddHostedService<PayloadSubmittedListener>();
+    builder.Services.AddHostedService<MeasureReportGeneratedListener>();
+    builder.Services.AddHostedService<MappingOutcomeListener>();
+
+    builder.Services.AddTransient<PatientAggregator>();
+    builder.Services.AddTransient<MeasureReportAggregator>();
+    builder.Services.AddTransient<ReportManifestProducer>();
+    builder.Services.AddTransient<SubmitPayloadProducer>();
+    builder.Services.AddTransient<ReadyForValidationProducer>();
+    builder.Services.AddTransient<DataAcquisitionRequestedProducer>();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+    builder.Services.AddSingleton<BlobStorageService>();
+
+    builder.Services.AddTransient<AuditableEventOccurredProducer>();
+
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
+
+    ConfigureLogging(builder);
+
+    builder.Services.AddLinkCorsService(options =>
+    {
+        options.Environment = builder.Environment;
+    });
+
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = ReportConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version;
+    });
+
+    builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
+}
 
 static void SetupMiddleware(WebApplication app)
 {
+    app.AutoMigrateEF<ReportDbContext>();
 
-    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.ToLower() == "local")
+    if (app.Environment.IsDevelopment())
     {
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
     }
 
-    //map health check middleware
+    app.ConfigureSwagger();
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "report");
 
     app.UseRouting();
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+    }
+    app.UseAuthorization();
+
     app.MapControllers();
 }
-
-#endregion

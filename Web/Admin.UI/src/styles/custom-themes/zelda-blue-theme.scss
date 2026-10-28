@@ -1,0 +1,44 @@
+@use '@angular/material' as mat;
+@use '../styles/zelda-blue-theme-colors.scss' as zeldaBlue;
+@include mat.core();
+
+$zelda-blue-primary: zeldaBlue.$primary-palette;
+$zelda-blue-tertiary: zeldaBlue.$tertiary-palette;
+
+
+html {
+  @include mat.theme((
+    color:(
+      theme-type: light,
+      primary: $zelda-blue-primary,
+      tertiary: $zelda-blue-tertiary,
+    ),
+    typography: Roboto,
+    density: 0
+  ));
+}
+
+*.zelda-blue {
+  @include mat.theme((
+    color: (
+      theme-type: light,
+      primary: $zelda-blue-primary,
+      tertiary: $zelda-blue-tertiary,
+    ),
+    typography: Roboto,
+    density: 0
+  ))
+}
+
+*.zelda-blue-dark {
+  @include mat.theme((
+    color: (
+      theme-type: dark,
+      primary: $zelda-blue-primary,
+      tertiary: $zelda-blue-tertiary,
+    ),
+    typography: Roboto,
+    density: 0
+  ))
+}
+

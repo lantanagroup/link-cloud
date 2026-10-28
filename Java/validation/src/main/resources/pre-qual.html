@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chart</title>
+    <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" rel="stylesheet">
+    <script crossorigin="anonymous"
+            integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+            src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script crossorigin="anonymous"
+            integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+            src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"></script>
+    <script crossorigin="anonymous"
+            integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+            src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style type="text/css">
+        body {
+            padding: 10px;
+        }
+
+        .row {
+            margin-top: 10px;
+        }
+    </style>
+    <script type="text/javascript">
+      var summary = {};
+    </script>
+</head>
+<body>
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+    <li class="nav-item">
+        <a aria-controls="general" aria-selected="true" class="nav-link active" data-toggle="tab" href="#general" id="general-tab"
+           role="tab">General</a>
+    </li>
+    <li class="nav-item">
+        <a aria-controls="graph" aria-selected="false" class="nav-link" data-toggle="tab" href="#graph" id="graph-tab"
+           role="tab">Categories Graph</a>
+    </li>
+    <li class="nav-item">
+        <a aria-controls="details" aria-selected="false" class="nav-link" data-toggle="tab" href="#details" id="details-tab"
+           role="tab">Details</a>
+    </li>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+    <div aria-labelledby="general-tab" class="tab-pane active" id="general" role="tabpanel">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Report Information</div>
+                    <div class="card-body">
+                        <p><strong>Report ID:</strong> <span id="report_id"></span></p>
+                        <p>
+                            <strong>Measures:</strong>
+                        <ul id="measures"></ul>
+                        </p>
+                        <p><strong>Reporting Period Start:</strong> <span id="reporting_period_start"></span></p>
+                        <p><strong>Reporting Period End:</strong> <span id="reporting_period_end"></span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Validation Information</div>
+                    <div class="card-body">
+                        <p><strong>Categories of Results:</strong> <span id="categories_count"></span></p>
+                        <p><strong>Total Validation Results:</strong> <span id="results_count"></span></p>
+                        <p><strong>Uncategorized Results:</strong> <span id="uncategorized_count">0</span></p>
+                        <p><strong>Pre-qualified?</strong> <span class="badge" id="prequal_status"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div aria-labelledby="graph-tab" class="tab-pane" id="graph" role="tabpanel">
+        <canvas id="myChart"></canvas>
+    </div>
+    <div aria-labelledby="details-tab" class="tab-pane" id="details" role="tabpanel">
+        <h2>Results for Category <span id="category_name"/></h2>
+        <p>
+            <strong>Guidance:</strong> <span id="category_guidance"></span>
+        </p>
+        <p>
+            <strong>Severity:</strong> <span id="category_severity"></span>
+        </p>
+        <p>
+            <strong>Acceptable:</strong> <span id="category_acceptable"></span>
+        </p>
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>Severity</th>
+                <th>Message</th>
+                <th>Expression</th>
+            </tr>
+            </thead>
+            <tbody id="results_tbody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+  $('#report_id').html(summary.report.id);
+  $('#reporting_period_start').html(summary.report.periodStart);
+  $('#reporting_period_end').html(summary.report.periodEnd);
+  $('#categories_count').html(summary.categories.length);
+  $('#results_count').html(summary.results.length);
+  $('#measures').html(summary.report.measures.map(function (measure) {
+    return '<li>' + measure + '</li>';
+  }).join(''));
+
+  if (summary.isPreQualified) {
+    $('#prequal_status').addClass('badge-success').html('Yes');
+  } else {
+    $('#prequal_status').addClass('badge-danger').html('No');
+  }
+
+  var uncategorizedCategory;
+  for (var category of summary.categories) {
+    if (category.id === 'uncategorized') {
+      uncategorizedCategory = category;
+      $('#uncategorized_count').html(category.count);
+      break;
+    }
+  }
+
+  var ctx = document.getElementById('myChart').getContext('2d');
+
+  var labels = [];
+  var data = [];
+  var backgrounds = [];
+
+  for (var category of summary.categories) {
+    labels.push(category.title);
+    data.push(category.count);
+    backgrounds.push(!category.acceptable && category.count > 0 ? 'red' : 'lightblue');
+  }
+
+  function addResultRow(result) {
+    var resultsTBody = document.getElementById('results_tbody');
+    var newRow = document.createElement('tr');
+    resultsTBody.appendChild(newRow);
+
+    var severityCol = document.createElement('td');
+    severityCol.innerHTML = result.severity;
+    newRow.appendChild(severityCol);
+
+    var messageCol = document.createElement('td');
+    messageCol.innerHTML = result.details;
+    newRow.appendChild(messageCol);
+
+    var expressionCol = document.createElement('td');
+    expressionCol.innerHTML = result.expression;
+    newRow.appendChild(expressionCol);
+  }
+
+  function setCategory(category) {
+    var resultsTBody = document.getElementById('results_tbody');
+    resultsTBody.innerHTML = '';
+
+    for (var result of summary.results) {
+      if (result.categories.indexOf(category.id) >= 0) {
+        addResultRow(result);
+      }
+    }
+
+    $('#category_name').html("&quot;" + category.title + "&quot;");
+    $('#category_guidance').html(category.guidance);
+    $('#category_severity').html(category.severity);
+    $('#category_acceptable').html(category.acceptable ? 'Yes' : 'No');
+    $('#category_details').css('display', 'block');
+  }
+
+  if (summary.categories && summary.categories.length > 0) {
+    setCategory(summary.categories[0]);
+  } else {
+    $('#details-tab').toggleClass('disabled');
+  }
+
+  var myChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Number of Issues',
+        data: data,
+        backgroundColor: backgrounds,
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      onClick: function (e) {
+        var activePoints = myChart.getElementsAtEventForMode(e, 'nearest', {intersect: true}, true);
+        if (activePoints.length > 0) {
+          var idx = activePoints[0].index;
+          var label = myChart.data.labels[idx];
+          var foundResults = [];
+          var foundCategory;
+
+          for (var category of summary.categories) {
+            if (category.title === label) {
+              foundCategory = category;
+              break;
+            }
+          }
+
+          setCategory(foundCategory);
+          $('#details-tab').tab('show')
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            minRotation: 45,
+            maxRotation: 75
+          }
+        },
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>

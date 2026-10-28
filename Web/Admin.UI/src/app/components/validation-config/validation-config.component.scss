@@ -1,0 +1,61 @@
+@use '../../../styles/core.scss';
+
+.upload-card {
+  max-width: 700px;
+  margin: 32px auto;
+  padding: 24px;
+}
+
+.info-note {
+  max-width: 700px;
+  margin: 16px auto 0;
+  padding: 12px 24px;
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border-radius: 4px;
+  font-size: 14px;
+  border-left: 4px solid #2196f3;
+}
+
+.form-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+}
+
+.form-section {
+  flex: 1 1 300px;
+}
+
+.form-label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.guide-name {
+  margin-top: 30px;
+  font-size: 16px;
+  color: #555;
+}
+
+.error-text {
+  margin-top: 8px;
+  color: #d32f2f;
+  font-size: 14px;
+}
+
+.form-label-bold {
+  font-weight: 600;
+}
+
+.header-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+

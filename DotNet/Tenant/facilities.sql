@@ -22,8 +22,8 @@ BEGIN
         [FacilityName] nvarchar(max) NULL,
         [MRPModifyDate] datetime2 NULL,
         [MRPCreatedDate] datetime2 NULL,
-        [CreatedOn] datetime2 NOT NULL,
-        [LastModifiedOn] datetime2 NULL,
+        [CreateDate] datetime2 NOT NULL,
+        [ModifyDate] datetime2 NULL,
         [MonthlyReportingPlans] nvarchar(max) NULL,
         [ScheduledTasks] nvarchar(max) NULL,
         CONSTRAINT [PK_Facilities] PRIMARY KEY NONCLUSTERED ([Id])

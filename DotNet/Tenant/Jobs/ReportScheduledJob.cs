@@ -1,11 +1,16 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Models.Messages;
+using LantanaGroup.Link.Tenant.Interfaces;
+using LantanaGroup.Link.Tenant.Services;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Quartz;
-using System.Text.Json;
+using static LantanaGroup.Link.Tenant.Services.ScheduleService;
 
 namespace LantanaGroup.Link.Tenant.Jobs
 {
@@ -15,11 +20,13 @@ namespace LantanaGroup.Link.Tenant.Jobs
     {
         private readonly ILogger<ReportScheduledJob> _logger;
         private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+        private readonly ITenantServiceMetrics _metrics;
 
-        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory)
+        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, ITenantServiceMetrics metrics)
         {
             _logger = logger;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -30,49 +37,53 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
+                string[] reportTypes = [];
+
                 string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
 
-                FacilityConfigModel facility = (FacilityConfigModel)dataMap[TenantConstants.Scheduler.Facility];
+                var facility = dataMap.GetObject<Facility>(TenantConstants.Scheduler.Facility);
 
-                string reportType = (string)dataMap[TenantConstants.Scheduler.ReportType];
+                string frequency = dataMap.GetObject<string>(TenantConstants.Scheduler.Frequency);
 
-                List<KeyValuePair<string, object>> parameters = new List<KeyValuePair<string, object>>();
+                TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone); // based on location
 
-                /*   DateTime startDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0);
+                // Anchor on Quartz's scheduled fire time rather than reading the wall clock again, so
+                // the whole of this job's period math comes from one instant. It is not misfire
+                // recovery: these triggers carry Quartz's smart policy, which for a cron trigger means
+                // fire once now, and Quartz implements that by moving the scheduled
+                // time to the recovery instant, so a fire recovered late announces the period of the
+                // recovery instant - the same behaviour as before this was anchored.
+                DateTimeOffset scheduledUtc = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
+                DateTime currentDateInTimeZone = TimeZoneInfo.ConvertTime(scheduledUtc, timeZone).DateTime;
 
-                   DateTime endDate1 = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, 0);
+                reportTypes = frequency switch
+                {
+                    ScheduleService.MONTHLY => facility.ScheduledReports.Monthly,
+                    ScheduleService.WEEKLY => facility.ScheduledReports.Weekly,
+                    ScheduleService.DAILY => facility.ScheduledReports.Daily,
+                    _ => []
+                };
 
-                   DateTime endDate = endDate1.AddMinutes(2);
-                */
+                var (startDate, endDate) = ReportingPeriodMath.ForFrequency(frequency, currentDateInTimeZone, timeZone);
 
-                DateTime startDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
-
-                DateTime endDate = startDate.AddMonths(1).AddSeconds(-1);
-
-                parameters.Add(new KeyValuePair<string, Object>(TenantConstants.Scheduler.StartDate, startDate));
-
-                parameters.Add(new KeyValuePair<string, Object>(TenantConstants.Scheduler.EndDate, endDate));
-
-                _logger.LogInformation($"Produce {KafkaTopic.ReportScheduled} + event for facility {facility.FacilityId} and {reportType} and trigger: {trigger}");
+                _logger.LogInformation("Produce {Topic} event on facility time {CurrentDateTime} for facility {FacilityId}, frequency {Frequency}, trigger: {Trigger}", KafkaTopic.ReportScheduled, currentDateInTimeZone, facility.FacilityId, frequency, trigger);
 
                 var headers = new Headers();
                 string correlationId = Guid.NewGuid().ToString();
 
                 headers.Add("X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId));
 
-                ReportScheduledKey Key = new ReportScheduledKey()
-                {
-                    FacilityId = facility.FacilityId,
-                    ReportType = reportType
-                };
-
                 var message = new Message<string, object>
                 {
-                    Key = JsonSerializer.Serialize(Key),
+                    Key = facility.FacilityId,
                     Headers = headers,
                     Value = new ReportScheduledMessage()
                     {
-                        Parameters = parameters
+                        ReportTypes = reportTypes,
+                        Frequency = frequency,
+                        StartDate = startDate,
+                        EndDate = endDate,
+                        ReportTrackingId = correlationId
                     },
                 };
 
@@ -80,7 +91,20 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 var producer = _kafkaProducerFactory.CreateProducer(producerConfig);
 
-                await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+                try
+                {
+                    await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+                }
+                catch (ProduceException<string, ReportScheduledMessage> ex)
+                {
+                    _logger.LogError(ex, "An error was encountered generating a ReportScheduled event.\n\tFacilityId: {facilityId}\n\tReportTypes: {reportTypes}", facility.FacilityId, string.Join(',', reportTypes));
+                }
+
+                _metrics.IncrementReportScheduledCounter([
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportType, reportTypes)
+                ]);
+
             }
             catch (Exception ex)
             {

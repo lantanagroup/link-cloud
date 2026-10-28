@@ -11,20 +11,21 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
     public class CreateAuditEventCommand : ICreateAuditEventCommand
     {
         private readonly ILogger<CreateAuditEventCommand> _logger;
-        private readonly IKafkaProducerFactory _kafkaProducerFactory;
+        //private readonly IKafkaProducerFactory _kafkaProducerFactory;
+        private readonly IProducer<string, AuditEventMessage> _producer;
 
-        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IKafkaProducerFactory kafkaProducerFactory)
+        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IProducer<string, AuditEventMessage> producer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            //_kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
         public async Task<bool> Execute(string? facilityId, AuditEventMessage auditEvent)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Audit Event");
             
-            using (var producer = _kafkaProducerFactory.CreateAuditEventProducer(useOpenTelemetry: true))
-            {
+
                 try 
                 {
                     var headers = new Headers();
@@ -36,7 +37,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     }                    
 
                     //write to auditable event occurred topic
-                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                    await _producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
                     {
                         Key = facilityId ?? string.Empty,
                         Value = auditEvent,
@@ -48,13 +49,13 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 catch (Exception ex)
                 {
                     Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                    ex.Data.Add("producer", producer);
+                    ex.Data.Add("producer", _producer);
                     ex.Data.Add("facility-id", facilityId);
                     ex.Data.Add("audit-event", auditEvent);                    
                     throw;
                 }
                 
-            }
+            
         }
     }
 }

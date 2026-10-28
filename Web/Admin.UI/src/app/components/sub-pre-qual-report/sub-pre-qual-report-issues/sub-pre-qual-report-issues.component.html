@@ -1,0 +1,39 @@
+<div class="sub-pre-qual-report">
+  <div style="margin: 2rem 4rem">
+    <nav mat-tab-nav-bar [tabPanel]="tabPanel" style="display: inline-block;">
+      <a mat-tab-link
+         [routerLink]="['/tenant/facility', facilityId, 'report', submissionId]"
+         routerLinkActive #reportDetailsActive="routerLinkActive"
+         [active]="reportDetailsActive.isActive">
+        Report Details
+      </a>
+      <a mat-tab-link
+         [routerLink]="['/sub-pre-qual-report/facility', facilityId, 'report', submissionId]"
+         routerLinkActive #prequalReportActive="routerLinkActive"
+         [active]="prequalReportActive.isActive">
+        Prequalification Report
+      </a>
+    </nav>
+    <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
+    <div style="margin-top:1rem;">
+      <a [routerLink]="['/sub-pre-qual-report/facility', facilityId, 'report', submissionId]" style=" text-decoration: none;">
+        <mat-icon style="top:5px;position:relative;">chevron_left</mat-icon>
+        Pre-Qual Report
+      </a>
+    </div>
+  </div>
+  @if(isLoading){
+  <div class="loading-container">
+    <mat-spinner></mat-spinner>
+  </div>
+  } @else {
+  <app-sub-pre-qual-report-meta [reportSummary]="reportSummary" [category]="category"></app-sub-pre-qual-report-meta>
+  <div class="sub-pre-qual-report--tables" style="margin-bottom: 0 !important">
+    <h4>{{category?.title}}</h4>
+    <div>Reported issues: {{issueCount | number}}</div>
+  </div>
+  <div class="sub-pre-qual-report--tables" style="margin-top: 1rem !important">
+    <app-sub-pre-qual-report-issues-table [reportIssues]="reportIssues"></app-sub-pre-qual-report-issues-table>
+  </div>
+  }
+</div>

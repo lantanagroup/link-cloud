@@ -1,0 +1,75 @@
+@use '../../../../../styles/validation-theme.scss' as vt;
+
+.validation-categories-list {
+  background-color: vt.$vd-neutral-50;
+  padding-bottom: 80px;
+
+  &-banner {
+    background-image: url('/assets/backgrounds/bg-eggplant-md.png');
+    background-repeat: no-repeat;
+    background-size: cover;
+    padding: 35px vt.$vd-container-padding-x;
+    color: vt.$vd-neutral-0;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    &-kicker {
+      @include vt.vd-subheading-02();
+
+      .sub-id {
+        font-weight: vt.$vd-font-weight-bold;
+      }
+    }
+
+    &-heading {
+      @include vt.vd-heading-02();
+      margin-top: .5rem;
+    }
+
+    .actions-container {
+      position: relative;
+
+      &:hover {
+        #actionsDropdownControl {
+            button {
+              background-color: vt.$vd-primary-800;
+            }
+
+          .icon {
+            transform: rotate(180deg);
+          }
+        }
+
+        .actions-dropdown {
+          display: flex;
+        }
+      }
+    }
+
+    .actions-dropdown {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 42px;
+      flex-direction: column;
+      gap: 1.25rem;
+      padding: 1rem 1.5rem;
+      background: vt.$vd-primary-800;
+      border-color: vt.$vd-primary-800;
+      color: vt.$vd-primary-50;
+      z-index: 999;
+      border: solid 2px vt.$vd-neutral-100;
+    }
+  }
+
+  &--table {
+    margin: vt.$vd-container-margin-x;
+
+    h4 {
+      @include vt.vd-subheading-01();
+      margin-bottom: 1.25rem;
+    }
+  }
+}

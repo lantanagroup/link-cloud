@@ -1,0 +1,145 @@
+@if (!initializeServiceInfos) {
+  <div class="content">
+    <p>
+      <mat-toolbar class="page-header-bar" color="primary">
+        <span>Service Meta Data</span>
+        <button mat-mini-fab aria-label="Refresh" matTooltip="Refresh service meta data" (click)="getServiceInfos()">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </mat-toolbar>
+    </p>
+    @if (serviceInfos.length > 0) {
+      <div class="table-container">
+        <table mat-table [dataSource]="serviceInfos">
+          <ng-container matColumnDef="serviceName">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Service</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matCellDef="let info">
+              @if (info.swaggerUrl) {
+                <a [href]="info.swaggerUrl" target="_blank">{{ info.serviceName }}</a>
+              } @else {
+                {{ info.serviceName }}
+              }
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="version">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Version</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.version || 'N/A' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="productVersion">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Product Version
+            </th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.productVersion || 'N/A' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="commit">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Commit</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.commit || 'N/A' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="build">
+            <th mat-header-cell [ngStyle]="{'border-right': '1px solid lightgray'}" *matHeaderCellDef> Build</th>
+            <td mat-cell [ngStyle]="{'border-right': '1px solid lightgray'}"
+                *matCellDef="let info"> {{ info.build || 'N/A' }}
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="serviceInfosDisplayColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: serviceInfosDisplayColumns;"></tr>
+        </table>
+      </div>
+    } @else {
+      <div class="no-results-found-container">
+        <span>No service information found.</span>
+      </div>
+    }
+  </div>
+} @else {
+  <div class="content">
+    <div class="no-results-found-container">
+      <span class="loading-indicator" role="status">
+        <mat-spinner [diameter]="24" aria-hidden="true"></mat-spinner>
+        Loading link services information.
+      </span>
+    </div>
+  </div>
+}
+
+<div class="content">
+  <mat-toolbar class="page-header-bar" color="primary">
+    <span>Health Checks</span>
+    <button mat-mini-fab aria-label="Refresh health checks" matTooltip="Refresh health checks"
+            [disabled]="initializeSummaries" (click)="refreshHealthSummary()">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </mat-toolbar>
+  <div class="table-container health-table-container" [attr.aria-busy]="initializeSummaries">
+    <table class="health-table" aria-label="Service health checks">
+      <thead>
+        <tr><th scope="col" class="expand-column"><span class="visually-hidden">Details</span></th><th scope="col">Service</th><th scope="col">Health</th><th scope="col">Duration</th></tr>
+      </thead>
+      <tbody>
+        @for (summary of healthSummary; track summary.serviceKey) {
+          <tr [class.expanded]="expandedServices.has(summary.serviceKey)">
+            <td class="expand-column">
+              <button mat-icon-button (click)="toggleService(summary.serviceKey)"
+                      [attr.aria-label]="(expandedServices.has(summary.serviceKey) ? 'Collapse ' : 'Expand ') + summary.service"
+                      [attr.aria-expanded]="expandedServices.has(summary.serviceKey)"
+                      [attr.aria-controls]="'health-entries-' + summary.serviceKey"
+                      [matTooltip]="expandedServices.has(summary.serviceKey) ? 'Collapse entries' : 'Expand entries'">
+                <mat-icon>{{ expandedServices.has(summary.serviceKey) ? 'remove' : 'add' }}</mat-icon>
+              </button>
+            </td>
+            <th scope="row">{{ summary.service }}</th>
+            <td>
+              <span class="health-status" [attr.data-status]="summary.status">
+                @if (summary.status === 'Loading...') {
+                  <mat-spinner [diameter]="24" aria-hidden="true"></mat-spinner>
+                } @else {
+                  <mat-icon aria-hidden="true">{{ summary.status === 'Healthy' ? 'check_circle' : summary.status === 'Unhealthy' ? 'cancel' : summary.status === 'Degraded' ? 'warning' : 'help_outline' }}</mat-icon>
+                }
+                {{ summary.status }}
+              </span>
+            </td>
+            <td [matTooltip]="summary.totalDuration">{{ formatDuration(summary.totalDuration) }}</td>
+          </tr>
+          <tr [hidden]="!expandedServices.has(summary.serviceKey)" class="detail-row">
+            <td colspan="4">
+              <div [id]="'health-entries-' + summary.serviceKey">
+                @if ((summary.entries | keyvalue).length > 0) {
+                  <table class="entries-table" [attr.aria-label]="summary.service + ' health check entries'">
+                    <thead><tr><th scope="col">Name</th><th scope="col">Health</th><th scope="col">Description</th><th scope="col">Duration</th></tr></thead>
+                    <tbody>
+                      @for (entry of summary.entries | keyvalue; track entry.key) {
+                        <tr>
+                          <th scope="row">{{ entry.key }}</th>
+                          <td><span class="health-status" [attr.data-status]="entry.value.status">
+                            <mat-icon aria-hidden="true">{{ entry.value.status === 'Healthy' ? 'check_circle' : entry.value.status === 'Unhealthy' ? 'cancel' : entry.value.status === 'Degraded' ? 'warning' : 'help_outline' }}</mat-icon>
+                            {{ entry.value.status }}
+                          </span></td>
+                          <td class="entry-description">{{ entry.value.description || '-' }}</td>
+                          <td [matTooltip]="entry.value.duration">{{ formatDuration(entry.value.duration) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  @if (summary.status === 'Loading...') {
+                    <p class="empty-entries loading-indicator" role="status">
+                      <mat-spinner [diameter]="24" aria-hidden="true"></mat-spinner>
+                      Loading health check entries...
+                    </p>
+                  } @else {
+                    <p class="empty-entries">No health check entries available.</p>
+                  }
+                }
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

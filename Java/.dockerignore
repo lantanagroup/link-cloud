@@ -1,0 +1,50 @@
+# Ignore Maven build output directory
+**/target/
+**/node_modules/
+
+# Ignore Maven configuration directory
+**/.mvn/
+
+# Ignore IDE files
+.idea/
+*.iml
+
+# Ignore log files
+*.log
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore Git files
+.git/
+.gitignore
+
+# Ignore Docker files
+**/.dockerignore
+**/Dockerfile
+
+# Ignore documentation
+**/README.md
+**/DEBUG-LOGGING.md
+
+# Tests are not packaged into the service jars
+**/src/test/
+
+# Ignore other files that might be generated during build
+**/bin/
+**/obj/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar
+*.rar
+*.7z
+*.swp
+*.bak
+*.orig
+*.old
+*.tmp
+*.rej

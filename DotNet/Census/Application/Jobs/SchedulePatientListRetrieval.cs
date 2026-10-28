@@ -1,34 +1,49 @@
 ﻿using Census.Domain.Entities;
 using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Jobs;
 
+[DisallowConcurrentExecution]
 public class SchedulePatientListRetrieval : IJob
 {
     private readonly ILogger<SchedulePatientListRetrieval> _logger;
-    private readonly IKafkaProducerFactory<string, Null> _kafkaFactory;
+    private readonly IProducer<string, Null> _kafkaProducer;
 
-    public SchedulePatientListRetrieval(ILogger<SchedulePatientListRetrieval> logger, IKafkaProducerFactory<string, Null> kafkaFactory)
+    public SchedulePatientListRetrieval(ILogger<SchedulePatientListRetrieval> logger, IProducer<string, Null> kafkaProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _kafkaFactory = kafkaFactory ?? throw new ArgumentNullException(nameof(kafkaFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
     public async Task Execute(IJobExecutionContext context)
     {
-        var producerConfig = new ProducerConfig();
-        using var producer = _kafkaFactory.CreateProducer(producerConfig);
         //get facility
-        var facility = (CensusConfigEntity)context.JobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility);
-        _logger.LogInformation($"Triggering {KafkaTopic.PatientCensusScheduled.ToString()} for facility: {facility.FacilityID} ");
+        var facility = context.JobDetail.JobDataMap.GetObject<CensusConfigEntity>(CensusConstants.Scheduler.Facility);
 
-        await producer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
+        _logger.LogDebug("Triggering {Topic} for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
+
+        // Skip execution if facility is disabled
+        if (facility.Enabled == false)
         {
-            Key = facility.FacilityID
-        });
+            _logger.LogInformation("Skipping execution for disabled facility: {FacilityId}", facility.FacilityID);
+            return;
+        }
+
+        try
+        {
+            await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
+            {
+                Key = facility.FacilityID
+            });
+        }
+        catch (ProduceException<string, Null> ex)
+        {
+            _logger.LogError(ex, "SchedulePatientListRetrieval: Error producing {Topic} message to Kafka for facility: {FacilityId}", KafkaTopic.PatientCensusScheduled.ToString(), facility.FacilityID);
+            throw;
+        }
     }
 }

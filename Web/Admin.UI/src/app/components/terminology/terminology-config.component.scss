@@ -1,0 +1,56 @@
+.terminology-config-container {
+  padding: 20px;
+
+  mat-card {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+
+    mat-form-field {
+      flex: 1;
+      min-width: 200px;
+    }
+  }
+
+  .table-container {
+    margin-bottom: 30px;
+    overflow: auto;
+
+    table {
+      width: 100%;
+    }
+
+    .mat-column-resourceType {
+      width: 150px;
+    }
+
+    .mat-column-id {
+      width: 150px;
+    }
+
+    .mat-column-version {
+      width: 100px;
+    }
+  }
+
+  .upload-container {
+    padding: 20px;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+
+    h3 {
+      margin-top: 0;
+    }
+
+    .upload-progress {
+      margin-top: 15px;
+    }
+  }
+}
