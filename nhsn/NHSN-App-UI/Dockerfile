@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:26.5.0-alpine AS build
 WORKDIR /app
 COPY packages/* ./packages/
 COPY package*.json ./
@@ -6,7 +6,7 @@ RUN npm ci
 COPY . .
 RUN npm run build:app
 
-FROM node:22-alpine AS runtime
+FROM node:26.5.0-alpine AS runtime
 WORKDIR /app
 COPY server ./server
 RUN npm install --prefix ./server --omit=dev
