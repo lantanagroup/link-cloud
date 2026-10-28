@@ -1,0 +1,22 @@
+{
+  "_comment": "Global parameters for the LEGPROG-516 metadata volume model. Every value records its source; see README.md.",
+  "facilities": {"value": 2000, "source": "LEGPROG-516 baseline"},
+  "share_monthly": {"value": 0.90, "source": "LEGPROG-516 baseline (ACH Monthly)"},
+  "share_daily": {"value": 0.45, "source": "LEGPROG-516 baseline (ACH Daily)"},
+  "share_both": {"value": 0.35, "source": "Derived minimum overlap (0.90 + 0.45 - 1); valid range 0.35-0.45"},
+  "patients_per_daily_report": {"value": 500, "source": "LEGPROG-516 decisions, 2026-10-28 (500 unique patients per facility per day)"},
+  "patients_per_monthly_report": {"value": 5000, "source": "LEGPROG-516 decisions, 2026-10-28 (5,000 unique patients per facility per month)"},
+  "census_patients_per_facility_month": {"value": 5000, "source": "LEGPROG-516 decisions, 2026-10-28 (facility-level unique patients per month)"},
+  "days_per_month": {"value": 30, "source": "Convention for rates; windows are calendar months in the product"},
+  "completion_lag_days": {"value": 1, "source": "Placeholder; LEGLINK-1369 measures period end to terminal report status"},
+  "cleanup_interval_days": {"value": 1, "source": "ADR 08 example schedule (daily)"},
+  "reference_window_months": {"value": 1, "source": "LEGPROG-516 decisions, 2026-10-28 (analyze at one month, then scale)"},
+  "projection_windows_months": {"value": [1, 3, 36, 84], "source": "LEGPROG-516 decisions, 2026-10-28"},
+  "window_cap_months": {"value": 36, "source": "ADR 08 / LEGLINK-1242 maximum; windows above it are flagged"},
+  "peak_processing_windows_hours": {"value": [2, 6, 24], "source": "Swept; the acceptable window is an output of LEGPROG-516"},
+  "kafka_retention_days": {"value": 7, "source": "Placeholder: Kafka broker default (168 h); production value is an output of LEGPROG-516"},
+  "kafka_replication_factor": {"value": 3, "source": "Placeholder: typical production value; local compose uses 1"},
+  "loki_retention_days": {"value": 30, "source": "Placeholder; production value is an output of LEGPROG-516"},
+  "dispatch_delay_hours": {"value": 2, "source": "Placeholder: example DispatchSchedule.Duration PT2H (ARCHITECTURE.md)"},
+  "retention_participants": {"value": 4, "source": "LEGLINK-1242 draft: PI 3 default participants (Report, MeasureEval, Validation, DataAcquisition)"}
+}

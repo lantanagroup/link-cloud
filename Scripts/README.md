@@ -47,6 +47,12 @@ subfolder and is summarised at the end.
 | `update_pr_coverage.py` | Reports test coverage restricted to the lines a PR changed. |
 | `download-swagger-specs.ps1 <version>` | Fetches each service's Swagger/OpenAPI document into `docs/domains/**/openapi.yml`. |
 
+### Capacity planning
+
+| Script | Purpose |
+|---|---|
+| `capacity_model/model.py [--format md\|csv] [--out <file>]` | LEGPROG-516 metadata volume model: arrival rates, held volume by retention window, and peak write throughput for every in-scope store. The inputs are `assumptions.json` and `stores.json`; see `capacity_model/README.md`. Stdlib only. Tests: `python -m unittest discover Scripts/capacity_model/tests`. |
+
 ### LINQPad utilities
 
 Run these in LINQPad; they prompt for a path rather than taking arguments.
