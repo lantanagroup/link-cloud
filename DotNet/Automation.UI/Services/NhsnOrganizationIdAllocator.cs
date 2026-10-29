@@ -50,6 +50,10 @@ public static class NhsnOrganizationIdAllocator
 
             return list.Body.Keys.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).ToArray();
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger?.LogWarning(

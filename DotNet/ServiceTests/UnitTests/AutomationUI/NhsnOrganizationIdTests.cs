@@ -114,6 +114,23 @@ public class NhsnOrganizationIdTests
         ids.Should().Equal("22001");
     }
 
+    [Fact]
+    public async global::System.Threading.Tasks.Task Facility_list_cancellation_is_not_an_empty_list()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var facility = new Mock<IFacilityServiceClient>();
+        facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+
+        var act = async () => await NhsnOrganizationIdAllocator.FacilityIdsAsync(
+            facility.Object,
+            NullLogger.Instance,
+            cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     [Theory]
     [InlineData(204)]
     [InlineData(503)]

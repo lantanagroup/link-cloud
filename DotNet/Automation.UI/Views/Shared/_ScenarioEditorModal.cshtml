@@ -2169,7 +2169,10 @@
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
-            document.getElementById('NhsnOrganizationId').value = (data.nhsnOrganizationId || '').trim() || generateRandomNhsnOrganizationId();
+            var storedOrgId = (data.nhsnOrganizationId || '').trim();
+            var orgInput = document.getElementById('NhsnOrganizationId');
+            orgInput.value = storedOrgId || (data.isSystemScenario ? '' : generateRandomNhsnOrganizationId());
+            orgInput.placeholder = data.isSystemScenario && !storedOrgId ? 'Assigned per run' : '';
             document.getElementById('EnableDmrp').checked = !!data.enableDmrp;
             var facilityMode = data.facilityConfigurationMode;
             legacyFacilityMode = !facilityMode || facilityMode === 'Unspecified';
@@ -2322,7 +2325,9 @@
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
-                document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
+                var newOrgInput = document.getElementById('NhsnOrganizationId');
+                newOrgInput.placeholder = '';
+                newOrgInput.value = generateRandomNhsnOrganizationId();
                 document.getElementById('EnableDmrp').checked = false;
                 legacyFacilityMode = false;
                 legacyPieceIds = null;

@@ -2,6 +2,7 @@
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace Automation.UI.Services;
 
@@ -114,7 +115,7 @@ public sealed class ScenarioSeedService : IHostedService
             _logger.LogInformation(
                 "Assigned NHSN organization id {OrganizationId} to scenario {Name} in place of a shared default.",
                 fresh,
-                scenario.Name);
+                (scenario.Name ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty).SanitizeForLog());
         }
     }
 

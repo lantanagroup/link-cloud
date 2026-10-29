@@ -232,11 +232,17 @@ public class ReportApiHelper
             {
                 facilityAborted = await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _output.WriteLine($"Could not read the facility abort flag: {ex.Message}");
             }
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         throw new TimeoutException(
             DescribeScheduledReportNotPersisted(
