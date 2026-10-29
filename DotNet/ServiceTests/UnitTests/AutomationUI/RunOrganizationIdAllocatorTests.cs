@@ -1,5 +1,6 @@
 using Automation.UI.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 
 namespace UnitTests.AutomationUI;
 
@@ -65,5 +66,71 @@ public class RunOrganizationIdAllocatorTests
 
         first.Should().Be("22222");
         second.Should().Be("33333");
+    }
+
+    [Fact]
+    public void Choose_keeps_the_run_id_when_numeric_only_facility_ids_are_off()
+    {
+        var runId = Guid.NewGuid();
+        var inUse = new HashSet<string>(StringComparer.Ordinal) { runId.ToString() };
+
+        var id = RunOrganizationIdAllocator.Choose(numericOnlyFacilityId: false, runId, inUse, (_, _) => 10_000);
+
+        id.Should().Be(runId.ToString());
+    }
+
+    [Fact]
+    public void Choose_draws_a_five_digit_id_when_numeric_only_facility_ids_are_on()
+    {
+        var runId = Guid.NewGuid();
+        var draws = new Queue<int>([10_000, 22_222]);
+        var inUse = new HashSet<string>(StringComparer.Ordinal) { "10000" };
+
+        var id = RunOrganizationIdAllocator.Choose(
+            numericOnlyFacilityId: true,
+            runId,
+            inUse,
+            (_, _) => draws.Dequeue());
+
+        id.Should().Be("22222");
+    }
+
+    [Fact]
+    public void Missing_facility_id_setting_binds_off()
+    {
+        var settings = new ConfigurationBuilder()
+            .Build()
+            .GetSection(FacilityIdFormatSettings.SectionName)
+            .Get<FacilityIdFormatSettings>();
+
+        (settings?.NumericOnlyFacilityId ?? false).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Facility_id_setting_binds_the_tenant_key()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [FacilityIdFormatSettings.NumericOnlyKey] = "true"
+            })
+            .Build();
+
+        var settings = configuration
+            .GetSection(FacilityIdFormatSettings.SectionName)
+            .Get<FacilityIdFormatSettings>();
+
+        settings!.NumericOnlyFacilityId.Should().BeTrue();
+        FacilityIdFormatSettings.NumericOnlyKey.Should().Be("FacilityIdSettings:NumericOnlyFacilityId");
+    }
+
+    [Fact]
+    public void Tenant_override_label_is_the_tenant_service_label()
+    {
+        var labels = FacilityIdFormatSettings.TenantOverrideLabels();
+
+        labels.Should().ContainSingle();
+        labels[0].Key.Should().Be("FacilityIdSettings:NumericOnlyFacilityId");
+        labels[0].Value.Should().Be("Tenant");
     }
 }

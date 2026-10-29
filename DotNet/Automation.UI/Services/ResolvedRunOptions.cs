@@ -43,8 +43,9 @@ public record ResolvedRunOptions(
     public DateTimeOffset? ReportPeriodEnd { get; init; }
 
     /// <summary>
-    /// NHSN organization id for this run. The run manager sets it to a five-digit
-    /// id, which is also the facility id. A scenario or request cannot choose it.
+    /// NHSN organization id for this run. The run manager sets it to the run id,
+    /// or to a five-digit id when numeric-only facility ids are on. That value is
+    /// also the facility id. A scenario or request cannot choose it.
     /// </summary>
     public string NhsnOrganizationId { get; init; } = string.Empty;
 

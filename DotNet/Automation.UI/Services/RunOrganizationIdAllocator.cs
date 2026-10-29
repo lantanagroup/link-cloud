@@ -12,6 +12,22 @@ internal static class RunOrganizationIdAllocator
     public const int ExclusiveMaximum = 100_000;
     public const int MaxAttempts = 64;
 
+    /// <summary>
+    /// The run id when numeric-only facility ids are off. A five-digit id that no
+    /// ongoing run is using when they are on.
+    /// </summary>
+    public static string Choose(
+        bool numericOnlyFacilityId,
+        Guid runId,
+        IReadOnlySet<string> ongoingOrganizationIds,
+        Func<int, int, int>? next = null)
+    {
+        if (!numericOnlyFacilityId)
+            return runId.ToString();
+
+        return Allocate(ongoingOrganizationIds, next);
+    }
+
     public static string Allocate(IReadOnlySet<string> inUse, Func<int, int, int>? next = null)
     {
         ArgumentNullException.ThrowIfNull(inUse);

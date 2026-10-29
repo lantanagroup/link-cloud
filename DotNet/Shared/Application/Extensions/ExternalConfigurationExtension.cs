@@ -13,7 +13,10 @@ namespace LantanaGroup.Link.Shared.Application.Extensions;
 
 public static class ExternalConfigurationExtension
 {
-    public static WebApplicationBuilder AddExternalConfiguration(this WebApplicationBuilder builder, string serviceName)
+    public static WebApplicationBuilder AddExternalConfiguration(
+        this WebApplicationBuilder builder,
+        string serviceName,
+        IEnumerable<KeyValuePair<string, string>>? additionalLabeledKeys = null)
     {
         using var loggerFactory = LoggerFactory.Create(logging =>
         {
@@ -54,6 +57,11 @@ public static class ExternalConfigurationExtension
                         {
                             logger.LogInformation("Connecting to external configuration source {ExternalConfigurationSource}.", externalConfigurationSource);
 
+                            var extraLabels = additionalLabeledKeys?
+                                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key)
+                                    && !string.IsNullOrWhiteSpace(pair.Value))
+                                .ToList();
+
                             options.Connect(connectionString)
                                 // Load configuration values with no label
                                 .Select("*", LabelFilter.Null)
@@ -62,6 +70,14 @@ public static class ExternalConfigurationExtension
                                 // Load configuration values for service name and environment
                                 .Select("*",
                                     serviceName + ":" + builder.Environment);
+
+                            // Later selects override earlier ones. Callers use this for a key
+                            // whose authoritative row is labeled for a different service.
+                            if (extraLabels is { Count: > 0 })
+                            {
+                                foreach (var pair in extraLabels)
+                                    options.Select(pair.Key, pair.Value);
+                            }
 
                             options.ConfigureRefresh(refresh =>
                             {

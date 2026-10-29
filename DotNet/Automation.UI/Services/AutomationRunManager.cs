@@ -34,6 +34,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IMeasureTemplateStore _measureTemplateStore;
     private readonly IFacilityTemplateStore _facilityTemplateStore;
     private readonly ITestRailPublisher _testRailPublisher;
+    private readonly bool _numericOnlyFacilityId;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
     private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
 
@@ -55,7 +56,8 @@ public class AutomationRunManager : IAutomationRunManager
         IPatientConfigurationStore patientConfigurationStore,
         IMeasureTemplateStore measureTemplateStore,
         IFacilityTemplateStore facilityTemplateStore,
-        ITestRailPublisher testRailPublisher)
+        ITestRailPublisher testRailPublisher,
+        IOptions<FacilityIdFormatSettings> facilityIdSettings)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -72,6 +74,9 @@ public class AutomationRunManager : IAutomationRunManager
         _measureTemplateStore = measureTemplateStore;
         _facilityTemplateStore = facilityTemplateStore;
         _testRailPublisher = testRailPublisher;
+        // Tenant copies this flag into a singleton at startup. Read it the same way
+        // so a run does not disagree with the check Tenant will apply.
+        _numericOnlyFacilityId = facilityIdSettings.Value.NumericOnlyFacilityId;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -100,10 +105,17 @@ public class AutomationRunManager : IAutomationRunManager
             cancellationToken);
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         MutableRunState state;
-        await _organizationIdGate.WaitAsync(cancellationToken);
+        if (_numericOnlyFacilityId)
+            await _organizationIdGate.WaitAsync(cancellationToken);
         try
         {
-            var organizationId = await AllocateOrganizationIdAsync(cancellationToken);
+            var ongoing = _numericOnlyFacilityId
+                ? await OngoingOrganizationIdsAsync(cancellationToken)
+                : new HashSet<string>(StringComparer.Ordinal);
+            var organizationId = RunOrganizationIdAllocator.Choose(
+                _numericOnlyFacilityId,
+                runId,
+                ongoing);
             options = options with { NhsnOrganizationId = organizationId };
             StampRunOrganizationId(request, organizationId);
 
@@ -113,14 +125,15 @@ public class AutomationRunManager : IAutomationRunManager
             };
             _runs[runId] = state;
 
-            // Persist before releasing the gate so the next start, including one in
-            // another process, sees this id as ongoing.
+            // Persist before releasing the gate so the next numeric-only start,
+            // including one in another process, sees this id as ongoing.
             await PersistRunInputAsync(runId, request);
             await PersistRunSummaryAsync(state);
         }
         finally
         {
-            _organizationIdGate.Release();
+            if (_numericOnlyFacilityId)
+                _organizationIdGate.Release();
         }
 
         state.ExecutionTask = Task.Run(async () =>
@@ -159,7 +172,7 @@ public class AutomationRunManager : IAutomationRunManager
         return runId;
     }
 
-    private async Task<string> AllocateOrganizationIdAsync(CancellationToken cancellationToken)
+    private async Task<HashSet<string>> OngoingOrganizationIdsAsync(CancellationToken cancellationToken)
     {
         var ongoing = new List<(string? FacilityId, string? OrganizationId, bool Ongoing)>();
         foreach (var state in _runs.Values)
@@ -173,13 +186,12 @@ public class AutomationRunManager : IAutomationRunManager
         foreach (var facilityId in await _snapshotStore.GetOngoingFacilityIdsAsync(cancellationToken))
             ongoing.Add((facilityId, null, true));
 
-        return RunOrganizationIdAllocator.Allocate(
-            RunOrganizationIdAllocator.CollectInUse(ongoing));
+        return RunOrganizationIdAllocator.CollectInUse(ongoing);
     }
 
     /// <summary>
     /// Records this run's organization id on the input snapshot. The value is the
-    /// five-digit id allocated for the run. A scenario cannot supply a different one.
+    /// id allocated for the run. A scenario cannot supply a different one.
     /// </summary>
     private static void StampRunOrganizationId(StartScenarioRequest request, string organizationId)
     {

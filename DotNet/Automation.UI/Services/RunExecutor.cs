@@ -514,8 +514,8 @@ internal sealed class RunExecutor
                 throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
             var measureId = measureIds[0];
 
-            // The facility id and the NHSN organization id are the five-digit id
-            // allocated at start. Two ongoing runs never share it.
+            // The facility id and the NHSN organization id are the id allocated at
+            // start. Two ongoing numeric-only runs never share a five-digit id.
             var facilityId = RequireOrganizationId(state);
             state.FacilityId = facilityId;
             var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
@@ -1939,8 +1939,8 @@ internal sealed class RunExecutor
     }
 
     /// <summary>
-    /// The five-digit id allocated at start. Empty when this state was built
-    /// without one, which only happens outside <see cref="AutomationRunManager"/>.
+    /// The id allocated at start. Empty when this state was built without one,
+    /// which only happens outside <see cref="AutomationRunManager"/>.
     /// </summary>
     private static string? AllocatedOrganizationId(MutableRunState state)
     {
