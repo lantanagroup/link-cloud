@@ -157,8 +157,8 @@ public class TestRailOptionsBinderTests
             ["Enabled"] = "false",
             ["BaseUrl"] = "",
             ["ProjectId"] = "NHSNLink 2.0",
-            ["ScenarioSuiteId"] = "0",
-            ["ApiHealthSuiteId"] = "0",
+            ["ScenarioSuiteId"] = "134",
+            ["ApiHealthSuiteId"] = "134",
             ["RequestTimeoutSeconds"] = "15",
             ["UseSharedRun"] = "false",
             ["SharedScenarioRunId"] = "",
@@ -169,6 +169,10 @@ public class TestRailOptionsBinderTests
         options.ProjectId.Should().Be(0);
         options.ProjectName.Should().Be("NHSNLink 2.0");
         options.HasProject.Should().BeTrue();
+        options.ScenarioSuiteId.Should().Be(134);
+        options.ApiHealthSuiteId.Should().Be(134);
+        options.HasScenarioSuite.Should().BeTrue();
+        options.HasApiHealthSuite.Should().BeTrue();
         options.SharedScenarioRunId.Should().BeNull();
         options.SharedApiHealthRunId.Should().BeNull();
         options.ConfigurationProblems.Should().BeEmpty();

@@ -610,13 +610,13 @@ services:
       required: false
       defaultValue: "NHSNLink 2.0"
     - key: "Automation:TestRail:ScenarioSuiteId"
-      description: "TestRail suite for scenario runs: the numeric id (34 or S34) or the exact suite name in the project. Blank or zero skips scenario publishing; the startup check then logs the project's suites."
+      description: "TestRail suite for scenario runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134. Blank or zero skips scenario publishing; the startup check then logs the project's suites."
       required: false
-      defaultValue: "0"
+      defaultValue: "134"
     - key: "Automation:TestRail:ApiHealthSuiteId"
-      description: "TestRail suite for API Health runs: the numeric id (34 or S34) or the exact suite name in the project. Blank or zero skips API Health publishing; the startup check then logs the project's suites."
+      description: "TestRail suite for API Health runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134, the same suite as scenario runs. Blank or zero skips API Health publishing; the startup check then logs the project's suites."
       required: false
-      defaultValue: "0"
+      defaultValue: "134"
     - key: "Automation:TestRail:RequestTimeoutSeconds"
       description: "HTTP timeout in seconds for each TestRail API call. Values below 1 use 15 seconds."
       required: false
