@@ -81,4 +81,17 @@ public class EntryMapperTests
         ((Action)(() => EntryMapper.ToReportingPlan("F1", 5, 2026, null!, DateTimeOffset.UtcNow)))
             .Should().Throw<ArgumentNullException>();
     }
+
+    [Fact]
+    public void ToReportingPlan_AGuidFacilityId_LeavesTheNumericOrgIdEmptyAndKeepsTheString()
+    {
+        var facilityId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+
+        var plan = EntryMapper.ToReportingPlan(facilityId, 5, 2026, [Entry()], DateTimeOffset.UtcNow);
+
+        plan.Orgid.Should().BeNull("a run id is not a number, so the root orgid stays empty");
+        plan.Plans.Should().ContainSingle();
+        plan.Plans.Single().Nhsnorgid.Should().Be(facilityId);
+        plan.Plans.Single().Name.Should().Be("HOB");
+    }
 }

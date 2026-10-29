@@ -39,6 +39,7 @@ These tests use `AutomationUiScenarioRunner` to start a seeded scenario and poll
 | `MultiPatientTest` | `00000000-0000-0000-0000-000000000002` | PR-safe |
 | `MegaPatientTest` | `00000000-0000-0000-0000-000000000003` | `Category=LongRunning` |
 | `ReportScheduledWorkflowTest` (`ReportScheduledTest`) | `00000000-0000-0000-0000-000000000004` | PR-safe |
+| `DmrpScheduledReportTest` | `00000000-0000-0000-0000-000000000010` | PR-safe (scheduled, Mock DMRP on) |
 | `RegenerateReportTest` | `00000000-0000-0000-0000-000000000005` | PR-safe |
 | `MultiMeasureTest` | `00000000-0000-0000-0000-000000000006` | PR-safe |
 | `MegaMultiPatientTest` | `00000000-0000-0000-0000-000000000007` | `Category=LongRunning` |
@@ -104,6 +105,7 @@ Current PR list includes:
 - `ApiStabilityTest`
 - `AutomationUiSmokeTest`
 - `ReportScheduledTest`
+- `DmrpScheduledReportTest`
 - `RegenerateReportTest`
 - `MultiMeasureTest`
 
