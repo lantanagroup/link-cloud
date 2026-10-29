@@ -31,6 +31,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using RequestStatusExtensions = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatusExtensions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -1793,6 +1794,146 @@ public class PatientDataServiceTests
         Assert.Equal(2, result[1].Id);  // High, oldest ExecutionDate
         Assert.Equal(3, result[2].Id);  // High, newer ExecutionDate
         Assert.Equal(1, result[3].Id);  // Normal Pending (next after highs)
+    }
+    // LEGLINK-1568: non-transient authorization failures are not retried.
+
+    private UpdateDataAcquisitionLogModel? _capturedUpdate;
+
+    private void ArrangeQueuedCoverageReadThatFails(int? retryAttempts, int? maxRetries, Exception fhirException)
+    {
+        var log = new DataAcquisitionLog
+        {
+            Id = 1,
+            FacilityId = "facilityId",
+            PatientId = "patient-1",
+            CorrelationId = "corr-1",
+            Status = RequestStatus.Queued,
+            RetryAttempts = retryAttempts,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery
+                {
+                    QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new FhirQueryResourceType { ResourceType = ResourceType.Coverage }
+                    },
+                    QueryParameters = new List<string>(),
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                }
+            }
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DataAcquisitionLogModel.FromDomain(log));
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facilityId", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FhirQueryConfigurationModel
+            {
+                FacilityId = "facilityId",
+                FhirServerBaseUrl = "http://example.com",
+                MaxRetries = maxRetries
+            });
+
+        _mockLogManager
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(fhirException);
+
+        _mockLogManager
+            .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()))
+            .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, _) => _capturedUpdate = m)
+            .Returns(Task.CompletedTask);
+    }
+
+    private static OpOutcomeException OutcomeWithStatus(HttpStatusCode status) =>
+        new("OperationOutcome encountered", new FhirOperationException(status.ToString(), status));
+
+    [Fact]
+    public async Task ExecuteLogRequest_Forbidden_IsTerminalOnTheFirstOccurrence()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 10, OutcomeWithStatus(HttpStatusCode.Forbidden));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.NotNull(_capturedUpdate.Status);
+        Assert.Contains(_capturedUpdate.Status.Value, RequestStatusExtensions.TerminalStatuses);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+        _mockFhirApiService.Verify(x => x.ExecuteRead(
+            It.IsAny<DataAcquisitionLogModel>(),
+            It.IsAny<FhirQueryModel>(),
+            It.IsAny<ResourceType>(),
+            It.IsAny<FhirQueryConfigurationModel>(),
+            It.IsAny<DiscoveredReferenceAccumulator>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Forbidden_NoteNamesTheStatusAndTheDeniedResourceType()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 10, OutcomeWithStatus(HttpStatusCode.Forbidden));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate?.NewNotes);
+        Assert.Contains(_capturedUpdate.NewNotes, n =>
+            n.Contains("Forbidden", StringComparison.OrdinalIgnoreCase) &&
+            n.Contains("Coverage", StringComparison.Ordinal) &&
+            n.Contains("not retried", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(_capturedUpdate.NewNotes, n => n.Contains("Retrying", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Unauthorized_FirstOccurrence_StaysRetryable()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.Unauthorized));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Unauthorized_RepeatOccurrence_IsTerminal()
+    {
+        // One failed execution plus the processing job's re-queue increment leaves RetryAttempts at 2.
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: 2, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.Unauthorized));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.NotNull(_capturedUpdate.Status);
+        Assert.Contains(_capturedUpdate.Status.Value, RequestStatusExtensions.TerminalStatuses);
+        Assert.Contains(_capturedUpdate.NewNotes!, n =>
+            n.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase) &&
+            n.Contains("credential", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_ServerError_StillRetriesUntilMaxRetries()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.InternalServerError));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
     }
 }
 

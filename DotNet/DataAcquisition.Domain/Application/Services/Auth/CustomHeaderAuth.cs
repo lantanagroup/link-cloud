@@ -35,4 +35,11 @@ public class CustomHeaderAuth : IAuth
 
         return (false, headers);
     }
+    /// <summary>
+    /// No cached credential to discard for this scheme.
+    /// </summary>
+    public Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
 }

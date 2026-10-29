@@ -3,6 +3,8 @@ using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -1345,5 +1347,116 @@ public class FhirApiServiceTests
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             times);
+    }
+    // LEGLINK-1568: non-transient authorization failures.
+
+    private static FhirApiService BuildAuthFailureService(
+        Mock<IReadFhirCommand>? readFhirCommand = null,
+        Mock<ISearchFhirCommand>? searchFhirCommand = null,
+        IAuthenticationRetrievalService? authenticationRetrievalService = null)
+    {
+        return new FhirApiService(
+            new Mock<IReferenceResourcesManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
+            (searchFhirCommand ?? new Mock<ISearchFhirCommand>()).Object,
+            (readFhirCommand ?? new Mock<IReadFhirCommand>()).Object,
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object,
+            CreateLocationMappingService(),
+            null,
+            authenticationRetrievalService);
+    }
+
+    private static FhirQueryConfigurationModel EpicConfiguration() => new()
+    {
+        FhirServerBaseUrl = "http://test",
+        Authentication = new AuthenticationConfigurationModel { AuthType = "Epic" }
+    };
+
+    [Fact]
+    public async Task ExecuteRead_ForbiddenWithoutOperationOutcome_ThrowsOpOutcomeException()
+    {
+        var readFhirCommand = new Mock<IReadFhirCommand>();
+        var service = BuildAuthFailureService(readFhirCommand: readFhirCommand);
+        var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "cov-1" };
+        var fhirQuery = new FhirQueryModel { IsReference = false };
+
+        readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FhirOperationException("Forbidden", HttpStatusCode.Forbidden));
+
+        var ex = await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Coverage, EpicConfiguration()));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Contains("HTTP Forbidden returned", log.Notes[0]);
+    }
+
+    [Fact]
+    public async Task ExecuteSearch_ForbiddenWithoutOperationOutcome_ThrowsOpOutcomeException()
+    {
+        var searchFhirCommand = new Mock<ISearchFhirCommand>();
+        var service = BuildAuthFailureService(searchFhirCommand: searchFhirCommand);
+        var log = new DataAcquisitionLogModel { FacilityId = "123", CorrelationId = "c-1" };
+        var fhirQuery = new FhirQueryModel { IsReference = false };
+
+        searchFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(GetExceptionBundleAsync(new FhirOperationException("Forbidden", HttpStatusCode.Forbidden)));
+
+        var ex = await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteSearch(log, fhirQuery, EpicConfiguration(), ResourceType.Coverage));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Contains("HTTP Forbidden returned for Search operation", log.Notes[0]);
+    }
+
+    [Fact]
+    public async Task ExecuteRead_Unauthorized_InvalidatesTheFacilityAuthentication()
+    {
+        var auth = new Mock<IAuth>();
+        var authenticationRetrievalService = new Mock<IAuthenticationRetrievalService>();
+        authenticationRetrievalService
+            .Setup(x => x.GetAuthenticationService(It.IsAny<AuthenticationConfigurationModel>()))
+            .Returns(auth.Object);
+
+        var readFhirCommand = new Mock<IReadFhirCommand>();
+        var service = BuildAuthFailureService(
+            readFhirCommand: readFhirCommand,
+            authenticationRetrievalService: authenticationRetrievalService.Object);
+        var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "cov-1" };
+        var fhirQuery = new FhirQueryModel { IsReference = false };
+
+        readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FhirOperationException("Unauthorized", HttpStatusCode.Unauthorized));
+
+        var ex = await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Coverage, EpicConfiguration()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
+        auth.Verify(x => x.InvalidateAuthentication("123", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteRead_Forbidden_LeavesTheFacilityAuthenticationAlone()
+    {
+        var auth = new Mock<IAuth>();
+        var authenticationRetrievalService = new Mock<IAuthenticationRetrievalService>();
+        authenticationRetrievalService
+            .Setup(x => x.GetAuthenticationService(It.IsAny<AuthenticationConfigurationModel>()))
+            .Returns(auth.Object);
+
+        var readFhirCommand = new Mock<IReadFhirCommand>();
+        var service = BuildAuthFailureService(
+            readFhirCommand: readFhirCommand,
+            authenticationRetrievalService: authenticationRetrievalService.Object);
+        var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "cov-1" };
+        var fhirQuery = new FhirQueryModel { IsReference = false };
+
+        readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FhirOperationException("Forbidden", HttpStatusCode.Forbidden));
+
+        await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Coverage, EpicConfiguration()));
+
+        auth.Verify(x => x.InvalidateAuthentication(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

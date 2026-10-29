@@ -411,4 +411,13 @@ public class EpicAuthTests
         }
         return null;
     }
+    [Fact]
+    public async Task InvalidateAuthentication_CachedToken_RemovesTheFacilityToken()
+    {
+        var sut = BuildSut(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        await sut.InvalidateAuthentication(FacilityId);
+
+        _mockCacheService.Verify(x => x.RemoveAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
