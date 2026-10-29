@@ -58,4 +58,51 @@ public class ReportApiHelperTests
         message.Should().Contain("Response: ");
         message.Should().Contain(new string('x', 180));
     }
+
+    [Fact]
+    public void NotPersisted_says_when_the_facility_is_still_aborted()
+    {
+        var message = ReportApiHelper.DescribeScheduledReportNotPersisted(
+            TrackingId,
+            TimeSpan.FromSeconds(120),
+            lastStatusCode: 404,
+            lastBody: null,
+            facilityId: "10765",
+            facilityAborted: true);
+
+        message.Should().Contain("Facility '10765' is still aborted");
+        message.Should().Contain("does not store the schedule");
+        message.Should().Contain("within 120s");
+    }
+
+    [Fact]
+    public void NotPersisted_says_when_the_facility_abort_flag_was_clear()
+    {
+        var message = ReportApiHelper.DescribeScheduledReportNotPersisted(
+            TrackingId,
+            TimeSpan.FromSeconds(120),
+            lastStatusCode: 404,
+            lastBody: null,
+            facilityId: "22001",
+            facilityAborted: false);
+
+        message.Should().Contain("The facility abort flag was not set when the wait ended.");
+        message.Should().NotContain("still aborted");
+    }
+
+    [Fact]
+    public void NotPersisted_strips_markup_from_the_facility_id()
+    {
+        var message = ReportApiHelper.DescribeScheduledReportNotPersisted(
+            TrackingId,
+            TimeSpan.FromSeconds(120),
+            lastStatusCode: 404,
+            lastBody: null,
+            facilityId: "22001<script>",
+            facilityAborted: true);
+
+        message.Should().Contain("still aborted");
+        message.Should().NotContain("<script");
+        message.Should().NotContain("<");
+    }
 }

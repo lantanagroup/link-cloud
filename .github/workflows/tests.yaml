@@ -338,6 +338,7 @@ jobs:
             "Adhoc Report Daily ACH|AdhocReportDailyAchTest|adhoc-report-daily-ach-test-results.trx"
             "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
+            "DMRP Scheduled Report|DmrpScheduledReportTest|dmrp-scheduled-report-test-results.trx"
             "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
             "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
           )

@@ -384,11 +384,12 @@ public class ApiHealthExecutionRunManagerTests
     [Fact]
     public async Task Seed_cancellation_tells_the_publisher_the_run_was_cancelled()
     {
-        ApiHealthTestRailPublishRequest? captured = null;
+        var published = new TaskCompletionSource<ApiHealthTestRailPublishRequest>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         var publisher = new Mock<ITestRailPublisher>();
         publisher
             .Setup(p => p.PublishApiHealthRunAsync(It.IsAny<ApiHealthTestRailPublishRequest>(), It.IsAny<CancellationToken>()))
-            .Callback<ApiHealthTestRailPublishRequest, CancellationToken>((request, _) => captured = request)
+            .Callback<ApiHealthTestRailPublishRequest, CancellationToken>((request, _) => published.TrySetResult(request))
             .Returns(Task.CompletedTask);
 
         var manager = new ApiHealthExecutionRunManager(
@@ -402,13 +403,11 @@ public class ApiHealthExecutionRunManagerTests
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(TestServiceName);
-        await WaitForCompletionAsync(manager, runId);
-        // Completed is set before the publisher is called, so the callback can land after the run looks finished.
-        for (var attempt = 0; captured is null && attempt < 100; attempt++)
-            await Task.Delay(10);
+        // Completion is set before TestRail publish, so waiting on the run flag
+        // can observe the run before this callback runs.
+        var captured = await published.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        captured.Should().NotBeNull();
-        captured!.RunId.Should().Be(runId);
+        captured.RunId.Should().Be(runId);
         captured.Cancelled.Should().BeTrue();
         captured.Failed.Should().BeTrue();
     }

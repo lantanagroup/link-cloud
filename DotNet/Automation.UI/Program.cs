@@ -37,11 +37,17 @@ if (!string.IsNullOrEmpty(externalConfigSource))
         .GetSection("ServiceInformation:ServiceName")
         .Get<string>() ?? "Link Automation UI";
 
-    builder.AddExternalConfiguration(serviceName);
+    // Tenant validates facility ids from FacilityIdSettings:NumericOnlyFacilityId.
+    // An unlabeled row is already loaded for every service. This adds the Tenant
+    // label for that one key so a Tenant-labeled row overrides it here too.
+    builder.AddExternalConfiguration(
+        serviceName,
+        FacilityIdFormatSettings.TenantOverrideLabels());
 }
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+builder.Services.Configure<FacilityIdFormatSettings>(builder.Configuration.GetSection(FacilityIdFormatSettings.SectionName));
 builder.Services.Configure<LeftoverRunCleanupOptions>(builder.Configuration.GetSection(LeftoverRunCleanupOptions.SectionName));
 builder.Services.Configure<ImportedBundleBlobStorageSettings>(builder.Configuration.GetSection(ImportedBundleBlobStorageSettings.Key));
 
