@@ -14,6 +14,9 @@ public class Topics {
     public static final String EVALUATION_REQUESTED_ERROR = "EvaluationRequested-Error";
     public static final String EVALUATION_REQUESTED_RETRY = "EvaluationRequested-Retry";
     public static final String VALIDATION_COMPLETE = "ValidationComplete";
+    public static final String REPORT_STATUS_UPDATED = "ReportStatusUpdated";
+    public static final String REPORT_STATUS_UPDATED_RETRY = "ReportStatusUpdated-Retry";
+    public static final String REPORT_STATUS_UPDATED_ERROR = "ReportStatusUpdated-Error";
     public static final String RETENTION_CHECK_REQUESTED = "RetentionCheckRequested";
     public static final String RETENTION_CHECK_REQUESTED_RETRY = "RetentionCheckRequested-Retry";
     public static final String RETENTION_CHECK_REQUESTED_ERROR = "RetentionCheckRequested-Error";

@@ -79,4 +79,9 @@ public enum KafkaTopic
     RetentionCheckCompleteRetry,
     [StringValue("RetentionCheckComplete-Error")]
     RetentionCheckCompleteError,
+    ReportStatusUpdated,
+    [StringValue("ReportStatusUpdated-Retry")]
+    ReportStatusUpdatedRetry,
+    [StringValue("ReportStatusUpdated-Error")]
+    ReportStatusUpdatedError,
 }
