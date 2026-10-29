@@ -52,6 +52,12 @@ public interface ISnapshotStore
     Task ClearFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default);
     Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default);
     Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Facility ids of runs that have not finished. A new run rejects one of these
+    /// before using it as an NHSN organization id.
+    /// </summary>
+    Task<IReadOnlyCollection<string>> GetOngoingFacilityIdsAsync(CancellationToken ct = default);
     Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default);
     Task UpsertRunSummaryAsync(AutomationRunSummary summary, string? facilityId, string? reportId, CancellationToken ct = default);
     Task UpsertRunInputAsync(AutomationRunInputSnapshot input, CancellationToken ct = default);

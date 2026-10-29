@@ -93,13 +93,8 @@ public class TestScenarioDefinition
     public List<PatientCohortDefinition> PatientCohorts { get; set; } = [];
 
     /// <summary>
-    /// Configured NHSN reporting Organization ID for this scenario.
-    /// </summary>
-    public string NhsnOrganizationId { get; set; } = string.Empty;
-
-
-    /// <summary>
     /// When true, this scenario uses DMRP enrollment to derive its reporting schedule.
+    /// The run generates its own NHSN organization id. The scenario does not store one.
     /// </summary>
     public bool EnableDmrp { get; set; }
 

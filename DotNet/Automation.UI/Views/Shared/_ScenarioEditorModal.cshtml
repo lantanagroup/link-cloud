@@ -201,11 +201,6 @@
                             <input class="form-control" type="number" id="PatientCount" value="10" readonly title="Sum of cohort patients + imported patients (read-only)." />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label" for="NhsnOrganizationId">NHSN Organization ID</label>
-                            <input class="form-control" type="text" id="NhsnOrganizationId" maxlength="64" />
-                            <div id="nhsnOrganizationHint" class="form-text"></div>
-                        </div>
-                        <div class="col-md-3">
                             <label class="form-label d-block">DMRP</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="EnableDmrp" />
@@ -572,14 +567,6 @@
         }
 
         function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
-        function generateRandomNhsnOrganizationId() {
-            var arr = new Uint32Array(1);
-            if (window.crypto && window.crypto.getRandomValues) {
-                window.crypto.getRandomValues(arr);
-                return String(10000 + (arr[0] % 90000));
-            }
-            return String(10000 + Math.floor(Math.random() * 90000));
-        }
         function esc(s) {
             return String(s == null ? '' : s)
                 .replace(/&/g, '&amp;')
@@ -832,26 +819,6 @@
         function clearFieldErrors() {
             document.querySelectorAll('#scenarioConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
             document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
-        }
-
-        function getUploadedOrganizationConflictMessage() {
-            return null;
-        }
-
-        function getSingleUploadedOrganizationId() {
-            return null;
-        }
-
-        function syncNhsnOrganizationFromUploadedPatients() {
-            var input = document.getElementById('NhsnOrganizationId');
-            var hint = document.getElementById('nhsnOrganizationHint');
-            if (!input || !hint) return;
-
-            input.classList.remove('is-invalid', 'bg-light');
-            hint.className = 'form-text';
-            hint.textContent = '';
-
-            input.readOnly = false;
         }
 
         function selectDefaultNormalizationSuite() {
@@ -1470,9 +1437,6 @@
         document.getElementById('IsMetricsRun').addEventListener('change', function () {
             syncMetricsRunUi();
         });
-        document.getElementById('EnableDmrp').addEventListener('change', function () {
-            syncDmrpUi();
-        });
         document.getElementById('FacilityModeFacility').addEventListener('change', function () {
             legacyFacilityMode = false;
             syncFacilityModeUi();
@@ -1523,22 +1487,6 @@
             if (value == null || String(value).trim() === '') return null;
             var n = parseInt(value, 10);
             return isNaN(n) ? null : n;
-        }
-
-        function syncDmrpUi() {
-            var toggle = document.getElementById('EnableDmrp');
-            var input = document.getElementById('NhsnOrganizationId');
-            var hint = document.getElementById('nhsnOrganizationHint');
-
-            if (!toggle || !input || !hint) return;
-
-            if (toggle.checked) {
-                input.required = true;
-                hint.textContent = 'Required when DMRP enrollment is enabled.';
-            } else {
-                input.required = false;
-                hint.textContent = '';
-            }
         }
 
         // ---- Imported Patients ----
@@ -1826,7 +1774,7 @@
             renderImportedEncounterCell(tr);
             reindexImported();
             updateImportedSummary();
-            syncNhsnOrganizationFromUploadedPatients();
+
         }
 
         // Renders the encounter-dates cell with an in/out-of-period indicator. Called whenever
@@ -1916,7 +1864,7 @@
                         : (res.organizationId ? String(res.organizationId).trim() : '');
                     renderImportedEncounterCell(row);
                     updateImportedSummary();
-                    syncNhsnOrganizationFromUploadedPatients();
+        
                 }
             } catch (err) {
                 showError('Classification failed: ' + (err.message || 'Unknown error'));
@@ -2069,7 +2017,7 @@
 
         importedRows.addEventListener('click', function (e) {
             var rm = e.target.closest('.btn-remove-imported');
-            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); syncNhsnOrganizationFromUploadedPatients(); return; }
+            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); return; }
             var det = e.target.closest('.btn-detect-imported');
             if (det) { classifyImportedRow(det.closest('tr')); return; }
         });
@@ -2132,7 +2080,6 @@
                 // configured; including imported patients here would inflate that fallback.
                 patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
                 patientCohorts: cohorts,
-                nhsnOrganizationId: (document.getElementById('NhsnOrganizationId').value || '').trim(),
                 enableDmrp: document.getElementById('EnableDmrp').checked,
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
@@ -2174,7 +2121,6 @@
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
-            document.getElementById('NhsnOrganizationId').value = (data.nhsnOrganizationId || '').trim() || generateRandomNhsnOrganizationId();
             document.getElementById('EnableDmrp').checked = !!data.enableDmrp;
             var facilityMode = data.facilityConfigurationMode;
             legacyFacilityMode = !facilityMode || facilityMode === 'Unspecified';
@@ -2277,8 +2223,7 @@
             });
             updateImportedSummary();
             syncCount();
-            syncNhsnOrganizationFromUploadedPatients();
-            syncDmrpUi();
+
             syncReportPeriodPolicyUi();
             syncLiveSimulationUi();
             syncMetricsRunUi();
@@ -2328,7 +2273,6 @@
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
-                document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('EnableDmrp').checked = false;
                 legacyFacilityMode = false;
                 legacyPieceIds = null;
@@ -2351,8 +2295,7 @@
                 importedRows.innerHTML = '';
                 updateImportedSummary();
                 syncCount();
-                syncNhsnOrganizationFromUploadedPatients();
-                syncDmrpUi();
+
                 syncReportPeriodPolicyUi();
                 syncLiveSimulationUi();
                 syncMetricsRunUi();
@@ -2385,13 +2328,6 @@
 
             if (model.facilityConfigurationMode === 'AlaCarte' && !model.queryPlanTemplateId) {
                 markFieldError('QueryPlanTemplate', 'Ala carte needs a query plan.');
-                valid = false;
-            }
-
-            if (model.enableDmrp && !(model.nhsnOrganizationId || '').trim()) {
-                markFieldError(
-                    'NhsnOrganizationId',
-                    'NHSN Organization ID is required when DMRP is enabled.');
                 valid = false;
             }
 

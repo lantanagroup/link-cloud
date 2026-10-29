@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -25,11 +26,11 @@ internal static class PipelineAbortSkip
         if (!await abortRegistry.IsAbortedAsync(facilityId, reportId, cancellationToken))
             return false;
 
-        logger.LogDebug(
-            "{Listener}: Skipping aborted pipeline FacilityId={FacilityId}, ReportId={ReportId}.",
+        logger.LogInformation(
+            "{Listener}: Skipping aborted pipeline FacilityId={FacilityId}, ReportId={ReportId}. The event is not applied.",
             listenerName,
-            facilityId,
-            reportId);
+            (facilityId ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty).SanitizeForLog(),
+            (reportId ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty).SanitizeForLog());
         return true;
     }
 }

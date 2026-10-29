@@ -63,9 +63,6 @@ public class ScenariosController(
         if (model.TestRailCaseId is <= 0)
             return BadRequest("TestRail case id must be a positive integer.");
 
-        if (model.EnableDmrp && string.IsNullOrWhiteSpace(model.NhsnOrganizationId))
-            return BadRequest("NHSN Organization ID is required when DMRP is enabled.");
-
         var existing = await scenarioStore.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystemScenario: true })
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
@@ -120,10 +117,6 @@ public class ScenariosController(
         if (importValidation != null)
             return BadRequest(importValidation);
 
-        model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
-            ? GenerateRandomNhsnOrganizationId()
-            : model.NhsnOrganizationId.Trim();
-        
         model.UpdatedAt = DateTimeOffset.UtcNow;
         if (model.SelectedMeasureIds.Count > 0)
         {
@@ -650,7 +643,6 @@ public class ScenariosController(
             SelectedMeasureIds = [.. source.SelectedMeasureIds],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
-            NhsnOrganizationId = source.NhsnOrganizationId,
             EnableDmrp = source.EnableDmrp,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
@@ -721,11 +713,6 @@ public class ScenariosController(
         var bytes = Encoding.UTF8.GetBytes(json);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
-    }
-
-    private static string GenerateRandomNhsnOrganizationId()
-    {
-        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private async Task<(bool? Exists, string? WarningMessage)> TryCheckPatientExistsAsync(

@@ -290,7 +290,7 @@ internal sealed class RunExecutor
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
-            output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
+            output.WriteLine($"NHSN Organization ID: {RequireOrganizationId(state)}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
             output.WriteLine("FHIR generator: Thetis Engine");
@@ -304,8 +304,9 @@ internal sealed class RunExecutor
             {
                 ValidateDmrpScenario(state.Options);
 
+                var organizationId = RequireOrganizationId(state);
                 var reachable = await mockDmrpClient!.SearchEntriesAsync(
-                    facilityId: state.Options.NhsnOrganizationId,
+                    facilityId: organizationId,
                     pageSize: 1,
                     cancellationToken: cancellationToken);
 
@@ -318,7 +319,7 @@ internal sealed class RunExecutor
 
                 output.WriteLine(
                     $"MockDmrpApi reachable for NHSN Organization ID " +
-                    $"'{state.Options.NhsnOrganizationId}'.");
+                    $"'{organizationId}'.");
             }
 
             List<string> patientIds;
@@ -513,22 +514,16 @@ internal sealed class RunExecutor
                 throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
             var measureId = measureIds[0];
 
-            var facilityId = state.Options.EnableDmrp
-                ? state.Options.NhsnOrganizationId
-                : state.RunId.ToString();
-
-            if (string.IsNullOrWhiteSpace(facilityId))
-            {
-                throw new InvalidOperationException(
-                    "A facility ID could not be resolved for this Automation run.");
-            }
-
+            // The facility id and the NHSN organization id are the id allocated at
+            // start. A numeric-only id is not one an existing facility or an ongoing
+            // run already uses.
+            var facilityId = RequireOrganizationId(state);
             state.FacilityId = facilityId;
             var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
 
             // Success-path quiesce sets the facility abort while it still holds this gate.
-            // Clear only after this run owns the facility, so a second DMRP run cannot
-            // drop that flag out from under the run that is still quiescing.
+            // Clear only after this run owns the facility, so another caller for the same
+            // facility id cannot drop that flag while this run is still quiescing.
             using var facilitySetupLock = await AcquireFacilityAndClearStaleAbortAsync(
                 facilityId,
                 abortRegistry,
@@ -889,6 +884,7 @@ internal sealed class RunExecutor
                         generationConfig,
                         generationRequirementsPlan,
                         acquisitionSimulation,
+                        abortRegistry,
                         ct),
                     cancellationToken);
 
@@ -919,6 +915,7 @@ internal sealed class RunExecutor
                         scenarioConfig,
                         patientIds,
                         profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                        abortRegistry,
                         ct),
                     cancellationToken);
 
@@ -1522,20 +1519,21 @@ internal sealed class RunExecutor
         }
         finally
         {
+            var organizationId = AllocatedOrganizationId(state);
             if (cleanupMockDmrpEntries &&
                 mockDmrpClientForCleanup != null &&
-                !string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
+                !string.IsNullOrWhiteSpace(organizationId))
             {
                 try
                 {
                     await DeleteMockDmrpEntriesAsync(
                         mockDmrpClientForCleanup,
-                        state.Options.NhsnOrganizationId,
+                        organizationId,
                         CancellationToken.None);
 
                     output.WriteLine(
                         $"MockDmrpApi enrollment cleanup complete for NHSN Organization ID " +
-                        $"'{state.Options.NhsnOrganizationId}'.");
+                        $"'{organizationId}'.");
                 }
                 catch (Exception ex)
                 {
@@ -1543,11 +1541,11 @@ internal sealed class RunExecutor
                     _logger.LogWarning(
                         ex,
                         "Failed to clean up MockDmrpApi entries for NHSN Organization ID {NhsnOrganizationId}",
-                        state.Options.NhsnOrganizationId);
+                        organizationId.SanitizeForLog());
 
                     output.WriteLine(
                         $"WARNING: MockDmrpApi cleanup failed for " +
-                        $"'{state.Options.NhsnOrganizationId}': {ex.Message}");
+                        $"'{organizationId}': {ex.Message}");
                 }
             }
 
@@ -1715,7 +1713,7 @@ internal sealed class RunExecutor
                     state.Options.BenchmarkKey,
                     state.Options.IsMetricsRun,
                     AutomationRunStatus.Succeeded.ToString(),
-                    state.FacilityId ?? state.RunId.ToString(),
+                    AllocatedOrganizationId(state) ?? string.Empty,
                     state.ReportId ?? string.Empty,
                     state.StartedAt ?? state.CreatedAt,
                     state.FinishedAt ?? DateTimeOffset.UtcNow,
@@ -1942,9 +1940,32 @@ internal sealed class RunExecutor
     }
 
     /// <summary>
-    /// A previous run quiesces the facility id for the abort TTL. DMRP runs reuse the
-    /// NHSN org id, so that flag is still set when the next run schedules a report and
-    /// Report then drops the ReportScheduled event. Report-id flags are left in place.
+    /// The id allocated at start. Empty when this state was built without one,
+    /// which only happens outside <see cref="AutomationRunManager"/>.
+    /// </summary>
+    private static string? AllocatedOrganizationId(MutableRunState state)
+    {
+        if (!string.IsNullOrWhiteSpace(state.FacilityId))
+            return state.FacilityId;
+        if (!string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
+            return state.Options.NhsnOrganizationId;
+        return null;
+    }
+
+    private static string RequireOrganizationId(MutableRunState state)
+    {
+        var organizationId = AllocatedOrganizationId(state);
+        if (!string.IsNullOrWhiteSpace(organizationId))
+            return organizationId;
+
+        throw new InvalidOperationException(
+            "This run has no NHSN organization id. Start allocates one before execution.");
+    }
+
+    /// <summary>
+    /// A previous run quiesces its facility id for the abort TTL. Clear that flag
+    /// for this run's facility so Report does not drop the ReportScheduled event.
+    /// Report-id flags are left in place.
     /// </summary>
     internal static async Task ClearStaleFacilityAbortAsync(
         IPipelineAbortRegistry? abortRegistry,
@@ -1983,6 +2004,7 @@ internal sealed class RunExecutor
         TestScenarioConfig scenarioConfig,
         IReadOnlyList<string> patientIds,
         IReadOnlyList<PatientProfile> profiles,
+        IPipelineAbortRegistry? abortRegistry,
         CancellationToken cancellationToken)
     {
         var scheduled = await StartAndReconcileScheduledReportAsync(
@@ -1992,6 +2014,7 @@ internal sealed class RunExecutor
             measureIds,
             selectedMeasures,
             scenarioConfig,
+            abortRegistry,
             cancellationToken);
 
         var reportTrackingId = scheduled.ReportTrackingId;
@@ -2090,6 +2113,7 @@ internal sealed class RunExecutor
         IReadOnlyList<string> measureIds,
         IReadOnlyList<ProfiledMeasureType> selectedMeasures,
         TestScenarioConfig scenarioConfig,
+        IPipelineAbortRegistry? abortRegistry,
         CancellationToken cancellationToken)
     {
         var window = DeriveScheduledReportWindow(scenarioConfig);
@@ -2109,7 +2133,11 @@ internal sealed class RunExecutor
         // The ReportScheduled event is processed asynchronously, so the schedule record is not
         // committed the instant StartScheduledReportAsync returns. Block until Report has persisted
         // it: otherwise census PatientEvents can reach Report before the schedule exists.
-        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
+        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(
+            reportTrackingId,
+            cancellationToken: cancellationToken,
+            facilityId: facilityId,
+            abortRegistry: abortRegistry);
 
         var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
         var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
@@ -2134,6 +2162,7 @@ internal sealed class RunExecutor
         FhirGenerationConfig? generationConfig,
         GenerationRequirementsPlan? generationRequirementsPlan,
         FhirGenerationPipeline.AcquisitionSimulationConfig? acquisitionSimulation,
+        IPipelineAbortRegistry? abortRegistry,
         CancellationToken cancellationToken)
     {
         var scheduled = await StartAndReconcileScheduledReportAsync(
@@ -2143,6 +2172,7 @@ internal sealed class RunExecutor
             measureIds,
             state.Options.SelectedMeasures,
             scenarioConfig,
+            abortRegistry,
             cancellationToken);
         var reportTrackingId = scheduled.ReportTrackingId;
 

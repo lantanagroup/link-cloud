@@ -4,6 +4,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -191,7 +192,9 @@ public class ReportApiHelper
     public async Task<ReportScheduleApiModel> WaitForScheduledReportAsync(
         string reportTrackingId,
         TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? facilityId = null,
+        IPipelineAbortRegistry? abortRegistry = null)
     {
         if (!Guid.TryParse(reportTrackingId, out _))
             throw new ArgumentException("reportTrackingId must be a valid Guid.", nameof(reportTrackingId));
@@ -222,8 +225,33 @@ public class ReportApiHelper
             await Task.Delay(pollingInterval, cancellationToken);
         }
 
+        bool? facilityAborted = null;
+        if (abortRegistry != null && !string.IsNullOrWhiteSpace(facilityId))
+        {
+            try
+            {
+                facilityAborted = await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"Could not read the facility abort flag: {ex.Message}");
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         throw new TimeoutException(
-            DescribeScheduledReportNotPersisted(reportTrackingId, effectiveTimeout, lastStatusCode, lastBody));
+            DescribeScheduledReportNotPersisted(
+                reportTrackingId,
+                effectiveTimeout,
+                lastStatusCode,
+                lastBody,
+                facilityId,
+                facilityAborted));
     }
 
     /// <summary>
@@ -234,14 +262,26 @@ public class ReportApiHelper
         string reportTrackingId,
         TimeSpan timeout,
         int? lastStatusCode,
-        string? lastBody)
+        string? lastBody,
+        string? facilityId = null,
+        bool? facilityAborted = null)
     {
         var status = lastStatusCode.HasValue ? $"HTTP {lastStatusCode.Value}" : "no response";
         var detail = SummarizeLookupBody(lastBody);
         var bodyClause = string.IsNullOrEmpty(detail) ? string.Empty : $" Response: {detail}.";
+        var safeFacility = string.IsNullOrWhiteSpace(facilityId)
+            ? "the facility"
+            : HtmlInputSanitizer.Sanitize(facilityId.Trim());
+
+        var abortClause = facilityAborted switch
+        {
+            true => $" Facility '{safeFacility}' is still aborted, so ReportScheduledListener skips the ReportScheduled event and does not store the schedule.",
+            false => " The facility abort flag was not set when the wait ended.",
+            _ => string.Empty
+        };
 
         return
-            $"Scheduled report {reportTrackingId} was not persisted within {timeout.TotalSeconds:F0}s. " +
+            $"Scheduled report {reportTrackingId} was not persisted within {timeout.TotalSeconds:F0}s.{abortClause} " +
             "Census snapshots were not published to avoid a 'No Scheduled Reports found' race. " +
             $"Checked GET /api/schedules/{reportTrackingId}; last response was {status}.{bodyClause} " +
             "The Report service creates that row when it consumes the ReportScheduled event. " +

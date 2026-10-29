@@ -91,7 +91,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             Mock.Of<IPatientConfigurationStore>(),
             measureTemplateStore ?? Mock.Of<IMeasureTemplateStore>(),
             Mock.Of<IFacilityTemplateStore>(),
-            testRailPublisher ?? new NoOpTestRailPublisher());
+            testRailPublisher ?? new NoOpTestRailPublisher(),
+            Options.Create(new FacilityIdFormatSettings()));
     }
 
     private static IHubContext<RunHub> CreateHub()
