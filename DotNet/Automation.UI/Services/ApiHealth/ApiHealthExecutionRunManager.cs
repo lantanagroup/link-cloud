@@ -5,6 +5,7 @@ using Automation.UI.Services.ApiHealth.Seeding;
 using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Shared.Application.Models;
+using Automation.UI.Services.TestRail;
 
 namespace Automation.UI.Services.ApiHealth;
 
@@ -15,6 +16,7 @@ public sealed class ApiHealthExecutionRunManager(
     IApiHealthRunStore store,
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
+    ITestRailPublisher testRailPublisher,
     ILogger<ApiHealthExecutionRunManager> logger)
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
@@ -214,7 +216,6 @@ public sealed class ApiHealthExecutionRunManager(
                 var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
                 await CompleteAsync(run, failed: true, error);
-                AddDone(run);
                 return;
             }
 
@@ -254,21 +255,18 @@ public sealed class ApiHealthExecutionRunManager(
             {
                 const string cancellationMessage = "ApiHealthScenario seed run was cancelled. Aborting API Health run.";
                 await AddPhaseAsync(run, "Failed", cancellationMessage, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                await CompleteAsync(run, failed: true, cancellationMessage);
-                AddDone(run);
+                await CompleteAsync(run, failed: true, cancellationMessage, cancelled: true);
                 return;
             }
 
             await AddPhaseAsync(run, "Done", "Service run complete");
             await CompleteAsync(run, failed: false, null);
-            AddDone(run);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health service run failed unexpectedly. RunId={RunId}", run.RunId);
             await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
             await CompleteAsync(run, failed: true, SanitizedInternalError);
-            AddDone(run);
         }
     }
 
@@ -289,7 +287,6 @@ public sealed class ApiHealthExecutionRunManager(
                 var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
                 await CompleteAsync(run, failed: true, error);
-                AddDone(run);
                 return;
             }
 
@@ -329,21 +326,18 @@ public sealed class ApiHealthExecutionRunManager(
             {
                 const string cancellationMessage = "ApiHealthScenario seed run was cancelled. Aborting API Health run.";
                 await AddPhaseAsync(run, "Failed", cancellationMessage, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                await CompleteAsync(run, failed: true, cancellationMessage);
-                AddDone(run);
+                await CompleteAsync(run, failed: true, cancellationMessage, cancelled: true);
                 return;
             }
 
             await AddPhaseAsync(run, "Done", "Run all complete");
             await CompleteAsync(run, failed: false, null);
-            AddDone(run);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health run-all failed unexpectedly. RunId={RunId}", run.RunId);
             await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
             await CompleteAsync(run, failed: true, SanitizedInternalError);
-            AddDone(run);
         }
     }
 
@@ -674,7 +668,7 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
-    private async Task CompleteAsync(RunState run, bool failed, string? error)
+    private async Task CompleteAsync(RunState run, bool failed, string? error, bool cancelled = false)
     {
         run.Completed = true;
         run.Failed = failed;
@@ -695,6 +689,28 @@ public sealed class ApiHealthExecutionRunManager(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to persist completion status for API Health run {RunId}.", run.RunId);
+        }
+
+        // The stream's done event is the run finishing, not TestRail accepting the results.
+        AddDone(run);
+
+        try
+        {
+            await testRailPublisher.PublishApiHealthRunAsync(new ApiHealthTestRailPublishRequest
+            {
+                RunId = run.RunId,
+                Scope = run.Scope,
+                ServiceName = run.ServiceName,
+                Failed = failed,
+                Cancelled = cancelled,
+                Error = error,
+                StartedAt = run.StartedAt,
+                FinishedAt = finishedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "TestRail publish failed for API Health run {RunId}.", run.RunId);
         }
 
         PruneCompletedRuns();

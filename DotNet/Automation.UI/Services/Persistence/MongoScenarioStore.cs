@@ -396,6 +396,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             Id = model.Id,
             Name = model.Name,
             Description = model.Description,
+            TestRailCaseId = model.TestRailCaseId,
             IsSystemScenario = model.IsSystemScenario,
             FacilityConfigurationMode = model.FacilityConfigurationMode.ToString(),
             FacilityTemplateId = model.FacilityTemplateId,
@@ -437,6 +438,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             Id = doc.Id,
             Name = doc.Name,
             Description = doc.Description,
+            TestRailCaseId = doc.TestRailCaseId,
             IsSystemScenario = doc.IsSystemScenario,
             FacilityConfigurationMode = Enum.TryParse<FacilityConfigurationMode>(doc.FacilityConfigurationMode, true, out var facilityMode)
                 ? facilityMode

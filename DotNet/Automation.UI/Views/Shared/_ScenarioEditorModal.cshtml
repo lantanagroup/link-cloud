@@ -72,6 +72,11 @@
                             <textarea class="form-control" id="ScenarioDescription" maxlength="500" rows="2"></textarea>
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label" for="TestRailCaseId">TestRail case</label>
+                            <input class="form-control" id="TestRailCaseId" maxlength="16" inputmode="text" autocomplete="off" placeholder="Optional" />
+                            <div class="form-text">Optional. Enter a case id such as 123 or C123.</div>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label" for="ReportMethod">Report Method</label>
                             <select class="form-select" id="ReportMethod">
                                 <option value="Adhoc">Adhoc</option>
@@ -455,10 +460,15 @@
     .au-cohort-table-wrap {
         overflow: visible;
     }
+    /* The wrapper is not clipped (row dropdowns open past it), so the table must fit its width. */
+    .au-cohort-table-wrap .au-cohort-table {
+        min-width: 0;
+    }
 </style>
 
 <script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script src="~/js/patient-configuration-editor.js" asp-append-version="true"></script>
+<script src="~/js/testrail-case-id.js" asp-append-version="true"></script>
 <script>
     (function () {
         var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
@@ -2118,6 +2128,7 @@
                 id: idInput.value || null,
                 name: document.getElementById('ScenarioName').value,
                 description: document.getElementById('ScenarioDescription').value,
+                testRailCaseId: parseTestRailCaseId(document.getElementById('TestRailCaseId').value).id,
                 isSystemScenario: false,
                 reportMethod: document.getElementById('ReportMethod').value,
                 selectedMeasures: selectedMeasureTypes(),
@@ -2158,6 +2169,7 @@
             isSystemInput.value = data.isSystemScenario ? 'true' : 'false';
             document.getElementById('ScenarioName').value = data.name || '';
             document.getElementById('ScenarioDescription').value = data.description || '';
+            document.getElementById('TestRailCaseId').value = data.testRailCaseId != null ? String(data.testRailCaseId) : '';
             document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
             document.getElementById('IsLiveSimulation').checked = !!data.isLiveSimulation;
             document.getElementById('ReportingWindowMinutes').value = String(data.reportingWindowMinutes || 10);
@@ -2314,6 +2326,7 @@
                 setEditable(true);
                 document.getElementById('ScenarioName').value = '';
                 document.getElementById('ScenarioDescription').value = '';
+                document.getElementById('TestRailCaseId').value = '';
                 document.getElementById('ReportMethod').value = 'Adhoc';
                 document.getElementById('IsLiveSimulation').checked = false;
                 document.getElementById('ReportingWindowMinutes').value = '10';
@@ -2372,6 +2385,14 @@
             if (!(model.name || '').trim()) {
                 markFieldError('ScenarioName', 'Name is required.');
                 valid = false;
+            }
+
+            var caseParsed = parseTestRailCaseId(document.getElementById('TestRailCaseId').value);
+            if (!caseParsed.ok) {
+                markFieldError('TestRailCaseId', 'TestRail case id must be a positive integer, such as 123 or C123.');
+                valid = false;
+            } else {
+                model.testRailCaseId = caseParsed.id;
             }
 
             if (model.facilityConfigurationMode === 'AlaCarte' && !model.queryPlanTemplateId) {

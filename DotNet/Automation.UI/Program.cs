@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Services;
+using Automation.UI.Services.TestRail;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Normalization.Engine;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -286,6 +287,20 @@ builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
 builder.Services.AddHostedService<PatientBundleExternalizationMigrationService>();
 builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
+// Read by TestRailOptionsBinder rather than the default binder so a malformed value turns
+// publishing off with a startup warning instead of stopping the service.
+builder.Services.AddOptions<TestRailOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+        TestRailOptionsBinder.Bind(configuration.GetSection(TestRailOptions.SectionName), options));
+builder.Services.AddHttpClient("TestRail", (sp, client) =>
+{
+    var configured = sp.GetRequiredService<IOptions<TestRailOptions>>().Value.RequestTimeoutSeconds;
+    var seconds = configured > 0 ? configured : TestRailOptions.DefaultRequestTimeoutSeconds;
+    client.Timeout = TimeSpan.FromSeconds(seconds);
+});
+builder.Services.AddSingleton<ITestRailApiClient, TestRailApiClient>();
+builder.Services.AddSingleton<ITestRailPublisher, TestRailPublisher>();
+builder.Services.AddHostedService<TestRailStartupCheckService>();
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -392,6 +407,8 @@ builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
 var app = builder.Build();
+
+TestRailStartupReport.Log(app.Logger, app.Services.GetRequiredService<IOptions<TestRailOptions>>().Value);
 
 // -- Ensure MongoDB indexes (Cosmos DB compatible) --
 app.Services.GetRequiredService<MongoIndexManager>().EnsureAllIndexes();
