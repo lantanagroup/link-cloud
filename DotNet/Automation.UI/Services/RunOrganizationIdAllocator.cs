@@ -4,7 +4,8 @@ namespace Automation.UI.Services;
 
 /// <summary>
 /// Draws the five-digit id one run uses as both its facility id and its NHSN
-/// organization id. The caller supplies ids ongoing runs already hold.
+/// organization id. The caller supplies ids that are already taken: facilities
+/// that exist in Tenant, and ids ongoing runs already hold.
 /// </summary>
 internal static class RunOrganizationIdAllocator
 {
@@ -13,19 +14,20 @@ internal static class RunOrganizationIdAllocator
     public const int MaxAttempts = 64;
 
     /// <summary>
-    /// The run id when numeric-only facility ids are off. A five-digit id that no
-    /// ongoing run is using when they are on.
+    /// The run id when numeric-only facility ids are off. A five-digit id that is
+    /// not in <paramref name="takenOrganizationIds"/> when they are on. That range
+    /// is 10000 through 99999, which satisfies Tenant's numeric facility id rule.
     /// </summary>
     public static string Choose(
         bool numericOnlyFacilityId,
         Guid runId,
-        IReadOnlySet<string> ongoingOrganizationIds,
+        IReadOnlySet<string> takenOrganizationIds,
         Func<int, int, int>? next = null)
     {
         if (!numericOnlyFacilityId)
             return runId.ToString();
 
-        return Allocate(ongoingOrganizationIds, next);
+        return Allocate(takenOrganizationIds, next);
     }
 
     public static string Allocate(IReadOnlySet<string> inUse, Func<int, int, int>? next = null)
@@ -44,7 +46,26 @@ internal static class RunOrganizationIdAllocator
         }
 
         throw new InvalidOperationException(
-            "Could not allocate a five-digit NHSN organization id that no ongoing run is using.");
+            "Could not allocate a five-digit NHSN organization id that no existing facility or ongoing run is using.");
+    }
+
+    /// <summary>
+    /// Adds facility ids Tenant already has. Blank ids are ignored. The same set
+    /// still holds ongoing runs from <see cref="CollectInUse"/>.
+    /// </summary>
+    public static HashSet<string> WithExistingFacilities(
+        HashSet<string> inUse,
+        IEnumerable<string> existingFacilityIds)
+    {
+        ArgumentNullException.ThrowIfNull(inUse);
+        ArgumentNullException.ThrowIfNull(existingFacilityIds);
+        foreach (var facilityId in existingFacilityIds)
+        {
+            if (!string.IsNullOrWhiteSpace(facilityId))
+                inUse.Add(facilityId);
+        }
+
+        return inUse;
     }
 
     public static HashSet<string> CollectInUse(

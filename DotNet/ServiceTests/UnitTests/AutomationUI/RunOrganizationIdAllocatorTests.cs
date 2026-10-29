@@ -1,5 +1,7 @@
 using Automation.UI.Services;
 using FluentAssertions;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Sdk.ApiClient;
 using Microsoft.Extensions.Configuration;
 
 namespace UnitTests.AutomationUI;
@@ -37,7 +39,7 @@ public class RunOrganizationIdAllocatorTests
         var act = () => RunOrganizationIdAllocator.Allocate(inUse, (_, _) => 10_000);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*ongoing run*");
+            .WithMessage("*existing facility or ongoing run*");
     }
 
     [Fact]
@@ -77,6 +79,62 @@ public class RunOrganizationIdAllocatorTests
         var id = RunOrganizationIdAllocator.Choose(numericOnlyFacilityId: false, runId, inUse, (_, _) => 10_000);
 
         id.Should().Be(runId.ToString());
+    }
+
+    [Fact]
+    public void Choose_skips_a_facility_that_already_exists()
+    {
+        var existing = RunCleanupHelper.RequireFacilityList(new LinkApiResponse<Dictionary<string, string>>
+        {
+            StatusCode = 200,
+            Body = new Dictionary<string, string> { ["10000"] = "General Hospital" }
+        });
+        var taken = RunOrganizationIdAllocator.WithExistingFacilities(
+            new HashSet<string>(StringComparer.Ordinal),
+            existing.Keys);
+        var draws = new Queue<int>([10_000, 22_222]);
+
+        var id = RunOrganizationIdAllocator.Choose(
+            numericOnlyFacilityId: true,
+            Guid.NewGuid(),
+            taken,
+            (_, _) => draws.Dequeue());
+
+        id.Should().Be("22222");
+    }
+
+    [Fact]
+    public void WithExistingFacilities_keeps_an_ongoing_id_and_ignores_a_blank_facility_id()
+    {
+        var taken = RunOrganizationIdAllocator.CollectInUse(
+        [
+            ("10001", null, Ongoing: true),
+            ("48291", "48291", Ongoing: false)
+        ]);
+
+        RunOrganizationIdAllocator.WithExistingFacilities(taken, ["48291", " ", ""]);
+
+        taken.Should().BeEquivalentTo(["10001", "48291"]);
+    }
+
+    [Fact]
+    public void An_empty_tenant_list_adds_nothing()
+    {
+        var existing = RunCleanupHelper.RequireFacilityList(new LinkApiResponse<Dictionary<string, string>>
+        {
+            StatusCode = 204
+        });
+        var taken = RunOrganizationIdAllocator.WithExistingFacilities(
+            new HashSet<string>(StringComparer.Ordinal),
+            existing.Keys);
+
+        var id = RunOrganizationIdAllocator.Choose(
+            numericOnlyFacilityId: true,
+            Guid.NewGuid(),
+            taken,
+            (_, _) => 10_000);
+
+        id.Should().Be("10000");
     }
 
     [Fact]

@@ -515,7 +515,8 @@ internal sealed class RunExecutor
             var measureId = measureIds[0];
 
             // The facility id and the NHSN organization id are the id allocated at
-            // start. Two ongoing numeric-only runs never share a five-digit id.
+            // start. A numeric-only id is not one an existing facility or an ongoing
+            // run already uses.
             var facilityId = RequireOrganizationId(state);
             state.FacilityId = facilityId;
             var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
@@ -1958,7 +1959,7 @@ internal sealed class RunExecutor
             return organizationId;
 
         throw new InvalidOperationException(
-            "This run has no NHSN organization id. Start allocates a five-digit id before execution.");
+            "This run has no NHSN organization id. Start allocates one before execution.");
     }
 
     /// <summary>

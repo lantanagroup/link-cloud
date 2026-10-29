@@ -109,13 +109,13 @@ public class AutomationRunManager : IAutomationRunManager
             await _organizationIdGate.WaitAsync(cancellationToken);
         try
         {
-            var ongoing = _numericOnlyFacilityId
-                ? await OngoingOrganizationIdsAsync(cancellationToken)
+            var taken = _numericOnlyFacilityId
+                ? await TakenOrganizationIdsAsync(cancellationToken)
                 : new HashSet<string>(StringComparer.Ordinal);
             var organizationId = RunOrganizationIdAllocator.Choose(
                 _numericOnlyFacilityId,
                 runId,
-                ongoing);
+                taken);
             options = options with { NhsnOrganizationId = organizationId };
             StampRunOrganizationId(request, organizationId);
 
@@ -172,7 +172,7 @@ public class AutomationRunManager : IAutomationRunManager
         return runId;
     }
 
-    private async Task<HashSet<string>> OngoingOrganizationIdsAsync(CancellationToken cancellationToken)
+    private async Task<HashSet<string>> TakenOrganizationIdsAsync(CancellationToken cancellationToken)
     {
         var ongoing = new List<(string? FacilityId, string? OrganizationId, bool Ongoing)>();
         foreach (var state in _runs.Values)
@@ -186,7 +186,18 @@ public class AutomationRunManager : IAutomationRunManager
         foreach (var facilityId in await _snapshotStore.GetOngoingFacilityIdsAsync(cancellationToken))
             ongoing.Add((facilityId, null, true));
 
-        return RunOrganizationIdAllocator.CollectInUse(ongoing);
+        var taken = RunOrganizationIdAllocator.CollectInUse(ongoing);
+
+        // Create still rejects a soft-deleted row, and the default list hides those.
+        // CheckFacilityExistsAsync is not this check: it reports 200 without calling
+        // Tenant when CheckIfTenantExists is off.
+        using var scope = _hostServices.CreateScope();
+        var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();
+        var response = await facilityClient.GetFacilityListAsync(
+            includeDeleted: true,
+            cancellationToken: cancellationToken);
+        var existing = RunCleanupHelper.RequireFacilityList(response);
+        return RunOrganizationIdAllocator.WithExistingFacilities(taken, existing.Keys);
     }
 
     /// <summary>
