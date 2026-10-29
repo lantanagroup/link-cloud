@@ -403,6 +403,9 @@ public class ApiHealthExecutionRunManagerTests
 
         var runId = await manager.StartServiceAsync(TestServiceName);
         await WaitForCompletionAsync(manager, runId);
+        // Completed is set before the publisher is called, so the callback can land after the run looks finished.
+        for (var attempt = 0; captured is null && attempt < 100; attempt++)
+            await Task.Delay(10);
 
         captured.Should().NotBeNull();
         captured!.RunId.Should().Be(runId);
