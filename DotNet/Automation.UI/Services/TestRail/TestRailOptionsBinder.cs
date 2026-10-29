@@ -51,7 +51,6 @@ public static class TestRailOptionsBinder
         options.UseSharedRun = ReadBool(section, nameof(TestRailOptions.UseSharedRun), false, problems);
         options.SharedScenarioRunId = ReadRunId(section, nameof(TestRailOptions.SharedScenarioRunId), problems);
         options.SharedApiHealthRunId = ReadRunId(section, nameof(TestRailOptions.SharedApiHealthRunId), problems);
-        options.SkipStatusId = ReadInt(section, nameof(TestRailOptions.SkipStatusId), problems) ?? 0;
 
         options.ScenarioCaseIds = ReadCaseMap(section, nameof(TestRailOptions.ScenarioCaseIds), problems);
         options.ApiHealthCaseIds = ReadCaseMap(section, nameof(TestRailOptions.ApiHealthCaseIds), problems);

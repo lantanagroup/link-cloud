@@ -606,17 +606,17 @@ services:
       required: false
       sensitive: true
     - key: "Automation:TestRail:ProjectId"
-      description: "TestRail project that receives Automation.UI results: the numeric id (12 or P12) or the exact project name. A name is looked up in TestRail on first use. Blank or zero leaves publishing off."
+      description: "TestRail project that receives Automation.UI results: the numeric id (12 or P12) or the exact project name. A name is looked up in TestRail on first use. The shipped default is the project name NHSNLink 2.0. Blank or zero leaves publishing off."
       required: false
-      defaultValue: "0"
+      defaultValue: "NHSNLink 2.0"
     - key: "Automation:TestRail:ScenarioSuiteId"
-      description: "TestRail suite for scenario runs: the numeric id (34 or S34) or the exact suite name in the project. Blank or zero skips scenario publishing; the startup check then logs the project's suites."
+      description: "TestRail suite for scenario runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134. Blank or zero skips scenario publishing; the startup check then logs the project's suites."
       required: false
-      defaultValue: "0"
+      defaultValue: "134"
     - key: "Automation:TestRail:ApiHealthSuiteId"
-      description: "TestRail suite for API Health runs: the numeric id (34 or S34) or the exact suite name in the project. Blank or zero skips API Health publishing; the startup check then logs the project's suites."
+      description: "TestRail suite for API Health runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134, the same suite as scenario runs. Blank or zero skips API Health publishing; the startup check then logs the project's suites."
       required: false
-      defaultValue: "0"
+      defaultValue: "134"
     - key: "Automation:TestRail:RequestTimeoutSeconds"
       description: "HTTP timeout in seconds for each TestRail API call. Values below 1 use 15 seconds."
       required: false
@@ -626,15 +626,13 @@ services:
       required: false
       defaultValue: "false"
     - key: "Automation:TestRail:SharedScenarioRunId"
-      description: "Existing TestRail run id reused for scenario results when UseSharedRun is true. Unset creates a run on first publish and keeps it in memory for the process."
+      description: "Existing TestRail run id reused for scenario results when UseSharedRun is true. Blank creates a run on first publish and keeps it in memory for the process. 123 or R123 selects an existing run."
       required: false
+      defaultValue: ""
     - key: "Automation:TestRail:SharedApiHealthRunId"
-      description: "Existing TestRail run id reused for API Health results when UseSharedRun is true. Unset creates a run on first publish and keeps it in memory for the process."
+      description: "Existing TestRail run id reused for API Health results when UseSharedRun is true. Blank creates a run on first publish and keeps it in memory for the process. 123 or R123 selects an existing run."
       required: false
-    - key: "Automation:TestRail:SkipStatusId"
-      description: "Unused. Skipped API Health results are not posted to TestRail."
-      required: false
-      defaultValue: "0"
+      defaultValue: ""
     - key: "Automation:TestRail:ScenarioCaseIds"
       description: "Optional map of scenario id or scenario name to a TestRail case id. The case id saved on the scenario is the source of truth and wins over this map. The automation run name is not a key."
       required: false

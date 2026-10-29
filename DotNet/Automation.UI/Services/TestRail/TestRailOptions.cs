@@ -48,8 +48,6 @@ public sealed class TestRailOptions
 
     public int? SharedApiHealthRunId { get; set; }
 
-    public int SkipStatusId { get; set; }
-
     public Dictionary<string, int> ScenarioCaseIds { get; set; } = new();
 
     public Dictionary<string, int> ApiHealthCaseIds { get; set; } = new();
