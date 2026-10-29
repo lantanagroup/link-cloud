@@ -97,7 +97,8 @@ public class AutomationRunManager : IAutomationRunManager
             resolved,
             _patientConfigurationStore,
             cancellationToken);
-        options = await ApplyUniqueNhsnOrganizationIdAsync(request, options, cancellationToken);
+        options = options with { NhsnOrganizationId = runId.ToString() };
+        StampRunOrganizationId(request, runId.ToString());
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
@@ -144,77 +145,32 @@ public class AutomationRunManager : IAutomationRunManager
     }
 
     /// <summary>
-    /// System runs and anything still holding a shared default get a new id.
-    /// A user scenario keeps the id it already owns.
+    /// Records the run's organization id on the input snapshot. The run id is
+    /// that value. A scenario cannot supply a different one.
     /// </summary>
-    private async Task<ResolvedRunOptions> ApplyUniqueNhsnOrganizationIdAsync(
-        StartScenarioRequest request,
-        ResolvedRunOptions options,
-        CancellationToken cancellationToken)
+    private static void StampRunOrganizationId(StartScenarioRequest request, string organizationId)
     {
-        var store = _hostServices.GetService<IScenarioStore>();
-        TestScenarioDefinition? scenario = null;
-        if (request.ScenarioId is Guid scenarioId && store != null)
-            scenario = await store.GetByIdAsync(scenarioId, cancellationToken);
-
-        var systemRun = scenario is { IsSystemScenario: true } || request.Scenario != AutomationScenarioKind.Custom;
-        var replace = systemRun || NhsnOrganizationIdAllocator.ShouldReplace(options.NhsnOrganizationId);
-        if (!replace)
-            return options;
-
-        var taken = new List<string>();
-        if (store != null)
+        JsonObject obj;
+        if (string.IsNullOrWhiteSpace(request.RunConfigurationJson))
         {
-            foreach (var existing in await store.GetAllAsync(cancellationToken))
+            obj = new JsonObject();
+        }
+        else
+        {
+            try
             {
-                if (string.IsNullOrWhiteSpace(existing.NhsnOrganizationId))
-                    continue;
-                if (scenario != null && existing.Id == scenario.Id && !systemRun)
-                    continue;
-                taken.Add(existing.NhsnOrganizationId);
+                if (JsonNode.Parse(request.RunConfigurationJson) is not JsonObject parsed)
+                    return;
+                obj = parsed;
+            }
+            catch (JsonException)
+            {
+                return;
             }
         }
 
-        taken.AddRange(await NhsnOrganizationIdAllocator.FacilityIdsAsync(
-            _hostServices.GetService<IFacilityServiceClient>(),
-            _logger,
-            cancellationToken));
-
-        var fresh = NhsnOrganizationIdAllocator.Allocate(taken);
-        request.NhsnOrganizationId = fresh;
-        StampOrganizationId(request, fresh);
-
-        if (store != null && scenario is { IsSystemScenario: false })
-        {
-            scenario.NhsnOrganizationId = fresh;
-            scenario.UpdatedAt = DateTimeOffset.UtcNow;
-            await store.UpsertAsync(scenario, cancellationToken);
-        }
-
-        _logger.LogInformation(
-            "Run will use NHSN organization id {OrganizationId}.",
-            fresh);
-
-        return options with { NhsnOrganizationId = fresh };
-    }
-
-    private static void StampOrganizationId(StartScenarioRequest request, string organizationId)
-    {
-        if (string.IsNullOrWhiteSpace(request.RunConfigurationJson))
-            return;
-
-        try
-        {
-            if (JsonNode.Parse(request.RunConfigurationJson) is not JsonObject obj)
-                return;
-
-            obj["nhsnOrganizationId"] = organizationId;
-            request.RunConfigurationJson = obj.ToJsonString();
-        }
-        catch (JsonException)
-        {
-            // The typed id on the request is what the run uses.
-        }
+        obj["nhsnOrganizationId"] = organizationId;
+        request.RunConfigurationJson = obj.ToJsonString();
     }
 
     private async Task PersistRunInputAsync(Guid runId, StartScenarioRequest request)

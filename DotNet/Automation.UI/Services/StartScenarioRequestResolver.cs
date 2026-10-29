@@ -38,22 +38,10 @@ public static class StartScenarioRequestResolver
         var defaultMeasures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], [])
-            {
-                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
-            },
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], [])
-            {
-                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
-            },
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], [])
-            {
-                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
-            },
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, CustomMaxPollingDurationMinutes, 30, false, true, defaultMeasures, [], [])
-            {
-                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
-            },
+            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, CustomMaxPollingDurationMinutes, 30, false, true, defaultMeasures, [], []),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 
@@ -120,7 +108,6 @@ public static class StartScenarioRequestResolver
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
 
         var hasImportedPatients = importedIds.Count > 0 || importedBundles.Count > 0;
-        var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
         var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
         var facilityMode = request.FacilityConfigurationMode != FacilityConfigurationMode.Unspecified
             ? request.FacilityConfigurationMode
@@ -188,7 +175,6 @@ public static class StartScenarioRequestResolver
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,
             ReportPeriodEnd = reportEnd,
-            NhsnOrganizationId = nhsnOrganizationId,
             EnableDmrp = enableDmrp,
             IsLiveSimulation = isLiveSimulation,
             ReportingWindowMinutes = reportingWindowMinutes,
@@ -332,33 +318,6 @@ public static class StartScenarioRequestResolver
         {
             return null;
         }
-    }
-
-    private static string ResolveNhsnOrganizationId(StartScenarioRequest request, string defaultValue)
-    {
-        if (!string.IsNullOrWhiteSpace(request.NhsnOrganizationId))
-            return request.NhsnOrganizationId.Trim();
-
-        if (!string.IsNullOrWhiteSpace(request.RunConfigurationJson))
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(request.RunConfigurationJson);
-                if (doc.RootElement.TryGetProperty("nhsnOrganizationId", out var org)
-                    && org.ValueKind == JsonValueKind.String)
-                {
-                    var value = org.GetString();
-                    if (!string.IsNullOrWhiteSpace(value))
-                        return value.Trim();
-                }
-            }
-            catch
-            {
-                // Fall through to default.
-            }
-        }
-
-        return defaultValue;
     }
 
     private static PatientCohortDefinition BuildDefaultCohort(

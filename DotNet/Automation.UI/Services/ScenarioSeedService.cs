@@ -1,8 +1,6 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
-using LantanaGroup.Link.Sdk.Clients;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace Automation.UI.Services;
 
@@ -15,10 +13,6 @@ public sealed class ScenarioSeedService : IHostedService
 {
     private readonly IScenarioStore _store;
     private readonly ILogger<ScenarioSeedService> _logger;
-    private readonly IFacilityServiceClient? _facilityClient;
-
-    /// <summary>Test seam. Production leaves this unset and uses <see cref="Random.Shared"/>.</summary>
-    internal Random? AllocationRandom { get; set; }
 
     // Deterministic IDs so seeding is idempotent.
     private static readonly Guid AdhocReportTestId = new("00000000-0000-0000-0000-000000000001");
@@ -55,12 +49,10 @@ public sealed class ScenarioSeedService : IHostedService
 
     public ScenarioSeedService(
         IScenarioStore store,
-        ILogger<ScenarioSeedService> logger,
-        IFacilityServiceClient? facilityClient = null)
+        ILogger<ScenarioSeedService> logger)
     {
         _store = store;
         _logger = logger;
-        _facilityClient = facilityClient;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -85,38 +77,6 @@ public sealed class ScenarioSeedService : IHostedService
             }
         }
 
-        await ReassignSharedOrganizationIdsAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// User scenarios saved with a historical default (or none) get a new id.
-    /// System scenarios stay blank; each of their runs allocates its own.
-    /// </summary>
-    private async Task ReassignSharedOrganizationIdsAsync(CancellationToken cancellationToken)
-    {
-        var scenarios = await _store.GetAllAsync(cancellationToken);
-        var taken = scenarios
-            .Select(scenario => scenario.NhsnOrganizationId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id.Trim())
-            .ToList();
-        taken.AddRange(await NhsnOrganizationIdAllocator.FacilityIdsAsync(_facilityClient, _logger, cancellationToken));
-
-        foreach (var scenario in scenarios)
-        {
-            if (scenario.IsSystemScenario || !NhsnOrganizationIdAllocator.ShouldReplace(scenario.NhsnOrganizationId))
-                continue;
-
-            var fresh = NhsnOrganizationIdAllocator.Allocate(taken, AllocationRandom);
-            taken.Add(fresh);
-            scenario.NhsnOrganizationId = fresh;
-            scenario.UpdatedAt = DateTimeOffset.UtcNow;
-            await _store.UpsertAsync(scenario, cancellationToken);
-            _logger.LogInformation(
-                "Assigned NHSN organization id {OrganizationId} to scenario {Name} in place of a shared default.",
-                fresh,
-                (scenario.Name ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty).SanitizeForLog());
-        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -172,7 +132,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260326,
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
@@ -202,7 +161,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DailyAchMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260825,
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
@@ -236,7 +194,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260501,
             PatientCount = 1,
             ResourcesPerPatientMin = 15,
@@ -266,7 +223,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260328,
             PatientCount = 150,
             ResourcesPerPatientMin = 25,
@@ -296,7 +252,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260327,
             PatientCount = FhirBundleGenerator.DefaultPatientCount,
             ResourcesPerPatientMin = FhirBundleGenerator.DefaultResourcesPerPatient,
@@ -326,7 +281,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260330,
             PatientCount = 150,
             ResourcesPerPatientMin = 25,
@@ -365,7 +319,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.ScheduledReport,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260326,
             PatientCount = 6,
             ResourcesPerPatientMin = 50,
@@ -440,7 +393,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.RegenerateReport,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260401,
             PatientCount = 1,
             ResourcesPerPatientMin = 100,
@@ -474,7 +426,6 @@ public sealed class ScenarioSeedService : IHostedService
                 ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
             ],
-            NhsnOrganizationId = string.Empty,
             Seed = 20260420,
             PatientCount = 2,
             ResourcesPerPatientMin = 250,
@@ -515,7 +466,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.ScheduledReport,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = string.Empty,
             EnableDmrp = true,
             Seed = 20260909,
             PatientCount = 1,

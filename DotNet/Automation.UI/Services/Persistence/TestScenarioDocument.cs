@@ -46,8 +46,6 @@ public sealed class TestScenarioDocument
     /// <summary>Serialized cohort configuration as JSON string.</summary>
     public string PatientCohortsJson { get; set; } = "[]";
 
-    public string? NhsnOrganizationId { get; set; }
-
     public bool EnableDmrp { get; set; }
 
     [BsonRepresentation(BsonType.String)]

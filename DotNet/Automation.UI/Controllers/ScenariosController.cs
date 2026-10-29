@@ -4,7 +4,6 @@ using Automation.UI.Services;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -27,7 +26,6 @@ public class ScenariosController(
     IMongoDatabase database,
     IImportedBundleContentStore bundleContentStore,
     PatientReplacementManager patientReplacementManager,
-    IFacilityServiceClient facilityClient,
     ILogger<ScenariosController> logger) : Controller
 {
     private static readonly JsonSerializerOptions FhirJsonOptions = LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation();
@@ -64,9 +62,6 @@ public class ScenariosController(
 
         if (model.TestRailCaseId is <= 0)
             return BadRequest("TestRail case id must be a positive integer.");
-
-        if (model.EnableDmrp && string.IsNullOrWhiteSpace(model.NhsnOrganizationId))
-            return BadRequest("NHSN Organization ID is required when DMRP is enabled.");
 
         var existing = await scenarioStore.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystemScenario: true })
@@ -122,12 +117,6 @@ public class ScenariosController(
         if (importValidation != null)
             return BadRequest(importValidation);
 
-        model.NhsnOrganizationId = await AssignNhsnOrganizationIdAsync(
-            model.Id,
-            existing?.NhsnOrganizationId,
-            model.NhsnOrganizationId,
-            ct);
-        
         model.UpdatedAt = DateTimeOffset.UtcNow;
         if (model.SelectedMeasureIds.Count > 0)
         {
@@ -654,7 +643,6 @@ public class ScenariosController(
             SelectedMeasureIds = [.. source.SelectedMeasureIds],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
-            NhsnOrganizationId = await AssignNhsnOrganizationIdAsync(Guid.Empty, currentId: null, submittedId: null, ct),
             EnableDmrp = source.EnableDmrp,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
@@ -725,51 +713,6 @@ public class ScenariosController(
         var bytes = Encoding.UTF8.GetBytes(json);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
-    }
-
-    /// <summary>
-    /// Keeps an id only when this scenario already owns it, or when it is a new
-    /// explicit id that no scenario and no facility is using. Shared defaults
-    /// and collisions are replaced.
-    /// </summary>
-    private async Task<string> AssignNhsnOrganizationIdAsync(
-        Guid scenarioId,
-        string? currentId,
-        string? submittedId,
-        CancellationToken ct)
-    {
-        var submitted = string.IsNullOrWhiteSpace(submittedId) ? string.Empty : submittedId.Trim();
-        var current = string.IsNullOrWhiteSpace(currentId) ? string.Empty : currentId.Trim();
-        var ownsIt = submitted.Length > 0
-            && string.Equals(submitted, current, StringComparison.Ordinal)
-            && !NhsnOrganizationIds.IsReserved(submitted);
-
-        if (ownsIt)
-            return submitted;
-
-        var scenarios = await scenarioStore.GetAllAsync(ct);
-        var taken = new List<string>();
-        foreach (var scenario in scenarios)
-        {
-            if (scenario.Id == scenarioId || string.IsNullOrWhiteSpace(scenario.NhsnOrganizationId))
-                continue;
-            taken.Add(scenario.NhsnOrganizationId);
-        }
-
-        var free = submitted.Length > 0
-            && NhsnOrganizationIds.IsValid(submitted)
-            && !NhsnOrganizationIds.IsReserved(submitted)
-            && !taken.Any(id => string.Equals(id.Trim(), submitted, StringComparison.Ordinal));
-
-        if (free)
-        {
-            var facilities = await NhsnOrganizationIdAllocator.FacilityIdsAsync(facilityClient, logger, ct);
-            if (!facilities.Any(id => string.Equals(id, submitted, StringComparison.Ordinal)))
-                return submitted;
-        }
-
-        taken.AddRange(await NhsnOrganizationIdAllocator.FacilityIdsAsync(facilityClient, logger, ct));
-        return NhsnOrganizationIdAllocator.Allocate(taken);
     }
 
     private async Task<(bool? Exists, string? WarningMessage)> TryCheckPatientExistsAsync(

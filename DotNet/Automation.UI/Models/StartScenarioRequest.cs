@@ -76,11 +76,6 @@ public class StartScenarioRequest : IValidatableObject
     public DateTimeOffset? ReportPeriodEnd { get; set; }
 
     /// <summary>
-    /// Configured NHSN reporting Organization ID for this run.
-    /// </summary>
-    public string? NhsnOrganizationId { get; set; }
-
-    /// <summary>
     /// When true, this run uses DMRP enrollment to derive its reporting schedule.
     /// </summary>
     public bool EnableDmrp { get; set; }
@@ -164,7 +159,6 @@ public class StartScenarioRequest : IValidatableObject
         ImportedPatientBundles = scenario.ImportedPatientBundles,
         ReportPeriodStart = scenario.ReportPeriodStart,
         ReportPeriodEnd = scenario.ReportPeriodEnd,
-        NhsnOrganizationId = scenario.NhsnOrganizationId,
         EnableDmrp = scenario.EnableDmrp,
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
         NormalizationSuiteId = scenario.NormalizationSuiteId,

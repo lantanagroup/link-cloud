@@ -374,9 +374,9 @@ public static class RunCleanupHelper
         Guid.TryParse(facilityId, out _);
 
     /// <summary>
-    /// The run id is the facility Automation creates for a normal scenario.
+    /// The run id is the facility Automation creates for a scenario.
     /// A different <see cref="AutomationRunSummary.FacilityId"/> is torn down only when
-    /// this run created it. DMRP can point that id at a tenant that already existed.
+    /// this run created it.
     /// </summary>
     public static bool IsOwnedAutomationFacilityId(AutomationRunSummary run, string? facilityId)
     {

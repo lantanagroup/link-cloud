@@ -16,7 +16,7 @@ public class ScenarioSeedServiceTests
     private static readonly Guid DmrpScheduledReportScenarioId = new("00000000-0000-0000-0000-000000000010");
 
     [Fact]
-    public async global::System.Threading.Tasks.Task Adhoc_report_daily_ach_scenario_uses_the_daily_measure_and_no_shared_org_id()
+    public async global::System.Threading.Tasks.Task Adhoc_report_daily_ach_scenario_uses_the_daily_measure()
     {
         var store = new InMemoryScenarioStore();
         var sut = new ScenarioSeedService(store, NullLogger<ScenarioSeedService>.Instance);
@@ -28,7 +28,6 @@ public class ScenarioSeedServiceTests
         monthly!.IsSystemScenario.Should().BeTrue();
         monthly.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
-        monthly.NhsnOrganizationId.Should().BeEmpty();
         monthly.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Facility);
         monthly.FacilityTemplateId.Should().Be(FacilityTemplateCatalog.SystemDefaultId);
 
@@ -39,7 +38,6 @@ public class ScenarioSeedServiceTests
         daily.ReportMethod.Should().Be(ReportMethod.Adhoc);
         daily.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
-        daily.NhsnOrganizationId.Should().BeEmpty();
         daily.PatientCount.Should().Be(1);
         daily.ResourcesPerPatientMin.Should().Be(1000);
         daily.ResourcesPerPatientMax.Should().Be(1000);
@@ -68,7 +66,7 @@ public class ScenarioSeedServiceTests
     }
 
     [Fact]
-    public async global::System.Threading.Tasks.Task Dmrp_scheduled_report_scenario_is_seeded_without_a_shared_org_id()
+    public async global::System.Threading.Tasks.Task Dmrp_scheduled_report_scenario_is_seeded()
     {
         var store = new InMemoryScenarioStore();
         var sut = new ScenarioSeedService(
@@ -88,7 +86,6 @@ public class ScenarioSeedServiceTests
         scenario.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
 
         scenario.EnableDmrp.Should().BeTrue();
-        scenario.NhsnOrganizationId.Should().BeEmpty();
 
         scenario.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(
@@ -106,67 +103,35 @@ public class ScenarioSeedServiceTests
     }
 
     [Fact]
-    public async global::System.Threading.Tasks.Task Startup_replaces_shared_org_ids_on_user_scenarios_only()
+    public async global::System.Threading.Tasks.Task Startup_refreshes_system_scenarios_and_leaves_user_scenarios_unchanged()
     {
         var store = new InMemoryScenarioStore();
-        var reserved = new TestScenarioDefinition
+        var user = new TestScenarioDefinition
         {
             Id = Guid.NewGuid(),
-            Name = "Saved with the old default",
+            Name = "User scenario",
+            Description = "keep me",
             IsSystemScenario = false,
-            NhsnOrganizationId = "10765"
+            EnableDmrp = true,
+            PatientCount = 4
         };
-        var alsoReserved = new TestScenarioDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Second saved default",
-            IsSystemScenario = false,
-            NhsnOrganizationId = " 10756 "
-        };
-        var blank = new TestScenarioDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "No org id",
-            IsSystemScenario = false,
-            NhsnOrganizationId = "   "
-        };
-        var owned = new TestScenarioDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Already unique",
-            IsSystemScenario = false,
-            NhsnOrganizationId = "22001"
-        };
-        await store.UpsertAsync(reserved, CancellationToken.None);
-        await store.UpsertAsync(alsoReserved, CancellationToken.None);
-        await store.UpsertAsync(blank, CancellationToken.None);
-        await store.UpsertAsync(owned, CancellationToken.None);
+        await store.UpsertAsync(user, CancellationToken.None);
 
         var sut = new ScenarioSeedService(store, NullLogger<ScenarioSeedService>.Instance);
         await sut.StartAsync(CancellationToken.None);
 
-        var savedReserved = await store.GetByIdAsync(reserved.Id, CancellationToken.None);
-        var savedAlso = await store.GetByIdAsync(alsoReserved.Id, CancellationToken.None);
-        var savedBlank = await store.GetByIdAsync(blank.Id, CancellationToken.None);
-        var savedOwned = await store.GetByIdAsync(owned.Id, CancellationToken.None);
+        var saved = await store.GetByIdAsync(user.Id, CancellationToken.None);
+        saved.Should().NotBeNull();
+        saved!.Name.Should().Be("User scenario");
+        saved.Description.Should().Be("keep me");
+        saved.EnableDmrp.Should().BeTrue();
+        saved.PatientCount.Should().Be(4);
+        saved.IsSystemScenario.Should().BeFalse();
 
-        AssertReplaced(savedReserved!.NhsnOrganizationId);
-        AssertReplaced(savedAlso!.NhsnOrganizationId);
-        AssertReplaced(savedBlank!.NhsnOrganizationId);
-        savedReserved.NhsnOrganizationId.Should().NotBe(savedAlso.NhsnOrganizationId);
-        savedReserved.NhsnOrganizationId.Should().NotBe(savedBlank.NhsnOrganizationId);
-        savedAlso.NhsnOrganizationId.Should().NotBe(savedBlank.NhsnOrganizationId);
-        savedOwned!.NhsnOrganizationId.Should().Be("22001");
-
-        var all = await store.GetAllAsync(CancellationToken.None);
-        all.Where(scenario => scenario.IsSystemScenario)
-            .Should().OnlyContain(scenario => string.IsNullOrEmpty(scenario.NhsnOrganizationId));
-    }
-
-    private static void AssertReplaced(string organizationId)
-    {
-        NhsnOrganizationIds.IsValid(organizationId).Should().BeTrue();
-        NhsnOrganizationIds.IsReserved(organizationId).Should().BeFalse();
+        var monthly = await store.GetByIdAsync(AdhocReportScenarioId, CancellationToken.None);
+        monthly.Should().NotBeNull();
+        monthly!.IsSystemScenario.Should().BeTrue();
+        monthly.EnableDmrp.Should().BeFalse();
     }
 
     private sealed class InMemoryScenarioStore : IScenarioStore

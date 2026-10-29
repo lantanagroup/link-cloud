@@ -290,7 +290,7 @@ internal sealed class RunExecutor
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
-            output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
+            output.WriteLine($"NHSN Organization ID: {state.RunId}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
             output.WriteLine("FHIR generator: Thetis Engine");
@@ -304,8 +304,9 @@ internal sealed class RunExecutor
             {
                 ValidateDmrpScenario(state.Options);
 
+                var organizationId = state.RunId.ToString();
                 var reachable = await mockDmrpClient!.SearchEntriesAsync(
-                    facilityId: state.Options.NhsnOrganizationId,
+                    facilityId: organizationId,
                     pageSize: 1,
                     cancellationToken: cancellationToken);
 
@@ -318,7 +319,7 @@ internal sealed class RunExecutor
 
                 output.WriteLine(
                     $"MockDmrpApi reachable for NHSN Organization ID " +
-                    $"'{state.Options.NhsnOrganizationId}'.");
+                    $"'{organizationId}'.");
             }
 
             List<string> patientIds;
@@ -513,9 +514,9 @@ internal sealed class RunExecutor
                 throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
             var measureId = measureIds[0];
 
-            var facilityId = state.Options.EnableDmrp
-                ? state.Options.NhsnOrganizationId
-                : state.RunId.ToString();
+            // The facility id and the NHSN organization id are this run's id.
+            // Two runs never share it, including two copies of the same scenario.
+            var facilityId = state.RunId.ToString();
 
             if (string.IsNullOrWhiteSpace(facilityId))
             {
@@ -527,8 +528,8 @@ internal sealed class RunExecutor
             var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
 
             // Success-path quiesce sets the facility abort while it still holds this gate.
-            // Clear only after this run owns the facility, so a second DMRP run cannot
-            // drop that flag out from under the run that is still quiescing.
+            // Clear only after this run owns the facility, so another caller for the same
+            // facility id cannot drop that flag while this run is still quiescing.
             using var facilitySetupLock = await AcquireFacilityAndClearStaleAbortAsync(
                 facilityId,
                 abortRegistry,
@@ -1524,20 +1525,23 @@ internal sealed class RunExecutor
         }
         finally
         {
+            var organizationId = string.IsNullOrWhiteSpace(state.FacilityId)
+                ? state.RunId.ToString()
+                : state.FacilityId;
             if (cleanupMockDmrpEntries &&
                 mockDmrpClientForCleanup != null &&
-                !string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
+                !string.IsNullOrWhiteSpace(organizationId))
             {
                 try
                 {
                     await DeleteMockDmrpEntriesAsync(
                         mockDmrpClientForCleanup,
-                        state.Options.NhsnOrganizationId,
+                        organizationId,
                         CancellationToken.None);
 
                     output.WriteLine(
                         $"MockDmrpApi enrollment cleanup complete for NHSN Organization ID " +
-                        $"'{state.Options.NhsnOrganizationId}'.");
+                        $"'{organizationId}'.");
                 }
                 catch (Exception ex)
                 {
@@ -1545,11 +1549,11 @@ internal sealed class RunExecutor
                     _logger.LogWarning(
                         ex,
                         "Failed to clean up MockDmrpApi entries for NHSN Organization ID {NhsnOrganizationId}",
-                        state.Options.NhsnOrganizationId);
+                        organizationId.SanitizeForLog());
 
                     output.WriteLine(
                         $"WARNING: MockDmrpApi cleanup failed for " +
-                        $"'{state.Options.NhsnOrganizationId}': {ex.Message}");
+                        $"'{organizationId}': {ex.Message}");
                 }
             }
 
