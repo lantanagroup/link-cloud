@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Automation.Generation;
+﻿using System.Text.Json.Serialization;
+using LantanaGroup.Automation.Generation;
 
 namespace Automation.UI.Models;
 
@@ -16,6 +17,9 @@ public class TestScenarioDefinition
 
     /// <summary>Optional description / notes.</summary>
     public string? Description { get; set; }
+
+    [JsonConverter(typeof(TestRailCaseIdJsonConverter))]
+    public int? TestRailCaseId { get; set; }
 
     /// <summary>
     /// When true, the scenario was seeded by the system and cannot be modified or deleted.

@@ -60,6 +60,9 @@ public class ScenariosController(
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Scenario name is required.");
 
+        if (model.TestRailCaseId is <= 0)
+            return BadRequest("TestRail case id must be a positive integer.");
+
         if (model.EnableDmrp && string.IsNullOrWhiteSpace(model.NhsnOrganizationId))
             return BadRequest("NHSN Organization ID is required when DMRP is enabled.");
 
@@ -640,6 +643,7 @@ public class ScenariosController(
             Id = Guid.NewGuid(),
             Name = $"{source.Name} (Copy)",
             Description = source.Description,
+            TestRailCaseId = source.TestRailCaseId,
             IsSystemScenario = false,
             ReportMethod = source.ReportMethod,
             SelectedMeasures = [.. source.SelectedMeasures],
