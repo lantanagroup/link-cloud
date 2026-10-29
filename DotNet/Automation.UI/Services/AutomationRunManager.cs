@@ -35,6 +35,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IFacilityTemplateStore _facilityTemplateStore;
     private readonly ITestRailPublisher _testRailPublisher;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
+    private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
 
     public AutomationRunManager(
         IHubContext<RunHub> hub,
@@ -97,16 +98,30 @@ public class AutomationRunManager : IAutomationRunManager
             resolved,
             _patientConfigurationStore,
             cancellationToken);
-        options = options with { NhsnOrganizationId = runId.ToString() };
-        StampRunOrganizationId(request, runId.ToString());
-
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
-        var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
-        _runs[runId] = state;
+        MutableRunState state;
+        await _organizationIdGate.WaitAsync(cancellationToken);
+        try
+        {
+            var organizationId = await AllocateOrganizationIdAsync(cancellationToken);
+            options = options with { NhsnOrganizationId = organizationId };
+            StampRunOrganizationId(request, organizationId);
 
-        await PersistRunInputAsync(runId, request);
+            state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson)
+            {
+                FacilityId = organizationId
+            };
+            _runs[runId] = state;
 
-        await PersistRunSummaryAsync(state);
+            // Persist before releasing the gate so the next start, including one in
+            // another process, sees this id as ongoing.
+            await PersistRunInputAsync(runId, request);
+            await PersistRunSummaryAsync(state);
+        }
+        finally
+        {
+            _organizationIdGate.Release();
+        }
 
         state.ExecutionTask = Task.Run(async () =>
         {
@@ -144,9 +159,27 @@ public class AutomationRunManager : IAutomationRunManager
         return runId;
     }
 
+    private async Task<string> AllocateOrganizationIdAsync(CancellationToken cancellationToken)
+    {
+        var ongoing = new List<(string? FacilityId, string? OrganizationId, bool Ongoing)>();
+        foreach (var state in _runs.Values)
+        {
+            lock (state.Sync)
+            {
+                ongoing.Add((state.FacilityId, state.Options.NhsnOrganizationId, !state.Status.IsTerminal()));
+            }
+        }
+
+        foreach (var facilityId in await _snapshotStore.GetOngoingFacilityIdsAsync(cancellationToken))
+            ongoing.Add((facilityId, null, true));
+
+        return RunOrganizationIdAllocator.Allocate(
+            RunOrganizationIdAllocator.CollectInUse(ongoing));
+    }
+
     /// <summary>
-    /// Records the run's organization id on the input snapshot. The run id is
-    /// that value. A scenario cannot supply a different one.
+    /// Records this run's organization id on the input snapshot. The value is the
+    /// five-digit id allocated for the run. A scenario cannot supply a different one.
     /// </summary>
     private static void StampRunOrganizationId(StartScenarioRequest request, string organizationId)
     {

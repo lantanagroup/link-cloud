@@ -290,7 +290,7 @@ internal sealed class RunExecutor
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
-            output.WriteLine($"NHSN Organization ID: {state.RunId}");
+            output.WriteLine($"NHSN Organization ID: {RequireOrganizationId(state)}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
             output.WriteLine("FHIR generator: Thetis Engine");
@@ -304,7 +304,7 @@ internal sealed class RunExecutor
             {
                 ValidateDmrpScenario(state.Options);
 
-                var organizationId = state.RunId.ToString();
+                var organizationId = RequireOrganizationId(state);
                 var reachable = await mockDmrpClient!.SearchEntriesAsync(
                     facilityId: organizationId,
                     pageSize: 1,
@@ -514,16 +514,9 @@ internal sealed class RunExecutor
                 throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
             var measureId = measureIds[0];
 
-            // The facility id and the NHSN organization id are this run's id.
-            // Two runs never share it, including two copies of the same scenario.
-            var facilityId = state.RunId.ToString();
-
-            if (string.IsNullOrWhiteSpace(facilityId))
-            {
-                throw new InvalidOperationException(
-                    "A facility ID could not be resolved for this Automation run.");
-            }
-
+            // The facility id and the NHSN organization id are the five-digit id
+            // allocated at start. Two ongoing runs never share it.
+            var facilityId = RequireOrganizationId(state);
             state.FacilityId = facilityId;
             var abortRegistry = _hostServices.GetService<IPipelineAbortRegistry>();
 
@@ -1525,9 +1518,7 @@ internal sealed class RunExecutor
         }
         finally
         {
-            var organizationId = string.IsNullOrWhiteSpace(state.FacilityId)
-                ? state.RunId.ToString()
-                : state.FacilityId;
+            var organizationId = AllocatedOrganizationId(state);
             if (cleanupMockDmrpEntries &&
                 mockDmrpClientForCleanup != null &&
                 !string.IsNullOrWhiteSpace(organizationId))
@@ -1721,7 +1712,7 @@ internal sealed class RunExecutor
                     state.Options.BenchmarkKey,
                     state.Options.IsMetricsRun,
                     AutomationRunStatus.Succeeded.ToString(),
-                    state.FacilityId ?? state.RunId.ToString(),
+                    AllocatedOrganizationId(state) ?? string.Empty,
                     state.ReportId ?? string.Empty,
                     state.StartedAt ?? state.CreatedAt,
                     state.FinishedAt ?? DateTimeOffset.UtcNow,
@@ -1948,9 +1939,32 @@ internal sealed class RunExecutor
     }
 
     /// <summary>
-    /// A previous run quiesces the facility id for the abort TTL. DMRP runs reuse the
-    /// NHSN org id, so that flag is still set when the next run schedules a report and
-    /// Report then drops the ReportScheduled event. Report-id flags are left in place.
+    /// The five-digit id allocated at start. Empty when this state was built
+    /// without one, which only happens outside <see cref="AutomationRunManager"/>.
+    /// </summary>
+    private static string? AllocatedOrganizationId(MutableRunState state)
+    {
+        if (!string.IsNullOrWhiteSpace(state.FacilityId))
+            return state.FacilityId;
+        if (!string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
+            return state.Options.NhsnOrganizationId;
+        return null;
+    }
+
+    private static string RequireOrganizationId(MutableRunState state)
+    {
+        var organizationId = AllocatedOrganizationId(state);
+        if (!string.IsNullOrWhiteSpace(organizationId))
+            return organizationId;
+
+        throw new InvalidOperationException(
+            "This run has no NHSN organization id. Start allocates a five-digit id before execution.");
+    }
+
+    /// <summary>
+    /// A previous run quiesces its facility id for the abort TTL. Clear that flag
+    /// for this run's facility so Report does not drop the ReportScheduled event.
+    /// Report-id flags are left in place.
     /// </summary>
     internal static async Task ClearStaleFacilityAbortAsync(
         IPipelineAbortRegistry? abortRegistry,

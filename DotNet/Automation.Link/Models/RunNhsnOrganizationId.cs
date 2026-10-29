@@ -1,8 +1,8 @@
 namespace LantanaGroup.Link.Automation.Link.Models;
 
 /// <summary>
-/// The NHSN organization id for a run is the facility id for that run.
-/// Both are the run id. A scenario does not store one.
+/// The NHSN organization id shown for a run. It is the facility id once that
+/// id is recorded. A summary with no facility id yet shows the run id.
 /// </summary>
 public static class RunNhsnOrganizationId
 {
