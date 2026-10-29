@@ -102,22 +102,35 @@ public class StartScenarioRequestResolverTests
     }
 
     [Theory]
-    [InlineData(AutomationScenarioKind.AdhocReportTest, "10756")]
-    [InlineData(AutomationScenarioKind.MultiPatientTest, "10758")]
-    [InlineData(AutomationScenarioKind.MegaPatientTest, "10759")]
-    public void Non_custom_scenarios_default_to_distinct_static_nhsn_organization_ids(
-        AutomationScenarioKind scenario,
-        string expectedNhsnOrganizationId)
+    [InlineData(AutomationScenarioKind.AdhocReportTest)]
+    [InlineData(AutomationScenarioKind.MultiPatientTest)]
+    [InlineData(AutomationScenarioKind.MegaPatientTest)]
+    public void Non_custom_scenarios_get_a_fresh_nhsn_organization_id(AutomationScenarioKind scenario)
     {
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
             Scenario = scenario,
+            NhsnOrganizationId = "10756"
         });
 
-        options.NhsnOrganizationId.Should().Be(expectedNhsnOrganizationId);
+        NhsnOrganizationIds.IsValid(options.NhsnOrganizationId).Should().BeTrue();
+        NhsnOrganizationIds.IsReserved(options.NhsnOrganizationId).Should().BeFalse();
+        options.NhsnOrganizationId.Should().NotBe("10756");
         options.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Facility);
         options.FacilityTemplateId.Should().Be(FacilityTemplateCatalog.SystemDefaultId);
         options.HonorExplicitFacilityPieces.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Custom_scenario_without_an_org_id_gets_a_valid_one()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom
+        });
+
+        NhsnOrganizationIds.IsValid(options.NhsnOrganizationId).Should().BeTrue();
+        NhsnOrganizationIds.IsReserved(options.NhsnOrganizationId).Should().BeFalse();
     }
 
     [Fact]

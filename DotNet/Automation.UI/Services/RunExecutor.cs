@@ -889,6 +889,7 @@ internal sealed class RunExecutor
                         generationConfig,
                         generationRequirementsPlan,
                         acquisitionSimulation,
+                        abortRegistry,
                         ct),
                     cancellationToken);
 
@@ -919,6 +920,7 @@ internal sealed class RunExecutor
                         scenarioConfig,
                         patientIds,
                         profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
+                        abortRegistry,
                         ct),
                     cancellationToken);
 
@@ -1983,6 +1985,7 @@ internal sealed class RunExecutor
         TestScenarioConfig scenarioConfig,
         IReadOnlyList<string> patientIds,
         IReadOnlyList<PatientProfile> profiles,
+        IPipelineAbortRegistry? abortRegistry,
         CancellationToken cancellationToken)
     {
         var scheduled = await StartAndReconcileScheduledReportAsync(
@@ -1992,6 +1995,7 @@ internal sealed class RunExecutor
             measureIds,
             selectedMeasures,
             scenarioConfig,
+            abortRegistry,
             cancellationToken);
 
         var reportTrackingId = scheduled.ReportTrackingId;
@@ -2090,6 +2094,7 @@ internal sealed class RunExecutor
         IReadOnlyList<string> measureIds,
         IReadOnlyList<ProfiledMeasureType> selectedMeasures,
         TestScenarioConfig scenarioConfig,
+        IPipelineAbortRegistry? abortRegistry,
         CancellationToken cancellationToken)
     {
         var window = DeriveScheduledReportWindow(scenarioConfig);
@@ -2109,7 +2114,11 @@ internal sealed class RunExecutor
         // The ReportScheduled event is processed asynchronously, so the schedule record is not
         // committed the instant StartScheduledReportAsync returns. Block until Report has persisted
         // it: otherwise census PatientEvents can reach Report before the schedule exists.
-        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
+        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(
+            reportTrackingId,
+            cancellationToken: cancellationToken,
+            facilityId: facilityId,
+            abortRegistry: abortRegistry);
 
         var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
         var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
@@ -2134,6 +2143,7 @@ internal sealed class RunExecutor
         FhirGenerationConfig? generationConfig,
         GenerationRequirementsPlan? generationRequirementsPlan,
         FhirGenerationPipeline.AcquisitionSimulationConfig? acquisitionSimulation,
+        IPipelineAbortRegistry? abortRegistry,
         CancellationToken cancellationToken)
     {
         var scheduled = await StartAndReconcileScheduledReportAsync(
@@ -2143,6 +2153,7 @@ internal sealed class RunExecutor
             measureIds,
             state.Options.SelectedMeasures,
             scenarioConfig,
+            abortRegistry,
             cancellationToken);
         var reportTrackingId = scheduled.ReportTrackingId;
 

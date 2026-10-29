@@ -14,10 +14,6 @@ namespace Automation.UI.Services;
 /// </summary>
 public static class StartScenarioRequestResolver
 {
-    private const string AdhocReportTestNhsnOrganizationId = "10756";
-    private const string MultiPatientTestNhsnOrganizationId = "10758";
-    private const string MegaPatientTestNhsnOrganizationId = "10759";
-
     private static readonly JsonSerializerOptions CohortJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -44,19 +40,19 @@ public static class StartScenarioRequestResolver
         {
             AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], [])
             {
-                NhsnOrganizationId = AdhocReportTestNhsnOrganizationId
+                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
             },
             AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], [])
             {
-                NhsnOrganizationId = MultiPatientTestNhsnOrganizationId
+                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
             },
             AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], [])
             {
-                NhsnOrganizationId = MegaPatientTestNhsnOrganizationId
+                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
             },
             AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, CustomMaxPollingDurationMinutes, 30, false, true, defaultMeasures, [], [])
             {
-                NhsnOrganizationId = GenerateRandomNhsnOrganizationId()
+                NhsnOrganizationId = NhsnOrganizationIds.Allocate(taken: null)
             },
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
@@ -363,11 +359,6 @@ public static class StartScenarioRequestResolver
         }
 
         return defaultValue;
-    }
-
-    private static string GenerateRandomNhsnOrganizationId()
-    {
-        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static PatientCohortDefinition BuildDefaultCohort(
