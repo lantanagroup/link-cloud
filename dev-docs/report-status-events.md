@@ -5,9 +5,8 @@ these events and advances the patient to the next stage on success (for example,
 `InitialAcquisition` completion advances to `InitialNormalization`). Report derives the report lifecycle
 from patient statuses; report-level statuses are never sent in this event.
 
-Source: [LEGLINK-1220 event contract](https://lantana.atlassian.net/wiki/spaces/LSD/pages/2372993025).
-LEGLINK-1223 introduces the shared contracts only. Producers, consumers, transitions, persistence, and
-replacement of existing status enums are implemented in subsequent stories on the LEGPROG-497 branch.
+The shared contracts define the event format. Service integration, including producers, consumers,
+transitions, persistence, and replacement of existing status enums, is separate work.
 
 ## Topics and models
 
@@ -43,7 +42,7 @@ The key uses the report identifier and FHIR patient id as supplied by the workfl
 serialize consistently, without indentation, casing changes, or additional fields. The shared fixture
 checks the exact bytes produced by .NET's Kafka serializer and Java's Spring Kafka JSON serializer.
 
-When the producer stories wire this contract into services, .NET producers must set
+When integrating this contract into services, .NET producers must set
 `ProducerConfig.Partitioner = Partitioner.Murmur2Random` to match Java's default keyed partitioning.
 Java producers must retain key hashing (do not enable `partitioner.ignore.keys`). Identical key objects
 alone are insufficient: Kafka hashes the serialized bytes, and .NET/librdkafka's default CRC32 hash
@@ -79,9 +78,6 @@ The patient lifecycle values are `PatientIdentified`, `InitialAcquisition`, `Ini
 `InitialEvaluation`, `SupplementalAcquisition`, `SupplementalNormalization`, `SupplementalEvaluation`,
 `Validation`, `Submission`, `Submitted`, `Failed`, `NotReportable`, and `NotSubmitted`.
 Report lifecycle values are `Pending`, `Completed`, `CompletedNotSubmitted`, `Failure`, and `Canceled`.
-
-The Confluence summary mentions `AcquisitionRequested`, but its detailed enum and payload definitions
-do not define that value. These models follow the detailed definitions, retaining `PatientIdentified`.
 
 ## Contract checks
 
