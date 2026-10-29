@@ -447,11 +447,9 @@ public class TestRailPublisherTests
                 [skipDef.Key] = new() { EndpointKey = skipDef.Key, EndpointName = skipDef.EndpointName, ServiceName = "Tenant", Skipped = true, SkipReason = "env" }
             });
 
-        var opts = ConfiguredOptions();
-        opts.SkipStatusId = 6;
         var publisher = CreatePublisher(
             api.Object,
-            opts,
+            ConfiguredOptions(),
             apiHealthStore: store.Object,
             registry: new ApiEndpointRegistry([new FakeSuite(passDef, failDef, skipDef)]));
 
@@ -572,11 +570,9 @@ public class TestRailPublisherTests
                 [skipDef.Key] = new() { EndpointKey = skipDef.Key, EndpointName = skipDef.EndpointName, Skipped = true }
             });
 
-        var opts = ConfiguredOptions();
-        opts.SkipStatusId = 6;
         var publisher = CreatePublisher(
             api.Object,
-            opts,
+            ConfiguredOptions(),
             apiHealthStore: store.Object,
             registry: new ApiEndpointRegistry([new FakeSuite(skipDef)]));
 
