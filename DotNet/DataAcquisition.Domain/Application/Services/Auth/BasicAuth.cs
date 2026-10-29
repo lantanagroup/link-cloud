@@ -55,4 +55,11 @@ public class BasicAuth : IAuth
         if (sensitiveData == null) return;
         Array.Clear(sensitiveData, 0, sensitiveData.Length);
     }
+    /// <summary>
+    /// No cached credential to discard for this scheme.
+    /// </summary>
+    public Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
 }

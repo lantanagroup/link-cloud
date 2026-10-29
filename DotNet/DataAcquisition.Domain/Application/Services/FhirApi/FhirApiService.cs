@@ -6,6 +6,7 @@ using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -49,6 +50,7 @@ public class FhirApiService : IFhirApiService
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
     private readonly ILocationMappingService _locationMappingService;
+    private readonly IAuthenticationRetrievalService? _authenticationRetrievalService;
     private readonly int _searchPageSize;
 
     public FhirApiService(
@@ -59,8 +61,10 @@ public class FhirApiService : IFhirApiService
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache,
         ILocationMappingService locationMappingService,
-        IOptions<FhirSearchSettings>? fhirSearchSettings = null)
+        IOptions<FhirSearchSettings>? fhirSearchSettings = null,
+        IAuthenticationRetrievalService? authenticationRetrievalService = null)
     {
+        _authenticationRetrievalService = authenticationRetrievalService;
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
         _searchFhirCommand = searchFhirCommand;
