@@ -866,6 +866,11 @@ public class PatientDataService : IPatientDataService
                                               FhirQueryConfigurationModel? fhirQueryConfiguration,
                                               CancellationToken cancellationToken)
     {
+        var resourceTypes = string.Join(", ", log.FhirQuery
+            .SelectMany(q => q.ResourceTypes)
+            .Distinct()
+            .Select(t => t.ToString()));
+
         _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
 
         string? newNote = null;
@@ -875,6 +880,26 @@ public class PatientDataService : IPatientDataService
             log.Status = RequestStatus.Completed;
             log.CompletionDate = DateTime.UtcNow;
         }
+        else if (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+            log.Status = RequestStatus.AccessDenied;
+            log.CompletionDate = DateTime.UtcNow;
+            newNote = $"[{DateTime.UtcNow}] HTTP {ex.StatusCode} from the FHIR server for {resourceTypes}. " +
+                      "Not retried: the server denied access to this resource type. " +
+                      "Check the facility's EHR app registration.";
+        }
+        else if (ex.StatusCode == HttpStatusCode.Unauthorized && (log.RetryAttempts ?? 0) >= 1)
+        {
+            // A 401 after the first retry indicates the facility's FHIR credentials are invalid. 
+            // Don't retry again, just mark it as AccessDenied.
+            log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
+            log.Status = RequestStatus.AccessDenied;
+            log.CompletionDate = DateTime.UtcNow;
+            newNote = $"[{DateTime.UtcNow}] HTTP {ex.StatusCode} from the FHIR server for {resourceTypes}. " +
+                    "Not retried: the facility's FHIR credentials were rejected again after re-authenticating. " +
+                    "Check the facility's authentication configuration.";
+        }        
         else
         {
             var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;

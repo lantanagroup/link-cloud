@@ -177,15 +177,16 @@ public class FhirApiService : IFhirApiService
                 return resourceIds;
             }
 
-            if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
+            if (ex.Status == HttpStatusCode.Unauthorized)
             {
-                string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
-
-                addNoteToLog(log, note);
-                _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
-                throw new OpOutcomeException(note, ex);
+                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, cancellationToken);
             }
-            throw;
+
+            string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
+
+            addNoteToLog(log, note);
+            _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
+            throw new OpOutcomeException(note, ex);
         }
     }
 
@@ -371,14 +372,15 @@ public class FhirApiService : IFhirApiService
         }
         catch (FhirOperationException ex)
         {
-            if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
+            if (ex.Status == HttpStatusCode.Unauthorized)
             {
-                string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
-                addNoteToLog(log, note);
-                _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
-                throw new OpOutcomeException(note, ex);
+                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, cancellationToken);
             }
-            throw;
+
+            string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
+            addNoteToLog(log, note);
+            _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
+            throw new OpOutcomeException(note, ex);
         }
     }
 
@@ -558,4 +560,25 @@ public class FhirApiService : IFhirApiService
         log.Notes.Add(note);
     }
     #endregion
+
+    /// <summary>
+    /// Drops the facility's cached credential after a 401 so the retry authenticates afresh.
+    /// </summary>
+    private async Task InvalidateAuthenticationAsync(DataAcquisitionLogModel log,
+                                                    FhirQueryConfigurationModel fhirQueryConfiguration,
+                                                    CancellationToken cancellationToken)
+    {
+        if (fhirQueryConfiguration.Authentication is null)
+        {
+            return;
+        }
+
+        var auth = _authenticationRetrievalService?.GetAuthenticationService(fhirQueryConfiguration.Authentication);
+        if (auth is null)
+        {
+            return;
+        }
+
+        await auth.InvalidateAuthentication(log.FacilityId, cancellationToken);
+    }    
 }
