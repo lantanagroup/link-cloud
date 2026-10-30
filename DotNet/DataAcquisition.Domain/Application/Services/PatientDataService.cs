@@ -19,6 +19,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -473,437 +474,521 @@ public class PatientDataService : IPatientDataService
     public async Task ExecuteLogRequest(AcquisitionRequest request, CancellationToken cancellationToken = default)
     {
         if (request == null)
+        {
             throw new ArgumentNullException(nameof(request));
+        }
 
-        //1. get log
         var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
+        if (log == null)
+        {
+            throw new ArgumentException($"Log with ID {request.logId} does not exist.");
+        }
 
-        // Read facility config once — reused by the happy path and all error handlers
+        if (log.ExecutionDate > DateTime.UtcNow)
+        {
+            await DeferUntilExecutionDateAsync(log, cancellationToken);
+            return;
+        }
+
+        // Read once the log is Processing and reused by the failure handlers below, which fall back to the
+        // default retry limit until it is loaded.
         FhirQueryConfigurationModel? fhirQueryConfiguration = null;
 
         try
         {
-            //check if log is null
-            if (log == null)
-            {
-                throw new ArgumentException($"Log with ID {request.logId} does not exist.");
-            }
+            ValidateLogQueries(log, request.facilityId);
 
-            if (log.ExecutionDate > DateTime.UtcNow)
-            {
-                throw new ProcessingDelayException(
-                    @$"Log Exection Date {log.ExecutionDate} indicates a future processing time.");
-            }
-
-            //check to ensure that facilityId matches
-            if (!log.FacilityId.Equals(request.facilityId, StringComparison.InvariantCultureIgnoreCase))
-            {
-                throw new ArgumentException(
-                    $"Facility ID {request.facilityId} does not match log's facility ID {log.FacilityId}.");
-            }
-
-            //check if log has any FhirQuery objects
-            if (log.FhirQuery == null || !log.FhirQuery.Any())
-            {
-                throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
-            }
-
-            //check if resource types are defined in all FhirQuery objects
-            if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
-            {
-                throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
-            }
-
-            //check if non-reference query type is search and there are no query parameters in FhirQuery
-            if (log.FhirQuery != null && log.FhirQuery.Any() &&
-                log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search
-                    && !(x.IsReference ?? false)
-                    && (x.QueryParameters == null || !x.QueryParameters.Any())))
-            {
-                throw new ArgumentException(
-                    $"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
-            }
-
-            //log should not have the notes collection loaded from the database as the collection will be reused to add new notes during this execution.
+            // The notes loaded from the database are replaced; this collection gathers the notes added by this execution.
             log.Notes = new List<string>();
 
-            //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
             if (log.IsCensus)
             {
                 await _patientCensusService.RetrieveListData(log, true, cancellationToken);
                 return;
             }
 
-            ActivityContext parentContext = default;
+            using var activity = StartExecutionActivity(log);
 
-            if (!string.IsNullOrWhiteSpace(log.TraceId))
+            if (!await TryMarkProcessingAsync(log, request, cancellationToken))
             {
-                var parts = log.TraceId.Split('|'); // Or whatever delimiter you choose
-                if (parts.Length == 2 &&
-                    parts[0].Length == 32 && IsValidHex(parts[0]) &&
-                    parts[1].Length == 16 && IsValidHex(parts[1]))
-                {
-                    try
-                    {
-                        var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
-                        var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
-                        var traceFlags = ActivityTraceFlags.Recorded;
-
-                        parentContext = new ActivityContext(traceId, spanId, traceFlags);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}",
-                            log.TraceId.Sanitize(), log.Id);
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}",
-                        log.Id);
-                }
+                return;
             }
 
+            using var duration = _metrics.MeasureDataRequestDuration(BuildMetricTags(log));
+            var stopwatch = Stopwatch.StartNew();
 
-            using var activity = ServiceActivitySource.Instance.StartActivity(
-                "PatientDataService.ExecuteLogRequest",
-                ActivityKind.Internal,
-                parentContext);
-
-            activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id.ToString());
-            activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
-            activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId ?? string.Empty);
-            activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId ?? string.Empty);
-            activity?.SetTag(DiagnosticNames.PatientId, log.PatientId?.Sanitize());
-
-            //check if log is not in ready state
-            if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Queued)
+            fhirQueryConfiguration = await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
+            if (fhirQueryConfiguration == null)
             {
-                throw new ArgumentException(
-                    $"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
+                throw new MissingFacilityConfigurationException($"No configuration for {log.FacilityId} exists.");
             }
 
-            //2. atomically update to "Processing" — single DB write, no follow-up UpdateAsync needed
-            var allowedStatuses = new List<RequestStatus> { RequestStatus.Queued };
-            if (request.ignoreStatusConstraint && log.Status.HasValue)
-            {
-                allowedStatuses.Add(log.Status.Value);
-            }
-
-            var successfullyUpdatedLog = await _dataAcquisitionLogManager.TrySetLogStatusAsync(log.Id,
-                allowedStatuses, RequestStatus.Processing,
-                cancellationToken: cancellationToken);
-
-            if (successfullyUpdatedLog)
-            {
-                log.Status = RequestStatus.Processing;
-
-                //3. start timer
-                var tags = new List<KeyValuePair<string, object?>>
-                {
-                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, log.FacilityId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(log.QueryPhase?.ToString()))
-                };
-
-                if (_telemetrySettings.CurrentValue.PatientTags)
-                {
-                    tags.Add(new KeyValuePair<string, object?>("patient_id", log.PatientId));
-                    tags.Add(new KeyValuePair<string, object?>("correlation_id", log.CorrelationId));
-                }
-
-                using var duration = _metrics.MeasureDataRequestDuration(tags);
-
-                Stopwatch stopwatch = new Stopwatch();
-                stopwatch.Start();
-
-                //4. get fhir query configuration (read once, reused by error handlers)
-                fhirQueryConfiguration =
-                    await _fhirQueryQueries.GetByFacilityIdAsync(log.FacilityId, cancellationToken);
-
-                if (fhirQueryConfiguration == null)
-                {
-                    throw new MissingFacilityConfigurationException(
-                        $"No configuration for {log.FacilityId} exists.");
-                }
-
-                // HashSet to hold unique resource ids emitted during execution.
-                var resourceIds = new HashSet<string>();
-
-                bool skipFetch = false;
-
-                var newNotes = new List<string>();
-
-                // Accumulator for references discovered while paging through this primary
-                // log's bundles. Drained once at the end of the fetch loop into the
-                // single durable same-phase reference log per (correlation, type).
-                var isReferenceLog = log.FhirQuery.Any(q => q.IsReference.GetValueOrDefault());
-                var referenceAccumulator = new DiscoveredReferenceAccumulator();
-                var pendingReferenceIdsAdded = 0;
-
-                if (isReferenceLog)
-                {
-                    var preparedReferenceLog = await _referenceResourceService.PrepareReferenceLogExecutionAsync(
-                        log,
-                        referenceAccumulator,
-                        cancellationToken);
-
-                    foreach (var resourceId in preparedReferenceLog.ResourceIds)
-                    {
-                        resourceIds.Add(resourceId);
-                    }
-
-                    if (preparedReferenceLog.Notes.Count > 0)
-                    {
-                        newNotes.AddRange(preparedReferenceLog.Notes);
-                    }
-
-                    skipFetch = preparedReferenceLog.SkipFetch;
-                }
-
-                // Execute the log's FHIR queries.
-                foreach (var fhirQuery in log.FhirQuery.ToList())
-                {
-                    if (skipFetch)
-                    {
-                        break;
-                    }
-
-                    if ((fhirQuery.QueryType == FhirQueryType.Search ||
-                         fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
-                    {
-                        var idParams = fhirQuery.QueryParameters?
-                            .Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList() ?? [];
-                        if (idParams.Any())
-                        {
-                            var ids = new List<string>();
-                            foreach (var idParam in idParams)
-                            {
-                                var splitIds = idParam.Substring(4).Trim().Split(',');
-                                ids.AddRange(splitIds);
-                            }
-
-                            ids = ids.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
-
-                            if (!ids.Any())
-                            {
-                                newNotes.Add(
-                                    $"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
-                                skipFetch = true;
-                            }
-                        }
-                    }
-
-                    if (!skipFetch)
-                    {
-                        foreach (var resourceType in fhirQuery.ResourceTypes)
-                        {
-                            if (fhirQuery.QueryType == FhirQueryType.Read)
-                            {
-                                var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType,
-                                    fhirQueryConfiguration, referenceAccumulator, cancellationToken);
-                                if (ids != null)
-                                    foreach (var id in ids)
-                                        resourceIds.Add(id);
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.Search ||
-                                     fhirQuery.QueryType == FhirQueryType.SearchPost)
-                            {
-                                var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration,
-                                    resourceType, referenceAccumulator, cancellationToken);
-                                if (ids != null)
-                                    foreach (var id in ids)
-                                        resourceIds.Add(id);
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest)
-                            {
-                                throw new NotSupportedException("Bulk Data is currently not supported.");
-                            }
-                            else if (fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
-                            {
-                                throw new NotSupportedException("Bulk Data is currently not supported.");
-                            }
-                        }
-                    }
-                }
-
-                // Drain discovered references into the single durable same-phase
-                // reference log per (correlation, type) before this primary goes terminal.
-                if (referenceAccumulator != null && referenceAccumulator.HasAny)
-                {
-                    pendingReferenceIdsAdded = await _referenceResourceService.FetchAndPersistAsync(
-                        log, referenceAccumulator, cancellationToken);
-                }
-
-                // Stop timer and persist the terminal state for this execution.
-                stopwatch.Stop();
-
-                if (isReferenceLog && pendingReferenceIdsAdded > 0)
-                {
-                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {pendingReferenceIdsAdded} new reference(s) during execution. Setting status back to Pending for re-execution.");
-                    log.Status = RequestStatus.Pending;
-                }
-                else
-                {
-                    log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
-                    log.CompletionDate = System.DateTime.UtcNow;
-                    log.Status = skipFetch && !isReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
-                }
-
-                if(log.Notes != null && log.Notes.Any())
-                {
-                    newNotes.AddRange(log.Notes);
-                }
-
-                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    RetryAttempts = log.RetryAttempts,
-                    ResourceAcquiredIds = resourceIds.ToList(),
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate,
-                    NewNotes = newNotes.Count > 0 ? newNotes : null,
-                    Status = log.Status,
-                }, cancellationToken);
-            }
-            else
-            {
-                // Diagnostic: the atomic Queued->Processing transition didn't match any row.
-                var currentDbStatus = (await _dataAcquisitionLogQueries.GetAsync(log.Id, cancellationToken))?.Status;
-
-                _logger.LogWarning(
-                    "Queued->Processing transition skipped for LogId {LogId}. " +
-                    "Fetched status was {FetchedStatus}; current DB status is {DbStatus}. " +
-                    "Another worker likely owns this log now.",
-                    log.Id.SanitizeForLog(), log.Status.SanitizeForLog(), currentDbStatus.SanitizeForLog());
-            }
+            var result = await AcquireResourcesAsync(log, fhirQueryConfiguration, cancellationToken);
+            await RecordSuccessAsync(log, result, stopwatch, cancellationToken);
         }
         catch (OpOutcomeException ex)
         {
-            _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
-
-            string? newNote = null;
-
-            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
-            {
-                log.Status = RequestStatus.Completed;
-                log.CompletionDate = DateTime.UtcNow;
-            }
-            else
-            {
-                var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
-
-                log.RetryAttempts ??= 0;
-                log.RetryAttempts++;
-
-                if (log.RetryAttempts >= maxRetryAttempts)
-                {
-                    log.Status = RequestStatus.MaxRetriesReached;
-                    newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Maximum retry attempts reached ({maxRetryAttempts}).";
-                }
-                else
-                {
-                    log.Status = RequestStatus.Failed;
-                    newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.";
-                }
-            }
-
-            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-            {
-                Id = log.Id,
-                RetryAttempts = log.RetryAttempts,
-                CompletionDate = log.CompletionDate,
-                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                TraceId = log.TraceId,
-                ExecutionDate = log.ExecutionDate,
-                NewNotes = newNote != null ? [newNote] : null,
-                Status = log.Status,
-            }, cancellationToken);
-        }
-        catch (ProcessingDelayException ex)
-        {
-            log!.RetryAttempts ??= 0;
-
-            log.Status = RequestStatus.Pending;
-            var newNote = $"[{DateTime.UtcNow}] Processing delay encountered. Retrying at {log.ExecutionDate}. See application logs for details.";
-
-            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-            {
-                Id = log.Id,
-                RetryAttempts = log.RetryAttempts,
-                ExecutionDate = log.ExecutionDate,
-                Status = log.Status,
-                NewNotes = [newNote],
-                CompletionDate = log.CompletionDate,
-                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                TraceId = log.TraceId
-            }, cancellationToken);
+            await RecordFhirOutcomeAsync(log, ex, fhirQueryConfiguration, cancellationToken);
         }
         catch (TooManyRequestsException ex)
         {
-            _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
-
-            log.RetryAttempts ??= 0;
-
-            log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
-            log.Status = RequestStatus.Failed; //Don't count this as a failure
-            var newNote =
-                $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.";
-
-            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-            {
-                Id = log.Id,
-                RetryAttempts = log.RetryAttempts,
-                ExecutionDate = log.ExecutionDate,
-                Status = log.Status,
-                NewNotes = [newNote],
-                CompletionDate = log.CompletionDate,
-                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                TraceId = log.TraceId
-            }, cancellationToken);
-
-            await _dataAcquisitionLogManager.ThrottleFacilityAcquisitions(log.FacilityId, log.ExecutionDate.Value,
-                cancellationToken);
+            await RecordThrottleAsync(log, ex, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "PatientDataService.ExecuteLogRequest error");
+            await RecordUnexpectedFailureAsync(log, ex, fhirQueryConfiguration, cancellationToken);
+            throw;
+        }
+    }
 
+    /// <summary>
+    /// Parks a log whose execution date has not arrived yet so the processing job picks it up later.
+    /// </summary>
+    private async Task DeferUntilExecutionDateAsync(DataAcquisitionLogModel log, CancellationToken cancellationToken)
+    {
+        log.RetryAttempts ??= 0;
+        log.Status = RequestStatus.Pending;
+        var newNote = $"[{DateTime.UtcNow}] Processing delay encountered. Retrying at {log.ExecutionDate}. See application logs for details.";
+
+        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            RetryAttempts = log.RetryAttempts,
+            ExecutionDate = log.ExecutionDate,
+            Status = log.Status,
+            NewNotes = [newNote],
+            CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+            TraceId = log.TraceId
+        }, cancellationToken);
+    }
+
+    private static void ValidateLogQueries(DataAcquisitionLogModel log, string facilityId)
+    {
+        if (!log.FacilityId.Equals(facilityId, StringComparison.InvariantCultureIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"Facility ID {facilityId} does not match log's facility ID {log.FacilityId}.");
+        }
+
+        if (log.FhirQuery == null || !log.FhirQuery.Any())
+        {
+            throw new ArgumentException($"Log with ID {log.Id} does not have any FHIR queries defined.");
+        }
+
+        if (log.FhirQuery.Any(x => x.ResourceTypes == null || !x.ResourceTypes.Any()))
+        {
+            throw new ArgumentException($"Log with ID {log.Id} has a FHIR query with no resource types defined.");
+        }
+
+        // A non-reference Search without parameters would query the whole resource type.
+        if (log.FhirQuery.Any(x => x.QueryType == FhirQueryType.Search &&
+                                   !(x.IsReference ?? false) &&
+                                   (x.QueryParameters == null || !x.QueryParameters.Any())))
+        {
+            throw new ArgumentException(
+                $"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
+        }
+    }
+
+    /// <summary>
+    /// Starts the execution span, parented on the trace and span ids carried by the log when they are well formed.
+    /// </summary>
+    private Activity? StartExecutionActivity(DataAcquisitionLogModel log)
+    {
+        ActivityContext parentContext = default;
+
+        if (!string.IsNullOrWhiteSpace(log.TraceId))
+        {
+            var parts = log.TraceId.Split('|');
+            if (parts.Length == 2 &&
+                parts[0].Length == 32 && IsValidHex(parts[0]) &&
+                parts[1].Length == 16 && IsValidHex(parts[1]))
+            {
+                try
+                {
+                    var traceId = ActivityTraceId.CreateFromString(parts[0].AsSpan());
+                    var spanId = ActivitySpanId.CreateFromString(parts[1].AsSpan());
+
+                    parentContext = new ActivityContext(traceId, spanId, ActivityTraceFlags.Recorded);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse combined TraceId/SpanId {TraceId} for log {LogId}",
+                        log.TraceId.Sanitize(), log.Id);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Invalid combined TraceId format (expected 32-16 hex chars) for log {LogId}",
+                    log.Id);
+            }
+        }
+
+        var activity = ServiceActivitySource.Instance.StartActivity(
+            "PatientDataService.ExecuteLogRequest",
+            ActivityKind.Internal,
+            parentContext);
+
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id.ToString());
+        activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId ?? string.Empty);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId ?? string.Empty);
+        activity?.SetTag(DiagnosticNames.PatientId, log.PatientId?.Sanitize());
+
+        return activity;
+    }
+
+    /// <summary>
+    /// Atomically moves the log from Queued to Processing. Returns false when another worker already owns it.
+    /// </summary>
+    private async Task<bool> TryMarkProcessingAsync(DataAcquisitionLogModel log,
+                                                    AcquisitionRequest request,
+                                                    CancellationToken cancellationToken)
+    {
+        if (!request.ignoreStatusConstraint && log.Status != RequestStatus.Queued)
+        {
+            throw new ArgumentException(
+                $"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
+        }
+
+        var allowedStatuses = new List<RequestStatus> { RequestStatus.Queued };
+        if (request.ignoreStatusConstraint && log.Status.HasValue)
+        {
+            allowedStatuses.Add(log.Status.Value);
+        }
+
+        var successfullyUpdatedLog = await _dataAcquisitionLogManager.TrySetLogStatusAsync(log.Id,
+            allowedStatuses, RequestStatus.Processing,
+            cancellationToken: cancellationToken);
+
+        if (successfullyUpdatedLog)
+        {
+            log.Status = RequestStatus.Processing;
+            return true;
+        }
+
+        // Diagnostic: the atomic Queued->Processing transition didn't match any row.
+        var currentDbStatus = (await _dataAcquisitionLogQueries.GetAsync(log.Id, cancellationToken))?.Status;
+
+        _logger.LogWarning(
+            "Queued->Processing transition skipped for LogId {LogId}. " +
+            "Fetched status was {FetchedStatus}; current DB status is {DbStatus}. " +
+            "Another worker likely owns this log now.",
+            log.Id.SanitizeForLog(), log.Status.SanitizeForLog(), currentDbStatus.SanitizeForLog());
+
+        return false;
+    }
+
+    private List<KeyValuePair<string, object?>> BuildMetricTags(DataAcquisitionLogModel log)
+    {
+        var tags = new List<KeyValuePair<string, object?>>
+        {
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, log.FacilityId),
+            new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(log.QueryPhase?.ToString()))
+        };
+
+        if (_telemetrySettings.CurrentValue.PatientTags)
+        {
+            tags.Add(new KeyValuePair<string, object?>("patient_id", log.PatientId));
+            tags.Add(new KeyValuePair<string, object?>("correlation_id", log.CorrelationId));
+        }
+
+        return tags;
+    }
+
+    /// <summary>
+    /// Runs the log's FHIR queries and drains any discovered references. The only place this service talks to the EHR.
+    /// </summary>
+    private async Task<AcquisitionResult> AcquireResourcesAsync(DataAcquisitionLogModel log,
+                                                                 FhirQueryConfigurationModel fhirQueryConfiguration,
+                                                                 CancellationToken cancellationToken)
+    {
+        // HashSet to hold unique resource ids emitted during execution.
+        var resourceIds = new HashSet<string>();
+        var skipFetch = false;
+        var newNotes = new List<string>();
+
+        // Accumulator for references discovered while paging through this primary
+        // log's bundles. Drained once at the end of the fetch loop into the
+        // single durable same-phase reference log per (correlation, type).
+        var isReferenceLog = log.FhirQuery.Any(q => q.IsReference.GetValueOrDefault());
+        var referenceAccumulator = new DiscoveredReferenceAccumulator();
+        var pendingReferenceIdsAdded = 0;
+
+        if (isReferenceLog)
+        {
+            var preparedReferenceLog = await _referenceResourceService.PrepareReferenceLogExecutionAsync(
+                log,
+                referenceAccumulator,
+                cancellationToken);
+
+            foreach (var resourceId in preparedReferenceLog.ResourceIds)
+            {
+                resourceIds.Add(resourceId);
+            }
+
+            if (preparedReferenceLog.Notes.Count > 0)
+            {
+                newNotes.AddRange(preparedReferenceLog.Notes);
+            }
+
+            skipFetch = preparedReferenceLog.SkipFetch;
+        }
+
+        // Execute the log's FHIR queries.
+        foreach (var fhirQuery in log.FhirQuery.ToList())
+        {
+            if (skipFetch)
+            {
+                break;
+            }
+
+            if ((fhirQuery.QueryType == FhirQueryType.Search ||
+                 fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
+            {
+                var idParams = fhirQuery.QueryParameters?
+                    .Where(x => x.StartsWith("_id=", StringComparison.InvariantCultureIgnoreCase)).ToList() ?? [];
+                if (idParams.Any())
+                {
+                    var ids = new List<string>();
+                    foreach (var idParam in idParams)
+                    {
+                        var splitIds = idParam.Substring(4).Trim().Split(',');
+                        ids.AddRange(splitIds);
+                    }
+
+                    ids = ids.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+
+                    if (!ids.Any())
+                    {
+                        newNotes.Add(
+                            $"[{DateTime.UtcNow}] No IDs found in _id query parameter for {fhirQuery.QueryType} FHIR query. Marking log as Completed.");
+                        skipFetch = true;
+                    }
+                }
+            }
+
+            if (skipFetch)
+            {
+                continue;
+            }
+
+            foreach (var resourceType in fhirQuery.ResourceTypes)
+            {
+                if (fhirQuery.QueryType == FhirQueryType.Read)
+                {
+                    var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType,
+                        fhirQueryConfiguration, referenceAccumulator, cancellationToken);
+                    if (ids != null)
+                    {
+                        resourceIds.UnionWith(ids);
+                    }
+                }
+                else if (fhirQuery.QueryType == FhirQueryType.Search ||
+                         fhirQuery.QueryType == FhirQueryType.SearchPost)
+                {
+                    var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration,
+                        resourceType, referenceAccumulator, cancellationToken);
+                    if (ids != null)
+                    {
+                        resourceIds.UnionWith(ids);
+                    }
+                }
+                else if (fhirQuery.QueryType == FhirQueryType.BulkDataRequest ||
+                         fhirQuery.QueryType == FhirQueryType.BulkDataPoll)
+                {
+                    throw new NotSupportedException("Bulk Data is currently not supported.");
+                }
+            }
+        }
+
+        // Drain discovered references into the single durable same-phase
+        // reference log per (correlation, type) before this primary goes terminal.
+        if (referenceAccumulator.HasAny)
+        {
+            pendingReferenceIdsAdded = await _referenceResourceService.FetchAndPersistAsync(
+                log, referenceAccumulator, cancellationToken);
+        }
+
+        return new AcquisitionResult(resourceIds, newNotes, skipFetch, isReferenceLog, pendingReferenceIdsAdded);
+    }
+
+    /// <summary>
+    /// Persists the terminal state of a successful execution, or sends a reference log back to Pending when it
+    /// discovered more references to fetch.
+    /// </summary>
+    private async Task RecordSuccessAsync(DataAcquisitionLogModel log,
+                                          AcquisitionResult result,
+                                          Stopwatch stopwatch,
+                                          CancellationToken cancellationToken)
+    {
+        stopwatch.Stop();
+
+        var newNotes = new List<string>(result.Notes);
+
+        if (result.IsReferenceLog && result.PendingReferenceIdsAdded > 0)
+        {
+            newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {result.PendingReferenceIdsAdded} new reference(s) during execution. Setting status back to Pending for re-execution.");
+            log.Status = RequestStatus.Pending;
+        }
+        else
+        {
+            log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
+            log.CompletionDate = DateTime.UtcNow;
+            log.Status = result.SkipFetch && !result.IsReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
+        }
+
+        if (log.Notes != null && log.Notes.Any())
+        {
+            newNotes.AddRange(log.Notes);
+        }
+
+        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            RetryAttempts = log.RetryAttempts,
+            ResourceAcquiredIds = result.ResourceIds.ToList(),
+            CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+            TraceId = log.TraceId,
+            ExecutionDate = log.ExecutionDate,
+            NewNotes = newNotes.Count > 0 ? newNotes : null,
+            Status = log.Status,
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Records the outcome of a FHIR OperationOutcome response: 404 and 410 complete the log, anything else is retried.
+    /// </summary>
+    private async Task RecordFhirOutcomeAsync(DataAcquisitionLogModel log,
+                                              OpOutcomeException ex,
+                                              FhirQueryConfigurationModel? fhirQueryConfiguration,
+                                              CancellationToken cancellationToken)
+    {
+        _logger.LogWarning(ex, "OperationOutcome encountered for facility {FacilityId}", log.FacilityId.Sanitize());
+
+        string? newNote = null;
+
+        if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+        {
+            log.Status = RequestStatus.Completed;
+            log.CompletionDate = DateTime.UtcNow;
+        }
+        else
+        {
             var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
 
             log.RetryAttempts ??= 0;
             log.RetryAttempts++;
 
-            string newNote;
             if (log.RetryAttempts >= maxRetryAttempts)
             {
                 log.Status = RequestStatus.MaxRetriesReached;
-                newNote =
-                    $"[{DateTime.UtcNow}] Error encountered. Maximum retry attempts reached ({maxRetryAttempts}). See application logs for details.";
+                newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Maximum retry attempts reached ({maxRetryAttempts}).";
             }
             else
             {
                 log.Status = RequestStatus.Failed;
-                newNote =
-                    $"[{DateTime.UtcNow}] Error encountered. Retrying. Attempt {log.RetryAttempts}. See application logs for details.";
+                newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.";
             }
-
-            await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-            {
-                Id = log.Id,
-                RetryAttempts = log.RetryAttempts,
-                CompletionDate = log.CompletionDate,
-                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                TraceId = log.TraceId,
-                ExecutionDate = log.ExecutionDate,
-                NewNotes = [newNote],
-                Status = log.Status,
-            }, cancellationToken);
-
-            throw;
         }
+
+        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            RetryAttempts = log.RetryAttempts,
+            CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+            TraceId = log.TraceId,
+            ExecutionDate = log.ExecutionDate,
+            NewNotes = newNote != null ? [newNote] : null,
+            Status = log.Status,
+        }, cancellationToken);
     }
+
+    /// <summary>
+    /// Reschedules the log after the EHR throttled it and pushes the facility's other pending logs out the same way.
+    /// </summary>
+    private async Task RecordThrottleAsync(DataAcquisitionLogModel log,
+                                           TooManyRequestsException ex,
+                                           CancellationToken cancellationToken)
+    {
+        _logger.LogWarning(ex, "Throttled by 429 for facility {FacilityId}", log.FacilityId.Sanitize());
+
+        log.RetryAttempts ??= 0;
+
+        log.ExecutionDate = DateTime.UtcNow.Add(ex.RetryAfter);
+        log.Status = RequestStatus.Failed; //Don't count this as a failure
+        var newNote =
+            $"[{DateTime.UtcNow}] Throttled (429): Retrying after {ex.RetryAfter.TotalSeconds}s. Attempt {log.RetryAttempts}.";
+
+        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            RetryAttempts = log.RetryAttempts,
+            ExecutionDate = log.ExecutionDate,
+            Status = log.Status,
+            NewNotes = [newNote],
+            CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+            TraceId = log.TraceId
+        }, cancellationToken);
+
+        await _dataAcquisitionLogManager.ThrottleFacilityAcquisitions(log.FacilityId, log.ExecutionDate.Value,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Counts an unexpected exception as a retry. The caller rethrows so the worker can log it and run the tail check.
+    /// </summary>
+    private async Task RecordUnexpectedFailureAsync(DataAcquisitionLogModel log,
+                                                    Exception ex,
+                                                    FhirQueryConfigurationModel? fhirQueryConfiguration,
+                                                    CancellationToken cancellationToken)
+    {
+        _logger.LogError(ex, "PatientDataService.ExecuteLogRequest error");
+
+        var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
+
+        log.RetryAttempts ??= 0;
+        log.RetryAttempts++;
+
+        string newNote;
+        if (log.RetryAttempts >= maxRetryAttempts)
+        {
+            log.Status = RequestStatus.MaxRetriesReached;
+            newNote =
+                $"[{DateTime.UtcNow}] Error encountered. Maximum retry attempts reached ({maxRetryAttempts}). See application logs for details.";
+        }
+        else
+        {
+            log.Status = RequestStatus.Failed;
+            newNote =
+                $"[{DateTime.UtcNow}] Error encountered. Retrying. Attempt {log.RetryAttempts}. See application logs for details.";
+        }
+
+        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            RetryAttempts = log.RetryAttempts,
+            CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+            TraceId = log.TraceId,
+            ExecutionDate = log.ExecutionDate,
+            NewNotes = [newNote],
+            Status = log.Status,
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// What one execution of a log's queries produced, before the terminal state is persisted.
+    /// </summary>
+    private sealed record AcquisitionResult(HashSet<string> ResourceIds,
+                                            List<string> Notes,
+                                            bool SkipFetch,
+                                            bool IsReferenceLog,
+                                            int PendingReferenceIdsAdded);
 
     private static string TEMPORARYPatientIdPart(string fullPatientUrl)
     {
