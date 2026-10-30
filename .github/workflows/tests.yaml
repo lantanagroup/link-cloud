@@ -22,6 +22,7 @@ jobs:
     outputs:
       run_job: ${{ steps.should.outputs.run_job }}
       run_admin_ui: ${{ steps.should.outputs.run_admin_ui }}
+      run_nhsn_app_ui: ${{ steps.should.outputs.run_nhsn_app_ui }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -53,10 +54,21 @@ jobs:
             echo "run_admin_ui=false" >> "$GITHUB_OUTPUT"
           fi
 
+          # Same reasoning for the NHSN-App-UI mocked tier, and more strongly: MockApiClient
+          # implements the ApiClient port in-process, so that suite issues no HTTP at all and
+          # no backend change can reach it. Note nhsn/NHSN-App-UI/ also appears in the
+          # run_job filter above, because the compose stack builds the nhsn-app-ui image.
+          if echo "$CHANGED_FILES" | grep -Eq '^(nhsn/NHSN-App-UI/|\.github/workflows/tests\.yaml)'; then
+            echo "run_nhsn_app_ui=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_nhsn_app_ui=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Show decision
         run: |
           echo "run_job=${{ steps.should.outputs.run_job }}"
           echo "run_admin_ui=${{ steps.should.outputs.run_admin_ui }}"
+          echo "run_nhsn_app_ui=${{ steps.should.outputs.run_nhsn_app_ui }}"
 
   backend-e2e-tests:
     # PR-safe Backend E2E against a SINGLE shared docker compose stack
@@ -555,6 +567,115 @@ jobs:
           path: |
             Web/Admin.UI/playwright-report/
             Web/Admin.UI/test-results/
+          if-no-files-found: ignore
+
+  nhsn-app-ui-mocked-tests:
+    # Mirrors admin-ui-mocked-tests, and needs a backend even less than that tier does:
+    # MockApiClient implements the whole ApiClient port in-process, so these specs issue no
+    # HTTP at all and Playwright only has to boot the webpack dev server on 4300.
+    name: NHSN App UI Tests (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    needs: changes
+    if: ${{ needs.changes.outputs.run_nhsn_app_ui == 'true' }}
+
+    permissions:
+      contents: read
+      checks: write
+
+    defaults:
+      run:
+        working-directory: nhsn/NHSN-App-UI
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # package.json depends on file:packages/nhsn-react-core-2.4.1.tgz, which is gitignored
+      # and kept in the private nhsnlink Azure repo — nothing installs without it. The
+      # lockfile pins its integrity hash, so `npm ci` below also proves this download is the
+      # same artifact the nhsn-app-ui image is already built from in backend-e2e-tests.
+      - name: Download NHSN React Core package from Azure Repos
+        shell: bash
+        env:
+          AZDO_PAT: ${{ secrets.AZDO_PAT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AZDO_PAT}" ]]; then
+            echo "AZDO_PAT repository secret is required to download the NHSN React Core package." >&2
+            exit 1
+          fi
+
+          package_path="packages/nhsn-react-core-2.4.1.tgz"
+
+          mkdir -p packages
+          curl --fail --show-error --silent --location \
+            --user ":${AZDO_PAT}" \
+            --output "${package_path}" \
+            "https://dev.azure.com/lantanagroup/nhsnlink/_apis/git/repositories/nhsnlink/items?path=/nhsn-app-ui/nhsn-react-core-2.4.1.tgz&download=true&api-version=7.1"
+
+          test -s "${package_path}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: nhsn/NHSN-App-UI/package-lock.json
+
+      - name: Install NHSN App UI dependencies
+        run: npm ci
+
+      # Ahead of the browser download on purpose: the draft fixtures are typed against
+      # src/core/onboarding/types, and Playwright strips those types without checking them,
+      # so a drifted fixture should fail in seconds rather than after a Chromium install.
+      - name: Typecheck NHSN App UI e2e suite
+        run: npm run typecheck:e2e
+
+      # Keyed on the Playwright version, so only a real @playwright/test upgrade rotates the
+      # browser cache.
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # `npm run e2e` is --project=mocked; playwright.config.ts starts `npm start` itself
+      # (webpack dev server on 4300) and waits for it.
+      - name: NHSN App UI mocked e2e tests
+        run: npm run e2e
+
+      # playwright.config.ts emits test-results/junit.xml under CI. Paths here are
+      # repo-relative: defaults.run.working-directory applies to `run` steps only, not to
+      # action inputs. Reporting must never fail the job — the test step above is the gate.
+      - name: NHSN App UI Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        continue-on-error: true
+        with:
+          name: NHSN App UI e2e (mocked)
+          path: nhsn/NHSN-App-UI/test-results/junit.xml
+          reporter: java-junit
+
+      # The HTML report plus traces and screenshots retained on failure, so a red run can be
+      # reproduced locally with `npx playwright show-trace <trace.zip>`.
+      - name: Upload NHSN App UI mocked e2e report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nhsn-app-ui-mocked-e2e-report
+          path: |
+            nhsn/NHSN-App-UI/playwright-report/
+            nhsn/NHSN-App-UI/test-results/
           if-no-files-found: ignore
 
   dotnet-tests:

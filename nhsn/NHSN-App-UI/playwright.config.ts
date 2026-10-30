@@ -24,7 +24,11 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : 4,
-  reporter: process.env.CI ? [['github'], ['html', {open: 'never'}]] : [['list'], ['html', {open: 'never'}]],
+  // The junit file is what the CI job hands to dorny/test-reporter, so a failure shows up as
+  // annotated test names rather than only in the raw log.
+  reporter: process.env.CI
+    ? [['github'], ['junit', {outputFile: 'test-results/junit.xml'}], ['html', {open: 'never'}]]
+    : [['list'], ['html', {open: 'never'}]],
   timeout: 60_000,
   expect: {timeout: 10_000},
 
