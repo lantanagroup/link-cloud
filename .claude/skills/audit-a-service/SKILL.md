@@ -39,6 +39,19 @@ next person. Submission is the worked example - one endpoint, `GET api/Submissio
 and no section in the ADR. If the endpoints look like they ought to be audited, that is a question
 for the ADR's owner, not a reason to mark them.
 
+### When a row matches no endpoint
+
+Some rows were written against an API that has since moved on, so the table is where you find out.
+A row whose method and route match nothing, or whose note names placeholders the nearest endpoint has
+no values for, is not an invitation to pick the closest endpoint - Census's
+`POST api/census/patient-encounters` ("Restore", note naming `{id}`, `{eventtype}`, `{createDate}`)
+has only `POST api/census/patient-encounters/rebuild` anywhere near it, which takes a facility and a
+correlation id and restores nothing. Marking that endpoint would publish `Restore` events for a view
+rebuild and leave the note half empty.
+
+Leave it unmarked, do the rows that do match, and list the orphans for the ADR's owner - with the
+routes the service actually has, so the row can be corrected rather than just queried.
+
 ### When the service already emits events for those endpoints
 
 The ADR words some rows as updates to an existing event ("Remove Notes. Remove CorrelationId.") -
