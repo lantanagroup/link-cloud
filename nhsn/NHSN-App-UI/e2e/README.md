@@ -177,6 +177,22 @@ which the dev server does not serve. A real BFF run therefore wants the composed
 (:8090), not `npm start`. `support/bff.ts` holds the preflight and `seedTestProfile()` for
 when that lands.
 
+## CI
+
+`tests.yaml` runs the mocked tier as its own job, **NHSN App UI Tests (mocked)**, gated on
+changes under `nhsn/NHSN-App-UI/` or to the workflow itself — mirroring Admin.UI's job. It
+typechecks the suite before downloading Chromium, so a drifted fixture fails in seconds, and
+publishes `test-results/junit.xml` through `dorny/test-reporter` plus the HTML report and
+failure traces as artifacts.
+
+The one step that is not in Admin.UI's job: `nhsn-react-core-2.4.1.tgz` is a gitignored
+`file:` dependency kept in the private `nhsnlink` Azure repo, so the job downloads it (using
+the `AZDO_PAT` secret) before `npm ci`, exactly as `backend-e2e-tests` already does for the
+compose build. The lockfile pins its integrity hash, so `npm ci` doubles as a check that the
+download is the same artifact the `nhsn-app-ui` image is built from.
+
+The `bff` project is **not** run in CI.
+
 ## Not built
 
 - **No demo tier.** Admin.UI has a paced, headed walkthrough for presenting. Nothing here
@@ -186,6 +202,3 @@ when that lands.
   with their modals and xlsx export — and each wants the same treatment: walk it in a browser
   first, then encode what was observed. The fixtures and page objects here are the starting
   point; extend `fixtures/drafts.ts` with the slice data each step's `isComplete` requires.
-- **No CI wiring.** `.github/workflows/tests.yaml` does not run this suite. Admin.UI's mocked
-  tier runs as its own job gated on `Web/Admin.UI/`; the equivalent here would be gated on
-  `nhsn/NHSN-App-UI/`.
