@@ -280,6 +280,7 @@ public class ProgressMonitor
             var completed = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Completed", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
             var failed = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Failed", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
             var maxRetries = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+            var accessDenied = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "AccessDenied", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
             var processing = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Processing", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
             var pending = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Pending", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
 
@@ -307,9 +308,11 @@ public class ProgressMonitor
                     $"(total={observation.ResourcesAcquired}, processing={observation.Processing}, pending={observation.Pending}).");
             }
 
-            if (maxRetries > 0)
+            if (maxRetries > 0 || accessDenied > 0)
             {
-                _output.WriteLine($"[DIAG][DataAcq] CRITICAL: {maxRetries} terminal MaxRetriesReached log(s) detected.");
+                _output.WriteLine(
+                    $"[DIAG][DataAcq] CRITICAL: {maxRetries} MaxRetriesReached and {accessDenied} AccessDenied " +
+                    "terminal log(s) detected.");
                 return true;
             }
 

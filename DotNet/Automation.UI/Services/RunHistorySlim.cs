@@ -147,7 +147,8 @@ public static class RunHistorySlim
     private static bool IsFailureStatus(string status)
         => status.Contains("fail", StringComparison.OrdinalIgnoreCase)
             || status.Contains("error", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("MaxRetriesReached", StringComparison.OrdinalIgnoreCase);
+            || status.Equals("MaxRetriesReached", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("AccessDenied", StringComparison.OrdinalIgnoreCase);
 
     private static AcquisitionLogFailure FailureSample(PipelineDataReader.AcquisitionLogInfo log, string status)
     {
