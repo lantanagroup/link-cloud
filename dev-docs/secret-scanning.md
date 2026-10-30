@@ -26,8 +26,8 @@ git config core.hooksPath .githooks
 ```
 
 The first commit downloads TruffleHog from its GitHub release into `.git/tools/` and checks it
-against the SHA-256 in the pins file. It does not use any `trufflehog` on `PATH`, which may be the
-old Python version 2 under the same name.
+against the SHA-256 in the pins file. It does not use any `trufflehog` on `PATH`, so every clone
+runs the pinned release.
 
 The hook fails closed. The commit is blocked when:
 
