@@ -12,7 +12,12 @@
     "lint": "eslint src",
     "test:watch": "vitest",
     "test:boundary": "vitest run --config vitest.boundary.config.ts",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "e2e": "playwright test --project=mocked",
+    "e2e:ui": "playwright test --project=mocked --ui",
+    "e2e:report": "playwright show-report",
+    "e2e:bff": "playwright test --project=bff --workers=1",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json"
   },
   "dependencies": {
     "@nhsn/nhsn-react-core": "file:packages/nhsn-react-core-2.4.1.tgz",
@@ -32,6 +37,7 @@
     "@babel/preset-react": "^7.25.9",
     "@babel/preset-typescript": "^7.26.0",
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.6",
