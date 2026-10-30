@@ -1,0 +1,280 @@
+name: "TruffleHog Bump"
+
+# Opens a pull request when TruffleHog has a newer release, rewriting .githooks/trufflehog.pins, the
+# version and SHA-256 pins that .githooks/pre-commit and .github/workflows/secret-scan.yml both read.
+# It only proposes a release that is at least MIN_RELEASE_AGE_DAYS old, whose checksums carry
+# TruffleHog's own release signature, and whose binary still produces the fields both checks read.
+# See dev-docs/secret-scanning.md.
+#
+# The pins live outside .github/workflows/ because GITHUB_TOKEN cannot push changes to workflow files.
+#
+# The new binary runs only in the check job, which can read this repository and nothing more. The
+# pull-request job, which can push, never runs it and verifies the release again for itself.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      min_release_age_days:
+        description: Only take a release at least this many days old. 0 takes the newest one.
+        required: false
+        default: '3'
+
+permissions: {}
+
+concurrency:
+  group: trufflehog-bump
+
+env:
+  MIN_RELEASE_AGE_DAYS: ${{ inputs.min_release_age_days || '3' }}
+  BUMP_BRANCH: automation/trufflehog-bump
+  # cosign v3.1.3.
+  COSIGN_IMAGE: >-
+    ghcr.io/sigstore/cosign/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
+
+jobs:
+  check:
+    name: Check the newest release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v5
+        with:
+          ref: dev
+          persist-credentials: false
+
+      - name: Find the newest release old enough to take
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$MIN_RELEASE_AGE_DAYS" | grep -qxE '[0-9]+'; then
+            echo "::error::min_release_age_days must be a whole number of days."
+            exit 1
+          fi
+          current=$(sed -n 's/^version=//p' .githooks/trufflehog.pins)
+          cutoff=$(date -u -d "$MIN_RELEASE_AGE_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
+          latest=$(gh api 'repos/trufflesecurity/trufflehog/releases?per_page=30' --jq \
+            "[.[] | select((.draft or .prerelease) | not) | select(.published_at <= \"$cutoff\")][0].tag_name // \"\"")
+          latest=${latest#v}
+          echo "Pinned: $current. Newest release at least $MIN_RELEASE_AGE_DAYS days old: ${latest:-none}."
+
+          if [ -z "$latest" ] || [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)" = "$current" ]; then
+            echo "Nothing to bump."
+            exit 0
+          fi
+          title="Bump TruffleHog to $latest"
+          open_titles=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BUMP_BRANCH" --state open \
+            --json title --jq '.[].title')
+          if printf '%s\n' "$open_titles" | grep -qxF "$title"; then
+            echo "A pull request for $latest is already open."
+            exit 0
+          fi
+
+          echo "version=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the release's signature
+        if: steps.release.outputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/release"
+          mkdir -p "$dir"
+          base="https://github.com/trufflesecurity/trufflehog/releases/download/v$VERSION/trufflehog_${VERSION}"
+          for suffix in checksums.txt checksums.txt.sig checksums.txt.pem; do
+            curl -fsSL --retry 2 -o "$dir/$suffix" "${base}_$suffix"
+          done
+
+          # Only TruffleHog's own release workflow, for this exact tag, can have signed these checksums.
+          docker run --rm -v "$dir:/w:ro" "$COSIGN_IMAGE" verify-blob /w/checksums.txt \
+            --signature /w/checksums.txt.sig --certificate /w/checksums.txt.pem \
+            --certificate-identity \
+              "https://github.com/trufflesecurity/trufflehog/.github/workflows/release.yml@refs/tags/v$VERSION" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+      - name: Check the new binary still produces what the checks read
+        if: steps.release.outputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/release"
+          asset="trufflehog_${VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 2 -o "$dir/$asset" \
+            "https://github.com/trufflesecurity/trufflehog/releases/download/v$VERSION/$asset"
+          (cd "$dir" && grep "  $asset\$" checksums.txt | sha256sum --check --quiet)
+          tar -xzf "$dir/$asset" -C "$dir" trufflehog
+          "$dir/trufflehog" --version
+
+          # A throwaway credential, assembled at run time so this file holds nothing a scanner would flag.
+          sample="$RUNNER_TEMP/sample"
+          key="Pass"
+          git init -q "$sample"
+          printf '{\n  "Db": "%s;User ID=smoke;%sword=Qv8mZp2Lw9xRt4kT;"\n}\n' \
+            "Server=tcp:smoke7.database.windows.net,1433" "$key" > "$sample/appsettings.json"
+          git -C "$sample" add -A
+          git -C "$sample" -c user.name=smoke -c user.email=smoke@localhost commit -q -m sample
+
+          # A plain directory for filesystem mode, as the hook gives it: no .git folder.
+          files="$RUNNER_TEMP/sample-files"
+          mkdir -p "$files"
+          cp "$sample/appsettings.json" "$files/"
+
+          (cd "$sample" && "$dir/trufflehog" git file://. --json --no-verification --no-update \
+            --results=verified,unknown,unverified) > "$dir/git.jsonl"
+          (cd "$files" && "$dir/trufflehog" filesystem . --json --no-verification --no-update \
+            --results=verified,unknown,unverified) > "$dir/filesystem.jsonl"
+
+          # The fields .githooks/pre-commit and secret-scan.yml read from each mode's results.
+          python3 - "$dir/git.jsonl" "$dir/filesystem.jsonl" <<'PY'
+          import json, sys
+          checks = (("git", sys.argv[1], "Git", ("commit", "file", "line")),
+                    ("filesystem", sys.argv[2], "Filesystem", ("file", "line")))
+          for mode, path, source, keys in checks:
+              results = [json.loads(l) for l in open(path, encoding="utf-8") if l.startswith("{")]
+              hits = [r for r in results if r.get("DetectorName") == "SQLServer"]
+              if not hits:
+                  sys.exit(f"The {mode} scan no longer reports the sample SQL Server credential.")
+              missing = [k for k in keys if k not in hits[0]["SourceMetadata"]["Data"].get(source, {})]
+              if missing:
+                  sys.exit(f"The {mode} scan's results no longer carry {', '.join(missing)}.")
+              print(f"{mode} scan: results carry DetectorName and {', '.join(keys)}.")
+          PY
+
+  pull-request:
+    name: Open the bump pull request
+    needs: check
+    if: needs.check.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      # The commit goes through the API below, so git itself never needs the token.
+      - name: Check out dev
+        uses: actions/checkout@v5
+        with:
+          ref: dev
+          persist-credentials: false
+
+      # Takes only the version from the check job, which ran the new binary, and verifies the rest itself.
+      - name: Verify the release's signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Unexpected version from the check job."
+            exit 1
+          fi
+          dir="$RUNNER_TEMP/release"
+          mkdir -p "$dir"
+          base="https://github.com/trufflesecurity/trufflehog/releases/download/v$VERSION/trufflehog_${VERSION}"
+          for suffix in checksums.txt checksums.txt.sig checksums.txt.pem; do
+            curl -fsSL --retry 2 -o "$dir/$suffix" "${base}_$suffix"
+          done
+
+          docker run --rm -v "$dir:/w:ro" "$COSIGN_IMAGE" verify-blob /w/checksums.txt \
+            --signature /w/checksums.txt.sig --certificate /w/checksums.txt.pem \
+            --certificate-identity \
+              "https://github.com/trufflesecurity/trufflehog/.github/workflows/release.yml@refs/tags/v$VERSION" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+      - name: Update the pins
+        id: pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "current=$(sed -n 's/^version=//p' .githooks/trufflehog.pins)" >> "$GITHUB_OUTPUT"
+          python3 - "$RUNNER_TEMP/release/checksums.txt" <<'PY'
+          import os, re, sys
+          version = os.environ["VERSION"]
+          path = ".githooks/trufflehog.pins"
+          sums = {name: digest for digest, name in (line.split() for line in open(sys.argv[1]) if line.strip())}
+          platforms = ("darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64",
+                       "windows_amd64", "windows_arm64")
+          missing = [p for p in platforms if f"trufflehog_{version}_{p}.tar.gz" not in sums]
+          if missing:
+              sys.exit(f"The checksums have no entry for {', '.join(missing)}.")
+
+          # Keep the header comments, naming the new checksums file, and rewrite every pin.
+          comments = [re.sub(r"trufflehog_[0-9.]+_checksums\.txt", f"trufflehog_{version}_checksums.txt", line)
+                      for line in open(path, encoding="utf-8").read().splitlines() if line.startswith("#")]
+          pins = [f"version={version}"] + [f"{p}={sums[f'trufflehog_{version}_{p}.tar.gz']}" for p in platforms]
+          open(path, "w", encoding="utf-8", newline="\n").write("\n".join(comments + pins) + "\n")
+          PY
+          git diff --stat
+
+      - name: Open or update the pull request
+        shell: bash
+        env:
+          CURRENT: ${{ steps.pins.outputs.current }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title="Bump TruffleHog to $VERSION"
+          base=$(git rev-parse HEAD)
+
+          # Start the branch from dev's head, replacing any earlier bump.
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$BUMP_BRANCH" > /dev/null 2>&1; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/$BUMP_BRANCH" \
+              -f sha="$base" -F force=true > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$BUMP_BRANCH" -f sha="$base" > /dev/null
+          fi
+
+          # dev requires signed commits. GitHub signs a commit it creates through the API, which a
+          # `git commit` on this runner would not be.
+          jq -n --arg repo "$GITHUB_REPOSITORY" --arg branch "$BUMP_BRANCH" --arg head "$base" \
+            --arg headline "$title" --arg contents "$(base64 -w0 .githooks/trufflehog.pins)" '{
+              query: ("mutation($input: CreateCommitOnBranchInput!) "
+                + "{ createCommitOnBranch(input: $input) { commit { oid } } }"),
+              variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                expectedHeadOid: $head,
+                message: {headline: $headline},
+                fileChanges: {additions: [{path: ".githooks/trufflehog.pins", contents: $contents}]}
+              }}
+            }' > "$RUNNER_TEMP/commit.json"
+          commit=$(gh api graphql --input "$RUNNER_TEMP/commit.json" --jq '.data.createCommitOnBranch.commit.oid')
+          echo "Committed $commit to $BUMP_BRANCH."
+
+          body=$(cat <<EOF
+          Moves the TruffleHog pins in \`.githooks/trufflehog.pins\`, which the pre-commit hook and the
+          Secret Scan check both read, from $CURRENT to $VERSION.
+
+          - Release notes: https://github.com/trufflesecurity/trufflehog/releases/tag/v$VERSION
+          - Changes since $CURRENT:
+            https://github.com/trufflesecurity/trufflehog/compare/v$CURRENT...v$VERSION
+          - The release is at least $MIN_RELEASE_AGE_DAYS days old.
+          - Its checksums carry the signature of TruffleHog's own release workflow for this tag, and the
+            pinned hashes come from them.
+          - The new linux_amd64 binary found a sample credential in both git and filesystem mode, with the
+            fields both checks read.
+
+          This pull request was opened by GitHub Actions, so it does not trigger the other workflows.
+          Close and reopen it to run the checks before merging.
+          EOF
+          )
+
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BUMP_BRANCH" --state open \
+            --json number --jq '.[0].number // ""')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base dev --head "$BUMP_BRANCH" --title "$title" --body "$body"
+          fi
