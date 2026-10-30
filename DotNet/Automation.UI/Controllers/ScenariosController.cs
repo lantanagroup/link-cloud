@@ -60,8 +60,8 @@ public class ScenariosController(
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Scenario name is required.");
 
-        if (model.EnableDmrp && string.IsNullOrWhiteSpace(model.NhsnOrganizationId))
-            return BadRequest("NHSN Organization ID is required when DMRP is enabled.");
+        if (model.TestRailCaseId is <= 0)
+            return BadRequest("TestRail case id must be a positive integer.");
 
         var existing = await scenarioStore.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystemScenario: true })
@@ -117,10 +117,6 @@ public class ScenariosController(
         if (importValidation != null)
             return BadRequest(importValidation);
 
-        model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
-            ? GenerateRandomNhsnOrganizationId()
-            : model.NhsnOrganizationId.Trim();
-        
         model.UpdatedAt = DateTimeOffset.UtcNow;
         if (model.SelectedMeasureIds.Count > 0)
         {
@@ -640,13 +636,13 @@ public class ScenariosController(
             Id = Guid.NewGuid(),
             Name = $"{source.Name} (Copy)",
             Description = source.Description,
+            TestRailCaseId = source.TestRailCaseId,
             IsSystemScenario = false,
             ReportMethod = source.ReportMethod,
             SelectedMeasures = [.. source.SelectedMeasures],
             SelectedMeasureIds = [.. source.SelectedMeasureIds],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
-            NhsnOrganizationId = source.NhsnOrganizationId,
             EnableDmrp = source.EnableDmrp,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
@@ -717,11 +713,6 @@ public class ScenariosController(
         var bytes = Encoding.UTF8.GetBytes(json);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
-    }
-
-    private static string GenerateRandomNhsnOrganizationId()
-    {
-        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private async Task<(bool? Exists, string? WarningMessage)> TryCheckPatientExistsAsync(

@@ -39,6 +39,8 @@ public sealed class ApiEndpointDefinition
     /// </summary>
     public bool IsTestSuiteStep { get; init; }
 
+    public int? TestRailCaseId { get; init; }
+
     /// <summary>
     /// When non-null, this step is permanently skipped and the reason is displayed
     /// on the dashboard even before the suite has been run for the first time.

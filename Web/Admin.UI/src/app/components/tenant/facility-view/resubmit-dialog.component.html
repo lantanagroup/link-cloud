@@ -1,18 +1,19 @@
-<h2 mat-dialog-title>Resubmit Report</h2>
+<h2 mat-dialog-title>Rerun Report</h2>
 
-<form [formGroup]="form"  (ngSubmit)="onSubmit()" mat-dialog-content>
-  <p>Are you sure you want to resubmit this report?</p>
-
-  <!-- Bypass submission checkbox -->
+<form [formGroup]="form" (ngSubmit)="onSubmit()" mat-dialog-content>
+  <p>
+    Rerunning re-evaluates and re-validates this report and regenerates it from the cached EHR data.
+  </p>
   <mat-checkbox formControlName="bypassSubmission">
-    Bypass submission
+    Bypass submission - the regenerated report will NOT be submitted to NHSN Azure Blob Storage (ABS).
+    When it is left unchecked, the regenerated report WILL be submitted to NHSN ABS.
   </mat-checkbox>
 
 </form>
 
 <mat-dialog-actions align="end">
   <button mat-button (click)="onCancel()">Cancel</button>
-  <button mat-flat-button  class="resubmit-button" [disabled]="isSubmitting" (click)="onSubmit()">
-    {{ isSubmitting ? 'Submitting...' : 'Resubmit' }}
+  <button mat-flat-button [disabled]="isSubmitting" (click)="onSubmit()">
+    {{ isSubmitting ? 'Rerunning...' : 'Rerun' }}
   </button>
 </mat-dialog-actions>

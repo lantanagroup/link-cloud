@@ -33,6 +33,15 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     /// </summary>
     public bool HasCriticalFailure => _monitor.State.HasCriticalFailure;
 
+    public string? ServiceHealthFailureMessage =>
+    _monitor.State.Issues
+        .FirstOrDefault(issue =>
+            issue.Severity == MonitorIssueSeverity.Critical &&
+            issue.Key.StartsWith(
+                "service-health-timeout:",
+                StringComparison.OrdinalIgnoreCase))
+        ?.Message;
+
     /// <summary>
     /// All Kafka error messages captured during monitoring.
     /// </summary>
@@ -106,7 +115,8 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         bool forwardInternalLogsToOutput = true,
         PipelineDataReader? pipelineReader = null,
         bool expectsDataAcquisition = true,
-        bool scrapeNormalizationResourceTypes = true)
+        bool scrapeNormalizationResourceTypes = true,
+        IBackgroundMonitorProbe? serviceHealthProbe = null)
     {
         _output = output;
         _lokiScraper = lokiScraper;
@@ -137,13 +147,18 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
         _milestoneOrchestrator = new MilestoneValidationOrchestrator(eventingOutput, reader, expectedPatientCount, expectsDataAcquisition);
         _pollInterval = pollInterval ?? TimeSpan.FromSeconds(5);
 
-        var probes = new IBackgroundMonitorProbe[]
+        var probes = new List<IBackgroundMonitorProbe>
         {
             new LokiErrorProbe(_lokiScraper, _pollInterval),
             new KafkaErrorProbe(_kafkaMonitor, TimeSpan.FromSeconds(2)),
             new ProgressProbe(progressMonitor, _pollInterval),
             new MilestoneProbe(_milestoneOrchestrator, _pollInterval)
         };
+
+        if (serviceHealthProbe is not null)
+        {
+            probes.Add(serviceHealthProbe);
+        }
 
         _monitor = new LantanaGroup.Automation.Helpers.TestRunMonitor(
             eventingOutput,

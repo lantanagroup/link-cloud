@@ -13,7 +13,9 @@ resources:
 trigger:
   branches:
     include:
-    - nhsn-app-component
+    - dev
+    - release/*
+    - linkathon/*
   paths:
     include:
     - nhsn/NHSN-App-UI/*
@@ -67,17 +69,9 @@ steps:
     targetType: 'inline'
     workingDirectory: '$(Pipeline.Workspace)/link-cloud'
     script: |
-      GIT_COMMIT=$(git rev-parse --short HEAD)
+      GIT_COMMIT=$(git rev-parse --short=8 HEAD | tr -d '\r\n')
       echo "GIT_COMMIT: ${GIT_COMMIT}"
       echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
-
-# - task: PythonScript@0
-#   displayName: "Inject Service Info"
-#   inputs:
-#     scriptSource: 'filePath'
-#     scriptPath: $(Pipeline.Workspace)/link-cloud/Scripts/set_service_info.py
-#     workingDirectory: '$(Pipeline.Workspace)/link-cloud'
-#     arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
 # Copy into Packages Folder
 - task: Bash@3
@@ -87,23 +81,6 @@ steps:
     script: |
       mkdir -p "$(workingDir)/packages"
       cp "$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz" "$(workingDir)/packages/"
-
-# # Install NPM dependencies
-# - task: Npm@1
-#   displayName: 'npm install'
-#   inputs:
-#     command: 'custom'
-#     workingDir: '$(workingDir)'
-#     customCommand: 'install $(reactCorePackage)'
-
-# # Build NHSN App UI
-# - task: Npm@1
-#   displayName: 'Build NHSN App UI'
-#   inputs:
-#     command: 'custom'
-#     workingDir: '$(workingDir)'
-#     customCommand: 'run build'
-#     verbose: false
 
 # Generate Docker image tag
 - task: PowerShell@2

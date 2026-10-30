@@ -77,9 +77,9 @@ test('lists the facility report schedules and links each id to its report', asyn
   );
   await expect(submitted).toContainText(schedules[0].frequency);
   await expect(submitted).toContainText(String(schedules[0].censusCount));
-  // Resubmit is offered only for reports that already reached Submitted.
-  await expect(submitted.getByRole('button', { name: /Resubmit/ })).toBeVisible();
-  await expect(view.reportRow(schedules[1].id).getByRole('button', { name: /Resubmit/ })).toHaveCount(0);
+  // Rerun is offered only for reports that already reached Submitted.
+  await expect(submitted.getByRole('button', { name: /Rerun/ })).toBeVisible();
+  await expect(view.reportRow(schedules[1].id).getByRole('button', { name: /Rerun/ })).toHaveCount(0);
 });
 
 test('filtering by status refetches the schedules with that status', async ({ page, api }) => {

@@ -195,7 +195,7 @@ test('row actions appear only for the statuses that allow them', async ({ page, 
   const reports = new ReportsDashboardPage(page);
   await reports.goto();
 
-  // Resubmit covers Submitted and CompletedNotSubmitted; cleanup covers those plus Scheduled
+  // Rerun covers Submitted and CompletedNotSubmitted; cleanup covers those plus Scheduled
   // (canCleanUpScheduleStatus), and only while the report is not already deleted. Abort is for
   // New and EndOfPeriod. TestFacility01 is Submitted; TestFacility02 is "InProgress", which is
   // not a ScheduleStatus member at all, so that row is bare — it reads like a rendering
@@ -203,7 +203,7 @@ test('row actions appear only for the statuses that allow them', async ({ page, 
   const submitted = reports.rows.filter({ hasText: 'TestFacility01' });
   const inProgress = reports.rows.filter({ hasText: 'TestFacility02' });
 
-  await expect(submitted.getByRole('button', { name: /Resubmit/ })).toBeVisible();
+  await expect(submitted.getByRole('button', { name: /Rerun/ })).toBeVisible();
   await expect(submitted.getByRole('button', { name: 'Clean up this report' })).toBeVisible();
   await expect(inProgress.getByRole('button')).toHaveCount(0);
 });

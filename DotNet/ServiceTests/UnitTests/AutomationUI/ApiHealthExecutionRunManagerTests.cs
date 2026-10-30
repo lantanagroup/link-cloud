@@ -3,8 +3,10 @@ using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Task = System.Threading.Tasks.Task;
 using System.Net;
 using System.Net.Http;
@@ -327,6 +329,7 @@ public class ApiHealthExecutionRunManagerTests
             store,
             CreateHostMetadataHttpClientFactory(),
             CreateConfiguration(tenantServiceUrl: tenantServiceUrl),
+            Mock.Of<ITestRailPublisher>(),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(
@@ -362,6 +365,7 @@ public class ApiHealthExecutionRunManagerTests
             store,
             CreateHostMetadataHttpClientFactory(),
             CreateConfiguration(adminBffServiceUrl: adminBffServiceUrl),
+            Mock.Of<ITestRailPublisher>(),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(
@@ -375,6 +379,75 @@ public class ApiHealthExecutionRunManagerTests
         result.Build.Should().Be("admin-build");
         result.Version.Should().Be("0.7.1+admin123");
         result.ProductVersion.Should().Be("admin-dev");
+    }
+
+    [Fact]
+    public async Task Seed_cancellation_tells_the_publisher_the_run_was_cancelled()
+    {
+        var published = new TaskCompletionSource<ApiHealthTestRailPublishRequest>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var publisher = new Mock<ITestRailPublisher>();
+        publisher
+            .Setup(p => p.PublishApiHealthRunAsync(It.IsAny<ApiHealthTestRailPublishRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<ApiHealthTestRailPublishRequest, CancellationToken>((request, _) => published.TrySetResult(request))
+            .Returns(Task.CompletedTask);
+
+        var manager = new ApiHealthExecutionRunManager(
+            new ApiEndpointRegistry([new TestServiceSuite(TestServiceName, CreateResults(passed: true, responseBody: "{}"))]),
+            new TestSeedOrchestrator { SeedCancelled = true },
+            new ApiHealthSeedContextAccessor(),
+            new TestApiHealthRunStore(),
+            CreateDefaultHttpClientFactory(),
+            CreateConfiguration(),
+            publisher.Object,
+            NullLogger<ApiHealthExecutionRunManager>.Instance);
+
+        var runId = await manager.StartServiceAsync(TestServiceName);
+        // Completion is set before TestRail publish, so waiting on the run flag
+        // can observe the run before this callback runs.
+        var captured = await published.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        captured.RunId.Should().Be(runId);
+        captured.Cancelled.Should().BeTrue();
+        captured.Failed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Done_event_is_visible_before_TestRail_publish_returns()
+    {
+        var publishEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePublish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var publisher = new Mock<ITestRailPublisher>();
+        publisher
+            .Setup(p => p.PublishApiHealthRunAsync(It.IsAny<ApiHealthTestRailPublishRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                publishEntered.TrySetResult();
+                await releasePublish.Task;
+            });
+
+        var manager = new ApiHealthExecutionRunManager(
+            new ApiEndpointRegistry([new TestServiceSuite(TestServiceName, CreateResults(passed: true, responseBody: "{}"))]),
+            new TestSeedOrchestrator(),
+            new ApiHealthSeedContextAccessor(),
+            new TestApiHealthRunStore(),
+            CreateDefaultHttpClientFactory(),
+            CreateConfiguration(),
+            publisher.Object,
+            NullLogger<ApiHealthExecutionRunManager>.Instance);
+
+        var runId = await manager.StartServiceAsync(TestServiceName);
+        try
+        {
+            await publishEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            manager.GetEventsSince(runId, 0).Should().Contain(e => e.EventName == "done");
+        }
+        finally
+        {
+            releasePublish.TrySetResult();
+        }
+
+        await WaitForCompletionAsync(manager, runId);
     }
 
     private static IReadOnlyList<ApiTestRunResult> CreateResults(
@@ -423,6 +496,7 @@ public class ApiHealthExecutionRunManagerTests
             store,
             CreateDefaultHttpClientFactory(),
             CreateConfiguration(),
+            Mock.Of<ITestRailPublisher>(),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(TestServiceName);
@@ -443,6 +517,7 @@ public class ApiHealthExecutionRunManagerTests
             store,
             httpClientFactory,
             CreateConfiguration(),
+            Mock.Of<ITestRailPublisher>(),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartAllAsync();
@@ -527,6 +602,7 @@ public class ApiHealthExecutionRunManagerTests
 
     private sealed class TestSeedOrchestrator : IApiHealthSeedOrchestrator
     {
+        public bool SeedCancelled { get; init; }
         public Task<ApiHealthSeedSession> BeginServiceAsync(
             string serviceName,
             IReadOnlyCollection<ApiHealthSeedRequirement> requirements,
@@ -556,7 +632,7 @@ public class ApiHealthExecutionRunManagerTests
         public Task<bool> IsSeedRunCancelledAsync(
             ApiHealthSeedSession session,
             CancellationToken ct = default) =>
-            Task.FromResult(false);
+            Task.FromResult(SeedCancelled);
     }
 
     private sealed class TestApiHealthRunStore : IApiHealthRunStore

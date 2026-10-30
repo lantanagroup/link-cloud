@@ -80,7 +80,7 @@ public class StartScenarioRequestResolverTests
             CleanupFhirData = false,
             ReportMethod = ReportMethod.RegenerateReport,
             QueryPlanTemplateId = Guid.NewGuid(),
-            NhsnOrganizationId = "10756",
+            RunConfigurationJson = """{ "nhsnOrganizationId": "10756" }""",
             SelectedMeasures = [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation],
         };
 
@@ -96,28 +96,38 @@ public class StartScenarioRequestResolverTests
         options.QueryPlanTemplateId.Should().Be(request.QueryPlanTemplateId);
         options.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Unspecified);
         options.HonorExplicitFacilityPieces.Should().BeFalse();
-        options.NhsnOrganizationId.Should().Be("10756");
+        options.NhsnOrganizationId.Should().BeEmpty();
         options.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
     }
 
     [Theory]
-    [InlineData(AutomationScenarioKind.AdhocReportTest, "10756")]
-    [InlineData(AutomationScenarioKind.MultiPatientTest, "10758")]
-    [InlineData(AutomationScenarioKind.MegaPatientTest, "10759")]
-    public void Non_custom_scenarios_default_to_distinct_static_nhsn_organization_ids(
-        AutomationScenarioKind scenario,
-        string expectedNhsnOrganizationId)
+    [InlineData(AutomationScenarioKind.AdhocReportTest)]
+    [InlineData(AutomationScenarioKind.MultiPatientTest)]
+    [InlineData(AutomationScenarioKind.MegaPatientTest)]
+    public void Non_custom_scenarios_do_not_take_an_org_id_from_json(AutomationScenarioKind scenario)
     {
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
             Scenario = scenario,
+            RunConfigurationJson = """{ "nhsnOrganizationId": "10756" }"""
         });
 
-        options.NhsnOrganizationId.Should().Be(expectedNhsnOrganizationId);
+        options.NhsnOrganizationId.Should().BeEmpty();
         options.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Facility);
         options.FacilityTemplateId.Should().Be(FacilityTemplateCatalog.SystemDefaultId);
         options.HonorExplicitFacilityPieces.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Custom_scenario_does_not_allocate_an_org_id()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom
+        });
+
+        options.NhsnOrganizationId.Should().BeEmpty();
     }
 
     [Fact]
@@ -456,7 +466,7 @@ public class StartScenarioRequestResolverTests
     }
 
     [Fact]
-    public void Custom_scenario_extracts_nhsn_organization_id_from_json_when_missing_on_request()
+    public void Custom_scenario_ignores_an_org_id_stored_in_json()
     {
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
@@ -464,7 +474,7 @@ public class StartScenarioRequestResolverTests
             RunConfigurationJson = """{ "nhsnOrganizationId": "22001" }"""
         });
 
-        options.NhsnOrganizationId.Should().Be("22001");
+        options.NhsnOrganizationId.Should().BeEmpty();
     }
 
     [Fact]
