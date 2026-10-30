@@ -265,10 +265,10 @@ public class EpicAuth : IAuth
         return tokenHandler.CreateToken(tokenDescriptor);
     }
     /// <summary>
-    /// No cached credential to discard for this scheme.
+    /// Drops the facility's cached Epic access token so the next request mints a new one.
     /// </summary>
-    public Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
+    public async Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        await _cacheService.RemoveAsync(facilityId, cancellationToken);
     }
 }
