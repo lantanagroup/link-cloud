@@ -112,7 +112,6 @@ public class TestRailOptionsBinderTests
             ["RequestTimeoutSeconds"] = "soon",
             ["UseSharedRun"] = "maybe",
             ["SharedScenarioRunId"] = "run-1",
-            ["SkipStatusId"] = "x",
             ["ApiKey"] = PlaceholderKey,
             ["ScenarioCaseIds:Smoke"] = "C77",
             ["ScenarioCaseIds:Broken"] = "seventy",
@@ -123,10 +122,9 @@ public class TestRailOptionsBinderTests
         options.RequestTimeoutSeconds.Should().Be(TestRailOptions.DefaultRequestTimeoutSeconds);
         options.UseSharedRun.Should().BeFalse();
         options.SharedScenarioRunId.Should().BeNull();
-        options.SkipStatusId.Should().Be(0);
         options.ScenarioCaseIds.Should().Equal(new Dictionary<string, int> { ["Smoke"] = 77 });
         options.ApiHealthCaseIds.Should().Equal(new Dictionary<string, int> { ["Tenant::Create"] = 15 });
-        options.ConfigurationProblems.Should().HaveCount(6);
+        options.ConfigurationProblems.Should().HaveCount(5);
         options.ConfigurationProblems.Should().OnlyContain(p => !p.Contains(PlaceholderKey));
     }
 
@@ -158,16 +156,25 @@ public class TestRailOptionsBinderTests
         {
             ["Enabled"] = "false",
             ["BaseUrl"] = "",
-            ["ProjectId"] = "0",
-            ["ScenarioSuiteId"] = "0",
-            ["ApiHealthSuiteId"] = "0",
+            ["ProjectId"] = "NHSNLink 2.0",
+            ["ScenarioSuiteId"] = "134",
+            ["ApiHealthSuiteId"] = "134",
             ["RequestTimeoutSeconds"] = "15",
             ["UseSharedRun"] = "false",
-            ["SkipStatusId"] = "0"
+            ["SharedScenarioRunId"] = "",
+            ["SharedApiHealthRunId"] = ""
         });
 
         options.IsConfigured.Should().BeFalse();
-        options.HasProject.Should().BeFalse();
+        options.ProjectId.Should().Be(0);
+        options.ProjectName.Should().Be("NHSNLink 2.0");
+        options.HasProject.Should().BeTrue();
+        options.ScenarioSuiteId.Should().Be(134);
+        options.ApiHealthSuiteId.Should().Be(134);
+        options.HasScenarioSuite.Should().BeTrue();
+        options.HasApiHealthSuite.Should().BeTrue();
+        options.SharedScenarioRunId.Should().BeNull();
+        options.SharedApiHealthRunId.Should().BeNull();
         options.ConfigurationProblems.Should().BeEmpty();
     }
 
