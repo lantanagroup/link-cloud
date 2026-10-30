@@ -60,6 +60,10 @@ starting; only a missing configuration does.
 A test host that builds the service by hand - a `WebApplicationFactory` subclass with its own service
 registrations - needs `AddLinkAuditing` too, usually with a fake `IAuditPublisher` so no Kafka is
 needed. Without it every request to an auditable endpoint fails, with an error naming that line.
+Faking the publisher does not take the counter out of the graph: the recorder resolves
+`IAuditMetrics` itself, to account for an event it loses. So such a host also needs `AddMetrics()` and
+a `ServiceInformation` whose `ServiceConfigName` is set, which `SetupServiceInformation` does, or a
+fake `IAuditMetrics` of its own.
 
 ## Mark the endpoint
 
