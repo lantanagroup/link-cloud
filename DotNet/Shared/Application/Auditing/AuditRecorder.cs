@@ -17,15 +17,17 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
         private readonly IAuditContext _audit;
         private readonly IAuditEventFactory _factory;
         private readonly IAuditPublisher _publisher;
+        private readonly IAuditMetrics _metrics;
         private readonly IHostApplicationLifetime _lifetime;
         private readonly ILogger<AuditRecorder> _logger;
 
         public AuditRecorder(IAuditContext audit, IAuditEventFactory factory, IAuditPublisher publisher,
-            IHostApplicationLifetime lifetime, ILogger<AuditRecorder> logger)
+            IAuditMetrics metrics, IHostApplicationLifetime lifetime, ILogger<AuditRecorder> logger)
         {
             _audit = audit ?? throw new ArgumentNullException(nameof(audit));
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));
             _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
@@ -40,6 +42,13 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
         /// <summary>
         /// Builds and publishes the event for an action that has already taken effect.
         /// </summary>
+        /// <remarks>
+        /// Nothing in here is allowed to throw. By the time a filter calls this the handler's change
+        /// is committed and, in MVC's result stage, the response is already written, so an exception
+        /// escaping would turn a change that really happened into an error the caller is told about.
+        /// Both failure paths count the lost event and log it, the same accounting
+        /// <see cref="KafkaAuditPublisher"/> does for one the broker never confirmed.
+        /// </remarks>
         public async Task RecordAsync(AuditableAttribute auditable, ClaimsPrincipal? user,
             RouteValueDictionary? routeValues, IQueryCollection? query = null)
         {
@@ -52,13 +61,35 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
             {
                 //the change is already committed; a bad note template or a missing claim must not
                 //turn a successful request into an error.
-                _logger.LogError(ex, "Audit event could not be built for {Action} {Resource}.",
-                    auditable.Action, auditable.Resource);
+                Lost(auditable);
+                _logger.LogError(ex, "Audit event could not be built for {Action} {Resource}; " +
+                    "the change it describes is already committed.", auditable.Action, auditable.Resource);
                 return;
             }
 
-            await _publisher.PublishAsync(auditEvent, CompletionToken);
+            try
+            {
+                await _publisher.PublishAsync(auditEvent, CompletionToken);
+            }
+            catch (Exception ex)
+            {
+                //the publisher this story ships accounts for its own failures and returns, so getting
+                //here means one broke that contract - the outbox implementation, a service's own, or a
+                //retry configuration the loop cannot work with. The request has already succeeded, so
+                //the event is written off rather than thrown. The publisher logs what it can about the
+                //event itself; this records that it is gone.
+                Lost(auditable);
+                _logger.LogError(ex, "Audit event for {Action} {Resource} was not published and the publisher " +
+                    "failed outright; the change it describes is already committed.",
+                    auditable.Action, auditable.Resource);
+            }
         }
+
+        /// <summary>
+        /// Counts an event that will never reach Kafka on the same meter as an abandoned publish, so
+        /// one counter still answers how many audited changes went unrecorded.
+        /// </summary>
+        private void Lost(AuditableAttribute auditable) => _metrics.PublishFailed(auditable.Resource);
 
         /// <summary>
         /// What governs finishing the request, as opposed to running it.

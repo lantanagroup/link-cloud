@@ -98,9 +98,10 @@ namespace UnitTests.Shared.Auditing
             new(service ?? Service(), timeProvider ?? TimeProvider.System, logger ?? NullLogger<AuditEventFactory>.Instance);
 
         public static AuditRecorder Recorder(IAuditContext audit, IAuditPublisher publisher,
-            IAuditEventFactory? factory = null) =>
-            new(audit, factory ?? Factory(), publisher, new TestHostApplicationLifetime(),
-                NullLogger<AuditRecorder>.Instance);
+            IAuditEventFactory? factory = null, IAuditMetrics? metrics = null,
+            ILogger<AuditRecorder>? logger = null) =>
+            new(audit, factory ?? Factory(), publisher, metrics ?? new FakeAuditMetrics(),
+                new TestHostApplicationLifetime(), logger ?? NullLogger<AuditRecorder>.Instance);
 
         /// <summary>
         /// A signed-in caller whose token carries the given email claim.

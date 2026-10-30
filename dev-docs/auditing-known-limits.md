@@ -118,9 +118,13 @@ cost is that a publish failing after that point loses the event. The request wai
 the background, and an event the producer finally gives up on is counted on the
 `audit_publish_failed` counter and written to the log in full at Error. In full means the whole
 event, the caller's email and any `PatientId` included, so a log sink less protected than the audit
-store ends up holding that for every event that never reached the store. The transactional outbox
-feature removes this by writing the event to the database the request already wrote to and shipping
-it from there, at which point audit events become never-lost.
+store ends up holding that for every event that never reached the store. Two narrower failures are
+accounted the same way and on the same counter, but without the event body: an event that cannot be
+assembled at all - a note template naming a placeholder nothing fills - and a publisher that fails
+outright instead of accounting for itself, which the Kafka publisher does not do but a later one
+could. Neither is allowed to reach the caller, whose change has already been made. The transactional
+outbox feature removes this by writing the event to the database the request already wrote to and
+shipping it from there, at which point audit events become never-lost.
 
 **An event can also arrive twice.** A produce that comes back `PossiblyPersisted` is retried on
 purpose: the broker may already hold the event, but not retrying could lose it with nothing counted,

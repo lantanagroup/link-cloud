@@ -12,7 +12,8 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
     public interface IAuditMetrics
     {
         /// <summary>
-        /// One per audit event abandoned after every retry was spent.
+        /// One per audit event that will never reach Kafka: abandoned after every retry was spent, or
+        /// lost before any produce because building it, or the publisher itself, failed.
         /// </summary>
         void PublishFailed(string? resource);
     }

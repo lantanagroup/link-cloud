@@ -43,11 +43,12 @@ namespace UnitTests.Shared.Auditing
             builder.Services.AddControllers()
                 .AddApplicationPart(typeof(AuditWiringTests).Assembly);
 
-            //everything AddLinkAuditing registers except the Kafka publisher, which is faked, and
-            //the startup logger, which needs none of this.
+            //everything AddLinkAuditing registers except the Kafka publisher and the counter, which
+            //are faked, and the startup logger, which needs none of this.
             builder.Services.AddSingleton(AuditTest.Service());
             builder.Services.AddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<IAuditPublisher>(_publisher);
+            builder.Services.AddSingleton<IAuditMetrics>(new FakeAuditMetrics());
             builder.Services.AddScoped<IAuditContext, AuditContext>();
             builder.Services.AddScoped<IAuditEventFactory, AuditEventFactory>();
             builder.Services.AddScoped<AuditRecorder>();
