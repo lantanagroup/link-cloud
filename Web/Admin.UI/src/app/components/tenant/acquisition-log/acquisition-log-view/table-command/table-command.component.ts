@@ -51,7 +51,7 @@ export class TableCommandComponent implements OnInit, OnDestroy {
   faBan = faBan;
   isOpen = false;
 
-  private readonly TERMINAL_STATUSES = ['MaxRetriesReached', 'ConfigurationMissing', 'Completed', 'Cancelled', 'Skipped'];
+  private readonly TERMINAL_STATUSES = ['MaxRetriesReached', 'AccessDenied', 'ConfigurationMissing', 'Completed', 'Cancelled', 'Skipped'];
 
   private readonly EXECUTE_INELIGIBLE_STATUSES = ['Completed', 'Skipped'];
 

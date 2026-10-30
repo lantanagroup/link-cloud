@@ -164,6 +164,29 @@ public class RunHistorySlimTests
     }
 
     [Fact]
+    public void Acquisition_chart_counts_AccessDenied_as_a_failure()
+    {
+        var chart = RunHistorySlim.ToAcquisitionChart(
+        [
+            new PipelineDataReader.AcquisitionLogInfo(
+                5,
+                "patient-9",
+                null,
+                null,
+                "AccessDenied",
+                "Initial",
+                ["HTTP Forbidden from the FHIR server for Coverage. Not retried."],
+                [],
+                [],
+                ResourceTypes: ["Coverage"])
+        ]);
+
+        chart.FailureCount.Should().Be(1);
+        chart.CompletedCount.Should().Be(0);
+        chart.Failures.Should().ContainSingle().Which.Message.Should().Contain("Forbidden");
+    }
+
+    [Fact]
     public void Acquisition_chart_keeps_the_latest_failure_note()
     {
         var chart = RunHistorySlim.ToAcquisitionChart(

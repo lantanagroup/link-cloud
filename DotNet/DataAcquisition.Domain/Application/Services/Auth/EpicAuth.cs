@@ -264,4 +264,11 @@ public class EpicAuth : IAuth
         JsonWebTokenHandler tokenHandler = new();
         return tokenHandler.CreateToken(tokenDescriptor);
     }
+    /// <summary>
+    /// Drops the facility's cached Epic access token so the next request mints a new one.
+    /// </summary>
+    public async Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
+    {
+        await _cacheService.RemoveAsync(facilityId, cancellationToken);
+    }
 }

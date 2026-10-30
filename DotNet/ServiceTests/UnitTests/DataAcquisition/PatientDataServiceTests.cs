@@ -31,8 +31,10 @@ using Microsoft.Extensions.Options;
 using Moq;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using RequestStatusExtensions = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatusExtensions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace UnitTests.DataAcquisition;
 
@@ -1793,6 +1795,510 @@ public class PatientDataServiceTests
         Assert.Equal(2, result[1].Id);  // High, oldest ExecutionDate
         Assert.Equal(3, result[2].Id);  // High, newer ExecutionDate
         Assert.Equal(1, result[3].Id);  // Normal Pending (next after highs)
+    }
+    // LEGLINK-1568: non-transient authorization failures are not retried.
+
+    private UpdateDataAcquisitionLogModel? _capturedUpdate;
+
+    private void ArrangeQueuedCoverageReadThatFails(int? retryAttempts, int? maxRetries, Exception fhirException)
+    {
+        var log = new DataAcquisitionLog
+        {
+            Id = 1,
+            FacilityId = "facilityId",
+            PatientId = "patient-1",
+            CorrelationId = "corr-1",
+            Status = RequestStatus.Queued,
+            RetryAttempts = retryAttempts,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery
+                {
+                    QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new FhirQueryResourceType { ResourceType = ResourceType.Coverage }
+                    },
+                    QueryParameters = new List<string>(),
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                }
+            }
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DataAcquisitionLogModel.FromDomain(log));
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facilityId", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FhirQueryConfigurationModel
+            {
+                FacilityId = "facilityId",
+                FhirServerBaseUrl = "http://example.com",
+                MaxRetries = maxRetries
+            });
+
+        _mockLogManager
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(fhirException);
+
+        _mockLogManager
+            .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()))
+            .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, _) => _capturedUpdate = m)
+            .Returns(Task.CompletedTask);
+    }
+
+    private static OpOutcomeException OutcomeWithStatus(HttpStatusCode status) =>
+        new("OperationOutcome encountered", new FhirOperationException(status.ToString(), status));
+
+    [Fact]
+    public async Task ExecuteLogRequest_Forbidden_IsTerminalOnTheFirstOccurrence()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 10, OutcomeWithStatus(HttpStatusCode.Forbidden));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.NotNull(_capturedUpdate.Status);
+        Assert.Contains(_capturedUpdate.Status.Value, RequestStatusExtensions.TerminalStatuses);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+        _mockFhirApiService.Verify(x => x.ExecuteRead(
+            It.IsAny<DataAcquisitionLogModel>(),
+            It.IsAny<FhirQueryModel>(),
+            It.IsAny<ResourceType>(),
+            It.IsAny<FhirQueryConfigurationModel>(),
+            It.IsAny<DiscoveredReferenceAccumulator>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Forbidden_NoteNamesTheStatusAndTheDeniedResourceType()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 10, OutcomeWithStatus(HttpStatusCode.Forbidden));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate?.NewNotes);
+        Assert.Contains(_capturedUpdate.NewNotes, n =>
+            n.Contains("Forbidden", StringComparison.OrdinalIgnoreCase) &&
+            n.Contains("Coverage", StringComparison.Ordinal) &&
+            n.Contains("not retried", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(_capturedUpdate.NewNotes, n => n.Contains("Retrying", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Unauthorized_FirstOccurrence_StaysRetryable()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.Unauthorized));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Unauthorized_RepeatOccurrence_IsTerminal()
+    {
+        // One failed execution plus the processing job's re-queue increment leaves RetryAttempts at 2.
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: 2, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.Unauthorized));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.NotNull(_capturedUpdate.Status);
+        Assert.True(_capturedUpdate.Status.Value.IsTerminal());
+        Assert.Contains(_capturedUpdate.NewNotes!, n =>
+            n.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase) &&
+            n.Contains("credential", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_ServerError_StillRetriesUntilMaxRetries()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.InternalServerError));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+    }
+    [Fact]
+    public async Task ExecuteLogRequest_LogDoesNotExist_ThrowsWithTheLogId()
+    {
+        _mockLogQueries
+            .Setup(q => q.GetAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DataAcquisitionLogModel?)null);
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _service.ExecuteLogRequest(new AcquisitionRequest(42, "facilityId"), CancellationToken.None));
+
+        Assert.Contains("42", ex.Message);
+        _mockLogManager.Verify(
+            m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_UnexpectedException_RetriesWithAnErrorNote()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 5, new InvalidOperationException("boom"));
+
+        // The log is updated and the exception is rethrown so the worker can log it and run the tail check.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None));
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+        Assert.Contains(_capturedUpdate.NewNotes!, n =>
+            n.Contains("Error encountered", StringComparison.Ordinal) &&
+            n.Contains("Retrying. Attempt 1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_UnexpectedExceptionAtMaxRetries_IsMaxRetriesReached()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: 4, maxRetries: 5, new InvalidOperationException("boom"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None));
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.MaxRetriesReached, _capturedUpdate.Status);
+        Assert.Equal(5, _capturedUpdate.RetryAttempts);
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("Maximum retry attempts reached (5)", StringComparison.Ordinal));
+    }
+    // Characterization tests for ExecuteLogRequest. They pin the behavior of the branches that have no
+    // other coverage so the method can be restructured without changing what it does.
+
+    private static DataAcquisitionLog BuildQueuedLog(
+        ResourceType resourceType,
+        FhirQueryType queryType = FhirQueryType.Read,
+        bool isReference = false,
+        List<string>? queryParameters = null)
+    {
+        return new DataAcquisitionLog
+        {
+            Id = 1,
+            FacilityId = "facilityId",
+            PatientId = "patient-1",
+            CorrelationId = "corr-1",
+            Status = RequestStatus.Queued,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery
+                {
+                    QueryType = queryType,
+                    IsReference = isReference,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new FhirQueryResourceType { ResourceType = resourceType }
+                    },
+                    QueryParameters = queryParameters ?? new List<string>(),
+                    ResourceReferenceTypes = new List<ResourceReferenceType>()
+                }
+            }
+        };
+    }
+
+    private void ArrangeLog(DataAcquisitionLog log, bool processingTransitionSucceeds = true)
+    {
+        _mockLogQueries
+            .Setup(q => q.GetAsync(log.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DataAcquisitionLogModel.FromDomain(log));
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facilityId", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FhirQueryConfigurationModel
+            {
+                FacilityId = "facilityId",
+                FhirServerBaseUrl = "http://example.com",
+                MaxRetries = 5
+            });
+
+        _mockLogManager
+            .Setup(q => q.TrySetLogStatusAsync(log.Id, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(processingTransitionSucceeds);
+
+        _mockLogManager
+            .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()))
+            .Callback<UpdateDataAcquisitionLogModel, CancellationToken>((m, _) => _capturedUpdate = m)
+            .Returns(Task.CompletedTask);
+    }
+
+    private void ArrangeReadReturns(IReadOnlyCollection<string> ids, Action<DiscoveredReferenceAccumulator>? discover = null)
+    {
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<DataAcquisitionLogModel, FhirQueryModel, ResourceType, FhirQueryConfigurationModel, DiscoveredReferenceAccumulator, CancellationToken>(
+                (_, _, _, _, accumulator, _) => discover?.Invoke(accumulator))
+            .ReturnsAsync(ids);
+    }
+
+    private void VerifyNoFhirCalls()
+    {
+        _mockFhirApiService.Verify(x => x.ExecuteRead(
+            It.IsAny<DataAcquisitionLogModel>(),
+            It.IsAny<FhirQueryModel>(),
+            It.IsAny<ResourceType>(),
+            It.IsAny<FhirQueryConfigurationModel>(),
+            It.IsAny<DiscoveredReferenceAccumulator>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _mockFhirApiService.Verify(x => x.ExecuteSearch(
+            It.IsAny<DataAcquisitionLogModel>(),
+            It.IsAny<FhirQueryModel>(),
+            It.IsAny<FhirQueryConfigurationModel>(),
+            It.IsAny<ResourceType>(),
+            It.IsAny<DiscoveredReferenceAccumulator>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_FutureExecutionDate_DefersWithoutCallingFhir()
+    {
+        var log = BuildQueuedLog(ResourceType.Coverage);
+        log.ExecutionDate = DateTime.UtcNow.AddHours(1);
+        ArrangeLog(log);
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Pending, _capturedUpdate.Status);
+        Assert.Equal(0, _capturedUpdate.RetryAttempts);
+        Assert.Equal(log.ExecutionDate, _capturedUpdate.ExecutionDate);
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("Processing delay encountered", StringComparison.Ordinal));
+        VerifyNoFhirCalls();
+        _mockLogManager.Verify(m => m.TrySetLogStatusAsync(
+            It.IsAny<long>(), It.IsAny<List<RequestStatus>>(), It.IsAny<RequestStatus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_FacilityMismatch_RecordsRetryAndRethrows()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Coverage));
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _service.ExecuteLogRequest(new AcquisitionRequest(1, "otherFacility"), CancellationToken.None));
+
+        Assert.Contains("does not match", ex.Message);
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("Error encountered", StringComparison.Ordinal));
+        VerifyNoFhirCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_SearchWithoutParameters_RecordsRetryAndRethrows()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Coverage, queryType: FhirQueryType.Search));
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None));
+
+        Assert.Contains("without any query parameters", ex.Message);
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+        VerifyNoFhirCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_LogNotQueued_RecordsRetryAndRethrows()
+    {
+        var log = BuildQueuedLog(ResourceType.Coverage);
+        log.Status = RequestStatus.Ready;
+        ArrangeLog(log);
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None));
+
+        Assert.Contains("not in a queued state", ex.Message);
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        VerifyNoFhirCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_LogNotQueuedWithIgnoreStatusConstraint_AllowsTheCurrentStatus()
+    {
+        var log = BuildQueuedLog(ResourceType.Coverage);
+        log.Status = RequestStatus.Ready;
+        ArrangeLog(log);
+        ArrangeReadReturns(new List<string> { "Coverage/cov-1" });
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId", ignoreStatusConstraint: true), CancellationToken.None);
+
+        _mockLogManager.Verify(m => m.TrySetLogStatusAsync(
+            1,
+            It.Is<List<RequestStatus>>(allowed => allowed.Contains(RequestStatus.Ready) && allowed.Contains(RequestStatus.Queued)),
+            RequestStatus.Processing,
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Completed, _capturedUpdate.Status);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_ProcessingTransitionSkipped_DoesNoWork()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Coverage), processingTransitionSucceeds: false);
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.Null(_capturedUpdate);
+        VerifyNoFhirCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_CensusLog_DelegatesToTheCensusService()
+    {
+        var log = BuildQueuedLog(ResourceType.List);
+        log.IsCensus = true;
+        ArrangeLog(log);
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        _mockPatientCensusService.Verify(
+            c => c.RetrieveListData(It.Is<DataAcquisitionLogModel>(m => m.Id == 1), true, It.IsAny<CancellationToken>()),
+            Times.Once);
+        Assert.Null(_capturedUpdate);
+        VerifyNoFhirCalls();
+        _mockLogManager.Verify(m => m.TrySetLogStatusAsync(
+            It.IsAny<long>(), It.IsAny<List<RequestStatus>>(), It.IsAny<RequestStatus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_ReferenceLogPreparedWithSkipFetch_CompletesWithThePreparedIds()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Location, isReference: true));
+        _mockRefService
+            .Setup(r => r.PrepareReferenceLogExecutionAsync(It.IsAny<DataAcquisitionLogModel>(), It.IsAny<DiscoveredReferenceAccumulator>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreparedReferenceLogExecutionModel
+            {
+                SkipFetch = true,
+                ResourceIds = new List<string> { "Location/loc-1" },
+                Notes = new List<string> { "Reference already cached." }
+            });
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Completed, _capturedUpdate.Status);
+        Assert.Contains("Location/loc-1", _capturedUpdate.ResourceAcquiredIds!);
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n == "Reference already cached.");
+        VerifyNoFhirCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_ReferenceLogDiscoversMoreReferences_GoesBackToPending()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Location, isReference: true));
+        _mockRefService
+            .Setup(r => r.PrepareReferenceLogExecutionAsync(It.IsAny<DataAcquisitionLogModel>(), It.IsAny<DiscoveredReferenceAccumulator>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreparedReferenceLogExecutionModel { SkipFetch = false });
+        ArrangeReadReturns(new List<string> { "Location/loc-1" }, accumulator => accumulator.Add("Location", "loc-9"));
+        _mockRefService
+            .Setup(r => r.FetchAndPersistAsync(It.IsAny<DataAcquisitionLogModel>(), It.IsAny<DiscoveredReferenceAccumulator>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Pending, _capturedUpdate.Status);
+        Assert.Null(_capturedUpdate.CompletionDate);
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("Setting status back to Pending", StringComparison.Ordinal));
+        _mockRefService.Verify(r => r.FetchAndPersistAsync(It.IsAny<DataAcquisitionLogModel>(), It.IsAny<DiscoveredReferenceAccumulator>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_PrimaryLogDiscoversReferences_DrainsThemAndCompletes()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Encounter));
+        ArrangeReadReturns(new List<string> { "Encounter/enc-1" }, accumulator => accumulator.Add("Location", "loc-9"));
+        _mockRefService
+            .Setup(r => r.FetchAndPersistAsync(It.IsAny<DataAcquisitionLogModel>(), It.IsAny<DiscoveredReferenceAccumulator>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Completed, _capturedUpdate.Status);
+        Assert.NotNull(_capturedUpdate.CompletionDate);
+        Assert.Contains("Encounter/enc-1", _capturedUpdate.ResourceAcquiredIds!);
+        _mockRefService.Verify(r => r.FetchAndPersistAsync(It.IsAny<DataAcquisitionLogModel>(), It.IsAny<DiscoveredReferenceAccumulator>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_NoReferencesDiscovered_DoesNotDrain()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Coverage));
+        ArrangeReadReturns(new List<string> { "Coverage/cov-1" });
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Completed, _capturedUpdate.Status);
+        _mockRefService.Verify(r => r.FetchAndPersistAsync(It.IsAny<DataAcquisitionLogModel>(), It.IsAny<DiscoveredReferenceAccumulator>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_Gone_SetsCompletedStatus()
+    {
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: null, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.Gone));
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Completed, _capturedUpdate.Status);
+        Assert.NotNull(_capturedUpdate.CompletionDate);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_BulkDataQuery_RecordsRetryAndRethrows()
+    {
+        ArrangeLog(BuildQueuedLog(ResourceType.Coverage, queryType: FhirQueryType.BulkDataRequest));
+
+        await Assert.ThrowsAsync<NotSupportedException>(() =>
+            _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None));
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(1, _capturedUpdate.RetryAttempts);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_MalformedTraceId_StillExecutes()
+    {
+        var log = BuildQueuedLog(ResourceType.Coverage);
+        log.TraceId = "not-a-trace-id";
+        ArrangeLog(log);
+        ArrangeReadReturns(new List<string> { "Coverage/cov-1" });
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Completed, _capturedUpdate.Status);
     }
 }
 

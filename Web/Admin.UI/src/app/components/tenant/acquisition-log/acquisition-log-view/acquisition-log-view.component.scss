@@ -26,6 +26,7 @@ $processing-status: #4338ca;
 $completed-status: #047832;
 $failed-status: #a1030eb3;
 $failed-maxRetry-status: #a10303ff;
+$access-denied-status: #7c2d12;
 $skipped-status: #ffbf00;
 $cancelled-status: #6b7280;
 $configuration-missing-status: #b45309;
@@ -80,6 +81,15 @@ $configuration-missing-status: #b45309;
   background-color: color.adjust($failed-maxRetry-status, $lightness: 60%);
   color: $failed-maxRetry-status;
   box-shadow: 0 0 0 1px color.adjust($failed-maxRetry-status, $lightness: -10%);
+  padding: 6px 6px;
+  border-radius: 0.375rem;
+}
+
+.status-accessDenied {
+  @extend .log-status;
+  background-color: color.adjust($access-denied-status, $lightness: 60%);
+  color: $access-denied-status;
+  box-shadow: 0 0 0 1px color.adjust($access-denied-status, $lightness: -10%);
   padding: 6px 6px;
   border-radius: 0.375rem;
 }
