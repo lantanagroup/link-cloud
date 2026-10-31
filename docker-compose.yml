@@ -778,7 +778,6 @@ services:
       dockerfile: DotNet/Automation.UI/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
-        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
       secrets:
         - feed_accesstoken
     networks:
@@ -1080,7 +1079,6 @@ services:
       dockerfile: DotNet/MockFhirServer/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
-        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
       secrets:
         - feed_accesstoken
     networks:
@@ -1156,6 +1154,8 @@ networks:
   link-nw:
      
 secrets:
+  # BuildKit secret for Shared_BOTW_Feed. Compose reads AZURE_ARTIFACTS_PAT
+  # from the process environment. Do not also pass the token as a build arg.
   feed_accesstoken:
     environment: AZURE_ARTIFACTS_PAT
 
