@@ -150,10 +150,13 @@ public class MilestoneValidationOrchestrator
         if (summary == null || summary.TotalLogs == 0)
             return;
 
-        var maxRetries = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
-        if (maxRetries > 0)
+        var (maxRetries, accessDenied) = AcquisitionTerminalFailures.Count(summary.StatusCounts);
+        if (maxRetries > 0 || accessDenied > 0)
         {
-            RecordIssue($"Data acquisition terminal failures detected: {maxRetries} max-retry log(s).", critical: true);
+            RecordIssue(
+                $"Data acquisition terminal failures detected: {maxRetries} max-retry log(s), " +
+                $"{accessDenied} access-denied log(s).",
+                critical: true);
             ResetAcquisitionCompletionCandidate();
             return;
         }
