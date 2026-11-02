@@ -72,7 +72,9 @@ public class EpicAuthTests
         new(
             new HttpClient(handler),
             _mockLogger.Object,
-            _mockCacheService.Object,
+            new FacilityAccessTokenCache(_mockCacheService.Object,
+                                         TokenLockProviders.Granting(),
+                                         Mock.Of<ILogger<FacilityAccessTokenCache>>()),
             _mockSecretManager.Object,
             Options.Create(new DataSourceAuthSettings { KeySource = keySource }),
             _mockTenantApiService.Object);
@@ -412,12 +414,30 @@ public class EpicAuthTests
         return null;
     }
     [Fact]
-    public async Task InvalidateAuthentication_CachedToken_RemovesTheFacilityToken()
+    public async Task InvalidateAuthentication_TokenMintedBeforeTheRequest_RemovesTheFacilityToken()
     {
+        var requestStartedUtc = DateTimeOffset.UtcNow;
+        _mockCacheService
+            .Setup(x => x.GetAsync<DateTimeOffset>($"{FacilityId}:access-token-minted-at", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(requestStartedUtc.AddMinutes(-2));
         var sut = BuildSut(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
 
-        await sut.InvalidateAuthentication(FacilityId);
+        await sut.InvalidateAuthentication(FacilityId, requestStartedUtc);
 
         _mockCacheService.Verify(x => x.RemoveAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task InvalidateAuthentication_TokenMintedAfterTheRequestStarted_KeepsTheFacilityToken()
+    {
+        var requestStartedUtc = DateTimeOffset.UtcNow;
+        _mockCacheService
+            .Setup(x => x.GetAsync<DateTimeOffset>($"{FacilityId}:access-token-minted-at", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(requestStartedUtc.AddSeconds(1));
+        var sut = BuildSut(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        await sut.InvalidateAuthentication(FacilityId, requestStartedUtc);
+
+        _mockCacheService.Verify(x => x.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

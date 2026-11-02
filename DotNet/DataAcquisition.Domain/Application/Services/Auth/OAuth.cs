@@ -14,28 +14,38 @@ public class OAuth : IAuth
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<OAuth> _logger;
-    private readonly ICacheService _cacheService;
+    private readonly FacilityAccessTokenCache _tokenCache;
     private readonly ISecretManager _secretManager;
 
     public OAuth(
         HttpClient httpClient,
         ILogger<OAuth> logger,
-        ICacheService cacheService,
+        FacilityAccessTokenCache tokenCache,
         ISecretManager secretManager)
     {
         _httpClient = httpClient;
         _logger = logger;
-        _cacheService = cacheService;
+        _tokenCache = tokenCache;
         _secretManager = secretManager;
     }
 
     public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken = default)
     {
-        var cachedToken = await _cacheService.GetAsync<string>(facilityId, cancellationToken);
+        var accessToken = await _tokenCache.GetOrMintAsync(facilityId,
+                                                           ct => MintAccessToken(facilityId, authSettings, ct),
+                                                           cancellationToken);
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            return (false, null);
+        }
 
-        if (!string.IsNullOrWhiteSpace(cachedToken))
-            return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, cachedToken));
+        return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
+    }
 
+    private async Task<(string Token, int ExpiresInSeconds)?> MintAccessToken(string facilityId,
+                                                                               AuthenticationConfigurationModel authSettings,
+                                                                               CancellationToken cancellationToken)
+    {
         try
         {
             if (string.IsNullOrWhiteSpace(authSettings.ClientId))
@@ -77,8 +87,7 @@ public class OAuth : IAuth
 
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
-                    await _cacheService.SetAsync(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute, cancellationToken);
-                    return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
+                    return (accessToken, expirationInSeconds);
                 }
             }
         }
@@ -87,13 +96,16 @@ public class OAuth : IAuth
             _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeForLog());
         }
 
-        return (false, null);
+        return null;
     }
     /// <summary>
-    /// No cached credential to discard for this scheme.
+    /// Drops the facility's cached OAuth access token so the next request requests a new one, unless the token
+    /// was obtained after the refused request started.
     /// </summary>
-    public Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
+    public Task InvalidateAuthentication(string facilityId,
+                                         DateTimeOffset requestStartedUtc,
+                                         CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        return _tokenCache.InvalidateAsync(facilityId, requestStartedUtc, cancellationToken);
     }
 }

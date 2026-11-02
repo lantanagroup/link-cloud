@@ -1427,12 +1427,16 @@ public class FhirApiServiceTests
 
         readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new FhirOperationException("Unauthorized", HttpStatusCode.Unauthorized));
+        var before = DateTimeOffset.UtcNow;
 
         var ex = await Assert.ThrowsAsync<OpOutcomeException>(async () =>
             await service.ExecuteRead(log, fhirQuery, ResourceType.Coverage, EpicConfiguration()));
 
         Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
-        auth.Verify(x => x.InvalidateAuthentication("123", It.IsAny<CancellationToken>()), Times.Once);
+        auth.Verify(x => x.InvalidateAuthentication("123",
+                                                    It.Is<DateTimeOffset>(t => t >= before && t <= DateTimeOffset.UtcNow),
+                                                    It.IsAny<CancellationToken>()),
+                    Times.Once);
     }
 
     [Fact]
@@ -1457,6 +1461,9 @@ public class FhirApiServiceTests
         await Assert.ThrowsAsync<OpOutcomeException>(async () =>
             await service.ExecuteRead(log, fhirQuery, ResourceType.Coverage, EpicConfiguration()));
 
-        auth.Verify(x => x.InvalidateAuthentication(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        auth.Verify(x => x.InvalidateAuthentication(It.IsAny<string>(),
+                                                    It.IsAny<DateTimeOffset>(),
+                                                    It.IsAny<CancellationToken>()),
+                    Times.Never);
     }
 }

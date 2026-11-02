@@ -58,7 +58,9 @@ public class BasicAuth : IAuth
     /// <summary>
     /// No cached credential to discard for this scheme.
     /// </summary>
-    public Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
+    public Task InvalidateAuthentication(string facilityId,
+                                         DateTimeOffset requestStartedUtc,
+                                         CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }

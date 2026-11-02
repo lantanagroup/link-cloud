@@ -24,14 +24,14 @@ public class EpicAuth : IAuth
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
-    private readonly ICacheService _cacheService;
+    private readonly FacilityAccessTokenCache _tokenCache;
     private readonly ISecretManager _secretManager;
     private readonly IOptions<DataSourceAuthSettings> _dataSourceAuthSettings;
     private readonly ITenantApiService _tenantApiService;
     public EpicAuth(
         HttpClient httpClient,
         ILogger<EpicAuth> logger,
-        ICacheService cacheService,
+        FacilityAccessTokenCache tokenCache,
         ISecretManager secretManager,
         IOptions<DataSourceAuthSettings> dataSourceAuthSettings,
         ITenantApiService tenantApiService
@@ -39,7 +39,7 @@ public class EpicAuth : IAuth
     {
         _httpClient = httpClient;
         _logger = logger;
-        _cacheService = cacheService;
+        _tokenCache = tokenCache;
         _secretManager = secretManager;
         _dataSourceAuthSettings = dataSourceAuthSettings;
         _tenantApiService = tenantApiService;
@@ -53,11 +53,21 @@ public class EpicAuth : IAuth
     /// <exception cref="NotImplementedException"></exception>
     public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings, CancellationToken cancellationToken = default)
     {
-        var cachedToken = await _cacheService.GetAsync<string>(facilityId, cancellationToken);
+        var accessToken = await _tokenCache.GetOrMintAsync(facilityId,
+                                                           ct => MintAccessToken(facilityId, authSettings, ct),
+                                                           cancellationToken);
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            return (false, null);
+        }
 
-        if (!string.IsNullOrWhiteSpace(cachedToken))
-            return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
+        return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
+    }
 
+    private async Task<(string Token, int ExpiresInSeconds)?> MintAccessToken(string facilityId,
+                                                                               AuthenticationConfigurationModel authSettings,
+                                                                               CancellationToken cancellationToken)
+    {
         var jwt = await GetJwt(facilityId, authSettings, cancellationToken);
 
         try
@@ -74,7 +84,7 @@ public class EpicAuth : IAuth
                 _logger.LogError(
                     "Token endpoint returned {StatusCode} acquiring an access token for facility {FacilityId}. Response: {Response}",
                     (int)responseMessage.StatusCode, facilityId.SanitizeForLog(), Truncate(responseBody).SanitizeForLog());
-                return (false, null);
+                return null;
             }
 
             using var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
@@ -89,7 +99,7 @@ public class EpicAuth : IAuth
                 _logger.LogError(
                     "Token endpoint response for facility {FacilityId} did not contain an access token.",
                     facilityId.SanitizeForLog());
-                return (false, null);
+                return null;
             }
 
             int expirationInSeconds = 300;
@@ -98,15 +108,14 @@ public class EpicAuth : IAuth
                 expirationInSeconds = expiresInElement.GetInt32();
             }
 
-            await _cacheService.SetAsync(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute, cancellationToken);
-            return (false, new AuthenticationHeaderValue(DataAcquisitionConstants.Auth.Bearer, accessToken));
+            return (accessToken, expirationInSeconds);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error Acquiring Access Token Encountered");
         }
 
-        return (false, null);
+        return null;
     }
 
     private string Sanitize(string? input)
@@ -265,10 +274,13 @@ public class EpicAuth : IAuth
         return tokenHandler.CreateToken(tokenDescriptor);
     }
     /// <summary>
-    /// Drops the facility's cached Epic access token so the next request mints a new one.
+    /// Drops the facility's cached Epic access token so the next request mints a new one, unless the token was
+    /// minted after the refused request started.
     /// </summary>
-    public async Task InvalidateAuthentication(string facilityId, CancellationToken cancellationToken = default)
+    public Task InvalidateAuthentication(string facilityId,
+                                         DateTimeOffset requestStartedUtc,
+                                         CancellationToken cancellationToken = default)
     {
-        await _cacheService.RemoveAsync(facilityId, cancellationToken);
+        return _tokenCache.InvalidateAsync(facilityId, requestStartedUtc, cancellationToken);
     }
 }

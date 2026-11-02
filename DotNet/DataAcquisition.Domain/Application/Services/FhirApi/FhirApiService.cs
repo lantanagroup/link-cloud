@@ -109,6 +109,7 @@ public class FhirApiService : IFhirApiService
         activity?.SetTag(DiagnosticNames.ResourceId, resourceIdToAcquire);
 
         var resourceIds = new List<string>();
+        var requestStartedUtc = DateTimeOffset.UtcNow;
 
         try
         {
@@ -179,7 +180,7 @@ public class FhirApiService : IFhirApiService
 
             if (ex.Status == HttpStatusCode.Unauthorized)
             {
-                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, cancellationToken);
+                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, requestStartedUtc, cancellationToken);
             }
 
             string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
@@ -259,6 +260,7 @@ public class FhirApiService : IFhirApiService
             log.FacilityId.SanitizeForLog(),
             log.CorrelationId.SanitizeForLog(),
             log.ReportTrackingId.SanitizeForLog());
+        var requestStartedUtc = DateTimeOffset.UtcNow;
         try
         {
             await foreach (var bundle in _searchFhirCommand.ExecuteAsync(
@@ -374,7 +376,7 @@ public class FhirApiService : IFhirApiService
         {
             if (ex.Status == HttpStatusCode.Unauthorized)
             {
-                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, cancellationToken);
+                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, requestStartedUtc, cancellationToken);
             }
 
             string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
@@ -562,10 +564,12 @@ public class FhirApiService : IFhirApiService
     #endregion
 
     /// <summary>
-    /// Drops the facility's cached credential after a 401 so the retry authenticates afresh.
+    /// Drops the facility's cached credential after a 401 so the retry authenticates afresh, unless it was obtained
+    /// after <paramref name="requestStartedUtc"/>.
     /// </summary>
     private async Task InvalidateAuthenticationAsync(DataAcquisitionLogModel log,
                                                     FhirQueryConfigurationModel fhirQueryConfiguration,
+                                                    DateTimeOffset requestStartedUtc,
                                                     CancellationToken cancellationToken)
     {
         if (fhirQueryConfiguration.Authentication is null)
@@ -579,6 +583,6 @@ public class FhirApiService : IFhirApiService
             return;
         }
 
-        await auth.InvalidateAuthentication(log.FacilityId, cancellationToken);
+        await auth.InvalidateAuthentication(log.FacilityId, requestStartedUtc, cancellationToken);
     }    
 }
