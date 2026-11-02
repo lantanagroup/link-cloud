@@ -1,4 +1,7 @@
-﻿using LantanaGroup.Link.DMRP.Api;
+﻿using LantanaGroup.Link.Shared.Application.Auditing;
+using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.Extensions.DependencyInjection;
+using LantanaGroup.Link.DMRP.Api;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Mapping;
@@ -23,6 +26,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
     [ApiController]
     public class FacilityReportingPlansController : ControllerBase
     {
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a
+        /// request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
+
         /// <summary>
         /// Columns a caller may sort by. The repository resolves sortBy reflectively and throws on an
         /// unknown property, so an unlisted value is refused here as a bad request rather than
@@ -420,6 +429,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
+        [Auditable(AuditEventType.Create, "FacilityReportingPlans")]
         public async Task<IActionResult> CreateFacilityReportingPlan(FacilityReportingPlanRequest request, CancellationToken cancellationToken)
         {
             FacilityReportingPlan created;
@@ -443,6 +453,13 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
 
             var model = ToModel(created);
+
+            //the facility arrives in the body on this route.
+            if (Audit is { } audit)
+            {
+                audit.FacilityId = request.FacilityId;
+                audit.RecordId = model.Id;
+            }
 
             return Created($"/api/dmrp/reporting-plans/{model.Id}", model);
         }
@@ -476,6 +493,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
+        [Auditable(AuditEventType.Update, "FacilityReportingPlans")]
         public async Task<IActionResult> UpdateFacilityReportingPlan(string id, FacilityReportingPlanUpdateRequest request, CancellationToken cancellationToken)
         {
             id = id.Sanitize();
@@ -516,6 +534,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             var model = await _queries.GetAsync(id, cancellationToken);
 
+            if (Audit is { } audit)
+            {
+                audit.FacilityId = model?.FacilityId;
+            }
+
             return Accepted(model);
         }
 
@@ -533,6 +556,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete]
+        [Auditable(AuditEventType.Delete, "FacilityReportingPlans", "All reporting plans deleted")]
         public async Task<IActionResult> DeleteFacilityReportingPlans(CancellationToken cancellationToken)
         {
             try
@@ -566,12 +590,23 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{id}")]
+        [Auditable(AuditEventType.Delete, "FacilityReportingPlans", "Reporting Plan for {Measure} (Month: {month}, Year: {year}) deleted")]
         public async Task<IActionResult> DeleteFacilityReportingPlan(string id, CancellationToken cancellationToken)
         {
             id = id.Sanitize();
 
             try
             {
+                //the ADR's note names the plan, which is gone once it is deleted.
+                var existing = await _queries.GetAsync(id, cancellationToken);
+                if (existing is not null && Audit is { } audit)
+                {
+                    audit.FacilityId = existing.FacilityId;
+                    audit.Set("Measure", existing.Measure);
+                    audit.Set("month", existing.ReportingMonth);
+                    audit.Set("year", existing.ReportingYear);
+                }
+
                 await _manager.DeleteAsync(id, cancellationToken);
             }
             catch (KeyNotFoundException ex)
@@ -607,6 +642,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("facilities/{facilityId}")]
+        [Auditable(AuditEventType.Delete, "FacilityReportingPlans", "All reporting plans for facility deleted")]
         public async Task<IActionResult> DeleteFacilityReportingPlansForFacility(string facilityId, CancellationToken cancellationToken)
         {
             facilityId = NullIfBlank(facilityId.Sanitize());

@@ -1,4 +1,7 @@
-﻿using LantanaGroup.Link.DMRP.Business.Managers;
+﻿using LantanaGroup.Link.Shared.Application.Auditing;
+using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.Extensions.DependencyInjection;
+using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Models;
@@ -23,6 +26,12 @@ namespace LantanaGroup.Link.DMRP.Controllers
     [ApiController]
     public class MeasureMappingsController : ControllerBase
     {
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a
+        /// request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
+
         private readonly ILogger<MeasureMappingsController> _logger;
         private readonly IMeasureMappingManager _manager;
         private readonly IMeasureMappingQueries _queries;
@@ -147,6 +156,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpPost]
+        [Auditable(AuditEventType.Create, "MeasureMappings")]
         public async Task<IActionResult> CreateMeasureMapping(MeasureMappingModel request, CancellationToken cancellationToken)
         {
             MeasureMapping created;
@@ -193,6 +203,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             var model = ToModel(created);
 
+            if (Audit is { } audit)
+            {
+                audit.RecordId = model.Id;
+            }
+
             return Created($"/api/dmrp/measure-mappings/{model.Id}", model);
         }
 
@@ -232,6 +247,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpPut("{id}")]
+        [Auditable(AuditEventType.Update, "MeasureMappings")]
         public async Task<IActionResult> UpdateMeasureMapping(string id, MeasureMappingModel request, CancellationToken cancellationToken)
         {
             id = id.Sanitize();
@@ -310,12 +326,22 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpDelete("{id}")]
+        [Auditable(AuditEventType.Delete, "MeasureMappings", "Measure: {Measure}, DQM: {dqm}, Frequency: {Frequency}")]
         public async Task<IActionResult> DeleteMeasureMapping(string id, CancellationToken cancellationToken)
         {
             id = id.Sanitize();
 
             try
             {
+                //the ADR's note names the mapping, which is gone once it is deleted.
+                var existing = await _queries.GetAsync(id, cancellationToken);
+                if (existing is not null && Audit is { } audit)
+                {
+                    audit.Set("Measure", existing.Measure);
+                    audit.Set("dqm", existing.DQM);
+                    audit.Set("Frequency", existing.Frequency);
+                }
+
                 await _manager.DeleteAsync(id, cancellationToken);
             }
             catch (MeasureMappingInUseException ex)
@@ -355,6 +381,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
         [HttpDelete]
+        [Auditable(AuditEventType.Delete, "MeasureMappings", "All measure mappings deleted")]
         public async Task<IActionResult> DeleteAllMeasureMappings(CancellationToken cancellationToken)
         {
             try
