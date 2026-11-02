@@ -423,7 +423,19 @@ public sealed class TestRailPublisher(
         {
             var cacheKey = (suiteId, runName);
             if (_sharedRuns.TryGetValue(cacheKey, out var shared))
-                return await UpdateCachedRunAsync(shared, caseIds, cancellationToken);
+            {
+                // Re-read the run from TestRail rather than trusting the cache. update_run replaces
+                // case_ids, so cases added by another instance or by hand must be kept, and a run that
+                // was closed since it was cached must not be reused.
+                var refreshed = await EnsureCasesOnRunAsync(shared.RunId, caseIds, cancellationToken);
+                if (refreshed is not null)
+                {
+                    _sharedRuns[cacheKey] = refreshed;
+                    return refreshed.RunId;
+                }
+
+                _sharedRuns.Remove(cacheKey);
+            }
 
             IReadOnlyList<TestRailRunDetails> openRuns;
             try
@@ -463,39 +475,11 @@ public sealed class TestRailPublisher(
         }
     }
 
-    private async Task<int?> UpdateCachedRunAsync(
-        SharedSuiteRun shared,
-        IReadOnlyList<int> caseIds,
-        CancellationToken cancellationToken)
-    {
-        if (shared.IncludeAll)
-            return shared.RunId;
-
-        var missing = caseIds.Where(id => !shared.CaseIds.Contains(id)).ToList();
-        if (missing.Count == 0)
-            return shared.RunId;
-
-        // update_run replaces case_ids, so this is the cases already on the run plus the new ones.
-        var union = shared.CaseIds.Concat(missing).OrderBy(id => id).ToList();
-        try
-        {
-            await api.UpdateRunCaseIdsAsync(shared.RunId, union, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "TestRail update_run failed for run {TestRailRunId}.", shared.RunId);
-            return null;
-        }
-
-        foreach (var id in missing)
-            shared.CaseIds.Add(id);
-        return shared.RunId;
-    }
-
     /// <summary>
     /// Makes sure <paramref name="caseIds"/> are in the run. An include_all run already contains
     /// every case, so it is left unchanged. A selective run is updated with the union of its
-    /// current cases and the missing ones. update_run replaces case_ids.
+    /// current cases and the missing ones. update_run replaces case_ids. A completed run is
+    /// rejected, because TestRail does not accept results on it.
     /// </summary>
     private async Task<SharedSuiteRun?> EnsureCasesOnRunAsync(
         int runId,
@@ -516,6 +500,13 @@ public sealed class TestRailPublisher(
         if (run is null || run.Id <= 0)
         {
             logger.LogError("TestRail get_run returned no run for {TestRailRunId}.", runId);
+            return null;
+        }
+
+        if (run.IsCompleted)
+        {
+            // TestRail does not accept results or case changes on a closed run.
+            logger.LogWarning("TestRail run {TestRailRunId} is completed. Results were not posted.", run.Id);
             return null;
         }
 
