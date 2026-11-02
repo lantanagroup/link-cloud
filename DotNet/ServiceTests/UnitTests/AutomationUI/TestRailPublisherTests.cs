@@ -186,6 +186,94 @@ public class TestRailPublisherTests
     }
 
     [Fact]
+    public async Task Non_shared_scenario_run_keeps_hyphenated_automation_run_id()
+    {
+        var runId = Guid.Parse("8fd02ea1-3d9b-448c-926a-9ff274456c73");
+        var hyphenated = runId.ToString("D");
+        var compact = runId.ToString("N");
+
+        string? runName = null;
+        IReadOnlyList<TestRailCaseResult>? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, int, string, IReadOnlyList<int>, CancellationToken>((_, _, name, _, _) => runName = name)
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results)
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            RunId = runId,
+            ScenarioId = scenarioId,
+            RunName = "Smoke",
+            Status = AutomationRunStatus.Failed,
+            Error = "boom",
+            Logs = ["line 1"]
+        });
+
+        runName.Should().Be($"Link Automation UI - Smoke - {hyphenated}");
+        runName.Should().NotContain(compact);
+        var result = posted.Should().ContainSingle().Subject;
+        result.Comment.Should().Contain($"Automation.UI scenario run {hyphenated}");
+        result.Comment.Should().NotContain(compact);
+        result.AttachmentFileName.Should().Be($"scenario-run-{hyphenated}.log");
+    }
+
+    [Fact]
+    public async Task Non_shared_api_health_run_keeps_hyphenated_automation_run_id()
+    {
+        var runId = Guid.Parse("8b8c9fab-72c2-4a5b-b200-271587e5d5d3");
+        var hyphenated = runId.ToString("D");
+        var compact = runId.ToString("N");
+
+        string? runName = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, int, string, IReadOnlyList<int>, CancellationToken>((_, _, name, _, _) => runName = name)
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var definition = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Create Facility",
+            TestRailCaseId = 1
+        };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(runId, It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [definition.Key] = new()
+                {
+                    EndpointKey = definition.Key,
+                    EndpointName = definition.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = true
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            ConfiguredOptions(),
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(definition)]));
+
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with
+        {
+            RunId = runId,
+            Scope = "Service",
+            ServiceName = "Tenant"
+        });
+
+        runName.Should().Be($"Link Automation UI - API Health Service Tenant - {hyphenated}");
+        runName.Should().NotContain(compact);
+    }
+
+    [Fact]
     public async Task Scenario_failure_attaches_logs_when_response_has_only_id_and_test_id()
     {
         var api = new Mock<ITestRailApiClient>();

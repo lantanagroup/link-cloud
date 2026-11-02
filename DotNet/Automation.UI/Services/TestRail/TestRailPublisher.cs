@@ -77,12 +77,12 @@ public sealed class TestRailPublisher(
                 Comment = comment,
                 Elapsed = elapsed,
                 Attachment = ShouldAttach(statusId) ? EncodeAttachment(request.Logs, request.Error) : null,
-                AttachmentFileName = ShouldAttach(statusId) ? $"scenario-run-{request.RunId:N}.log" : null
+                AttachmentFileName = ShouldAttach(statusId) ? $"scenario-run-{request.RunId:D}.log" : null
             };
 
             var runName = opts.UseSharedRun
                 ? "Link Automation UI - Scenario suite"
-                : $"Link Automation UI - {request.RunName} - {request.RunId:N}";
+                : $"Link Automation UI - {request.RunName} - {request.RunId:D}";
 
             await PublishResultsAsync(
                 opts,
@@ -186,7 +186,7 @@ public sealed class TestRailPublisher(
 
             var runName = opts.UseSharedRun
                 ? "Link Automation UI - API Health suite"
-                : $"Link Automation UI - API Health {request.Scope} {request.ServiceName} - {request.RunId:N}".Trim();
+                : $"Link Automation UI - API Health {request.Scope} {request.ServiceName} - {request.RunId:D}".Trim();
 
             await PublishResultsAsync(
                 opts,
