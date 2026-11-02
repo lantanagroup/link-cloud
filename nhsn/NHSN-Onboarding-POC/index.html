@@ -374,6 +374,9 @@
     box-shadow: 0 1px 3px rgba(20,30,50,0.06);
     box-sizing: border-box;
   }
+  .census-results-panel.adt-preview { flex-basis: 580px; }
+  .census-results-panel.adt-preview th,
+  .census-results-panel.adt-preview td:nth-child(4) { white-space: normal; }
   .census-results-panel .section-title { color: var(--blue-dark); }
   .census-results-panel .summary-list li { border-bottom-color: #dce9f8; }
   .census-results-panel .table-scroll { border-color: #cfe0f5; }
@@ -848,6 +851,7 @@
             <option value="">Select a vendor…</option>
             <option value="Epic">Epic</option>
             <option value="Cerner">Cerner</option>
+            <option value="Meditech">Meditech</option>
             <option value="Other">Other</option>
           </select>
         </div>
@@ -1101,11 +1105,14 @@
               </div>
               <div id="censusFieldsCerner" hidden>
                 <div class="instructions-box">
-                  <p>If an SFTP endpoint or file extraction has not been disclosed for NHSNLink usage, the following instructions can be downloaded for your technical team to use to set up Cerner census extracts.</p><br/>
-                  <a class="download-link" href="/Cerner_Census_Instructions.pdf" target="_blank" rel="noopener">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-                    Download PDF Instructions
-                  </a>
+                  <div id="censusCInstructionsCerner">
+                    <p>If an SFTP endpoint or file extraction has not been disclosed for NHSNLink usage, the following instructions can be downloaded for your technical team to use to set up Cerner census extracts.</p><br/>
+                    <a class="download-link" href="/Cerner_Census_Instructions.pdf" target="_blank" rel="noopener">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+                      Download PDF Instructions
+                    </a>
+                  </div>
+                  <p id="censusCInstructionsMeditech" hidden>NHSNLink identifies your facility's POI from HL7 v2 ADT events delivered as files to an SFTP server. If an SFTP endpoint has not been disclosed for NHSNLink usage, work with your technical team to set one up, then enter its connection details below.</p>
                 </div>
                 <div class="form-group"><label for="censusCHost">SFTP Host URL<span class="backend-support-slot" data-support-key="censusCHost"></span></label><input type="text" id="censusCHost"><div class="error-text" id="censusCHostError">SFTP Host URL is required.</div></div>
                 <div class="form-group"><label for="censusCPort">SFTP Host URL Port<span class="backend-support-slot" data-support-key="censusCPort"></span></label><input type="number" id="censusCPort" min="1" max="65535"><div class="error-text" id="censusCPortError">SFTP Host URL Port is required.</div></div>
@@ -2436,10 +2443,11 @@
       );
     }
 
-    var censusFields = [
-      { key: 'usesAdt', label: 'Will your facility be using an HL7 V2 ADT feed for NHSNLink census management? (TRUE/FALSE)', description: '' }
-    ];
-    if (vendor === 'Epic' || vendor === 'Cerner') {
+    var censusFields = [];
+    if (vendor !== 'Meditech') {
+      censusFields.push({ key: 'usesAdt', label: 'Will your facility be using an HL7 V2 ADT feed for NHSNLink census management? (TRUE/FALSE)', description: '' });
+    }
+    if (vendor === 'Epic' || vendor === 'Cerner' || vendor === 'Meditech') {
       censusFields.push(
         { key: 'censusFreqHours', label: 'Census Acquisition Frequency - Hours', description: CENSUS_FREQ_DESCRIPTION },
         { key: 'censusFreqMinutes', label: 'Census Acquisition Frequency - Minutes', description: CENSUS_FREQ_DESCRIPTION }
@@ -2454,7 +2462,7 @@
         { key: 'discharge24to48', label: 'Discharge - Where lookback of admission is between 24 and 48 hours', description: '' },
         { key: 'dischargeGt48', label: 'Discharge - Where lookback of admission is over 48 hours', description: '' }
       );
-    } else if (vendor === 'Cerner') {
+    } else if (vendor === 'Cerner' || vendor === 'Meditech') {
       censusFields.push(
         { key: 'sftpHost', label: 'SFTP Host URL', description: '' },
         { key: 'sftpPort', label: 'SFTP Host URL Port', description: '' },
@@ -2468,7 +2476,7 @@
     var locationOrgFields = [
       { key: 'customFhirPath', label: 'Custom FHIR Path', description: "A custom FHIRPath expression used to resolve the reporting facility's Location, when applicable." }
     ];
-    if (vendor === 'Epic' || vendor === 'Cerner') {
+    if (vendor === 'Epic' || vendor === 'Cerner' || vendor === 'Meditech') {
       locationOrgFields.unshift({ key: 'locOrgMethod', label: 'Resolution Method', description: 'The method used to resolve which FHIR Location resources belong to the reporting facility.' });
     }
 
@@ -2486,7 +2494,7 @@
           data: (f.locationOrg.locationIdentifierPairs || []).map(function (p) { return [p.system || '', p.code || '']; })
         }
       });
-    } else if (vendor === 'Cerner') {
+    } else if (vendor === 'Cerner' || vendor === 'Meditech') {
       sections.push({
         title: 'Organization Identification — Location Types',
         rows: {
@@ -2494,13 +2502,15 @@
           data: (f.locationOrg.locationTypePairs || []).map(function (p) { return [p.code || '', p.alias || '']; })
         }
       });
-      sections.push({
-        title: 'Organization Identification — Managing Organizations',
-        rows: {
-          headers: ['Managing Organization'],
-          data: (f.locationOrg.managingOrgs || []).map(function (p) { return [p.value || '']; })
-        }
-      });
+      if (vendor === 'Cerner') {
+        sections.push({
+          title: 'Organization Identification — Managing Organizations',
+          rows: {
+            headers: ['Managing Organization'],
+            data: (f.locationOrg.managingOrgs || []).map(function (p) { return [p.value || '']; })
+          }
+        });
+      }
     }
 
     sections.push({
@@ -3069,6 +3079,34 @@
           r++;
         }
       });
+    } else if (f.vendor === 'Meditech') {
+      lastCol = 'H';
+      rows.push('<row r="' + r + '">' +
+        cell('A' + r, 'SFTP File Name', STYLE_COLUMN_HEADER) +
+        cell('B' + r, 'MRN', STYLE_COLUMN_HEADER) +
+        cell('C' + r, 'ADT Patient Id', STYLE_COLUMN_HEADER) +
+        cell('D' + r, 'FHIR Patient Id', STYLE_COLUMN_HEADER) +
+        cell('E' + r, 'First and Last Name', STYLE_COLUMN_HEADER) +
+        cell('F' + r, 'Admit Date', STYLE_COLUMN_HEADER) +
+        cell('G' + r, 'Discharge Date', STYLE_COLUMN_HEADER) +
+        cell('H' + r, 'Queried At', STYLE_COLUMN_HEADER) +
+        '</row>'); r++;
+      (f.census.sftpFiles || []).forEach(function (file) {
+        var queriedAt = formatQueriedAt(file.queriedAt);
+        (file.patients || []).forEach(function (p3) {
+          rows.push('<row r="' + r + '">' +
+            cell('A' + r, file.fileName) +
+            cell('B' + r, p3.mrn) +
+            cell('C' + r, p3.adtPatientId) +
+            cell('D' + r, p3.id) +
+            cell('E' + r, p3.firstName + ' ' + p3.lastName) +
+            cell('F' + r, p3.admitDate) +
+            cell('G' + r, p3.dischargeDate) +
+            cell('H' + r, queriedAt) +
+            '</row>');
+          r++;
+        });
+      });
     } else {
       rows.push('<row r="' + r + '">' +
         cell('A' + r, 'SFTP File Name', STYLE_COLUMN_HEADER) +
@@ -3098,7 +3136,8 @@
     }
 
     var colsXml = '<col min="1" max="1" width="34" customWidth="1"/><col min="2" max="2" width="26" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="18" customWidth="1"/><col min="5" max="5" width="18" customWidth="1"/>';
-    if (lastCol === 'F') colsXml += '<col min="6" max="6" width="24" customWidth="1"/>';
+    if (lastCol === 'F' || lastCol === 'H') colsXml += '<col min="6" max="6" width="24" customWidth="1"/>';
+    if (lastCol === 'H') colsXml += '<col min="7" max="7" width="18" customWidth="1"/><col min="8" max="8" width="24" customWidth="1"/>';
 
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
@@ -3129,6 +3168,7 @@
   function getJwksInstructionsPdfName(vendor) {
     if (vendor === 'Epic') return 'Epic_JWKS_Instructions.pdf';
     if (vendor === 'Cerner') return 'Cerner_JWKS_Instructions.pdf';
+    if (vendor === 'Meditech') return 'Meditech_JWKS_Instructions.pdf';
     return null;
   }
 
@@ -3694,7 +3734,7 @@
 
   function renderFhirAuthSection() {
     var vendor = facility.vendor;
-    var showJwks = vendor === 'Epic' || vendor === 'Cerner';
+    var showJwks = vendor === 'Epic' || vendor === 'Cerner' || vendor === 'Meditech';
     $('fhirJwksInstructionsWrap').hidden = !showJwks;
     $('fhirAuthOtherWrap').hidden = vendor !== 'Other';
 
@@ -3724,6 +3764,11 @@
   $('fhirContinueBtn').addEventListener('click', function () { enterStep('census'); });
 
   // ---------- census configuration ----------
+  // POI comes from files on an SFTP server: Cerner census extracts (when not using ADT) or Meditech HL7 v2 ADT events.
+  function usesSftpCensus(f) {
+    return f.vendor === 'Meditech' || (f.vendor === 'Cerner' && f.census.usesAdt === false);
+  }
+
   function collectCensusFieldsFromDom() {
     var c = facility.census;
     if (facility.vendor === 'Epic') {
@@ -3733,7 +3778,7 @@
       c.dischargeLt24 = $('censusEDischargeLt24').value;
       c.discharge24to48 = $('censusEDischarge24to48').value;
       c.dischargeGt48 = $('censusEDischargeGt48').value;
-    } else if (facility.vendor === 'Cerner') {
+    } else if (facility.vendor === 'Cerner' || facility.vendor === 'Meditech') {
       c.sftpHost = $('censusCHost').value;
       c.sftpPort = $('censusCPort').value;
       c.sftpUsername = $('censusCUsername').value;
@@ -3741,7 +3786,7 @@
       c.remoteDirectory = $('censusCRemoteDir').value;
       c.removeFilesAfterProcessing = $('censusCRemove').checked;
     }
-    if (facility.vendor === 'Epic' || facility.vendor === 'Cerner') {
+    if (facility.vendor === 'Epic' || facility.vendor === 'Cerner' || facility.vendor === 'Meditech') {
       facility.acquisitionFrequency.census = { hours: $('freqCensusHours').value, minutes: $('freqCensusMinutes').value };
     }
   }
@@ -3789,12 +3834,12 @@
 
     if (vendor === 'Epic') {
       CENSUS_EPIC_REQUIRED_FIELD_IDS.forEach(function (id) { check(requireCensusField(id), $(id)); });
-    } else if (vendor === 'Cerner') {
+    } else if (vendor === 'Cerner' || vendor === 'Meditech') {
       check(requireCensusField('censusCHost'), $('censusCHost'));
       check(requireCensusField('censusCPort'), $('censusCPort'));
     }
 
-    if (vendor === 'Epic' || vendor === 'Cerner') {
+    if (vendor === 'Epic' || vendor === 'Cerner' || vendor === 'Meditech') {
       check(validateCensusFreq(), $('freqCensusHours'));
     }
 
@@ -3833,6 +3878,23 @@
     var d = new Date();
     d.setDate(d.getDate() - (seed % 6));
     return d.toISOString().slice(0, 10);
+  }
+
+  function mockDischargeDate(seed) {
+    // Odd seeds have a discharge event on file; even seeds are still admitted.
+    if (seed % 2 === 0) return '';
+    var d = new Date();
+    d.setDate(d.getDate() - Math.floor((seed % 6) / 2));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function mockAdtPatient(seed) {
+    var p = mockCensusPatient(seed);
+    p.mrn = 'MRN' + (700000 + seed);
+    p.adtPatientId = 'ADT' + (500000 + seed);
+    p.admitDate = mockAdmitDate(seed);
+    p.dischargeDate = mockDischargeDate(seed);
+    return p;
   }
 
   function formatQueriedAt(iso) {
@@ -3935,8 +3997,15 @@
 
   function renderSftpFileResultsBody(fileInfo) {
     var patients = fileInfo.patients || [];
+    var isAdt = facility.vendor === 'Meditech';
+    var headers = isAdt
+      ? ['MRN', 'ADT Patient Id', 'FHIR Patient Id', 'First and Last Name', 'Admit Date', 'Discharge Date']
+      : ['FHIR Patient Id', 'Last Name', 'First Name', 'Admit Date'];
     var rows = patients.map(function (p) {
-      return '<tr><td>' + escapeHtml(p.id) + '</td><td>' + escapeHtml(p.lastName) + '</td><td>' + escapeHtml(p.firstName) + '</td><td>' + escapeHtml(p.admitDate) + '</td></tr>';
+      var cells = isAdt
+        ? [p.mrn, p.adtPatientId, p.id, p.firstName + ' ' + p.lastName, p.admitDate, p.dischargeDate]
+        : [p.id, p.lastName, p.firstName, p.admitDate];
+      return '<tr>' + cells.map(function (val) { return '<td>' + escapeHtml(val) + '</td>'; }).join('') + '</tr>';
     });
 
     var html = '<ul class="summary-list" style="margin-bottom:16px;">' +
@@ -3944,7 +4013,7 @@
       '<li><span>Queried At</span><span>' + escapeHtml(formatQueriedAt(fileInfo.queriedAt)) + '</span></li>' +
       '<li><span>Patient Count</span><span>' + escapeHtml(String(patients.length)) + '</span></li>' +
       '</ul>' +
-      '<div class="table-scroll"><table><thead><tr><th>FHIR Patient Id</th><th>Last Name</th><th>First Name</th><th>Admit Date</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+      '<div class="table-scroll"><table><thead><tr>' + headers.map(function (h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
 
     $('censusResultsPanelBody').innerHTML = html;
     fixTableScrollWidth($('censusResultsPanelBody'));
@@ -4005,7 +4074,8 @@
     });
   }
 
-  function generateMockSftpFiles() {
+  function generateMockSftpFiles(vendor) {
+    var isAdt = vendor === 'Meditech';
     var today = new Date().toISOString().slice(0, 10);
     var queriedAt = new Date().toISOString();
     var count = 2 + Math.floor(Math.random() * 4);
@@ -4015,12 +4085,12 @@
       var seedBase = i * 100;
       var patients = [];
       for (var j = 0; j < patientCount; j++) {
-        var p = mockCensusPatient(seedBase + j);
+        var p = isAdt ? mockAdtPatient(seedBase + j) : mockCensusPatient(seedBase + j);
         p.admitDate = mockAdmitDate(seedBase + j);
         patients.push(p);
       }
       files.push({
-        fileName: 'census_extract_' + (i + 1) + '_' + today + '.csv',
+        fileName: isAdt ? 'adt_events_' + (i + 1) + '_' + today + '.hl7' : 'census_extract_' + (i + 1) + '_' + today + '.csv',
         patientCount: patientCount,
         queriedAt: queriedAt,
         patients: patients
@@ -4031,10 +4101,9 @@
 
   function renderSftpFilesTable() {
     var wrap = $('censusResultsWrap');
-    var vendor = facility.vendor;
     var c = facility.census;
 
-    if (!c.validated || c.usesAdt !== false || vendor !== 'Cerner') {
+    if (!c.validated || !usesSftpCensus(facility)) {
       wrap.hidden = true;
       return;
     }
@@ -4069,13 +4138,13 @@
   function renderCensusPanelState() {
     var c = facility.census;
 
-    if (facility.vendor === 'Other' && c.usesAdt !== true) {
+    if ((facility.vendor === 'Other' || facility.vendor === 'Meditech') && c.usesAdt !== true) {
       c.usesAdt = true;
       c.validated = false;
       c.accurate = null;
       saveFacility();
     }
-    $('censusAdtQuestionWrap').hidden = facility.vendor === 'Other';
+    $('censusAdtQuestionWrap').hidden = facility.vendor === 'Other' || facility.vendor === 'Meditech';
 
     $('censusAdtQuestion').querySelectorAll('.choice-btn').forEach(function (b) {
       b.classList.toggle('selected', c.usesAdt !== null && (b.getAttribute('data-value') === 'true') === c.usesAdt);
@@ -4088,16 +4157,20 @@
     vendorWrap.hidden = true;
     adtTodoWrap.hidden = true;
 
-    if (c.usesAdt === true) {
+    var isEpicCensus = facility.vendor === 'Epic' && c.usesAdt === false;
+    var isSftpCensus = usesSftpCensus(facility);
+
+    if (isSftpCensus) {
+      vendorWrap.hidden = false;
+      cernerEl.hidden = false;
+      $('censusCInstructionsCerner').hidden = facility.vendor === 'Meditech';
+      $('censusCInstructionsMeditech').hidden = facility.vendor !== 'Meditech';
+    } else if (c.usesAdt === true) {
       adtTodoWrap.hidden = false;
     } else if (c.usesAdt === false) {
       vendorWrap.hidden = false;
       if (facility.vendor === 'Epic') epicEl.hidden = false;
-      else if (facility.vendor === 'Cerner') cernerEl.hidden = false;
     }
-
-    var isEpicCensus = facility.vendor === 'Epic' && c.usesAdt === false;
-    var isCernerCensus = facility.vendor === 'Cerner' && c.usesAdt === false;
 
     var selectedField = null;
     if (isEpicCensus && c.validated && c.selectedListKey) {
@@ -4105,25 +4178,26 @@
       if (!selectedField) c.selectedListKey = null;
     }
     var selectedSftpFile = null;
-    if (isCernerCensus && c.validated && c.selectedSftpFile) {
+    if (isSftpCensus && c.validated && c.selectedSftpFile) {
       selectedSftpFile = (c.sftpFiles || []).filter(function (f) { return f.fileName === c.selectedSftpFile; })[0] || null;
       if (!selectedSftpFile) c.selectedSftpFile = null;
     }
 
-    var showResultsPanel = (isEpicCensus && c.validated && !!selectedField) || (isCernerCensus && c.validated && !!selectedSftpFile);
+    var showResultsPanel = (isEpicCensus && c.validated && !!selectedField) || (isSftpCensus && c.validated && !!selectedSftpFile);
     $('panel-census').classList.toggle('census-two-col', showResultsPanel);
     $('censusResultsPanel').hidden = !showResultsPanel;
+    $('censusResultsPanel').classList.toggle('adt-preview', facility.vendor === 'Meditech');
     if (isEpicCensus) renderEpicListIndicators(selectedField);
-    if (isCernerCensus) renderSftpPanelBody(selectedSftpFile);
-    if (showResultsPanel) alignCensusResultsPanel();
+    if (isSftpCensus) renderSftpPanelBody(selectedSftpFile);
 
-    $('censusFreqWrap').hidden = !(c.usesAdt === false && (facility.vendor === 'Epic' || facility.vendor === 'Cerner'));
+    $('censusFreqWrap').hidden = !(isEpicCensus || isSftpCensus);
     $('censusValidateRow').hidden = c.usesAdt === null;
-    $('censusExportBtn').hidden = !(c.validated && c.usesAdt === false && (facility.vendor === 'Epic' || facility.vendor === 'Cerner'));
+    $('censusExportBtn').hidden = !(c.validated && (isEpicCensus || isSftpCensus));
     renderSftpFilesTable();
     $('censusAccuracyWrap').hidden = !c.validated;
     $('censusAccuracyAckCheckbox').checked = !!c.accurate;
     $('censusAccuracyContinueBtn').disabled = !c.accurate;
+    if (showResultsPanel) alignCensusResultsPanel();
   }
 
   $('censusAdtQuestion').querySelectorAll('.choice-btn').forEach(function (btn) {
@@ -4151,10 +4225,10 @@
       $('censusResultsPanel').hidden = true;
       saveFacility();
       startEpicListValidation();
-    } else if (facility.vendor === 'Cerner') {
+    } else if (facility.vendor === 'Cerner' || facility.vendor === 'Meditech') {
       facility.census.validated = true;
       facility.census.selectedSftpFile = null;
-      facility.census.sftpFiles = generateMockSftpFiles();
+      facility.census.sftpFiles = generateMockSftpFiles(facility.vendor);
       saveFacility();
       renderCensusPanelState();
     } else {
@@ -4282,11 +4356,21 @@
         { value: 'ManagingOrg', label: 'Managing Organization' },
         { value: 'CustomFHIRPath', label: 'Custom FHIRPath' }
       ];
+    } else if (vendor === 'Meditech') {
+      options = [
+        { value: 'LocationType', label: 'Location Type' },
+        { value: 'CustomFHIRPath', label: 'Custom FHIRPath' }
+      ];
     } else if (vendor === 'Epic') {
       options = [
         { value: 'LocationIdentifier', label: 'Location Identifier' },
         { value: 'CustomFHIRPath', label: 'Custom FHIRPath' }
       ];
+    }
+
+    // A method carried over from a previous vendor selection may not be offered for this one.
+    if (options.length && !options.some(function (opt) { return opt.value === facility.locationOrg.method; })) {
+      facility.locationOrg.method = '';
     }
 
     if (options.length) {
@@ -4424,7 +4508,7 @@
   // ---------- HSLOC location mapping ----------
   function getHslocFieldLabel(vendor) {
     if (vendor === 'Epic') return 'Location.identifier value';
-    if (vendor === 'Cerner') return 'Location.alias value';
+    if (vendor === 'Cerner' || vendor === 'Meditech') return 'Location.alias value';
     return 'Location value';
   }
 
@@ -4648,7 +4732,7 @@
 
   function renderHslocPanel() {
     var vendor = facility.vendor;
-    var isOther = vendor !== 'Epic' && vendor !== 'Cerner';
+    var isOther = vendor !== 'Epic' && vendor !== 'Cerner' && vendor !== 'Meditech';
     $('hslocFieldsOther').hidden = !isOther;
     $('hslocFieldsMapping').hidden = isOther;
 
@@ -5988,6 +6072,8 @@
   // Reference FHIR query plans (source: NHSNLink example query plans per EHR/version).
   var CERNER_QUERY_PLAN = {"Id":"4d6e65ad-892b-4cb2-b901-695fd6fa807a","PlanName":"Cerner-ACHMonthly","FacilityId":"6d889fbd-10d3-4805-90b0-057592cf14bb","EHRDescription":"Cerner","LookBack":"P0D","InitialQueries":{"0":{"queryConfigType":"Parameter","resourceType":"Encounter","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"}]},"1":{"queryConfigType":"Reference","resourceType":"Location","operationType":2,"paged":100}},"SupplementalQueries":{"0":{"resourceType":"Condition","queryConfigType":"Parameter","parameters":[{"parameterType":"Variable","name":"patient","variable":0,"format":null}]},"1":{"resourceType":"Coverage","queryConfigType":"Parameter","parameters":[{"parameterType":"Variable","name":"patient","variable":0,"format":null}]},"2":{"queryConfigType":"Parameter","resourceType":"DiagnosticReport","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"}]},"3":{"queryConfigType":"Parameter","resourceType":"MedicationAdministration","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"effective-time","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"effective-time","variable":3,"format":"le{0}"}]},"4":{"resourceType":"MedicationRequest","queryConfigType":"Parameter","parameters":[{"parameterType":"Variable","name":"patient","variable":0,"format":null}]},"5":{"resourceType":"Observation","queryConfigType":"Parameter","parameters":[{"parameterType":"Variable","name":"patient","variable":0,"format":null},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"category","literal":"imaging,laboratory,procedure,social-history,survey,vital-signs"}]},"6":{"queryConfigType":"Parameter","resourceType":"Procedure","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"}]},"7":{"resourceType":"ServiceRequest","queryConfigType":"Parameter","parameters":[{"parameterType":"Variable","name":"patient","variable":0,"format":null}]},"8":{"queryConfigType":"Reference","resourceType":"Device","operationType":2,"paged":100},"9":{"resourceType":"Medication","queryConfigType":"Reference","operationType":2,"paged":100},"10":{"queryConfigType":"Reference","resourceType":"Specimen","operationType":2,"paged":100}},"Type":"Discharge"};
 
+  var MEDITECH_QUERY_PLAN = Object.assign({}, CERNER_QUERY_PLAN, { PlanName: 'Meditech-ACHMonthly', EHRDescription: 'Meditech' });
+
   var EPIC_QUERY_PLAN = {"Id":"09d5eff0-1ac6-457a-947b-cad8cfed8bd4","PlanName":"Epic-ACHMonthly","FacilityId":"umich-beta-cdc","EHRDescription":"Epic","LookBack":"P0D","InitialQueries":{"0":{"queryConfigType":"Parameter","resourceType":"Encounter","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"_include","literal":"Encounter:location"}]}},"SupplementalQueries":{"0":{"queryConfigType":"Parameter","resourceType":"Condition","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"recorded-date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"recorded-date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"category","literal":"encounter-diagnosis,health-concern,problem-list-item"}]},"1":{"queryConfigType":"Parameter","resourceType":"Observation","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"category","literal":"imaging,laboratory,social-history,vital-signs"},{"parameterType":"Literal","name":"_include","literal":"Observation:specimen"}]},"2":{"queryConfigType":"Parameter","resourceType":"Coverage","parameters":[{"parameterType":"Variable","name":"patient","variable":0}]},"3":{"queryConfigType":"Parameter","resourceType":"Procedure","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"}]},"4":{"queryConfigType":"Parameter","resourceType":"ServiceRequest","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"authored","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"authored","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"_include","literal":"ServiceRequest:specimen"}]},"5":{"queryConfigType":"Parameter","resourceType":"DiagnosticReport","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"category","literal":"LAB,LP29708-2,LP7839-6,LP29684-5"}]},"6":{"queryConfigType":"Parameter","resourceType":"MedicationRequest","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"authoredon","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"authoredon","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"intent","literal":"order"},{"parameterType":"Literal","name":"_include","literal":"MedicationRequest:medication"}]},"7":{"queryConfigType":"Reference","resourceType":"Device","operationType":2,"paged":150}},"Type":"Discharge"};
 
   var EPIC_QUERY_PLAN_NO_INCLUDE = {"Id":"1e8716da-c36d-47e4-a3f7-1c73578c66dc","PlanName":"Epic-ACHMonthly-NoInclude","FacilityId":"10116-ucdavis","EHRDescription":"Epic","LookBack":"P0D","InitialQueries":{"0":{"queryConfigType":"Parameter","resourceType":"Encounter","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"}]},"1":{"queryConfigType":"Reference","resourceType":"Location","operationType":2,"paged":100}},"SupplementalQueries":{"0":{"queryConfigType":"Parameter","resourceType":"Condition","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"recorded-date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"recorded-date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"category","literal":"encounter-diagnosis,health-concern,problem-list-item"}]},"1":{"queryConfigType":"Parameter","resourceType":"Observation","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"category","literal":"imaging,laboratory,social-history,vital-signs"}]},"2":{"queryConfigType":"Parameter","resourceType":"Coverage","parameters":[{"parameterType":"Variable","name":"patient","variable":0}]},"3":{"queryConfigType":"Parameter","resourceType":"Procedure","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"}]},"4":{"queryConfigType":"Parameter","resourceType":"ServiceRequest","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"authored","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"authored","variable":3,"format":"le{0}"}]},"5":{"queryConfigType":"Parameter","resourceType":"DiagnosticReport","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"date","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"date","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"category","literal":"LAB,LP29708-2,LP7839-6,LP29684-5"}]},"6":{"queryConfigType":"Parameter","resourceType":"MedicationRequest","parameters":[{"parameterType":"Variable","name":"patient","variable":0},{"parameterType":"Variable","name":"authoredon","variable":1,"format":"ge{0}"},{"parameterType":"Variable","name":"authoredon","variable":3,"format":"le{0}"},{"parameterType":"Literal","name":"intent","literal":"order"}]},"7":{"queryConfigType":"Reference","resourceType":"Device","operationType":2,"paged":150},"8":{"queryConfigType":"Reference","resourceType":"Specimen","operationType":2,"paged":100},"9":{"queryConfigType":"Reference","resourceType":"Medication","operationType":2,"paged":100}},"Type":"Discharge"};
@@ -6108,7 +6194,7 @@
       }
       return { type: 'LocationIdentifier', system: 'urn:oid:9.9.9.9.9.9.999999', code: 'UNMAPPED-' + seed };
     }
-    if (vendor === 'Cerner' && method === 'LocationType') {
+    if ((vendor === 'Cerner' || vendor === 'Meditech') && method === 'LocationType') {
       var typePairs = (facility.locationOrg.locationTypePairs || []).filter(function (p) { return p.code; });
       if (wantMatch && typePairs.length) {
         var typePair = typePairs[seed % typePairs.length];
@@ -6722,7 +6808,7 @@
     });
   }
 
-  function getCernerFileSources(census) {
+  function getSftpFileSources(census) {
     return (census.sftpFiles || []).map(function (file, idx) {
       return { key: String(idx), label: file.fileName, patients: file.patients || [], showAdmitDate: true };
     });
@@ -6739,8 +6825,8 @@
         listPatients[field.key] = patients;
       });
       return getEpicListSources({ listPatients: listPatients });
-    } else if (vendor === 'Cerner') {
-      return getCernerFileSources({ sftpFiles: generateMockSftpFiles() });
+    } else if (vendor === 'Cerner' || vendor === 'Meditech') {
+      return getSftpFileSources({ sftpFiles: generateMockSftpFiles(vendor) });
     }
     return [];
   }
@@ -6857,12 +6943,12 @@
   function renderCensusPullTab() {
     var vendor = facility.vendor;
     var isEpic = vendor === 'Epic';
-    var isCerner = vendor === 'Cerner';
-    $('patientIdCensusOtherNotice').hidden = isEpic || isCerner;
-    $('patientIdCensusBody').hidden = !(isEpic || isCerner);
-    if (!isEpic && !isCerner) return;
+    var isSftp = vendor === 'Cerner' || vendor === 'Meditech';
+    $('patientIdCensusOtherNotice').hidden = isEpic || isSftp;
+    $('patientIdCensusBody').hidden = !(isEpic || isSftp);
+    if (!isEpic && !isSftp) return;
 
-    var sources = isEpic ? getEpicListSources(facility.census) : getCernerFileSources(facility.census);
+    var sources = isEpic ? getEpicListSources(facility.census) : getSftpFileSources(facility.census);
     if (!sources.some(function (s) { return s.key === censusPullSelectedKey; })) censusPullSelectedKey = null;
     var selectedSource = sources.filter(function (s) { return s.key === censusPullSelectedKey; })[0] || null;
 
@@ -6882,10 +6968,10 @@
   function renderNewPullTab() {
     var vendor = facility.vendor;
     var isEpic = vendor === 'Epic';
-    var isCerner = vendor === 'Cerner';
-    $('patientIdNewPullOtherNotice').hidden = isEpic || isCerner;
-    $('patientIdNewPullBody').hidden = !(isEpic || isCerner);
-    if (!isEpic && !isCerner) return;
+    var isSftp = vendor === 'Cerner' || vendor === 'Meditech';
+    $('patientIdNewPullOtherNotice').hidden = isEpic || isSftp;
+    $('patientIdNewPullBody').hidden = !(isEpic || isSftp);
+    if (!isEpic && !isSftp) return;
 
     $('patientIdNewPullResult').hidden = !newPullSources;
     if (!newPullSources) return;
@@ -6904,7 +6990,7 @@
 
   $('patientIdRunPullBtn').addEventListener('click', function () {
     var vendor = facility.vendor;
-    if (vendor !== 'Epic' && vendor !== 'Cerner') return;
+    if (vendor !== 'Epic' && vendor !== 'Cerner' && vendor !== 'Meditech') return;
     $('patientIdRunPullBtn').disabled = true;
     $('patientIdRunPullBtn').textContent = 'Running Census Pull…';
     setTimeout(function () {
@@ -7193,7 +7279,7 @@
       return;
     }
 
-    $('rdViewQueryPlanBtn').hidden = (facility.vendor !== 'Epic' && facility.vendor !== 'Cerner');
+    $('rdViewQueryPlanBtn').hidden = (facility.vendor !== 'Epic' && facility.vendor !== 'Cerner' && facility.vendor !== 'Meditech');
 
     $('rdReportId').textContent = r.reportId;
     $('rdPeriod').textContent = r.startDate + ' to ' + r.endDate;
@@ -7430,7 +7516,7 @@
       buildReportDetailsXlsxFile(r),
       buildAcquisitionLogXlsxFile(r.reportId)
     ];
-    if (facility.vendor === 'Epic' || facility.vendor === 'Cerner') {
+    if (facility.vendor === 'Epic' || facility.vendor === 'Cerner' || facility.vendor === 'Meditech') {
       parts.push(buildQueryPlanXlsxFile());
     }
     return Promise.all(parts.map(function (p) { return p.blob.arrayBuffer(); })).then(function (buffers) {
@@ -7464,7 +7550,7 @@
     if (vendor === 'Epic' && method === 'LocationIdentifier') {
       return { type: 'LocationIdentifier', headers: ['Location Identifier System', 'Location Identifier Code'], rows: facility.locationOrg.locationIdentifierPairs || [] };
     }
-    if (vendor === 'Cerner' && method === 'LocationType') {
+    if ((vendor === 'Cerner' || vendor === 'Meditech') && method === 'LocationType') {
       return { type: 'LocationType', headers: ['Location Type Code', 'Location Alias'], rows: facility.locationOrg.locationTypePairs || [] };
     }
     if (vendor === 'Cerner' && method === 'ManagingOrg') {
@@ -7557,7 +7643,7 @@
   function openLocationOrgCheckModal(reportId, pid, dqm) {
     locationOrgCheckContext = { reportId: reportId, pid: pid, dqm: dqm };
     $('locCheckPatientId').textContent = pid;
-    var methodLabels = { LocationIdentifier: 'Location Identifier (Epic)', LocationType: 'Location Type (Cerner)', ManagingOrg: 'Managing Organization (Cerner)' };
+    var methodLabels = { LocationIdentifier: 'Location Identifier (Epic)', LocationType: 'Location Type (' + facility.vendor + ')', ManagingOrg: 'Managing Organization (Cerner)' };
     $('locCheckMethod').textContent = methodLabels[facility.locationOrg.method] || '(not configured)';
     renderLocationOrgCheckBody();
     $('locationOrgCheckModal').hidden = false;
@@ -7803,6 +7889,8 @@
     var plan, epicVersionLabel;
     if (vendor === 'Cerner') {
       plan = CERNER_QUERY_PLAN;
+    } else if (vendor === 'Meditech') {
+      plan = MEDITECH_QUERY_PLAN;
     } else {
       var useNoInclude = Math.random() < 0.5;
       plan = useNoInclude ? EPIC_QUERY_PLAN_NO_INCLUDE : EPIC_QUERY_PLAN;
@@ -8005,7 +8093,7 @@
 
   function renderCompleteSummary() {
     var f = facility;
-    var censusMethod = f.census.usesAdt ? 'ADT (not yet supported)' : (f.vendor === 'Other' ? 'ADT (not yet supported)' : f.vendor);
+    var censusMethod = f.vendor === 'Meditech' ? 'HL7 v2 ADT via SFTP' : (f.census.usesAdt ? 'ADT (not yet supported)' : (f.vendor === 'Other' ? 'ADT (not yet supported)' : f.vendor));
     var rows = [
       ['Facility ID', f.facilityId],
       ['Facility Name', f.facilityName],
