@@ -16,8 +16,12 @@ public sealed class TestRailPublisher(
     ILogger<TestRailPublisher> logger) : ITestRailPublisher
 {
     private const int MaxCommentChars = 20_000;
+    internal const string SharedScenarioRunName = "Link Automation UI - Scenario suite";
+    internal const string SharedApiHealthRunName = "Link Automation UI - API Health suite";
     private readonly SemaphoreSlim _sharedRunGate = new(1, 1);
-    private readonly Dictionary<int, SharedSuiteRun> _sharedRuns = new();
+    // Suite id alone is not enough: scenario and API Health may share a suite and still
+    // publish to differently named runs.
+    private readonly Dictionary<(int SuiteId, string RunName), SharedSuiteRun> _sharedRuns = new();
     private readonly TestRailTargetResolver _targets = new(api, logger);
 
     public async Task PublishScenarioRunAsync(
@@ -61,7 +65,7 @@ public sealed class TestRailPublisher(
 
             if (caseId is null)
             {
-                logger.LogInformation(
+                logger.LogWarning(
                     "TestRail publisher skipped for scenario run {RunId}: no TestRail case id mapped.",
                     request.RunId);
                 return;
@@ -81,7 +85,7 @@ public sealed class TestRailPublisher(
             };
 
             var runName = opts.UseSharedRun
-                ? "Link Automation UI - Scenario suite"
+                ? SharedScenarioRunName
                 : $"Link Automation UI - {request.RunName} - {request.RunId:N}";
 
             await PublishResultsAsync(
@@ -185,7 +189,7 @@ public sealed class TestRailPublisher(
             }
 
             var runName = opts.UseSharedRun
-                ? "Link Automation UI - API Health suite"
+                ? SharedApiHealthRunName
                 : $"Link Automation UI - API Health {request.Scope} {request.ServiceName} - {request.RunId:N}".Trim();
 
             await PublishResultsAsync(
@@ -317,7 +321,9 @@ public sealed class TestRailPublisher(
         int? runId;
         if (opts.UseSharedRun && configuredSharedRunId is > 0)
         {
-            runId = configuredSharedRunId;
+            // A pinned run created with include_all false rejects results for cases it does not
+            // contain. Read the run and add any missing cases before posting.
+            runId = await EnsurePinnedRunAsync(configuredSharedRunId.Value, caseIds, cancellationToken);
         }
         else
         {
@@ -382,6 +388,24 @@ public sealed class TestRailPublisher(
         }
     }
 
+    private async Task<int?> EnsurePinnedRunAsync(
+        int runId,
+        IReadOnlyList<int> caseIds,
+        CancellationToken cancellationToken)
+    {
+        // Same in-process gate as run creation. Two overlapping updates would each replace case_ids.
+        await _sharedRunGate.WaitAsync(cancellationToken);
+        try
+        {
+            var ensured = await EnsureCasesOnRunAsync(runId, caseIds, cancellationToken);
+            return ensured?.RunId;
+        }
+        finally
+        {
+            _sharedRunGate.Release();
+        }
+    }
+
     private async Task<int?> GetOrCreateRunAsync(
         TestRailOptions opts,
         int projectId,
@@ -397,38 +421,150 @@ public sealed class TestRailPublisher(
         await _sharedRunGate.WaitAsync(cancellationToken);
         try
         {
-            if (_sharedRuns.TryGetValue(suiteId, out var shared))
+            var cacheKey = (suiteId, runName);
+            if (_sharedRuns.TryGetValue(cacheKey, out var shared))
+                return await UpdateCachedRunAsync(shared, caseIds, cancellationToken);
+
+            IReadOnlyList<TestRailRunDetails> openRuns;
+            try
             {
-                var missing = caseIds.Where(id => !shared.CaseIds.Contains(id)).ToList();
-                if (missing.Count == 0)
-                    return shared.RunId;
+                openRuns = await api.GetOpenRunsAsync(projectId, suiteId, cancellationToken) ?? [];
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "TestRail get_runs failed for suite {SuiteId}.", suiteId);
+                return null;
+            }
 
-                // update_run replaces case_ids, so this is the cases already on the run plus the new ones.
-                var union = shared.CaseIds.Concat(missing).OrderBy(id => id).ToList();
-                try
-                {
-                    await api.UpdateRunCaseIdsAsync(shared.RunId, union, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "TestRail update_run failed for run {TestRailRunId}.", shared.RunId);
+            // First match in get_runs order. TestRail lists newer runs first.
+            var match = openRuns.FirstOrDefault(run => IsReusableSharedRun(run, suiteId, runName));
+            if (match is not null)
+            {
+                var adopted = await EnsureCasesOnRunAsync(match.Id, caseIds, cancellationToken);
+                if (adopted is null)
                     return null;
-                }
 
-                foreach (var id in missing)
-                    shared.CaseIds.Add(id);
-                return shared.RunId;
+                _sharedRuns[cacheKey] = adopted;
+                logger.LogInformation(
+                    "Reusing open TestRail run {TestRailRunId} named {RunName}.",
+                    adopted.RunId,
+                    runName);
+                return adopted.RunId;
             }
 
             var created = await CreateRunAsync(projectId, suiteId, runName, caseIds, cancellationToken);
             if (created is int runId)
-                _sharedRuns[suiteId] = new SharedSuiteRun(runId, caseIds);
+                _sharedRuns[cacheKey] = new SharedSuiteRun(runId, includeAll: false, caseIds);
             return created;
         }
         finally
         {
             _sharedRunGate.Release();
         }
+    }
+
+    private async Task<int?> UpdateCachedRunAsync(
+        SharedSuiteRun shared,
+        IReadOnlyList<int> caseIds,
+        CancellationToken cancellationToken)
+    {
+        if (shared.IncludeAll)
+            return shared.RunId;
+
+        var missing = caseIds.Where(id => !shared.CaseIds.Contains(id)).ToList();
+        if (missing.Count == 0)
+            return shared.RunId;
+
+        // update_run replaces case_ids, so this is the cases already on the run plus the new ones.
+        var union = shared.CaseIds.Concat(missing).OrderBy(id => id).ToList();
+        try
+        {
+            await api.UpdateRunCaseIdsAsync(shared.RunId, union, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "TestRail update_run failed for run {TestRailRunId}.", shared.RunId);
+            return null;
+        }
+
+        foreach (var id in missing)
+            shared.CaseIds.Add(id);
+        return shared.RunId;
+    }
+
+    /// <summary>
+    /// Makes sure <paramref name="caseIds"/> are in the run. An include_all run already contains
+    /// every case, so it is left unchanged. A selective run is updated with the union of its
+    /// current cases and the missing ones. update_run replaces case_ids.
+    /// </summary>
+    private async Task<SharedSuiteRun?> EnsureCasesOnRunAsync(
+        int runId,
+        IReadOnlyList<int> caseIds,
+        CancellationToken cancellationToken)
+    {
+        TestRailRunDetails? run;
+        try
+        {
+            run = await api.GetRunAsync(runId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "TestRail get_run failed for run {TestRailRunId}.", runId);
+            return null;
+        }
+
+        if (run is null || run.Id <= 0)
+        {
+            logger.LogError("TestRail get_run returned no run for {TestRailRunId}.", runId);
+            return null;
+        }
+
+        if (run.IncludeAll)
+            return new SharedSuiteRun(run.Id, includeAll: true, caseIds);
+
+        IReadOnlyList<int>? existing;
+        try
+        {
+            existing = await api.GetRunCaseIdsAsync(run.Id, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "TestRail get_tests failed for run {TestRailRunId}.", run.Id);
+            return null;
+        }
+
+        if (existing is null)
+        {
+            logger.LogError("TestRail get_tests returned no case list for run {TestRailRunId}.", run.Id);
+            return null;
+        }
+
+        var have = existing.ToHashSet();
+        var missing = caseIds.Where(id => !have.Contains(id)).ToList();
+        var union = have.Concat(missing).Distinct().OrderBy(id => id).ToList();
+        if (missing.Count > 0)
+        {
+            try
+            {
+                await api.UpdateRunCaseIdsAsync(run.Id, union, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "TestRail update_run failed for run {TestRailRunId}.", run.Id);
+                return null;
+            }
+        }
+
+        return new SharedSuiteRun(run.Id, includeAll: false, union);
+    }
+
+    private static bool IsReusableSharedRun(TestRailRunDetails run, int suiteId, string runName)
+    {
+        if (run.Id <= 0 || run.IsCompleted)
+            return false;
+        if (run.SuiteId > 0 && run.SuiteId != suiteId)
+            return false;
+        return string.Equals(run.Name.Trim(), runName.Trim(), StringComparison.Ordinal);
     }
 
     private async Task<int?> CreateRunAsync(
@@ -449,9 +585,10 @@ public sealed class TestRailPublisher(
         }
     }
 
-    private sealed class SharedSuiteRun(int runId, IReadOnlyList<int> caseIds)
+    private sealed class SharedSuiteRun(int runId, bool includeAll, IReadOnlyList<int> caseIds)
     {
         public int RunId { get; } = runId;
+        public bool IncludeAll { get; } = includeAll;
         public HashSet<int> CaseIds { get; } = [.. caseIds];
     }
 

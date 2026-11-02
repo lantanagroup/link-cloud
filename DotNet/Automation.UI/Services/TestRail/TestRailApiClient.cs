@@ -196,6 +196,134 @@ public sealed class TestRailApiClient : ITestRailApiClient
         return items;
     }
 
+    public async Task<TestRailRunDetails?> GetRunAsync(int runId, CancellationToken cancellationToken = default)
+    {
+        using var doc = await GetJsonAsync($"get_run/{runId}", cancellationToken);
+        if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var run = ReadRun(doc.RootElement);
+        return run.Id > 0 ? run : null;
+    }
+
+    public async Task<IReadOnlyList<int>> GetRunCaseIdsAsync(int runId, CancellationToken cancellationToken = default)
+    {
+        var ids = new List<int>();
+        var offset = 0;
+        for (var page = 0; page < MaxProjectPages; page++)
+        {
+            var path = offset == 0 ? $"get_tests/{runId}" : $"get_tests/{runId}&offset={offset}";
+            var (count, hasNext) = await ReadPageAsync(path, "tests", element =>
+            {
+                if (element.TryGetProperty("case_id", out var caseId) && caseId.TryGetInt32(out var value) && value > 0)
+                    ids.Add(value);
+            }, cancellationToken);
+
+            if (!hasNext || count == 0)
+                break;
+            offset += count;
+        }
+
+        return ids;
+    }
+
+    public async Task<IReadOnlyList<TestRailRunDetails>> GetOpenRunsAsync(
+        int projectId,
+        int suiteId,
+        CancellationToken cancellationToken = default)
+    {
+        var runs = new List<TestRailRunDetails>();
+        var offset = 0;
+        for (var page = 0; page < MaxProjectPages; page++)
+        {
+            var path = offset == 0
+                ? $"get_runs/{projectId}&suite_id={suiteId}&is_completed=0"
+                : $"get_runs/{projectId}&suite_id={suiteId}&is_completed=0&offset={offset}";
+            var (count, hasNext) = await ReadPageAsync(path, "runs", element =>
+            {
+                var run = ReadRun(element);
+                if (run.Id > 0)
+                    runs.Add(run);
+            }, cancellationToken);
+
+            if (!hasNext || count == 0)
+                break;
+            offset += count;
+        }
+
+        return runs;
+    }
+
+    private async Task<(int Count, bool HasNext)> ReadPageAsync(
+        string path,
+        string listProperty,
+        Action<JsonElement> onItem,
+        CancellationToken cancellationToken)
+    {
+        using var doc = await GetJsonAsync(path, cancellationToken);
+        var root = doc.RootElement;
+        var list = root;
+        var hasNext = false;
+        if (root.ValueKind == JsonValueKind.Object)
+        {
+            if (!root.TryGetProperty(listProperty, out list))
+                return (0, false);
+            hasNext = HasNextLink(root);
+        }
+
+        if (list.ValueKind != JsonValueKind.Array)
+            return (0, false);
+
+        var count = 0;
+        foreach (var element in list.EnumerateArray())
+        {
+            count++;
+            if (element.ValueKind == JsonValueKind.Object)
+                onItem(element);
+        }
+
+        return (count, hasNext);
+    }
+
+    private static bool HasNextLink(JsonElement root) =>
+        root.TryGetProperty("_links", out var links)
+        && links.ValueKind == JsonValueKind.Object
+        && links.TryGetProperty("next", out var next)
+        && next.ValueKind == JsonValueKind.String
+        && !string.IsNullOrWhiteSpace(next.GetString());
+
+    private static TestRailRunDetails ReadRun(JsonElement element)
+    {
+        var id = element.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var idValue) ? idValue : 0;
+        var name = element.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+            ? nameElement.GetString() ?? string.Empty
+            : string.Empty;
+        var suiteId = element.TryGetProperty("suite_id", out var suiteElement) && suiteElement.TryGetInt32(out var suiteValue)
+            ? suiteValue
+            : 0;
+        return new TestRailRunDetails
+        {
+            Id = id,
+            Name = name,
+            SuiteId = suiteId,
+            IncludeAll = ReadFlag(element, "include_all"),
+            IsCompleted = ReadFlag(element, "is_completed")
+        };
+    }
+
+    private static bool ReadFlag(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var value))
+            return false;
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.Number => value.TryGetInt32(out var number) && number != 0,
+            _ => false
+        };
+    }
+
     private async Task<JsonDocument> GetJsonAsync(string apiPath, CancellationToken cancellationToken)
     {
         using var response = await SendWithRetryAsync(() => CreateRequest(HttpMethod.Get, apiPath), cancellationToken);
