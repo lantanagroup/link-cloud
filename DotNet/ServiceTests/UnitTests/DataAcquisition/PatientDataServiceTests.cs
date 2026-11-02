@@ -1906,7 +1906,23 @@ public class PatientDataServiceTests
         Assert.NotNull(_capturedUpdate);
         Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
         Assert.Equal(1, _capturedUpdate.RetryAttempts);
-        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(_capturedUpdate.NewNotes!, n => n.Contains("OperationOutcome encountered (HTTP Unauthorized)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_FirstUnauthorizedAfterAnEarlierNon401Failure_StaysRetryable()
+    {
+        // An earlier 500 plus the processing job's re-queue increment leaves RetryAttempts at 2, but no 401 note.
+        ArrangeQueuedCoverageReadThatFails(retryAttempts: 2, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.Unauthorized));
+        _mockLogQueries
+            .Setup(q => q.HasNoteContainingAsync(1, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
+
+        Assert.NotNull(_capturedUpdate);
+        Assert.Equal(RequestStatus.Failed, _capturedUpdate.Status);
+        Assert.Equal(3, _capturedUpdate.RetryAttempts);
     }
 
     [Fact]
@@ -1914,12 +1930,15 @@ public class PatientDataServiceTests
     {
         // One failed execution plus the processing job's re-queue increment leaves RetryAttempts at 2.
         ArrangeQueuedCoverageReadThatFails(retryAttempts: 2, maxRetries: 5, OutcomeWithStatus(HttpStatusCode.Unauthorized));
+        _mockLogQueries
+            .Setup(q => q.HasNoteContainingAsync(1, "OperationOutcome encountered (HTTP Unauthorized)", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         await _service.ExecuteLogRequest(new AcquisitionRequest(1, "facilityId"), CancellationToken.None);
 
         Assert.NotNull(_capturedUpdate);
-        Assert.NotNull(_capturedUpdate.Status);
-        Assert.True(_capturedUpdate.Status.Value.IsTerminal());
+        Assert.Equal(RequestStatus.AccessDenied, _capturedUpdate.Status);
+        Assert.Equal(3, _capturedUpdate.RetryAttempts);
         Assert.Contains(_capturedUpdate.NewNotes!, n =>
             n.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase) &&
             n.Contains("credential", StringComparison.OrdinalIgnoreCase));

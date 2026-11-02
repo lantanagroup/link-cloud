@@ -150,8 +150,7 @@ public class MilestoneValidationOrchestrator
         if (summary == null || summary.TotalLogs == 0)
             return;
 
-        var maxRetries = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
-        var accessDenied = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "AccessDenied", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+        var (maxRetries, accessDenied) = AcquisitionTerminalFailures.Count(summary.StatusCounts);
         if (maxRetries > 0 || accessDenied > 0)
         {
             RecordIssue(

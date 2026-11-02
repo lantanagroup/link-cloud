@@ -300,6 +300,37 @@ public class DataAcquisitionLogQueriesTests
     }
 
     [Fact]
+    public async Task HasNoteContainingAsync_MatchesOnlyThatLogsNotes()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var facilityId = $"NoteLookup_{Guid.NewGuid():N}";
+        var withNote = new DataAcquisitionLog { FacilityId = facilityId, FhirVersion = "R4", Status = RequestStatus.Failed };
+        var withoutNote = new DataAcquisitionLog { FacilityId = facilityId, FhirVersion = "R4", Status = RequestStatus.Failed };
+        dbContext.DataAcquisitionLogs.AddRange(withNote, withoutNote);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.DataAcquisitionLogNotes.AddRange(
+            new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = withNote.Id,
+                Note = "[11/2/2026 3:00:00 PM] OperationOutcome encountered (HTTP Unauthorized): Retrying. Attempt 1."
+            },
+            new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = withoutNote.Id,
+                Note = "[11/2/2026 3:00:00 PM] OperationOutcome encountered (HTTP InternalServerError): Retrying. Attempt 1."
+            });
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        Assert.True(await queries.HasNoteContainingAsync(withNote.Id, "OperationOutcome encountered (HTTP Unauthorized)"));
+        Assert.False(await queries.HasNoteContainingAsync(withoutNote.Id, "OperationOutcome encountered (HTTP Unauthorized)"));
+    }
+
+    [Fact]
     public async Task GetTailingMessages_WithCompleted_ReturnsEligibleTailingMessages()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();

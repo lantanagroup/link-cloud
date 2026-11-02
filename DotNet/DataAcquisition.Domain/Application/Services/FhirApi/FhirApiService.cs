@@ -186,7 +186,11 @@ public class FhirApiService : IFhirApiService
             string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
 
             addNoteToLog(log, note);
-            _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
+            _logger.LogError(ex,
+                             "FhirOperationException for log {LogId} with facility {FacilityId}: {note}",
+                             log.Id.SanitizeForLog(),
+                             log.FacilityId.SanitizeForLog(),
+                             note.SanitizeForLog());
             throw new OpOutcomeException(note, ex);
         }
     }
@@ -381,7 +385,11 @@ public class FhirApiService : IFhirApiService
 
             string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
             addNoteToLog(log, note);
-            _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
+            _logger.LogWarning(ex,
+                               "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}",
+                               log.Id.SanitizeForLog(),
+                               log.FacilityId.SanitizeForLog(),
+                               note.SanitizeForLog());
             throw new OpOutcomeException(note, ex);
         }
     }
@@ -583,6 +591,16 @@ public class FhirApiService : IFhirApiService
             return;
         }
 
-        await auth.InvalidateAuthentication(log.FacilityId, requestStartedUtc, cancellationToken);
+        try
+        {
+            await auth.InvalidateAuthentication(log.FacilityId, requestStartedUtc, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The 401 still has to reach the caller, so a failure here only costs the token refresh.
+            _logger.LogWarning(ex,
+                               "Could not discard the cached credential for facility {FacilityId} after a 401.",
+                               log.FacilityId.SanitizeForLog());
+        }
     }    
 }

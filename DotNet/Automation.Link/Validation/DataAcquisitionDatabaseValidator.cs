@@ -139,9 +139,9 @@ public class DataAcquisitionDatabaseValidator
                 AddError(errors, $"No DataAcquisitionLog rows found for expected patient {patientId}.");
         }
 
-        var failureStatuses = new[] { "Failed", "MaxRetriesReached", "AccessDenied" };
         var failedLogs = logs
-            .Where(l => failureStatuses.Contains(l.Status, StringComparer.OrdinalIgnoreCase))
+            .Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) ||
+                        AcquisitionTerminalFailures.IsTerminalFailure(l.Status))
             .ToList();
         foreach (var failed in failedLogs.Take(10))
         {

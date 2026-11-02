@@ -215,7 +215,8 @@ export class AcquisitionLogViewComponent implements OnInit {
 
   get hasActionEligibleOnPage(): boolean {
     if (this.isReportSubmitted) return false;
-    return this.acquisitionLogs.some(l => !this.TERMINAL_STATUSES.includes(l.status));
+    // Terminal failures such as AccessDenied cannot be cancelled but can still be re-executed.
+    return this.acquisitionLogs.some(l => this.isLogExecuteEligible(l) || this.isLogCancelEligible(l));
   }
 
   get executeEligibleSelectedCount(): number {

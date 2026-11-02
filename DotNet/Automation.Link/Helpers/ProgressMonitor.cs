@@ -279,8 +279,7 @@ public class ProgressMonitor
             var total = summary.TotalLogs;
             var completed = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Completed", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
             var failed = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Failed", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
-            var maxRetries = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
-            var accessDenied = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "AccessDenied", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+            var (maxRetries, accessDenied) = AcquisitionTerminalFailures.Count(summary.StatusCounts);
             var processing = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Processing", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
             var pending = summary.StatusCounts.FirstOrDefault(s => string.Equals(s.Status, "Pending", StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
 

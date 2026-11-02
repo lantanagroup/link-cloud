@@ -1466,4 +1466,30 @@ public class FhirApiServiceTests
                                                     It.IsAny<CancellationToken>()),
                     Times.Never);
     }
+    [Fact]
+    public async Task ExecuteRead_UnauthorizedAndInvalidationFails_StillThrowsTheUnauthorizedOutcome()
+    {
+        var auth = new Mock<IAuth>();
+        auth.Setup(x => x.InvalidateAuthentication(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache unavailable"));
+        var authenticationRetrievalService = new Mock<IAuthenticationRetrievalService>();
+        authenticationRetrievalService
+            .Setup(x => x.GetAuthenticationService(It.IsAny<AuthenticationConfigurationModel>()))
+            .Returns(auth.Object);
+
+        var readFhirCommand = new Mock<IReadFhirCommand>();
+        var service = BuildAuthFailureService(
+            readFhirCommand: readFhirCommand,
+            authenticationRetrievalService: authenticationRetrievalService.Object);
+        var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "cov-1" };
+        var fhirQuery = new FhirQueryModel { IsReference = false };
+
+        readFhirCommand.Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FhirOperationException("Unauthorized", HttpStatusCode.Unauthorized));
+
+        var ex = await Assert.ThrowsAsync<OpOutcomeException>(async () =>
+            await service.ExecuteRead(log, fhirQuery, ResourceType.Coverage, EpicConfiguration()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
+    }
 }

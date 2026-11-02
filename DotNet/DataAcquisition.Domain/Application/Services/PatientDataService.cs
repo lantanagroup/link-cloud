@@ -859,7 +859,8 @@ public class PatientDataService : IPatientDataService
     }
 
     /// <summary>
-    /// Records the outcome of a FHIR OperationOutcome response: 404 and 410 complete the log, anything else is retried.
+    /// Records the outcome of a FHIR OperationOutcome response: 404 and 410 complete the log, a 403 or a second 401
+    /// marks it AccessDenied, and anything else is retried.
     /// </summary>
     private async Task RecordFhirOutcomeAsync(DataAcquisitionLogModel log,
                                               OpOutcomeException ex,
@@ -889,17 +890,20 @@ public class PatientDataService : IPatientDataService
                       "Not retried: the server denied access to this resource type. " +
                       "Check the facility's EHR app registration.";
         }
-        else if (ex.StatusCode == HttpStatusCode.Unauthorized && (log.RetryAttempts ?? 0) >= 1)
+        else if (ex.StatusCode == HttpStatusCode.Unauthorized &&
+                 await _dataAcquisitionLogQueries.HasNoteContainingAsync(log.Id,
+                                                                         OutcomeNotePrefix(HttpStatusCode.Unauthorized),
+                                                                         cancellationToken))
         {
-            // A 401 after the first retry indicates the facility's FHIR credentials are invalid. 
-            // Don't retry again, just mark it as AccessDenied.
+            // An earlier attempt on this log already got a 401 and was retried, by then with a token that had
+            // not been near expiry, so the credentials themselves are being rejected.
             log.RetryAttempts = (log.RetryAttempts ?? 0) + 1;
             log.Status = RequestStatus.AccessDenied;
             log.CompletionDate = DateTime.UtcNow;
             newNote = $"[{DateTime.UtcNow}] HTTP {ex.StatusCode} from the FHIR server for {resourceTypes}. " +
-                    "Not retried: the facility's FHIR credentials were rejected again after re-authenticating. " +
-                    "Check the facility's authentication configuration.";
-        }        
+                      "Not retried again: the facility's FHIR credentials were rejected on the retry as well. " +
+                      "Check the facility's authentication configuration.";
+        }
         else
         {
             var maxRetryAttempts = fhirQueryConfiguration?.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
@@ -910,12 +914,12 @@ public class PatientDataService : IPatientDataService
             if (log.RetryAttempts >= maxRetryAttempts)
             {
                 log.Status = RequestStatus.MaxRetriesReached;
-                newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Maximum retry attempts reached ({maxRetryAttempts}).";
+                newNote = $"[{DateTime.UtcNow}] {OutcomeNotePrefix(ex.StatusCode)}: Maximum retry attempts reached ({maxRetryAttempts}).";
             }
             else
             {
                 log.Status = RequestStatus.Failed;
-                newNote = $"[{DateTime.UtcNow}] OperationOutcome encountered (HTTP {ex.StatusCode}): Retrying. Attempt {log.RetryAttempts}.";
+                newNote = $"[{DateTime.UtcNow}] {OutcomeNotePrefix(ex.StatusCode)}: Retrying. Attempt {log.RetryAttempts}.";
             }
         }
 
@@ -931,6 +935,12 @@ public class PatientDataService : IPatientDataService
             Status = log.Status,
         }, cancellationToken);
     }
+
+    /// <summary>
+    /// The start of the note written when a FHIR request fails with an OperationOutcome. A repeat 401 is
+    /// recognized by finding this prefix for 401 among the log's earlier notes, so the two must stay in step.
+    /// </summary>
+    private static string OutcomeNotePrefix(HttpStatusCode? statusCode) => $"OperationOutcome encountered (HTTP {statusCode})";
 
     /// <summary>
     /// Reschedules the log after the EHR throttled it and pushes the facility's other pending logs out the same way.
