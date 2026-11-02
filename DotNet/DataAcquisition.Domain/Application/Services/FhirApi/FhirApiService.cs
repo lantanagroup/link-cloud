@@ -6,7 +6,6 @@ using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -50,7 +49,6 @@ public class FhirApiService : IFhirApiService
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
     private readonly ILocationMappingService _locationMappingService;
-    private readonly IAuthenticationRetrievalService? _authenticationRetrievalService;
     private readonly int _searchPageSize;
 
     public FhirApiService(
@@ -61,10 +59,8 @@ public class FhirApiService : IFhirApiService
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache,
         ILocationMappingService locationMappingService,
-        IOptions<FhirSearchSettings>? fhirSearchSettings = null,
-        IAuthenticationRetrievalService? authenticationRetrievalService = null)
+        IOptions<FhirSearchSettings>? fhirSearchSettings = null)
     {
-        _authenticationRetrievalService = authenticationRetrievalService;
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
         _searchFhirCommand = searchFhirCommand;
@@ -177,16 +173,15 @@ public class FhirApiService : IFhirApiService
                 return resourceIds;
             }
 
-            if (ex.Status == HttpStatusCode.Unauthorized)
+            if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
-                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, cancellationToken);
+                string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
+
+                addNoteToLog(log, note);
+                _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
+                throw new OpOutcomeException(note, ex);
             }
-
-            string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
-
-            addNoteToLog(log, note);
-            _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
-            throw new OpOutcomeException(note, ex);
+            throw;
         }
     }
 
@@ -372,15 +367,14 @@ public class FhirApiService : IFhirApiService
         }
         catch (FhirOperationException ex)
         {
-            if (ex.Status == HttpStatusCode.Unauthorized)
+            if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
-                await InvalidateAuthenticationAsync(log, fhirQueryConfiguration, cancellationToken);
+                string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
+                addNoteToLog(log, note);
+                _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
+                throw new OpOutcomeException(note, ex);
             }
-
-            string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
-            addNoteToLog(log, note);
-            _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
-            throw new OpOutcomeException(note, ex);
+            throw;
         }
     }
 
@@ -560,25 +554,4 @@ public class FhirApiService : IFhirApiService
         log.Notes.Add(note);
     }
     #endregion
-
-    /// <summary>
-    /// Drops the facility's cached credential after a 401 so the retry authenticates afresh.
-    /// </summary>
-    private async Task InvalidateAuthenticationAsync(DataAcquisitionLogModel log,
-                                                    FhirQueryConfigurationModel fhirQueryConfiguration,
-                                                    CancellationToken cancellationToken)
-    {
-        if (fhirQueryConfiguration.Authentication is null)
-        {
-            return;
-        }
-
-        var auth = _authenticationRetrievalService?.GetAuthenticationService(fhirQueryConfiguration.Authentication);
-        if (auth is null)
-        {
-            return;
-        }
-
-        await auth.InvalidateAuthentication(log.FacilityId, cancellationToken);
-    }    
 }
