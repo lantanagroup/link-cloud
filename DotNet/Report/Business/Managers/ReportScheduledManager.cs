@@ -437,6 +437,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 foreach (var r in batch)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (deleted)
+                    {
+                        // A tracked report may have completed since it was loaded.
+                        await _context.Entry(r).ReloadAsync(cancellationToken);
+                    }
+
                     r.IsDeleted = deleted;
                     r.ModifyDate = now.UtcDateTime;
                     if (deleted)

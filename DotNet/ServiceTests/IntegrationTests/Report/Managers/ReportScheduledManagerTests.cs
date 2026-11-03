@@ -261,6 +261,7 @@ public class ReportScheduledManagerTests
         Assert.Equal(terminalStatus, updated.Status);
         Assert.NotNull(completedDate);
         Assert.Equal(completedDate, updated.CompletedDate);
+        Assert.Null(updated.SoftDeletedDate);
     }
 
     [Theory]
