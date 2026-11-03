@@ -56,3 +56,12 @@ public sealed class TestRailNamedItem
     public string Name { get; init; } = string.Empty;
     public bool IsCompleted { get; init; }
 }
+
+public sealed class TestRailRunDetails
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public int SuiteId { get; init; }
+    public bool IncludeAll { get; init; }
+    public bool IsCompleted { get; init; }
+}
