@@ -99,7 +99,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
     builder.Services.Configure<PatientAggregatorSettings>(builder.Configuration.GetSection(PatientAggregatorSettings.Key));
-    builder.Services.Configure<RetentionScheduleSettings>(builder.Configuration.GetSection(RetentionScheduleSettings.Key));
 
     string? connectionString = builder.Configuration.GetConnectionString("DatabaseConnection");
 
@@ -165,8 +164,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<GroupPopulation>, EntityRepository<GroupPopulation, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<MeasureReportPopulation>, EntityRepository<MeasureReportPopulation, ReportDbContext>>();
     builder.Services.AddTransient<IDatabase, Database>();
-
-    builder.Services.AddScoped<IRetentionCheckWorker, LoggingRetentionCheck>();
 
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
     builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
@@ -251,6 +248,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             KafkaTopic.MappingOutcomeEvaluatedRetry.GetStringValue(),
         ]));
 
+    // Before RetryScheduleService: the retention job must be settled before the scheduler starts.
+    builder.Services.AddRetentionSchedule(builder.Configuration);
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
@@ -273,7 +272,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
     builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
