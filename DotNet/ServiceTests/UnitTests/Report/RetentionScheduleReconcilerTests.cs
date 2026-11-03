@@ -180,6 +180,18 @@ public class RetentionScheduleReconcilerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reconcile_JobWithoutTrigger_LogsWarningAndLeavesStoreAlone()
+    {
+        await _scheduler.AddJob(CreateStoredJob(), replace: false);
+
+        await CreateReconciler().ReconcileAsync(CancellationToken.None);
+
+        Assert.True(await _scheduler.CheckExists(JobKey));
+        Assert.Empty(await _scheduler.GetTriggersOfJob(JobKey));
+        Assert.Single(_logger.Entries, e => e.Level == LogLevel.Warning);
+    }
+
+    [Fact]
     public async Task Reconcile_LosesCreateRace_VerifiesTriggerInsteadOfThrowing()
     {
         // Another instance stored the job and trigger after this one checked the store.

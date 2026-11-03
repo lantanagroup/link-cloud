@@ -97,15 +97,13 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
             .OfType<ICronTrigger>()
             .FirstOrDefault();
 
+        // ScheduleJob stores the job and its trigger in one transaction, so a job without its trigger
+        // means the store was edited by hand. Say so rather than repair it.
         if (existing is null)
         {
-            var trigger = BuildTrigger(jobKey, cron);
-            await scheduler.ScheduleJob(trigger, cancellationToken);
-
-            _logger.LogInformation("Scheduled retention nightly job ({Cron}). {nextFire} {TimeZone}",
-                cron.SanitizeForLog(),
-                trigger.GetNextFireTimeUtc()?.ToString("o") ?? "unknown",
-                TimeZoneInfo.Utc.Id);
+            _logger.LogWarning(
+                "The retention nightly job is stored without a cron trigger, so it will never fire. " +
+                "Delete the job and restart Report to recreate both.");
             return;
         }
 
