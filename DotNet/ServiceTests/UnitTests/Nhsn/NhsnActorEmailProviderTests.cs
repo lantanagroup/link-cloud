@@ -54,12 +54,29 @@ namespace UnitTests.Nhsn
             Assert.Equal("nurse@hospital.example.org", provider.CurrentEmail);
         }
 
-        [Fact]
-        public void WithoutTheConfiguredClaim_FallsBackToTheStandardEmailClaim()
+        [Theory]
+        [InlineData("email")]
+        [InlineData(ClaimTypes.Email)]
+        public void WithoutTheConfiguredClaim_FallsBackToTheStandardEmailClaim(string claimType)
         {
-            var provider = AProvider(ARequestFrom(new Claim(ClaimTypes.Email, "nurse@hospital.example.org")));
+            //the raw name is the one that can actually fire. Program.cs sets MapInboundClaims =
+            //false, so an issuer's "email" claim keeps that name and is never rewritten to the
+            //WS-Federation URI; matching only the URI made this fallback dead for any real token.
+            var provider = AProvider(ARequestFrom(new Claim(claimType, "nurse@hospital.example.org")));
 
             Assert.Equal("nurse@hospital.example.org", provider.CurrentEmail);
+        }
+
+        [Fact]
+        public void TheConfiguredClaimWins_WhenATokenCarriesBothNames()
+        {
+            //widening the fallback must not let a second claim outrank the one the environment
+            //configured, since that is the row an operator changes to correct a gateway mismatch.
+            var provider = AProvider(ARequestFrom(
+                new Claim("upn", "configured@hospital.example.org"),
+                new Claim("email", "standard@hospital.example.org")));
+
+            Assert.Equal("configured@hospital.example.org", provider.CurrentEmail);
         }
 
         [Fact]
@@ -133,6 +150,24 @@ namespace UnitTests.Nhsn
 
             Assert.Equal("NHSN-849217", userContext.Email);
             Assert.Null(AProvider(httpContext, settings).CurrentEmail);
+        }
+
+        [Fact]
+        public void TheUserContextSharesTheWidenedFallback_SoAnEmailClaimIsNotReadAsAnIdentifier()
+        {
+            //the other half of sharing one helper: a gateway that names the email "email" rather
+            //than the configured "upn" used to fall through to ExternalUserId here, so the UI and
+            //the NhsnUser table recorded an identifier where an address belongs.
+            var httpContext = ARequestFrom(
+                new Claim("userId", "NHSN-849217"),
+                new Claim("email", "nurse@hospital.example.org"));
+            var settings = new NhsnJwtSettings();
+
+            var userContext = new NhsnUserContext(
+                new HttpContextAccessor { HttpContext = httpContext }, Options.Create(settings));
+
+            Assert.Equal("nurse@hospital.example.org", userContext.Email);
+            Assert.Equal("nurse@hospital.example.org", AProvider(httpContext, settings).CurrentEmail);
         }
     }
 }
