@@ -166,6 +166,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<MeasureReportPopulation>, EntityRepository<MeasureReportPopulation, ReportDbContext>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
+    builder.Services.AddScoped<IRetentionCheckWorker, LoggingRetentionCheck>();
+
     builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
     builder.Services.AddTransient<IReportEntryManager, ReportEntryManager>();
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();

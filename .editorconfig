@@ -15,3 +15,6 @@ dotnet_diagnostic.CS8603.severity = silent
 # CA2254: Template should be a static expression
 dotnet_diagnostic.CA2254.severity = error
 dotnet_diagnostic.CA2253.severity = error
+
+# IDE0290: Use primary constructor
+dotnet_diagnostic.IDE0290.severity = none
