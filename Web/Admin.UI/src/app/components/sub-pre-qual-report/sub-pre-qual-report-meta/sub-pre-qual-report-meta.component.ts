@@ -30,7 +30,6 @@ export class SubPreQualReportMetaComponent implements OnInit, OnChanges {
   reportStartDate!: Date;
   reportEndDate!: Date;
   timestamp!: Date;
-  fileSize = 'XXMB';
 
   private readonly STATUS_META: Record<ScheduleStatus, {
     icon: string;
