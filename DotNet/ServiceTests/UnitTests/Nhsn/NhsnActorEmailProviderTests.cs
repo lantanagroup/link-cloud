@@ -79,6 +79,34 @@ namespace UnitTests.Nhsn
             Assert.Equal("configured@hospital.example.org", provider.CurrentEmail);
         }
 
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void ABlankConfiguredClaim_DoesNotHideAUsableFallback(string blank)
+        {
+            //selection used to stop at the first claim that merely existed, so a gateway sending an
+            //empty upn beside a real email claim named nobody: the token went out with no email at
+            //all and the receiving service recorded the change against no one, even though the
+            //address was right there. Nothing rejects a blank claim value, so this is a token a
+            //gateway can actually send.
+            var provider = AProvider(ARequestFrom(
+                new Claim("upn", blank),
+                new Claim("email", "standard@hospital.example.org")));
+
+            Assert.Equal("standard@hospital.example.org", provider.CurrentEmail);
+        }
+
+        [Fact]
+        public void BlanksAreSkippedRightAlongTheOrder_NotOnlyOnTheConfiguredClaim()
+        {
+            var provider = AProvider(ARequestFrom(
+                new Claim("upn", " "),
+                new Claim("email", ""),
+                new Claim(ClaimTypes.Email, "last@hospital.example.org")));
+
+            Assert.Equal("last@hospital.example.org", provider.CurrentEmail);
+        }
+
         [Fact]
         public void OnAnUnauthenticatedRequest_NamesNobodyEvenWhenTheClaimIsPresent()
         {

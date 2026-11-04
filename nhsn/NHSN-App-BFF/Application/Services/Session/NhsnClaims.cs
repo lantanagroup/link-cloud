@@ -30,13 +30,29 @@ internal static class NhsnClaims
     /// <c>email</c>, so <see cref="ClaimTypes.Email"/> alone would match nothing an issuer sends -
     /// it is kept after it for a principal assembled elsewhere, with mapping on.
     /// <para>
-    /// Selection only: the value comes back as it appears on the token, blank included. The two
-    /// callers disagree about what a blank means - one falls back to an identifier, the other treats
-    /// it as naming nobody - so normalising it here would quietly change one of them.
+    /// Selection only: the value comes back as it appears on the token, blank included, because
+    /// <see cref="NhsnUserContext"/> falls back to an identifier and so has to be able to see that a
+    /// blank is what the token carried. A caller that wants the first claim actually holding an
+    /// address wants <see cref="NonBlankEmail"/>.
     /// </para>
     /// </remarks>
     public static string? Email(ClaimsPrincipal principal, NhsnJwtSettings settings) =>
         principal.FindFirstValue(settings.EmailClaimType)
         ?? principal.FindFirstValue(StandardEmailClaim)
         ?? principal.FindFirstValue(ClaimTypes.Email);
+
+    /// <summary>
+    /// The first nonblank email claim, in the same order as <see cref="Email"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Email"/> stops at the first claim that merely exists, so a configured claim that
+    /// is present but empty hides a usable address on either fallback - and nothing rejects a blank
+    /// claim value, so a gateway can send exactly that. Attributing a call needs the address rather
+    /// than the position, hence a second selection rather than a change to the first: that one's
+    /// blank is load-bearing for its own caller.
+    /// </remarks>
+    public static string? NonBlankEmail(ClaimsPrincipal principal, NhsnJwtSettings settings) =>
+        new[] { settings.EmailClaimType, StandardEmailClaim, ClaimTypes.Email }
+            .Select(type => principal.FindFirstValue(type))
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 }

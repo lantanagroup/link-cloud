@@ -48,10 +48,12 @@ public sealed class NhsnActorEmailProvider : IActorEmailProvider
                 return null;
             }
 
-            //blank counts as naming nobody, so the claim is omitted rather than sent empty.
-            var email = NhsnClaims.Email(user, _jwtSettings);
+            //blank counts as naming nobody, so the claim is omitted rather than sent empty - and
+            //selection skips blanks, so an empty configured claim cannot hide a usable address on
+            //one of the fallbacks.
+            var email = NhsnClaims.NonBlankEmail(user, _jwtSettings);
 
-            return string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+            return email?.Trim();
         }
     }
 }
