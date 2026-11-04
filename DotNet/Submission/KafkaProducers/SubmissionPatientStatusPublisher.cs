@@ -26,6 +26,7 @@ public static class SubmissionPatientStatus
     /// ListenerExecutionFailedException and a "Retry count exceeded" exception are wrappers:
     /// the cause is used when one is present. A retry record that kept only the attempt
     /// message uses that message, and an exception-type header when the record has one.
+    /// A secret-looking message with no type name is replaced with the default failure text.
     /// </summary>
     public static string TerminalErrorMessage(Exception? exception, Headers? headers, string? fallback)
     {
@@ -192,18 +193,13 @@ public static class SubmissionPatientStatus
     private static string FormatErrorMessage(string? typeName, string? rawMessage)
     {
         var normalized = NormalizeMessage(rawMessage);
-        var message = TruncateMessage(normalized);
-        if (!string.IsNullOrEmpty(typeName))
+        if (string.IsNullOrEmpty(normalized) || ContainsSecret(normalized))
         {
-            if (string.IsNullOrEmpty(normalized) || ContainsSecret(normalized))
-            {
-                return typeName;
-            }
-
-            return $"{typeName}: {message}";
+            return string.IsNullOrEmpty(typeName) ? DefaultErrorMessage : typeName;
         }
 
-        return string.IsNullOrEmpty(message) ? DefaultErrorMessage : message;
+        var message = TruncateMessage(normalized);
+        return string.IsNullOrEmpty(typeName) ? message! : $"{typeName}: {message}";
     }
 
     private static string? NormalizeMessage(string? text)

@@ -84,6 +84,27 @@ public class SubmissionPatientStatusTests
     }
 
     [Fact]
+    public void TerminalErrorMessage_SecretMessageWithNoType_UsesSubmissionFailed()
+    {
+        var headers = new Headers
+        {
+            {
+                KafkaConstants.HeaderConstants.RetryExceptionMessage,
+                Encoding.UTF8.GetBytes("connection failed password=hunter2\n   at Submission.Listener")
+            }
+        };
+
+        var message = SubmissionPatientStatus.TerminalErrorMessage(
+            new DeadLetterException("Retry count exceeded for message with key: abc"),
+            headers,
+            "Retry count exceeded for message with key: abc");
+
+        Assert.Equal("Submission failed.", message);
+        Assert.DoesNotContain("password", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("hunter2", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void TerminalErrorMessage_UnwrapsRetryWrapperToTheCause()
     {
         var headers = new Headers
