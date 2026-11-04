@@ -3,6 +3,7 @@ import {IReportCategoryCount} from '../../tenant/facility-view/report-view.inter
 import {MatSort, MatSortModule} from '@angular/material/sort';
 import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {RouterModule} from '@angular/router';
+import {DecimalPipe} from '@angular/common';
 
 interface CategoryRow {
   id: string;
@@ -13,7 +14,7 @@ interface CategoryRow {
 
 @Component({
   selector: 'app-sub-pre-qual-report-categories-table',
-  imports: [MatTableModule, MatSortModule, RouterModule],
+  imports: [MatTableModule, MatSortModule, RouterModule, DecimalPipe],
   templateUrl: './sub-pre-qual-report-categories-table.component.html',
   styleUrls: ['./sub-pre-qual-report-categories-table.component.scss'],
   standalone: true

@@ -8,6 +8,8 @@
           <td mat-cell *matCellDef="let category">
             @if (column.key === 'name') {
               <a [routerLink]="[category['id']]">{{ category[column.key] }}</a>
+            } @else if (column.key === 'quantity') {
+              {{ category.quantity | number:'1.0-0' }}
             } @else {
               {{ category[column.key] }}
             }
