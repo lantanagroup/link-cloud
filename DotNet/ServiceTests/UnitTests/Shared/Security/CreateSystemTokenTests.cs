@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -27,12 +28,13 @@ namespace UnitTests.Shared.Security
             public string? CurrentEmail { get; } = email;
         }
 
-        private static CreateSystemToken AMinter(IActorEmailProvider? actorEmailProvider = null) =>
+        private static CreateSystemToken AMinter(IActorEmailProvider? actorEmailProvider = null, bool logToken = false) =>
             new(NullLogger<CreateSystemToken>.Instance,
                 Options.Create(new LinkTokenServiceSettings
                 {
                     Authority = "https://link.example.org",
-                    LinkAdminEmail = AdminEmail
+                    LinkAdminEmail = AdminEmail,
+                    LogToken = logToken
                 }),
                 actorEmailProvider);
 
@@ -116,6 +118,34 @@ namespace UnitTests.Shared.Security
             var minter = AMinter(new ThrowingActorEmailProvider());
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => minter.ExecuteAsync(SigningKey, 5));
+        }
+
+        [Fact]
+        public async Task LogToken_RecordsMetadataRatherThanTheJwtOrTheActorsAddress()
+        {
+            //LEGLINK-1359 made this token carry the caller's address rather than the deployment's
+            //admin one, and the activity event below is exported - so it must name neither the
+            //address nor the credential that holds it. That an actor was named is the part worth
+            //keeping: it is what makes an audit event with no User diagnosable, and it discloses
+            //nobody.
+            const string actorEmail = "nurse@hospital.example.org";
+            using var activity = new Activity("CreateSystemTokenTests").Start();
+
+            var jwt = await AMinter(new StubActorEmailProvider(actorEmail), logToken: true)
+                .ExecuteAsync(SigningKey, 5);
+
+            var logged = activity.Events.Single();
+            Assert.Equal("Token generated.", logged.Name);
+            Assert.All(logged.Tags, tag =>
+            {
+                var value = tag.Value?.ToString() ?? string.Empty;
+                Assert.DoesNotContain(actorEmail, value);
+                Assert.DoesNotContain(jwt, value);
+            });
+
+            var tags = logged.Tags.ToDictionary(tag => tag.Key, tag => tag.Value);
+            Assert.Equal("https://link.example.org", tags["token.issuer"]?.ToString());
+            Assert.True(tags["token.actor_email_present"] is true);
         }
 
         private sealed class ThrowingActorEmailProvider : IActorEmailProvider
