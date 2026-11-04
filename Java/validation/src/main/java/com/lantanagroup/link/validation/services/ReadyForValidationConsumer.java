@@ -489,12 +489,12 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         }
     }
 
+    /**
+     * The exception type only. Provider and parser messages can include connection text,
+     * SQL, or a fragment of the payload, and this event is what Report stores.
+     */
     private static String stageErrorMessage(Exception failure) {
-        String message = failure.getMessage();
-        if (message == null || message.isBlank()) {
-            return failure.getClass().getSimpleName();
-        }
-        return message;
+        return failure.getClass().getSimpleName();
     }
 
     private void produceValidationCompleteRecord(

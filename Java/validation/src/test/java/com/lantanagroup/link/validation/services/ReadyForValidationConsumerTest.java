@@ -703,7 +703,7 @@ public class ReadyForValidationConsumerTest {
                 eq(PATIENT_ID),
                 eq(CORRELATION_ID),
                 anyLong(),
-                eq("database unavailable"),
+                eq("IllegalStateException"),
                 any());
         verify(reportStatusUpdatedProducer, never()).publishSuccess(
                 any(), any(), any(), anyLong(), anyBoolean(), anyLong(), any());
