@@ -91,10 +91,10 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
             string? error = null;
             if (response.StatusCode is >= 200 and < 300)
             {
-                await using var body = await response.GetStreamAsync().ConfigureAwait(false);
+                await using var body = await response.ResponseMessage.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
                 await body.CopyToAsync(destination, 81920, cancellationToken).ConfigureAwait(false);
             }
-            else error = await response.GetStringAsync().ConfigureAwait(false);
+            else error = await response.ResponseMessage.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return new LinkApiResponse { StatusCode = response.StatusCode, RawBody = error,
                 ContentType = response.ResponseMessage.Content.Headers.ContentType?.ToString() };
         }
@@ -106,7 +106,9 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
         catch (FlurlHttpException ex) when (ex.StatusCode is not (>= 200 and < 300))
         {
             return new LinkApiResponse { StatusCode = ex.StatusCode ?? 0,
-                RawBody = await ex.GetResponseStringAsync().ConfigureAwait(false) };
+                RawBody = ex.Call.Response is { } errorResponse
+                    ? await errorResponse.ResponseMessage.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
+                    : null };
         }
     }
 }
