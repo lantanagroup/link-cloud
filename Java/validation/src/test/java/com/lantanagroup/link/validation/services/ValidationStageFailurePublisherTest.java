@@ -6,6 +6,7 @@ import com.lantanagroup.link.validation.records.ReadyForValidation;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.kafka.listener.ListenerExecutionFailedException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -32,7 +33,7 @@ class ValidationStageFailurePublisherTest {
     }
 
     @Test
-    void finalFailure_publishesExceptionTypeAndNotedProcessingTime() {
+    void finalFailure_publishesCauseMessageAndNotedProcessingTime() {
         publisher.noteFailedAttempt(80L);
 
         publisher.publishFinalFailure(readyRecord(true), new IllegalStateException("database unavailable"));
@@ -42,7 +43,7 @@ class ValidationStageFailurePublisherTest {
                 eq(PATIENT_ID),
                 eq(CORRELATION_ID),
                 eq(80L),
-                eq("IllegalStateException"),
+                eq("IllegalStateException: database unavailable"),
                 any());
         verify(producer, never()).publishSuccess(any(), any(), any(), anyLong(), anyBoolean(), anyLong(), any());
     }
@@ -52,7 +53,12 @@ class ValidationStageFailurePublisherTest {
         publisher.publishFinalFailure(readyRecord(true), new IllegalStateException("database unavailable"));
 
         verify(producer).publishFailure(
-                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), isNull(), eq("IllegalStateException"), any());
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("IllegalStateException: database unavailable"),
+                any());
     }
 
     @Test
@@ -64,7 +70,169 @@ class ValidationStageFailurePublisherTest {
         publisher.publishFinalFailure(record, new IllegalStateException("database unavailable"));
 
         verify(producer).publishFailure(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("IllegalStateException: database unavailable"),
+                any());
+    }
+
+    @Test
+    void multiLineMessage_publishesTheFirstLineOnly() {
+        publisher.publishFinalFailure(
+                readyRecord(true),
+                new IllegalStateException("database unavailable\r\npassword=hunter2\nignored"));
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("IllegalStateException: database unavailable"),
+                any());
+    }
+
+    @Test
+    void longMessage_isCutTo200CharactersWithAnEllipsis() {
+        String body = "a".repeat(250);
+        String expected = "a".repeat(ValidationStageFailurePublisher.MAX_ERROR_MESSAGE_LENGTH - 3) + "...";
+
+        publisher.publishFinalFailure(readyRecord(true), new IllegalStateException(body));
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("IllegalStateException: " + expected),
+                any());
+    }
+
+    @Test
+    void secretPattern_publishesTheTypeOnly() {
+        publisher.publishFinalFailure(
+                readyRecord(true),
+                new IllegalStateException("login failed password=hunter2"));
+
+        verify(producer).publishFailure(
                 eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), isNull(), eq("IllegalStateException"), any());
+    }
+
+    @Test
+    void bearerSecret_matchesOnlyWithTheTrailingSpace() {
+        publisher.publishFinalFailure(
+                readyRecord(true),
+                new IllegalStateException("Authorization bearer abc123"));
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), isNull(), eq("IllegalStateException"), any());
+    }
+
+    @Test
+    void bearerSeparatedByWhitespace_isStillASecret() {
+        publisher.publishFinalFailure(
+                readyRecord(true),
+                new IllegalStateException("Authorization bearer\tabc123"));
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), isNull(), eq("IllegalStateException"), any());
+    }
+
+    @Test
+    void blankMessage_publishesTheTypeOnly() {
+        publisher.publishFinalFailure(readyRecord(true), new IllegalStateException("  \t "));
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), isNull(), eq("IllegalStateException"), any());
+    }
+
+    @Test
+    void controlCharactersAreRemovedAndWhitespaceIsCollapsed() {
+        publisher.publishFinalFailure(
+                readyRecord(true),
+                new IllegalStateException("  database \u0000  unavailable\tnow  "));
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("IllegalStateException: database unavailable now"),
+                any());
+    }
+
+    @Test
+    void frameworkWrapper_usesTheUnderlyingCause() {
+        Exception cause = new IllegalArgumentException("bad bundle");
+        Exception wrapped = new ListenerExecutionFailedException(
+                "Listener failed",
+                new IllegalStateException("Retry count exceeded for message with key: k", cause));
+
+        publisher.publishFinalFailure(readyRecord(true), wrapped);
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("IllegalArgumentException: bad bundle"),
+                any());
+    }
+
+    @Test
+    void secretMessageWithoutAType_publishesValidationFailed() {
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = readyRecord(true);
+        record.headers().add("kafka_dlt-exception-message", Headers.getBytes("pwd=hunter2"));
+
+        publisher.publishFinalFailure(record, null);
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), isNull(), eq("Validation failed."), any());
+    }
+
+    @Test
+    void messageHeaderWithoutAType_publishesTheCleanedMessage() {
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = readyRecord(true);
+        record.headers().add("kafka_exception-message", Headers.getBytes("  database\tunavailable\nignored"));
+
+        publisher.publishFinalFailure(record, null);
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("database unavailable"),
+                any());
+    }
+
+    @Test
+    void exceptionTypeHeader_prefixesTheMessage() {
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = readyRecord(true);
+        record.headers().add(
+                "kafka_dlt-exception-fqcn",
+                Headers.getBytes(ListenerExecutionFailedException.class.getName()));
+        record.headers().add("kafka_dlt-exception-cause-fqcn", Headers.getBytes("java.io.IOException"));
+        record.headers().add(Headers.EXCEPTION_MESSAGE, Headers.getBytes("disk full"));
+
+        publisher.publishFinalFailure(record, null);
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                isNull(),
+                eq("IOException: disk full"),
+                any());
+    }
+
+    @Test
+    void noExceptionAndNoHeader_publishesValidationFailed() {
+        publisher.publishFinalFailure(readyRecord(true), null);
+
+        verify(producer).publishFailure(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), isNull(), eq("Validation failed."), any());
     }
 
     @Test
