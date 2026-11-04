@@ -45,6 +45,6 @@ public interface IValidationServiceClient
     /// Leaves the destination open. Caller cancellation controls the download timeout. Transfer failures
     /// can leave a partial file; publish the destination only after successful completion.
     /// </summary>
-    Task<LinkApiResponse> CopyValidationResultsCsvAsync(Guid reportId, Stream destination,
+    Task<LinkApiResponse> CopyValidationResultsCsvAsync(string facilityId, Guid reportId, Stream destination,
         CancellationToken cancellationToken = default);
 }

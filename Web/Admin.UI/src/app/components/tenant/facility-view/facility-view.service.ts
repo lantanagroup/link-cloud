@@ -14,9 +14,9 @@ import {IPagedReportSchedule} from "../../../interfaces/report/report-schedule.i
 export class FacilityViewService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
-  downloadValidationResults(reportId: string): void {
+  downloadValidationResults(facilityId: string, reportId: string): void {
     // Let the browser stream the attachment directly to disk instead of buffering a multi-GB blob.
-    window.location.href = `${this.appConfigService.config?.baseApiUrl}/validation/reports/${encodeURIComponent(reportId)}/results.csv`;
+    window.location.href = `${this.appConfigService.config?.baseApiUrl}/validation/facilities/${encodeURIComponent(facilityId)}/reports/${encodeURIComponent(reportId)}/results.csv`;
   }
 
   downloadReport(facilityId: string, reportId: string) {

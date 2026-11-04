@@ -92,7 +92,7 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
   }
 
   downloadReport(): void {
-    this.facilityViewService.downloadValidationResults(this.submissionId);
+    this.facilityViewService.downloadValidationResults(this.facilityId, this.submissionId);
   }
 
   ngOnDestroy(): void {

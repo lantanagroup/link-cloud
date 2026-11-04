@@ -75,15 +75,16 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
     }
 
     public async Task<LinkApiResponse> CopyValidationResultsCsvAsync(
-        Guid reportId, Stream destination, CancellationToken cancellationToken = default)
+        string facilityId, Guid reportId, Stream destination, CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
         ArgumentNullException.ThrowIfNull(destination);
         if (!destination.CanWrite) throw new ArgumentException("Destination must be writable.", nameof(destination));
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
             // Read headers first and let the caller's token control long-running exports.
-            using var response = await Request($"validation/reports/{reportId:D}/results.csv")
+            using var response = await Request($"validation/facilities/{Uri.EscapeDataString(facilityId)}/reports/{reportId:D}/results.csv")
                 .WithTimeout(Timeout.InfiniteTimeSpan)
                 .GetAsync(System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);

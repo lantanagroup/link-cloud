@@ -10,7 +10,7 @@ describe('SubPreQualReportComponent', () => {
   let validation: jasmine.SpyObj<ValidationService>;
 
   beforeEach(() => {
-    reports = jasmine.createSpyObj('FacilityViewService', ['getReportSummary', 'getReportCategoryCounts']);
+    reports = jasmine.createSpyObj('FacilityViewService', ['getReportSummary', 'getReportCategoryCounts', 'downloadValidationResults']);
     validation = jasmine.createSpyObj('ValidationService', ['getValidationCategories']);
     reports.getReportSummary.and.returnValue(of({id: 'report-1'} as any));
     reports.getReportCategoryCounts.and.returnValue(of({
@@ -36,6 +36,12 @@ describe('SubPreQualReportComponent', () => {
     }));
     expect(component.reportIssuesSummary).toEqual([{value: 'Stored title', count: 3825417}]);
     expect(component.isLoading).toBeFalse();
+  });
+
+  it('downloads findings for the current facility and report', () => {
+    component.ngOnInit();
+    component.downloadReport();
+    expect(reports.downloadValidationResults).toHaveBeenCalledWith('facility-1', 'report-1');
   });
 
   it('stops loading and shows an error when stored counts are missing', () => {

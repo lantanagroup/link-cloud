@@ -17,11 +17,11 @@ public class ResultCsvExportService {
         this.jdbc = jdbc;
     }
 
-    public Long upperBound(String reportId) {
-        return jdbc.queryForObject("SELECT MAX(id) FROM result WHERE report_id = ?", Long.class, reportId);
+    public Long upperBound(String facilityId, String reportId) {
+        return jdbc.queryForObject("SELECT MAX(id) FROM result WHERE facility_id = ? AND report_id = ?", Long.class, facilityId, reportId);
     }
 
-    public void write(String reportId, Long upperBound, Writer writer) throws IOException {
+    public void write(String facilityId, String reportId, Long upperBound, Writer writer) throws IOException {
         writer.write("resultId,facilityId,reportId,patientId,severity,code,message,location,expression,profile,"
                 + "categoryId,categoryTitle,categorySeverity,acceptable,submit,guidance\r\n");
         writer.flush();
@@ -36,7 +36,7 @@ public class ResultCsvExportService {
                         SELECT r.id, r.facility_id, r.report_id, r.patient_id, r.severity, r.code,
                                r.message, r.location, r.expression, r.profile,
                                c.id, c.title, c.severity, c.acceptable, c.submit, c.guidance
-                        FROM (SELECT * FROM result WHERE report_id = ? AND id > ? AND id <= ?
+                        FROM (SELECT * FROM result WHERE facility_id = ? AND report_id = ? AND id > ? AND id <= ?
                               ORDER BY id OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY) r
                         LEFT JOIN result_category rc ON rc.result_id = r.id
                         LEFT JOIN category c ON c.id = rc.category_id
@@ -54,7 +54,7 @@ public class ResultCsvExportService {
                         // Stop querying immediately when the download connection closes.
                         throw new UncheckedIOException(ex);
                     }
-                }, reportId, after, upperBound, BATCH_SIZE);
+                }, facilityId, reportId, after, upperBound, BATCH_SIZE);
             } catch (UncheckedIOException ex) {
                 throw ex.getCause();
             }

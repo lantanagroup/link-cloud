@@ -22,10 +22,10 @@ class ResultCsvControllerTest {
 
     @Test
     void returnsCsvAttachment() throws Exception {
-        when(service.upperBound(ID)).thenReturn(null);
-        doAnswer(call -> { ((Writer) call.getArgument(2)).write("resultId,patientId\r\n"); return null; })
-                .when(service).write(eq(ID), isNull(), any(Writer.class));
-        mvc.perform(get("/api/validation/reports/" + ID + "/results.csv"))
+        when(service.upperBound("facility", ID)).thenReturn(null);
+        doAnswer(call -> { ((Writer) call.getArgument(3)).write("resultId,patientId\r\n"); return null; })
+                .when(service).write(eq("facility"), eq(ID), isNull(), any(Writer.class));
+        mvc.perform(get("/api/validation/facilities/facility/reports/" + ID + "/results.csv"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"validation-results-" + ID + ".csv\""))
                 .andExpect(header().string("Cache-Control", "no-store"))
@@ -34,7 +34,7 @@ class ResultCsvControllerTest {
     }
     @Test
     void rejectsInvalidUuidBeforeQuerying() throws Exception {
-        mvc.perform(get("/api/validation/reports/invalid/results.csv")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/validation/facilities/facility/reports/invalid/results.csv")).andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
 }

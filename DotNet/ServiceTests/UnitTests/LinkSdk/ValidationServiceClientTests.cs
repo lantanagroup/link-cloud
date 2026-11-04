@@ -33,11 +33,11 @@ public class ValidationServiceClientTests
         using var client = Create(http.BaseUrl);
         using var destination = new MemoryStream();
         var id = Guid.NewGuid();
-        var response = await client.CopyValidationResultsCsvAsync(id, destination);
+        var response = await client.CopyValidationResultsCsvAsync("facility", id, destination);
         Assert.True(response.IsSuccessStatusCode);
         Assert.True(destination.CanWrite);
         Assert.Equal(csv, System.Text.Encoding.UTF8.GetString(destination.ToArray()));
-        Assert.Equal($"/api/validation/reports/{id:D}/results.csv", http.SingleRequest().Path);
+        Assert.Equal($"/api/validation/facilities/facility/reports/{id:D}/results.csv", http.SingleRequest().Path);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class ValidationServiceClientTests
         using var http = new FakeHttpBoundary(problem, 400);
         using var client = Create(http.BaseUrl);
         using var destination = new MemoryStream();
-        var response = await client.CopyValidationResultsCsvAsync(Guid.NewGuid(), destination);
+        var response = await client.CopyValidationResultsCsvAsync("facility", Guid.NewGuid(), destination);
         Assert.Equal(400, response.StatusCode);
         Assert.Equal(problem, response.RawBody);
         Assert.Equal(0, destination.Length);
@@ -62,7 +62,7 @@ public class ValidationServiceClientTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            client.CopyValidationResultsCsvAsync(Guid.NewGuid(), destination, cancellation.Token));
+            client.CopyValidationResultsCsvAsync("facility", Guid.NewGuid(), destination, cancellation.Token));
     }
 
     private static ValidationServiceClient Create(string url) => new(

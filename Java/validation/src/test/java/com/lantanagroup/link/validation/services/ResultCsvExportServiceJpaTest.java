@@ -30,11 +30,11 @@ class ResultCsvExportServiceJpaTest {
         for (int i = 0; i < 1001; i++) result("report", "message-" + i, i == 0 ? List.of(a, b) : List.of());
         result("other-report", "excluded", List.of());
         em.flush();
-        Long upper = service.upperBound("report");
+        Long upper = service.upperBound("facility", "report");
         result("report", "inserted-after-start", List.of());
         em.flush();
         StringWriter csv = new StringWriter();
-        service.write("report", upper, csv);
+        service.write("facility", "report", upper, csv);
         List<String> lines = csv.toString().lines().toList();
         assertEquals(1003, lines.size()); // header + 1001 findings + second category for first finding
         assertTrue(lines.get(1).contains("\"a\",\"a\""));
@@ -45,9 +45,27 @@ class ResultCsvExportServiceJpaTest {
     }
 
     @Test
+    void scopesUpperBoundAndRowsToFacilityAndReport() throws Exception {
+        result("report", "included", List.of());
+        em.flush();
+        Long expectedUpper = service.upperBound("facility", "report");
+        result("other-facility", "report", "excluded-facility", List.of());
+        result("other-report", "excluded-report", List.of());
+        em.flush();
+
+        assertEquals(expectedUpper, service.upperBound("facility", "report"));
+        assertNull(service.upperBound("missing-facility", "report"));
+        StringWriter csv = new StringWriter();
+        service.write("facility", "report", service.upperBound("other-facility", "report"), csv);
+        assertEquals(2, csv.toString().lines().count());
+        assertTrue(csv.toString().contains("included"));
+        assertFalse(csv.toString().contains("excluded"));
+    }
+
+    @Test
     void emptyReportIsHeaderOnly() throws Exception {
         StringWriter csv = new StringWriter();
-        service.write("missing", service.upperBound("missing"), csv);
+        service.write("facility", "missing", service.upperBound("facility", "missing"), csv);
         assertEquals(1, csv.toString().lines().count());
         assertTrue(csv.toString().startsWith("resultId,facilityId,reportId,patientId"));
     }
@@ -76,7 +94,7 @@ class ResultCsvExportServiceJpaTest {
             public void close() {}
         };
         var error = assertThrows(java.io.IOException.class,
-                () -> service.write("report", service.upperBound("report"), writer));
+                () -> service.write("facility", "report", service.upperBound("facility", "report"), writer));
         assertEquals("Client disconnected", error.getMessage());
     }
 
@@ -86,8 +104,11 @@ class ResultCsvExportServiceJpaTest {
         em.persist(c); return c;
     }
     private void result(String report, String message, List<Category> categories) {
+        result("facility", report, message, categories);
+    }
+    private void result(String facility, String report, String message, List<Category> categories) {
         Result r = new Result();
-        r.setFacilityId("facility"); r.setReportId(report); r.setPatientId("patient");
+        r.setFacilityId(facility); r.setReportId(report); r.setPatientId("patient");
         r.setMessage(message); r.setSeverity(OperationOutcome.IssueSeverity.ERROR);
         r.setCode(OperationOutcome.IssueType.INVALID); r.setCategories(categories);
         em.persist(r);

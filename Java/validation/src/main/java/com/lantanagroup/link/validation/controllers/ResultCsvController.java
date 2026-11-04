@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/validation/reports")
+@RequestMapping("/api/validation/facilities/{facilityId}/reports")
 @SecurityRequirement(name = "bearer-key")
 public class ResultCsvController {
     private final ResultCsvExportService export;
@@ -32,9 +32,9 @@ public class ResultCsvController {
     @ApiResponse(responseCode = "400", description = "Invalid report UUID; Problem Details")
     @ApiResponse(responseCode = "500", description = "Failure before streaming starts; Problem Details")
     @GetMapping(value = "/{reportId}/results.csv", produces = "text/csv")
-    public void download(@PathVariable UUID reportId, HttpServletResponse response) throws IOException {
+    public void download(@PathVariable String facilityId, @PathVariable UUID reportId, HttpServletResponse response) throws IOException {
         String id = reportId.toString();
-        Long upperBound = export.upperBound(id);
+        Long upperBound = export.upperBound(facilityId, id);
         response.setContentType("text/csv");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setHeader("Content-Disposition", "attachment; filename=\"validation-results-" + id + ".csv\"");
@@ -42,7 +42,7 @@ public class ResultCsvController {
         // Synchronous streaming avoids MVC async timeouts and unbounded async worker queues.
         // Avoid PrintWriter, which swallows client-disconnect IOExceptions.
         var writer = new BufferedWriter(new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8), 65536);
-        export.write(id, upperBound, writer);
+        export.write(facilityId, id, upperBound, writer);
         writer.flush();
     }
 }
