@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
 using Quartz;
@@ -56,93 +57,52 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
                 RetentionScheduleSettings.DefaultCron);
         }
 
-        var cron = new CronExpression(settings.ResolvedCron).CronExpressionString;
-
-        if (!await scheduler.CheckExists(jobKey, cancellationToken))
+        // A missed firing runs once on recovery and reports the recovery instant, not the missed cron time.
+        // See dev-docs/retention-schedule.md.
+        var definition = new CronJobDefinition
         {
-            var job = JobBuilder.Create<RetentionCheckJob>()
-                .WithIdentity(jobKey)
-                .WithDescription("Report Retention Check to purge expired reports")
-                .RequestRecovery()
-                .StoreDurably()
-                .Build();
+            JobKey = jobKey,
+            JobType = typeof(RetentionCheckJob),
+            Cron = settings.ResolvedCron,
+            TimeZone = TimeZoneInfo.Utc,
+            RequestRecovery = true,
+            Description = "Report Retention Check to purge expired reports"
+        };
 
-            try
-            {
-                var trigger = BuildTrigger(jobKey, cron) as ICronTrigger;
-                
-                if (trigger is null)
-                {
-                    throw new InvalidOperationException("Failed to build the retention job trigger.");
-                }
+        var result = await CronJobReconciler.EnsureAsync(scheduler, definition, cancellationToken);
+        var nextFire = result.NextFireTimeUtc?.ToString("o") ?? "unknown";
+        var timeZone = TimeZoneInfo.Utc.Id;
 
-                await scheduler.ScheduleJob(job, trigger, cancellationToken);
-
+        switch (result.Outcome)
+        {
+            case CronJobReconcileOutcome.Created:
                 _logger.LogInformation("Scheduled retention nightly job ({Cron}). {nextFire} {TimeZone}",
-                    cron.SanitizeForLog(), 
-                    trigger.GetNextFireTimeUtc()?.ToString("o") ?? "unknown", 
-                    trigger.TimeZone.Id.SanitizeForLog());
-                return;
-            }
-            catch (ObjectAlreadyExistsException ex)
-            {
-                // Another cluster node's ReconcileAsync won the race between our CheckExists
-                // and this ScheduleJob. Fall through to the verify/reschedule logic below instead
-                // of crashing the loser out of the hosted service's StartAsync.
-                _logger.LogDebug(ex, "Retention Nightly job was scheduled by another node; verifying its trigger.");
-            }
+                    result.Cron.SanitizeForLog(),
+                    nextFire,
+                    timeZone);
+                break;
+            case CronJobReconcileOutcome.TriggerAdded:
+                _logger.LogInformation(
+                    "Retention nightly job was stored without its trigger; added it ({Cron}). {nextFire} {TimeZone}",
+                    result.Cron.SanitizeForLog(),
+                    nextFire,
+                    timeZone);
+                break;
+            case CronJobReconcileOutcome.Rescheduled:
+                _logger.LogInformation(
+                    "Rescheduled Retention Nightly job: {OldCron} -> {NewCron}. " +
+                    "Next {nextFire} {TimeZone}",
+                    result.PreviousCron.SanitizeForLog(),
+                    result.Cron.SanitizeForLog(),
+                    nextFire,
+                    timeZone);
+                break;
+            default:
+                _logger.LogInformation("Retention nightly job is already scheduled ({Cron}). {nextFire} {TimeZone}",
+                    result.Cron.SanitizeForLog(),
+                    nextFire,
+                    timeZone);
+                break;
         }
-
-        var existing = (await scheduler.GetTriggersOfJob(jobKey, cancellationToken))
-            .OfType<ICronTrigger>()
-            .FirstOrDefault();
-
-        // ScheduleJob stores the job and its trigger in one transaction, so a job without its trigger
-        // means the store was edited by hand. Say so rather than repair it.
-        if (existing is null)
-        {
-            _logger.LogWarning(
-                "The retention nightly job is stored without a cron trigger, so it will never fire. " +
-                "Delete the job and restart Report to recreate both.");
-            return;
-        }
-
-        if (existing.CronExpressionString == cron && Equals(existing.TimeZone, TimeZoneInfo.Utc))
-        {
-            _logger.LogInformation("Retention nightly job is already scheduled ({Cron}). {nextFire} {TimeZone}",
-                cron.SanitizeForLog(),
-                existing.GetNextFireTimeUtc()?.ToString("o") ?? "unknown",
-                existing.TimeZone.Id.SanitizeForLog());
-            return;
-        }
-
-        var replacement = BuildTrigger(jobKey, cron) as ICronTrigger;
-        if (replacement is null)
-        {
-            throw new InvalidOperationException("Failed to build the retention job trigger.");
-        }
-
-        await scheduler.RescheduleJob(existing.Key, replacement, cancellationToken);
-
-        _logger.LogInformation(
-            "Rescheduled Retention Nightly job: {OldCron} -> {NewCron}. " +
-            "Next {nextFire} {TimeZone}",
-            existing.CronExpressionString.SanitizeForLog(),
-            cron.SanitizeForLog(),
-            replacement.GetNextFireTimeUtc()?.ToString("o") ?? "unknown",
-            replacement.TimeZone.Id.SanitizeForLog());
     }
-
-    private static ITrigger BuildTrigger(JobKey jobKey, string cron) =>
-        TriggerBuilder.Create()
-            .ForJob(jobKey)
-            .WithIdentity(jobKey.Name, jobKey.Group)
-            .WithDescription(cron)
-            .WithCronSchedule(cron, x => x
-                .InTimeZone(TimeZoneInfo.Utc)
-                // A fire missed while the service was down runs once on recovery, rather than being
-                // dropped or run once per missed night. The run reports the recovery instant, not the
-                // missed cron time. See dev-docs/retention-schedule.md.
-                .WithMisfireHandlingInstructionFireAndProceed())
-            .Build();
 }

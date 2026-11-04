@@ -40,9 +40,12 @@ where the configuration says something different:
 - The trigger's cron or time zone differs from the configuration: it reschedules the trigger. The
   cron is compared in the form Quartz stores, which is uppercased (`sat,sun` is stored as
   `SAT,SUN`), so a lowercase setting does not reschedule on every startup.
-- The job is stored without a trigger: it logs a warning and leaves the store alone. `ScheduleJob`
-  stores both together, so that state only comes from editing the store by hand; delete the job
-  and restart Report to recreate both.
+- The job is stored without a trigger, for example after the trigger was unscheduled or its rows
+  were deleted: it adds the trigger back.
+
+The reconciling itself is the shared `CronJobReconciler` in
+`DotNet/Shared/Application/Extensions/Quartz/`, which DMRP's nightly zone jobs also use. The
+retention reconciler adds the `Enabled` check, the invalid-cron error and its own log lines.
 
 Every startup logs the cron and the next fire time. An invalid cron is logged at `Error` and the
 default is used. Any other failure, such as SQL Server being unreachable or a lock timeout while

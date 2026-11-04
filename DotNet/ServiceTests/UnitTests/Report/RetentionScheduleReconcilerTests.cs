@@ -195,15 +195,17 @@ public class RetentionScheduleReconcilerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Reconcile_JobWithoutTrigger_LogsWarningAndLeavesStoreAlone()
+    public async Task Reconcile_JobWithoutTrigger_AddsTrigger()
     {
         await _scheduler.AddJob(CreateStoredJob(), replace: false);
 
         await CreateReconciler().ReconcileAsync(CancellationToken.None);
 
-        Assert.True(await _scheduler.CheckExists(JobKey));
-        Assert.Empty(await _scheduler.GetTriggersOfJob(JobKey));
-        Assert.Single(_logger.Entries, e => e.Level == LogLevel.Warning);
+        var trigger = await SingleCronTriggerAsync();
+        Assert.Equal(RetentionScheduleSettings.DefaultCron, trigger.CronExpressionString);
+        Assert.Equal(TimeZoneInfo.Utc.Id, trigger.TimeZone.Id);
+        Assert.Contains(_logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("added it"));
+        Assert.DoesNotContain(_logger.Entries, e => e.Level >= LogLevel.Warning);
     }
 
     [Fact]
