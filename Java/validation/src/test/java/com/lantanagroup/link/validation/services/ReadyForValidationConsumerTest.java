@@ -665,6 +665,20 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
+    void process_blankCorrelationHeader_usesCorrelationIdFromTheKey() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(null, false);
+        record.headers().add(Headers.CORRELATION_ID, Headers.getBytes("   "));
+        record.key().setCorrelationId(CORRELATION_ID);
+
+        consumer.process(record);
+
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), anyLong(), eq(true), eq(0L), any());
+    }
+
+    @Test
     void process_missingCorrelationHeader_usesCorrelationIdFromTheKey() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());

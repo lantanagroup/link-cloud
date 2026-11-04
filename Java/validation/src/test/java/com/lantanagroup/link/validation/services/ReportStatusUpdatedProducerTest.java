@@ -156,6 +156,32 @@ class ReportStatusUpdatedProducerTest {
         assertNull(captor.getValue().value().getValidationResult());
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void interruptedSend_doesNotRetry() throws Exception {
+        CompletableFuture<SendResult<ReportStatusUpdatedKey, ReportStatusUpdated>> interrupted = mock(CompletableFuture.class);
+        when(interrupted.get()).thenThrow(new InterruptedException("stopped"));
+        when(template.send(any(ProducerRecord.class))).thenReturn(interrupted);
+        try {
+            assertThrows(RuntimeException.class, () ->
+                    producer.publishSuccess(REPORT_ID, PATIENT_ID, CORRELATION_ID, 10L, true, 1L, null));
+            verify(template, times(1)).send(any(ProducerRecord.class));
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void publishFailure_nullCorrelationId_omitsCorrelationHeaderAndField() throws Exception {
+        producer.publishFailure(REPORT_ID, PATIENT_ID, null, 10L, "IllegalStateException", null);
+
+        ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated> record = captureRecord();
+        assertNull(record.headers().lastHeader(Headers.CORRELATION_ID));
+        assertFalse(valueNode(record.value()).has("correlationId"));
+        assertEquals("IllegalStateException", record.value().getErrorMessage());
+    }
+
     private ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated> captureSuccess(boolean passed, long messageCount)
             throws Exception {
         producer.publishSuccess(
