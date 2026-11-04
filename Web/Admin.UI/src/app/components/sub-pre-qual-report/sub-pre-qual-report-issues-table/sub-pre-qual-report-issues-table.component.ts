@@ -16,5 +16,5 @@ export class SubPreQualReportIssuesTableComponent {
   @Input() pageIndex = 0;
   @Input() pageSize = 25;
   @Output() pageChange = new EventEmitter<PageEvent>();
-  issueColumns = ['message', 'expression', 'location'];
+  issueColumns = ['message', 'patientId', 'expression', 'location'];
 }
