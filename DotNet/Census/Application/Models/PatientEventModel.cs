@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using LantanaGroup.Link.Census.Application.Interfaces;
 
 namespace LantanaGroup.Link.Census.Application.Models;
@@ -16,8 +17,10 @@ public class PatientEventModel
     public string? SourceVisitId { get; set; }
     public string? MedicalRecordNumber { get; set; }
     public string EventType { get; set; }
+    [JsonConverter(typeof(PayloadJsonConverter))]
     public IPayload Payload { get; set; }
     public string SourceType { get; set; }
+    public DateTime EventDate { get; set; }
 
     public PatientEvent ToDomain()
     {
@@ -31,7 +34,8 @@ public class PatientEventModel
             MedicalRecordNumber = MedicalRecordNumber,
             EventType = Enum.Parse<EventType>(EventType),
             Payload = Payload,
-            SourceType = Enum.Parse<SourceType>(SourceType)
+            SourceType = Enum.Parse<SourceType>(SourceType),
+            EventDate = EventDate
         };
     }
 
@@ -47,7 +51,8 @@ public class PatientEventModel
             MedicalRecordNumber = patientEvent.MedicalRecordNumber,
             EventType = patientEvent.EventType.ToString(),
             Payload = patientEvent.Payload,
-            SourceType = patientEvent.SourceType.ToString()
+            SourceType = patientEvent.SourceType.ToString(),
+            EventDate = patientEvent.EventDate
         };
     }
 }

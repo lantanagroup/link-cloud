@@ -7,8 +7,10 @@ import {
   FormGroup,
   ReactiveFormsModule,
   ValidationErrors,
+  ValidatorFn,
   Validators
 } from '@angular/forms';
+import { MatRadioModule } from '@angular/material/radio';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -22,6 +24,7 @@ import { FormMode } from 'src/app/models/FormMode.enum';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { DataAcquisitionService } from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
 import {
+  IAdtConfiguration,
   ICreateSftpConfigurationModel,
   ISftpAcquisitionTypeConfiguration,
   ISftpConfigurationModel,
@@ -29,6 +32,11 @@ import {
   SftpAcquisitionSubType,
   SftpAcquisitionType
 } from '../../../interfaces/data-acquisition/sftp-config-model.interface';
+
+type AdtPatientIdSource = 'adtEvent' | 'mrnSearch';
+
+// Keep in step with Hl7Path on the Data Acquisition service, which validates these again when they are saved.
+const HL7_LOCATION = /^[A-Za-z][A-Za-z0-9]{2}(\[([1-9]\d{0,2}|[1-9]\d{0,2}(\.[1-9]\d{0,2})?=[^\]]+)\])?[-.][1-9]\d{0,2}(\[([1-9]\d{0,2}|[1-9]\d{0,2}=[^\]]+)\])?(\.[1-9]\d{0,2}(\.[1-9]\d{0,2})?)?$/;
 
 @Component({
   selector: 'app-sftp-config-form',
@@ -43,7 +51,8 @@ import {
     MatSnackBarModule,
     MatSelectModule,
     MatExpansionModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatRadioModule
   ],
   templateUrl: './sftp-config-form.component.html',
   styleUrls: ['./sftp-config-form.component.scss']
@@ -72,6 +81,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
   showCredentialFields: boolean = false;
   acquisitionTypes = Object.values(SftpAcquisitionType);
   acquisitionSubTypes = Object.values(SftpAcquisitionSubType);
+  readonly adtSubType = SftpAcquisitionSubType.HL7ADT;
 
   constructor(
     private snackBar: MatSnackBar,
@@ -89,7 +99,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
       acquisitionConfigurations: this.fb.array([]),
       username: this.fb.control(''),
       password: this.fb.control('')
-    });
+    }, { validators: SftpConfigFormComponent.adtFilesHandledValidator });
   }
 
   ngOnInit(): void {
@@ -278,14 +288,97 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
   }
 
   createAcquisitionConfigGroup(config?: ISftpAcquisitionTypeConfiguration): FormGroup {
-    return this.fb.group({
+    const adt = config?.adtConfiguration;
+    const patientIdSource: AdtPatientIdSource = adt?.mrnIdentifierSystem ? 'mrnSearch' : 'adtEvent';
+
+    const group = this.fb.group({
       acquisitionType: [config?.acquisitionType || SftpAcquisitionType.Census, Validators.required],
       subType: [config?.subType || SftpAcquisitionSubType.None, Validators.required],
       remoteDirectory: [config?.remoteDirectory || '', SftpConfigFormComponent.notBlankValidator],
       processedDirectory: [config?.processedDirectory || '', SftpConfigFormComponent.notBlankValidator],
       fileNamePattern: [config?.fileNamePattern || ''],
-      parsingConfiguration: [config?.parsingConfiguration || null]
+      parsingConfiguration: [config?.parsingConfiguration || null],
+      adtConfiguration: this.fb.group({
+        patientIdSource: [patientIdSource],
+        patientIdLocation: [adt?.patientIdLocation || '',
+          SftpConfigFormComponent.adtSourceValidator('adtEvent', SftpConfigFormComponent.hl7LocationValidator)],
+        mrnIdentifierSystem: [adt?.mrnIdentifierSystem || '',
+          SftpConfigFormComponent.adtSourceValidator('mrnSearch', SftpConfigFormComponent.identifierSystemValidator)],
+        mrnLocation: [adt?.mrnLocation || '', SftpConfigFormComponent.hl7LocationValidator],
+        encounterIdLocation: [adt?.encounterIdLocation || '', SftpConfigFormComponent.hl7LocationValidator]
+      })
     });
+
+    // Which ADT fields are required depends on these two controls, so re-check them when either changes
+    const revalidateAdtFields = () => {
+      group.get('adtConfiguration.patientIdLocation')?.updateValueAndValidity();
+      group.get('adtConfiguration.mrnIdentifierSystem')?.updateValueAndValidity();
+    };
+    group.get('subType')?.valueChanges.subscribe(() => revalidateAdtFields());
+    group.get('adtConfiguration.patientIdSource')?.valueChanges.subscribe(() => revalidateAdtFields());
+    revalidateAdtFields();
+
+    return group;
+  }
+
+  /**
+   * Requires and checks a field only when this acquisition is HL7 ADT and identifies patients the way the field is for.
+   * Otherwise the field is hidden, and what it holds is not submitted, so it must not block saving.
+   */
+  private static adtSourceValidator(source: AdtPatientIdSource, format: ValidatorFn): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const adtGroup = control.parent;
+      if (adtGroup?.parent?.get('subType')?.value !== SftpAcquisitionSubType.HL7ADT
+        || adtGroup.get('patientIdSource')?.value !== source) {
+        return null;
+      }
+      return control.value?.trim() ? format(control) : { required: true };
+    };
+  }
+
+  /**
+   * A system goes into the search as system|value, so it cannot contain that separator, or spaces. Spaces around it are
+   * trimmed when it is submitted.
+   */
+  private static identifierSystemValidator(control: AbstractControl): ValidationErrors | null {
+    return /^[^\s|]*$/.test(control.value?.trim() ?? '') ? null : { pattern: true };
+  }
+
+  /**
+   * Allows empty, otherwise requires a location such as PID-2, PID-3[5=MR].1 or OBX[3.1=FHIRID]-5.
+   */
+  static hl7LocationValidator(control: AbstractControl): ValidationErrors | null {
+    const value = control.value?.trim();
+    return !value || HL7_LOCATION.test(value) ? null : { hl7Location: true };
+  }
+
+  /**
+   * ADT events are a stream, so a file read twice is wasted work on every run: it must leave the directory once read.
+   */
+  static adtFilesHandledValidator(control: AbstractControl): ValidationErrors | null {
+    const form = control as FormGroup;
+    if (form.get('removeAfterProcessing')?.value) {
+      return null;
+    }
+
+    const configurations = form.get('acquisitionConfigurations') as FormArray | null;
+    const unhandled = configurations?.getRawValue().some((config: ISftpAcquisitionTypeConfiguration) =>
+      config.subType === SftpAcquisitionSubType.HL7ADT && !config.processedDirectory?.trim());
+
+    return unhandled ? { adtFilesNotHandled: true } : null;
+  }
+
+  /**
+   * Keeps only what applies to the chosen way of identifying patients, so the service receives exactly one of the two.
+   */
+  private toAdtConfiguration(value: any): IAdtConfiguration {
+    const mrnSearch = value.patientIdSource === 'mrnSearch';
+    return {
+      patientIdLocation: mrnSearch ? undefined : value.patientIdLocation?.trim(),
+      mrnIdentifierSystem: mrnSearch ? value.mrnIdentifierSystem?.trim() : undefined,
+      mrnLocation: value.mrnLocation?.trim() || undefined,
+      encounterIdLocation: value.encounterIdLocation?.trim() || undefined
+    };
   }
 
   /**
@@ -331,7 +424,8 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
         acquisitionConfigurations: this.acquisitionConfigurationsArray.value.map((ac: any) => ({
           ...ac,
           remoteDirectory: ac.remoteDirectory || undefined,
-          processedDirectory: ac.processedDirectory || undefined
+          processedDirectory: ac.processedDirectory || undefined,
+          adtConfiguration: ac.subType === SftpAcquisitionSubType.HL7ADT ? this.toAdtConfiguration(ac.adtConfiguration) : undefined
         }))
       };
 

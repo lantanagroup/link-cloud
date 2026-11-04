@@ -876,6 +876,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:TerminologyServiceUrl` | dotnet | - | dev, qa, qa2, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:ValidationServiceUrl` | dotnet | - | dev, qa, qa2, test | `DotNet/Account/Program.cs:80` |
 | `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
@@ -1043,6 +1044,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:TerminologyServiceUrl` | dotnet | - | dev, qa, qa2, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:ValidationServiceUrl` | dotnet | - | dev, qa, qa2, test | `DotNet/Account/Program.cs:80` |
 | `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |

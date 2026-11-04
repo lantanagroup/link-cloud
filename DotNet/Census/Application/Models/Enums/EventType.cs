@@ -9,5 +9,12 @@ public enum EventType
     FHIRListDischarge,
     CernerListAdmit,
     CernerListUpdate,
-    CernerListDischarge
+    CernerListDischarge,
+    A02,
+    A06,
+    A07,
+    A11,
+    A12,
+    A13,
+    A18
 }

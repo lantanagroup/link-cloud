@@ -20,6 +20,7 @@ public class CensusPatientEncounterApiModel
     public string? EncounterType { get; set; }
     public string? EncounterStatus { get; set; }
     public string? EncounterClass { get; set; }
+    public string? Location { get; set; }
     public DateTime? CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
     public List<CensusPatientVisitIdentifierApiModel> PatientVisitIdentifiers { get; set; } = [];
@@ -55,6 +56,7 @@ public class CensusPatientEventApiModel
     public string EventType { get; set; } = string.Empty;
     public JsonElement Payload { get; set; }
     public string SourceType { get; set; } = string.Empty;
+    public DateTime EventDate { get; set; }
 }
 
 public class CensusFhirListApiModel

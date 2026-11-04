@@ -1,6 +1,9 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
+using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
@@ -22,6 +25,9 @@ public interface IPatientEncounterQueries
     Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default);
     Task<IEnumerable<string>> GetCurrentlyAdmittedPatientsForFacility(string facilityId, CancellationToken cancellationToken = default);
     Task<List<PatientEncounter>> GetAdmittedPatientsByFacility(string facilityId, CancellationToken cancellationToken = default);
+    Task<List<PatientEncounter>> GetTrackedEncountersByFhirPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default);
+    Task<List<PatientEncounter>> GetTrackedEncountersByIdentifiers(string facilityId, IReadOnlyCollection<string> identifiers, CancellationToken cancellationToken = default);
+    Task SaveTrackedChanges(CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterQueries : IPatientEncounterQueries
@@ -96,6 +102,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             EncounterType = e.EncounterType,
             EncounterStatus = e.EncounterStatus,
             EncounterClass = e.EncounterClass,
+            Location = e.Location,
             CreateDate = e.CreateDate,
             ModifyDate = e.ModifyDate,
 
@@ -183,6 +190,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 EncounterType = e.EncounterType,
                 EncounterStatus = e.EncounterStatus,
                 EncounterClass = e.EncounterClass,
+                Location = e.Location,
                 CreateDate = e.CreateDate,
                 ModifyDate = e.ModifyDate,
                 PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(pvi => new PatientVisitIdentifierModel
@@ -296,9 +304,9 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 var payload = evt.Payload;
 
                 // For admit events - create a new encounter
-                if (evt.EventType == EventType.FHIRListAdmit && payload is FHIRListAdmitPayload admitPayload)
+                if (payload is FHIRListAdmitPayload or CernerListAdmitPayload)
                 {
-                    encounter = admitPayload.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
+                    encounter = payload.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
 
                     // Ensure ID is set - generate a new one if null
                     if (string.IsNullOrEmpty(encounter.Id))
@@ -322,6 +330,20 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                         {
                             visitIdentifier.Id = Guid.NewGuid().ToString();
                         }
+                    }
+                }
+                // ADT messages each know how to create or update the encounter
+                else if (payload is AdtPayload adtPayload)
+                {
+                    if (encounter != null)
+                    {
+                        encounter = adtPayload.UpdatePatientEncounter(encounter);
+                        encounter.ModifyDate = evt.ModifyDate;
+                    }
+                    else if (adtPayload.ImpliesAdmission)
+                    {
+                        encounter = adtPayload.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
+                        encounter.ModifyDate = evt.ModifyDate;
                     }
                 }
                 // For discharge or update events - update existing encounter
@@ -485,13 +507,18 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
 
         var currentDateTime = DateTime.UtcNow;
+        // Identifiers from an ADT feed are the facility's own, not FHIR ids
+        var adtSourceType = SourceType.ADT.ToString();
         return _context.PatientEncounters
             .AsNoTracking()
             .Include(e => e.PatientIdentifiers)
             .Include(e => e.PatientVisitIdentifiers)
             .Where(e => e.FacilityId == facilityId
                 && (e.AdmitDate <= currentDateTime && (e.DischargeDate == null || e.DischargeDate >= currentDateTime)))
-            .Select(x => x.PatientIdentifiers.FirstOrDefault().Identifier);
+            .Select(x => x.PatientIdentifiers
+                .Where(i => i.SourceType != adtSourceType)
+                .Select(i => i.Identifier)
+                .FirstOrDefault());
     }
 
     public async Task<List<PatientEncounter>> GetAdmittedPatientsByFacility(string facilityId, CancellationToken cancellationToken = default)
@@ -519,6 +546,48 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             .Where(e => e.FacilityId == facilityId
                 && (e.AdmitDate <= endDateTime && (e.DischargeDate == null || e.DischargeDate >= startDateTime)))
             .Select(x => PatientEncounterModel.FromDomain(x));
+    }
+
+    /// <summary>
+    /// Gets a patient's encounters, most recently admitted first and leaving out cancelled ones, as tracked entities for
+    /// <see cref="SaveTrackedChanges"/>.
+    /// </summary>
+    public async Task<List<PatientEncounter>> GetTrackedEncountersByFhirPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default)
+    {
+        var fhirSourceType = SourceType.FHIR.ToString();
+
+        return await _context.PatientEncounters
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && (e.EncounterStatus == null || e.EncounterStatus != AdtPayload.CancelledStatus)
+                && e.PatientIdentifiers.Any(i => i.SourceType == fhirSourceType && i.Identifier == patientId))
+            .OrderByDescending(e => e.AdmitDate)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the encounters carrying any of these identifiers, as an MRN or a patient identifier, as tracked entities for
+    /// <see cref="SaveTrackedChanges"/>.
+    /// </summary>
+    public async Task<List<PatientEncounter>> GetTrackedEncountersByIdentifiers(string facilityId, IReadOnlyCollection<string> identifiers, CancellationToken cancellationToken = default)
+    {
+        return await _context.PatientEncounters
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && ((e.MedicalRecordNumber != null && identifiers.Contains(e.MedicalRecordNumber))
+                    || e.PatientIdentifiers.Any(i => identifiers.Contains(i.Identifier))))
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Saves changes made to tracked encounters. Use this rather than the repository's Update for an encounter that gained
+    /// identifiers: identifier keys are client-assigned, so Update would treat new rows as existing ones.
+    /// </summary>
+    public async Task SaveTrackedChanges(CancellationToken cancellationToken = default)
+    {
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     #region Private Methods
@@ -556,6 +625,8 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         return payload switch
         {
             FHIRListDischargePayload => true,
+            CernerListUpdatePayload => true,
+            CernerListDischargePayload => true,
             _ => false
         };
     }

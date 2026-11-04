@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
 using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
@@ -20,7 +21,12 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public PayloadJsonConverter(ILogger<PayloadJsonConverter> logger = null)
+    // A [JsonConverter] attribute can only create a converter through a parameterless constructor
+    public PayloadJsonConverter() : this(null)
+    {
+    }
+
+    public PayloadJsonConverter(ILogger<PayloadJsonConverter> logger)
     {
         _logger = logger;
     }
@@ -92,6 +98,24 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     return JsonSerializer.Deserialize<CernerListDischargePayload>(document);
                 case "CernerListUpdate":
                     return JsonSerializer.Deserialize<CernerListUpdatePayload>(document);
+                case "A01":
+                    return JsonSerializer.Deserialize<AdtA01Payload>(document);
+                case "A02":
+                    return JsonSerializer.Deserialize<AdtA02Payload>(document);
+                case "A03":
+                    return JsonSerializer.Deserialize<AdtA03Payload>(document);
+                case "A06":
+                    return JsonSerializer.Deserialize<AdtA06Payload>(document);
+                case "A07":
+                    return JsonSerializer.Deserialize<AdtA07Payload>(document);
+                case "A11":
+                    return JsonSerializer.Deserialize<AdtA11Payload>(document);
+                case "A12":
+                    return JsonSerializer.Deserialize<AdtA12Payload>(document);
+                case "A13":
+                    return JsonSerializer.Deserialize<AdtA13Payload>(document);
+                case "A18":
+                    return JsonSerializer.Deserialize<AdtA18Payload>(document);
                 default:
                     return null;
             }
@@ -137,6 +161,10 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         else if (value is CernerListDischargePayload cernerDischargePayload)
         {
             writer.WriteRawValue(JsonSerializer.Serialize(cernerDischargePayload));
+        }
+        else if (value is AdtPayload adtPayload)
+        {
+            writer.WriteRawValue(JsonSerializer.Serialize(adtPayload, adtPayload.GetType()));
         }
     }
 }
