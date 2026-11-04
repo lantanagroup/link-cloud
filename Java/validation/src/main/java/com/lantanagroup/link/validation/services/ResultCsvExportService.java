@@ -46,7 +46,14 @@ public class ResultCsvExportService {
                     try {
                         for (int column = 1; column <= 16; column++) {
                             if (column > 1) writer.write(',');
-                            writeCell(writer, row.getString(column));
+                            String value;
+                            if (column == 14 || column == 15) {
+                                boolean flag = row.getBoolean(column);
+                                value = row.wasNull() ? null : Boolean.toString(flag);
+                            } else {
+                                value = row.getString(column);
+                            }
+                            writeCell(writer, value);
                         }
                         writer.write("\r\n");
                         last[0] = row.getLong(1);

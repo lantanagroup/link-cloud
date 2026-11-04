@@ -45,6 +45,23 @@ class ResultCsvExportServiceJpaTest {
     }
 
     @Test
+    void exportsBooleanFlagsAsTextAndLeavesUncategorizedFlagsBlank() throws Exception {
+        Category category = category("flags");
+        category.setAcceptable(true);
+        category.setSubmit(false);
+        result("report", "categorized", List.of(category));
+        result("report", "uncategorized", List.of());
+        em.flush();
+
+        StringWriter csv = new StringWriter();
+        service.write("facility", "report", service.upperBound("facility", "report"), csv);
+        List<String> lines = csv.toString().lines().toList();
+        assertEquals(3, lines.size());
+        assertTrue(lines.get(1).endsWith("\"true\",\"false\",\"guidance\""));
+        assertTrue(lines.get(2).endsWith(",\"\",\"\",\"\",\"\",\"\",\"\""));
+    }
+
+    @Test
     void scopesUpperBoundAndRowsToFacilityAndReport() throws Exception {
         result("report", "included", List.of());
         em.flush();
