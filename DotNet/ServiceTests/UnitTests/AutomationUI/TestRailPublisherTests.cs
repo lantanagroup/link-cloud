@@ -111,11 +111,15 @@ public class TestRailPublisherTests
     public async Task Missing_case_id_is_noop()
     {
         var api = new Mock<ITestRailApiClient>(MockBehavior.Strict);
-        var publisher = CreatePublisher(api.Object, ConfiguredOptions());
+        var logs = new CaptureLogger<TestRailPublisher>();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), logger: logs);
 
         await publisher.PublishScenarioRunAsync(SampleScenarioRequest());
 
         api.VerifyNoOtherCalls();
+        logs.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Warning
+            && entry.Message.Contains("no TestRail case id mapped", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -183,6 +187,94 @@ public class TestRailPublisherTests
             It.Is<string>(n => n.EndsWith(".log", StringComparison.Ordinal)),
             It.Is<byte[]>(b => Encoding.UTF8.GetString(b).Contains("boom")),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Non_shared_scenario_run_keeps_hyphenated_automation_run_id()
+    {
+        var runId = Guid.Parse("8fd02ea1-3d9b-448c-926a-9ff274456c73");
+        var hyphenated = runId.ToString("D");
+        var compact = runId.ToString("N");
+
+        string? runName = null;
+        IReadOnlyList<TestRailCaseResult>? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, int, string, IReadOnlyList<int>, CancellationToken>((_, _, name, _, _) => runName = name)
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results)
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            RunId = runId,
+            ScenarioId = scenarioId,
+            RunName = "Smoke",
+            Status = AutomationRunStatus.Failed,
+            Error = "boom",
+            Logs = ["line 1"]
+        });
+
+        runName.Should().Be($"Link Automation UI - Smoke - {hyphenated}");
+        runName.Should().NotContain(compact);
+        var result = posted.Should().ContainSingle().Subject;
+        result.Comment.Should().Contain($"Automation.UI scenario run {hyphenated}");
+        result.Comment.Should().NotContain(compact);
+        result.AttachmentFileName.Should().Be($"scenario-run-{hyphenated}.log");
+    }
+
+    [Fact]
+    public async Task Non_shared_api_health_run_keeps_hyphenated_automation_run_id()
+    {
+        var runId = Guid.Parse("8b8c9fab-72c2-4a5b-b200-271587e5d5d3");
+        var hyphenated = runId.ToString("D");
+        var compact = runId.ToString("N");
+
+        string? runName = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, int, string, IReadOnlyList<int>, CancellationToken>((_, _, name, _, _) => runName = name)
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var definition = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Create Facility",
+            TestRailCaseId = 1
+        };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(runId, It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [definition.Key] = new()
+                {
+                    EndpointKey = definition.Key,
+                    EndpointName = definition.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = true
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            ConfiguredOptions(),
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(definition)]));
+
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with
+        {
+            RunId = runId,
+            Scope = "Service",
+            ServiceName = "Tenant"
+        });
+
+        runName.Should().Be($"Link Automation UI - API Health Service Tenant - {hyphenated}");
+        runName.Should().NotContain(compact);
     }
 
     [Fact]
@@ -268,7 +360,10 @@ public class TestRailPublisherTests
             .ReturnsAsync(321);
         api.Setup(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-
+        api.Setup(a => a.GetRunAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails { Id = 321, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName, IncludeAll = false });
+        api.Setup(a => a.GetRunCaseIdsAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([42]);
         var scenarioId = Guid.NewGuid();
         var opts = ConfiguredOptions();
         opts.UseSharedRun = true;
@@ -279,6 +374,7 @@ public class TestRailPublisherTests
         await publisher.PublishScenarioRunAsync(request);
 
         api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.GetRunAsync(321, It.IsAny<CancellationToken>()), Times.Once);
         api.Verify(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         api.Verify(a => a.UpdateRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -290,6 +386,11 @@ public class TestRailPublisherTests
         IReadOnlyList<int>? updated = null;
         api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(321);
+        api.Setup(a => a.GetRunAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails { Id = 321, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName, IncludeAll = false });
+        // Case 50 was added to the run outside this publisher (another instance or by hand).
+        api.Setup(a => a.GetRunCaseIdsAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([42, 50]);
         api.Setup(a => a.UpdateRunCaseIdsAsync(321, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
             .Callback<int, IReadOnlyList<int>, CancellationToken>((_, ids, _) => updated = ids)
             .Returns(Task.CompletedTask);
@@ -311,7 +412,7 @@ public class TestRailPublisherTests
         await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = firstId });
         await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = secondId });
 
-        updated.Should().Equal(42, 43);
+        updated.Should().Equal(42, 43, 50);
         api.Verify(a => a.AddRunAsync(
             9,
             100,
@@ -341,6 +442,10 @@ public class TestRailPublisherTests
             });
         api.Setup(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        api.Setup(a => a.GetRunAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails { Id = 321, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName, IncludeAll = false });
+        api.Setup(a => a.GetRunCaseIdsAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([42]);
 
         var scenarioId = Guid.NewGuid();
         var opts = ConfiguredOptions();
@@ -362,9 +467,63 @@ public class TestRailPublisherTests
     }
 
     [Fact]
-    public async Task SharedRunId_skips_add_run()
+    public async Task Pinned_shared_run_unions_missing_cases_before_posting()
+    {
+        var cases = new HashSet<int> { 10 };
+        var events = new List<string>();
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetRunAsync(999, It.IsAny<CancellationToken>()))
+            .Callback(() => events.Add("get_run"))
+            .ReturnsAsync(new TestRailRunDetails { Id = 999, IncludeAll = false, Name = "pinned" });
+        api.Setup(a => a.GetRunCaseIdsAsync(999, It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                events.Add("get_tests");
+                return Task.FromResult<IReadOnlyList<int>>(cases.OrderBy(id => id).ToList());
+            });
+        api.Setup(a => a.UpdateRunCaseIdsAsync(999, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<int>, CancellationToken>((_, ids, _) =>
+            {
+                events.Add("update:" + string.Join(',', ids));
+                cases.Clear();
+                foreach (var id in ids)
+                    cases.Add(id);
+            })
+            .Returns(Task.CompletedTask);
+        api.Setup(a => a.AddResultsForCasesAsync(999, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback(() => events.Add("post"))
+            .ReturnsAsync([]);
+
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var scenarios = new Mock<IScenarioStore>();
+        scenarios.Setup(s => s.GetByIdAsync(firstId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestScenarioDefinition { Id = firstId, Name = "One", TestRailCaseId = 42 });
+        scenarios.Setup(s => s.GetByIdAsync(secondId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestScenarioDefinition { Id = secondId, Name = "Two", TestRailCaseId = 43 });
+
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        opts.SharedScenarioRunId = 999;
+        var publisher = CreatePublisher(api.Object, opts, scenarios.Object);
+
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = firstId });
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = secondId });
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = firstId });
+
+        events.Should().Equal(
+            "get_run", "get_tests", "update:10,42", "post",
+            "get_run", "get_tests", "update:10,42,43", "post",
+            "get_run", "get_tests", "post");
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Pinned_shared_run_with_include_all_does_not_update()
     {
         var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetRunAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails { Id = 999, IncludeAll = true, Name = "pinned" });
         api.Setup(a => a.AddResultsForCasesAsync(999, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
@@ -375,9 +534,260 @@ public class TestRailPublisherTests
         var publisher = CreatePublisher(api.Object, opts, ScenarioStore(scenarioId));
 
         await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = scenarioId });
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = scenarioId });
+
+        api.Verify(a => a.GetRunAsync(999, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        api.Verify(a => a.GetRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.UpdateRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.AddResultsForCasesAsync(999, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Pinned_shared_run_does_not_post_when_get_run_fails()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetRunAsync(999, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("missing run"));
+
+        var scenarioId = Guid.NewGuid();
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        opts.SharedScenarioRunId = 999;
+        var publisher = CreatePublisher(api.Object, opts, ScenarioStore(scenarioId));
+
+        await publisher.Invoking(p => p.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = scenarioId }))
+            .Should().NotThrowAsync();
+
+        api.Verify(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.UpdateRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UseSharedRun_reuses_an_existing_open_run_and_unions_its_cases()
+    {
+        var cases = new HashSet<int> { 7 };
+        var updates = new List<int[]>();
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new TestRailRunDetails { Id = 4, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName, IsCompleted = true },
+                new TestRailRunDetails { Id = 1, SuiteId = 100, Name = "Link Automation UI - Scenario suite (old)" },
+                new TestRailRunDetails { Id = 3, SuiteId = 999, Name = TestRailPublisher.SharedScenarioRunName },
+                new TestRailRunDetails { Id = 777, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName }
+            ]);
+        api.Setup(a => a.GetRunAsync(777, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails
+            {
+                Id = 777,
+                SuiteId = 100,
+                Name = TestRailPublisher.SharedScenarioRunName,
+                IncludeAll = false
+            });
+        api.Setup(a => a.GetRunCaseIdsAsync(777, It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult<IReadOnlyList<int>>(cases.OrderBy(id => id).ToList()));
+        api.Setup(a => a.UpdateRunCaseIdsAsync(777, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<int>, CancellationToken>((_, ids, _) =>
+            {
+                updates.Add(ids.ToArray());
+                cases.Clear();
+                foreach (var id in ids)
+                    cases.Add(id);
+            })
+            .Returns(Task.CompletedTask);
+        api.Setup(a => a.AddResultsForCasesAsync(777, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var thirdId = Guid.NewGuid();
+        var scenarios = new Mock<IScenarioStore>();
+        scenarios.Setup(s => s.GetByIdAsync(firstId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestScenarioDefinition { Id = firstId, Name = "One", TestRailCaseId = 42 });
+        scenarios.Setup(s => s.GetByIdAsync(secondId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestScenarioDefinition { Id = secondId, Name = "Two", TestRailCaseId = 43 });
+        scenarios.Setup(s => s.GetByIdAsync(thirdId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestScenarioDefinition { Id = thirdId, Name = "Three", TestRailCaseId = 44 });
+
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        var firstPublisher = CreatePublisher(api.Object, opts, scenarios.Object);
+        await firstPublisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = firstId });
+        await firstPublisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = secondId });
+
+        var restarted = CreatePublisher(api.Object, opts, scenarios.Object);
+        await restarted.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = thirdId });
+
+        updates.Should().HaveCount(3);
+        updates[0].Should().Equal(7, 42);
+        updates[1].Should().Equal(7, 42, 43);
+        updates[2].Should().Equal(7, 42, 43, 44);
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        api.Verify(a => a.GetRunAsync(777, It.IsAny<CancellationToken>()), Times.Exactly(3));
+        api.Verify(a => a.AddResultsForCasesAsync(777, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task UseSharedRun_creates_when_no_open_run_has_the_shared_name()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new TestRailRunDetails { Id = 5, SuiteId = 100, Name = "someone else's run" },
+                new TestRailRunDetails { Id = 6, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName, IsCompleted = true }
+            ]);
+        api.Setup(a => a.AddRunAsync(9, 100, TestRailPublisher.SharedScenarioRunName, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(321);
+        api.Setup(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        api.Setup(a => a.GetRunAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails { Id = 321, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName, IncludeAll = false });
+        api.Setup(a => a.GetRunCaseIdsAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([42]);
+
+        var scenarioId = Guid.NewGuid();
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        var publisher = CreatePublisher(api.Object, opts, ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId };
+
+        await publisher.PublishScenarioRunAsync(request);
+        await publisher.PublishScenarioRunAsync(request);
+
+        api.Verify(a => a.AddRunAsync(
+            9,
+            100,
+            TestRailPublisher.SharedScenarioRunName,
+            It.Is<IReadOnlyList<int>>(ids => ids.SequenceEqual(new[] { 42 })),
+            It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.GetRunAsync(321, It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.UpdateRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Pinned_shared_run_that_is_completed_does_not_post_or_update()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetRunAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails { Id = 999, IncludeAll = false, IsCompleted = true, Name = "pinned" });
+
+        var scenarioId = Guid.NewGuid();
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        opts.SharedScenarioRunId = 999;
+        var publisher = CreatePublisher(api.Object, opts, ScenarioStore(scenarioId));
+
+        await publisher.Invoking(p => p.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = scenarioId }))
+            .Should().NotThrowAsync();
+
+        api.Verify(a => a.GetRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.UpdateRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UseSharedRun_replaces_a_cached_run_that_was_closed()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        api.SetupSequence(a => a.AddRunAsync(9, 100, TestRailPublisher.SharedScenarioRunName, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(321)
+            .ReturnsAsync(322);
+        api.Setup(a => a.GetRunAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails { Id = 321, SuiteId = 100, Name = TestRailPublisher.SharedScenarioRunName, IsCompleted = true });
+        api.Setup(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var scenarioId = Guid.NewGuid();
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        var publisher = CreatePublisher(api.Object, opts, ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId };
+
+        await publisher.PublishScenarioRunAsync(request);
+        await publisher.PublishScenarioRunAsync(request);
+
+        api.Verify(a => a.AddRunAsync(9, 100, TestRailPublisher.SharedScenarioRunName, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        api.Verify(a => a.UpdateRunCaseIdsAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.AddResultsForCasesAsync(322, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UseSharedRun_does_not_create_when_lookup_fails()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("down"));
+
+        var scenarioId = Guid.NewGuid();
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        var publisher = CreatePublisher(api.Object, opts, ScenarioStore(scenarioId));
+
+        await publisher.Invoking(p => p.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = scenarioId }))
+            .Should().NotThrowAsync();
 
         api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
-        api.Verify(a => a.AddResultsForCasesAsync(999, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UseSharedRun_keeps_separate_runs_when_scenario_and_api_health_share_a_suite()
+    {
+        var created = new List<string>();
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetOpenRunsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, int, string, IReadOnlyList<int>, CancellationToken>((_, _, name, _, _) => created.Add(name))
+            .ReturnsAsync(50);
+        api.Setup(a => a.AddResultsForCasesAsync(50, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var scenarioId = Guid.NewGuid();
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        opts.ApiHealthSuiteId = 100;
+        var definition = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Create Facility",
+            TestRailCaseId = 8
+        };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [definition.Key] = new()
+                {
+                    EndpointKey = definition.Key,
+                    EndpointName = definition.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = true
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            opts,
+            ScenarioStore(scenarioId),
+            store.Object,
+            new ApiEndpointRegistry([new FakeSuite(definition)]));
+
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with { ScenarioId = scenarioId });
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest());
+
+        created.Should().Equal(
+            TestRailPublisher.SharedScenarioRunName,
+            TestRailPublisher.SharedApiHealthRunName);
     }
 
     [Fact]
