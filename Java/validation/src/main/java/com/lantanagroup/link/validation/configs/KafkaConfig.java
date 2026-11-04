@@ -10,6 +10,8 @@ import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecoverer;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdated;
+import com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdatedKey;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ShadowCompareEvent;
 import com.lantanagroup.link.validation.records.ValidationComplete;
@@ -104,6 +106,7 @@ public class KafkaConfig {
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
                 ReadyForValidation.Key.class, getJsonSerializer(objectMapper, ReadyForValidation.Key.class),
+                ReportStatusUpdatedKey.class, getJsonSerializer(objectMapper, ReportStatusUpdatedKey.class),
                 // A record whose key fails to deserialize carries raw bytes, and those bytes are what the
                 // dead-letter publisher must write. Without this delegate the publication throws and the
                 // container redelivers the record forever, blocking the partition.
@@ -117,6 +120,7 @@ public class KafkaConfig {
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
                 ValidationComplete.class, getJsonSerializer(objectMapper, ValidationComplete.class),
+                ReportStatusUpdated.class, getJsonSerializer(objectMapper, ReportStatusUpdated.class),
                 ReadyForValidation.class, getJsonSerializer(objectMapper, ReadyForValidation.class),
                 ShadowCompareEvent.class, getJsonSerializer(objectMapper, ShadowCompareEvent.class),
                 // A record that fails deserialization reaches the dead-letter publisher as the raw byte[]
