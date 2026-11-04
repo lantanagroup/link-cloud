@@ -38,7 +38,7 @@ Per-resource work runs in tight in-process loops that execute **hundreds of thou
 
 It is deliberately *not* exhaustive. `docs/config-key-inventory.md` is the complete list of every key the code reads, generated from source — add a key to the catalog only if it is provisioned per environment, has no safe default, or is a documented operational knob.
 
-`required: true` means a row must exist in **all three** environment stores. An entry with a working shipped default should be `required: false` with that value recorded in `defaultValue`; requiring it would mean provisioning one identical value three times.
+`required: true` means a row must exist in **every** environment store declared in the catalog's `environments` block. An entry with a working shipped default should be `required: false` with that value recorded in `defaultValue`; requiring it would mean provisioning one identical value in every store.
 
 **The per-environment values are not in this repo.** The catalog is here; the exports it is checked against (`app-config.<env>.json`, one per store) live in the private **`lantanagroup/link-cac`** repository — this one is public and those files are the deployed environments' real configuration. Everything under `Scripts/AzureAppConfig/` still runs from this repo root and defaults to a sibling clone at `../link-cac/Config`; override with `LINK_CAC_CONFIG_DIR` or `--config-dir`. Adding a `required: true` key here means adding its rows there, in the same pair of PRs.
 

@@ -3,6 +3,7 @@ using System.Globalization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
 
 namespace LantanaGroup.Link.Report.Jobs;
@@ -52,7 +53,7 @@ public class RetentionCheckJob : IJob
             "(recovery {IsRecovery}, fire instance {FireInstanceId}).",
             run.ScheduledFireTimeUtc,
             run.IsRecovery,
-            run.FireInstanceId);
+            run.FireInstanceId.SanitizeForLog());
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -76,7 +77,7 @@ public class RetentionCheckJob : IJob
                 "Retention check job failed for the firing due at {ScheduledFireTimeUtc:O} " +
                 "(fire instance {FireInstanceId}); it will run again at the next scheduled firing.",
                 run.ScheduledFireTimeUtc,
-                run.FireInstanceId);
+                run.FireInstanceId.SanitizeForLog());
 
             throw new JobExecutionException(ex, refireImmediately: false);
         }

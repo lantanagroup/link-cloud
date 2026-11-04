@@ -51,17 +51,28 @@ public class ReportProgramWiringTests
         IReadOnlyList<ServiceDescriptor>? captured = null;
 
         // Any public Report type locates the entry point; Report's top-level Program is not visible here.
+        // Pinned rather than taken from the machine running the tests: under Production, Report's startup
+        // requires Redis for its pipeline abort registry and throws before the services can be captured.
         using var factory = new WebApplicationFactory<RetentionCheckJob>()
-            .WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            {
-                captured = services.ToList();
-                throw new ServicesCapturedException();
-            }));
+            .WithWebHostBuilder(builder => builder
+                .UseEnvironment(Environments.Development)
+                .ConfigureTestServices(services =>
+                {
+                    captured = services.ToList();
+                    throw new ServicesCapturedException();
+                }));
 
         var exception = Record.Exception(() => factory.Services);
 
+        // Anything other than our own stop means Program.cs failed first; show that failure, not a null.
+        if (exception is not ServicesCapturedException)
+        {
+            throw new InvalidOperationException(
+                "Report's Program.cs failed before its services could be captured.",
+                exception);
+        }
+
         Assert.NotNull(captured);
-        Assert.NotNull(exception);
 
         return captured;
     }

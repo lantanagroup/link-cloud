@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Report.Services;
 
@@ -28,7 +29,7 @@ public class LoggingRetentionCheck : IRetentionCheckWorker
             "(recovery {IsRecovery}, fire instance {FireInstanceId}).",
             run.ScheduledFireTimeUtc,
             run.IsRecovery,
-            run.FireInstanceId);
+            run.FireInstanceId.SanitizeForLog());
 
         return Task.CompletedTask;
     }

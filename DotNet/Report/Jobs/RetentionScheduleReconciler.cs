@@ -81,12 +81,12 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
                 _logger.LogInformation("Scheduled retention nightly job ({Cron}). {nextFire} {TimeZone}",
                     cron.SanitizeForLog(), 
                     trigger.GetNextFireTimeUtc()?.ToString("o") ?? "unknown", 
-                    trigger.TimeZone.Id);
+                    trigger.TimeZone.Id.SanitizeForLog());
                 return;
             }
             catch (ObjectAlreadyExistsException ex)
             {
-                // Another cluster node's ReconcileAllAsync won the race between our CheckExists
+                // Another cluster node's ReconcileAsync won the race between our CheckExists
                 // and this ScheduleJob. Fall through to the verify/reschedule logic below instead
                 // of crashing the loser out of the hosted service's StartAsync.
                 _logger.LogDebug(ex, "Retention Nightly job was scheduled by another node; verifying its trigger.");
@@ -112,7 +112,7 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
             _logger.LogInformation("Retention nightly job is already scheduled ({Cron}). {nextFire} {TimeZone}",
                 cron.SanitizeForLog(),
                 existing.GetNextFireTimeUtc()?.ToString("o") ?? "unknown",
-                existing.TimeZone.Id);
+                existing.TimeZone.Id.SanitizeForLog());
             return;
         }
 
@@ -130,7 +130,7 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
             existing.CronExpressionString.SanitizeForLog(),
             cron.SanitizeForLog(),
             replacement.GetNextFireTimeUtc()?.ToString("o") ?? "unknown",
-            replacement.TimeZone.Id);
+            replacement.TimeZone.Id.SanitizeForLog());
     }
 
     private static ITrigger BuildTrigger(JobKey jobKey, string cron) =>
