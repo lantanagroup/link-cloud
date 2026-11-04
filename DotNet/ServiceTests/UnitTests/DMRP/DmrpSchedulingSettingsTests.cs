@@ -20,6 +20,7 @@ public class DmrpSchedulingSettingsTests
     [InlineData("not a cron")]
     [InlineData("")]
     [InlineData(null)]
+    [InlineData("0 59 23 1 1 ? 2020")]
     public void An_invalid_cron_falls_back_to_the_default(string? cron)
     {
         new DmrpSchedulingSettings { NightlyCron = cron! }.ResolvedNightlyCron.Should().Be("0 59 23 * * ?");

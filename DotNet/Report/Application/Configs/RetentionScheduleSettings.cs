@@ -1,4 +1,4 @@
-using Quartz;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 
 namespace LantanaGroup.Link.Report.Application.Options
 {
@@ -34,10 +34,10 @@ namespace LantanaGroup.Link.Report.Application.Options
 
         /// <summary>
         /// Gets a value indicating whether the cron expression is valid. Returns false when the cron expression
-        /// is null, empty, whitespace, or not a valid Quartz cron expression.
+        /// is null, empty, whitespace, not a valid Quartz cron expression, or can never fire again.
         /// </summary>
         public bool CronIsValid =>
-            !string.IsNullOrWhiteSpace(Cron) && CronExpression.IsValidExpression(Cron);
+            CronJobReconciler.CanFire(Cron, TimeZoneInfo.Utc);
 
         /// <summary>
         /// Gets the resolved cron expression for the retention schedule. If the cron expression is invalid,

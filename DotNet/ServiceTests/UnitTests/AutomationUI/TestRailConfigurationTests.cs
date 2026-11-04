@@ -489,6 +489,76 @@ public class TestRailApiClientListTests
     }
 
     [Fact]
+    public async Task GetRun_reads_include_all()
+    {
+        var handler = new PathHandler(_ =>
+            """{"id":999,"name":"pinned","suite_id":100,"include_all":true,"is_completed":false}""");
+        var client = CreateClient(handler);
+
+        var run = await client.GetRunAsync(999);
+
+        run.Should().NotBeNull();
+        run!.IncludeAll.Should().BeTrue();
+        run.IsCompleted.Should().BeFalse();
+        run.SuiteId.Should().Be(100);
+        run.Name.Should().Be("pinned");
+        handler.Paths.Should().ContainSingle()
+            .Which.Should().Be("https://example.testrail.io/index.php?/api/v2/get_run/999");
+    }
+
+    [Fact]
+    public async Task GetOpenRuns_requests_suite_and_follows_pages()
+    {
+        var handler = new PathHandler(path => path switch
+        {
+            _ when path.EndsWith("get_runs/6&suite_id=134&is_completed=0", StringComparison.Ordinal) =>
+                """{"offset":0,"limit":1,"size":1,"_links":{"next":"/api/v2/get_runs/6&suite_id=134&is_completed=0&offset=1","prev":null},"runs":[{"id":10,"name":"Link Automation UI - Scenario suite","suite_id":134,"include_all":0,"is_completed":0}]}""",
+            _ when path.EndsWith("get_runs/6&suite_id=134&is_completed=0&offset=1", StringComparison.Ordinal) =>
+                """{"offset":1,"limit":1,"size":1,"_links":{"next":null},"runs":[{"id":11,"name":"other","suite_id":134,"include_all":1,"is_completed":false}]}""",
+            _ => throw new InvalidOperationException(path)
+        });
+        var client = CreateClient(handler);
+
+        var runs = await client.GetOpenRunsAsync(6, 134);
+
+        runs.Select(r => r.Id).Should().Equal(10, 11);
+        runs[0].IncludeAll.Should().BeFalse();
+        runs[1].IncludeAll.Should().BeTrue();
+        handler.Paths.Should().HaveCount(2);
+        handler.Methods.Should().OnlyContain(m => m == HttpMethod.Get);
+    }
+
+    [Fact]
+    public async Task GetRunCaseIds_follows_pages()
+    {
+        var handler = new PathHandler(path => path switch
+        {
+            _ when path.EndsWith("get_tests/9&offset=2", StringComparison.Ordinal) =>
+                """{"offset":2,"limit":2,"size":1,"_links":{"next":null},"tests":[{"id":3,"case_id":44}]}""",
+            _ when path.EndsWith("get_tests/9", StringComparison.Ordinal) =>
+                """{"offset":0,"limit":2,"size":2,"_links":{"next":"/api/v2/get_tests/9&offset=2","prev":null},"tests":[{"id":1,"case_id":42},{"id":2,"case_id":43}]}""",
+            _ => throw new InvalidOperationException(path)
+        });
+        var client = CreateClient(handler);
+
+        var ids = await client.GetRunCaseIdsAsync(9);
+
+        ids.Should().Equal(42, 43, 44);
+        handler.Paths.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetRunCaseIds_reads_bare_array()
+    {
+        var handler = new PathHandler(_ => """[{"id":1,"case_id":42},{"id":2,"case_id":43}]""");
+        var client = CreateClient(handler);
+
+        var ids = await client.GetRunCaseIdsAsync(9);
+
+        ids.Should().Equal(42, 43);
+    }
+
+    [Fact]
     public async Task Unauthorized_list_throws_with_status()
     {
         var handler = new PathHandler(_ => """{"error":"Authentication failed"}""", HttpStatusCode.Unauthorized);
