@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http"
 import { Injectable } from "@angular/core";
 import { catchError, map, Observable } from "rxjs";
 import { AppConfigService } from "src/app/services/app-config.service";
-import { ICategoryIssuePage, IReportCategoryCounts, IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary, IReportListSummary } from "./report-view.interface";
+import { ICategoryIssuePage, IReportCategoryCounts, IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 import { IApiResponse } from "src/app/interfaces/api-response.interface";
 import {IPagedReportSchedule} from "../../../interfaces/report/report-schedule.interface";
@@ -181,31 +181,5 @@ export class FacilityViewService {
     return this.http.get<IReportCategoryCounts>(
       `${this.appConfigService.config?.baseApiUrl}/validation/facilities/${encodeURIComponent(facilityId)}/reports/${encodeURIComponent(reportId)}/category-counts`
     );
-  }
-
-  getReportIssues(facilityId: string, reportId: string): Observable<IValidationIssue[]> {
-    return this.http.get<IValidationIssue[]>(`${this.appConfigService.config?.baseApiUrl}/validation/result/${facilityId}/${reportId}`)
-      .pipe(
-        map((response: IValidationIssue[]) => {
-          return response;
-        }),
-        catchError((error: HttpErrorResponse) => {
-          this.errorHandler.handleError(error);
-          return [];
-        })
-      );
-  }
-
-  getReportIssuesSummary(issues: IValidationIssue[]): Observable<IValidationIssueCategorySummary[]> {
-    return this.http.post<IValidationIssueCategorySummary[]>(`${this.appConfigService.config?.baseApiUrl}/validation/$categorize?summarize=true`, issues)
-      .pipe(
-        map((response: IValidationIssueCategorySummary[]) => {
-          return response;
-        }),
-        catchError((error: HttpErrorResponse) => {
-          this.errorHandler.handleError(error);
-          return [];
-        })
-      )
   }
 }

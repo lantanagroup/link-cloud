@@ -10,7 +10,7 @@ describe('SubPreQualReportIssuesComponent', () => {
   let reports: jasmine.SpyObj<FacilityViewService>;
   beforeEach(() => {
     reports = jasmine.createSpyObj('FacilityViewService', ['getReportSummary', 'getReportCategoryCounts',
-      'getCategoryIssuesPage', 'getReportIssues', 'getReportIssuesSummary']);
+      'getCategoryIssuesPage']);
     reports.getReportSummary.and.returnValue(of({id: 'r'} as any));
     reports.getReportCategoryCounts.and.returnValue(of({facilityId: 'f', reportId: 'r', lastUpdated: '',
       categories: [{categoryId: 'c', title: 'Stored title', acceptable: false, submit: true, issues: 1000}]}));
@@ -26,8 +26,6 @@ describe('SubPreQualReportIssuesComponent', () => {
   it('requests only the selected category and page, keeping stored and available counts distinct', () => {
     component.ngOnInit();
     expect(reports.getCategoryIssuesPage).toHaveBeenCalledWith('f', 'r', 'c', 1, 25);
-    expect(reports.getReportIssues).not.toHaveBeenCalled();
-    expect(reports.getReportIssuesSummary).not.toHaveBeenCalled();
     expect(component.issueCount).toBe(1000);
     expect(component.availableCount).toBe(50);
     expect(component.category?.title).toBe('Stored title');

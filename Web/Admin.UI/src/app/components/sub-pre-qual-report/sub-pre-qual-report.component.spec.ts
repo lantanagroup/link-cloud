@@ -10,7 +10,7 @@ describe('SubPreQualReportComponent', () => {
   let validation: jasmine.SpyObj<ValidationService>;
 
   beforeEach(() => {
-    reports = jasmine.createSpyObj('FacilityViewService', ['getReportSummary', 'getReportCategoryCounts', 'getReportIssues', 'getReportIssuesSummary']);
+    reports = jasmine.createSpyObj('FacilityViewService', ['getReportSummary', 'getReportCategoryCounts']);
     validation = jasmine.createSpyObj('ValidationService', ['getValidationCategories']);
     reports.getReportSummary.and.returnValue(of({id: 'report-1'} as any));
     reports.getReportCategoryCounts.and.returnValue(of({
@@ -31,8 +31,6 @@ describe('SubPreQualReportComponent', () => {
   it('loads stored category counts without downloading or recategorizing findings', () => {
     component.ngOnInit();
     expect(reports.getReportCategoryCounts).toHaveBeenCalledWith('facility-1', 'report-1');
-    expect(reports.getReportIssues).not.toHaveBeenCalled();
-    expect(reports.getReportIssuesSummary).not.toHaveBeenCalled();
     expect(component.categoryCounts[0]).toEqual(jasmine.objectContaining({
       title: 'Stored title', acceptable: false, submit: false, issues: 3825417, guidance: 'Review findings'
     }));
@@ -45,7 +43,6 @@ describe('SubPreQualReportComponent', () => {
     component.ngOnInit();
     expect(component.isLoading).toBeFalse();
     expect(component.loadError).toBeDefined();
-    expect(reports.getReportIssues).not.toHaveBeenCalled();
   });
 
   it('shows counts when category guidance is unavailable', () => {
