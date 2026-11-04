@@ -337,6 +337,81 @@ public class AdtAcquiredWorkflowTests
     }
 
     [Fact]
+    public async Task A18_OnlyChangesPatientIdentifiers_OnEveryStayOfThePatient()
+    {
+        var discharge = new DateTime(2026, 1, 20);
+        await Process(
+            Entry("A01", visitId: "old-stay", configure: e =>
+            {
+                e.AdmitDateTime = new DateTime(2026, 1, 10);
+                e.PatientClass = "O";
+                e.Location = "OLD^LOCATION";
+            }),
+            Entry("A03", visitId: "old-stay", configure: e =>
+            {
+                e.DischargeDateTime = discharge;
+                e.PatientClass = "O";
+                e.Location = "OLD^LOCATION";
+            }),
+            Entry("A01", visitId: "open-stay", configure: e =>
+            {
+                e.AdmitDateTime = new DateTime(2026, 2, 1);
+                e.PatientClass = "I";
+                e.Location = "OPEN^LOCATION";
+            }));
+
+        // The merge message's PV1 describes one visit of the surviving patient, not every stay it matches
+        var messages = await Process(Entry("A18", patientId: "fhir-2", visitId: "merge-visit", configure: e =>
+        {
+            e.MedicalRecordNumber = "mrn-2";
+            e.PatientClass = "E";
+            e.Location = "MERGE^LOCATION";
+            e.PatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-2", IdentifierType = "MR" }];
+            e.Merge = new AdtMergeInformation { PriorPatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-1" }] };
+        }));
+
+        Assert.Empty(messages);
+
+        async Task AssertStays()
+        {
+            var encounters = await Encounters();
+            Assert.Equal(2, encounters.Count);
+
+            // Each stay moved to the surviving patient and kept its prior identifier
+            Assert.All(encounters, e =>
+            {
+                Assert.Equal("mrn-2", e.MedicalRecordNumber);
+                Assert.Equal("fhir-2", e.GetIdentifierByType(SourceType.FHIR).Identifier);
+                Assert.Contains(e.PatientIdentifiers, i => i.Identifier == "mrn-1");
+                Assert.Contains(e.PatientIdentifiers, i => i.Identifier == "mrn-2");
+                Assert.DoesNotContain(e.PatientVisitIdentifiers, v => v.Identifier == "merge-visit");
+            });
+
+            var old = encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "old-stay"));
+            Assert.Equal("O", old.EncounterClass);
+            Assert.Equal("OLD^LOCATION", old.Location);
+            Assert.Equal("finished", old.EncounterStatus);
+            Assert.Equal(discharge, old.DischargeDate);
+
+            var open = encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "open-stay"));
+            Assert.Equal("I", open.EncounterClass);
+            Assert.Equal("OPEN^LOCATION", open.Location);
+            Assert.Equal("in-progress", open.EncounterStatus);
+            Assert.Null(open.DischargeDate);
+        }
+
+        await AssertStays();
+
+        // A rebuild replays the same payloads, so it must reach the same result
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>().RebuildPatientEncounterTable(_facilityId);
+        }
+
+        await AssertStays();
+    }
+
+    [Fact]
     public async Task A18_MatchingNothing_IsRecordedButOpensNothing()
     {
         var messages = await Process(Entry("A18", configure: e =>

@@ -73,7 +73,8 @@ A message belongs to the encounter with the same encounter id. Without one, it b
 and an A13 to their most recent one. A cancelled encounter is never matched, so an A01 after an A11 starts a new one.
 
 An A18 finds encounters by MRG-1, MRG-2 and MRG-4, against each encounter's MRN and patient identifiers, within the
-facility. PID is the surviving patient. The prior identifiers stay on the encounter.
+facility. PID is the surviving patient. The prior identifiers stay on the encounter. Only the patient's identifiers and
+MRN change: a merge can match several stays, including ended ones, so its PV1 is not applied to any of them.
 
 On `PatientIdentifiers`, `SourceType` `FHIR` is the FHIR Patient.Id and `ADT` is an identifier from PID-3, which is the
 facility's own and must never be read as a FHIR id.

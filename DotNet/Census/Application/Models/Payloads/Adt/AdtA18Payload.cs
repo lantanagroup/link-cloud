@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 /// <summary>
 /// Merge patient information: PID describes the surviving patient and MRG the patient merged into it. The surviving
 /// Patient.Id, MRN and identifiers are applied with the details common to every message, while the prior identifiers
-/// stay on the encounter.
+/// stay on the encounter. Nothing else about the encounter changes.
 /// </summary>
 public class AdtA18Payload : AdtPayload
 {
@@ -42,6 +42,14 @@ public class AdtA18Payload : AdtPayload
             .Select(x => x!)
             .Distinct()
             .ToList();
+    }
+
+    /// <summary>
+    /// A merge can match several stays, including ended ones, but PV1 describes at most one visit of the surviving
+    /// patient, so it must not be applied to all of them.
+    /// </summary>
+    protected override void ApplyVisitDetails(PatientEncounter patientEncounter)
+    {
     }
 
     protected override void ApplyToEncounter(PatientEncounter patientEncounter)

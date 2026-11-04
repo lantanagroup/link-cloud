@@ -86,8 +86,6 @@ public abstract class AdtPayload : IPayload
     public PatientEncounter UpdatePatientEncounter(PatientEncounter patientEncounter)
     {
         patientEncounter.MedicalRecordNumber = MedicalRecordNumber ?? patientEncounter.MedicalRecordNumber;
-        patientEncounter.EncounterClass = PatientClass ?? patientEncounter.EncounterClass;
-        patientEncounter.Location = Location ?? patientEncounter.Location;
         patientEncounter.ModifyDate = DateTime.UtcNow;
 
         SetFhirPatientIdentifier(patientEncounter);
@@ -97,11 +95,22 @@ public abstract class AdtPayload : IPayload
             AddIdentifierIfMissing(patientEncounter, identifier.Id);
         }
 
-        AddVisitIdentifierIfMissing(patientEncounter);
+        ApplyVisitDetails(patientEncounter);
 
         ApplyToEncounter(patientEncounter);
 
         return patientEncounter;
+    }
+
+    /// <summary>
+    /// Applies what PV1 says about the visit: its class, location and encounter id.
+    /// </summary>
+    protected virtual void ApplyVisitDetails(PatientEncounter patientEncounter)
+    {
+        patientEncounter.EncounterClass = PatientClass ?? patientEncounter.EncounterClass;
+        patientEncounter.Location = Location ?? patientEncounter.Location;
+
+        AddVisitIdentifierIfMissing(patientEncounter);
     }
 
     /// <summary>
