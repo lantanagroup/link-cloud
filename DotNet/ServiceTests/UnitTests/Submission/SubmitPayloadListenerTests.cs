@@ -378,7 +378,7 @@ public class SubmitPayloadListenerTests
                 It.Is<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(m =>
                     m.Value.Status == PatientReportingStatus.Submission
                     && !m.Value.IsSuccess
-                    && m.Value.ErrorMessage == "Facility ID not specified."
+                    && m.Value.ErrorMessage == "DeadLetterException: Facility ID not specified."
                     && m.Value.ProcessingTime == null
                     && m.Value.CorrelationId == "corr-1"
                     && m.Value.PatientId == "patient-123"
@@ -418,7 +418,7 @@ public class SubmitPayloadListenerTests
             p => p.ProduceAsync(
                 nameof(KafkaTopic.ReportStatusUpdated),
                 It.Is<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(m =>
-                    m.Value.ErrorMessage == "Facility ID not specified."),
+                    m.Value.ErrorMessage == "DeadLetterException: Facility ID not specified."),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }

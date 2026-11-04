@@ -266,7 +266,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 if (!patientStatusPublished)
                 {
-                    _patientStatus.PublishTerminalFailure(key, value, headers, ex.Message, cancellationToken);
+                    _patientStatus.PublishTerminalFailure(key, value, headers, ex, ex.Message, cancellationToken);
                 }
 
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
@@ -279,7 +279,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 if (!patientStatusPublished)
                 {
-                    _patientStatus.PublishTerminalFailure(key, value, headers, ex.Message, cancellationToken);
+                    _patientStatus.PublishTerminalFailure(key, value, headers, ex, ex.Message, cancellationToken);
                 }
 
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);

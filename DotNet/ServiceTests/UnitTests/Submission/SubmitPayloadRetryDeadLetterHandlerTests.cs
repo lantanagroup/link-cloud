@@ -117,7 +117,10 @@ public class SubmitPayloadRetryDeadLetterHandlerTests
             { KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(header) }
         };
 
-        var message = SubmissionPatientStatus.TerminalErrorMessage(headers, "Retry count exceeded for message with key: abc");
+        var message = SubmissionPatientStatus.TerminalErrorMessage(
+            new DeadLetterException("Retry count exceeded for message with key: abc"),
+            headers,
+            "Retry count exceeded for message with key: abc");
 
         Assert.Equal(expected, message);
     }

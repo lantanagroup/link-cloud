@@ -35,19 +35,19 @@ public sealed class SubmitPayloadRetryDeadLetterHandler : IDeadLetterExceptionHa
 
     public void HandleException(ConsumeResult<string, string> consumeResult, string facilityId, string message = "")
     {
-        PublishIfTerminal(consumeResult, message);
+        PublishIfTerminal(consumeResult, failure: null, message);
         _inner.HandleException(consumeResult, facilityId, message);
     }
 
     public void HandleException(ConsumeResult<string, string> consumeResult, Exception ex, string facilityId)
     {
-        PublishIfTerminal(consumeResult, ex.Message);
+        PublishIfTerminal(consumeResult, ex, ex.Message);
         _inner.HandleException(consumeResult, ex, facilityId);
     }
 
     public void HandleException(ConsumeResult<string, string> consumeResult, DeadLetterException ex, string facilityId)
     {
-        PublishIfTerminal(consumeResult, ex.Message);
+        PublishIfTerminal(consumeResult, ex, ex.Message);
         _inner.HandleException(consumeResult, ex, facilityId);
     }
 
@@ -58,11 +58,11 @@ public sealed class SubmitPayloadRetryDeadLetterHandler : IDeadLetterExceptionHa
 
     public void ProduceDeadLetter(ConsumeResult<string, string> consumeResult, string exceptionMessage)
     {
-        PublishIfTerminal(consumeResult, exceptionMessage);
+        PublishIfTerminal(consumeResult, failure: null, exceptionMessage);
         _inner.ProduceDeadLetter(consumeResult, exceptionMessage);
     }
 
-    private void PublishIfTerminal(ConsumeResult<string, string>? consumeResult, string? fallbackError)
+    private void PublishIfTerminal(ConsumeResult<string, string>? consumeResult, Exception? failure, string? fallbackError)
     {
         if (!string.Equals(Topic, ErrorTopic, StringComparison.Ordinal) || consumeResult?.Message == null)
         {
@@ -74,7 +74,6 @@ public sealed class SubmitPayloadRetryDeadLetterHandler : IDeadLetterExceptionHa
             return;
         }
 
-        var errorMessage = SubmissionPatientStatus.TerminalErrorMessage(consumeResult.Message.Headers, fallbackError);
-        _patientStatus.PublishTerminalFailure(key, value, consumeResult.Message.Headers, errorMessage, CancellationToken.None);
+        _patientStatus.PublishTerminalFailure(key, value, consumeResult.Message.Headers, failure, fallbackError, CancellationToken.None);
     }
 }
