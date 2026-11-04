@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http"
 import { Injectable } from "@angular/core";
 import { catchError, map, Observable } from "rxjs";
 import { AppConfigService } from "src/app/services/app-config.service";
-import { IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary, IReportListSummary } from "./report-view.interface";
+import { ICategoryIssuePage, IReportCategoryCounts, IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 import { IApiResponse } from "src/app/interfaces/api-response.interface";
 import {IPagedReportSchedule} from "../../../interfaces/report/report-schedule.interface";
@@ -167,6 +167,20 @@ export class FacilityViewService {
           return [];
         })
       );
+  }
+
+  getCategoryIssuesPage(facilityId: string, reportId: string, categoryId: string,
+                       pageNumber: number, pageSize: number): Observable<ICategoryIssuePage> {
+    return this.http.get<ICategoryIssuePage>(
+      `${this.appConfigService.config?.baseApiUrl}/validation/facilities/${encodeURIComponent(facilityId)}/reports/${encodeURIComponent(reportId)}/categories/${encodeURIComponent(categoryId)}/issues`,
+      {params: {pageNumber, pageSize}}
+    );
+  }
+
+  getReportCategoryCounts(facilityId: string, reportId: string): Observable<IReportCategoryCounts> {
+    return this.http.get<IReportCategoryCounts>(
+      `${this.appConfigService.config?.baseApiUrl}/validation/facilities/${encodeURIComponent(facilityId)}/reports/${encodeURIComponent(reportId)}/category-counts`
+    );
   }
 
   getReportIssues(facilityId: string, reportId: string): Observable<IValidationIssue[]> {

@@ -3,6 +3,9 @@ package com.lantanagroup.link.validation.services;
 import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.models.CategoryIssueModel;
+import com.lantanagroup.link.validation.models.CategoryIssuePage;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import com.lantanagroup.link.validation.models.CategorySummaryModel;
 import com.lantanagroup.link.validation.models.ResultSummaryModel;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
@@ -21,6 +24,22 @@ public class ResultService {
     }
 
     private static final String UNCATEGORIZED_CATEGORY_ID = "uncategorized";
+
+    @Transactional(readOnly = true)
+    public CategoryIssuePage getCategoryIssuesPage(
+            String facilityId, String reportId, String categoryId, int pageNumber, int pageSize) {
+        var pageable = PageRequest.of(pageNumber - 1, pageSize,
+                Sort.by("id"));
+        var page = UNCATEGORIZED_CATEGORY_ID.equalsIgnoreCase(categoryId)
+                ? resultRepository.findUncategorizedResults(facilityId, reportId, pageable)
+                : resultRepository.findCategoryResults(facilityId, reportId, categoryId, pageable);
+        var records = page.getContent().stream().map(result -> new CategoryIssueModel(
+                result.getLocation(), result.getMessage(), result.getCode().toString(),
+                result.getExpression(), result.getPatientId(), result.getProfile())).toList();
+        return new CategoryIssuePage(records,
+                new CategoryIssuePage.Metadata(
+                        pageSize, pageNumber, page.getTotalElements(), page.getTotalPages()));
+    }
 
     /**
      * Replaces a patient's saved results for a report with {@code results}, in one transaction, so validating the
