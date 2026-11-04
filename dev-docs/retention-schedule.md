@@ -9,10 +9,6 @@ SQL-clustered Quartz store. The job only schedules the work. It hands each firin
 are covered in [retention-events.md](retention-events.md), and the dates it ages reports from in
 [report-retention-dates.md](report-retention-dates.md).
 
-Status: the settings, the job and the worker interface are in place. The startup step that stores
-the job and its trigger in the Quartz store is still to come, so nothing fires the job yet. Update
-this page when it lands.
-
 ## Settings
 
 `RetentionScheduleSettings` binds `Retention:Schedule`. Both keys have defaults in
@@ -26,6 +22,28 @@ this page when it lands.
 `CronIsValid` is false for a blank value or one Quartz cannot parse, and `ResolvedCron` then
 returns the default instead. Settings are read with `IOptions`, so a change takes effect at the
 next startup.
+
+## Scheduling at startup
+
+`RetentionScheduleHostedService` runs `RetentionScheduleReconciler` when Report starts.
+`AddRetentionSchedule` registers both, and `Program.cs` calls it just above `RetryScheduleService`,
+so the job is settled before that service starts the shared scheduler. The job and its trigger are
+both keyed `RetentionCheck` / `Retention`.
+
+Quartz keeps the stored job and trigger across restarts, so the reconciler changes the store only
+where the configuration says something different:
+
+- `Enabled` is false: it deletes the job, which also removes its trigger.
+- The job is not stored: it stores it, durable and requesting recovery, with one cron trigger in
+  UTC whose misfire policy is fire-once-now. If another instance stores it first, it carries on to
+  the checks below instead of failing.
+- The trigger's cron or time zone differs from the configuration: it reschedules the trigger.
+- The job is stored without a trigger: it logs a warning and leaves the store alone. `ScheduleJob`
+  stores both together, so that state only comes from editing the store by hand; delete the job
+  and restart Report to recreate both.
+
+Every startup logs the cron and the next fire time. An invalid cron is logged at `Error` and the
+default is used. Any other failure, such as SQL Server being unreachable, fails Report's startup.
 
 ## The job
 
