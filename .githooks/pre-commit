@@ -165,6 +165,14 @@ scan_staged_secrets() {
         return 1
     fi
 
+    # The staged copy, so a pattern added in this commit applies to it.
+    exclude_file=".githooks/trufflehog-exclude.txt"
+    : > "$tmpdir/exclude.txt"
+    if git cat-file -e ":$exclude_file" 2>/dev/null && ! git show ":$exclude_file" > "$tmpdir/exclude.txt"; then
+        echo "pre-commit: BLOCKED -- could not read the staged $exclude_file."
+        return 1
+    fi
+
     # No verification: it would send each candidate to its provider, and a database that is not
     # reachable from here would read as an invalid credential and be dropped.
     if ! (cd "$staged" && "$TRUFFLEHOG" filesystem . --json --no-verification --no-update \
@@ -176,9 +184,11 @@ scan_staged_secrets() {
 
     # TruffleHog reports whole files, so keep only findings on lines this commit adds. Secrets
     # already committed are not this commit's to fix. Never print the secret itself.
-    if ! hits=$(PYTHONIOENCODING=utf-8 "$PYTHON" - "$tmpdir/findings.jsonl" <<'PY'
+    if ! hits=$(PYTHONIOENCODING=utf-8 "$PYTHON" - "$tmpdir/findings.jsonl" "$tmpdir/exclude.txt" <<'PY'
 import json, re, subprocess, sys
 
+excluded = [re.compile(pattern) for pattern in (raw.strip() for raw in open(sys.argv[2], encoding="utf-8"))
+            if pattern and not pattern.startswith("#")]
 added = {}
 
 def added_lines(path):
@@ -200,6 +210,8 @@ for line in open(sys.argv[1], encoding="utf-8"):
     location = finding["SourceMetadata"]["Data"]["Filesystem"]
     path = location["file"].replace("\\", "/").removeprefix("./")
     number = location.get("line")
+    if any(pattern.search(path) for pattern in excluded):
+        continue
     # Without a line number there is no telling whether this commit added it, so report it.
     if number is not None and number not in added_lines(path):
         continue
@@ -220,7 +232,7 @@ PY
         echo "$hits"
         echo ""
         echo "pre-commit: The values are not shown. Remove each one from the staged file and rotate any"
-        echo "pre-commit: real credential."
+        echo "pre-commit: real credential. For a false positive, see dev-docs/secret-scanning.md."
         return 1
     fi
 }

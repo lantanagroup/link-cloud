@@ -44,6 +44,39 @@ Job **TruffleHog secret scan** scans the commits between the pull request's merg
 Commits brought in by merging the base branch are not scanned again. If TruffleHog itself fails, the
 job fails rather than passing.
 
+Each commit is scanned on its own. A finding stays on the commit that added it, so removing or
+marking the line in a later commit does not clear the check. Amend or squash the commit that added
+it, then force-push.
+
+## Real secrets and false positives
+
+If the finding is a real credential, take it out of the file and rotate it. Local values belong in
+the root `.env`, which is not committed; `docker-compose.yml` reads them as `${VARIABLE}`
+references, which TruffleHog does not report.
+
+If the finding is not a secret, there are two ways to tell the scans so.
+
+**Mark the line.** Put `trufflehog:ignore` in a comment on the same line:
+
+```yaml
+password: not-a-real-password  # trufflehog:ignore
+```
+
+It works in any file that allows a comment on the line, including `appsettings*.json`, whose
+reader accepts `//` comments. The pull request check only honors the tag if it is on the line in
+the commit that adds the line (see above).
+
+**List the path.** `.githooks/trufflehog-exclude.txt` holds regular expressions, one per line. A
+finding in a path that matches one is ignored by both checks. Each pattern is searched for in the
+path relative to the repository root, with forward slashes, so anchor it:
+`^Tests/Fixtures/.*\.json$`. Prefer marking the line: a listed path is never scanned again, whatever
+is later added to it.
+
+The pull request check reads the exclude file from the base branch as it currently is, not from the
+pull request, so a pull request cannot exclude its own findings. Add a pattern in a pull request of
+its own. Once that has merged, re-run the check on the pull request it was for. The hook reads the
+staged copy, so a pattern you stage applies to your commit straight away.
+
 ## Upgrading TruffleHog
 
 `.githooks/trufflehog.pins` holds the version and the SHA-256 of each platform's archive. The hook
