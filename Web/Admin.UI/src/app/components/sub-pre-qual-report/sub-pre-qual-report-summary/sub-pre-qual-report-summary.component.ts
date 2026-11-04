@@ -1,5 +1,5 @@
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { Component, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Output, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { IValidationIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
 
 import { BaseChartDirective } from 'ng2-charts';
@@ -19,6 +19,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
   standalone: true
 })
 export class SubPreQualReportSummaryComponent implements OnChanges {
+  @Output() downloadReport = new EventEmitter<void>();
   @Input() reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
 
   @ViewChild(BaseChartDirective) chart: BaseChartDirective<'bar'> | undefined;
