@@ -55,14 +55,16 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.subscription = this.route.params.pipe(
-      tap(params => {
-        this.facilityId = params['facilityId'];
-        this.submissionId = params['submissionId'];
-        this.isLoading = true;
-        this.loadError = undefined;
-        this.categoryCounts = [];
-        this.reportIssuesSummary = [];
-        this.reportSummary = undefined;
+      tap({
+        next: params => {
+          this.facilityId = params['facilityId'];
+          this.submissionId = params['submissionId'];
+          this.isLoading = true;
+          this.loadError = undefined;
+          this.categoryCounts = [];
+          this.reportIssuesSummary = [];
+          this.reportSummary = undefined;
+        }
       }),
       switchMap(() => forkJoin({
         report: this.facilityViewService.getReportSummary(this.facilityId, this.submissionId),
