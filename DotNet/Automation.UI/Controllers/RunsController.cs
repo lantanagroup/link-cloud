@@ -2,6 +2,7 @@
 using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
@@ -287,6 +288,74 @@ public class RunsController(
         var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
         if (manifest == null) return NoContent();
         return Json(manifest);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> NormalizationResults(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        NormalizationEvidenceSnapshot? evidence = null;
+        try
+        {
+            evidence = (await snapshotStore.GetDomainAsync<NormalizationEvidenceSnapshot>(
+                id,
+                NormalizationEvidenceSnapshot.Domain,
+                cancellationToken))?.Data;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Normalization evidence could not be read for run {RunId}.", id);
+            evidence = null;
+        }
+
+        var suiteId = manifest?.AppliedNormalizationSuiteId
+            ?? RunConfigurationReader.Read(run.RunConfigurationJson).SuiteId;
+        var hasRecordedSequences = evidence?.SuiteSequences is { Count: > 0 };
+        NormalizationSuiteDefinition? suite = null;
+        List<NormalizationOperationDefinition>? operations = null;
+        List<NormalizationSequenceDefinition>? sequences = null;
+        var suiteChangedAfterRun = false;
+        if (suiteId.HasValue && !hasRecordedSequences)
+        {
+            suite = await normalizationStore.GetSuiteByIdAsync(suiteId.Value, cancellationToken);
+            if (suite != null)
+            {
+                operations = await normalizationStore.GetAllOperationsAsync(cancellationToken);
+                sequences = await normalizationStore.GetAllSequencesAsync(cancellationToken);
+                suiteChangedAfterRun = NormalizationRunResultsBuilder.SuiteDefinitionChangedAfter(
+                    suite,
+                    operations,
+                    sequences,
+                    run.StartedAt ?? run.CreatedAt);
+            }
+        }
+
+        var mapId = manifest?.AppliedOrganizationResourceMapTemplateId
+            ?? RunConfigurationReader.Read(run.RunConfigurationJson).OrganizationMapId;
+        OrganizationResourceMapTemplate? organizationMap = null;
+        if (mapId.HasValue)
+            organizationMap = await organizationResourceMapTemplateStore.GetByIdAsync(mapId.Value, cancellationToken);
+
+        var finished = run.Status is AutomationRunStatus.Succeeded
+            or AutomationRunStatus.Failed
+            or AutomationRunStatus.Cancelled;
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunConfigurationJson = run.RunConfigurationJson,
+            RunFinished = finished,
+            Manifest = manifest,
+            Evidence = evidence,
+            Suite = suite,
+            SuiteOperations = operations,
+            SuiteSequences = sequences,
+            SuiteChangedAfterRun = suiteChangedAfterRun,
+            OrganizationMap = organizationMap
+        });
+        return Json(results);
     }
 
     [HttpGet]

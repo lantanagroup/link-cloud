@@ -121,6 +121,43 @@ The canonical specification lives on the Keystone site, which supersedes the old
 - Do not overload routes for UI concerns; prefer consistent resource representations over UI-specific endpoints.
 - All services should have a base route of `/api/<servicename>`
 
+### Auditing an endpoint
+
+Any .NET REST endpoint that changes configuration records who changed what, through the shared
+mechanism in `DotNet/Shared/Application/Auditing`: `[Auditable(action, resource)]` on a controller
+action, or `.Auditable(action, resource)` on a mapped minimal-API endpoint, with
+`AddLinkAuditing<TContext>()` registered once per service. Which endpoints are auditable, and with what
+action and resource, is decided by the [REST API auditing ADR](https://keystone.lantanagroup.com/Proposals/Details/rest-api-auditing).
+The Java services (Validation, MeasureEval) are not covered by it: their ADR rows need a producer of
+their own.
+
+See **[dev-docs/auditing-an-endpoint.md](dev-docs/auditing-an-endpoint.md)** for the whole of it, and
+**[dev-docs/auditing-known-limits.md](dev-docs/auditing-known-limits.md)** for what it does not do. Six
+things that catch people out:
+
+- **The mechanism undoes nothing - atomicity stays with the handler.** Marking an endpoint auditable
+  does not change what it does to the database, so a handler that saves more than once, or saves and
+  then returns a non-2xx result, can leave a partial change the event describes as whole. Writes that
+  belong together need their own transaction, finished before the handler returns.
+- **The property-change interceptor is attached by the service** with `.AddLinkAuditInterceptor(sp)`
+  inside its own `AddDbContext`, because Account, Audit and Notification keep their own
+  `UpdateBaseEntityInterceptor` and Report and Submission register the shared one without attaching
+  it. A service built on the shared `AddSQLServerEF<T>()` helper (QueryDispatch) gets it attached by
+  the helper instead.
+- **Secrets, credentials and personal data are masked, not omitted.** A changed value one of them
+  catches appears as `[redacted]` on both sides, so a reader sees that it changed but not to what.
+  Names and patterns are shared and cannot be removed by a service; personal data is masked with
+  `[AuditMask]` on the entity.
+- **Only tracked changes are captured.** `AsNoTracking`, detached `Update()` and
+  `ExecuteUpdateAsync` produce an event with no property changes.
+- **`ResourceId` must uniquely identify the row acted on**, and comes only from the handler's
+  `IAuditContext.RecordId` or the route key the attribute names - never guessed from what was saved.
+  Set `RecordId` on every create and wherever the route does not carry the row's own id; a route key
+  names that id, never the facility.
+- **Every host that serves an audited endpoint registers auditing**, test hosts included - usually
+  with a fake `IAuditPublisher`. Without it every request to the endpoint fails with an error naming
+  the missing call, and a service with no `KafkaConnection` fails to start.
+
 ### Input Sanitization
 
 For any `string` query parameter on a REST endpoint, run it through `HtmlInputSanitizer.Sanitize()` or `SanitizeAndRemove()` before passing to business logic. Logging-message arguments must also be sanitized before reaching the logger to clear SAST findings.

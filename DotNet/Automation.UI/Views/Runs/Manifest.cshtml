@@ -1,6 +1,6 @@
 @model LantanaGroup.Automation.Generation.GenerationManifestSnapshot
 @{
-    ViewData["Title"] = "Generation Manifest";
+    ViewData["Title"] = "Patient Manifest";
     var run = (LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary)ViewBag.Run;
     var runId = (Guid)ViewBag.RunId;
     var isComplete = run.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled;
@@ -9,7 +9,7 @@
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
-        <h3 class="fw-bold mb-0"><i class="bi bi-card-checklist me-2"></i>Generation Manifest</h3>
+        <h3 class="fw-bold mb-0"><i class="bi bi-card-checklist me-2"></i>Patient Manifest</h3>
         <div class="small text-muted">
             Run: <a asp-action="Details" asp-route-id="@runId" class="text-decoration-none">@run.RunName</a>
             <code class="ms-1">@runId</code>
@@ -98,6 +98,7 @@
     <!-- ════════════════════ PATIENTS TAB ════════════════════ -->
     <div class="tab-pane fade" id="tab-patients">
         <div id="generationTemplateBanner" class="mb-3"></div>
+        <div id="patientOriginNote" class="small text-muted mb-2"></div>
         <div class="au-card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-people me-2"></i>Per-Patient Resource Breakdown</span>
@@ -173,6 +174,18 @@
         const d = document.createElement('div');
         d.appendChild(document.createTextNode(s));
         return d.innerHTML;
+    }
+
+    function patientOriginBadge(patientId) {
+        const origins = manifestData?.patientOriginByPatient;
+        if (!origins || typeof origins !== 'object')
+            return '<span class="text-muted" title="Not recorded for this run">&ndash;</span>';
+        const origin = origins[patientId];
+        if (origin === 'Generated')
+            return '<span class="badge bg-primary">Generated</span>';
+        if (origin === 'Uploaded')
+            return '<span class="badge bg-secondary">Uploaded</span>';
+        return '<span class="text-muted" title="Not recorded for this run">&ndash;</span>';
     }
 
     function generatedBundleDownloadLink(patientId) {
@@ -433,7 +446,7 @@
 
             html += `
                 <tr>
-                    <td><code>${escapeHtml(pid)}</code></td>
+                    <td><code>${escapeHtml(pid)}</code> ${patientOriginBadge(pid)}</td>
                     <td>${badge}</td>
                 </tr>`;
         });
@@ -456,6 +469,12 @@
 
         const container =
             document.getElementById('patientBreakdownContainer');
+        const originNote = document.getElementById('patientOriginNote');
+        if (originNote) {
+            originNote.textContent = m.patientOriginByPatient
+                ? ''
+                : 'Patient source was not recorded for this run.';
+        }
 
         if (!allPatientEntries.length) {
             container.innerHTML =
@@ -577,6 +596,7 @@
                             ${patientSortIcon()}
                         </button>
                     </th>
+                <th>Source</th>
                 <th>Inpatient Pattern</th>
                 <th>Patient config</th>
                 <th class="text-end">Total</th>
@@ -595,6 +615,7 @@
                 .join('');
             html += `<tr>
                 <td><code>${escapeHtml(pid)}</code></td>
+                <td>${patientOriginBadge(pid)}</td>
                 <td>${formatScheduledPattern(inpatientPattern)}</td>
                 <td>${escapeHtml(patientConfigLabelForId(pid))}</td>
                 <td class="text-end fw-semibold">${total.toLocaleString()}</td>
@@ -927,7 +948,7 @@
                 detailHtml += '</tbody></table>';
 
                 html += `<tr class="${rowClass} comp-patient-row" data-pid="${escapeHtml(pid)}">
-                    <td><code>${escapeHtml(pid)}</code></td>
+                    <td><code>${escapeHtml(pid)}</code> ${patientOriginBadge(pid)}</td>
                     <td class="text-end">${gTotal.toLocaleString()}</td>
                     <td class="text-end fw-semibold" style="color:var(--au-accent);">${eTotal.toLocaleString()}</td>
                     <td class="text-end">${aTotal > 0 ? aTotal.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>

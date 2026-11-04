@@ -8,6 +8,7 @@ import com.lantanagroup.link.validation.models.ResultSummaryModel;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -20,6 +21,18 @@ public class ResultService {
     }
 
     private static final String UNCATEGORIZED_CATEGORY_ID = "uncategorized";
+
+    /**
+     * Replaces a patient's saved results for a report with {@code results}, in one transaction, so validating the
+     * patient again leaves one set of results rather than adding a second. An empty list removes them.
+     */
+    @Transactional
+    public void replacePatientResults(String facilityId, String reportId, String patientId, List<Result> results) {
+        // Category links first: result_category references result.
+        resultRepository.deletePatientResultCategories(facilityId, reportId, patientId);
+        resultRepository.deletePatientResults(facilityId, reportId, patientId);
+        resultRepository.saveAll(results);
+    }
 
     /**
      * Gets results for a facility and report; optionally filters by a minimum severity

@@ -7,11 +7,16 @@ import com.lantanagroup.link.shared.utils.IssueSeverityUtils;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
+import com.lantanagroup.link.validation.models.EvaluateRequestDto;
+import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
+import com.lantanagroup.link.validation.records.ApiResponse;
 import com.lantanagroup.link.validation.services.CategorizationService;
 import com.lantanagroup.link.validation.services.PreQualService;
+import com.lantanagroup.link.validation.services.RubricExecutionService;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.OperationOutcome;
@@ -43,6 +48,7 @@ public class ValidationController {
 
     private final PreQualService preQualService;
     private final ReportClient reportClient;
+    private final RubricExecutionService rubricExecutionService;
 
     private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
 
@@ -58,13 +64,15 @@ public class ValidationController {
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository,
-            PreQualService preQualService) {
+            PreQualService preQualService,
+            RubricExecutionService rubricExecutionService) {
         this.reportClient = reportClient;
         this.fhirContext = fhirContext;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
         this.resultRepository = resultRepository;
         this.preQualService = preQualService;
+        this.rubricExecutionService = rubricExecutionService;
     }
 
     private List<ResultSummary> summarize(List<Result> results, Function<Result, Stream<String>> mapper) {
@@ -209,5 +217,27 @@ public class ValidationController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problemDetail);
 
         }
+    }
+
+    @Operation(summary = "Perform rubric validation synchronously against a FHIR payload (v2)")
+    @PostMapping("/v2/rubrics/{rubricId}/$rubric-validate")
+    public ResponseEntity<ApiResponse<ValidationResultEnvelope>> evaluate(
+            @PathVariable String rubricId,
+            @RequestParam(name = "version", required = false) String version,
+            @RequestHeader(name = "X-Correlation-Id", required = false) String correlationId,
+            @Valid @RequestBody EvaluateRequestDto request) {
+        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, version, request, true, correlationId);
+        return ResponseEntity.ok(ApiResponse.ok("Rubric validation completed", result));
+    }
+
+    @Operation(summary = "Dry-run a rubric: no result is persisted, but the outcome is recorded on the version (v2)")
+    @PostMapping("/v2/rubrics/{rubricId}/versions/{semver}/$dry-run")
+    public ResponseEntity<ApiResponse<ValidationResultEnvelope>> dryRun(
+            @PathVariable String rubricId,
+            @PathVariable String semver,
+            @RequestHeader(name = "X-Correlation-Id", required = false) String correlationId,
+            @Valid @RequestBody EvaluateRequestDto request) {
+        ValidationResultEnvelope result = rubricExecutionService.evaluate(rubricId, semver, request, false, correlationId);
+        return ResponseEntity.ok(ApiResponse.ok("Dry-run completed", result));
     }
 }

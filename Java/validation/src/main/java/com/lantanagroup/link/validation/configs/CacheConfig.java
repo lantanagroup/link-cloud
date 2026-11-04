@@ -14,9 +14,18 @@ public class CacheConfig {
     @Getter @Setter
     private ValidateCodeConfig validateCode = new ValidateCodeConfig();
 
+    @Getter @Setter
+    private RubricConfig rubric = new RubricConfig();
+
     @Getter
     @Setter
     public static class ValidateCodeConfig {
+        private long ttl = 3600;
+    }
+
+    @Getter
+    @Setter
+    public static class RubricConfig {
         private long ttl = 3600;
     }
 }

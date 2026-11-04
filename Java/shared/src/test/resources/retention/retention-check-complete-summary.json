@@ -1,0 +1,10 @@
+{
+  "retentionCleanupId": "6f1c2a9e-4b7d-4c1e-9a53-2d8e7f0b1c34",
+  "serviceName": "Census",
+  "completedDateTime": "2026-10-01T06:01:45Z",
+  "summary": {
+    "status": "Completed",
+    "recordsAffected": 0,
+    "completedDateTime": "2026-10-01T06:01:45Z"
+  }
+}

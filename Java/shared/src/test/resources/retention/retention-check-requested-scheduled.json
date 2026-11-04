@@ -1,0 +1,31 @@
+{
+  "RetentionCleanupId": "6f1c2a9e-4b7d-4c1e-9a53-2d8e7f0b1c34",
+  "InitiatedBy": "Scheduled",
+  "InitiatedDateTime": "2026-10-01T06:00:00+00:00",
+  "Mode": "Scrub",
+  "CutoffDateTime": "2025-10-01T06:00:00+00:00",
+  "Reports": [
+    {
+      "FacilityId": "Hospital1",
+      "ReportScheduleId": "0b7e3f52-9c1d-4e8a-b2f6-71a4c5d9e803",
+      "RetentionWindow": {
+        "Unit": "Months",
+        "Count": 12
+      },
+      "CutoffDateTime": "2025-10-01T06:00:00+00:00"
+    },
+    {
+      "FacilityId": "Hospital2",
+      "ReportScheduleId": "c3d94a17-5e2b-4f60-8d1a-9b7e2f4c6a05",
+      "RetentionWindow": {
+        "Unit": "Days",
+        "Count": 400
+      },
+      "CutoffDateTime": "2025-08-27T06:00:00+00:00"
+    }
+  ],
+  "Participants": [
+    "MeasureEval",
+    "Validation"
+  ]
+}

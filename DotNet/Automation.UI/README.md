@@ -435,7 +435,7 @@ scenarios, the Custom scenario kind, and any saved scenario.
 
 ### Imported patients
 
-Imported patients are fully integrated into the run and into the Generation Manifest, so
+Imported patients are fully integrated into the run and into the Patient Manifest, so
 prediction-vs-actual reconciliation works for them too. They come from one of two
 sources:
 
@@ -734,7 +734,7 @@ otherwise query-plan-acquired and CQL-referenced.
 
 See `DotNet/Automation/README.md` section 8 for the full prediction formula and profile table.
 
-### Generation Manifest page
+### Patient Manifest page
 
 `Runs/Manifest` provides a deep-dive UX for this model:
 

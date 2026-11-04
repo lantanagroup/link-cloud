@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Services;
+using Automation.UI.Services.TestRail;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Normalization.Engine;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -36,11 +37,17 @@ if (!string.IsNullOrEmpty(externalConfigSource))
         .GetSection("ServiceInformation:ServiceName")
         .Get<string>() ?? "Link Automation UI";
 
-    builder.AddExternalConfiguration(serviceName);
+    // Tenant validates facility ids from FacilityIdSettings:NumericOnlyFacilityId.
+    // An unlabeled row is already loaded for every service. This adds the Tenant
+    // label for that one key so a Tenant-labeled row overrides it here too.
+    builder.AddExternalConfiguration(
+        serviceName,
+        FacilityIdFormatSettings.TenantOverrideLabels());
 }
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+builder.Services.Configure<FacilityIdFormatSettings>(builder.Configuration.GetSection(FacilityIdFormatSettings.SectionName));
 builder.Services.Configure<LeftoverRunCleanupOptions>(builder.Configuration.GetSection(LeftoverRunCleanupOptions.SectionName));
 builder.Services.Configure<ImportedBundleBlobStorageSettings>(builder.Configuration.GetSection(ImportedBundleBlobStorageSettings.Key));
 
@@ -286,6 +293,20 @@ builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
 builder.Services.AddHostedService<PatientBundleExternalizationMigrationService>();
 builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
+// Read by TestRailOptionsBinder rather than the default binder so a malformed value turns
+// publishing off with a startup warning instead of stopping the service.
+builder.Services.AddOptions<TestRailOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+        TestRailOptionsBinder.Bind(configuration.GetSection(TestRailOptions.SectionName), options));
+builder.Services.AddHttpClient("TestRail", (sp, client) =>
+{
+    var configured = sp.GetRequiredService<IOptions<TestRailOptions>>().Value.RequestTimeoutSeconds;
+    var seconds = configured > 0 ? configured : TestRailOptions.DefaultRequestTimeoutSeconds;
+    client.Timeout = TimeSpan.FromSeconds(seconds);
+});
+builder.Services.AddSingleton<ITestRailApiClient, TestRailApiClient>();
+builder.Services.AddSingleton<ITestRailPublisher, TestRailPublisher>();
+builder.Services.AddHostedService<TestRailStartupCheckService>();
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -392,6 +413,8 @@ builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
 var app = builder.Build();
+
+TestRailStartupReport.Log(app.Logger, app.Services.GetRequiredService<IOptions<TestRailOptions>>().Value);
 
 // -- Ensure MongoDB indexes (Cosmos DB compatible) --
 app.Services.GetRequiredService<MongoIndexManager>().EnsureAllIndexes();

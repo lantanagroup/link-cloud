@@ -33,7 +33,7 @@
     <div class="au-card au-cleanup-activity mb-4" id="cleanup-activity-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-activity me-2"></i>Live activity</span>
-            <span id="cleanup-activity-badge" class="badge text-bg-secondary">Idle</span>
+            <span id="cleanup-activity-badge" class="badge @CleanupStatusBadge.ForActivity(activity.Status)">@CleanupStatusBadge.ActivityLabel(activity.Status)</span>
         </div>
         <div class="card-body">
             <p id="cleanup-activity-label" class="fw-semibold mb-1">No cleanup pass running</p>
@@ -268,7 +268,7 @@
                                 <td>@report.Label</td>
                                 <td>@report.Trigger</td>
                                 <td>
-                                    <span class="badge @(report.Status == "failed" ? "text-bg-danger" : "text-bg-success")">@report.Status</span>
+                                    <span class="badge @CleanupStatusBadge.ForReport(report.Status)">@report.Status</span>
                                 </td>
                                 <td class="small">
                                     quiesced @report.QuiescedFacilityIds.Count/@report.QuiesceCandidateCount,
@@ -344,17 +344,17 @@
     }
 
     function badgeClass(status) {
-        if (status === 'running') return 'text-bg-primary';
-        if (status === 'completed') return 'text-bg-success';
-        if (status === 'failed') return 'text-bg-danger';
-        return 'text-bg-secondary';
+        if (status === 'running') return '@CleanupStatusBadge.Running';
+        if (status === 'completed') return '@CleanupStatusBadge.Completed';
+        if (status === 'failed') return '@CleanupStatusBadge.Failed';
+        return '@CleanupStatusBadge.Idle';
     }
 
     function badgeText(status) {
-        if (status === 'running') return 'Running';
-        if (status === 'completed') return 'Completed';
-        if (status === 'failed') return 'Failed';
-        return 'Idle';
+        if (status === 'running') return '@CleanupStatusBadge.RunningLabel';
+        if (status === 'completed') return '@CleanupStatusBadge.CompletedLabel';
+        if (status === 'failed') return '@CleanupStatusBadge.FailedLabel';
+        return '@CleanupStatusBadge.IdleLabel';
     }
 
     function field(activity, name) {

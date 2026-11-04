@@ -541,7 +541,7 @@ public sealed class LeftoverRunCleanupService(
                     // Weekly history-purge always wants per-run facility teardown.
                     // Custom-range honors the independent teardownFacilities checkbox; skip IDs the facility loop already handled.
                     var teardownInPurge = mode == "history-purge" || teardownFacilities;
-                    // FacilityId and the scenario RunId are both Automation-owned facility ids.
+                    // Tear down ids this run owns. A five-digit id counts only when the run created it.
                     // Keep the run snapshot when a required teardown fails so a later pass can retry.
                     var done = new HashSet<string>(
                         await snapshotStore.GetFacilityTeardownProgressAsync(run.RunId, cancellationToken) ?? [],
@@ -966,7 +966,8 @@ public sealed class LeftoverRunCleanupService(
 
     private static bool IsNewHistoryTeardown(string? facilityId, List<string> tornDown)
         => !string.IsNullOrWhiteSpace(facilityId)
-           && RunCleanupHelper.IsAutomationFacilityId(facilityId)
+           && (RunCleanupHelper.IsAutomationFacilityId(facilityId)
+               || RunCleanupHelper.IsFiveDigitFacilityId(facilityId))
            && !tornDown.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase));
 
     private static List<string> HistoryTeardownCandidates(IReadOnlyList<AutomationRunSummary> historyRuns)

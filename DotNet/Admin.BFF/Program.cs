@@ -266,7 +266,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>(nameof(HealthCheckType.Cache));
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckNames.RedisCache);
     }
 
 

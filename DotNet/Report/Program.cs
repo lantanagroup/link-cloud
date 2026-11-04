@@ -73,9 +73,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion);
 
-    builder.AddExternalConfiguration(serviceInformation.ServiceConfigName);
+    // The external source must be in place before ServiceInformation is bound, or App Configuration
+    // values for that section never reach the singleton the manifest Device is built from (LEGLINK-1420).
+    builder.AddExternalConfiguration(ReportConstants.ServiceName);
+    var serviceInformation = builder.SetupServiceInformation(ReportConstants.ServiceName, assemblyVersion);
 
     builder.WebHost.ConfigureKestrel(options =>
     {
@@ -191,7 +193,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, serviceInformation.ServiceConfigName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<ReportDbContext>>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<ReportDbContext>>(HealthCheckNames.SqlServerDatabase)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddEndpointsApiExplorer();

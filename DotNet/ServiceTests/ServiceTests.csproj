@@ -61,7 +61,6 @@
     <ProjectReference Include="..\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj" />
     <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
-    <ProjectReference Include="..\DMRP\DMRP.csproj" />
     <ProjectReference Include="..\MockDmrpApi\MockDmrpApi.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
     <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
@@ -156,6 +155,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\Admin.BFF\appsettings.Development.json" Link="Resources\Admin.BFF\appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- The retention message fixtures are shared with the Java tests, so both runtimes check the same JSON. -->
+  <ItemGroup>
+    <None Include="..\..\Java\shared\src\test\resources\retention\*.json" Link="Resources\Retention\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

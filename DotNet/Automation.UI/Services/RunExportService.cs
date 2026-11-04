@@ -159,11 +159,11 @@ public sealed class RunExportService : IRunExportService
         var abs = await _runManager.GetAbsUploadSnapshotAsync(runId);
 
         var sb = new StringBuilder();
-        WriteHeader(sb, "GENERATION MANIFEST");
+        WriteHeader(sb, "PATIENT MANIFEST");
 
         if (manifest == null)
         {
-            sb.AppendLine("(no generation manifest persisted for this run)");
+            sb.AppendLine("(no patient manifest persisted for this run)");
         }
         else
         {

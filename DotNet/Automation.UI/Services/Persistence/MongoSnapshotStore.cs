@@ -165,6 +165,21 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return docs.Select(ToMeta).ToList();
     }
 
+    public async Task<IReadOnlyCollection<string>> GetOngoingFacilityIdsAsync(CancellationToken ct = default)
+    {
+        var terminal = new[]
+        {
+            AutomationRunStatus.Succeeded.ToString(),
+            AutomationRunStatus.Failed.ToString(),
+            AutomationRunStatus.Cancelled.ToString()
+        };
+        var filter = Builders<AutomationRunDocument>.Filter.And(
+            Builders<AutomationRunDocument>.Filter.Nin(r => r.Status, terminal),
+            Builders<AutomationRunDocument>.Filter.Ne(r => r.FacilityId, string.Empty));
+
+        return await _runs.Find(filter).Project(r => r.FacilityId).ToListAsync(ct);
+    }
+
     public async Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default)
     {
         var doc = await _runs.Find(r => r.RunId == runId).FirstOrDefaultAsync(ct);
