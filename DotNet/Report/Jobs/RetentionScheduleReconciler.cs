@@ -50,13 +50,13 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
         if (!settings.CronIsValid)
         {
             _logger.LogError(
-                "Retention:Schedule:Cron '{Cron}' is not a valid Quartz cron expression; " +
+                "Retention:Schedule:Cron '{Cron}' is not a valid Quartz cron expression or can never fire; " +
                 "using the default {DefaultCron}.",
                 settings.Cron.SanitizeForLog(),
                 RetentionScheduleSettings.DefaultCron);
         }
 
-        var cron = settings.ResolvedCron;
+        var cron = new CronExpression(settings.ResolvedCron).CronExpressionString;
 
         if (!await scheduler.CheckExists(jobKey, cancellationToken))
         {

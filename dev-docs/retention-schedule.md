@@ -19,9 +19,9 @@ are covered in [retention-events.md](retention-events.md), and the dates it ages
 | `Retention:Schedule:Cron` | `0 0 2 * * ?` | Quartz cron expression, evaluated in UTC. The default is 02:00 UTC daily. |
 | `Retention:Schedule:Enabled` | `true` | Whether the job is scheduled at all. |
 
-`CronIsValid` is false for a blank value or one Quartz cannot parse, and `ResolvedCron` then
-returns the default instead. Settings are read with `IOptions`, so a change takes effect at the
-next startup.
+`CronIsValid` is false for a blank value, one Quartz cannot parse, or one that can never fire again
+(such as a cron limited to a past year), and `ResolvedCron` then returns the default instead.
+Settings are read with `IOptions`, so a change takes effect at the next startup.
 
 ## Scheduling at startup
 
@@ -37,13 +37,19 @@ where the configuration says something different:
 - The job is not stored: it stores it, durable and requesting recovery, with one cron trigger in
   UTC whose misfire policy is fire-once-now. If another instance stores it first, it carries on to
   the checks below instead of failing.
-- The trigger's cron or time zone differs from the configuration: it reschedules the trigger.
+- The trigger's cron or time zone differs from the configuration: it reschedules the trigger. The
+  cron is compared in the form Quartz stores, which is uppercased (`sat,sun` is stored as
+  `SAT,SUN`), so a lowercase setting does not reschedule on every startup.
 - The job is stored without a trigger: it logs a warning and leaves the store alone. `ScheduleJob`
   stores both together, so that state only comes from editing the store by hand; delete the job
   and restart Report to recreate both.
 
 Every startup logs the cron and the next fire time. An invalid cron is logged at `Error` and the
-default is used. Any other failure, such as SQL Server being unreachable, fails Report's startup.
+default is used. Any other failure, such as SQL Server being unreachable or a lock timeout while
+several instances start together, is logged at `Error` and Report starts anyway: retention is not
+worth stopping Report's other work for. A trigger stored on an earlier start keeps firing, and with
+several instances only one needs to succeed. If every instance fails on a first deployment, nothing
+is scheduled until Report next restarts. A canceled startup still propagates.
 
 ## The job
 

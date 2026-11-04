@@ -24,7 +24,7 @@ public class RetentionScheduleSettingsTests
     [Theory]
     [InlineData("0 30 3 * * ?")]
     [InlineData("0 0 2 ? * MON")]
-    [InlineData("0 0 2 * * ? 2027")]
+    [InlineData("0 0 2 * * ? 2099")]
     public void ResolvedCron_ValidCron_ReturnsConfigured(string cron)
     {
         var settings = new RetentionScheduleSettings { Cron = cron };
@@ -38,6 +38,7 @@ public class RetentionScheduleSettingsTests
     [InlineData("0 0 2 * *")]
     [InlineData("0 0 25 * * ?")]
     [InlineData("0 0 2 * * MON")]
+    [InlineData("0 0 2 1 1 ? 2020")]
     public void ResolvedCron_InvalidCron_ReturnsDefault(string cron)
     {
         var settings = new RetentionScheduleSettings { Cron = cron };

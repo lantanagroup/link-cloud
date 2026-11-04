@@ -10,13 +10,17 @@ namespace LantanaGroup.Link.Report.Jobs;
 public class RetentionScheduleHostedService : IHostedService
 {
     private readonly IRetentionScheduleReconciler _reconciler;
+    private readonly ILogger<RetentionScheduleHostedService> _logger;
 
     /// <summary>
     /// Creates the hosted service.
     /// </summary>
-    public RetentionScheduleHostedService(IRetentionScheduleReconciler reconciler)
+    public RetentionScheduleHostedService(
+        IRetentionScheduleReconciler reconciler,
+        ILogger<RetentionScheduleHostedService> logger)
     {
         _reconciler = reconciler ?? throw new ArgumentNullException(nameof(reconciler));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -24,7 +28,19 @@ public class RetentionScheduleHostedService : IHostedService
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await _reconciler.ReconcileAsync(cancellationToken);
+        try
+        {
+            await _reconciler.ReconcileAsync(cancellationToken);    
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reconcile the retention job with Retention:Schedule.");
+        }
+        
     }
 
     /// <summary>

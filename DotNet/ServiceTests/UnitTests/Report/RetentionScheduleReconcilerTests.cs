@@ -116,6 +116,21 @@ public class RetentionScheduleReconcilerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reconcile_LowercaseNamesUnchanged_DoesNotReschedule()
+    {
+        // Quartz stores cron expressions uppercased, so "sat,sun" comes back as "SAT,SUN".
+        _settings.Cron = "0 0 2 ? * sat,sun";
+        await CreateReconciler().ReconcileAsync(CancellationToken.None);
+        _logger.Entries.Clear();
+
+        await CreateReconciler().ReconcileAsync(CancellationToken.None);
+
+        Assert.Equal("0 0 2 ? * SAT,SUN", (await SingleCronTriggerAsync()).CronExpressionString);
+        Assert.DoesNotContain(_logger.Entries, e => e.Message.Contains("Rescheduled"));
+        Assert.Contains(_logger.Entries, e => e.Message.Contains("already scheduled"));
+    }
+
+    [Fact]
     public async Task Reconcile_CronChanged_ReschedulesExistingTrigger()
     {
         await CreateReconciler().ReconcileAsync(CancellationToken.None);

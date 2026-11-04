@@ -34,10 +34,31 @@ namespace LantanaGroup.Link.Report.Application.Options
 
         /// <summary>
         /// Gets a value indicating whether the cron expression is valid. Returns false when the cron expression
-        /// is null, empty, whitespace, or not a valid Quartz cron expression.
+        /// is null, empty, whitespace, not a valid Quartz cron expression, or can never fire again.
         /// </summary>
-        public bool CronIsValid =>
-            !string.IsNullOrWhiteSpace(Cron) && CronExpression.IsValidExpression(Cron);
+        public bool CronIsValid
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Cron))
+                {
+                    return false;
+                }
+
+                if (!CronExpression.IsValidExpression(Cron))
+                {
+                    return false;
+                }
+
+                if (new CronExpression(Cron).GetNextValidTimeAfter(DateTimeOffset.UtcNow) == null)
+                {
+                    return false;
+                }
+
+                return true;
+
+            }
+        }
 
         /// <summary>
         /// Gets the resolved cron expression for the retention schedule. If the cron expression is invalid,
