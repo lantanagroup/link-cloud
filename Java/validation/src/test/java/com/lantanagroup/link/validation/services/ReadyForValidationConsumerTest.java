@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -70,6 +71,7 @@ public class ReadyForValidationConsumerTest {
     @Mock private LegacyResultMapper legacyResultMapper;
     @Mock private KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
     @Mock private ReportStatusUpdatedProducer reportStatusUpdatedProducer;
+    @Mock private ValidationStageFailurePublisher validationStageFailurePublisher;
 
     private static final String RUBRIC_ID = "measure-report-submission-v1";
 
@@ -112,7 +114,7 @@ public class ReadyForValidationConsumerTest {
                 false,
                 RUBRIC_ID,
                 false,
-                reportStatusUpdatedProducer, recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithoutBlobStorage = new ReadyForValidationConsumer(
                 fhirContext,
@@ -133,7 +135,7 @@ public class ReadyForValidationConsumerTest {
                 false,
                 RUBRIC_ID,
                 false,
-                reportStatusUpdatedProducer, recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithBridgeEnabled = new ReadyForValidationConsumer(
                 fhirContext,
@@ -154,7 +156,7 @@ public class ReadyForValidationConsumerTest {
                 true,
                 RUBRIC_ID,
                 false,
-                reportStatusUpdatedProducer, recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithShadowEnabled = new ReadyForValidationConsumer(
                 fhirContext,
@@ -175,7 +177,7 @@ public class ReadyForValidationConsumerTest {
                 false,
                 RUBRIC_ID,
                 true,
-                reportStatusUpdatedProducer, recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithBridgeAndShadowEnabled = new ReadyForValidationConsumer(
                 fhirContext,
@@ -196,7 +198,7 @@ public class ReadyForValidationConsumerTest {
                 true,
                 RUBRIC_ID,
                 true,
-                reportStatusUpdatedProducer, recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         bundle = new Bundle();
 
@@ -488,7 +490,7 @@ public class ReadyForValidationConsumerTest {
                 fhirContext, reportClient, validationService, realCategorizationService, resultService,
                 categoryCountService, validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
                 preQualificationConfig, preQualOperationOutcomeBuilder, rubricExecutionService,
-                legacyResultMapper, objectMapper, shadowCompareEventTemplate, false, RUBRIC_ID, false, reportStatusUpdatedProducer, recoverer);
+                legacyResultMapper, objectMapper, shadowCompareEventTemplate, false, RUBRIC_ID, false, reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         Result inactiveResult = new Result();
         inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
@@ -611,10 +613,41 @@ public class ReadyForValidationConsumerTest {
                 () -> consumer.process(buildRecord(null)));
 
         assertTrue(thrown.getMessage().contains("Failed to produce ValidationComplete message"));
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), any(), anyLong(), eq(true), eq(0L), any());
         verify(reportStatusUpdatedProducer, never()).publishFailure(
-                any(), any(), any(), anyLong(), any(), any());
-        verify(reportStatusUpdatedProducer, never()).publishSuccess(
+                any(), any(), any(), any(), any(), any());
+        verify(validationStageFailurePublisher).noteFailedAttempt(anyLong());
+    }
+
+    @Test
+    void process_publishesStatusBeforeValidationComplete() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null, true));
+
+        InOrder order = inOrder(reportStatusUpdatedProducer, validationCompleteTemplate);
+        order.verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), anyLong(), eq(true), eq(0L), any());
+        order.verify(validationCompleteTemplate).send(any(ProducerRecord.class));
+    }
+
+    @Test
+    void process_statusSendFails_doesNotSendValidationComplete() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        doThrow(new RuntimeException("broker down")).when(reportStatusUpdatedProducer).publishSuccess(
                 any(), any(), any(), anyLong(), anyBoolean(), anyLong(), any());
+
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> consumer.process(buildRecord(null, true)));
+
+        assertEquals("broker down", thrown.getMessage());
+        verify(validationCompleteTemplate, never()).send(any(ProducerRecord.class));
+        verify(reportStatusUpdatedProducer, never()).publishFailure(
+                any(), any(), any(), any(), any(), any());
+        verify(validationStageFailurePublisher).noteFailedAttempt(anyLong());
     }
 
     // -------------------------------------------------------------------------
@@ -703,7 +736,7 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
-    void process_validationThrows_publishesFailedStageAndRethrows() throws Exception {
+    void process_validationThrows_publishesNothingAndRethrows() throws Exception {
         stubRestRetrieval();
         when(validationService.validate(bundle, FACILITY_ID, REPORT_ID))
                 .thenThrow(new IllegalStateException("database unavailable"));
@@ -712,32 +745,12 @@ public class ReadyForValidationConsumerTest {
                 () -> consumer.process(buildRecord(null, true)));
 
         assertEquals("database unavailable", thrown.getMessage());
-        verify(reportStatusUpdatedProducer).publishFailure(
-                eq(REPORT_ID),
-                eq(PATIENT_ID),
-                eq(CORRELATION_ID),
-                anyLong(),
-                eq("IllegalStateException"),
-                any());
+        verify(reportStatusUpdatedProducer, never()).publishFailure(
+                any(), any(), any(), any(), any(), any());
         verify(reportStatusUpdatedProducer, never()).publishSuccess(
                 any(), any(), any(), anyLong(), anyBoolean(), anyLong(), any());
         verify(validationCompleteTemplate, never()).send(any(ProducerRecord.class));
-    }
-
-    @Test
-    void process_validationThrows_publishFailureDoesNotReplaceTheStageException() throws Exception {
-        stubRestRetrieval();
-        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID))
-                .thenThrow(new IllegalStateException("database unavailable"));
-        doThrow(new RuntimeException("broker down")).when(reportStatusUpdatedProducer).publishFailure(
-                any(), any(), any(), anyLong(), any(), any());
-
-        IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> consumer.process(buildRecord(null)));
-
-        assertEquals("database unavailable", thrown.getMessage());
-        assertEquals(1, thrown.getSuppressed().length);
-        assertEquals("broker down", thrown.getSuppressed()[0].getMessage());
+        verify(validationStageFailurePublisher).noteFailedAttempt(anyLong());
     }
 
     @Test

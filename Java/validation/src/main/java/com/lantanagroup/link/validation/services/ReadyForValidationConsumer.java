@@ -67,6 +67,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final ObjectMapper objectMapper;
     private final KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
     private final ReportStatusUpdatedProducer reportStatusUpdatedProducer;
+    private final ValidationStageFailurePublisher validationStageFailurePublisher;
     private final boolean bridgeEnabled;
     private final boolean shadowEnabled;
     private final String rubricId;
@@ -99,6 +100,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             // ADR-0003 shadow-run: independent of bridgeEnabled -- works in either direction.
             @Value("${vaas.bridge.shadow-enabled:false}") boolean shadowEnabled,
             ReportStatusUpdatedProducer reportStatusUpdatedProducer,
+            ValidationStageFailurePublisher validationStageFailurePublisher,
             @Qualifier("readyForValidationRecoverer") ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
@@ -117,6 +119,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         this.objectMapper = objectMapper;
         this.shadowCompareEventTemplate = shadowCompareEventTemplate;
         this.reportStatusUpdatedProducer = reportStatusUpdatedProducer;
+        this.validationStageFailurePublisher = validationStageFailurePublisher;
         this.bridgeEnabled = bridgeEnabled;
         this.shadowEnabled = shadowEnabled;
         this.rubricId = rubricId;
@@ -146,6 +149,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         String patientId = record.value().getPatientId();
         String reportId = record.value().getReportTrackingId();
         String payloadUri = record.value().getPayloadUri();
+        validationStageFailurePublisher.clearFailedAttempt();
         long startedAt = System.currentTimeMillis();
         Bundle bundle;
         // Only set when the rubric engine runs, using the ID already created for its rubric_result.
@@ -187,19 +191,23 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             isValid = checkIsValid(results, rubricStatus);
             messageCount = results.size();
             processingTime = System.currentTimeMillis() - startedAt;
+            // Status goes out before ValidationComplete. A failed status send must not leave a
+            // ValidationComplete behind: the inbound record retries, and a repeated status event is
+            // acceptable. A repeated ValidationComplete is not.
+            reportStatusUpdatedProducer.publishSuccess(
+                    reportId,
+                    patientId,
+                    correlationId,
+                    processingTime,
+                    isValid,
+                    messageCount,
+                    record.headers());
+            produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid, record.headers());
         } catch (Exception ex) {
-            publishStageFailure(correlationId, patientId, reportId, startedAt, ex, record.headers());
+            // The recoverer publishes isSuccess=false only when this record is dead-lettered.
+            validationStageFailurePublisher.noteFailedAttempt(System.currentTimeMillis() - startedAt);
             throw ex;
         }
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid, record.headers());
-        reportStatusUpdatedProducer.publishSuccess(
-                reportId,
-                patientId,
-                correlationId,
-                processingTime,
-                isValid,
-                messageCount,
-                record.headers());
 
         if (shadowEnabled) {
             try {
@@ -463,38 +471,6 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             }
         }
         return new int[] { uncategorized, unacceptable, acceptable };
-    }
-
-    /**
-     * The validation work failed, so the stage itself did not complete. Delivery of ValidationComplete
-     * is separate: a broker failure there retries the inbound record instead of reporting the stage as failed.
-     */
-    private void publishStageFailure(
-            String correlationId,
-            String patientId,
-            String reportId,
-            long startedAt,
-            Exception failure,
-            org.apache.kafka.common.header.Headers inboundHeaders) {
-        try {
-            reportStatusUpdatedProducer.publishFailure(
-                    reportId,
-                    patientId,
-                    correlationId,
-                    System.currentTimeMillis() - startedAt,
-                    stageErrorMessage(failure),
-                    inboundHeaders);
-        } catch (Exception publishError) {
-            failure.addSuppressed(publishError);
-        }
-    }
-
-    /**
-     * The exception type only. Provider and parser messages can include connection text,
-     * SQL, or a fragment of the payload, and this event is what Report stores.
-     */
-    private static String stageErrorMessage(Exception failure) {
-        return failure.getClass().getSimpleName();
     }
 
     private void produceValidationCompleteRecord(

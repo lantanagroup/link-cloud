@@ -16,9 +16,11 @@ import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ShadowCompareEvent;
 import com.lantanagroup.link.validation.records.ValidationComplete;
 import com.lantanagroup.link.validation.services.ShadowValidationConsumer;
+import com.lantanagroup.link.validation.services.ValidationStageFailurePublisher;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.*;
@@ -42,6 +44,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -205,8 +208,10 @@ public class KafkaConfig {
             KafkaTemplate<?, ?> kafkaTemplate,
             String retryTopic,
             String errorTopic,
-            KafkaRetryConfig retryConfig) {
-        return RetryTopicRecovererFactory.create(kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE);
+            KafkaRetryConfig retryConfig,
+            BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter) {
+        return RetryTopicRecovererFactory.create(
+                kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE, onDeadLetter);
     }
 
     // Shadow comparison runs on its own container and consumer group, so its pace, lag, and failures
@@ -237,13 +242,18 @@ public class KafkaConfig {
     public ConsumerRecordRecoverer readyForValidationRecoverer(
             @Qualifier("compressedKafkaTemplate")
             KafkaTemplate<?, ?> kafkaTemplate,
-            KafkaRetryConfig retryConfig) {
+            KafkaRetryConfig retryConfig,
+            ValidationStageFailurePublisher validationStageFailurePublisher) {
 
+        // onDeadLetter runs only after a durable publish to ReadyForValidation-Error.
+        // Deserialization failures use deadLetterPublishingRecoverer instead and have no report or
+        // patient id, so they do not publish a status event.
         return createRetryTopicRecoverer(
                 kafkaTemplate,
                 Topics.READY_FOR_VALIDATION_RETRY,
                 Topics.READY_FOR_VALIDATION_ERROR,
-                retryConfig
+                retryConfig,
+                validationStageFailurePublisher::publishFinalFailure
         );
     }
 

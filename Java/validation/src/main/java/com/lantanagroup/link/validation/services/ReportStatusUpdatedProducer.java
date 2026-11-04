@@ -6,11 +6,8 @@ import com.lantanagroup.link.shared.kafka.records.reportstatus.PatientReportingS
 import com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdated;
 import com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdatedKey;
 import com.lantanagroup.link.shared.kafka.records.reportstatus.ValidationResult;
-import com.lantanagroup.link.shared.utils.LogUtils;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -21,13 +18,12 @@ import java.time.OffsetDateTime;
 
 /**
  * Publishes a patient's Validation-stage {@link ReportStatusUpdated} event.
- * The occurrence timestamp is set once, when the event is built, and the same record is sent again
- * if the first send fails. See dev-docs/report-status-events.md.
+ * The occurrence timestamp is set when the event is built. Delivery is one synchronous send;
+ * the Kafka producer retries that send. A failure propagates so the inbound record can be retried.
+ * See dev-docs/report-status-events.md.
  */
 @Service
 public class ReportStatusUpdatedProducer {
-    private static final Logger logger = LoggerFactory.getLogger(ReportStatusUpdatedProducer.class);
-
     private final KafkaTemplate<ReportStatusUpdatedKey, ReportStatusUpdated> template;
     private final Clock clock;
 
@@ -66,7 +62,7 @@ public class ReportStatusUpdatedProducer {
             String reportScheduleId,
             String patientId,
             String correlationId,
-            long processingTimeMillis,
+            Long processingTimeMillis,
             String errorMessage,
             org.apache.kafka.common.header.Headers inboundHeaders) {
         ReportStatusUpdated event = baseEvent(reportScheduleId, patientId, correlationId, processingTimeMillis)
@@ -80,7 +76,7 @@ public class ReportStatusUpdatedProducer {
             String reportScheduleId,
             String patientId,
             String correlationId,
-            long processingTimeMillis) {
+            Long processingTimeMillis) {
         return ReportStatusUpdated.builder()
                 .reportScheduleId(reportScheduleId)
                 .patientId(patientId)
@@ -103,26 +99,7 @@ public class ReportStatusUpdatedProducer {
                 key,
                 event,
                 headers(event.getCorrelationId(), inboundHeaders));
-        try {
-            doSend(record);
-        } catch (RuntimeException first) {
-            if (isInterrupted(first)) {
-                throw first;
-            }
-            logger.warn("Retrying ReportStatusUpdated for report {} patient {}",
-                    LogUtils.sanitize(event.getReportScheduleId()),
-                    LogUtils.sanitize(event.getPatientId()),
-                    first);
-            try {
-                doSend(record);
-            } catch (RuntimeException second) {
-                logger.error("Failed to produce ReportStatusUpdated for report {} patient {}",
-                        LogUtils.sanitize(event.getReportScheduleId()),
-                        LogUtils.sanitize(event.getPatientId()),
-                        second);
-                throw second;
-            }
-        }
+        doSend(record);
     }
 
     private void doSend(ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated> record) {
@@ -134,17 +111,6 @@ public class ReportStatusUpdatedProducer {
         } catch (Exception ex) {
             throw new RuntimeException("Failed to produce ReportStatusUpdated message", ex);
         }
-    }
-
-    private static boolean isInterrupted(Throwable failure) {
-        Throwable current = failure;
-        while (current != null) {
-            if (current instanceof InterruptedException) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
     }
 
     private static org.apache.kafka.common.header.Headers headers(

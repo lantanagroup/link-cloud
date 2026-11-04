@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -116,49 +115,31 @@ class ReportStatusUpdatedProducerTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void retryingSend_preservesOccurrenceTimestampAndKey() throws Exception {
-        CompletableFuture<SendResult<ReportStatusUpdatedKey, ReportStatusUpdated>> failed = mock(CompletableFuture.class);
-        when(failed.get()).thenThrow(new ExecutionException(new RuntimeException("broker")));
-        CompletableFuture<SendResult<ReportStatusUpdatedKey, ReportStatusUpdated>> succeeded = succeededFuture();
-        when(template.send(any(ProducerRecord.class))).thenReturn(failed, succeeded);
-
-        producer.publishSuccess(REPORT_ID, PATIENT_ID, CORRELATION_ID, 10L, true, 1L, new RecordHeaders());
-
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated>> captor =
-                ArgumentCaptor.forClass(ProducerRecord.class);
-        verify(template, times(2)).send(captor.capture());
-        ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated> first = captor.getAllValues().get(0);
-        ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated> second = captor.getAllValues().get(1);
-        assertSame(first, second);
-        assertEquals(OCCURRED, first.value().getTimestamp());
-        assertEquals(OCCURRED, second.value().getTimestamp());
-        assertArrayEquals(keyBytes(first.key()), keyBytes(second.key()));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void retryingSend_secondFailurePropagatesWithoutRebuildingTheEvent() throws Exception {
+    void failedSend_sendsOnceAndPropagates() throws Exception {
         CompletableFuture<SendResult<ReportStatusUpdatedKey, ReportStatusUpdated>> failed = mock(CompletableFuture.class);
         when(failed.get()).thenThrow(new ExecutionException(new RuntimeException("broker")));
         when(template.send(any(ProducerRecord.class))).thenReturn(failed);
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () ->
-                producer.publishFailure(REPORT_ID, PATIENT_ID, CORRELATION_ID, 10L, "database unavailable", null));
+                producer.publishFailure(REPORT_ID, PATIENT_ID, CORRELATION_ID, 10L, "IllegalStateException", null));
 
         assertTrue(thrown.getMessage().contains("Failed to produce ReportStatusUpdated message"));
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated>> captor =
-                ArgumentCaptor.forClass(ProducerRecord.class);
-        verify(template, times(2)).send(captor.capture());
-        assertSame(captor.getAllValues().get(0), captor.getAllValues().get(1));
-        assertEquals(OCCURRED, captor.getValue().value().getTimestamp());
-        assertNull(captor.getValue().value().getValidationResult());
+        verify(template, times(1)).send(any(ProducerRecord.class));
+        ProducerRecord<ReportStatusUpdatedKey, ReportStatusUpdated> record = captureRecord();
+        assertEquals(OCCURRED, record.value().getTimestamp());
+        assertNull(record.value().getValidationResult());
+    }
+
+    @Test
+    void publishFailure_nullProcessingTime_omitsTheField() throws Exception {
+        producer.publishFailure(REPORT_ID, PATIENT_ID, CORRELATION_ID, null, "IllegalStateException", null);
+
+        assertFalse(valueNode(captureRecord().value()).has("processingTime"));
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void interruptedSend_doesNotRetry() throws Exception {
+    void interruptedSend_sendsOnceAndRestoresTheInterruptFlag() throws Exception {
         CompletableFuture<SendResult<ReportStatusUpdatedKey, ReportStatusUpdated>> interrupted = mock(CompletableFuture.class);
         when(interrupted.get()).thenThrow(new InterruptedException("stopped"));
         when(template.send(any(ProducerRecord.class))).thenReturn(interrupted);
