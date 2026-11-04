@@ -140,8 +140,9 @@ public class RetentionScheduleReconciler : IRetentionScheduleReconciler
             .WithDescription(cron)
             .WithCronSchedule(cron, x => x
                 .InTimeZone(TimeZoneInfo.Utc)
-                // A fire missed while the service was down runs once on recovery, anchored on
-                // its scheduled time, rather than being dropped or run once per missed night.
+                // A fire missed while the service was down runs once on recovery, rather than being
+                // dropped or run once per missed night. The run reports the recovery instant, not the
+                // missed cron time. See dev-docs/retention-schedule.md.
                 .WithMisfireHandlingInstructionFireAndProceed())
             .Build();
 }
