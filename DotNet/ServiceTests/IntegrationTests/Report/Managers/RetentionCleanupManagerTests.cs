@@ -285,6 +285,270 @@ public class RetentionCleanupManagerTests
         await Assert.ThrowsAsync<ArgumentException>(() => CreateAsync(request, DefaultParticipants()));
     }
 
+    [Fact]
+    public async Task ApplyCompletionAsync_EveryParticipantCompletes_CompletesAndScrubs()
+    {
+        var first = await SeedScheduleAsync();
+        var second = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(first, second), DefaultParticipants()))
+            .RetentionCleanupId!.Value;
+
+        foreach (var service in new[] { "Report", "MeasureEval", "Validation", "DataAcquisition" })
+        {
+            Assert.Equal(RetentionCompletionOutcome.Applied,
+                         await ApplyAsync(cleanupId, ReportCompletion(cleanupId, service, Completed(first, 4),
+                                                                      Completed(second, 6))));
+        }
+
+        var cleanup = await LoadCleanupAsync(cleanupId);
+        Assert.Equal(RetentionCleanupStatus.Completed, cleanup.Status);
+        Assert.Equal(Now, cleanup.CompletedDateTime);
+        Assert.All(cleanup.Participants.SelectMany(p => p.Results),
+                   r => Assert.Equal(RetentionCleanupResultStatus.Completed, r.Status));
+        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(first));
+        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(second));
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_OneReportFails_ScrubsOnlyTheOtherAndIsPartial()
+    {
+        var done = await SeedScheduleAsync();
+        var failing = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(done, failing), ReportAndMeasureEval()))
+            .RetentionCleanupId!.Value;
+
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "Report", Completed(done, 1), Completed(failing, 1)));
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "MeasureEval", Completed(done, 2),
+                                                     Failed(failing, 1, "Bulk delete failed (MongoException).")));
+
+        var cleanup = await LoadCleanupAsync(cleanupId);
+        Assert.Equal(RetentionCleanupStatus.Partial, cleanup.Status);
+        Assert.Null(cleanup.CompletedDateTime);
+        var failed = Assert.Single(cleanup.Participants.SelectMany(p => p.Results),
+                                   r => r.Status == RetentionCleanupResultStatus.Failed);
+        Assert.Equal("Bulk delete failed (MongoException).", failed.ErrorMessage);
+        Assert.Equal(1, failed.RecordsAffected);
+        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(done));
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, await RetentionStatusAsync(failing));
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_FirstFailureArrives_ShowsFailedWithoutWaiting()
+    {
+        var report = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(report), ReportAndMeasureEval()))
+            .RetentionCleanupId!.Value;
+
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "MeasureEval", Failed(report, 0, "Timed out.")));
+
+        Assert.Equal(RetentionCleanupStatus.Failed, (await LoadCleanupAsync(cleanupId)).Status);
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, await RetentionStatusAsync(report));
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_LateSuccessAfterFailure_MovesTheCleanupForward()
+    {
+        var report = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(report), ReportAndMeasureEval()))
+            .RetentionCleanupId!.Value;
+
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "MeasureEval", Failed(report, 0, "Timed out.")));
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "Report", Completed(report, 3)));
+        Assert.Equal(RetentionCleanupStatus.Partial, (await LoadCleanupAsync(cleanupId)).Status);
+
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "MeasureEval", Completed(report, 9)));
+
+        var cleanup = await LoadCleanupAsync(cleanupId);
+        Assert.Equal(RetentionCleanupStatus.Completed, cleanup.Status);
+        var measureEval = cleanup.Participants.Single(p => p.ServiceName == "MeasureEval").Results.Single();
+        Assert.Null(measureEval.ErrorMessage);
+        Assert.Equal(9, measureEval.RecordsAffected);
+        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(report));
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_ReportMissingFromCompletion_RecordsItFailed()
+    {
+        var listed = await SeedScheduleAsync();
+        var omitted = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(listed, omitted), ReportAndMeasureEval()))
+            .RetentionCleanupId!.Value;
+
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "MeasureEval", Completed(listed, 1)));
+
+        var results = (await LoadCleanupAsync(cleanupId)).Participants
+            .Single(p => p.ServiceName == "MeasureEval")
+            .Results
+            .ToList();
+        var missing = Assert.Single(results, r => r.Status == RetentionCleanupResultStatus.Failed);
+        Assert.Contains("Missing from the MeasureEval completion", missing.ErrorMessage);
+        Assert.Equal(0, missing.RecordsAffected);
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_DuplicateCompletion_ChangesNothing()
+    {
+        var report = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(report), ReportAndMeasureEval()))
+            .RetentionCleanupId!.Value;
+        var completion = ReportCompletion(cleanupId, "MeasureEval", Completed(report, 5));
+
+        await ApplyAsync(cleanupId, completion);
+        var before = await LoadCleanupAsync(cleanupId);
+        var rerun = ReportCompletion(cleanupId, "MeasureEval", Completed(report, 0, Now.AddHours(1)));
+        await ApplyAsync(cleanupId, completion);
+        await ApplyAsync(cleanupId, rerun);
+
+        var after = await LoadCleanupAsync(cleanupId);
+        Assert.Equal(before.Status, after.Status);
+        var result = after.Participants.Single(p => p.ServiceName == "MeasureEval").Results.Single();
+        Assert.Equal(5, result.RecordsAffected);
+        Assert.Equal(Now, result.CompletedDateTime);
+        Assert.Equal(2, after.Participants.SelectMany(p => p.Results).Count());
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_UnexpectedService_ChangesNothing()
+    {
+        var report = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(report), ReportAndMeasureEval()))
+            .RetentionCleanupId!.Value;
+
+        var outcome = await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "Census", Failed(report, 0, "x")));
+
+        Assert.Equal(RetentionCompletionOutcome.UnexpectedService, outcome);
+        var cleanup = await LoadCleanupAsync(cleanupId);
+        Assert.Equal(RetentionCleanupStatus.InProgress, cleanup.Status);
+        Assert.All(cleanup.Participants.SelectMany(p => p.Results),
+                   r => Assert.Equal(RetentionCleanupResultStatus.Pending, r.Status));
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_UnknownCleanup_ReturnsUnknown()
+    {
+        var cleanupId = Guid.NewGuid();
+
+        var outcome = await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "Report"));
+
+        Assert.Equal(RetentionCompletionOutcome.UnknownCleanup, outcome);
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_CutoffScopedParticipant_NeverHoldsBackScrubbed()
+    {
+        var report = await SeedScheduleAsync();
+        var participants = Participants(new Dictionary<string, string?>
+        {
+            ["Retention:Participants:0:ServiceName"] = "Report",
+            ["Retention:Participants:0:Scope"] = "Report",
+            ["Retention:Participants:1:ServiceName"] = "Audit",
+            ["Retention:Participants:1:Scope"] = "Cutoff"
+        });
+        var cleanupId = (await CreateAsync(ScheduledRequest(report), participants)).RetentionCleanupId!.Value;
+
+        await ApplyAsync(cleanupId, ReportCompletion(cleanupId, "Report", Completed(report, 2)));
+
+        Assert.Equal(RetentionCleanupStatus.InProgress, (await LoadCleanupAsync(cleanupId)).Status);
+        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(report));
+
+        await ApplyAsync(cleanupId, new RetentionCheckCompleteValue
+        {
+            RetentionCleanupId = cleanupId.ToString(),
+            ServiceName = "Audit",
+            CompletedDateTime = Now,
+            Summary = new RetentionReportResult
+            {
+                Status = RetentionResultStatus.Completed,
+                RecordsAffected = 40,
+                CompletedDateTime = Now
+            }
+        });
+
+        var cleanup = await LoadCleanupAsync(cleanupId);
+        Assert.Equal(RetentionCleanupStatus.Completed, cleanup.Status);
+        Assert.Equal(40, cleanup.Participants.Single(p => p.ServiceName == "Audit").Results.Single().RecordsAffected);
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_ParticipantsReplyConcurrently_EndsCompleted()
+    {
+        var reports = new List<Guid>();
+        for (var i = 0; i < 10; i++)
+        {
+            reports.Add(await SeedScheduleAsync());
+        }
+
+        var cleanupId = (await CreateAsync(ScheduledRequest([.. reports]), DefaultParticipants()))
+            .RetentionCleanupId!.Value;
+        var replies = reports.Select(id => Completed(id, 1)).ToArray();
+
+        await Task.WhenAll(new[] { "Report", "MeasureEval", "Validation", "DataAcquisition" }
+            .Select(service => ApplyAsync(cleanupId, ReportCompletion(cleanupId, service, replies))));
+
+        Assert.Equal(RetentionCleanupStatus.Completed, (await LoadCleanupAsync(cleanupId)).Status);
+        foreach (var report in reports)
+        {
+            Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(report));
+        }
+    }
+
+    private async Task<RetentionCompletionOutcome> ApplyAsync(Guid retentionCleanupId,
+                                                              RetentionCheckCompleteValue completion)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        return await CreateManager(scope, DefaultParticipants()).ApplyCompletionAsync(retentionCleanupId,
+                                                                                       completion);
+    }
+
+    private static RetentionCheckCompleteValue ReportCompletion(Guid retentionCleanupId,
+                                                                string serviceName,
+                                                                params RetentionReportResult[] reports)
+    {
+        return new RetentionCheckCompleteValue
+        {
+            RetentionCleanupId = retentionCleanupId.ToString(),
+            ServiceName = serviceName,
+            CompletedDateTime = Now,
+            Reports = [.. reports]
+        };
+    }
+
+    private static RetentionReportResult Completed(Guid reportScheduleId,
+                                                   long recordsAffected,
+                                                   DateTimeOffset? completedDateTime = null)
+    {
+        return new RetentionReportResult
+        {
+            ReportScheduleId = reportScheduleId.ToString(),
+            Status = RetentionResultStatus.Completed,
+            RecordsAffected = recordsAffected,
+            CompletedDateTime = completedDateTime ?? Now
+        };
+    }
+
+    private static RetentionReportResult Failed(Guid reportScheduleId, long recordsAffected, string errorMessage)
+    {
+        return new RetentionReportResult
+        {
+            ReportScheduleId = reportScheduleId.ToString(),
+            Status = RetentionResultStatus.Failed,
+            RecordsAffected = recordsAffected,
+            ErrorMessage = errorMessage,
+            CompletedDateTime = Now
+        };
+    }
+
+    private static RetentionParticipants ReportAndMeasureEval()
+    {
+        return Participants(new Dictionary<string, string?>
+        {
+            ["Retention:Participants:0:ServiceName"] = "Report",
+            ["Retention:Participants:0:Scope"] = "Report",
+            ["Retention:Participants:1:ServiceName"] = "MeasureEval",
+            ["Retention:Participants:1:Scope"] = "Report"
+        });
+    }
+
     private async Task<RetentionCleanupCreation> CreateAsync(RetentionCleanupRequest request,
                                                              RetentionParticipants participants)
     {

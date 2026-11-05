@@ -148,3 +148,38 @@ them as never sent.
 
 A failure shows as soon as it arrives. A later success moves `Failed` to `Partial`, and a successful retry
 moves `Partial` to `Completed`.
+
+## Applying a completion
+
+`RetentionCheckCompleteListener` consumes `RetentionCheckComplete` and hands each completion to
+`IRetentionCleanupManager.ApplyCompletionAsync`. It commits offsets manually and routes failures through the
+shared handlers: a malformed message (no `ServiceName`, or a `RetentionCleanupId` that is not a UUID) goes to
+`RetentionCheckComplete-Error`, and anything else, such as a database fault, goes to
+`RetentionCheckComplete-Retry`. When the key and the value's `RetentionCleanupId` differ, it logs a warning
+and uses the value.
+
+In one transaction, the manager:
+
+1. Takes an update lock on the cleanup row. Two instances can hold the same completion during a rebalance,
+   and the lock makes the second wait, so each recalculates the status from committed results.
+2. Ignores the completion, with a warning, when no cleanup has the id or the sender is not one of the
+   cleanup's participants. Service names match without regard to case.
+3. Applies the reply to each of the participant's results (`RetentionCleanupRules`):
+   - A `Completed` result never changes again. No request asks a participant again about a report it
+     finished, so a later `Failed` is stale and a later `Completed` is a duplicate; the first count is kept.
+   - A `Completed` reply replaces a failure, including one Report recorded itself.
+   - A `Failed` reply replaces an earlier failure only when its `CompletedDateTime` is later.
+   - A **pending** result the completion leaves out is recorded `Failed`, with 0 records and "Missing from
+     the \<ServiceName\> completion". A completed or failed result that is left out is unchanged, because a
+     retry asks only about failed reports.
+   - Report ids in the completion that are not in the cleanup, are not UUIDs or appear twice are ignored and
+     counted in a warning.
+   - A cutoff-scoped participant's `Summary` applies to its one result. A completion with no `Summary` leaves
+     that result missing.
+4. Recalculates `Status` (see *Status rules*), and sets `CompletedDateTime` the first time it is `Completed`.
+5. Moves each report from `PendingDeletion` to `Scrubbed` once every report-scoped participant has
+   `Completed` it, whatever the rest of the cleanup is doing.
+
+A duplicate completion is applied like any other and changes nothing, so redelivery is harmless.
+`RecordsAffected` comes from the latest reply that changed the result, so a failure followed by a successful
+retry reports the retry's count. Counts can undercount after a restart; the contract accepts that.
