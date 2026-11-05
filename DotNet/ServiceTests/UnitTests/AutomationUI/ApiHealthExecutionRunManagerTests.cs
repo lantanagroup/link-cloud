@@ -414,6 +414,39 @@ public class ApiHealthExecutionRunManagerTests
     }
 
     [Fact]
+    public async Task Published_TestRail_run_is_stored_on_the_execution_record()
+    {
+        var reference = new TestRailRunReference
+        {
+            RunId = 44,
+            Url = "https://example.testrail.io/index.php?/runs/view/44"
+        };
+        var publisher = new Mock<ITestRailPublisher>();
+        publisher
+            .Setup(p => p.PublishApiHealthRunAsync(It.IsAny<ApiHealthTestRailPublishRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(() => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([reference]));
+
+        var store = new TestApiHealthRunStore();
+        var manager = new ApiHealthExecutionRunManager(
+            new ApiEndpointRegistry([new TestServiceSuite(TestServiceName, CreateResults(passed: true, responseBody: "{}"))]),
+            new TestSeedOrchestrator(),
+            new ApiHealthSeedContextAccessor(),
+            store,
+            CreateDefaultHttpClientFactory(),
+            CreateConfiguration(),
+            publisher.Object,
+            NullLogger<ApiHealthExecutionRunManager>.Instance);
+
+        var runId = await manager.StartServiceAsync(TestServiceName);
+        var stored = await store.TestRailStored.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        store.StoredTestRailRunId.Should().Be(runId);
+        stored.Should().ContainSingle();
+        stored[0].RunId.Should().Be(44);
+        stored[0].Url.Should().Be("https://example.testrail.io/index.php?/runs/view/44");
+    }
+
+    [Fact]
     public async Task Done_event_is_visible_before_TestRail_publish_returns()
     {
         var publishEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -717,6 +750,22 @@ public class ApiHealthExecutionRunManagerTests
             DateTimeOffset finishedAt,
             CancellationToken ct = default) =>
             Task.CompletedTask;
+
+        public Guid? StoredTestRailRunId { get; private set; }
+        public IReadOnlyList<TestRailRunReference>? StoredTestRailRuns { get; private set; }
+        public TaskCompletionSource<IReadOnlyList<TestRailRunReference>> TestRailStored { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task SetExecutionTestRailRunsAsync(
+            Guid runId,
+            IReadOnlyList<TestRailRunReference> runs,
+            CancellationToken ct = default)
+        {
+            StoredTestRailRunId = runId;
+            StoredTestRailRuns = runs.ToList();
+            TestRailStored.TrySetResult(StoredTestRailRuns);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TestHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
