@@ -359,15 +359,15 @@ public sealed class TestRailPublisher(
             return [];
         }
 
-        if (posted is not { Count: > 0 })
+        TestRailRunReference? captured = null;
+        if (posted is { Count: > 0 })
+            captured = TestRailRunLinks.Capture(opts.BaseUrl, runId.Value, posted);
+        else
         {
             logger.LogWarning(
                 "TestRail add_results_for_cases returned no results for TestRail run {TestRailRunId}.",
                 runId);
-            return [];
         }
-
-        var captured = TestRailRunLinks.Capture(opts.BaseUrl, runId.Value, posted);
 
         for (var index = 0; index < results.Count; index++)
         {
