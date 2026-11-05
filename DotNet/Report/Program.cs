@@ -38,6 +38,7 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -170,6 +171,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
     builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
+    builder.Services.TryAddSingleton(TimeProvider.System);
+    builder.Services.AddTransient<IRetentionCleanupManager, RetentionCleanupManager>();
 
     builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 

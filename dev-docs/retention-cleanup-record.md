@@ -102,6 +102,39 @@ table.
 
 Cutoff-scoped participants never hold back `Scrubbed`. A purged report has no state, because its row is gone.
 
+## Creating a cleanup
+
+`IRetentionCleanupManager.CreateAsync` records a cleanup. The caller (the retention check, LEGLINK-1273)
+computes everything first: the reports with the window and cutoff that selected each, the top-level cutoff,
+`InitiatedBy`, `Mode`, the run id and the initiating user. In one transaction, the manager:
+
+1. Takes the requested reports that are still `None`, moving them to `PendingDeletion`. It does this with a
+   single `UPDATE ... OUTPUT` that only touches rows still at `None`. A second cleanup asking for the same
+   report waits on the row lock, then finds the report no longer `None` and skips it, so a report is never in
+   two cleanups that send requests.
+2. Writes the cleanup (`InProgress`), its reports, a copy of `Retention:Participants`, and a `Pending` result
+   for each report-scoped participant and report, plus one for each cutoff-scoped participant.
+
+It returns the cleanup id, the reports it took, the reports it skipped (missing, or no longer `None`) and the
+`RetentionCheckRequested` value to publish.
+
+When `Retention:Participants` is invalid, it takes nothing. The cleanup is recorded `Failed` with the reason
+and the reports it would have covered, which stay at `None`, and there are no participants, no results and
+nothing to publish. When none of the requested reports is still `None`, no cleanup is recorded at all.
+
+A request that breaks a contract rule throws `ArgumentException`:
+
+- no reports, or the same report twice;
+- `Purge` on anything but a single-report cleanup;
+- a single-report cleanup with more than one report, or with a window;
+- a scheduled or manual cleanup with a report that has no window;
+- no initiating user, or a report with no facility.
+
+Sending is recorded separately. After the publish succeeds, the caller calls `RecordSentAsync`, which sets
+`LastSentDateTime` and adds one to `SendCount` on every result of the cleanup. If Report stops between the
+commit and the publish, the results keep a null `LastSentDateTime`, so re-sending (LEGLINK-1217) can treat
+them as never sent.
+
 ## Status rules
 
 `RetentionCleanup.Status` is recalculated on every reply, across all of the cleanup's results:
