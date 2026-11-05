@@ -802,12 +802,23 @@ public class AutomationRunManager : IAutomationRunManager
         {
             state.Logs.Add(line);
             if (state.Logs.Count > 4000)
+            {
                 state.Logs.RemoveRange(0, 500);
+                state.LogTrimmed = true;
+            }
+
             BeginLogAppend(state);
+            // The store assigns a sequence number only after its Mongo calls. Overlapping
+            // appends can take those numbers out of write order, and publish sorts by them.
+            var prior = state.LogPersistChain ?? Task.CompletedTask;
+            state.LogPersistChain = prior.ContinueWith(
+                _ => PersistLogLineAsync(state, line),
+                CancellationToken.None,
+                TaskContinuationOptions.RunContinuationsAsynchronously,
+                TaskScheduler.Default).Unwrap();
         }
 
         _ = _hub.Clients.Group(state.RunId.ToString()).SendAsync("log", line);
-        _ = PersistLogLineAsync(state, line);
     }
 
     private static void BeginLogAppend(MutableRunState state)
@@ -842,6 +853,8 @@ public class AutomationRunManager : IAutomationRunManager
         catch
         {
             // log persistence is best-effort
+            lock (state.Sync)
+                state.FailedLogAppends++;
         }
         finally
         {
@@ -865,10 +878,10 @@ public class AutomationRunManager : IAutomationRunManager
     /// The Run Details page shows the persisted log once the run is no longer in memory,
     /// and the open page has every line as it was written. The in-memory list drops the
     /// oldest lines once it passes 4,000, so publish reads the store after those appends finish.
-    /// A stuck store must not block the result post, so the wait is bounded. If those appends
-    /// are still running when the wait ends, the store is missing the lines still in flight
-    /// and the in-memory log is the fallback. The store read uses the same budget and stops
-    /// when the run is cancelled.
+    /// A stuck store must not block the result post, so the wait is bounded. When the in-memory
+    /// log is still complete, a timed-out or failed append uses that list: the store is missing
+    /// those lines. Once the in-memory list has been trimmed, the store is the only copy of the
+    /// earlier lines. The store read uses the same budget and stops when the run is cancelled.
     /// </summary>
     private async Task<IReadOnlyList<string>> ReadLogsForPublishAsync(MutableRunState state)
     {
@@ -885,7 +898,17 @@ public class AutomationRunManager : IAutomationRunManager
                 state.RunId);
         }
 
-        if (appendsSettled)
+        bool trimmed;
+        int failedAppends;
+        lock (state.Sync)
+        {
+            trimmed = state.LogTrimmed;
+            failedAppends = state.FailedLogAppends;
+        }
+
+        // Untrimmed memory still has every line. Prefer it when the store is short.
+        var memoryIsComplete = !trimmed && (!appendsSettled || failedAppends > 0);
+        if (!memoryIsComplete)
         {
             try
             {

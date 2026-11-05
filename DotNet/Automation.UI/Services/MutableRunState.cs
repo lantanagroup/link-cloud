@@ -44,7 +44,13 @@ internal sealed class MutableRunState(
     /// <see cref="LogAppendIdle"/> when this is greater than zero.
     /// </summary>
     public int PendingLogAppends;
+    /// <summary>Appends that did not land in the store. A non-empty store can still be missing those lines.</summary>
+    public int FailedLogAppends;
+    /// <summary>True after the in-memory log has dropped older lines.</summary>
+    public bool LogTrimmed;
     public TaskCompletionSource? LogAppendIdle;
+    /// <summary>Tail of the per-run persist chain. Appends run one at a time so store sequence follows write order.</summary>
+    public Task? LogPersistChain;
     public CancellationTokenSource RunCancellation { get; } = new();
     public bool CancelRequested { get; set; }
     public int TestRailPublished;
