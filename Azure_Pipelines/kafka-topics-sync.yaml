@@ -204,7 +204,7 @@ stages:
 
                 DELETED=false
 
-                for attempt in {1..30}; do
+                for attempt in {1..60}; do
 
                   CHECK_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
                     -u "$USERNAME:$PASSWORD" \
@@ -224,7 +224,7 @@ stages:
                 done
 
                 if [[ "$DELETED" != "true" ]]; then
-                  echo "ERROR: Topic '$TOPIC' was not deleted within 60 seconds."
+                  echo "ERROR: Topic '$TOPIC' was not deleted within 120 seconds."
                   exit 1
                 fi
 
