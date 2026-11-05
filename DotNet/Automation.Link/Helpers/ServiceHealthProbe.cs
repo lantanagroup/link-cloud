@@ -11,7 +11,6 @@ public sealed class ServiceHealthProbe : IBackgroundMonitorProbe
     private sealed class ServiceState
     {
         public required MonitoredService Service { get; init; }
-        public bool HasBeenHealthy { get; set; }
         public DateTimeOffset? UnhealthySince { get; set; }
     }
 
@@ -100,7 +99,6 @@ public sealed class ServiceHealthProbe : IBackgroundMonitorProbe
                         TimestampUtc: now.UtcDateTime));
                 }
 
-                serviceState.HasBeenHealthy = true;
                 serviceState.UnhealthySince = null;
                 continue;
             }
@@ -112,11 +110,8 @@ public sealed class ServiceHealthProbe : IBackgroundMonitorProbe
                 continue;
             }
 
-            // Do not count an outage until the service has been
-            // successfully reached at least once during this run.
-            if (!serviceState.HasBeenHealthy)
-                continue;
-
+            // Track the outage from the first confirmed unhealthy check,
+            // even if the service was never healthy during this run.
             if (!serviceState.UnhealthySince.HasValue)
             {
                 serviceState.UnhealthySince = now;
