@@ -158,14 +158,22 @@ public class AutomationRunManager : IAutomationRunManager
                 if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
                 {
                     _logger.LogInformation("Run {RunId} threw after cancellation: {Message}", state.RunId, ex.Message);
-                    return;
                 }
-
-                _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
-                state.Status = AutomationRunStatus.Failed;
-                state.Error = ex.Message;
-                state.FinishedAt = DateTimeOffset.UtcNow;
-                await BroadcastStatus(state);
+                else
+                {
+                    _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = ex.Message;
+                    state.FinishedAt = DateTimeOffset.UtcNow;
+                    await BroadcastStatus(state);
+                }
+            }
+            finally
+            {
+                // Terminal status is broadcast before the executor writes its last lines
+                // ("Run completed successfully", failure text, quiesce). Publish after
+                // those writes so TestRail gets the same log the run page shows.
+                await TryPublishToTestRailAsync(state);
             }
         }, CancellationToken.None);
 
@@ -795,16 +803,100 @@ public class AutomationRunManager : IAutomationRunManager
             state.Logs.Add(line);
             if (state.Logs.Count > 4000)
                 state.Logs.RemoveRange(0, 500);
+            BeginLogAppend(state);
         }
 
         _ = _hub.Clients.Group(state.RunId.ToString()).SendAsync("log", line);
+        _ = PersistLogLineAsync(state, line);
+    }
 
-        // Persist to store (fire-and-forget, best effort)
-        _ = Task.Run(async () =>
+    private static void BeginLogAppend(MutableRunState state)
+    {
+        if (state.PendingLogAppends == 0)
+            state.LogAppendIdle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        state.PendingLogAppends++;
+    }
+
+    private void FinishLogAppend(MutableRunState state)
+    {
+        TaskCompletionSource? completed = null;
+        lock (state.Sync)
         {
-            try { await _snapshotStore.AppendLogsAsync(state.RunId, [line]); }
-            catch { /* log persistence is best-effort */ }
-        });
+            state.PendingLogAppends--;
+            if (state.PendingLogAppends == 0)
+            {
+                completed = state.LogAppendIdle;
+                state.LogAppendIdle = null;
+            }
+        }
+
+        completed?.TrySetResult();
+    }
+
+    private async Task PersistLogLineAsync(MutableRunState state, string line)
+    {
+        try
+        {
+            await _snapshotStore.AppendLogsAsync(state.RunId, [line]);
+        }
+        catch
+        {
+            // log persistence is best-effort
+        }
+        finally
+        {
+            FinishLogAppend(state);
+        }
+    }
+
+    private static Task WaitForLogAppendsAsync(MutableRunState state)
+    {
+        lock (state.Sync)
+        {
+            if (state.PendingLogAppends == 0)
+                return Task.CompletedTask;
+            return state.LogAppendIdle?.Task ?? Task.CompletedTask;
+        }
+    }
+
+    private static readonly TimeSpan LogPublishWait = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// The Run Details page shows the persisted log once the run is no longer in memory,
+    /// and the open page has every line as it was written. The in-memory list drops the
+    /// oldest lines once it passes 4,000, so publish reads the store after those appends finish.
+    /// A stuck store must not block the result post, so the wait is bounded and the
+    /// in-memory log is the fallback.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> ReadLogsForPublishAsync(MutableRunState state)
+    {
+        var pending = WaitForLogAppendsAsync(state);
+        try
+        {
+            await pending.WaitAsync(LogPublishWait);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Persisted logs for run {RunId} were still writing when TestRail publish started.",
+                state.RunId);
+        }
+
+        try
+        {
+            var persisted = await _snapshotStore.GetLogsAsync(state.RunId).WaitAsync(LogPublishWait);
+            if (persisted.Count > 0)
+                return persisted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Could not read persisted logs for TestRail publish of run {RunId}. Using the in-memory log.",
+                state.RunId);
+        }
+
+        lock (state.Sync)
+            return state.Logs.ToList();
     }
 
     private async Task BroadcastStatus(MutableRunState state)
@@ -812,7 +904,6 @@ public class AutomationRunManager : IAutomationRunManager
         await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", ToSummary(state));
         await PersistRunSummaryAsync(state);
-        await TryPublishToTestRailAsync(state);
     }
 
     private async Task TryPublishToTestRailAsync(MutableRunState state)
@@ -824,10 +915,7 @@ public class AutomationRunManager : IAutomationRunManager
 
         try
         {
-            List<string> logs;
-            lock (state.Sync)
-                logs = state.Logs.ToList();
-
+            var logs = await ReadLogsForPublishAsync(state);
             await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
             {
                 RunId = state.RunId,

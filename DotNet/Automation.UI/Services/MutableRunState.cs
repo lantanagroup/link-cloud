@@ -39,6 +39,12 @@ internal sealed class MutableRunState(
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
     public string? Error { get; set; }
     public List<string> Logs { get; } = [];
+    /// <summary>
+    /// Appends still writing this run's log to the store. Publish waits on
+    /// <see cref="LogAppendIdle"/> when this is greater than zero.
+    /// </summary>
+    public int PendingLogAppends;
+    public TaskCompletionSource? LogAppendIdle;
     public CancellationTokenSource RunCancellation { get; } = new();
     public bool CancelRequested { get; set; }
     public int TestRailPublished;
