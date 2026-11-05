@@ -20,7 +20,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<ReportScheduledEventListener> _logger;
         private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly IProducer<string, AuditEventMessage> _auditProducer;
         private readonly IDeadLetterExceptionHandler<ReportScheduledEventListener, string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ReportScheduledEventListener, string, string> _consumeResultDeadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -29,7 +28,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             ILogger<ReportScheduledEventListener> logger,
             IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
             IQueryDispatchFactory queryDispatchFactory,
-            IProducer<string, AuditEventMessage> auditProducer,
             IDeadLetterExceptionHandler<ReportScheduledEventListener, string, ReportScheduledValue> deadLetterExceptionHandler,
             IDeadLetterExceptionHandler<ReportScheduledEventListener, string, string> consumeResultDeadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory)
@@ -37,7 +35,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _queryDispatchFactory = queryDispatchFactory;
-            _auditProducer = auditProducer;
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
             _serviceScopeFactory = serviceScopeFactory;
@@ -136,17 +133,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 {
                                     _logger.LogError(ex, "Failed to process Report Scheduled event");
 
-                                    var auditValue = new AuditEventMessage
-                                    {
-                                        FacilityId = consumeResult.Message.Key,
-                                        Action = AuditEventType.Query,
-                                        ServiceName = "QueryDispatch",
-                                        EventDate = DateTime.UtcNow,
-                                        Notes = $"Report Scheduled event processing failure \nException Message: {ex}",
-                                    };
-
-                                    ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-
                                     _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), consumeResult.Message.Key);
 
                                     _reportScheduledConsumer.Commit(consumeResult);
@@ -194,16 +180,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             }
 
             return facilityId;
-        }
-
-        private void ProduceAuditEvent(AuditEventMessage auditEvent, Headers headers)
-        {
-            _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-            {
-                Value = auditEvent,
-                Headers = headers
-            });
-
         }
     }
 }

@@ -21,7 +21,6 @@ public class QueryDispatchJobMetricsTests
     {
         var metrics = new Mock<IQueryDispatchServiceMetrics>();
         var acquisitionProducer = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
-        var auditProducer = new Mock<IProducer<string, AuditEventMessage>>();
         var patientDispatchMgr = new Mock<IPatientDispatchManager>();
         patientDispatchMgr
             .Setup(m => m.deletePatientDispatch(It.IsAny<string>(), It.IsAny<string>()))
@@ -38,7 +37,6 @@ public class QueryDispatchJobMetricsTests
             Mock.Of<ILogger<QueryDispatchJob>>(),
             scopeFactory.Object,
             acquisitionProducer.Object,
-            auditProducer.Object,
             metrics.Object);
 
         var entity = new PatientDispatchEntity

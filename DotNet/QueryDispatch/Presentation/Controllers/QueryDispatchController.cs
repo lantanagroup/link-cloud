@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Auditing;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -33,6 +35,18 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             _queryDispatchConfigRepo = queryDispatchConfigRepo;
             _queryDispatchConfigurationManager = queryDispatchConfigurationManager;
         }
+
+        /// <summary>
+        /// What the ADR's QueryDispatch rows act on. A literal rather than the entity's type name,
+        /// because stored audit rows are queried by it: renaming the entity must not rename the
+        /// resource. Events published before this story read QueryDispatchConfigurationEntity.
+        /// </summary>
+        private const string ConfigurationResource = "QueryDispatchConfiguration";
+
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
 
         /// <summary>
         /// Gets a Query Dispatch facility configuration by facilityId
@@ -88,6 +102,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("configuration")]
+        [Auditable(AuditEventType.Create, ConfigurationResource)]
         public async Task<ActionResult<RequestResponse>> CreateQueryDispatchConfigurationAsync(QueryDispatchConfiguration model, CancellationToken cancellationToken)
         {
             //validate config values
@@ -131,6 +146,13 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
                 await _queryDispatchConfigurationManager.AddConfigEntity(config, cancellationToken);
 
+                if (Audit is { } audit)
+                {
+                    //the route carries neither, so both come from here: the new row's id only
+                    //exists after the save, and the facility arrived in the body.
+                    audit.RecordId = config.Id;
+                    audit.FacilityId = config.FacilityId;
+                }
 
                 return Created(config.Id, config);
             }
@@ -153,6 +175,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("configuration/facility/{facilityId}")]
+        [Auditable(AuditEventType.Delete, ConfigurationResource)]
         public async Task<ActionResult<RequestResponse>> DeleteQueryDispatchConfiguration(string facilityId, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(facilityId))
@@ -162,6 +185,16 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             try
             {
+                //read the row before it goes, so the event names the configuration deleted rather
+                //than the facility. The endpoint answers 204 whether or not one existed, so a
+                //delete that found nothing publishes an event with no ResourceId.
+                var existingConfig = await _queryDispatchConfigurationManager.GetConfigEntity(facilityId, cancellationToken);
+
+                if (Audit is { } audit && existingConfig is not null)
+                {
+                    audit.RecordId = existingConfig.Id;
+                }
+
                 await _queryDispatchConfigurationManager.DeleteConfigEntity(facilityId, cancellationToken);
 
                 return NoContent();
@@ -190,6 +223,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("configuration/facility/{facilityId}")]
+        [Auditable(AuditEventType.Update, ConfigurationResource)]
         public async Task<ActionResult<RequestResponse>> UpdateQueryDispatchConfiguration(string facilityId, QueryDispatchConfiguration model, CancellationToken cancellationToken)
         {
             if (model == null)
@@ -228,10 +262,22 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
                     var config = _configurationFactory.CreateQueryDispatchConfiguration(facilityId, model.DispatchSchedules);
                     await _queryDispatchConfigurationManager.AddConfigEntity(config, cancellationToken);
 
+                    if (Audit is { } createAudit)
+                    {
+                        //this branch creates and answers 201, so the event says Create
+                        createAudit.ActionOverride = AuditEventType.Create;
+                        createAudit.RecordId = config.Id;
+                    }
+
                     return Created(config.Id, config);
                 }
                 else
                 {
+                    if (Audit is { } updateAudit)
+                    {
+                        updateAudit.RecordId = existingConfig.Id;
+                    }
+
                     await _queryDispatchConfigurationManager.SaveConfigEntity(existingConfig, model.DispatchSchedules, cancellationToken);
                     return NoContent();
                 }

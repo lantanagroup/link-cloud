@@ -19,7 +19,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
     {
         private readonly ILogger<QueryDispatchJob> _logger;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _acquisitionProducer;
-        private readonly IProducer<string, AuditEventMessage> _auditProducer;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IQueryDispatchServiceMetrics _metrics;
 
@@ -27,13 +26,11 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             ILogger<QueryDispatchJob> logger,
             IServiceScopeFactory serviceScopeFactory,
             IProducer<string, DataAcquisitionRequestedValue> acquisitionProducer,
-            IProducer<string, AuditEventMessage> auditProducer,
             IQueryDispatchServiceMetrics metrics)
         {
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
             _acquisitionProducer = acquisitionProducer;
-            _auditProducer = auditProducer;
             _metrics = metrics;
         }
 
@@ -108,33 +105,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                     _metrics.IncrementPatientsDispatched(patientDispatchEntity.FacilityId, outcome);
                 }
             }
-
-
-
-
-            var headers = new Headers
-                {
-                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(patientDispatchEntity.CorrelationId) }
-                };
-
-            var auditMessage = new AuditEventMessage
-            {
-                FacilityId = patientDispatchEntity.FacilityId,
-                ServiceName = QueryDispatchConstants.ServiceName,
-                Action = AuditEventType.Create,
-                EventDate = DateTime.UtcNow,
-                Resource = nameof(KafkaTopic.DataAcquisitionRequested),
-                Notes = $"Produced Data Acquisition Event for facilityId: {patientDispatchEntity.FacilityId}"
-            };
-
-            _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-            {
-                Value = auditMessage,
-                Headers = headers
-            });
-
-            _auditProducer.Flush();
-
         }
     }
 }

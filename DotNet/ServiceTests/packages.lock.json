@@ -2916,7 +2916,6 @@
           "AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer": "[0.5.2, )",
           "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
           "Azure.Identity": "[1.21.0, )",
-          "CompareNETObjects": "[4.84.0, )",
           "Confluent.Kafka": "[2.14.2, )",
           "Grpc.AspNetCore": "[2.80.0, )",
           "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",

@@ -8,7 +8,6 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using QueryDispatch.Application.Settings;
@@ -27,7 +26,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<PatientEventListener, string, string> _consumeResultDeadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IProducer<string, AuditEventMessage> _producer;
 
         public PatientEventListener(
             ILogger<PatientEventListener> logger,
@@ -36,9 +34,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue> deadLetterExceptionHandler,
             IDeadLetterExceptionHandler<PatientEventListener, string, string> consumeResultDeadLetterExceptionHandler,
             ITransientExceptionHandler<PatientEventListener, string, PatientEventValue> transientExceptionHandler,
-            IServiceScopeFactory serviceScopeFactory
-,
-            IProducer<string, AuditEventMessage> producer)
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -53,7 +49,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
 
             _consumeResultDeadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
-            _producer = producer ?? throw new ArgumentException(nameof(producer));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -174,17 +169,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 {
                                     _logger.LogError(ex, "Failed to process Patient Event");
 
-                                    var auditValue = new AuditEventMessage
-                                    {
-                                        FacilityId = consumeResult.Message.Key,
-                                        Action = AuditEventType.Query,
-                                        ServiceName = "QueryDispatch",
-                                        EventDate = DateTime.UtcNow,
-                                        Notes = $"Patient Event processing failure \nException Message: {ex}",
-                                    };
-
-                                    ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-
                                     _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, ex), consumeResult.Message.Key);
                                     _patientEventConsumer.Commit();
 
@@ -217,17 +201,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                     _patientEventConsumer.Dispose();
                 }
             }
-        }
-
-        private void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
-        {
-
-            _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-            {
-                Value = auditValue,
-                Headers = headers
-            });
-
         }
     }
 }

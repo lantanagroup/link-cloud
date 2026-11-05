@@ -20,7 +20,6 @@
 		<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
 		<PackageReference Include="Azure.Identity" />
-		<PackageReference Include="CompareNETObjects" />
 		<PackageReference Include="Confluent.Kafka" />
 		<PackageReference Include="Grpc.AspNetCore" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />

@@ -18,9 +18,8 @@ public static class KafkaRegistration
         var dataProducer = new KafkaProducerFactory<string, DataAcquisitionRequestedValue>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
         services.AddSingleton(dataProducer);
 
-        services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-        var auditProducer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateAuditEventProducer();
-        services.AddSingleton(auditProducer);
+        //No audit event producer here: the shared audit mechanism registers its own, and nothing in
+        //QueryDispatch publishes audit events by hand any more.
 
         services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
         var stringProducer = new KafkaProducerFactory<string, string>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());

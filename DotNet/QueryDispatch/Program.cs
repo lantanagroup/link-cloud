@@ -72,6 +72,10 @@ builder.Services.AddLinkBearerServiceAuthentication(options =>
 //Add database context
 builder.AddSQLServerEF<QueryDispatchDbContext>(true);
 
+//Add REST endpoint auditing. The shared database helper above attaches the property-change
+//interceptor itself, so this one line is the whole registration.
+builder.Services.AddLinkAuditing<QueryDispatchDbContext>();
+
 IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
 builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
 var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
