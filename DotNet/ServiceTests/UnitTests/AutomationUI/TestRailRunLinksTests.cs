@@ -126,6 +126,8 @@ public class TestRailRunLinksTests
             TestRailRunLinks.Capture("https://example.testrail.io", 293, [new TestRailResultDto { Id = 3, TestId = 0 }])!
         ]);
         published.ToString().Should().NotContain(TestRailRunLinks.NotPublished);
+        published.ToString().Should().Contain($"{"TestRail Run",-26}: R292");
+        published.ToString().Should().Contain($"{"TestRail Run",-26}: R293");
         published.ToString().Should().Contain("https://example.testrail.io/index.php?/runs/view/292");
         published.ToString().Should().Contain("https://example.testrail.io/index.php?/runs/view/293");
         published.ToString().Should().Contain("https://example.testrail.io/index.php?/tests/view/5");

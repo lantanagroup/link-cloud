@@ -12,6 +12,18 @@ public static class TestRailRunLinks
 {
     public const string NotPublished = "Not published";
 
+    public static string RunLabel(int runId) =>
+        "R" + runId.ToString(CultureInfo.InvariantCulture);
+
+    public static string TestLabel(int testId) =>
+        "T" + testId.ToString(CultureInfo.InvariantCulture);
+
+    public static string RunLinkTitle(int runId) =>
+        "Open TestRail run " + RunLabel(runId);
+
+    public static string TestLinkTitle(int testId) =>
+        "Open TestRail test " + TestLabel(testId);
+
     private static readonly string[] BaseSuffixes = ["/index.php?/api/v2", "/index.php?", "/index.php"];
 
     public static TestRailRunReference? Capture(string? baseUrl, int runId, IReadOnlyList<TestRailResultDto>? posted)
@@ -121,7 +133,7 @@ public static class TestRailRunLinks
 
         foreach (var run in distinct)
         {
-            AppendKvp(sb, "TestRail Run", run.RunId.ToString(CultureInfo.InvariantCulture));
+            AppendKvp(sb, "TestRail Run", RunLabel(run.RunId));
             AppendKvp(sb, "TestRail URL", run.Url);
             if (run.TestId is > 0 && IsHttpUrl(run.TestUrl))
                 AppendKvp(sb, "TestRail Test", run.TestUrl);

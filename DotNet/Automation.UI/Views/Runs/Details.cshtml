@@ -65,10 +65,10 @@
                             {
                                 @:,
                             }
-                            <a href="@testRailRun.Url" target="_blank" rel="noopener noreferrer">@testRailRun.RunId</a>
+                            <a href="@testRailRun.Url" target="_blank" rel="noopener noreferrer" title="@TestRailRunLinks.RunLinkTitle(testRailRun.RunId)">@TestRailRunLinks.RunLabel(testRailRun.RunId)</a>
                             if (testRailRun.TestId is > 0 && TestRailRunLinks.IsHttpUrl(testRailRun.TestUrl))
                             {
-                                <a href="@testRailRun.TestUrl" target="_blank" rel="noopener noreferrer" class="ms-1">test @testRailRun.TestId</a>
+                                <a href="@testRailRun.TestUrl" target="_blank" rel="noopener noreferrer" class="ms-1" title="@TestRailRunLinks.TestLinkTitle(testRailRun.TestId.Value)">@TestRailRunLinks.TestLabel(testRailRun.TestId.Value)</a>
                             }
                         }
                     }
@@ -1760,7 +1760,8 @@
                 link.href = url;
                 link.target = '_blank';
                 link.rel = 'noopener noreferrer';
-                link.textContent = String(id);
+                link.textContent = 'R' + id;
+                link.title = 'Open TestRail run R' + id;
                 el.appendChild(link);
                 const testId = Number(run.testId != null ? run.testId : run.TestId);
                 const testUrl = run.testUrl || run.TestUrl;
@@ -1771,7 +1772,8 @@
                     testLink.target = '_blank';
                     testLink.rel = 'noopener noreferrer';
                     testLink.className = 'ms-1';
-                    testLink.textContent = 'test ' + testId;
+                    testLink.textContent = 'T' + testId;
+                    testLink.title = 'Open TestRail test T' + testId;
                     el.appendChild(testLink);
                 }
             });
