@@ -373,6 +373,7 @@ public class AutomationRunManager : IAutomationRunManager
         {
             try
             {
+                // The cancel request can end before this write finishes. Do not drop the link.
                 await _snapshotStore.UpsertRunSummaryAsync(
                     summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
             }
@@ -902,6 +903,7 @@ public class AutomationRunManager : IAutomationRunManager
 
         try
         {
+            // A disconnect on the status request must not drop a link that was already published.
             await _snapshotStore.UpsertRunSummaryAsync(
                 summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
         }
