@@ -130,6 +130,85 @@ public class RunExecutorServiceHealthTests
         services.Should().BeEmpty();
     }
 
+
+    [Fact]
+    public async Task Preflight_UnhealthyDependency_ThrowsBeforeExecution()
+    {
+        var services = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health")
+    };
+
+        Func<Task> action = () =>
+            RunExecutor.ValidateRequiredServicesCoreAsync(
+                services,
+                (_, _) => Task.FromResult<bool?>(false),
+                _ => { },
+                CancellationToken.None);
+
+        await action.Should()
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Terminology service is unavailable*");
+    }
+
+    [Fact]
+    public async Task Preflight_HealthyDependency_Completes()
+    {
+        var services = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health")
+    };
+
+        Func<Task> action = () =>
+            RunExecutor.ValidateRequiredServicesCoreAsync(
+                services,
+                (_, _) => Task.FromResult<bool?>(true),
+                _ => { },
+                CancellationToken.None);
+
+        await action.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task Preflight_NoDependencies_SkipsHealthChecks()
+    {
+        var checkCount = 0;
+
+        await RunExecutor.ValidateRequiredServicesCoreAsync(
+            new List<(string Name, string Url)>(),
+            (_, _) =>
+            {
+                checkCount++;
+                return Task.FromResult<bool?>(true);
+            },
+            _ => { },
+            CancellationToken.None);
+
+        checkCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Preflight_CallerCancellation_Propagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var services = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health")
+    };
+
+        Func<Task> action = () =>
+            RunExecutor.ValidateRequiredServicesCoreAsync(
+                services,
+                (_, _) => Task.FromResult<bool?>(true),
+                _ => { },
+                cancellation.Token);
+
+        await action.Should()
+            .ThrowAsync<OperationCanceledException>();
+    }
+
     [Theory]
     [InlineData("not-a-url")]
     [InlineData("ftp://terminology.example.com")]

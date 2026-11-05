@@ -1560,33 +1560,48 @@ internal sealed class RunExecutor
         }
     }
 
-    private async Task ValidateRequiredServicesAsync(
-    IAutomationOutput output,
-    CancellationToken cancellationToken)
-    {
-        if (_monitoredServiceHealthUrls.Count == 0)
-        {
-            output.WriteLine(
-                "[Service Health] No dependency health URLs configured; skipping pre-flight check.");
-            return;
-        }
 
+    private async Task ValidateRequiredServicesAsync(
+        IAutomationOutput output,
+        CancellationToken cancellationToken)
+    {
         using var healthClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(5)
         };
 
-        foreach (var (name, url) in _monitoredServiceHealthUrls)
+        await ValidateRequiredServicesCoreAsync(
+            _monitoredServiceHealthUrls,
+            (url, ct) => CheckHealthAsync(healthClient, url, ct),
+            output.WriteLine,
+            cancellationToken);
+    }
+
+    internal static async Task ValidateRequiredServicesCoreAsync(
+        IReadOnlyList<(string Name, string Url)> services,
+        Func<string, CancellationToken, Task<bool?>> checkHealth,
+        Action<string> writeLine,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (services.Count == 0)
+        {
+            writeLine(
+                "[Service Health] No dependency health URLs configured; skipping pre-flight check.");
+            return;
+        }
+
+        foreach (var (name, url) in services)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            output.WriteLine(
+            writeLine(
                 $"[Service Health] Checking {name} before starting automation...");
 
-            var healthy = await CheckHealthAsync(
-                healthClient,
-                url,
-                cancellationToken);
+            var healthy = await checkHealth(url, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (healthy != true)
             {
@@ -1595,10 +1610,10 @@ internal sealed class RunExecutor
                     "Automation run cannot proceed.");
             }
 
-            output.WriteLine(
-                $"[Service Health] {name} is healthy.");
+            writeLine($"[Service Health] {name} is healthy.");
         }
     }
+
 
     internal static async Task<bool?> CheckHealthAsync(
     HttpClient client,
