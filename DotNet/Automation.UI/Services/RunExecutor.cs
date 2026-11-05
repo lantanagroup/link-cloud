@@ -1565,16 +1565,32 @@ internal sealed class RunExecutor
         IAutomationOutput output,
         CancellationToken cancellationToken)
     {
-        using var healthClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(5)
-        };
+        using var healthClient = _hostServices
+            .GetRequiredService<IHttpClientFactory>()
+            .CreateClient();
+
+        healthClient.Timeout = TimeSpan.FromSeconds(5);
+
+        var requiredStartupServices = GetRequiredStartupServices(
+            _monitoredServiceHealthUrls);
 
         await ValidateRequiredServicesCoreAsync(
-            _monitoredServiceHealthUrls,
+            requiredStartupServices,
             (url, ct) => CheckHealthAsync(healthClient, url, ct),
             output.WriteLine,
             cancellationToken);
+    }
+
+    internal static IReadOnlyList<(string Name, string Url)> GetRequiredStartupServices(
+        IReadOnlyList<(string Name, string Url)> monitoredServices)
+    {
+        return monitoredServices
+            .Where(service =>
+                string.Equals(
+                    service.Name,
+                    "Terminology",
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     internal static async Task ValidateRequiredServicesCoreAsync(

@@ -130,6 +130,35 @@ public class RunExecutorServiceHealthTests
         services.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Preflight_ValidationUnavailable_DoesNotBlockStartup()
+    {
+        var monitoredServices = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health"),
+        ("Validation", "https://validation.example.com/health")
+    };
+
+        var requiredServices = RunExecutor.GetRequiredStartupServices(
+            monitoredServices);
+
+        var checkedServices = new List<string>();
+
+        await RunExecutor.ValidateRequiredServicesCoreAsync(
+            requiredServices,
+            (url, _) =>
+            {
+                checkedServices.Add(url);
+                return Task.FromResult<bool?>(true);
+            },
+            _ => { },
+            CancellationToken.None);
+
+        checkedServices.Should().ContainSingle()
+            .Which.Should().Be("https://terminology.example.com/health");
+
+        monitoredServices.Should().HaveCount(2);
+    }
 
     [Fact]
     public async Task Preflight_UnhealthyDependency_ThrowsBeforeExecution()
