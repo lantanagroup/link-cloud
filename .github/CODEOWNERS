@@ -12,6 +12,9 @@
 
 docs/* @lantanagroup/devops @lantanagroup/link-arch
 
+# A pattern here stops both secret scans reporting anything in the paths it matches.
+/.githooks/trufflehog-exclude.txt @lantanagroup/link-security-team
+
 # Similarly, the DevOps team is interested in any changes to Kafka topics
 topics.txt @lantanagroup/devops
 
