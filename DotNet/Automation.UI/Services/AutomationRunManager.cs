@@ -865,34 +865,44 @@ public class AutomationRunManager : IAutomationRunManager
     /// The Run Details page shows the persisted log once the run is no longer in memory,
     /// and the open page has every line as it was written. The in-memory list drops the
     /// oldest lines once it passes 4,000, so publish reads the store after those appends finish.
-    /// A stuck store must not block the result post, so the wait is bounded and the
-    /// in-memory log is the fallback.
+    /// A stuck store must not block the result post, so the wait is bounded. If those appends
+    /// are still running when the wait ends, the store is missing the lines still in flight
+    /// and the in-memory log is the fallback. The store read uses the same budget and stops
+    /// when the run is cancelled.
     /// </summary>
     private async Task<IReadOnlyList<string>> ReadLogsForPublishAsync(MutableRunState state)
     {
-        var pending = WaitForLogAppendsAsync(state);
+        var appendsSettled = true;
         try
         {
-            await pending.WaitAsync(LogPublishWait);
+            await WaitForLogAppendsAsync(state).WaitAsync(LogPublishWait);
         }
         catch (Exception ex)
         {
+            appendsSettled = false;
             _logger.LogWarning(ex,
-                "Persisted logs for run {RunId} were still writing when TestRail publish started.",
+                "Persisted logs for run {RunId} were still writing when TestRail publish started. Using the in-memory log.",
                 state.RunId);
         }
 
-        try
+        if (appendsSettled)
         {
-            var persisted = await _snapshotStore.GetLogsAsync(state.RunId).WaitAsync(LogPublishWait);
-            if (persisted.Count > 0)
-                return persisted;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex,
-                "Could not read persisted logs for TestRail publish of run {RunId}. Using the in-memory log.",
-                state.RunId);
+            try
+            {
+                using var readTimeout = new CancellationTokenSource(LogPublishWait);
+                using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                    state.RunCancellation.Token,
+                    readTimeout.Token);
+                var persisted = await _snapshotStore.GetLogsAsync(state.RunId, readCancellation.Token);
+                if (persisted.Count > 0)
+                    return persisted;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Could not read persisted logs for TestRail publish of run {RunId}. Using the in-memory log.",
+                    state.RunId);
+            }
         }
 
         lock (state.Sync)
