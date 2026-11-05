@@ -234,6 +234,10 @@ internal sealed class RunExecutor
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
+            // Fail early when a required dependency is already unavailable.
+            // Avoid generating and uploading patient data for a run that cannot complete.
+            await ValidateRequiredServicesAsync(output, cancellationToken);
+
             var isLiveSimulation = state.Options.IsLiveSimulation;
             var usesScheduledWorkflow = ReportExecution.UsesCensusScheduleKickoff(state.Options.ReportMethod);
 
@@ -1553,6 +1557,46 @@ internal sealed class RunExecutor
                 _liveInjector.CloseSession(state.RunId);
 
             runServices?.Dispose();
+        }
+    }
+
+    private async Task ValidateRequiredServicesAsync(
+    IAutomationOutput output,
+    CancellationToken cancellationToken)
+    {
+        if (_monitoredServiceHealthUrls.Count == 0)
+        {
+            output.WriteLine(
+                "[Service Health] No dependency health URLs configured; skipping pre-flight check.");
+            return;
+        }
+
+        using var healthClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
+
+        foreach (var (name, url) in _monitoredServiceHealthUrls)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            output.WriteLine(
+                $"[Service Health] Checking {name} before starting automation...");
+
+            var healthy = await CheckHealthAsync(
+                healthClient,
+                url,
+                cancellationToken);
+
+            if (healthy != true)
+            {
+                throw new InvalidOperationException(
+                    $"{name} service is unavailable during pre-flight health check. " +
+                    "Automation run cannot proceed.");
+            }
+
+            output.WriteLine(
+                $"[Service Health] {name} is healthy.");
         }
     }
 
