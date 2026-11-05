@@ -28,6 +28,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly IStorageService _blobStorageService;
         private readonly ISubmissionServiceMetrics _metrics;
         private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
+        private readonly SubmissionPatientStatusPublisher _patientStatus;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
         private readonly ExternalBlobStorageSettings _externalBlobStorageSettings;
 
@@ -39,6 +40,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             IStorageService blobStorageService,
             ISubmissionServiceMetrics metrics,
             PayloadSubmittedProducer payloadSubmittedProducer,
+            SubmissionPatientStatusPublisher patientStatus,
             AuditableEventOccurredProducer auditableEventOccurredProducer,
             IOptions<ExternalBlobStorageSettings> externalBlobStorageSettings)
         {
@@ -61,6 +63,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             _metrics = metrics;
 
             _payloadSubmittedProducer = payloadSubmittedProducer;
+            _patientStatus = patientStatus;
 
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
             _externalBlobStorageSettings = externalBlobStorageSettings.Value;
@@ -137,6 +140,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             
             string? facilityId = key?.FacilityId;
+            var stageStopwatch = Stopwatch.StartNew();
+            var patientStatusPublished = false;
             try
             {
                 if (string.IsNullOrEmpty(facilityId))
@@ -217,6 +222,33 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 if (uploaded)
                 {
+                    // Status goes out before PayloadSubmitted. A failed status send retries this
+                    // record, so PayloadSubmitted is not emitted without a status event.
+                    // A repeated status event on that retry is acceptable.
+                    if (SubmissionPatientStatus.IsPatientSubmission(value))
+                    {
+                        stageStopwatch.Stop();
+                        try
+                        {
+                            _patientStatus.PublishSuccess(
+                                key,
+                                value,
+                                correlationId,
+                                stageStopwatch.ElapsedMilliseconds,
+                                headers,
+                                cancellationToken);
+                            patientStatusPublished = true;
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new TransientException("Failed to publish submission status.", ex);
+                        }
+                    }
+
                     _payloadSubmittedProducer.Produce(
                         correlationId,
                         facilityId,
@@ -227,10 +259,16 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (TransientException ex)
             {
+                // This attempt will be retried. Do not report the patient as failed yet.
                 _transientExceptionHandler.HandleException(result, ex, facilityId!);
             }
             catch (DeadLetterException ex)
             {
+                if (!patientStatusPublished)
+                {
+                    _patientStatus.PublishTerminalFailure(key, value, headers, ex, ex.Message, cancellationToken);
+                }
+
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -239,6 +277,11 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (Exception ex)
             {
+                if (!patientStatusPublished)
+                {
+                    _patientStatus.PublishTerminalFailure(key, value, headers, ex, ex.Message, cancellationToken);
+                }
+
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             finally

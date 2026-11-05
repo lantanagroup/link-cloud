@@ -20,6 +20,7 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
+using LantanaGroup.Link.Submission.Application.Error;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Middleware;
 using LantanaGroup.Link.Submission.Application.Services;
@@ -189,10 +190,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     var auditableEventOccurredProducer = new KafkaProducerFactory<string, AuditEventMessage>(kafkaConnection).CreateProducer(auditableEventOccurredConfig);
     builder.Services.AddSingleton(auditableEventOccurredProducer);
 
+    // CreateProducer overwrites ClientId from the connection. It leaves Partitioner as set here.
+    var reportStatusUpdatedProducer = new KafkaProducerFactory<ReportStatusUpdatedKey, ReportStatusUpdatedValue>(kafkaConnection)
+        .CreateProducer(ReportStatusUpdatedProducer.CreateConfig());
+    builder.Services.AddSingleton(reportStatusUpdatedProducer);
+    builder.Services.AddSingleton<ReportStatusUpdatedProducer>();
+    builder.Services.AddSingleton<SubmissionPatientStatusPublisher>();
+
     #region Exception Handling
     builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
+    builder.Services.AddSingleton<DeadLetterExceptionHandler<RetryListener, string, string>>();
+    builder.Services.AddSingleton<IDeadLetterExceptionHandler<RetryListener, string, string>, SubmitPayloadRetryDeadLetterHandler>();
     #endregion
 
     // Logging using Serilog
