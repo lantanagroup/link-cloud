@@ -1,4 +1,6 @@
+using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Jobs;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using UnitTests.Shared.Auditing;
@@ -7,8 +9,8 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Report;
 
 /// <summary>
-/// Covers the startup hook that reconciles the retention job and leaves the scheduler's lifecycle to
-/// RetryScheduleService.
+/// Covers the startup hook that logs the retention participants, reconciles the retention job and leaves the
+/// scheduler's lifecycle to RetryScheduleService.
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class RetentionScheduleHostedServiceTests
@@ -77,5 +79,58 @@ public class RetentionScheduleHostedServiceTests
         _reconciler.VerifyNoOtherCalls();
     }
 
-    private RetentionScheduleHostedService CreateService() => new(_reconciler.Object, _logger);
+    [Fact]
+    public async Task StartAsync_DefaultParticipants_LogsThemAsInformation()
+    {
+        await CreateService().StartAsync(CancellationToken.None);
+
+        var entry = Assert.Single(_logger.Entries, e => e.Level == LogLevel.Information);
+        Assert.Contains("DataAcquisition (Report), the default", entry.Message);
+    }
+
+    [Fact]
+    public async Task StartAsync_InvalidParticipants_LogsAnErrorAndStillReconciles()
+    {
+        var participants = ReadParticipants(new Dictionary<string, string?>
+        {
+            ["Retention:Participants:0:ServiceName"] = "Report"
+        });
+
+        await CreateService(participants).StartAsync(CancellationToken.None);
+
+        var entry = Assert.Single(_logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains("has no Scope", entry.Message);
+        _reconciler.Verify(r => r.ReconcileAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task StartAsync_ReconcilerThrowsWithInvalidParticipants_LogsBothErrorsParticipantsFirst()
+    {
+        _reconciler
+            .Setup(r => r.ReconcileAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("store unreachable"));
+        var participants = ReadParticipants(new Dictionary<string, string?>
+        {
+            ["Retention:Participants"] = ""
+        });
+
+        await CreateService(participants).StartAsync(CancellationToken.None);
+
+        var errors = _logger.Entries.Where(e => e.Level == LogLevel.Error).ToList();
+        Assert.Equal(2, errors.Count);
+        Assert.Contains("lists no participants", errors[0].Message);
+        Assert.Contains("Failed to reconcile", errors[1].Message);
+    }
+
+    private RetentionScheduleHostedService CreateService(RetentionParticipants? participants = null) =>
+        new(_reconciler.Object, participants ?? ReadParticipants(new Dictionary<string, string?>()), _logger);
+
+    private static RetentionParticipants ReadParticipants(Dictionary<string, string?> values)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
+            .Build();
+
+        return RetentionParticipants.FromConfiguration(configuration);
+    }
 }
