@@ -248,6 +248,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             KafkaTopic.MappingOutcomeEvaluatedRetry.GetStringValue(),
         ]));
 
+    // Before RetryScheduleService: the retention job must be settled before the scheduler starts.
+    builder.Services.AddRetentionSchedule(builder.Configuration);
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
@@ -270,7 +272,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
     builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
