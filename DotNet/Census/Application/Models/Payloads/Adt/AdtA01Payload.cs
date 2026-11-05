@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Census.Application.Models.Enums;
+﻿using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
@@ -21,7 +21,6 @@ public class AdtA01Payload : AdtPayload
 
     protected override void ApplyToEncounter(PatientEncounter patientEncounter)
     {
-        patientEncounter.EncounterStatus = InProgressStatus;
         patientEncounter.AdmitDate = AdmitDateTime ?? patientEncounter.AdmitDate;
     }
 }

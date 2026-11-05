@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Census.Application.Factories;
+﻿using LantanaGroup.Link.Census.Application.Factories;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
@@ -101,12 +101,10 @@ public abstract class AdtPayload : IPayload
     }
 
     /// <summary>
-    /// Applies what PV1 says about the visit: its class and encounter id.
+    /// Applies what PV1 says about the visit: encounter id.
     /// </summary>
     protected virtual void ApplyVisitDetails(PatientEncounter patientEncounter)
     {
-        patientEncounter.EncounterClass = PatientClass ?? patientEncounter.EncounterClass;
-
         AddVisitIdentifierIfMissing(patientEncounter);
     }
 
