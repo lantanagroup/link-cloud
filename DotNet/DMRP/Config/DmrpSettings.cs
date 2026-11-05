@@ -1,4 +1,5 @@
 using System.Globalization;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 
 namespace LantanaGroup.Link.DMRP.Config
 {
@@ -179,8 +180,12 @@ namespace LantanaGroup.Link.DMRP.Config
             "yyyy-MM-dd HH:mm"
         ];
 
+        /// <summary>
+        /// <see cref="NightlyCron"/> when it is valid and can still fire, else <see cref="DefaultNightlyCron"/>.
+        /// A cron limited to a past year would otherwise make scheduling throw and stop Tenant starting.
+        /// </summary>
         public string ResolvedNightlyCron =>
-            !string.IsNullOrWhiteSpace(NightlyCron) && Quartz.CronExpression.IsValidExpression(NightlyCron)
+            CronJobReconciler.CanFire(NightlyCron, TimeZoneInfo.Utc)
                 ? NightlyCron
                 : DefaultNightlyCron;
 

@@ -48,6 +48,12 @@ public class ReportSqlServerIntegrationTestFixture : IAsyncLifetime
 
     public IServiceScopeFactory ScopeFactory { get; private set; } = default!;
 
+    /// <summary>
+    /// The connection string of the migrated test database, for tests that open their own connections,
+    /// such as clustered Quartz schedulers.
+    /// </summary>
+    public string ConnectionString { get; private set; } = default!;
+
     public ReportSqlServerIntegrationTestFixture()
     {
         if (string.IsNullOrWhiteSpace(ExternalConnectionString))
@@ -77,6 +83,7 @@ public class ReportSqlServerIntegrationTestFixture : IAsyncLifetime
             InitialCatalog = _testDatabaseName,
             ConnectTimeout = 60
         }.ConnectionString;
+        ConnectionString = connectionString;
 
         await using (var masterConnection = new SqlConnection(_serverConnectionString))
         {
