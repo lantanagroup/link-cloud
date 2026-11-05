@@ -71,13 +71,44 @@ public class TestRailRunLinksTests
         var stored = new List<TestRailRunReference>();
         var first = TestRailRunLinks.Capture("https://example.testrail.io", 10, [new TestRailResultDto { TestId = 1 }])!;
         var same = TestRailRunLinks.Capture("https://example.testrail.io/", 10, [new TestRailResultDto { TestId = 1 }])!;
-        var second = TestRailRunLinks.Capture("https://example.testrail.io", 11, [])!;
+        var second = TestRailRunLinks.Capture(
+            "https://example.testrail.io",
+            11,
+            [new TestRailResultDto { Id = 2, TestId = 0 }])!;
 
         TestRailRunLinks.AddDistinct(stored, [first]).Should().BeTrue();
         TestRailRunLinks.AddDistinct(stored, [same, second]).Should().BeTrue();
         TestRailRunLinks.AddDistinct(stored, [second]).Should().BeFalse();
 
         stored.Select(run => run.RunId).Should().Equal(10, 11);
+    }
+
+    [Fact]
+    public void Capture_records_nothing_when_no_results_were_posted()
+    {
+        TestRailRunLinks.Capture("https://example.testrail.io", 501, null).Should().BeNull();
+        TestRailRunLinks.Capture("https://example.testrail.io", 501, []).Should().BeNull();
+    }
+
+    [Fact]
+    public void Second_publish_of_the_same_run_id_does_not_duplicate_the_entry()
+    {
+        var stored = new List<TestRailRunReference>();
+        var first = TestRailRunLinks.Capture(
+            "https://example.testrail.io",
+            501,
+            [new TestRailResultDto { Id = 1, TestId = 16898 }])!;
+        var again = TestRailRunLinks.Capture(
+            "https://example.testrail.io/",
+            501,
+            [new TestRailResultDto { Id = 2, TestId = 16898 }])!;
+
+        TestRailRunLinks.AddDistinct(stored, [first]).Should().BeTrue();
+        TestRailRunLinks.AddDistinct(stored, [again]).Should().BeFalse();
+
+        stored.Should().ContainSingle();
+        stored[0].RunId.Should().Be(501);
+        stored[0].TestId.Should().Be(16898);
     }
 
     [Fact]
@@ -92,7 +123,7 @@ public class TestRailRunLinksTests
         TestRailRunLinks.AppendExport(published,
         [
             TestRailRunLinks.Capture("https://example.testrail.io/", 292, [new TestRailResultDto { TestId = 5 }])!,
-            TestRailRunLinks.Capture("https://example.testrail.io", 293, [])!
+            TestRailRunLinks.Capture("https://example.testrail.io", 293, [new TestRailResultDto { Id = 3, TestId = 0 }])!
         ]);
         published.ToString().Should().NotContain(TestRailRunLinks.NotPublished);
         published.ToString().Should().Contain("https://example.testrail.io/index.php?/runs/view/292");

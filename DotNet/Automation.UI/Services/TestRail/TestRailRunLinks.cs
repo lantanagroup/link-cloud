@@ -16,6 +16,9 @@ public static class TestRailRunLinks
 
     public static TestRailRunReference? Capture(string? baseUrl, int runId, IReadOnlyList<TestRailResultDto>? posted)
     {
+        if (posted == null || posted.Count == 0)
+            return null;
+
         var url = RunUrl(baseUrl, runId);
         if (url == null)
             return null;

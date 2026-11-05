@@ -1313,6 +1313,24 @@ public class TestRailPublisherTests
         published.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Empty_result_post_does_not_record_a_run_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Succeeded };
+
+        var published = await publisher.PublishScenarioRunAsync(request);
+
+        published.Should().BeEmpty();
+    }
+
     private static IScenarioStore ScenarioStore(Guid scenarioId, int caseId = 42)
     {
         var scenarios = new Mock<IScenarioStore>();
