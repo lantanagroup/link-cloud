@@ -348,10 +348,10 @@ public class AutomationRunManager : IAutomationRunManager
             _logger.LogWarning(ex, "Could not load the scenario id for TestRail publish of run {RunId}.", runId);
         }
 
-        ScenarioTestRailPublishRequest? publishRequest = null;
+        IReadOnlyList<TestRailRunReference> published = [];
         try
         {
-            publishRequest = new ScenarioTestRailPublishRequest
+            var publishRequest = new ScenarioTestRailPublishRequest
             {
                 RunId = runId,
                 ScenarioId = scenarioId,
@@ -362,14 +362,14 @@ public class AutomationRunManager : IAutomationRunManager
                 StartedAt = summary.StartedAt,
                 FinishedAt = summary.FinishedAt
             };
-            await _testRailPublisher.PublishScenarioRunAsync(publishRequest, cancellationToken);
+            published = await _testRailPublisher.PublishScenarioRunAsync(publishRequest, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "TestRail publish failed for zombie scenario run {RunId}.", runId);
         }
 
-        if (publishRequest != null && TestRailRunLinks.AddDistinct(summary.TestRailRuns, publishRequest.PublishedRuns))
+        if (TestRailRunLinks.AddDistinct(summary.TestRailRuns, published))
         {
             try
             {
@@ -854,8 +854,8 @@ public class AutomationRunManager : IAutomationRunManager
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt
             };
-            await _testRailPublisher.PublishScenarioRunAsync(publishRequest);
-            await RecordTestRailRunsAsync(state.RunId, publishRequest.PublishedRuns);
+            var published = await _testRailPublisher.PublishScenarioRunAsync(publishRequest);
+            await RecordTestRailRunsAsync(state.RunId, published);
         }
         catch (Exception ex)
         {

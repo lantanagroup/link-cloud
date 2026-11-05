@@ -5,6 +5,7 @@ using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
 using Automation.UI.Services.TestRail;
 using FluentAssertions;
+using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -390,7 +391,7 @@ public class ApiHealthExecutionRunManagerTests
         publisher
             .Setup(p => p.PublishApiHealthRunAsync(It.IsAny<ApiHealthTestRailPublishRequest>(), It.IsAny<CancellationToken>()))
             .Callback<ApiHealthTestRailPublishRequest, CancellationToken>((request, _) => published.TrySetResult(request))
-            .Returns(Task.CompletedTask);
+            .Returns(() => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]));
 
         var manager = new ApiHealthExecutionRunManager(
             new ApiEndpointRegistry([new TestServiceSuite(TestServiceName, CreateResults(passed: true, responseBody: "{}"))]),
@@ -424,6 +425,7 @@ public class ApiHealthExecutionRunManagerTests
             {
                 publishEntered.TrySetResult();
                 await releasePublish.Task;
+                return (IReadOnlyList<TestRailRunReference>)[];
             });
 
         var manager = new ApiHealthExecutionRunManager(

@@ -12,9 +12,6 @@ public sealed record ScenarioTestRailPublishRequest
     public IReadOnlyList<string> Logs { get; init; } = [];
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
-
-    /// <summary>Filled when results were posted. Empty when publishing was skipped or failed.</summary>
-    public List<TestRailRunReference> PublishedRuns { get; } = [];
 }
 
 public sealed record ApiHealthTestRailPublishRequest
@@ -27,9 +24,6 @@ public sealed record ApiHealthTestRailPublishRequest
     public string? Error { get; init; }
     public DateTimeOffset StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
-
-    /// <summary>Filled when results were posted. Empty when publishing was skipped or failed.</summary>
-    public List<TestRailRunReference> PublishedRuns { get; } = [];
 }
 
 public sealed class TestRailCaseResult

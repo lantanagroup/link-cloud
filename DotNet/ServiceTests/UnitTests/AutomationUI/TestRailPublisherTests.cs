@@ -1182,9 +1182,9 @@ public class TestRailPublisherTests
         var publisher = CreatePublisher(api.Object, options, ScenarioStore(scenarioId));
         var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Succeeded };
 
-        await publisher.PublishScenarioRunAsync(request);
+        var publishedRuns = await publisher.PublishScenarioRunAsync(request);
 
-        var published = request.PublishedRuns.Should().ContainSingle().Subject;
+        var published = publishedRuns.Should().ContainSingle().Subject;
         published.RunId.Should().Be(501);
         published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/501");
         published.TestId.Should().Be(16898);
@@ -1224,10 +1224,10 @@ public class TestRailPublisherTests
         var publisher = CreatePublisher(api.Object, options, ScenarioStore(scenarioId));
         var request = SampleScenarioRequest() with { ScenarioId = scenarioId };
 
-        await publisher.PublishScenarioRunAsync(request);
+        var publishedRuns = await publisher.PublishScenarioRunAsync(request);
 
         api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
-        var published = request.PublishedRuns.Should().ContainSingle().Subject;
+        var published = publishedRuns.Should().ContainSingle().Subject;
         published.RunId.Should().Be(777);
         published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/777");
         published.TestUrl.Should().Be("https://example.testrail.io/index.php?/tests/view/91");
@@ -1265,9 +1265,9 @@ public class TestRailPublisherTests
             registry: new ApiEndpointRegistry([new FakeSuite(passDef, failDef)]));
         var request = SampleApiHealthRequest();
 
-        await publisher.PublishApiHealthRunAsync(request);
+        var publishedRuns = await publisher.PublishApiHealthRunAsync(request);
 
-        var published = request.PublishedRuns.Should().ContainSingle().Subject;
+        var published = publishedRuns.Should().ContainSingle().Subject;
         published.RunId.Should().Be(44);
         published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/44");
         published.TestId.Should().BeNull();
@@ -1289,9 +1289,9 @@ public class TestRailPublisherTests
             Status = cancelled ? AutomationRunStatus.Cancelled : AutomationRunStatus.Succeeded
         };
 
-        await publisher.PublishScenarioRunAsync(request);
+        var published = await publisher.PublishScenarioRunAsync(request);
 
-        request.PublishedRuns.Should().BeEmpty();
+        published.Should().BeEmpty();
         api.VerifyNoOtherCalls();
     }
 
@@ -1308,9 +1308,9 @@ public class TestRailPublisherTests
         var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
         var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Failed };
 
-        await publisher.PublishScenarioRunAsync(request);
+        var published = await publisher.PublishScenarioRunAsync(request);
 
-        request.PublishedRuns.Should().BeEmpty();
+        published.Should().BeEmpty();
     }
 
     private static IScenarioStore ScenarioStore(Guid scenarioId, int caseId = 42)
