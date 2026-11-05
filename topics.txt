@@ -1,4 +1,4 @@
-1AuditableEventOccurred:3:1
+AuditableEventOccurred:3:1
 AuditableEventOccurred-Error:3:1
 AuditableEventOccurred-Retry:3:1
 DataAcquisitionRequested:3:1
