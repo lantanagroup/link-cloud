@@ -863,7 +863,11 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    public async Task RecordTestRailRunsAsync(
+    /// <summary>
+    /// Stores TestRail runs that accepted this automation run's results.
+    /// The same run id is kept once. A missing automation run is left unchanged.
+    /// </summary>
+    private async Task RecordTestRailRunsAsync(
         Guid runId,
         IReadOnlyList<TestRailRunReference> runs,
         CancellationToken cancellationToken = default)

@@ -11,11 +11,6 @@ public interface IAutomationRunManager
     Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default, DateTimeOffset? createdFromUtc = null, DateTimeOffset? createdBeforeUtc = null);
     Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default);
-    /// <summary>
-    /// Stores TestRail runs that accepted this automation run's results.
-    /// The same run id is kept once. A missing automation run is left unchanged.
-    /// </summary>
-    Task RecordTestRailRunsAsync(Guid runId, IReadOnlyList<TestRailRunReference> runs, CancellationToken cancellationToken = default);
     Task<bool> DeleteRunAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<GenerationManifestSnapshot?> GetGenerationManifestAsync(Guid runId, CancellationToken cancellationToken = default);
