@@ -51,23 +51,22 @@ on as sent.
 ## Census
 
 `AdtEventService` applies the messages in order, in one transaction, and only then are `PatientEvent` messages produced.
-Other message types are ignored. A message already recorded, with the same patient, type, MSH-7 and encounter id, is
+Other message types, including A02 and A12, are ignored. A message already recorded, with the same patient, type, MSH-7 and encounter id, is
 ignored too, so reading a file twice changes nothing.
 
 | Message | Encounter | PatientEvent message |
 | --- | --- | --- |
 | A01 Admit/visit | Sets the status, and the admit date from PV1-44 | Admit, if it opened the stay |
-| A02 Transfer | Sets the location | Admit, if it opened the stay |
 | A03 Discharge | Sets the discharge date and status | Discharge, plus Admit first if it opened the stay |
 | A06 Outpatient to inpatient | Sets the class | Admit, if it opened the stay |
 | A07 Inpatient to outpatient | Sets the class | Admit, if it opened the stay |
 | A11 Cancel admit/visit | Marks `cancelled`, closed at its admit date | None |
-| A12 Cancel transfer | Sets the location back | Admit, if it opened the stay |
 | A13 Cancel discharge | Clears the discharge date | Admit, if it opened the stay |
 | A18 Merge | Moves matching encounters to the surviving patient | None |
 
-A feed can start mid-stay, so whichever message comes first for a stay opens it and emits Admit. A later A01 for that
-stay fills in its details without a second Admit.
+A feed can start mid-stay, so whichever tracked message comes first for a stay opens it and emits Admit. A later A01 for
+that stay fills in its details without a second Admit. A patient who has only had ignored messages, such as transfers,
+is not in the census until a tracked message arrives.
 
 A message belongs to the encounter with the same encounter id. Without one, it belongs to the patient's open encounter,
 and an A13 to their most recent one. A cancelled encounter is never matched, so an A01 after an A11 starts a new one.

@@ -102,7 +102,6 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             EncounterType = e.EncounterType,
             EncounterStatus = e.EncounterStatus,
             EncounterClass = e.EncounterClass,
-            Location = e.Location,
             CreateDate = e.CreateDate,
             ModifyDate = e.ModifyDate,
 
@@ -190,7 +189,6 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 EncounterType = e.EncounterType,
                 EncounterStatus = e.EncounterStatus,
                 EncounterClass = e.EncounterClass,
-                Location = e.Location,
                 CreateDate = e.CreateDate,
                 ModifyDate = e.ModifyDate,
                 PatientVisitIdentifiers = e.PatientVisitIdentifiers.Select(pvi => new PatientVisitIdentifierModel

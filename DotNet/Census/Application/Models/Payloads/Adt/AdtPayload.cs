@@ -30,7 +30,6 @@ public abstract class AdtPayload : IPayload
     public string? AlternatePatientId { get; set; }
     public string? PatientAccountNumber { get; set; }
     public string? PatientClass { get; set; }
-    public string? Location { get; set; }
     public DateTime? AdmitDateTime { get; set; }
     public DateTime? DischargeDateTime { get; set; }
 
@@ -60,7 +59,6 @@ public abstract class AdtPayload : IPayload
         AlternatePatientId = entry.AlternatePatientId;
         PatientAccountNumber = entry.PatientAccountNumber;
         PatientClass = entry.PatientClass;
-        Location = entry.Location;
         AdmitDateTime = entry.AdmitDateTime;
         DischargeDateTime = entry.DischargeDateTime;
     }
@@ -103,12 +101,11 @@ public abstract class AdtPayload : IPayload
     }
 
     /// <summary>
-    /// Applies what PV1 says about the visit: its class, location and encounter id.
+    /// Applies what PV1 says about the visit: its class and encounter id.
     /// </summary>
     protected virtual void ApplyVisitDetails(PatientEncounter patientEncounter)
     {
         patientEncounter.EncounterClass = PatientClass ?? patientEncounter.EncounterClass;
-        patientEncounter.Location = Location ?? patientEncounter.Location;
 
         AddVisitIdentifierIfMissing(patientEncounter);
     }

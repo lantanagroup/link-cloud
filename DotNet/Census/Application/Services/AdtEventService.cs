@@ -23,10 +23,10 @@ public interface IAdtEventService
 /// <summary>
 /// Applies an ADT feed to the census. Only an admission and a discharge reach the rest of the pipeline:
 /// <list type="bullet">
-/// <item>The first message of a stay emits Admit, whatever its type, because a feed can start mid-stay. A later A01 for
-/// that open stay fills in its details but does not emit a second Admit.</item>
+/// <item>The first tracked message of a stay emits Admit, whatever its type, because a feed can start mid-stay. A later
+/// A01 for that open stay fills in its details but does not emit a second Admit.</item>
 /// <item>An A03 emits Discharge, so an A03 that is also the first message of a stay emits Admit and Discharge.</item>
-/// <item>A11 and A18 never imply a stay, and A11, A12, A13 and A18 emit nothing: downstream has no way to take back an
+/// <item>A11 and A18 never imply a stay, and A11, A13 and A18 emit nothing: downstream has no way to take back an
 /// Admit or Discharge it has already received.</item>
 /// </list>
 /// </summary>

@@ -139,7 +139,6 @@ public class Hl7MessageTests
         Assert.Equal("ALT1", entry.AlternatePatientId);
         Assert.Equal("ACCT1", entry.PatientAccountNumber);
         Assert.Equal("I", entry.PatientClass);
-        Assert.Equal("4E^401^A", entry.Location);
         Assert.Equal(new DateTime(2026, 1, 2, 10, 0, 0), entry.AdmitDateTime);
         Assert.Null(entry.DischargeDateTime);
         Assert.Null(entry.Merge);

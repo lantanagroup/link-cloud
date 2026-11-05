@@ -12,12 +12,10 @@ public static class AdtPayloadFactory
         return entry.MessageType?.Trim().ToUpperInvariant() switch
         {
             "A01" => new AdtA01Payload(entry),
-            "A02" => new AdtA02Payload(entry),
             "A03" => new AdtA03Payload(entry),
             "A06" => new AdtA06Payload(entry),
             "A07" => new AdtA07Payload(entry),
             "A11" => new AdtA11Payload(entry),
-            "A12" => new AdtA12Payload(entry),
             "A13" => new AdtA13Payload(entry),
             "A18" => new AdtA18Payload(entry),
             _ => null

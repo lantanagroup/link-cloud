@@ -100,8 +100,6 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     return JsonSerializer.Deserialize<CernerListUpdatePayload>(document);
                 case "A01":
                     return JsonSerializer.Deserialize<AdtA01Payload>(document);
-                case "A02":
-                    return JsonSerializer.Deserialize<AdtA02Payload>(document);
                 case "A03":
                     return JsonSerializer.Deserialize<AdtA03Payload>(document);
                 case "A06":
@@ -110,8 +108,6 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     return JsonSerializer.Deserialize<AdtA07Payload>(document);
                 case "A11":
                     return JsonSerializer.Deserialize<AdtA11Payload>(document);
-                case "A12":
-                    return JsonSerializer.Deserialize<AdtA12Payload>(document);
                 case "A13":
                     return JsonSerializer.Deserialize<AdtA13Payload>(document);
                 case "A18":

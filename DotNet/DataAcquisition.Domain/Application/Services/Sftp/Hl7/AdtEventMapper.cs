@@ -15,7 +15,6 @@ public static class AdtEventMapper
     private static readonly Hl7Path AlternatePatientId = Hl7Path.Parse("PID-4.1");
     private static readonly Hl7Path PatientAccountNumber = Hl7Path.Parse("PID-18.1");
     private static readonly Hl7Path PatientClass = Hl7Path.Parse("PV1-2.1");
-    private static readonly Hl7Path Location = Hl7Path.Parse("PV1-3");
     private static readonly Hl7Path AdmitDateTime = Hl7Path.Parse("PV1-44.1");
     private static readonly Hl7Path DischargeDateTime = Hl7Path.Parse("PV1-45.1");
     private static readonly Hl7Path PriorAlternatePatientId = Hl7Path.Parse("MRG-2.1");
@@ -51,7 +50,6 @@ public static class AdtEventMapper
             AlternatePatientId = message.GetValue(AlternatePatientId),
             PatientAccountNumber = message.GetValue(PatientAccountNumber),
             PatientClass = message.GetValue(PatientClass),
-            Location = message.GetValue(Location),
             AdmitDateTime = Hl7Message.ParseTimestamp(message.GetValue(AdmitDateTime)),
             DischargeDateTime = Hl7Message.ParseTimestamp(message.GetValue(DischargeDateTime)),
             Merge = messageType == "A18" && message.HasSegment("MRG")

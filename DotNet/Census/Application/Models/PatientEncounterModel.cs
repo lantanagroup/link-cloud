@@ -13,7 +13,6 @@ public class PatientEncounterModel
     public string? EncounterType { get; set; }
     public string? EncounterStatus { get; set; }
     public string? EncounterClass { get; set; }
-    public string? Location { get; set; }
     public DateTime? CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
     public List<PatientVisitIdentifierModel> PatientVisitIdentifiers { get; set; } = new List<PatientVisitIdentifierModel>();
@@ -32,7 +31,6 @@ public class PatientEncounterModel
             EncounterType = EncounterType,
             EncounterStatus = EncounterStatus,
             EncounterClass = EncounterClass,
-            Location = Location,
             CreateDate = CreateDate ?? DateTime.UtcNow,
             ModifyDate = ModifyDate ?? DateTime.UtcNow,
             PatientVisitIdentifiers = PatientVisitIdentifiers.Select(p => p.ToDomain()).ToList(),
@@ -53,7 +51,6 @@ public class PatientEncounterModel
             EncounterType = patientEncounter.EncounterType,
             EncounterStatus = patientEncounter.EncounterStatus,
             EncounterClass = patientEncounter.EncounterClass,
-            Location = patientEncounter.Location,
             CreateDate = patientEncounter.CreateDate,
             ModifyDate = patientEncounter.ModifyDate,
             PatientVisitIdentifiers = patientEncounter.PatientVisitIdentifiers.Select(p => PatientVisitIdentifierModel.FromDomain(p)).ToList(),

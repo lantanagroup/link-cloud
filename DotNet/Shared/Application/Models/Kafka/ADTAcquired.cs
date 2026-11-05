@@ -47,9 +47,6 @@ public class AdtEventEntry
     /// <summary>PV1-2, patient class (HL7 table 0004).</summary>
     public string? PatientClass { get; set; }
 
-    /// <summary>PV1-3, assigned patient location, as sent (point of care^room^bed...).</summary>
-    public string? Location { get; set; }
-
     /// <summary>PV1-44, admit date/time.</summary>
     public DateTime? AdmitDateTime { get; set; }
 
