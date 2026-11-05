@@ -31,10 +31,10 @@ PatientListsAcquired-Retry:3:1
 PayloadSubmitted:3:1
 PayloadSubmitted-Error:3:1
 PayloadSubmitted-Retry:3:1
-ReadyForValidation:3:1
+ReadyForValidation:10:1
 ReadyForValidation-Error:3:1
 ReadyForValidation-Retry:3:1
-ReadyToAcquire:3:1
+ReadyToAcquire:5:1
 ReadyToAcquire-Error:3:1
 ReadyToAcquire-Retry:3:1
 ReportScheduled:3:1
