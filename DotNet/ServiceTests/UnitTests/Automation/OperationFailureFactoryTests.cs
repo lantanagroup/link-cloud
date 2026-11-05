@@ -87,6 +87,26 @@ public class OperationFailureFactoryTests
     }
 
     [Fact]
+    public void Missing_http_status_is_marked_not_provided()
+    {
+        var failure = OperationFailureFactory.FromHttp(new OperationFailureInput
+        {
+            Name = "patient-1_chunk01",
+            ProgressPrefix = "[patient-1] ",
+            Method = "POST",
+            Endpoint = "http://fhir.example/fhir",
+            StatusCode = null,
+            ResponseBody = null,
+            TimestampUtc = FixedTime,
+            RespondingSystem = "FHIR server"
+        });
+
+        failure.OneLineSummary.Should().Be("Patient chunk failed: patient-1_chunk01 (HTTP Not provided)");
+        failure.FormattedBlock.Should().Contain("HTTP status: Not provided");
+        failure.TechnicalDetails.Should().Be(OperationFailureText.NotProvided);
+    }
+
+    [Fact]
     public void Trace_id_prefers_traceparent_then_header_then_the_id_that_was_sent()
     {
         var fromParent = OperationFailureFactory.FromHttp(Sample(

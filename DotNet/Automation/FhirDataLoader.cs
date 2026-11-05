@@ -1074,7 +1074,7 @@ public class FhirDataLoader
             Step = step,
             Method = "POST",
             Endpoint = _baseUri.AbsoluteUri,
-            StatusCode = (int)response.StatusCode,
+            StatusCode = response.StatusCode == 0 ? null : (int)response.StatusCode,
             ReasonPhrase = FailureReason(response),
             ResponseBody = response.Content,
             TraceParent = HeaderValue(response, "traceparent"),

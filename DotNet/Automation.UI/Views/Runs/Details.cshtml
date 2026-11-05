@@ -1,6 +1,34 @@
 @model LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary
+@functions {
+    private static void SplitFailureBlock(string block, out string before, out string? technical, out string? search)
+    {
+        before = block;
+        technical = null;
+        search = null;
+        const string marker = "\nTechnical details:\n";
+        var index = block.IndexOf(marker, StringComparison.Ordinal);
+        if (index < 0)
+            return;
+
+        before = block[..index];
+        var rest = block[(index + marker.Length)..];
+        const string searchMarker = "\nSearch: ";
+        var searchIndex = rest.LastIndexOf(searchMarker, StringComparison.Ordinal);
+        if (searchIndex < 0)
+        {
+            technical = rest;
+            return;
+        }
+
+        technical = rest[..searchIndex];
+        search = rest[(searchIndex + 1)..];
+    }
+}
 @{
     ViewData["Title"] = "Run Details";
+    var failureBlocks = Model.FailureDetails ?? Array.Empty<string>();
+    var failureBlocksJson = System.Text.Json.JsonSerializer.Serialize(failureBlocks)
+        .Replace("<", "\\u003c", StringComparison.Ordinal);
 }
 
 <div class="container mt-4">
@@ -70,14 +98,32 @@
         </div>
     </div>
 
-    <div class="au-card" id="failureDetailsCard" style="@(Model.FailureDetails == null || Model.FailureDetails.Count == 0 ? "display:none;" : "")">
+    <div class="au-card" id="failureDetailsCard" style="@(failureBlocks.Count == 0 ? "display:none;" : "")">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-bug me-2"></i>Failure details</span>
+            <span><i class="bi bi-bug me-2"></i>Failures</span>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCopyFailures">Copy</button>
         </div>
-        <div class="card-body">
-            <pre id="failureDetailsText" class="mb-0 small" style="white-space:pre-wrap;max-height:480px;overflow:auto;">@string.Join("\n\n", Model.FailureDetails ?? [])</pre>
+        <div class="card-body" id="failureDetailsHost">
+            @foreach (var block in failureBlocks)
+            {
+                SplitFailureBlock(block, out var before, out var technical, out var search);
+                <div class="failure-record mb-3">
+                    <pre class="mb-2 small" style="white-space:pre-wrap;">@before</pre>
+                    @if (technical != null)
+                    {
+                        <details class="mb-2">
+                            <summary class="small">Technical details</summary>
+                            <pre class="mb-0 small mt-2" style="white-space:pre-wrap;">@technical</pre>
+                        </details>
+                    }
+                    @if (!string.IsNullOrEmpty(search))
+                    {
+                        <pre class="mb-0 small" style="white-space:pre-wrap;">@search</pre>
+                    }
+                </div>
+            }
         </div>
+        <script type="application/json" id="failureDetailsSource">@Html.Raw(failureBlocksJson)</script>
     </div>
 
     @if (Model.IsMetricsRun)
@@ -1713,29 +1759,107 @@
                 el.textContent = value;
         }
 
+        var failureDetailBlocks = [];
+        try {
+            var failureSource = document.getElementById('failureDetailsSource');
+            if (failureSource && failureSource.textContent)
+                failureDetailBlocks = JSON.parse(failureSource.textContent) || [];
+        } catch (e) {
+            failureDetailBlocks = [];
+        }
+
+        function splitFailureBlock(block) {
+            var marker = '\nTechnical details:\n';
+            var index = block.indexOf(marker);
+            if (index < 0)
+                return { before: block, technical: null, search: '' };
+            var before = block.slice(0, index);
+            var rest = block.slice(index + marker.length);
+            var searchMarker = '\nSearch: ';
+            var searchIndex = rest.lastIndexOf(searchMarker);
+            if (searchIndex < 0)
+                return { before: before, technical: rest, search: '' };
+            return {
+                before: before,
+                technical: rest.slice(0, searchIndex),
+                search: rest.slice(searchIndex + 1)
+            };
+        }
+
+        function renderFailureHost(items) {
+            var host = document.getElementById('failureDetailsHost');
+            if (!host) return;
+            host.replaceChildren();
+            items.forEach(function (block) {
+                var parts = splitFailureBlock(block);
+                var record = document.createElement('div');
+                record.className = 'failure-record mb-3';
+                var before = document.createElement('pre');
+                before.className = 'mb-2 small';
+                before.style.whiteSpace = 'pre-wrap';
+                before.textContent = parts.before;
+                record.appendChild(before);
+                if (parts.technical != null) {
+                    var details = document.createElement('details');
+                    details.className = 'mb-2';
+                    var summary = document.createElement('summary');
+                    summary.className = 'small';
+                    summary.textContent = 'Technical details';
+                    var technical = document.createElement('pre');
+                    technical.className = 'mb-0 small mt-2';
+                    technical.style.whiteSpace = 'pre-wrap';
+                    technical.textContent = parts.technical;
+                    details.appendChild(summary);
+                    details.appendChild(technical);
+                    record.appendChild(details);
+                }
+                if (parts.search) {
+                    var search = document.createElement('pre');
+                    search.className = 'mb-0 small';
+                    search.style.whiteSpace = 'pre-wrap';
+                    search.textContent = parts.search;
+                    record.appendChild(search);
+                }
+                host.appendChild(record);
+            });
+        }
+
         function renderFailureDetails(run) {
             if (!run || !Object.prototype.hasOwnProperty.call(run, 'failureDetails')) return;
             const card = document.getElementById('failureDetailsCard');
-            const pre = document.getElementById('failureDetailsText');
-            if (!card || !pre) return;
+            if (!card) return;
             const items = Array.isArray(run.failureDetails) ? run.failureDetails.filter(function (item) { return item; }) : [];
+            failureDetailBlocks = items;
             if (items.length === 0) {
                 card.style.display = 'none';
-                pre.textContent = '';
+                renderFailureHost([]);
                 return;
             }
-            pre.textContent = items.join('\n\n');
+            renderFailureHost(items);
             card.style.display = '';
+        }
+
+        function copyFailureText(value) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(value).catch(function () { copyFailureTextFallback(value); });
+                return;
+            }
+            copyFailureTextFallback(value);
+        }
+
+        function copyFailureTextFallback(value) {
+            var area = document.createElement('textarea');
+            area.value = value;
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            area.remove();
         }
 
         var copyFailuresBtn = document.getElementById('btnCopyFailures');
         if (copyFailuresBtn) {
             copyFailuresBtn.addEventListener('click', function () {
-                var text = document.getElementById('failureDetailsText');
-                var value = text ? text.textContent : '';
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(value || '');
-                }
+                copyFailureText(failureDetailBlocks.join('\n\n'));
             });
         }
 
