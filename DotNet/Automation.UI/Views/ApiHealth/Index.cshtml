@@ -190,19 +190,28 @@
                                                 <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.RequestBody) ? "No request body details were recorded for this run." : ep.LastResult.RequestBody)</pre></dd>
                                                 <dt class="col-sm-2 text-muted">Status</dt>
                                                 <dd class="col-sm-10">@(ep.LastResult.ActualStatusCode?.ToString() ?? "N/A") (expected @ep.LastResult.ExpectedStatusCode)</dd>
-                                                @if (!string.IsNullOrWhiteSpace(ep.LastResult.TraceId))
-                                                {
-                                                    <dt class="col-sm-2 text-muted">Trace</dt>
-                                                    <dd class="col-sm-10">
-                                                        <code class="user-select-all">@ep.LastResult.TraceId</code>
-                                                    </dd>
-                                                }
+                                                <dt class="col-sm-2 text-muted">Trace</dt>
+                                                <dd class="col-sm-10">
+                                                    <code class="user-select-all">@(string.IsNullOrWhiteSpace(ep.LastResult.TraceId) ? "Not provided" : ep.LastResult.TraceId)</code>
+                                                </dd>
                                                 <dt class="col-sm-2 text-muted">Response</dt>
                                                 <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.ResponseBody) ? "No response body details were recorded for this run." : ep.LastResult.ResponseBody)</pre></dd>
                                                 @if (!string.IsNullOrWhiteSpace(ep.LastResult.ErrorMessage))
                                                 {
                                                     <dt class="col-sm-2 text-muted">Error</dt>
                                                     <dd class="col-sm-10 text-danger">@ep.LastResult.ErrorMessage</dd>
+                                                }
+                                                @if (!ep.LastResult.Passed && !ep.LastResult.Skipped)
+                                                {
+                                                    var failureText = Automation.UI.Services.ApiHealth.ApiHealthFailureText.Format(ep.LastResult);
+                                                    if (!string.IsNullOrWhiteSpace(failureText))
+                                                    {
+                                                        <dt class="col-sm-2 text-muted">Failure details</dt>
+                                                        <dd class="col-sm-10">
+                                                            <pre class="mb-2 p-2 bg-light rounded small" style="white-space:pre-wrap;max-height:240px;overflow:auto;">@failureText</pre>
+                                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText)">Copy</button>
+                                                        </dd>
+                                                    }
                                                 }
                                                 <dt class="col-sm-2 text-muted">Time</dt>
                                                 <dd class="col-sm-10">@ep.LastResult.ExecutedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") UTC | @(ep.LastResult.DurationMs)ms</dd>

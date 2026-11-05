@@ -2682,6 +2682,11 @@
           "LinkSdk": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[8.0.27, )",
           "Normalization.Engine": "[1.0.0, )",
+          "Serilog.AspNetCore": "[8.0.3, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
+          "Serilog.Exceptions": "[8.4.0, )",
+          "Serilog.Expressions": "[4.0.0, )",
+          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
           "Swashbuckle.AspNetCore": "[6.9.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }

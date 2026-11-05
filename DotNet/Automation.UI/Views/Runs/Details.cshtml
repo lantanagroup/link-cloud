@@ -58,7 +58,7 @@
                     <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Generation templates</span><span class="au-value" id="generationTemplateVersion">v@(templateCacheVersion.Value)</span></div></div>
                 }
             </div>
-            <div id="errorRow" class="mt-3" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
+            <div id="errorRow" class="mt-3" style="@(string.IsNullOrWhiteSpace(Model.Error) ? "display:none;" : "")"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
             <div id="validationHoldBanner" class="alert alert-info mt-3 mb-0 py-2 small" style="display:none;" role="status">
                 <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
                 <span id="validationHoldText"></span>
@@ -67,6 +67,16 @@
                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:.7rem;height:.7rem;"></span>
                 <span id="finalizingBadgeText">Finalizing…</span>
             </span>
+        </div>
+    </div>
+
+    <div class="au-card" id="failureDetailsCard" style="@(Model.FailureDetails == null || Model.FailureDetails.Count == 0 ? "display:none;" : "")">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-bug me-2"></i>Failure details</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCopyFailures">Copy</button>
+        </div>
+        <div class="card-body">
+            <pre id="failureDetailsText" class="mb-0 small" style="white-space:pre-wrap;max-height:480px;overflow:auto;">@string.Join("\n\n", Model.FailureDetails ?? [])</pre>
         </div>
     </div>
 
@@ -1703,6 +1713,32 @@
                 el.textContent = value;
         }
 
+        function renderFailureDetails(run) {
+            if (!run || !Object.prototype.hasOwnProperty.call(run, 'failureDetails')) return;
+            const card = document.getElementById('failureDetailsCard');
+            const pre = document.getElementById('failureDetailsText');
+            if (!card || !pre) return;
+            const items = Array.isArray(run.failureDetails) ? run.failureDetails.filter(function (item) { return item; }) : [];
+            if (items.length === 0) {
+                card.style.display = 'none';
+                pre.textContent = '';
+                return;
+            }
+            pre.textContent = items.join('\n\n');
+            card.style.display = '';
+        }
+
+        var copyFailuresBtn = document.getElementById('btnCopyFailures');
+        if (copyFailuresBtn) {
+            copyFailuresBtn.addEventListener('click', function () {
+                var text = document.getElementById('failureDetailsText');
+                var value = text ? text.textContent : '';
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(value || '');
+                }
+            });
+        }
+
         function applyRunStatus(run) {
             if (!run) return;
             currentRunStatus = run.status || currentRunStatus;
@@ -1716,6 +1752,12 @@
             document.getElementById('status').textContent = displayStatus(run.status);
             showValidationHold();
             document.getElementById('error').textContent = run.error || '-';
+            const errorRowLive = document.getElementById('errorRow');
+            if (errorRowLive) {
+                const errorText = run.error || '';
+                errorRowLive.style.display = errorText && errorText !== '-' ? '' : 'none';
+            }
+            renderFailureDetails(run);
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
             document.getElementById('pipelineDuration').textContent = run.duration || '-';

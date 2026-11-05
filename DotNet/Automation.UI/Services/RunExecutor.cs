@@ -1,6 +1,7 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
+using LantanaGroup.Automation.Diagnostics;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Automation.Link;
@@ -267,6 +268,24 @@ internal sealed class RunExecutor
             var lokiScraper = services.GetRequiredService<LokiScraper>();
             var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
             state.FhirDataLoader = fhirDataLoader;
+            fhirDataLoader.UseOperationContext(new FhirOperationContext
+            {
+                RunId = state.RunId.ToString("D"),
+                FacilityId = () =>
+                {
+                    lock (state.Sync)
+                        return state.FacilityId;
+                },
+                Logger = _logger,
+                Record = failure =>
+                {
+                    lock (state.Sync)
+                    {
+                        if (state.FailureDetails.Count < OperationFailureText.MaxRecordedFailures)
+                            state.FailureDetails.Add(failure.FormattedBlock);
+                    }
+                }
+            });
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
             var dmrpClient = services.GetRequiredService<IDmrpServiceClient>();
@@ -1493,6 +1512,7 @@ internal sealed class RunExecutor
         }
         catch (Exception ex)
         {
+            var operationFailures = OperationFailedException.Collect(ex);
             bool cancelledAfterFault;
             lock (state.Sync)
             {
@@ -1500,7 +1520,9 @@ internal sealed class RunExecutor
                 if (!cancelledAfterFault)
                 {
                     state.Status = AutomationRunStatus.Failed;
-                    state.Error = ex.Message;
+                    state.Error = operationFailures.Count > 0
+                        ? operationFailures[0].OneLineSummary
+                        : ex.Message;
                     state.FinishedAt = DateTimeOffset.UtcNow;
                 }
             }
@@ -1511,10 +1533,15 @@ internal sealed class RunExecutor
                 return;
             }
 
-            _logger.LogError(ex, "Run {RunId} failed", state.RunId);
+            // The upload path already wrote one warning and the failure block.
+            if (operationFailures.Count == 0)
+            {
+                _logger.LogError(ex, "Run {RunId} failed", state.RunId);
+                output.WriteLine($"Run failed: {ex.Message}");
+            }
+
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
-            output.WriteLine($"Run failed: {ex.Message}");
             await QuiescePipelineAsync(state, output, CancellationToken.None);
         }
         finally
