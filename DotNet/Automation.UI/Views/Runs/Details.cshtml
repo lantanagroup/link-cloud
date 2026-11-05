@@ -50,29 +50,7 @@
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
-                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">TestRail</span><span class="au-value" id="testRailRuns">@{
-                    var testRailRuns = TestRailRunLinks.Copy(Model.TestRailRuns);
-                    if (testRailRuns.Count == 0)
-                    {
-                        @TestRailRunLinks.NotPublished
-                    }
-                    else
-                    {
-                        for (var testRailIndex = 0; testRailIndex < testRailRuns.Count; testRailIndex++)
-                        {
-                            var testRailRun = testRailRuns[testRailIndex];
-                            if (testRailIndex > 0)
-                            {
-                                @:,
-                            }
-                            <a href="@testRailRun.Url" target="_blank" rel="noopener noreferrer" title="@TestRailRunLinks.RunLinkTitle(testRailRun.RunId)">@TestRailRunLinks.RunLabel(testRailRun.RunId)</a>
-                            if (testRailRun.TestId is > 0 && TestRailRunLinks.IsHttpUrl(testRailRun.TestUrl))
-                            {
-                                <a href="@testRailRun.TestUrl" target="_blank" rel="noopener noreferrer" class="ms-1" title="@TestRailRunLinks.TestLinkTitle(testRailRun.TestId.Value)">@TestRailRunLinks.TestLabel(testRailRun.TestId.Value)</a>
-                            }
-                        }
-                    }
-                }</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">TestRail</span><span class="au-value" id="testRailRuns">@TestRailRunLinks.NotPublished</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">FHIR generator</span><span class="au-value" id="fhirGenerator">Thetis Engine</span></div></div>
                 @{
                     var templateCacheVersion = ViewBag.TemplateCacheVersionNumber as int?;
@@ -1778,6 +1756,13 @@
                 }
             });
         }
+
+        renderTestRailRuns(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            TestRailRunLinks.Copy(Model.TestRailRuns),
+            new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            })));
 
         function applyRunStatus(run) {
             if (!run) return;
