@@ -56,7 +56,7 @@ reviews:
         when new configuration is added, flag this as a required change and recommend blocking the PR until the configuration is documented in `/app-config.yaml`.
         The catalog is curated, not exhaustive: a key belongs in it only if it is provisioned per environment, has no safe default, or is a documented
         operational knob. A key with a working default in `appsettings.json` or `application.yml` should be `required: false` with that value recorded in
-        `defaultValue`, because `required: true` obligates a row in all three environment stores. The exhaustive list of every key the code reads is the
+        `defaultValue`, because `required: true` obligates a row in every declared environment store. The exhaustive list of every key the code reads is the
         generated `docs/config-key-inventory.md`, not this catalog.
         Schema conformance and required-key presence are enforced mechanically by
         `.github/workflows/appconfig-catalog-check.yml`, so review effort here is better spent on whether an entry's `required` flag and description are
