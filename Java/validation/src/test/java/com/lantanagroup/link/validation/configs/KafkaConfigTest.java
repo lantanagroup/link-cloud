@@ -17,6 +17,7 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.serialization.Serializer;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -32,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.BiConsumer;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,7 +41,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -153,6 +158,22 @@ class KafkaConfigTest {
      */
     @SuppressWarnings("unchecked")
     private static String routedTopic(KafkaRetryConfig config, ConsumerRecord<String, String> record, Exception exception) {
+        KafkaTemplate<Object, Object> template = accept(config, record, exception, null);
+        ArgumentCaptor<ProducerRecord<Object, Object>> captor = ArgumentCaptor.forClass(ProducerRecord.class);
+        verify(template).send(captor.capture());
+        return captor.getValue().topic();
+    }
+
+    /**
+     * Drives the production recoverer, including the dead-letter hook. {@code onDeadLetter} may be null,
+     * which is how the topic-routing tests observe a recoverer with no status publisher.
+     */
+    @SuppressWarnings("unchecked")
+    private static KafkaTemplate<Object, Object> accept(
+            KafkaRetryConfig config,
+            ConsumerRecord<String, String> record,
+            Exception exception,
+            BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter) {
         KafkaTemplate<Object, Object> template = mock(KafkaTemplate.class);
         when(template.partitionsFor(anyString())).thenAnswer(invocation ->
                 List.of(new PartitionInfo(invocation.getArgument(0), 0, null, new Node[0], new Node[0])));
@@ -161,12 +182,9 @@ class KafkaConfigTest {
 
         RetryTopicRecoverer recoverer = RetryTopicRecovererFactory.create(
                 template, Topics.READY_FOR_VALIDATION_RETRY, Topics.READY_FOR_VALIDATION_ERROR,
-                config, KafkaConfig.NON_RETRYABLE);
+                config, KafkaConfig.NON_RETRYABLE, onDeadLetter);
         recoverer.accept(record, exception);
-
-        ArgumentCaptor<ProducerRecord<Object, Object>> captor = ArgumentCaptor.forClass(ProducerRecord.class);
-        verify(template).send(captor.capture());
-        return captor.getValue().topic();
+        return template;
     }
 
     @Test
@@ -220,6 +238,42 @@ class KafkaConfigTest {
         stampAttempts(record, 1);
         assertEquals(Topics.READY_FOR_VALIDATION_RETRY,
                 routedTopic(retryConfig(3, false), record, new RuntimeException("still failing")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void transientFailure_doesNotPublishValidationStatus() {
+        BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter = mock(BiConsumer.class);
+
+        accept(retryConfig(3, false), record(), new RuntimeException("transient boom"), onDeadLetter);
+
+        verify(onDeadLetter, never()).accept(any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void exhaustedAttempts_publishesValidationStatusOnceAfterTheErrorTopicSend() {
+        ConsumerRecord<String, String> record = record();
+        stampAttempts(record, 2);
+        BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter = mock(BiConsumer.class);
+        RuntimeException failure = new RuntimeException("still failing");
+
+        KafkaTemplate<Object, Object> template = accept(
+                retryConfig(3, false), record, failure, onDeadLetter);
+
+        InOrder order = inOrder(template, onDeadLetter);
+        order.verify(template, times(1)).send(any(ProducerRecord.class));
+        order.verify(onDeadLetter, times(1)).accept(record, failure);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void poisonException_publishesValidationStatusOnce() {
+        BiConsumer<ConsumerRecord<?, ?>, Exception> onDeadLetter = mock(BiConsumer.class);
+
+        accept(retryConfig(3, false), record(), new ValidationException("invalid message"), onDeadLetter);
+
+        verify(onDeadLetter, times(1)).accept(any(), any());
     }
 
     // ---- Raw-byte serialization. A record that fails deserialization reaches the dead-letter publisher

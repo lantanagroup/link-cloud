@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -69,6 +70,8 @@ public class ReadyForValidationConsumerTest {
     @Mock private RubricExecutionService rubricExecutionService;
     @Mock private LegacyResultMapper legacyResultMapper;
     @Mock private KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
+    @Mock private ReportStatusUpdatedProducer reportStatusUpdatedProducer;
+    @Mock private ValidationStageFailurePublisher validationStageFailurePublisher;
 
     private static final String RUBRIC_ID = "measure-report-submission-v1";
 
@@ -111,7 +114,7 @@ public class ReadyForValidationConsumerTest {
                 false,
                 RUBRIC_ID,
                 false,
-                recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithoutBlobStorage = new ReadyForValidationConsumer(
                 fhirContext,
@@ -132,7 +135,7 @@ public class ReadyForValidationConsumerTest {
                 false,
                 RUBRIC_ID,
                 false,
-                recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithBridgeEnabled = new ReadyForValidationConsumer(
                 fhirContext,
@@ -153,7 +156,7 @@ public class ReadyForValidationConsumerTest {
                 true,
                 RUBRIC_ID,
                 false,
-                recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithShadowEnabled = new ReadyForValidationConsumer(
                 fhirContext,
@@ -174,7 +177,7 @@ public class ReadyForValidationConsumerTest {
                 false,
                 RUBRIC_ID,
                 true,
-                recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         consumerWithBridgeAndShadowEnabled = new ReadyForValidationConsumer(
                 fhirContext,
@@ -195,7 +198,7 @@ public class ReadyForValidationConsumerTest {
                 true,
                 RUBRIC_ID,
                 true,
-                recoverer);
+                reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         bundle = new Bundle();
 
@@ -487,7 +490,7 @@ public class ReadyForValidationConsumerTest {
                 fhirContext, reportClient, validationService, realCategorizationService, resultService,
                 categoryCountService, validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
                 preQualificationConfig, preQualOperationOutcomeBuilder, rubricExecutionService,
-                legacyResultMapper, objectMapper, shadowCompareEventTemplate, false, RUBRIC_ID, false, recoverer);
+                legacyResultMapper, objectMapper, shadowCompareEventTemplate, false, RUBRIC_ID, false, reportStatusUpdatedProducer, validationStageFailurePublisher, recoverer);
 
         Result inactiveResult = new Result();
         inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
@@ -610,6 +613,161 @@ public class ReadyForValidationConsumerTest {
                 () -> consumer.process(buildRecord(null)));
 
         assertTrue(thrown.getMessage().contains("Failed to produce ValidationComplete message"));
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), any(), anyLong(), eq(true), eq(0L), any());
+        verify(reportStatusUpdatedProducer, never()).publishFailure(
+                any(), any(), any(), any(), any(), any());
+        verify(validationStageFailurePublisher).noteFailedAttempt(anyLong());
+    }
+
+    @Test
+    void process_publishesStatusBeforeValidationComplete() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null, true));
+
+        InOrder order = inOrder(reportStatusUpdatedProducer, validationCompleteTemplate);
+        order.verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), anyLong(), eq(true), eq(0L), any());
+        order.verify(validationCompleteTemplate).send(any(ProducerRecord.class));
+    }
+
+    @Test
+    void process_statusSendFails_doesNotSendValidationComplete() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        doThrow(new RuntimeException("broker down")).when(reportStatusUpdatedProducer).publishSuccess(
+                any(), any(), any(), anyLong(), anyBoolean(), anyLong(), any());
+
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> consumer.process(buildRecord(null, true)));
+
+        assertEquals("broker down", thrown.getMessage());
+        verify(validationCompleteTemplate, never()).send(any(ProducerRecord.class));
+        verify(reportStatusUpdatedProducer, never()).publishFailure(
+                any(), any(), any(), any(), any(), any());
+        verify(validationStageFailurePublisher).noteFailedAttempt(anyLong());
+    }
+
+    // -------------------------------------------------------------------------
+    // ReportStatusUpdated
+    // -------------------------------------------------------------------------
+
+    @Test
+    void process_allAcceptableCategories_publishesPassedStatus() throws Exception {
+        Result acceptable = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        Result uncategorized = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID))
+                .thenReturn(List.of(acceptable, uncategorized));
+
+        consumer.process(buildRecord(null, true));
+
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                anyLong(),
+                eq(true),
+                eq(2L),
+                any());
+    }
+
+    @Test
+    void process_mixedCategories_publishesFailedOutcomeAndCountsEveryResult() throws Exception {
+        Result acceptable = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        Result unacceptable = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        Result uncategorized = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID))
+                .thenReturn(List.of(acceptable, unacceptable, uncategorized));
+
+        consumer.process(buildRecord(null, true));
+
+        // Uncategorized results do not fail the legacy gate, but an unacceptable category does.
+        // messageCount still includes the acceptable, unacceptable, and uncategorized results.
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID),
+                eq(PATIENT_ID),
+                eq(CORRELATION_ID),
+                anyLong(),
+                eq(false),
+                eq(3L),
+                any());
+    }
+
+    @Test
+    void process_blankCorrelationHeader_usesCorrelationIdFromTheKey() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(null, false);
+        record.headers().add(Headers.CORRELATION_ID, Headers.getBytes("   "));
+        record.key().setCorrelationId(CORRELATION_ID);
+
+        consumer.process(record);
+
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), anyLong(), eq(true), eq(0L), any());
+    }
+
+    @Test
+    void process_missingCorrelationHeader_usesCorrelationIdFromTheKey() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(null, false);
+        record.key().setCorrelationId(CORRELATION_ID);
+
+        consumer.process(record);
+
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), anyLong(), eq(true), eq(0L), any());
+    }
+
+    @Test
+    void process_noResults_publishesPassedStatusWithZeroMessages() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+
+        consumer.process(buildRecord(null, true));
+
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), anyLong(), eq(true), eq(0L), any());
+    }
+
+    @Test
+    void process_validationThrows_publishesNothingAndRethrows() throws Exception {
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID))
+                .thenThrow(new IllegalStateException("database unavailable"));
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> consumer.process(buildRecord(null, true)));
+
+        assertEquals("database unavailable", thrown.getMessage());
+        verify(reportStatusUpdatedProducer, never()).publishFailure(
+                any(), any(), any(), any(), any(), any());
+        verify(reportStatusUpdatedProducer, never()).publishSuccess(
+                any(), any(), any(), anyLong(), anyBoolean(), anyLong(), any());
+        verify(validationCompleteTemplate, never()).send(any(ProducerRecord.class));
+        verify(validationStageFailurePublisher).noteFailedAttempt(anyLong());
+    }
+
+    @Test
+    void process_bridgeUnacceptable_publishesPassedFalseEvenWhenCategoriesAreAcceptable() throws Exception {
+        stubRestRetrieval();
+        stubBundleJsonEncoding();
+        Result mapped = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID)))
+                .thenReturn(envelope);
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
+                .thenReturn(new BridgeOutcome(List.of(mapped), RubricResultStatus.UNACCEPTABLE));
+
+        consumerWithBridgeEnabled.process(buildRecord(null, true));
+
+        verify(reportStatusUpdatedProducer).publishSuccess(
+                eq(REPORT_ID), eq(PATIENT_ID), eq(CORRELATION_ID), anyLong(), eq(false), eq(1L), any());
     }
 
     // -------------------------------------------------------------------------

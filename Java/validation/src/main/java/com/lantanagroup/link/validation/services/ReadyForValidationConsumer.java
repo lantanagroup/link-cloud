@@ -66,6 +66,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final LegacyResultMapper legacyResultMapper;
     private final ObjectMapper objectMapper;
     private final KafkaTemplate<String, ShadowCompareEvent> shadowCompareEventTemplate;
+    private final ReportStatusUpdatedProducer reportStatusUpdatedProducer;
+    private final ValidationStageFailurePublisher validationStageFailurePublisher;
     private final boolean bridgeEnabled;
     private final boolean shadowEnabled;
     private final String rubricId;
@@ -97,6 +99,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             @Value("${vaas.bridge.rubric-id:measure-report-submission-v1}") String rubricId,
             // ADR-0003 shadow-run: independent of bridgeEnabled -- works in either direction.
             @Value("${vaas.bridge.shadow-enabled:false}") boolean shadowEnabled,
+            ReportStatusUpdatedProducer reportStatusUpdatedProducer,
+            ValidationStageFailurePublisher validationStageFailurePublisher,
             @Qualifier("readyForValidationRecoverer") ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
@@ -114,6 +118,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         this.legacyResultMapper = legacyResultMapper;
         this.objectMapper = objectMapper;
         this.shadowCompareEventTemplate = shadowCompareEventTemplate;
+        this.reportStatusUpdatedProducer = reportStatusUpdatedProducer;
+        this.validationStageFailurePublisher = validationStageFailurePublisher;
         this.bridgeEnabled = bridgeEnabled;
         this.shadowEnabled = shadowEnabled;
         this.rubricId = rubricId;
@@ -129,6 +135,11 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     @Override
     protected void process(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
+        if ((correlationId == null || correlationId.isBlank()) && record.key() != null) {
+            // Report also puts the workflow id on the ReadyForValidation key. The status contract
+            // requires correlationId, so use the key when the header did not survive.
+            correlationId = record.key().getCorrelationId();
+        }
         _logger.info("Processing {} message for facility {}, patient {}, report {}",
                 LogUtils.sanitize(record.topic()),
                 LogUtils.sanitize(record.key().getFacilityId()),
@@ -138,39 +149,65 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         String patientId = record.value().getPatientId();
         String reportId = record.value().getReportTrackingId();
         String payloadUri = record.value().getPayloadUri();
+        validationStageFailurePublisher.clearFailedAttempt();
+        long startedAt = System.currentTimeMillis();
         Bundle bundle;
-        try (Timer fetchTimer = Timer.start()) {
-            bundle = getBundleFromBlobStorage(payloadUri);
-            if (bundle == null) {
-                bundle = getBundleViaRest(facilityId, patientId, reportId);
-            }
-            _logger.info("Retrieved patient bundle with {} entries facility={} report={}",
-                    bundle != null ? bundle.getEntry().size() : 0,
-                    LogUtils.sanitize(facilityId),
-                    LogUtils.sanitize(reportId));
-            if (Headers.isPerformanceMode(record.headers())) {
-                Attributes fetchAttributes = Attributes.builder()
-                        .put(DiagnosticNames.FACILITY_ID, facilityId)
-                        .build();
-                validationMetrics.recordReportFetchDuration(fetchTimer.getMilliseconds(), fetchAttributes);
-            }
-        }
         // Only set when the rubric engine runs, using the ID already created for its rubric_result.
         // It is passed to the shadow run so the legacy comparison can share the same ID.
         List<Result> results;
         RubricResultStatus rubricStatus = null;
         UUID requestId = null;
-        if (bridgeEnabled) {
-            RubricEngineResult engineResult = evaluateViaRubricEngine(correlationId, facilityId, patientId, reportId, bundle);
-            results = engineResult.results();
-            rubricStatus = engineResult.status();
-            requestId = engineResult.requestId();
-        } else {
-            results = validate(correlationId, facilityId, patientId, reportId, bundle);
+        boolean isValid;
+        long messageCount;
+        long processingTime;
+        try {
+            try (Timer fetchTimer = Timer.start()) {
+                bundle = getBundleFromBlobStorage(payloadUri);
+                if (bundle == null) {
+                    bundle = getBundleViaRest(facilityId, patientId, reportId);
+                }
+                _logger.info("Retrieved patient bundle with {} entries facility={} report={}",
+                        bundle != null ? bundle.getEntry().size() : 0,
+                        LogUtils.sanitize(facilityId),
+                        LogUtils.sanitize(reportId));
+                if (Headers.isPerformanceMode(record.headers())) {
+                    Attributes fetchAttributes = Attributes.builder()
+                            .put(DiagnosticNames.FACILITY_ID, facilityId)
+                            .build();
+                    validationMetrics.recordReportFetchDuration(fetchTimer.getMilliseconds(), fetchAttributes);
+                }
+            }
+            if (bridgeEnabled) {
+                RubricEngineResult engineResult = evaluateViaRubricEngine(correlationId, facilityId, patientId, reportId, bundle);
+                results = engineResult.results();
+                rubricStatus = engineResult.status();
+                requestId = engineResult.requestId();
+            } else {
+                results = validate(correlationId, facilityId, patientId, reportId, bundle);
+            }
+            appendPreQualOperationOutcome(bundle, results, payloadUri);
+            // passed is the same gate ValidationComplete already publishes. messageCount counts every
+            // result from this stage, including uncategorized results and every category and severity.
+            isValid = checkIsValid(results, rubricStatus);
+            messageCount = results.size();
+            processingTime = System.currentTimeMillis() - startedAt;
+            // Status goes out before ValidationComplete. A failed status send must not leave a
+            // ValidationComplete behind: the inbound record retries, and a repeated status event is
+            // acceptable. A repeated ValidationComplete is not.
+            reportStatusUpdatedProducer.publishSuccess(
+                    reportId,
+                    patientId,
+                    correlationId,
+                    processingTime,
+                    isValid,
+                    messageCount,
+                    record.headers());
+            produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid, record.headers());
+        } catch (Exception ex) {
+            // The recoverer publishes isSuccess=false only when this record is dead-lettered.
+            validationStageFailurePublisher.noteFailedAttempt(System.currentTimeMillis() - startedAt);
+            throw ex;
         }
-        appendPreQualOperationOutcome(bundle, results, payloadUri);
-        boolean isValid = checkIsValid(results, rubricStatus);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, isValid, record.headers());
 
         if (shadowEnabled) {
             try {
