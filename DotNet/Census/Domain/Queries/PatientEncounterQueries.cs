@@ -505,7 +505,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
 
         var currentDateTime = DateTime.UtcNow;
-        // Identifiers from an ADT feed are the facility's own, not FHIR ids
+        // ADT identifiers are the facility's own, not FHIR ids
         var adtSourceType = SourceType.ADT.ToString();
         return _context.PatientEncounters
             .AsNoTracking()
@@ -547,18 +547,18 @@ public class PatientEncounterQueries : IPatientEncounterQueries
     }
 
     /// <summary>
-    /// Gets a patient's encounters, most recently admitted first and leaving out cancelled ones, as tracked entities for
+    /// Gets a patient's encounters, most recently admitted first and leaving out any an A11 cancelled, as tracked entities for
     /// <see cref="SaveTrackedChanges"/>.
     /// </summary>
     public async Task<List<PatientEncounter>> GetTrackedEncountersByFhirPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default)
     {
-        var fhirSourceType = SourceType.FHIR.ToString();
+        var fhirSourceType = SourceType.ADT_FHIR.ToString();
 
         return await _context.PatientEncounters
             .Include(e => e.PatientIdentifiers)
             .Include(e => e.PatientVisitIdentifiers)
             .Where(e => e.FacilityId == facilityId
-                && (e.EncounterStatus == null || e.EncounterStatus != AdtPayload.CancelledStatus)
+                && !_context.PatientEvents.Any(x => x.FacilityId == facilityId && x.CorrelationId == e.CorrelationId && x.EventType == EventType.A11)
                 && e.PatientIdentifiers.Any(i => i.SourceType == fhirSourceType && i.Identifier == patientId))
             .OrderByDescending(e => e.AdmitDate)
             .ToListAsync(cancellationToken);

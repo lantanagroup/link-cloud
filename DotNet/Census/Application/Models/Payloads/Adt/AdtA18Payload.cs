@@ -6,8 +6,8 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 
 /// <summary>
 /// Merge patient information: PID describes the surviving patient and MRG the patient merged into it. The surviving
-/// Patient.Id, MRN and identifiers are applied with the details common to every message, while the prior identifiers
-/// stay on the encounter. Nothing else about the encounter changes.
+/// Patient.Id, MRN and identifiers are applied with the details common to every message. The surviving MRN replaces the
+/// prior one, while other prior identifiers stay on the encounter. Nothing else about the encounter changes.
 /// </summary>
 public class AdtA18Payload : AdtPayload
 {

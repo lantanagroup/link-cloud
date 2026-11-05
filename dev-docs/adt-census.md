@@ -56,11 +56,11 @@ ignored too, so reading a file twice changes nothing.
 
 | Message | Encounter | PatientEvent message |
 | --- | --- | --- |
-| A01 Admit/visit | Sets the status, and the admit date from PV1-44 | Admit, if it opened the stay |
-| A03 Discharge | Sets the discharge date and status | Discharge, plus Admit first if it opened the stay |
-| A06 Outpatient to inpatient | Sets the class | Admit, if it opened the stay |
-| A07 Inpatient to outpatient | Sets the class | Admit, if it opened the stay |
-| A11 Cancel admit/visit | Marks `cancelled`, closed at its admit date | None |
+| A01 Admit/visit | Sets the admit date from PV1-44 | Admit, if it opened the stay |
+| A03 Discharge | Sets the discharge date | Discharge, plus Admit first if it opened the stay |
+| A06 Outpatient to inpatient | Nothing specific to the message | Admit, if it opened the stay |
+| A07 Inpatient to outpatient | Nothing specific to the message | Admit, if it opened the stay |
+| A11 Cancel admit/visit | Closes it at its admit date | None |
 | A13 Cancel discharge | Clears the discharge date | Admit, if it opened the stay |
 | A18 Merge | Moves matching encounters to the surviving patient | None |
 
@@ -68,15 +68,24 @@ A feed can start mid-stay, so whichever tracked message comes first for a stay o
 that stay fills in its details without a second Admit. A patient who has only had ignored messages, such as transfers,
 is not in the census until a tracked message arrives.
 
+ADT messages do not set `EncounterStatus` or `EncounterClass`, so both stay empty on these encounters. PV1-2 is still kept
+in the `PatientEvents` payload.
+
 A message belongs to the encounter with the same encounter id. Without one, it belongs to the patient's open encounter,
-and an A13 to their most recent one. A cancelled encounter is never matched, so an A01 after an A11 starts a new one.
+and an A13 to their most recent one. An encounter with an A11 event is never matched, so the next message that can open a
+stay, such as an A01 with the same encounter id, starts a new one and emits Admit.
 
 An A18 finds encounters by MRG-1, MRG-2 and MRG-4, against each encounter's MRN and patient identifiers, within the
-facility. PID is the surviving patient. The prior identifiers stay on the encounter. Only the patient's identifiers and
-MRN change: a merge can match several stays, including ended ones, so its PV1 is not applied to any of them.
+facility. PID is the surviving patient, and its MRN replaces the prior one. Other prior identifiers stay on the encounter.
+Only the patient's identifiers and MRN change: a merge can match several stays, including ended ones, so its PV1 is not
+applied to any of them.
 
-On `PatientIdentifiers`, `SourceType` `FHIR` is the FHIR Patient.Id and `ADT` is an identifier from PID-3, which is the
-facility's own and must never be read as a FHIR id.
+The MRN is stored only on `PatientEncounters.MedicalRecordNumber`. On `PatientIdentifiers`, `SourceType` `ADT_FHIR` is the
+FHIR Patient.Id, with one row per encounter whichever way it was found, as `SFTP_FHIR` is for a Cerner extract. `ADT` is any
+other identifier from PID-3, which is the facility's own and must never be read as a FHIR id. A PID-3 repetition counts as
+an MRN if it has type `MR` or the same value as the message's MRN, and as the FHIR id if it has the same value as the
+Patient.Id, alone or as a reference such as `Patient/123`. Neither is saved as `ADT`. The `PatientEvents` payload still keeps the
+whole of PID-3.
 
 ## Known limits
 

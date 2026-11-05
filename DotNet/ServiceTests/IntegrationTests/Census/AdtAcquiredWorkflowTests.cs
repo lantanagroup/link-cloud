@@ -112,10 +112,10 @@ public class AdtAcquiredWorkflowTests
         Assert.Equal(admitDate, encounter.AdmitDate);
         Assert.Null(encounter.DischargeDate);
         Assert.Equal("mrn-1", encounter.MedicalRecordNumber);
-        Assert.Equal("I", encounter.EncounterClass);
-        Assert.Equal("in-progress", encounter.EncounterStatus);
-        Assert.Contains(encounter.PatientIdentifiers, i => i.Identifier == PatientId && i.SourceType == nameof(SourceType.FHIR));
-        Assert.Contains(encounter.PatientIdentifiers, i => i.Identifier == "mrn-1" && i.SourceType == nameof(SourceType.ADT));
+        Assert.Null(encounter.EncounterClass);
+        Assert.Null(encounter.EncounterStatus);
+        Assert.Contains(encounter.PatientIdentifiers, i => i.Identifier == PatientId && i.SourceType == nameof(SourceType.ADT_FHIR));
+        Assert.DoesNotContain(encounter.PatientIdentifiers, i => i.Identifier == "mrn-1");
         Assert.Contains(encounter.PatientVisitIdentifiers, i => i.Identifier == VisitId && i.SourceType == nameof(SourceType.ADT));
 
         var patientEvent = Assert.Single(await Events());
@@ -128,6 +128,46 @@ public class AdtAcquiredWorkflowTests
     }
 
     [Fact]
+    public async Task MrnsAndTheFhirIdAreLeftOutOfAdtIdentifiers_WhileOtherIdentifiersAreKept()
+    {
+        await Process(Entry("A01", configure: e =>
+        {
+            // The MRN by type and by value, the FHIR id alone and as a reference, and an identifier that is none of these
+            e.PatientIdentifierList =
+            [
+                new AdtPatientIdentifier { Id = "other-mrn", IdentifierType = "mr" },
+                new AdtPatientIdentifier { Id = "mrn-1", IdentifierType = "PI" },
+                new AdtPatientIdentifier { Id = PatientId, IdentifierType = "FHIR" },
+                new AdtPatientIdentifier { Id = $"Patient/{PatientId}", IdentifierType = "FHIR" },
+                new AdtPatientIdentifier { Id = "ssn-1", IdentifierType = "SS" },
+            ];
+        }));
+
+        async Task AssertIdentifiers()
+        {
+            var encounter = Assert.Single(await Encounters());
+            Assert.Equal("mrn-1", encounter.MedicalRecordNumber);
+            Assert.Equal(
+                [(PatientId, nameof(SourceType.ADT_FHIR)), ("ssn-1", nameof(SourceType.ADT))],
+                encounter.PatientIdentifiers.Select(i => (i.Identifier, i.SourceType)).OrderBy(i => i.SourceType == nameof(SourceType.ADT)));
+
+            // The stored message keeps everything it was sent
+            var patientEvent = Assert.Single(await Events());
+            Assert.Equal(5, ((AdtA01Payload)patientEvent.Payload).PatientIdentifierList.Count);
+        }
+
+        await AssertIdentifiers();
+
+        // A rebuild replays the same payloads, so it must reach the same result
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>().RebuildPatientEncounterTable(_facilityId);
+        }
+
+        await AssertIdentifiers();
+    }
+
+    [Fact]
     public async Task A03_AfterA01_EmitsDischarge_AndClosesTheEncounter()
     {
         var dischargeDate = new DateTime(2026, 2, 3);
@@ -137,7 +177,6 @@ public class AdtAcquiredWorkflowTests
         Assert.Equal(AdmitAndDischarge, messages);
         var encounter = Assert.Single(await Encounters());
         Assert.Equal(dischargeDate, encounter.DischargeDate);
-        Assert.Equal("finished", encounter.EncounterStatus);
     }
 
     [Fact]
@@ -190,8 +229,8 @@ public class AdtAcquiredWorkflowTests
     {
         await Process(Entry("A01", visitId: null));
 
-        Assert.Empty(await Process(Entry("A07", visitId: null, configure: e => e.PatientClass = "O")));
-        Assert.Equal("O", Assert.Single(await Encounters()).EncounterClass);
+        Assert.Empty(await Process(Entry("A07", visitId: null)));
+        Assert.Single(await Encounters());
 
         Assert.Equal(Discharge, await Process(Entry("A03", visitId: null)));
         Assert.Equal(Admit, await Process(Entry("A01", visitId: null)));
@@ -213,12 +252,12 @@ public class AdtAcquiredWorkflowTests
     {
         await Process(Entry("A01", visitId: "visit-a"), Entry("A01", visitId: "visit-b"));
 
-        Assert.Empty(await Process(Entry("A07", visitId: "visit-a", configure: e => e.PatientClass = "O")));
+        Assert.Equal(Discharge, await Process(Entry("A03", visitId: "visit-a")));
 
         var encounters = await Encounters();
         Assert.Equal(2, encounters.Count);
-        Assert.Equal("O", encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "visit-a")).EncounterClass);
-        Assert.Equal("I", encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "visit-b")).EncounterClass);
+        Assert.NotNull(encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "visit-a")).DischargeDate);
+        Assert.Null(encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "visit-b")).DischargeDate);
     }
 
     [Theory]
@@ -232,7 +271,6 @@ public class AdtAcquiredWorkflowTests
         Assert.Empty(await Process(Entry(type, configure: e => e.PatientClass = "O")));
 
         var after = Assert.Single(await Encounters());
-        Assert.Equal(before.EncounterClass, after.EncounterClass);
         Assert.Equal(before.ModifyDate, after.ModifyDate);
         Assert.Single(await Events());
     }
@@ -251,26 +289,27 @@ public class AdtAcquiredWorkflowTests
     }
 
     [Fact]
-    public async Task A06AndA07_UpdateTheClass_WithoutMessages()
+    public async Task A06AndA07_EmitNoMessages_AndLeaveTheClassAndStatusUnset()
     {
         await Process(Entry("A01", configure: e => e.PatientClass = "O"));
 
         Assert.Empty(await Process(Entry("A06", configure: e => e.PatientClass = "I")));
-        Assert.Equal("I", Assert.Single(await Encounters()).EncounterClass);
-
         Assert.Empty(await Process(Entry("A07", configure: e => e.PatientClass = "O")));
-        Assert.Equal("O", Assert.Single(await Encounters()).EncounterClass);
+
+        var encounter = Assert.Single(await Encounters());
+        Assert.Null(encounter.EncounterClass);
+        Assert.Null(encounter.EncounterStatus);
     }
 
     [Fact]
-    public async Task A11_CancelsTheEncounter_WithoutMessages_AndALaterA01StartsAnother()
+    public async Task A11_ClosesTheEncounter_WithoutMessages_AndALaterA01StartsAnother()
     {
         await Process(Entry("A01"));
 
         Assert.Empty(await Process(Entry("A11")));
 
         var cancelled = Assert.Single(await Encounters());
-        Assert.Equal("cancelled", cancelled.EncounterStatus);
+        Assert.Null(cancelled.EncounterStatus);
         Assert.Equal(cancelled.AdmitDate, cancelled.DischargeDate);
 
         using (var scope = _fixture.ServiceProvider.CreateScope())
@@ -279,7 +318,42 @@ public class AdtAcquiredWorkflowTests
             Assert.Empty(admitted);
         }
 
+        // The same encounter id, as when the patient is admitted again after the cancellation
         Assert.Equal(Admit, await Process(Entry("A01")));
+
+        async Task AssertStays()
+        {
+            var encounters = await Encounters();
+            Assert.Equal(2, encounters.Count);
+            Assert.NotEqual(encounters[0].CorrelationId, encounters[1].CorrelationId);
+
+            var closed = encounters.Single(e => e.DischargeDate is not null);
+            Assert.Equal(closed.AdmitDate, closed.DischargeDate);
+            Assert.Single(encounters, e => e.DischargeDate is null);
+        }
+
+        await AssertStays();
+
+        // A rebuild replays the same payloads, so it must reach the same result
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>().RebuildPatientEncounterTable(_facilityId);
+        }
+
+        await AssertStays();
+
+        // Later messages belong to the new stay
+        var discharge = new DateTime(2026, 3, 1);
+        Assert.Equal(Discharge, await Process(Entry("A03", configure: e => e.DischargeDateTime = discharge)));
+        Assert.Contains(await Encounters(), e => e.DischargeDate == discharge);
+    }
+
+    [Fact]
+    public async Task A01_AfterA11_InTheSameFile_StartsAnotherStay()
+    {
+        var messages = await Process(Entry("A01"), Entry("A11"), Entry("A01"));
+
+        Assert.Equal([nameof(PatientEvents.Admit), nameof(PatientEvents.Admit)], messages);
         Assert.Equal(2, (await Encounters()).Count);
     }
 
@@ -337,9 +411,9 @@ public class AdtAcquiredWorkflowTests
 
         var encounter = Assert.Single(await Encounters());
         Assert.Equal("mrn-2", encounter.MedicalRecordNumber);
-        Assert.Equal("fhir-2", encounter.GetIdentifierByType(SourceType.FHIR).Identifier);
-        Assert.Contains(encounter.PatientIdentifiers, i => i.Identifier == "mrn-1");
-        Assert.Contains(encounter.PatientIdentifiers, i => i.Identifier == "mrn-2");
+        Assert.Equal("fhir-2", encounter.GetIdentifierByType(SourceType.ADT_FHIR).Identifier);
+        Assert.DoesNotContain(encounter.PatientIdentifiers, i => i.Identifier == "mrn-1");
+        Assert.DoesNotContain(encounter.PatientIdentifiers, i => i.Identifier == "mrn-2");
 
         var merge = Assert.Single(await Events(), e => e.EventType == EventType.A18);
         Assert.Equal(encounter.CorrelationId, merge.CorrelationId);
@@ -354,27 +428,14 @@ public class AdtAcquiredWorkflowTests
     {
         var discharge = new DateTime(2026, 1, 20);
         await Process(
-            Entry("A01", visitId: "old-stay", configure: e =>
-            {
-                e.AdmitDateTime = new DateTime(2026, 1, 10);
-                e.PatientClass = "O";
-            }),
-            Entry("A03", visitId: "old-stay", configure: e =>
-            {
-                e.DischargeDateTime = discharge;
-                e.PatientClass = "O";
-            }),
-            Entry("A01", visitId: "open-stay", configure: e =>
-            {
-                e.AdmitDateTime = new DateTime(2026, 2, 1);
-                e.PatientClass = "I";
-            }));
+            Entry("A01", visitId: "old-stay", configure: e => e.AdmitDateTime = new DateTime(2026, 1, 10)),
+            Entry("A03", visitId: "old-stay", configure: e => e.DischargeDateTime = discharge),
+            Entry("A01", visitId: "open-stay", configure: e => e.AdmitDateTime = new DateTime(2026, 2, 1)));
 
         // The merge message's PV1 describes one visit of the surviving patient, not every stay it matches
         var messages = await Process(Entry("A18", patientId: "fhir-2", visitId: "merge-visit", configure: e =>
         {
             e.MedicalRecordNumber = "mrn-2";
-            e.PatientClass = "E";
             e.PatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-2", IdentifierType = "MR" }];
             e.Merge = new AdtMergeInformation { PriorPatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-1" }] };
         }));
@@ -386,24 +447,20 @@ public class AdtAcquiredWorkflowTests
             var encounters = await Encounters();
             Assert.Equal(2, encounters.Count);
 
-            // Each stay moved to the surviving patient and kept its prior identifier
+            // Each stay moved to the surviving patient, whose MRN replaced the prior one
             Assert.All(encounters, e =>
             {
                 Assert.Equal("mrn-2", e.MedicalRecordNumber);
-                Assert.Equal("fhir-2", e.GetIdentifierByType(SourceType.FHIR).Identifier);
-                Assert.Contains(e.PatientIdentifiers, i => i.Identifier == "mrn-1");
-                Assert.Contains(e.PatientIdentifiers, i => i.Identifier == "mrn-2");
+                Assert.Equal("fhir-2", e.GetIdentifierByType(SourceType.ADT_FHIR).Identifier);
+                Assert.DoesNotContain(e.PatientIdentifiers, i => i.Identifier == "mrn-1");
+                Assert.DoesNotContain(e.PatientIdentifiers, i => i.Identifier == "mrn-2");
                 Assert.DoesNotContain(e.PatientVisitIdentifiers, v => v.Identifier == "merge-visit");
             });
 
             var old = encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "old-stay"));
-            Assert.Equal("O", old.EncounterClass);
-            Assert.Equal("finished", old.EncounterStatus);
             Assert.Equal(discharge, old.DischargeDate);
 
             var open = encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "open-stay"));
-            Assert.Equal("I", open.EncounterClass);
-            Assert.Equal("in-progress", open.EncounterStatus);
             Assert.Null(open.DischargeDate);
         }
 
@@ -484,8 +541,8 @@ public class AdtAcquiredWorkflowTests
     {
         var dischargeDate = new DateTime(2026, 2, 5);
         await Process(
-            Entry("A07", configure: e => e.PatientClass = "O"),
-            Entry("A06", configure: e => e.PatientClass = "E"),
+            Entry("A07"),
+            Entry("A06"),
             Entry("A01", configure: e => e.AdmitDateTime = new DateTime(2026, 1, 15)),
             Entry("A03", configure: e => e.DischargeDateTime = dischargeDate));
         var before = Assert.Single(await Encounters());
@@ -499,8 +556,8 @@ public class AdtAcquiredWorkflowTests
         Assert.Equal(before.CorrelationId, after.CorrelationId);
         Assert.Equal(before.AdmitDate, after.AdmitDate);
         Assert.Equal(dischargeDate, after.DischargeDate);
-        Assert.Equal(before.EncounterClass, after.EncounterClass);
-        Assert.Equal(before.EncounterStatus, after.EncounterStatus);
+        Assert.Null(after.EncounterClass);
+        Assert.Null(after.EncounterStatus);
         Assert.Equal(before.PatientIdentifiers.Count, after.PatientIdentifiers.Count);
         Assert.Equal(before.PatientVisitIdentifiers.Count, after.PatientVisitIdentifiers.Count);
     }

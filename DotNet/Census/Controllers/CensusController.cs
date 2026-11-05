@@ -71,7 +71,7 @@ public class CensusController : Controller
             foreach (var patient in patients)
             {
 
-                // Identifiers from an ADT feed are the facility's own, not FHIR ids
+                // ADT identifiers are the facility's own, not FHIR ids
                 var identifier = patient.PatientIdentifiers.FirstOrDefault(x => x.SourceType != SourceType.ADT.ToString());
 
                 if (identifier != null)

@@ -3,6 +3,7 @@ using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
@@ -14,12 +15,6 @@ namespace LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 /// </summary>
 public abstract class AdtPayload : IPayload
 {
-    protected const string InProgressStatus = "in-progress";
-    protected const string FinishedStatus = "finished";
-
-    /// <summary>The encounter status of an encounter whose admit was cancelled.</summary>
-    public const string CancelledStatus = "cancelled";
-
     public string PayloadType => EventType.ToString();
     public string PatientId { get; set; } = string.Empty;
     public string? MedicalRecordNumber { get; set; }
@@ -88,7 +83,7 @@ public abstract class AdtPayload : IPayload
 
         SetFhirPatientIdentifier(patientEncounter);
 
-        foreach (var identifier in PatientIdentifierList)
+        foreach (var identifier in PatientIdentifierList.Where(x => !IsMedicalRecordNumber(x) && !IsFhirPatientId(x)))
         {
             AddIdentifierIfMissing(patientEncounter, identifier.Id);
         }
@@ -115,11 +110,11 @@ public abstract class AdtPayload : IPayload
 
     private void SetFhirPatientIdentifier(PatientEncounter patientEncounter)
     {
-        var fhirIdentifier = patientEncounter.GetIdentifierByType(SourceType.FHIR);
+        var fhirIdentifier = patientEncounter.GetIdentifierByType(SourceType.ADT_FHIR);
 
         if (fhirIdentifier is null)
         {
-            patientEncounter.PatientIdentifiers.Add(NewPatientIdentifier(patientEncounter, PatientId, SourceType.FHIR));
+            patientEncounter.PatientIdentifiers.Add(NewPatientIdentifier(patientEncounter, PatientId, SourceType.ADT_FHIR));
         }
         else
         {
@@ -127,6 +122,20 @@ public abstract class AdtPayload : IPayload
             fhirIdentifier.Identifier = PatientId;
         }
     }
+
+    /// <summary>
+    /// An MRN belongs in <see cref="PatientEncounter.MedicalRecordNumber"/>, not in the patient identifiers. A site can
+    /// read its MRN from anywhere, so one is recognized by its value as well as by its identifier type.
+    /// </summary>
+    private bool IsMedicalRecordNumber(AdtPatientIdentifier identifier) =>
+        identifier.Id == MedicalRecordNumber
+        || string.Equals(identifier.IdentifierType, "MR", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A message can carry its FHIR Patient.Id in PID-3, which is already recorded as the encounter's ADT_FHIR identifier.
+    /// </summary>
+    private bool IsFhirPatientId(AdtPatientIdentifier identifier) =>
+        identifier.Id.SplitReference().Trim() == PatientId;
 
     private static void AddIdentifierIfMissing(PatientEncounter patientEncounter, string identifier)
     {
