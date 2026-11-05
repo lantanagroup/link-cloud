@@ -32,5 +32,17 @@ public class AutomationRunSummary
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
+    /// <summary>TestRail runs that accepted this automation run's results. Empty when nothing was published.</summary>
+    public List<TestRailRunReference> TestRailRuns { get; set; } = [];
     public IReadOnlyList<string> Logs { get; set; } = [];
+}
+
+/// <summary>One TestRail run that received results for an automation run.</summary>
+public sealed class TestRailRunReference
+{
+    public int RunId { get; set; }
+    public string Url { get; set; } = string.Empty;
+    /// <summary>Set when the publish response included exactly one test id.</summary>
+    public int? TestId { get; set; }
+    public string? TestUrl { get; set; }
 }

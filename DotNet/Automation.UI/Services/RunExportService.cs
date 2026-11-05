@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Services.TestRail;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using System.Globalization;
@@ -134,6 +135,7 @@ public sealed class RunExportService : IRunExportService
         WriteKvp(sb, "Finished", FormatTime(run.FinishedAt));
         WriteKvp(sb, "Pipeline Duration", run.Duration);
         WriteKvp(sb, "Error", NormalizeErrorSummary(run.Error));
+        TestRailRunLinks.AppendExport(sb, run.TestRailRuns);
 
         if (!string.IsNullOrWhiteSpace(run.RunConfigurationJson))
         {

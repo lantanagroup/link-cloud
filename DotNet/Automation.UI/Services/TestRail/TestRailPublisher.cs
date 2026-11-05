@@ -3,6 +3,7 @@ using Automation.UI.Models;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.Extensions.Options;
 
 namespace Automation.UI.Services.TestRail;
@@ -96,6 +97,7 @@ public sealed class TestRailPublisher(
                 opts.SharedScenarioRunId,
                 runName,
                 [result],
+                request.PublishedRuns,
                 cancellationToken);
         }
         catch (Exception ex)
@@ -200,6 +202,7 @@ public sealed class TestRailPublisher(
                 opts.SharedApiHealthRunId,
                 runName,
                 caseResults,
+                request.PublishedRuns,
                 cancellationToken);
         }
         catch (Exception ex)
@@ -315,6 +318,7 @@ public sealed class TestRailPublisher(
         int? configuredSharedRunId,
         string runName,
         IReadOnlyList<TestRailCaseResult> results,
+        List<TestRailRunReference> publishedRuns,
         CancellationToken cancellationToken)
     {
         var caseIds = results.Select(r => r.CaseId).Distinct().ToList();
@@ -355,6 +359,10 @@ public sealed class TestRailPublisher(
             logger.LogError(ex, "TestRail add_results_for_cases failed for TestRail run {TestRailRunId}.", runId);
             return;
         }
+
+        var captured = TestRailRunLinks.Capture(opts.BaseUrl, runId.Value, posted);
+        if (captured != null)
+            publishedRuns.Add(captured);
 
         for (var index = 0; index < results.Count; index++)
         {

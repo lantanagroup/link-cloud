@@ -348,9 +348,10 @@ public class AutomationRunManager : IAutomationRunManager
             _logger.LogWarning(ex, "Could not load the scenario id for TestRail publish of run {RunId}.", runId);
         }
 
+        ScenarioTestRailPublishRequest? publishRequest = null;
         try
         {
-            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            publishRequest = new ScenarioTestRailPublishRequest
             {
                 RunId = runId,
                 ScenarioId = scenarioId,
@@ -360,11 +361,25 @@ public class AutomationRunManager : IAutomationRunManager
                 Logs = summary.Logs ?? [],
                 StartedAt = summary.StartedAt,
                 FinishedAt = summary.FinishedAt
-            }, cancellationToken);
+            };
+            await _testRailPublisher.PublishScenarioRunAsync(publishRequest, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "TestRail publish failed for zombie scenario run {RunId}.", runId);
+        }
+
+        if (publishRequest != null && TestRailRunLinks.AddDistinct(summary.TestRailRuns, publishRequest.PublishedRuns))
+        {
+            try
+            {
+                await _snapshotStore.UpsertRunSummaryAsync(
+                    summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist the TestRail run link for zombie scenario run {RunId}.", runId);
+            }
         }
 
         QueueCancellationCleanup(
@@ -828,7 +843,7 @@ public class AutomationRunManager : IAutomationRunManager
             lock (state.Sync)
                 logs = state.Logs.ToList();
 
-            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            var publishRequest = new ScenarioTestRailPublishRequest
             {
                 RunId = state.RunId,
                 ScenarioId = state.ScenarioId,
@@ -838,11 +853,67 @@ public class AutomationRunManager : IAutomationRunManager
                 Logs = logs,
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt
-            });
+            };
+            await _testRailPublisher.PublishScenarioRunAsync(publishRequest);
+            await RecordTestRailRunsAsync(state.RunId, publishRequest.PublishedRuns);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "TestRail publish failed for scenario run {RunId}.", state.RunId);
+        }
+    }
+
+    public async Task RecordTestRailRunsAsync(
+        Guid runId,
+        IReadOnlyList<TestRailRunReference> runs,
+        CancellationToken cancellationToken = default)
+    {
+        if (runs == null || runs.Count == 0)
+            return;
+
+        if (_runs.TryGetValue(runId, out var state))
+        {
+            bool added;
+            lock (state.Sync)
+                added = TestRailRunLinks.AddDistinct(state.TestRailRuns, runs);
+            if (!added)
+                return;
+
+            await PersistRunSummaryAsync(state);
+            try
+            {
+                await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state), cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not push the TestRail run link for {RunId}.", runId);
+            }
+
+            return;
+        }
+
+        var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
+        if (summary == null || !TestRailRunLinks.AddDistinct(summary.TestRailRuns, runs))
+            return;
+
+        try
+        {
+            await _snapshotStore.UpsertRunSummaryAsync(
+                summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist the TestRail run link for {RunId}.", runId);
+            return;
+        }
+
+        try
+        {
+            await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not push the TestRail run link for {RunId}.", runId);
         }
     }
 
@@ -986,6 +1057,7 @@ public class AutomationRunManager : IAutomationRunManager
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
                 GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
                 GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
+                TestRailRuns = TestRailRunLinks.Copy(state.TestRailRuns),
                 Logs = state.Logs.ToList()
             };
         }

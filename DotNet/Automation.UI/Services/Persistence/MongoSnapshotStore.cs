@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using Automation.UI.Services.TestRail;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -139,6 +140,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheScenarioKey, summary.GeneratedTemplateCacheScenarioKey));
         if (!string.IsNullOrWhiteSpace(summary.GeneratedTemplateSetHash))
             updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateSetHash, summary.GeneratedTemplateSetHash));
+        // An earlier summary, written before publish, must not clear a link stored later.
+        if (summary.TestRailRuns is { Count: > 0 })
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.TestRailRuns, summary.TestRailRuns));
 
         var update = Builders<AutomationRunDocument>.Update.Combine(updates);
 
@@ -541,6 +545,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             GeneratedTemplateCacheVersionNumber = doc.GeneratedTemplateCacheVersionNumber,
             GeneratedTemplateCacheScenarioKey = doc.GeneratedTemplateCacheScenarioKey,
             GeneratedTemplateSetHash = doc.GeneratedTemplateSetHash,
+            TestRailRuns = TestRailRunLinks.Copy(doc.TestRailRuns),
             Logs = []
         };
     }

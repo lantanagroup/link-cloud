@@ -1167,6 +1167,152 @@ public class TestRailPublisherTests
             && entry.Message.Contains("cancelled runs are not posted", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Scenario_publish_records_the_created_run_and_single_test_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestRailResultDto { Id = 1, CaseId = 42, TestId = 16898 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var options = ConfiguredOptions();
+        options.BaseUrl = "https://example.testrail.io///";
+        var publisher = CreatePublisher(api.Object, options, ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Succeeded };
+
+        await publisher.PublishScenarioRunAsync(request);
+
+        var published = request.PublishedRuns.Should().ContainSingle().Subject;
+        published.RunId.Should().Be(501);
+        published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/501");
+        published.TestId.Should().Be(16898);
+        published.TestUrl.Should().Be("https://example.testrail.io/index.php?/tests/view/16898");
+    }
+
+    [Fact]
+    public async Task Shared_scenario_publish_records_the_existing_run()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new TestRailRunDetails
+                {
+                    Id = 777,
+                    SuiteId = 100,
+                    Name = TestRailPublisher.SharedScenarioRunName,
+                    IncludeAll = true
+                }
+            ]);
+        api.Setup(a => a.GetRunAsync(777, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails
+            {
+                Id = 777,
+                SuiteId = 100,
+                Name = TestRailPublisher.SharedScenarioRunName,
+                IncludeAll = true
+            });
+        api.Setup(a => a.AddResultsForCasesAsync(777, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestRailResultDto { Id = 9, CaseId = 42, TestId = 91 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var options = ConfiguredOptions();
+        options.UseSharedRun = true;
+        options.BaseUrl = "https://example.testrail.io/";
+        var publisher = CreatePublisher(api.Object, options, ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId };
+
+        await publisher.PublishScenarioRunAsync(request);
+
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        var published = request.PublishedRuns.Should().ContainSingle().Subject;
+        published.RunId.Should().Be(777);
+        published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/777");
+        published.TestUrl.Should().Be("https://example.testrail.io/index.php?/tests/view/91");
+    }
+
+    [Fact]
+    public async Task Api_health_publish_records_the_run_without_a_single_test_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new TestRailResultDto { Id = 1, CaseId = 1, TestId = 10 },
+                new TestRailResultDto { Id = 2, CaseId = 2, TestId = 11 }
+            ]);
+
+        var passDef = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Create Facility", TestRailCaseId = 1 };
+        var failDef = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Get Facility", TestRailCaseId = 2 };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [passDef.Key] = new() { EndpointKey = passDef.Key, EndpointName = passDef.EndpointName, ServiceName = "Tenant", Passed = true },
+                [failDef.Key] = new() { EndpointKey = failDef.Key, EndpointName = failDef.EndpointName, ServiceName = "Tenant", Passed = false, ErrorMessage = "nope" }
+            });
+
+        var options = ConfiguredOptions();
+        options.BaseUrl = "https://example.testrail.io";
+        var publisher = CreatePublisher(
+            api.Object,
+            options,
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(passDef, failDef)]));
+        var request = SampleApiHealthRequest();
+
+        await publisher.PublishApiHealthRunAsync(request);
+
+        var published = request.PublishedRuns.Should().ContainSingle().Subject;
+        published.RunId.Should().Be(44);
+        published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/44");
+        published.TestId.Should().BeNull();
+        published.TestUrl.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Unpublished_scenario_run_records_nothing(bool cancelled)
+    {
+        var api = new Mock<ITestRailApiClient>(MockBehavior.Strict);
+        var options = ConfiguredOptions();
+        if (!cancelled)
+            options.Enabled = false;
+        var publisher = CreatePublisher(api.Object, options);
+        var request = SampleScenarioRequest() with
+        {
+            Status = cancelled ? AutomationRunStatus.Cancelled : AutomationRunStatus.Succeeded
+        };
+
+        await publisher.PublishScenarioRunAsync(request);
+
+        request.PublishedRuns.Should().BeEmpty();
+        api.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Failed_result_post_does_not_record_a_run_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("down"));
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Failed };
+
+        await publisher.PublishScenarioRunAsync(request);
+
+        request.PublishedRuns.Should().BeEmpty();
+    }
+
     private static IScenarioStore ScenarioStore(Guid scenarioId, int caseId = 42)
     {
         var scenarios = new Mock<IScenarioStore>();
