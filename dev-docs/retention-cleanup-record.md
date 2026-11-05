@@ -42,6 +42,34 @@ The expected participants, copied from `Retention:Participants` when the cleanup
 `ServiceName` and a `Scope` (`Report` or `Cutoff`) each. A later configuration change does not touch cleanups
 that already exist. A completion whose `ServiceName` is not listed here is logged and ignored.
 
+## `Retention:Participants`
+
+Each entry is a `ServiceName`, the name the participant puts in `RetentionCheckComplete`, and a `Scope`:
+
+- `Report`: the participant deletes per report and replies with one result per report.
+- `Cutoff`: the participant acts on the cleanup's cutoff and replies with one result per cleanup. It never
+  holds back a report's `Scrubbed` state.
+
+When the key is not set, the list is `Report`, `MeasureEval`, `Validation` and `DataAcquisition`, all
+`Report`-scoped. In App Configuration a custom list is one pair of rows per entry:
+
+```text
+Retention:Participants:0:ServiceName = Report
+Retention:Participants:0:Scope       = Report
+Retention:Participants:1:ServiceName = MeasureEval
+Retention:Participants:1:Scope       = Report
+```
+
+Set the whole list or none of it. .NET merges list entries from different sources by index, so rows for
+indices 0 and 1 on top of a four-entry list elsewhere would leave entries 2 and 3 in place. That is why the
+default is in code and not in `appsettings.json`.
+
+The whole list is invalid when it is empty (including an empty JSON array), when an entry has no `ServiceName`
+or no `Scope`, when a `Scope` is not `Report` or `Cutoff`, when a name is longer than 100 characters, or when
+two entries share a name, ignoring case. Report reads the list once at startup and logs every problem as an
+error, but still starts. While the list is invalid, each cleanup is recorded `Failed` with the reason, no
+request is sent, and its reports stay at `None`. A change takes effect when Report restarts.
+
 ### `RetentionCleanupResult`
 
 One row per report-scoped participant and report, and one per cleanup, with a null
