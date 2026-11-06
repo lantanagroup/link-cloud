@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using LantanaGroup.Automation.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -137,6 +138,45 @@ public class OperationFailureFactoryTests
         fromSent.TraceId.Should().Be("from-activity");
     }
 
+    [Theory]
+    [InlineData("not-a-trace")]
+    [InlineData("garbage-not-a-trace-id")]
+    [InlineData("00-short-bbbbbbbbbbbbbbbb-01")]
+    [InlineData("ff-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01")]
+    [InlineData("FF-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01")]
+    [InlineData("00-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-bbbbbbbbbbbbbbbb-01")]
+    [InlineData("00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01-extra")]
+    [InlineData("00-00000000000000000000000000000000-bbbbbbbbbbbbbbbb-01")]
+    [InlineData("00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-0000000000000000-01")]
+    [InlineData("00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-0g")]
+    public void Malformed_or_all_zero_traceparent_falls_back_to_the_response_trace_header(string traceParent)
+    {
+        var failure = OperationFailureFactory.FromHttp(Sample(
+            "patient-1_chunk01",
+            "[patient-1] ",
+            500,
+            OperationOutcome,
+            traceParent: traceParent,
+            traceHeader: "from-header",
+            sentTraceId: "from-activity"));
+
+        failure.TraceId.Should().Be("from-header");
+    }
+
+    [Fact]
+    public void Invalid_traceparent_falls_back_to_the_sent_trace_id_when_the_header_is_absent()
+    {
+        var failure = OperationFailureFactory.FromHttp(Sample(
+            "patient-1_chunk01",
+            "[patient-1] ",
+            500,
+            OperationOutcome,
+            traceParent: "00-00000000000000000000000000000000-bbbbbbbbbbbbbbbb-01",
+            sentTraceId: "from-activity"));
+
+        failure.TraceId.Should().Be("from-activity");
+    }
+
     [Fact]
     public void Sanitizer_strips_userinfo_bearer_tokens_and_secret_query_values()
     {
@@ -209,6 +249,23 @@ public class OperationFailureFactoryTests
         var failure = OperationFailureFactory.FromHttp(Sample("patient-1_chunk01", "[patient-1] ", 500, body));
 
         failure.UnderlyingCause.Should().Be("relation \"patient\" does not exist");
+    }
+
+    [Fact]
+    public void Deeper_sql_exception_redacts_a_secret_before_the_cause_is_capped()
+    {
+        var password = new string('p', 520);
+        var diagnostics = "JpaSystemException: could not extract ResultSet; PSQLException: Connection failed {\"password\":\""
+            + password
+            + "\"}";
+        var body = "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"diagnostics\":"
+            + JsonSerializer.Serialize(diagnostics)
+            + "}]}";
+
+        var failure = OperationFailureFactory.FromHttp(Sample("patient-1_chunk01", "[patient-1] ", 500, body));
+
+        failure.UnderlyingCause.Should().Be("Connection failed {\"password\":\"[redacted]\"}");
+        failure.UnderlyingCause.Should().NotContain(password);
     }
 
     [Fact]

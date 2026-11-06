@@ -282,7 +282,7 @@ public static class OperationFailureFactory
 
         var deeper = DeeperSqlMessage(text);
         if (deeper != null)
-            return Cap(deeper, MaxDetailsChars);
+            return Cap(Collapse(RedactSecrets(deeper)), MaxDetailsChars);
 
         if (text.Contains("JpaSystemException", StringComparison.OrdinalIgnoreCase)
             || text.Contains("could not extract ResultSet", StringComparison.OrdinalIgnoreCase)
@@ -319,8 +319,52 @@ public static class OperationFailureFactory
         if (string.IsNullOrWhiteSpace(traceParent))
             return null;
 
-        var parts = traceParent.Split('-', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length >= 2 ? parts[1] : null;
+        // W3C traceparent: version-trace-id-parent-id-flags. Version ff and an all-zero id are invalid.
+        var parts = traceParent.Split('-', StringSplitOptions.TrimEntries);
+        if (parts.Length != 4)
+            return null;
+
+        var version = parts[0];
+        var traceId = parts[1];
+        var parentId = parts[2];
+        var flags = parts[3];
+        if (!IsHex(version, 2, lowerOnly: false) || version.Equals("ff", StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (!IsHex(traceId, 32, lowerOnly: true) || IsAllZero(traceId))
+            return null;
+        if (!IsHex(parentId, 16, lowerOnly: false) || IsAllZero(parentId))
+            return null;
+        if (!IsHex(flags, 2, lowerOnly: false))
+            return null;
+
+        return traceId;
+    }
+
+    private static bool IsHex(string value, int length, bool lowerOnly)
+    {
+        if (value.Length != length)
+            return false;
+
+        foreach (var c in value)
+        {
+            if (!char.IsAsciiHexDigit(c))
+                return false;
+            if (lowerOnly && c is >= 'A' and <= 'F')
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsAllZero(string value)
+    {
+        foreach (var c in value)
+        {
+            if (c != '0')
+                return false;
+        }
+
+        return true;
     }
 
     private static string? First(params string?[] values)
