@@ -116,3 +116,33 @@ export interface IValidationRuleSet {
   ruleSetNumber: number;
   rules: IValidationRule[];
 }
+
+export interface IReportCategoryCount {
+  categoryId: string;
+  title: string;
+  acceptable: boolean;
+  submit: boolean;
+  issues: number;
+  guidance?: string;
+}
+
+export interface IReportCategoryCounts {
+  facilityId: string;
+  reportId: string;
+  lastUpdated: string;
+  categories: IReportCategoryCount[];
+}
+
+export interface ICategoryIssue {
+  message: string;
+  expression: string;
+  location: string;
+  code: string;
+  patientId: string;
+  profile?: string;
+}
+
+export interface ICategoryIssuePage {
+  records: ICategoryIssue[];
+  metadata: {pageSize: number; pageNumber: number; totalCount: number; totalPages: number};
+}

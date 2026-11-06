@@ -2,13 +2,9 @@
   <div class="sub-pre-qual-report-summary--heading-row">
     <h4>Pre-Qual Report</h4>
     <div class="sub-pre-qual-report-summary--action-button-group">
-      <vd-button type="button" variant="outline">
+      <vd-button type="button" variant="outline" (click)="downloadReport.emit()">
         <vd-icon filePath="../../../assets/icons/download.svg" />
         Download Pre-Qual Report
-      </vd-button>
-      <vd-button type="button" variant="outline">
-        <vd-icon filePath="../../../assets/icons/download.svg" />
-        Download Submission
       </vd-button>
     </div>
   </div>
