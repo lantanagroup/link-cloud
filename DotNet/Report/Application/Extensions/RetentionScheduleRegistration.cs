@@ -28,6 +28,7 @@ public static class RetentionScheduleRegistration
         services.TryAddSingleton(RetentionCheckSettings.FromConfiguration(configuration));
 
         services.AddScoped<IRetentionCheckWorker, LoggingRetentionCheck>();
+        services.TryAddScoped<IRetentionPendingResender, NoRetentionResends>();
         services.AddSingleton<IRetentionScheduleReconciler, RetentionScheduleReconciler>();
         services.AddHostedService<RetentionScheduleHostedService>();
 
