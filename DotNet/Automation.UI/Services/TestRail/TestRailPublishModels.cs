@@ -9,7 +9,15 @@ public sealed record ScenarioTestRailPublishRequest
     public string RunName { get; init; } = string.Empty;
     public AutomationRunStatus Status { get; init; }
     public string? Error { get; init; }
+    public IReadOnlyList<string> FailureDetails { get; init; } = [];
     public IReadOnlyList<string> Logs { get; init; } = [];
+
+    /// <summary>
+    /// True when the in-memory log was trimmed and at least one append failed,
+    /// so neither the memory list nor the store is guaranteed to contain every line.
+    /// </summary>
+    public bool LogsMayBeIncomplete { get; init; }
+
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
 }
