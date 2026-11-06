@@ -15,6 +15,12 @@ public sealed class TestRailPublisher(
     ApiEndpointRegistry endpointRegistry,
     ILogger<TestRailPublisher> logger) : ITestRailPublisher
 {
+    /// <summary>
+    /// Largest result comment we post. The TestRail result comment is a text field with no
+    /// documented maximum. A full run log can still be large enough to fail the result call,
+    /// and the attachment is uploaded only after that call succeeds, so the comment stays
+    /// inside this size and the log goes in the attachment.
+    /// </summary>
     private const int MaxCommentChars = 20_000;
     internal const string SharedScenarioRunName = "Link Automation UI - Scenario suite";
     internal const string SharedApiHealthRunName = "Link Automation UI - API Health suite";
@@ -72,7 +78,13 @@ public sealed class TestRailPublisher(
             }
 
             var statusId = TestRailStatusMapper.FromScenarioStatus(request.Status);
-            var comment = BuildScenarioComment(request);
+            var attachmentName = $"scenario-run-{request.RunId:D}.log";
+            var fullComment = BuildScenarioComment(request);
+            var commentFits = fullComment.Length <= MaxCommentChars;
+            var comment = commentFits ? fullComment : BuildLogOverflowComment(request, attachmentName);
+            byte[]? attachment = null;
+            if (!commentFits || ShouldAttach(statusId))
+                attachment = EncodeAttachment(request.Logs, request.Error);
             var elapsed = FormatElapsed(request.StartedAt, request.FinishedAt);
             var result = new TestRailCaseResult
             {
@@ -80,8 +92,8 @@ public sealed class TestRailPublisher(
                 StatusId = statusId,
                 Comment = comment,
                 Elapsed = elapsed,
-                Attachment = ShouldAttach(statusId) ? EncodeAttachment(request.Logs, request.Error) : null,
-                AttachmentFileName = ShouldAttach(statusId) ? $"scenario-run-{request.RunId:D}.log" : null
+                Attachment = attachment,
+                AttachmentFileName = attachment is null ? null : attachmentName
             };
 
             var runName = opts.UseSharedRun
@@ -610,7 +622,7 @@ public sealed class TestRailPublisher(
     private static bool ShouldAttach(int statusId) =>
         statusId == TestRailStatusMapper.Failed || statusId == TestRailStatusMapper.Blocked;
 
-    private static string? BuildScenarioComment(ScenarioTestRailPublishRequest request)
+    private static string BuildScenarioHeader(ScenarioTestRailPublishRequest request)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"Automation.UI scenario run {request.RunId:D}");
@@ -620,21 +632,77 @@ public sealed class TestRailPublisher(
         if (!string.IsNullOrWhiteSpace(request.Error))
             sb.AppendLine($"Error: {request.Error}");
 
+        if (request.FailureDetails.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Failure details:");
+            foreach (var block in request.FailureDetails)
+            {
+                sb.AppendLine(block);
+                sb.AppendLine();
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string BuildScenarioComment(ScenarioTestRailPublishRequest request)
+    {
+        var sb = new StringBuilder(BuildScenarioHeader(request));
         if (request.Logs.Count > 0)
         {
             sb.AppendLine();
+            sb.AppendLine();
             sb.AppendLine("Logs:");
-            foreach (var line in request.Logs.TakeLast(200))
+            foreach (var line in request.Logs)
                 sb.AppendLine(line);
         }
 
-        return Truncate(sb.ToString());
+        return sb.ToString().Trim();
+    }
+
+    /// <summary>
+    /// The comment names the attachment instead of pasting a partial log. A partial log
+    /// drops the lines that do not fit, which is the gap this publisher used to ship.
+    /// When neither copy of the log is complete, the comment says so.
+    /// </summary>
+    private static string BuildLogOverflowComment(ScenarioTestRailPublishRequest request, string attachmentFileName)
+    {
+        var logNote = request.LogsMayBeIncomplete
+            ? $"The log is attached as {attachmentFileName}. Some lines may be missing."
+            : $"The complete log is attached as {attachmentFileName}.";
+        var note = request.Logs.Count > 0
+            ? $"The run log is {request.Logs.Count} lines and does not fit in this result comment. {logNote}"
+            : $"The result text does not fit in this result comment. The complete text is attached as {attachmentFileName}.";
+        if (note.Length > MaxCommentChars)
+            return note[..MaxCommentChars];
+
+        var header = BuildScenarioHeader(request);
+        var combined = header + "\n\n" + note;
+        if (combined.Length <= MaxCommentChars)
+            return combined;
+
+        const string cutMarker = " [truncated]";
+        var roomForHeader = MaxCommentChars - note.Length - 2;
+        if (roomForHeader <= cutMarker.Length)
+            return note;
+
+        var shortened = header[..(roomForHeader - cutMarker.Length)].TrimEnd() + cutMarker;
+        var fitted = shortened + "\n\n" + note;
+        return fitted.Length <= MaxCommentChars ? fitted : note;
     }
 
     private static string? BuildApiHealthComment(ApiTestRunResult result, string? runError)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"{result.ServiceName} :: {result.EndpointName}");
+        var failureBlock = ApiHealthFailureText.Format(result);
+        if (!string.IsNullOrWhiteSpace(failureBlock))
+        {
+            sb.AppendLine();
+            sb.AppendLine(failureBlock);
+            sb.AppendLine();
+        }
         if (result.Skipped)
             sb.AppendLine($"Skipped: {result.SkipReason}");
         if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
