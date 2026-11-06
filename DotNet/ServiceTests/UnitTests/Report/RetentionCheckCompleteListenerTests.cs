@@ -110,6 +110,26 @@ public class RetentionCheckCompleteListenerTests
     }
 
     [Fact]
+    public async Task ConsumeMessageAsync_UndefinedStatus_ThrowsDeadLetter()
+    {
+        var completion = Completion(CleanupId.ToString(), "MeasureEval");
+        completion.Reports =
+        [
+            new RetentionReportResult
+            {
+                ReportScheduleId = Guid.NewGuid().ToString(),
+                Status = (RetentionResultStatus)2,
+                RecordsAffected = 0,
+                CompletedDateTime = completion.CompletedDateTime
+            }
+        ];
+
+        await Assert.ThrowsAsync<DeadLetterException>(() => ConsumeAsync(Message(CleanupId.ToString(), completion)));
+
+        _manager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public async Task ConsumeMessageAsync_NullValue_ThrowsDeadLetter()
     {
         await Assert.ThrowsAsync<DeadLetterException>(() => ConsumeAsync(Message(CleanupId.ToString(), null)));
