@@ -14,14 +14,16 @@ public class CodeMapTargetSystemUiTests
             "DotNet", "Automation.UI", "wwwroot", "js", "code-map-target-system.js")));
 
         editor.Should().Contain("code-map-target-system.js");
-        editor.Should().Contain("applyTargetSystemField(");
+        editor.Should().Contain("lockTargetSystemInput(");
+        editor.Should().Contain("targetSystemDraft(");
         editor.Should().Contain("normalizeCodeSystemMapsForSave(");
-        editor.Should().Contain("targetSystemForSave(");
         editor.Should().Contain("hslocUrl: hslocTargetSystemUrl");
         editor.Should().Contain("Target system is the NHSN HSLOC URL and cannot be changed.");
 
         script.Should().Contain("input.readOnly = state.readOnly");
         script.Should().Contain("input.disabled = state.readOnly");
+        script.Should().Contain("function lockTargetSystemInput");
+        script.Should().Contain("dataset.codeMapTarget");
         script.Should().Contain("return hslocTargetSystemUrl");
         script.Should().Contain("https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html");
     }

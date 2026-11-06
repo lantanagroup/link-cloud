@@ -793,6 +793,94 @@ public class NormalizationsControllerTests
             .Which.TargetSystem.Should().Be("http://example.org/new");
     }
 
+    [Fact]
+    public async Task SaveOperation_SystemOperation_ReturnsForbiddenWithoutSaving()
+    {
+        var existing = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "System HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            IsSystem = true,
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        };
+
+        var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(existing.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        var sut = new NormalizationsController(store.Object);
+
+        var result = await sut.SaveOperation(new NormalizationOperationDefinition
+        {
+            Id = existing.Id,
+            Name = "System HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "http://example.org/not-hsloc",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        }, CancellationToken.None);
+
+        var forbidden = result.Should().BeOfType<ObjectResult>().Subject;
+        forbidden.StatusCode.Should().Be(403);
+        forbidden.Value.Should().Be("System operations cannot be modified.");
+        store.Verify(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveOperation_HslocMap_Update_RejectsEmptyCodeSystemMaps()
+    {
+        var existing = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Facility HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        };
+
+        var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(existing.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        var sut = new NormalizationsController(store.Object);
+
+        var result = await sut.SaveOperation(new NormalizationOperationDefinition
+        {
+            Id = existing.Id,
+            Name = "Facility HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeSystemMaps = []
+        }, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>()
+            .Which.Value.Should().Be("HSLOCMap requires at least one Code System Map.");
+        store.Verify(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static NormalizationOperationDefinition MakeOperation(string name)
         => new()
         {

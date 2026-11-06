@@ -4,6 +4,8 @@ const path = require('node:path');
 const {
     hslocTargetSystemUrl,
     applyTargetSystemField,
+    lockTargetSystemInput,
+    targetSystemDraft,
     normalizeCodeSystemMapsForSave,
     targetSystemForSave
 } = require(path.join(
@@ -16,6 +18,7 @@ function fakeInput(value) {
         value,
         readOnly: false,
         disabled: false,
+        dataset: {},
         setAttribute(name, attrValue) { attrs.set(name, attrValue); },
         removeAttribute(name) { attrs.delete(name); },
         getAttribute(name) { return attrs.has(name) ? attrs.get(name) : null; }
@@ -74,4 +77,28 @@ test('creating and editing a CodeMap still accepts the entered Target System', (
         { sourceSystem: 'urn:local', targetSystem: '  http://example.org/codes  ' }
     ]);
     assert.equal(saved[0].targetSystem, 'http://example.org/codes');
+});
+
+test('switching a CodeMap to HSLOC and back keeps the draft target', () => {
+    const input = fakeInput('http://example.org/codes');
+
+    lockTargetSystemInput(input, 'HSLOCMap');
+    assert.equal(input.readOnly, true);
+    assert.equal(input.disabled, true);
+    assert.equal(input.value, hslocTargetSystemUrl);
+    assert.equal(targetSystemDraft(input), 'http://example.org/codes');
+
+    lockTargetSystemInput(input, 'HSLOCMap');
+    assert.equal(targetSystemDraft(input), 'http://example.org/codes');
+
+    lockTargetSystemInput(input, 'CodeMap');
+    assert.equal(input.readOnly, false);
+    assert.equal(input.disabled, false);
+    assert.equal(input.value, 'http://example.org/codes');
+    assert.equal(input.dataset.codeMapTarget, undefined);
+
+    const savedWhileHsloc = normalizeCodeSystemMapsForSave('HSLOCMap', [
+        { sourceSystem: 'urn:local', targetSystem: 'http://example.org/codes' }
+    ]);
+    assert.equal(savedWhileHsloc[0].targetSystem, hslocTargetSystemUrl);
 });

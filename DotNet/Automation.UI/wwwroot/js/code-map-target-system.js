@@ -10,6 +10,8 @@
     root.isHslocMapOperation = api.isHslocMapOperation;
     root.targetSystemField = api.targetSystemField;
     root.applyTargetSystemField = api.applyTargetSystemField;
+    root.lockTargetSystemInput = api.lockTargetSystemInput;
+    root.targetSystemDraft = api.targetSystemDraft;
     root.targetSystemForSave = api.targetSystemForSave;
     root.normalizeCodeSystemMapsForSave = api.normalizeCodeSystemMapsForSave;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
@@ -41,6 +43,29 @@
         return state;
     }
 
+    // Remember a Code Map target before showing the locked HSLOC URL, so changing
+    // the operation type back restores the draft instead of keeping the URL.
+    function lockTargetSystemInput(input, operationType) {
+        var dataset = input.dataset || (input.dataset = {});
+        if (isHslocMapOperation(operationType)) {
+            if (dataset.codeMapTarget == null)
+                dataset.codeMapTarget = input.value || '';
+            return applyTargetSystemField(input, operationType, input.value);
+        }
+
+        var restored = dataset.codeMapTarget != null ? dataset.codeMapTarget : input.value;
+        if (dataset.codeMapTarget != null)
+            delete dataset.codeMapTarget;
+        return applyTargetSystemField(input, operationType, restored);
+    }
+
+    function targetSystemDraft(input) {
+        var dataset = input.dataset;
+        if (dataset && dataset.codeMapTarget != null && dataset.codeMapTarget !== '')
+            return String(dataset.codeMapTarget);
+        return input.value == null ? '' : String(input.value);
+    }
+
     function targetSystemForSave(operationType, submittedValue) {
         if (isHslocMapOperation(operationType))
             return hslocTargetSystemUrl;
@@ -68,6 +93,8 @@
         isHslocMapOperation: isHslocMapOperation,
         targetSystemField: targetSystemField,
         applyTargetSystemField: applyTargetSystemField,
+        lockTargetSystemInput: lockTargetSystemInput,
+        targetSystemDraft: targetSystemDraft,
         targetSystemForSave: targetSystemForSave,
         normalizeCodeSystemMapsForSave: normalizeCodeSystemMapsForSave
     };

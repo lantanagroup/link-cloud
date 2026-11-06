@@ -579,23 +579,8 @@
     function lockDisplayedHslocTargets() {
         const operationType = document.getElementById('OpType').value;
         document.querySelectorAll('#opCodeSystemMapRows .csm-target-system').forEach(input => {
-            applyTargetSystemField(input, operationType, input.value);
+            lockTargetSystemInput(input, operationType);
         });
-        if (!isHslocMapOperation(operationType))
-            return;
-
-        const text = document.getElementById('OpCodeSystemMaps');
-        const raw = (text.value || '').trim();
-        if (!raw)
-            return;
-        try {
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed))
-                return;
-            text.value = JSON.stringify(normalizeCodeSystemMapsForSave(operationType, parsed), null, 2);
-        } catch {
-            // Leave invalid JSON for the save parser to report.
-        }
     }
 
     function applyHslocMapDefaultsIfEmpty() {
@@ -672,10 +657,9 @@
         card.querySelector('.csm-add-code-map').addEventListener('click', () => addCodeMapEntryRow(entriesHost, '', { code: '', display: '' }));
 
         card.querySelector('.csm-source-system').value = item?.sourceSystem || item?.SourceSystem || '';
-        applyTargetSystemField(
-            card.querySelector('.csm-target-system'),
-            document.getElementById('OpType').value,
-            item?.targetSystem || item?.TargetSystem || '');
+        const targetInput = card.querySelector('.csm-target-system');
+        targetInput.value = item?.targetSystem || item?.TargetSystem || '';
+        lockTargetSystemInput(targetInput, document.getElementById('OpType').value);
 
         const maps = item?.codeMaps || item?.CodeMaps || {};
         const entries = Object.entries(maps);
@@ -706,12 +690,10 @@
         const cards = Array.from(document.querySelectorAll('#opCodeSystemMapRows .code-system-map-card'));
         if (cards.length === 0) return null;
 
-        const operationType = document.getElementById('OpType').value;
         return cards.map((card, index) => {
             const sourceSystem = (card.querySelector('.csm-source-system').value || '').trim();
-            const targetSystem = targetSystemForSave(
-                operationType,
-                (card.querySelector('.csm-target-system').value || '').trim());
+            const targetInput = card.querySelector('.csm-target-system');
+            const targetSystem = (targetSystemDraft(targetInput) || '').trim();
             if (!sourceSystem) throw new Error(`Code System Map #${index + 1} requires Source System.`);
             if (!targetSystem) throw new Error(`Code System Map #${index + 1} requires Target System.`);
 
