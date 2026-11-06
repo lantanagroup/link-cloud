@@ -1480,18 +1480,22 @@ public class TestRailPublisherTests
 
         var passedResult = posted.Single(result => result.CaseId == 1);
         passedResult.Comment.Should().Contain("Create Facility");
+        passedResult.Comment.Should().Contain("Result: Passed");
         passedResult.Comment.Should().Contain("ApiHealthScenario seed run was cancelled.");
         passedResult.Elapsed.Should().Be("2s");
         passedResult.Attachment.Should().NotBeNull();
 
         var notRunResult = posted.Single(result => result.CaseId == 2);
         notRunResult.Comment.Should().Contain("Get Facility");
+        notRunResult.Comment.Should().NotContain("Result:");
         notRunResult.Comment.Should().Contain("ApiHealthScenario seed run was cancelled.");
         notRunResult.Attachment.Should().NotBeNull();
 
         var collapsed = posted.Single(result => result.CaseId == 7);
         collapsed.Comment.Should().Contain("List Facilities");
+        collapsed.Comment.Should().Contain("Result: Passed");
         collapsed.Comment.Should().Contain("Update Facility");
+        collapsed.Comment.Should().Contain("Result: Failed");
         collapsed.Comment.Should().NotContain("Posted as Failed");
         collapsed.AttachmentFileName.Should().Be("api-health-c7.txt");
 

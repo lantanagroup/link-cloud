@@ -164,7 +164,7 @@ public sealed class TestRailPublisher(
 
                     var comment = result is null
                         ? BuildCancelledEndpointComment(definition, request.Error)
-                        : BuildApiHealthComment(result, request.Error);
+                        : BuildApiHealthComment(result, request.Error, includeResultStatus: true);
                     var attachment = Encoding.UTF8.GetBytes(comment ?? "Blocked");
                     caseResults.Add(new TestRailCaseResult
                     {
@@ -723,10 +723,12 @@ public sealed class TestRailPublisher(
         return Truncate(sb.ToString());
     }
 
-    private static string? BuildApiHealthComment(ApiTestRunResult result, string? runError)
+    private static string? BuildApiHealthComment(ApiTestRunResult result, string? runError, bool includeResultStatus = false)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"{result.ServiceName} :: {result.EndpointName}");
+        if (includeResultStatus)
+            sb.AppendLine(result.Passed ? "Result: Passed" : "Result: Failed");
         var failureBlock = ApiHealthFailureText.Format(result);
         if (!string.IsNullOrWhiteSpace(failureBlock))
         {
