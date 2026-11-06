@@ -739,9 +739,10 @@ public sealed class ApiHealthExecutionRunManager(
         // The stream's done event is the run finishing, not TestRail accepting the results.
         AddDone(run);
 
+        IReadOnlyList<TestRailRunReference> published = [];
         try
         {
-            await testRailPublisher.PublishApiHealthRunAsync(new ApiHealthTestRailPublishRequest
+            published = await testRailPublisher.PublishApiHealthRunAsync(new ApiHealthTestRailPublishRequest
             {
                 RunId = run.RunId,
                 Scope = run.Scope,
@@ -756,6 +757,18 @@ public sealed class ApiHealthExecutionRunManager(
         catch (Exception ex)
         {
             logger.LogError(ex, "TestRail publish failed for API Health run {RunId}.", run.RunId);
+        }
+
+        if (published.Count > 0)
+        {
+            try
+            {
+                await store.SetExecutionTestRailRunsAsync(run.RunId, published);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to persist the TestRail run link for API Health run {RunId}.", run.RunId);
+            }
         }
 
         PruneCompletedRuns();

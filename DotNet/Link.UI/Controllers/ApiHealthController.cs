@@ -1,6 +1,8 @@
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
+using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -52,6 +54,14 @@ public sealed class ApiHealthController : Controller
             : new Dictionary<string, ApiTestRunResult>(StringComparer.Ordinal);
 
         var selectedIsAll = string.Equals(selectedRunMode, "All", StringComparison.OrdinalIgnoreCase);
+        IReadOnlyList<TestRailRunReference> testRailRuns = [];
+        if (activeExecution != null)
+            testRailRuns = TestRailRunLinks.Copy(activeExecution.TestRailRuns);
+        else if (selectedRunId is Guid completedRunId)
+        {
+            var completedExecution = await _store.GetExecutionRunStatusAsync(completedRunId, ct);
+            testRailRuns = TestRailRunLinks.Copy(completedExecution?.TestRailRuns);
+        }
 
         var groups = endpoints
             .GroupBy(e => e.ServiceName)
@@ -81,7 +91,8 @@ public sealed class ApiHealthController : Controller
             Services = groups,
             HasActiveRun = activeExecution != null,
             LatestRunMode = selectedRunMode,
-            LatestRunServiceName = selectedServiceName
+            LatestRunServiceName = selectedServiceName,
+            TestRailRuns = testRailRuns
         });
     }
 

@@ -37,6 +37,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IMeasureTemplateStore _measureTemplateStore;
     private readonly IFacilityTemplateStore _facilityTemplateStore;
     private readonly ITestRailPublisher _testRailPublisher;
+    private readonly TestRailRunLinkRecorder _testRailRunLinks;
     private readonly bool _numericOnlyFacilityId;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
     private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
@@ -94,6 +95,7 @@ public class AutomationRunManager : IAutomationRunManager
             configuration,
             _logger,
             liveInjector);
+        _testRailRunLinks = new TestRailRunLinkRecorder(_hub, _logger, _snapshotStore);
     }
 
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
@@ -405,9 +407,10 @@ public class AutomationRunManager : IAutomationRunManager
             _logger.LogWarning(ex, "Could not load the scenario id for TestRail publish of run {RunId}.", runId);
         }
 
+        IReadOnlyList<TestRailRunReference> published = [];
         try
         {
-            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            var publishRequest = new ScenarioTestRailPublishRequest
             {
                 RunId = runId,
                 ScenarioId = scenarioId,
@@ -418,11 +421,28 @@ public class AutomationRunManager : IAutomationRunManager
                 Logs = summary.Logs ?? [],
                 StartedAt = summary.StartedAt,
                 FinishedAt = summary.FinishedAt
-            }, cancellationToken);
+            };
+            published = await _testRailPublisher.PublishScenarioRunAsync(publishRequest, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "TestRail publish failed for zombie scenario run {RunId}.", runId);
+        }
+
+        var persistedLinks = TestRailRunLinks.Copy(summary.TestRailRuns);
+        if (TestRailRunLinks.AddDistinct(summary.TestRailRuns, published))
+        {
+            try
+            {
+                // The cancel request can end before this write finishes. Do not drop the link.
+                await _snapshotStore.UpsertRunSummaryAsync(
+                    summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                summary.TestRailRuns = persistedLinks;
+                _logger.LogError(ex, "Failed to persist the TestRail run link for zombie scenario run {RunId}.", runId);
+            }
         }
 
         QueueCancellationCleanup(
@@ -1044,7 +1064,7 @@ public class AutomationRunManager : IAutomationRunManager
             lock (state.Sync)
                 failureDetails = state.FailureDetails.ToList();
 
-            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            var publishRequest = new ScenarioTestRailPublishRequest
             {
                 RunId = state.RunId,
                 ScenarioId = state.ScenarioId,
@@ -1056,12 +1076,33 @@ public class AutomationRunManager : IAutomationRunManager
                 LogsMayBeIncomplete = logsMayBeIncomplete,
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt
-            });
+            };
+            var published = await _testRailPublisher.PublishScenarioRunAsync(publishRequest);
+            await RecordTestRailRunsAsync(state.RunId, published);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "TestRail publish failed for scenario run {RunId}.", state.RunId);
         }
+    }
+
+    /// <summary>
+    /// Stores TestRail runs that accepted this automation run's results.
+    /// The same run id is kept once. A missing automation run is left unchanged.
+    /// </summary>
+    internal Task RecordTestRailRunsAsync(
+        Guid runId,
+        IReadOnlyList<TestRailRunReference> runs,
+        CancellationToken cancellationToken = default)
+    {
+        _runs.TryGetValue(runId, out var state);
+        return _testRailRunLinks.RecordAsync(
+            runId,
+            runs,
+            state,
+            TryPersistRunSummaryAsync,
+            state => ToSummary(state),
+            cancellationToken);
     }
 
     private async Task PersistOwnershipAsync(MutableRunState state)
@@ -1096,11 +1137,15 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    private async Task PersistRunSummaryAsync(MutableRunState state)
+    private Task PersistRunSummaryAsync(MutableRunState state) =>
+        TryPersistRunSummaryAsync(state);
+
+    private async Task<bool> TryPersistRunSummaryAsync(MutableRunState state)
     {
         try
         {
             await WriteRunSummaryAsync(state, CancellationToken.None);
+            return true;
         }
         catch (Exception ex)
         {
@@ -1113,6 +1158,7 @@ public class AutomationRunManager : IAutomationRunManager
                 "on the dashboard KPIs (via the in-memory merge) but will NOT appear " +
                 "in the Recent Runs table until a successful upsert lands.",
                 state.RunId);
+            return false;
         }
     }
 
@@ -1208,6 +1254,7 @@ public class AutomationRunManager : IAutomationRunManager
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
                 GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
                 GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
+                TestRailRuns = TestRailRunLinks.Copy(state.TestRailRuns),
                 Logs = includeLogs ? state.Logs.ToList() : []
             };
         }

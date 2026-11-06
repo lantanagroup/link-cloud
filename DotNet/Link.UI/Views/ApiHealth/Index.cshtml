@@ -1,3 +1,4 @@
+@using Automation.UI.Services.TestRail
 @model ApiHealthDashboardViewModel
 @{
     ViewData["Title"] = "API Health";
@@ -40,6 +41,32 @@
         <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
         <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Skipped == true)) skipped</span>
         <span class="badge au-badge-muted" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && (!s.IsIncludedInLatestRun || e.LastResult == null))) not run</span>
+    </div>
+
+    <div class="mb-3 small" id="apiHealthTestRail">
+        <span class="text-muted">TestRail</span>
+        <span class="ms-2" id="apiHealthTestRailRuns">@{
+            if (Model.TestRailRuns.Count == 0)
+            {
+                @TestRailRunLinks.NotPublished
+            }
+            else
+            {
+                for (var testRailIndex = 0; testRailIndex < Model.TestRailRuns.Count; testRailIndex++)
+                {
+                    var testRailRun = Model.TestRailRuns[testRailIndex];
+                    if (testRailIndex > 0)
+                    {
+                        @:,
+                    }
+                    <a href="@testRailRun.Url" target="_blank" rel="noopener noreferrer" title="@TestRailRunLinks.RunLinkTitle(testRailRun.RunId)">@TestRailRunLinks.RunLabel(testRailRun.RunId)</a>
+                    if (testRailRun.TestId is > 0 && TestRailRunLinks.IsHttpUrl(testRailRun.TestUrl))
+                    {
+                        <a href="@testRailRun.TestUrl" target="_blank" rel="noopener noreferrer" class="ms-1" title="@TestRailRunLinks.TestLinkTitle(testRailRun.TestId.Value)">@TestRailRunLinks.TestLabel(testRailRun.TestId.Value)</a>
+                    }
+                }
+            }
+        }</span>
     </div>
 
     <div id="runPhaseBanner" class="alert alert-secondary py-2 px-3 mb-3" style="display:none;">
