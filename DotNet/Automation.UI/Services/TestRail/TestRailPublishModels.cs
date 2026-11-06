@@ -9,6 +9,7 @@ public sealed record ScenarioTestRailPublishRequest
     public string RunName { get; init; } = string.Empty;
     public AutomationRunStatus Status { get; init; }
     public string? Error { get; init; }
+    public IReadOnlyList<string> FailureDetails { get; init; } = [];
     public IReadOnlyList<string> Logs { get; init; } = [];
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
