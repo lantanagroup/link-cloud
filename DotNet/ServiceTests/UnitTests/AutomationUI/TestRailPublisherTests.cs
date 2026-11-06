@@ -1268,38 +1268,275 @@ public class TestRailPublisherTests
     }
 
     [Fact]
-    public async Task Cancelled_scenario_run_is_not_posted()
+    public async Task Cancelled_scenario_posts_one_blocked_result()
     {
-        var api = new Mock<ITestRailApiClient>(MockBehavior.Strict);
+        var runId = Guid.Parse("4c1d8e2a-6b70-4f11-9a3e-2d5b7c8e9f01");
+        TestRailCaseResult? posted = null;
+        string? runName = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, int, string, IReadOnlyList<int>, CancellationToken>((_, _, name, _, _) => runName = name)
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
         var scenarioId = Guid.NewGuid();
-        var logs = new CaptureLogger<TestRailPublisher>();
-        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId), logger: logs);
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            RunId = runId,
+            ScenarioId = scenarioId,
+            RunName = "Smoke",
+            Status = AutomationRunStatus.Cancelled,
+            Error = "Cancelled by user.",
+            FailureDetails = ["Census step failed. TraceId: abc"],
+            Logs = ["still running when cancelled"],
+            StartedAt = DateTimeOffset.Parse("2026-11-06T12:00:00Z"),
+            FinishedAt = DateTimeOffset.Parse("2026-11-06T12:00:05Z")
+        });
+
+        posted.Should().NotBeNull();
+        posted!.CaseId.Should().Be(42);
+        posted.StatusId.Should().Be(TestRailStatusMapper.Blocked);
+        posted.Comment.Should().Contain($"Automation.UI scenario run {runId:D}");
+        posted.Comment.Should().Contain("Status: Cancelled");
+        posted.Comment.Should().Contain("Error: Cancelled by user.");
+        posted.Comment.Should().Contain("Failure details:");
+        posted.Comment.Should().Contain("Census step failed. TraceId: abc");
+        posted.Comment.Should().Contain("still running when cancelled");
+        posted.AttachmentFileName.Should().Be($"scenario-run-{runId:D}.log");
+        var attached = Encoding.UTF8.GetString(posted.Attachment!);
+        attached.Should().Contain("Cancelled by user.");
+        attached.Should().Contain("still running when cancelled");
+        runName.Should().Be($"Link Automation UI - Smoke - {runId:D}");
+
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.AddAttachmentToResultAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Cancelled_scenario_on_a_shared_run_posts_one_blocked_result()
+    {
+        TestRailCaseResult? posted = null;
+        string? runName = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, int, string, IReadOnlyList<int>, CancellationToken>((_, _, name, _, _) => runName = name)
+            .ReturnsAsync(321);
+        api.Setup(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 9, CaseId = 42 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var opts = ConfiguredOptions();
+        opts.UseSharedRun = true;
+        var publisher = CreatePublisher(api.Object, opts, ScenarioStore(scenarioId));
 
         await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
         {
             ScenarioId = scenarioId,
-            Status = AutomationRunStatus.Cancelled
+            Status = AutomationRunStatus.Cancelled,
+            Error = "Cancelled by user."
         });
 
-        api.VerifyNoOtherCalls();
-        logs.Entries.Should().Contain(entry =>
-            entry.Level == LogLevel.Information
-            && entry.Message.Contains("cancelled runs are not posted", StringComparison.Ordinal));
+        runName.Should().Be(TestRailPublisher.SharedScenarioRunName);
+        posted!.StatusId.Should().Be(TestRailStatusMapper.Blocked);
+        posted.Comment.Should().Contain("Error: Cancelled by user.");
+        api.Verify(a => a.AddResultsForCasesAsync(321, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Cancelled_api_health_run_is_not_posted()
+    public async Task Cancelled_scenario_without_a_case_id_is_not_posted()
     {
         var api = new Mock<ITestRailApiClient>(MockBehavior.Strict);
         var logs = new CaptureLogger<TestRailPublisher>();
         var publisher = CreatePublisher(api.Object, ConfiguredOptions(), logger: logs);
 
-        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with { Cancelled = true, Failed = true });
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            Status = AutomationRunStatus.Cancelled,
+            Error = "Cancelled by user."
+        });
+
+        api.VerifyNoOtherCalls();
+        logs.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Warning
+            && entry.Message.Contains("no TestRail case id mapped", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Cancelled_api_health_posts_blocked_for_mapped_endpoints_once()
+    {
+        IReadOnlyList<TestRailCaseResult>? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results)
+            .ReturnsAsync([]);
+
+        var passed = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Create Facility",
+            TestRailCaseId = 1
+        };
+        var notRun = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Get Facility",
+            TestRailCaseId = 2
+        };
+        var skipped = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Skip Me",
+            TestRailCaseId = 3
+        };
+        var unmapped = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "No Case"
+        };
+        var informational = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Info Only",
+            TestRailCaseId = 9,
+            AlwaysSkipReason = "not executable"
+        };
+        var sameCasePass = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "List Facilities",
+            TestRailCaseId = 7
+        };
+        var sameCaseFail = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Update Facility",
+            TestRailCaseId = 7
+        };
+
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [passed.Key] = new()
+                {
+                    EndpointKey = passed.Key,
+                    EndpointName = passed.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = true,
+                    DurationMs = 1500
+                },
+                [skipped.Key] = new()
+                {
+                    EndpointKey = skipped.Key,
+                    EndpointName = skipped.EndpointName,
+                    ServiceName = "Tenant",
+                    Skipped = true,
+                    SkipReason = "env"
+                },
+                [sameCasePass.Key] = new()
+                {
+                    EndpointKey = sameCasePass.Key,
+                    EndpointName = sameCasePass.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = true
+                },
+                [sameCaseFail.Key] = new()
+                {
+                    EndpointKey = sameCaseFail.Key,
+                    EndpointName = sameCaseFail.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = false,
+                    ErrorMessage = "nope"
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            ConfiguredOptions(),
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([
+                new FakeSuite(passed, notRun, skipped, unmapped, informational, sameCasePass, sameCaseFail)]));
+
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with
+        {
+            Cancelled = true,
+            Failed = true,
+            Error = "ApiHealthScenario seed run was cancelled. Aborting API Health run."
+        });
+
+        posted.Should().NotBeNull();
+        posted!.Should().HaveCount(3);
+        posted.Should().OnlyContain(result => result.StatusId == TestRailStatusMapper.Blocked);
+        posted.Select(result => result.CaseId).Should().BeEquivalentTo([1, 2, 7]);
+
+        var passedResult = posted.Single(result => result.CaseId == 1);
+        passedResult.Comment.Should().Contain("Create Facility");
+        passedResult.Comment.Should().Contain("ApiHealthScenario seed run was cancelled.");
+        passedResult.Elapsed.Should().Be("2s");
+        passedResult.Attachment.Should().NotBeNull();
+
+        var notRunResult = posted.Single(result => result.CaseId == 2);
+        notRunResult.Comment.Should().Contain("Get Facility");
+        notRunResult.Comment.Should().Contain("ApiHealthScenario seed run was cancelled.");
+        notRunResult.Attachment.Should().NotBeNull();
+
+        var collapsed = posted.Single(result => result.CaseId == 7);
+        collapsed.Comment.Should().Contain("List Facilities");
+        collapsed.Comment.Should().Contain("Update Facility");
+        collapsed.Comment.Should().NotContain("Posted as Failed");
+        collapsed.AttachmentFileName.Should().Be("api-health-c7.txt");
+
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Cancelled_api_health_without_a_mapped_case_is_not_posted()
+    {
+        var api = new Mock<ITestRailApiClient>(MockBehavior.Strict);
+        var logs = new CaptureLogger<TestRailPublisher>();
+        var unmapped = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "No Case" };
+        var skipped = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Skip Me", TestRailCaseId = 3 };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [skipped.Key] = new()
+                {
+                    EndpointKey = skipped.Key,
+                    EndpointName = skipped.EndpointName,
+                    Skipped = true,
+                    SkipReason = "env"
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            ConfiguredOptions(),
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(unmapped, skipped)]),
+            logger: logs);
+
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with
+        {
+            Cancelled = true,
+            Failed = true,
+            Error = "ApiHealthScenario seed run was cancelled. Aborting API Health run."
+        });
 
         api.VerifyNoOtherCalls();
         logs.Entries.Should().Contain(entry =>
             entry.Level == LogLevel.Information
-            && entry.Message.Contains("cancelled runs are not posted", StringComparison.Ordinal));
+            && entry.Message.Contains("no mapped TestRail case ids", StringComparison.Ordinal));
     }
 
     private static IScenarioStore ScenarioStore(Guid scenarioId, int caseId = 42)

@@ -43,14 +43,6 @@ public sealed class TestRailPublisher(
                 return;
             }
 
-            if (request.Status == AutomationRunStatus.Cancelled)
-            {
-                logger.LogInformation(
-                    "TestRail publisher skipped for scenario run {RunId}: cancelled runs are not posted.",
-                    request.RunId);
-                return;
-            }
-
             if (!opts.HasScenarioSuite)
             {
                 logger.LogWarning(
@@ -129,14 +121,6 @@ public sealed class TestRailPublisher(
                 return;
             }
 
-            if (request.Cancelled)
-            {
-                logger.LogInformation(
-                    "TestRail publisher skipped for API Health run {RunId}: cancelled runs are not posted.",
-                    request.RunId);
-                return;
-            }
-
             if (!opts.HasApiHealthSuite)
             {
                 logger.LogWarning(
@@ -158,36 +142,74 @@ public sealed class TestRailPublisher(
             var defByKey = definitions.ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
             var caseResults = new List<TestRailCaseResult>();
 
-            foreach (var (key, result) in resultsByKey)
+            if (request.Cancelled)
             {
-                defByKey.TryGetValue(key, out var definition);
-                var caseId = TestRailCaseMapper.ResolveApiHealthCaseId(
-                    definition?.TestRailCaseId,
-                    result.EndpointKey,
-                    result.EndpointName,
-                    opts.ApiHealthCaseIds);
-
-                if (caseId is null)
-                    continue;
-
-                var statusId = TestRailStatusMapper.FromApiHealthResult(result.Passed, result.Skipped);
-                if (statusId is null)
-                    continue;
-
-                var comment = BuildApiHealthComment(result, request.Error);
-                var attachment = ShouldAttach(statusId.Value)
-                    ? Encoding.UTF8.GetBytes(comment ?? result.ErrorMessage ?? "Failed")
-                    : null;
-
-                caseResults.Add(new TestRailCaseResult
+                // The run may have been cancelled before any endpoint stored a result.
+                // Post Blocked for every mapped endpoint that was in scope. A stored
+                // pass or fail stays in the comment; the result status is Blocked.
+                // Skipped and informational endpoints stay unpublished.
+                foreach (var definition in defByKey.Values)
                 {
-                    CaseId = caseId.Value,
-                    StatusId = statusId.Value,
-                    Comment = comment,
-                    Elapsed = result.DurationMs > 0 ? FormatElapsedMs(result.DurationMs) : null,
-                    Attachment = attachment,
-                    AttachmentFileName = attachment is null ? null : $"api-health-{SanitizeFileName(result.EndpointKey)}.txt"
-                });
+                    resultsByKey.TryGetValue(definition.Key, out var result);
+                    if (result?.Skipped == true || definition.IsInformational)
+                        continue;
+
+                    var caseId = TestRailCaseMapper.ResolveApiHealthCaseId(
+                        definition.TestRailCaseId,
+                        result?.EndpointKey ?? definition.Key,
+                        result?.EndpointName ?? definition.EndpointName,
+                        opts.ApiHealthCaseIds);
+                    if (caseId is null)
+                        continue;
+
+                    var comment = result is null
+                        ? BuildCancelledEndpointComment(definition, request.Error)
+                        : BuildApiHealthComment(result, request.Error);
+                    var attachment = Encoding.UTF8.GetBytes(comment ?? "Blocked");
+                    caseResults.Add(new TestRailCaseResult
+                    {
+                        CaseId = caseId.Value,
+                        StatusId = TestRailStatusMapper.Blocked,
+                        Comment = comment,
+                        Elapsed = result is { DurationMs: > 0 } ? FormatElapsedMs(result.DurationMs) : null,
+                        Attachment = attachment,
+                        AttachmentFileName = $"api-health-{SanitizeFileName(result?.EndpointKey ?? definition.Key)}.txt"
+                    });
+                }
+            }
+            else
+            {
+                foreach (var (key, result) in resultsByKey)
+                {
+                    defByKey.TryGetValue(key, out var definition);
+                    var caseId = TestRailCaseMapper.ResolveApiHealthCaseId(
+                        definition?.TestRailCaseId,
+                        result.EndpointKey,
+                        result.EndpointName,
+                        opts.ApiHealthCaseIds);
+
+                    if (caseId is null)
+                        continue;
+
+                    var statusId = TestRailStatusMapper.FromApiHealthResult(result.Passed, result.Skipped);
+                    if (statusId is null)
+                        continue;
+
+                    var comment = BuildApiHealthComment(result, request.Error);
+                    var attachment = ShouldAttach(statusId.Value)
+                        ? Encoding.UTF8.GetBytes(comment ?? result.ErrorMessage ?? "Failed")
+                        : null;
+
+                    caseResults.Add(new TestRailCaseResult
+                    {
+                        CaseId = caseId.Value,
+                        StatusId = statusId.Value,
+                        Comment = comment,
+                        Elapsed = result.DurationMs > 0 ? FormatElapsedMs(result.DurationMs) : null,
+                        Attachment = attachment,
+                        AttachmentFileName = attachment is null ? null : $"api-health-{SanitizeFileName(result.EndpointKey)}.txt"
+                    });
+                }
             }
 
             caseResults = CollapseApiHealthResults(caseResults);
@@ -690,6 +712,15 @@ public sealed class TestRailPublisher(
         var shortened = header[..(roomForHeader - cutMarker.Length)].TrimEnd() + cutMarker;
         var fitted = shortened + "\n\n" + note;
         return fitted.Length <= MaxCommentChars ? fitted : note;
+    }
+
+    private static string BuildCancelledEndpointComment(ApiEndpointDefinition definition, string? runError)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"{definition.ServiceName} :: {definition.EndpointName}");
+        if (!string.IsNullOrWhiteSpace(runError))
+            sb.AppendLine($"Run error: {runError}");
+        return Truncate(sb.ToString());
     }
 
     private static string? BuildApiHealthComment(ApiTestRunResult result, string? runError)
