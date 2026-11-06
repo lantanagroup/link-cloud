@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -337,6 +337,35 @@ public class PipelineDataReader
         }, cancellationToken);
     }
 
+    /// <summary>Raw entry status counts for one report, from the aggregate summary call.</summary>
+    public virtual async Task<(Dictionary<string, int> Reporting, Dictionary<string, int> Submission)?> GetReportEntryStatusCountsAsync(Guid scheduleId, CancellationToken cancellationToken = default)
+    {
+        var response = await _reportClient.GetEntrySummaryByScheduleAsync(scheduleId.ToString(), cancellationToken);
+        if (!response.IsSuccessStatusCode || response.Body is null)
+            return null;
+        return (new Dictionary<string, int>(response.Body.ReportingStatusCounts, StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, int>(response.Body.SubmissionStatusCounts, StringComparer.OrdinalIgnoreCase));
+    }
+    /// <summary>Per-report counts from one aggregate call: no per-patient payload, so it is safe to poll.</summary>
+    public sealed record ReportEntrySummaryInfo(int Total, int Evaluated, int Validated, int Submitted);
+
+    public virtual async Task<ReportEntrySummaryInfo?> GetReportEntrySummaryAsync(Guid scheduleId, CancellationToken cancellationToken = default)
+    {
+        var response = await _reportClient.GetEntrySummaryByScheduleAsync(scheduleId.ToString(), cancellationToken);
+        var body = response.Body;
+        if (!response.IsSuccessStatusCode || body is null)
+            return null;
+        int R(string key) => body.ReportingStatusCounts.Where(p => string.Equals(p.Key, key, StringComparison.OrdinalIgnoreCase)).Sum(p => p.Value);
+        int S(string key) => body.SubmissionStatusCounts.Where(p => string.Equals(p.Key, key, StringComparison.OrdinalIgnoreCase)).Sum(p => p.Value);
+        var total = body.ReportingStatusCounts.Values.Sum();
+        return new ReportEntrySummaryInfo(
+            total,
+            // Every status past PatientIdentified means the patient's measure report exists.
+            total - R("PatientIdentified"),
+            R("PassedValidation") + R("FailedValidation") + R("NotReportable"),
+            // A bypassed patient ends on NotSubmitted and is just as finished.
+            S("Submitted") + S("NotSubmitted"));
+    }
     public Task<List<ReportEntryInfo>> GetReportEntriesAsync(Guid scheduleId)
         => GetReportEntriesWithMeasureReportsAsync(scheduleId);
 

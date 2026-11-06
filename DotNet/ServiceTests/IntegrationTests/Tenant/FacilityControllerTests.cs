@@ -136,7 +136,7 @@ public class FacilityControllerTests : IDisposable
         };
         await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
-        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, null, null, 10, 1, false, CancellationToken.None);
+        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, null, null, 10, 1, false, null, CancellationToken.None);
 
         var okResult = result.Result as OkObjectResult;
         var value = okResult.Value as PagedConfigModel<FacilityModel>;

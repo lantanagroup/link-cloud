@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * pre-qual append both run inside process()), where the Kafka retry-topic ladder owns retrying.
  * The Azure SDK's default policy (4 exponential tries, effectively unbounded per-try timeout) hides
  * minutes of silent retrying inside every consumer attempt during an ABS outage while blocking the
- * single-threaded consumer executor. These tests pin the fail-fast policy handed to the builder.
+ * listener thread. These tests pin the fail-fast policy handed to the builder.
  */
 class BlobStorageConfigTest {
 

@@ -1,4 +1,4 @@
-﻿using HealthChecks.UI.Client;
+using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
@@ -13,6 +13,7 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -23,6 +24,9 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+using LantanaGroup.Link.Shared.Application.Factories;
+using Link.Authorization.Policies;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
@@ -34,6 +38,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using StackExchange.Redis;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -101,6 +106,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
     builder.Services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { AllowAutoCreateTopics = false });
 
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
@@ -160,6 +166,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
+
+    builder.Services.AddHttpContextAccessor();
 
     builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 

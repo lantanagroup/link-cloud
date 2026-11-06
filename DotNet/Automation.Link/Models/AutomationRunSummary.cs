@@ -18,6 +18,11 @@ public class AutomationRunSummary
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public string? Error { get; set; }
+    /// <summary>Short note of what this run kept or removed. Empty when both cleanup settings are off.</summary>
+    public string? RetentionNotice { get; set; }
+    /// <summary>Who started the run (Admin.BFF user email or id). Sent as the audit initiator on background service calls.</summary>
+    public string? InitiatedById { get; set; }
+    public string? InitiatedByName { get; set; }
     /// <summary>Formatted operation-failure blocks, capped when recorded. Empty when the run had none.</summary>
     public IReadOnlyList<string> FailureDetails { get; set; } = [];
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
@@ -34,5 +39,17 @@ public class AutomationRunSummary
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
+    /// <summary>TestRail runs that accepted this automation run's results. Empty when nothing was published.</summary>
+    public List<TestRailRunReference> TestRailRuns { get; set; } = [];
     public IReadOnlyList<string> Logs { get; set; } = [];
+}
+
+/// <summary>One TestRail run that received results for an automation run.</summary>
+public sealed class TestRailRunReference
+{
+    public int RunId { get; set; }
+    public string Url { get; set; } = string.Empty;
+    /// <summary>Set when the publish response included exactly one test id.</summary>
+    public int? TestId { get; set; }
+    public string? TestUrl { get; set; }
 }

@@ -131,7 +131,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new ProducerConfig());
-    builder.Services.RegisterKafkaProducer<string, Null>(kafkaConnection, new ProducerConfig());
+    builder.Services.RegisterKafkaProducer<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientCensusScheduled>(kafkaConnection, new ProducerConfig());
     builder.Services.RegisterKafkaProducer<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>(kafkaConnection, new ProducerConfig());
 
     // Factories
@@ -173,7 +173,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [
+            KafkaTopic.PatientListsAcquiredRetry.GetStringValue(),
+            KafkaTopic.CernerPatientsAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 

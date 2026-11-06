@@ -39,6 +39,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class ReportScheduledMessage
     {
+        public string? FacilityId { get; set; }
+
         /// <summary>
         /// List of report types to be generated
         /// </summary>

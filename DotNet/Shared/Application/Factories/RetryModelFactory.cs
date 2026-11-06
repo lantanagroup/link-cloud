@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -10,7 +11,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
 {
     public partial class RetryModelFactory : IRetryModelFactory
     {
-        [GeneratedRegex(@"-Retry$", RegexOptions.IgnoreCase, "en-US")]
+        [GeneratedRegex(@"-Retry(-.+)?$", RegexOptions.IgnoreCase, "en-US")]
         private static partial Regex RetrySuffix();
 
         public RetryModel CreateRetryModel(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings)
@@ -40,7 +41,9 @@ namespace LantanaGroup.Link.Shared.Application.Factories
                 ServiceName = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionService).Value ?? "",
                 FacilityId = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionFacilityId).Value ?? "",
                 ScheduledTrigger = triggerDate,
-                Topic = RetrySuffix().Replace(consumeResult.Topic, ""),
+                Topic = KafkaTopicNames.TryMainFromRetry(consumeResult.Topic, out var mainTopic, out _)
+                    ? mainTopic
+                    : RetrySuffix().Replace(consumeResult.Topic, ""),
                 Key = consumeResult.Message.Key,
                 Value = consumeResult.Message.Value,
                 RetryCount = retryCount,

@@ -1,0 +1,118 @@
+@model FacilityViewModel
+@{
+    var titleName = LabeledIdRules.DisplayName(Model.FacilityName, Model.FacilityId);
+    var heading = titleName ?? "Facility";
+    ViewData["Title"] = heading;
+}
+
+<div class="mb-3 d-flex flex-wrap gap-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
+    @if (!Model.NotFound && Model.LoadError is null)
+    {
+        <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Configuration" aria-label="Configuration"><i class="bi bi-gear" aria-hidden="true"></i><span class="ms-1">Configuration</span></a>
+        <button type="button" class="btn btn-sm btn-au-link" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
+    }
+</div>
+
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success">@message</div>
+}
+@if (TempData["Error"] is string actionError)
+{
+    <div class="alert alert-warning">@actionError</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound)
+{
+    <div class="au-card card">
+        <div class="card-header">Facility</div>
+        <div class="card-body">
+            <p class="mb-0">No facility named <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, CopyLabel = "Copy facility id" })" /> was found.</p>
+        </div>
+    </div>
+}
+else
+{
+    <h1 class="h3 mb-3">@heading</h1>
+    <div class="au-card card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>Facility <partial name="_AutomationBadge" model="Model.IsTest" /></span>
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, CopyLabel = "Copy facility id" })" />
+        </div>
+        <div class="card-body">
+            <h2 class="h6">Enrolled reporting</h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr><th>Cadence</th><th>Measures</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var report in Model.Enrolled)
+                    {
+                        <tr>
+                            <td>@report.Cadence</td>
+                            <td>
+                                @if (report.Measures.Count == 0)
+                                {
+                                    <span class="text-muted">No enrolled measures</span>
+                                }
+                                else
+                                {
+                                    @string.Join(", ", report.Measures)
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <nav class="lu-section-nav mb-3" aria-label="Facility sections">
+        @foreach (var section in new[] { ("reports", "Reports", "bi-file-earmark"), ("hsloc", "HSLOC locations", "bi-geo-alt"), ("locations", "Org locations", "bi-building"), ("encounters", "Encounters", "bi-person") })
+        {
+            <a class="btn btn-sm @(Model.Section == section.Item1 ? "lu-nav-current" : "btn-au-link")"
+ asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute(section.Item1).WithOrigin(ReturnUrlRules.FromQuery(Context.Request))"><i class="bi @(section.Item3) me-1"></i>@(section.Item2)</a>
+        }
+        @if (Model.DmrpEnabled)
+        {
+            <a class="btn btn-sm @(Model.Section == "plans" ? "lu-nav-current" : "btn-au-link")"
+ asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute("plans").WithOrigin(ReturnUrlRules.FromQuery(Context.Request))"><i class="bi bi-calendar3 me-1"></i>Reporting plans</a>
+        }
+    </nav>
+
+    @if (!string.IsNullOrWhiteSpace(Model.SectionError))
+    {
+        <div class="alert alert-warning">@Model.SectionError</div>
+    }
+    else if (Model.Section == "reports")
+    {
+        <partial name="_ViewReports" model="Model" />
+    }
+    else if (Model.Section == "hsloc")
+    {
+        <partial name="_ViewHsloc" model="Model" />
+    }
+    else if (Model.Section == "locations")
+    {
+        <partial name="_ViewLocations" model="Model" />
+    }
+    else if (Model.Section == "encounters")
+    {
+        <partial name="_ViewEncounters" model="Model" />
+    }
+    else if (Model.Section == "plans")
+    {
+        <partial name="_ViewPlans" model="Model" />
+    }
+}
+
+@if (!Model.NotFound && Model.LoadError is null && !string.IsNullOrWhiteSpace(Model.FacilityId))
+{
+    <partial name="_DataAcquisitionLogsModal" model="@(new DataAcquisitionLogsModal { FacilityId = Model.FacilityId })" />
+}

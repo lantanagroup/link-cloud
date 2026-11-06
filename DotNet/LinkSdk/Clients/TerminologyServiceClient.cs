@@ -22,6 +22,15 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public TerminologyServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
+
     /// <inheritdoc />
     // Flurl drops a null query parameter, so an unsupplied filter is omitted from the URL rather than
     // sent empty -- which matters here, because the service rejects a blank codeSystem or valueSet
@@ -71,6 +80,16 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
         if (!string.IsNullOrWhiteSpace(url)) request = request.SetQueryParam("url", url);
         return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse<string>> GetValueSetSummariesAsync(CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("terminology/fhir/ValueSet")
+            .SetQueryParam("_summary", "true")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> GetCodeSystemSummariesAsync(CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("terminology/fhir/CodeSystem")
+            .SetQueryParam("_summary", "true")
+            .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<string>> LookupCodeInCodeSystemAsync(
         string? system = null,

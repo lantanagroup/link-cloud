@@ -19,7 +19,12 @@ public class Facility
     [Required]
     public string TimeZone { get; set; } = "";
 
-    public bool IsDeleted { get; set; } 
+    public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// Test (automation) facility. Existing rows and payloads that omit the field read as false.
+    /// </summary>
+    public bool IsTest { get; set; }
 
     public DateTime CreateDate { get; set; }
 

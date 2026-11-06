@@ -1,3 +1,6 @@
+-- Keep local SQL from starving the rest of the stack (container limit is 3 GB).
+EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+EXEC sp_configure 'max server memory (MB)', 2048; RECONFIGURE;
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-audit') CREATE DATABASE [link-audit];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-census') CREATE DATABASE [link-census];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-dataacquisition') CREATE DATABASE [link-dataacquisition];
@@ -9,4 +12,5 @@ IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-querydispatch') CR
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-account') CREATE DATABASE [link-account];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-submission') CREATE DATABASE [link-submission];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-mock-dmrp') CREATE DATABASE [link-mock-dmrp];
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-operations') CREATE DATABASE [link-operations];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-nhsn-app-bff') CREATE DATABASE [link-nhsn-app-bff];

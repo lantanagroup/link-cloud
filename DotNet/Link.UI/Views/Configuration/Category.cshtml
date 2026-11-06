@@ -1,0 +1,161 @@
+@model CategoryPage
+@using Link.UI.Services
+@{
+    var form = Model.Form;
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Validation")!, "Validation"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Validation category</h1>
+<partial name="_Alerts" />
+
+@if (Model.Missing)
+{
+    <div class="alert au-note">This category is not saved yet. Saving creates it.</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (Model.ShowForm)
+{
+    <div class="au-card card">
+        <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = form.Id, CopyLabel = "Copy id" })" /></div>
+        <div class="card-body">
+            <form method="post" data-au-save asp-action="SaveCategory" class="row g-3">
+                <input type="hidden" name="Id" value="@form.Id" />
+                <div class="col-12">
+                    <label class="form-label" for="title">Title</label>
+                    <input id="title" name="Title" value="@form.Title" class="form-control" maxlength="500" required />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="severity">Severity</label>
+                    <select id="severity" name="Severity" class="form-select">
+                        @foreach (var severity in ConfigurationRules.Severities)
+                        {
+                            if (string.Equals(severity, form.Severity, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@severity" selected>@severity</option>
+                            }
+                            else
+                            {
+                                <option value="@severity">@severity</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-md-8 d-flex flex-wrap align-items-end gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="acceptable" name="Acceptable" value="true" @(form.Acceptable ? "checked" : null) />
+                        <label class="form-check-label" for="acceptable">Acceptable</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="submit" name="Submit" value="true" @(form.Submit ? "checked" : null) />
+                        <input type="hidden" name="Submit" value="false" />
+                        <label class="form-check-label" for="submit">Submit</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="review" name="Review" value="true" @(form.Review ? "checked" : null) />
+                        <input type="hidden" name="Review" value="false" />
+                        <label class="form-check-label" for="review">Review</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="guidance">Guidance</label>
+                    <textarea id="guidance" name="Guidance" class="form-control" rows="6" maxlength="1000" required>@form.Guidance</textarea>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success">Save category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Missing)
+    {
+        <p class="text-muted mt-3">Save the category before adding a rule.</p>
+    }
+    else
+    {
+        <div class="au-card card mt-3">
+            <div class="card-header">Rules</div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.RuleError))
+                {
+                    <div class="alert alert-warning">@Model.RuleError</div>
+                }
+                @if (Model.Rules.Count == 0)
+                {
+                    <p>No rules yet. Saving a matcher adds a new latest rule.</p>
+                }
+                else
+                {
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm align-middle mb-0 lu-wide-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Id</th>
+                                    <th scope="col">When</th>
+                                    <th scope="col">Matcher</th>
+                                    <th scope="col">Inverted</th>
+                                    <th scope="col"><span class="visually-hidden">Delete</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var rule in Model.Rules)
+                            {
+                                <tr>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Rule", Value = rule.Id.ToString(), Compact = true, CopyLabel = "Copy rule id" })" /></td>
+                                    <td class="text-nowrap">@(string.IsNullOrWhiteSpace(rule.Timestamp) ? "—" : rule.Timestamp)</td>
+                                    <td>@rule.Summary</td>
+                                    <td>@(rule.Inverted ? "Yes" : "No")</td>
+                                    <td>
+                                        <form method="post" data-au-save asp-action="DeleteRule" asp-route-ruleId="@rule.Id">
+                                            <input type="hidden" name="id" value="@form.Id" />
+                                            <button data-hold="@Hold.Of("Delete this rule? This cannot be undone.", "Delete this rule? This cannot be undone.", "This cannot be undone.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete rule @rule.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                <form method="post" data-au-save asp-action="SaveRule" asp-route-id="@form.Id" class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="field">Field</label>
+                        <select id="field" name="field" class="form-select">
+                            @foreach (var field in ConfigurationRules.ResultFields)
+                            {
+                                <option value="@field">@field</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-8">
+                        <label class="form-label" for="regex">Regex</label>
+                        <input id="regex" name="regex" class="form-control" maxlength="500" />
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="inverted" name="inverted" value="true" />
+                            <input type="hidden" name="inverted" value="false" />
+                            <label class="form-check-label" for="inverted">Inverted</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="matcher">Matcher JSON</label>
+                        <textarea id="matcher" name="matcher" class="form-control" rows="5" placeholder='{"field":"CODE","regex":"^abc","inverted":false}'></textarea>
+                        <p class="text-muted small mb-0">Leave this blank to save the field and regex above. A composite uses children, for example {"children":[{"field":"CODE","regex":"^a","inverted":false}],"requiresAllChildren":true,"inverted":false}.</p>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success">Save rule</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+}

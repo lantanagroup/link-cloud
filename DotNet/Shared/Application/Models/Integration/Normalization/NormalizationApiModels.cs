@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
+
+namespace LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 
 public class NormalizationOperationApiModel
 {
@@ -10,6 +12,14 @@ public class NormalizationOperationApiModel
     public string Description { get; set; } = string.Empty;
     public bool IsDisabled { get; set; }
     public List<NormalizationOperationResourceTypeApiModel> OperationResourceTypes { get; set; } = [];
+    public List<NormalizationOperationVendorPresetApiModel> VendorPresets { get; set; } = [];
+}
+
+public class NormalizationOperationVendorPresetApiModel
+{
+    public Guid Id { get; set; }
+    public Guid VendorVersionId { get; set; }
+    public VendorVersionModel? VendorVersion { get; set; }
 }
 
 public class CreateNormalizationOperationRequestApiModel
@@ -19,6 +29,20 @@ public class CreateNormalizationOperationRequestApiModel
     public CreateNormalizationOperationDetailsApiModel Operation { get; set; } = new();
     public string? Description { get; set; }
     public List<Guid> VendorVersionIds { get; set; } = [];
+}
+
+public class UpdateNormalizationOperationRequestApiModel
+{
+    public Guid? Id { get; set; }
+    public List<string> ResourceTypes { get; set; } = [];
+    public string? FacilityId { get; set; }
+    public CreateNormalizationOperationDetailsApiModel Operation { get; set; } = new();
+    public bool IsDisabled { get; set; }
+
+    /// <summary>
+    /// Null leaves vendor presets alone. An empty list removes them.
+    /// </summary>
+    public List<Guid>? VendorVersionIds { get; set; }
 }
 
 public class CreateNormalizationOperationDetailsApiModel
@@ -211,4 +235,15 @@ public class HslocCodeApiModel
     public string LongDescription { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+}
+
+/// <summary>Resources normalized for one report (one aggregate row from the Normalization service).</summary>
+public class NormalizationReportSummaryApiModel
+{
+    public string ReportId { get; set; } = string.Empty;
+    public int Passes { get; set; }
+    public long ResourcesNormalized { get; set; }
+    public long Failures { get; set; }
+    public DateTime? FirstNormalizedUtc { get; set; }
+    public DateTime? LastNormalizedUtc { get; set; }
 }

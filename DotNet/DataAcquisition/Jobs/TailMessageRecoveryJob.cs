@@ -25,13 +25,13 @@ public class TailMessageRecoveryJob : IJob
 {
     private readonly ILogger<TailMessageRecoveryJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
+    private readonly IProducer<string, ResourcesAcquired> _resourceAcquiredProducer;
     private readonly TailMessageRecoveryJobSettings _settings;
 
     public TailMessageRecoveryJob(
         ILogger<TailMessageRecoveryJob> logger,
         IServiceScopeFactory serviceScopeFactory,
-        IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
+        IProducer<string, ResourcesAcquired> resourceAcquiredProducer,
         IOptions<TailMessageRecoveryJobSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -98,15 +98,14 @@ public class TailMessageRecoveryJob : IJob
                         headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
                     }
 
+                    tailResult.ResourcesAcquired.FacilityId = tailResult.FacilityId;
+                    tailResult.ResourcesAcquired.PatientId = tailResult.PatientId;
+
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourcesAcquired.ToString(),
-                        new Message<ResourceKey, ResourcesAcquired>
+                        new Message<string, ResourcesAcquired>
                         {
-                            Key = new ResourceKey
-                            {
-                                FacilityId = tailResult.FacilityId,
-                                PatientId = tailResult.PatientId
-                            },
+                            Key = KafkaKeys.ForPatient(tailResult.FacilityId, tailResult.PatientId),
                             Headers = headers,
                             Value = tailResult.ResourcesAcquired
                         },

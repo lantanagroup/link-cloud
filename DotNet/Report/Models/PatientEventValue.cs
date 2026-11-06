@@ -4,6 +4,7 @@ namespace LantanaGroup.Link.Report.Models
 {
     public class PatientEventValue
     {
+        public string? FacilityId { get; set; }
         public string PatientId { get; set; }
         public string EventType { get; set; }
     }

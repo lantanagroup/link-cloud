@@ -1,0 +1,21 @@
+# topic:service[,service]
+# kafka-topics-sync creates {topic}-Retry-{service} and {topic}-Redrive-{service}
+# with at least the main topic partition count. It never deletes or shrinks.
+# Prefix a service with ~ to create only {topic}-Redrive-{service}.
+# Use that when the service subscribes to its redrive topic and has no retry consumer.
+AuditableEventOccurred:Audit
+DataAcquisitionRequested:DataAcquisition
+GenerateReportRequested:Report
+MappingOutcomeEvaluated:Report
+MeasureReportGenerated:Report
+PayloadSubmitted:Report
+PatientCensusScheduled:DataAcquisition
+PatientEvent:QueryDispatch,Report
+PatientListsAcquired:Census
+CernerPatientsAcquired:Census
+ReportScheduled:Report,QueryDispatch
+ResourcesAcquired:Normalization
+SubmitPayload:Submission
+ValidationComplete:Report
+NotificationRequested:~Notification
+ReadyToAcquire:~DataAcquisitionWorker

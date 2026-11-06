@@ -9,6 +9,7 @@ using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Infrastructure;
+using ServiceActivitySource = LantanaGroup.Link.Notification.Infrastructure.ServiceActivitySource;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
@@ -35,7 +36,12 @@ using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 
@@ -80,6 +86,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     var serviceInformation = builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
+        serviceInformation.ServiceConfigName = NotificationConstants.ServiceName;
+        builder.Services.AddSingleton(serviceInformation);
         ServiceActivitySource.Initialize(serviceInformation);
     }
     else
@@ -154,6 +162,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(new KafkaProducerFactory(kafkaConnection).CreateAuditEventProducer());
 
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, NotificationMessage>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, NotificationMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, string>>();
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
 
     // Add Link Security

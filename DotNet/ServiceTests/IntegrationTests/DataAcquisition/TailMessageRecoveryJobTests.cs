@@ -71,7 +71,7 @@ public class TailMessageRecoveryJobTests
 
         var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourcesAcquired>>();
 
         var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
 
@@ -83,7 +83,7 @@ public class TailMessageRecoveryJobTests
         _fixture.ResourcesAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ResourcesAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -139,7 +139,7 @@ public class TailMessageRecoveryJobTests
 
         var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourcesAcquired>>();
 
         var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
 
@@ -151,7 +151,7 @@ public class TailMessageRecoveryJobTests
         _fixture.ResourcesAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ResourcesAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -197,7 +197,7 @@ public class TailMessageRecoveryJobTests
 
         var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourcesAcquired>>();
 
         var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
 
@@ -209,7 +209,7 @@ public class TailMessageRecoveryJobTests
         _fixture.ResourcesAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ResourcesAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -254,7 +254,7 @@ public class TailMessageRecoveryJobTests
 
         var logger = new Mock<ILogger<TailMessageRecoveryJob>>().Object;
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourcesAcquired>>();
+        var producer = _fixture.ServiceProvider.GetRequiredService<IProducer<string, ResourcesAcquired>>();
 
         var job = new TailMessageRecoveryJob(logger, scopeFactory, producer, settings);
 
@@ -266,7 +266,7 @@ public class TailMessageRecoveryJobTests
         _fixture.ResourcesAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
                 KafkaTopic.ResourcesAcquired.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
 

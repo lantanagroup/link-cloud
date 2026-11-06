@@ -8,6 +8,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 
 public class ResourcesAcquired
 {
+    public string? FacilityId { get; set; }
+    public string? PatientId { get; set; }
     public string QueryType { get; set; } = string.Empty;
     public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();
     public ReportableEvent ReportableEvent { get; set; }

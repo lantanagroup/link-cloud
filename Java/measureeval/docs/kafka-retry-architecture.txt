@@ -9,11 +9,12 @@ cleanup and the onDeadLetter hook, fail-fast blob clients, and testing recipes.
 --------------------------------------------------------------------------------
 1. THE DRIVING CONSTRAINT
 --------------------------------------------------------------------------------
-MeasureEval evaluates CQL, which can run long. Processing on the Kafka POLL
-thread would risk exceeding max.poll.interval.ms -> consumer eviction ->
-rebalance (and duplicate processing). So records are processed on a background
-single-thread executor (AbstractAsyncConsumer): the container thread submits the
-work and immediately returns to polling.
+MeasureEval evaluates CQL, which can run long and can exceed
+max.poll.interval.ms. Records are still processed on the listener thread
+(AbstractAsyncConsumer). The listener returns only after process and ack, so a
+rebalance cannot acknowledge a record the thread has not finished. A long
+evaluation can still trip max.poll.interval.ms; that is accepted so an in-flight
+record is never acked from a thread the rebalance has already revoked.
 
 Consequence that shapes everything: the business exception is thrown on the
 EXECUTOR thread, not the container thread. Spring Kafka's native @RetryableTopic
@@ -26,8 +27,8 @@ and retries must be routed by hand.
 2. THE CORE PATTERN - OWN THE POLICY, RENT THE PLUMBING
 --------------------------------------------------------------------------------
 
-  main topic --> @KafkaListener.consume --> doConsume (background executor)
-                                              | success --> ack
+  main topic --> @KafkaListener.consume --> doConsume (caller thread)
+                                              | success --> ack, then return
                                               | failure --> RetryTopicRecoverer
                                               |    | attempts++
                                               |    | due = now + backoff(attempt)
@@ -56,7 +57,7 @@ leaves the offset uncommitted -> redelivery, no silent loss).
 --------------------------------------------------------------------------------
 
   Async path:
-    business exception in process() (executor thread)
+    business exception in process() (listener thread)
     -> RetryTopicRecoverer + resolver -> -Retry or -Error
 
   Container-thread path:
@@ -65,9 +66,9 @@ leaves the offset uncommitted -> redelivery, no silent loss).
 
 Complementary, not redundant: deserialization poison can never succeed, so it is
 intercepted at intake and dead-lettered immediately without burning a retry
-cycle - and it never reaches -Retry. The async recoverer never sees
-deserialization failures (they happen before the executor hand-off), so a
-separate container-thread handler is required.
+cycle - and it never reaches -Retry. The recoverer never sees deserialization
+failures (they happen before the listener runs), so a separate
+container-thread handler is required.
 
 
 --------------------------------------------------------------------------------
@@ -75,8 +76,8 @@ separate container-thread handler is required.
 --------------------------------------------------------------------------------
 
   AbstractAsyncConsumer<K,T>            (shared/kafka)
-      Submits process(record) to a single-thread executor; on success acks; on
-      failure calls the recoverer then acks (always, in finally).
+      Runs process(record) and ack on the caller thread. On success acks. On
+      failure calls the recoverer then acks. Does not ack when recovery throws.
 
   ResourcesNormalizedConsumer /        (measureeval/services)
   EvaluationRequestedConsumer
@@ -175,9 +176,11 @@ Guarded by:
 --------------------------------------------------------------------------------
 8. DESIGN DECISIONS (the steps that produced this)
 --------------------------------------------------------------------------------
-  1.  Keep the async executor (pre-spike architectural constraint). -> Rules out
-      the native synchronous retry-topic model, since the framework can't see
-      async exceptions.
+  1.  Process and ack on the listener thread. A background executor let a
+      rebalance ack a record the thread had not finished, and let the listener
+      return before the ack. Business exceptions are still caught inside
+      doConsume and routed by RetryTopicRecoverer, so the container error
+      handler does not see them and does not republish to the main topic.
   2.  Topic-based retry, reusing Spring's backoff listener, for the first ship -
       no new infrastructure; Kafka gives durability, distribution, and crash
       recovery for free. (Mongo store is the preferred longer-term destination;

@@ -11,6 +11,9 @@ public interface IAdminBffIntegrationClient
 
     Task<LinkApiResponse<string>> GetServiceHealthAsync(string service, CancellationToken cancellationToken = default);
 
+    /// <summary>GET /api/info. Admin.BFF collects each service's version block.</summary>
+    Task<LinkApiResponse<string>> GetServiceInformationAsync(CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<FacilityModel>> CreateFacilityAsync(
         FacilityModel request,
         CancellationToken cancellationToken = default);
@@ -47,6 +50,15 @@ public interface IAdminBffIntegrationClient
         string reportScheduleId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Stops an in-progress report and soft-deletes it:
+    /// <c>POST /api/aggregate/reports/{reportScheduleId}/abort</c>.
+    /// Admin.BFF owns this because it also drops that report's acquisition work.
+    /// </summary>
+    Task<LinkApiResponse> AbortAggregateReportAsync(
+        string reportScheduleId,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse> RestoreAggregateReportAsync(
         string reportScheduleId,
         CancellationToken cancellationToken = default);
@@ -64,5 +76,38 @@ public interface IAdminBffIntegrationClient
         string facilityId,
         IReadOnlyList<PatientListItem> patientLists,
         Guid reportTrackingId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> CreatePatientEventAsync(
+        string facilityId,
+        string patientId,
+        string eventType,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> CreateDataAcquisitionRequestedAsync(
+        string facilityId,
+        string patientId,
+        string queryType,
+        IReadOnlyList<string> reportTypes,
+        DateTime startDateUtc,
+        DateTime endDateUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> CreatePatientAcquiredAsync(
+        string facilityId,
+        IReadOnlyList<string> patientIds,
+        string reportTrackingId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> StartConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<string>> ReadConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> StopConsumersAsync(
+        string correlationId,
         CancellationToken cancellationToken = default);
 }

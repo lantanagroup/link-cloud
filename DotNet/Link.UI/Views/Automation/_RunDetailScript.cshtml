@@ -1,0 +1,2204 @@
+@using Automation.UI.Services.TestRail
+<script>
+    (function () {
+        const runId = '@Model.RunId';
+        const isMetricsRun = @(Model.IsMetricsRun ? "true" : "false");
+        const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RunConfigurationJson ?? string.Empty));
+        const patientConfigurationCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            ((List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? []).Select(c => new { c.Id, c.Name }),
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+        const snapshotUrl = '@Url.Action("PipelineSnapshot", "Automation")';
+        const statusUrl = '@Url.Action("Status", "Automation", new { id = Model.RunId })';
+        const logsUrl = '@Url.Action("Logs", "Automation")';
+        const manifestUrl = '@Url.Action("ManifestData", "Automation")';
+        const performancePanelUrl = '@Url.Action("PerformancePanel", "Automation", new { id = Model.RunId })';
+        let advancedPanelLoaded = @(ViewBag.Performance != null ? "true" : "false");
+        let advancedPollTimer = null;
+
+        async function refreshAdvancedPerformancePanel() {
+            if (!isMetricsRun || advancedPanelLoaded) return true;
+            try {
+                const response = await fetch(performancePanelUrl, { headers: { 'Accept': 'text/html' } });
+                if (!response.ok || response.status === 204) return false;
+                const html = await response.text();
+                if (!html || !html.trim()) return false;
+                const host = document.getElementById('advancedPerformanceHost');
+                if (host) {
+                    host.innerHTML = html;
+                    if (window.luPaintTimes) window.luPaintTimes(host);
+                    advancedPanelLoaded = true;
+                }
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function startAdvancedPerformancePolling() {
+            if (!isMetricsRun || advancedPanelLoaded || advancedPollTimer) return;
+            advancedPollTimer = setInterval(async function () {
+                const done = await refreshAdvancedPerformancePanel();
+                if (done && advancedPollTimer) {
+                    clearInterval(advancedPollTimer);
+                    advancedPollTimer = null;
+                }
+            }, 5000);
+            setTimeout(function () {
+                if (advancedPollTimer) {
+                    clearInterval(advancedPollTimer);
+                    advancedPollTimer = null;
+                }
+            }, 180000);
+        }
+
+        if (isMetricsRun && !advancedPanelLoaded)
+            startAdvancedPerformancePolling();
+
+        const queryPlanGetJsonUrl = '@Url.Action("GetJson", "QueryPlans")';
+        const normalizationSuiteGetJsonUrl = '@Url.Action("GetSuiteJson", "Normalizations")';
+        const normalizationResultsUrl = '@Url.Action("NormalizationResults", "Automation")';
+        let lastNormalizationResults = null;
+        let normalizationResultsRequest = null;
+        let normalizationResultsLoadedAt = 0;
+        const orgResourceMapGetJsonUrl = '@Url.Action("GetJson", "OrganizationResourceMaps")';
+        const logBox = document.getElementById('logBox');
+        let dataAcqErrors = [];
+        let measureErrors = [];
+        let validationErrors = [];
+        let normalizationErrors = [];
+        let lastDataAcqSnapshot = null;
+        const serviceErrorLines = {
+            'Data Acquisition': [],
+            'Normalization': [],
+            'Measure Eval': [],
+            'Validation': [],
+            'Report': []
+        };
+        const charts = {};
+        let currentRunStatus = '@Model.Status';
+        let validationPatientsOpen = 0;
+        let validationCountsSeen = false;
+        let validationCountKey = '';
+        let validationMovedAt = 0;
+        const validationQuietMs = 30 * 60 * 1000;
+        let currentFinishedAt = '@(Model.FinishedAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ") ?? string.Empty)';
+        let runCompletedAtMs = currentFinishedAt ? (Date.parse(currentFinishedAt) || Date.now()) : null;
+        let snapshotTimer = null;
+        let statusPollTimer = null;
+        const templateNameCache = new Map();
+
+        async function resolveTemplateName(endpointUrl, id) {
+            const normalized = String(id || '').trim();
+            if (!normalized) return '';
+
+            const cacheKey = `${endpointUrl}|${normalized}`;
+            if (templateNameCache.has(cacheKey))
+                return templateNameCache.get(cacheKey) || '';
+
+            try {
+                const response = await fetch(`${endpointUrl}?id=${encodeURIComponent(normalized)}`);
+                if (!response.ok) {
+                    templateNameCache.set(cacheKey, '');
+                    return '';
+                }
+
+                const body = await response.json();
+                const name = (body?.name || body?.Name || '').toString().trim();
+                templateNameCache.set(cacheKey, name);
+                return name;
+            } catch {
+                templateNameCache.set(cacheKey, '');
+                return '';
+            }
+        }
+
+        function antiforgeryToken() {
+            var token = document.querySelector('input[name="__RequestVerificationToken"]');
+            return token ? token.value : '';
+        }
+
+        function swapCancelToDelete() {
+            var cancelBtn = document.getElementById('btnCancelRun');
+            if (cancelBtn) cancelBtn.remove();
+
+            var actionsDiv = document.getElementById('runHeaderActions');
+            if (!actionsDiv) return;
+
+            var backLink = actionsDiv.querySelector('a.btn-au-link');
+
+            if (!document.getElementById('btnDeleteRun')) {
+                var deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'btn btn-danger btn-sm';
+                deleteBtn.id = 'btnDeleteRun';
+                deleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+                if (backLink) actionsDiv.insertBefore(deleteBtn, backLink);
+                else actionsDiv.appendChild(deleteBtn);
+            }
+
+            if (!document.getElementById('btnExportRun')) {
+                var exportLink = document.createElement('a');
+                exportLink.id = 'btnExportRun';
+                exportLink.className = 'btn btn-sm btn-au-link';
+                exportLink.href = '@Url.Action("Export", "Automation", new { id = Model.RunId })';
+                exportLink.innerHTML = '<i class="bi bi-download me-1"></i>Export Diagnostics';
+                if (backLink) actionsDiv.insertBefore(exportLink, backLink);
+                else actionsDiv.appendChild(exportLink);
+            }
+        }
+
+        function handleDeleteClick(btn) {
+            if (!window.luHoldConfirm) return;
+            window.luHoldConfirm.open(btn, {
+                title: 'Delete this run',
+                action: 'Delete this run and all persisted data.',
+                details: [['Run', runId]],
+                fields: [],
+                risks: ['The run log and the data it persisted are removed.', 'This cannot be undone from this page.'],
+                confirm: '',
+                label: 'Hold to delete'
+            }, function () { deleteRun(btn); });
+        }
+
+        function deleteRun(btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Deleting…';
+
+            fetch('@Url.Action("DeleteJson", "Automation")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': antiforgeryToken()
+                },
+                body: JSON.stringify({ id: runId })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (result) {
+                if (result.success) {
+                    window.location.href = '@Url.Action("Index", "Automation")';
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+                    alert('Unable to delete the run. It may still be active.');
+                }
+            })
+            .catch(function (err) {
+                console.error('Delete failed', err);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+                alert('Unable to delete the run. Please try again.');
+            });
+        }
+
+        // Use event delegation so dynamically-created delete buttons also work
+        document.getElementById('runHeaderActions').addEventListener('click', function (e) {
+            var deleteBtn = e.target.closest('#btnDeleteRun');
+            if (deleteBtn) {
+                handleDeleteClick(deleteBtn);
+                return;
+            }
+        });
+
+        var cancelBtn = document.getElementById('btnCancelRun');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                if (!window.luHoldConfirm) return;
+                window.luHoldConfirm.open(cancelBtn, {
+                    title: 'Cancel this run',
+                    action: 'Cancel this running test. This aborts pipeline work for the facility and removes generated FHIR data.',
+                    details: [['Run', runId]],
+                    fields: [],
+                    risks: ['Pipeline work for this facility is aborted.', 'Generated FHIR data for this run is removed.'],
+                    confirm: '',
+                    label: 'Hold to cancel'
+                }, function () { cancelRun(); });
+            });
+        }
+
+        function cancelRun() {
+            if (!cancelBtn) return;
+            cancelBtn.disabled = true;
+            cancelBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Cancelling…';
+
+                fetch('@Url.Action("CancelJson", "Automation")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': antiforgeryToken()
+                    },
+                    body: JSON.stringify({ id: runId })
+                })
+                .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+                .then(function (res) {
+                    if (res.ok && res.body && res.body.success) {
+                        swapCancelToDelete();
+                        return;
+                    }
+                    cancelBtn.disabled = false;
+                    cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancel';
+                    var reason = (res.body && (res.body.error || res.body.detail))
+                        ? (res.body.error || res.body.detail)
+                        : 'This run is not running.';
+                    alert(reason);
+                })
+                .catch(function (err) {
+                    console.error('Cancel failed', err);
+                    cancelBtn.disabled = false;
+                    cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancel';
+                    alert('Cancel could not be completed. Refresh the page and check the run status.');
+                });
+        }
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/hubs/runs')
+            .withAutomaticReconnect()
+            .build();
+
+        let logPageNumber = 0;
+        let logTotalPages = 1;
+        let logOnTail = true;
+
+        function renderLogPage(page) {
+            const lines = (page && (page.lines || page.Lines)) || [];
+            logPageNumber = page.pageNumber || page.PageNumber || 1;
+            logTotalPages = page.totalPages || page.TotalPages || 1;
+            logOnTail = logPageNumber >= logTotalPages;
+            logBox.textContent = lines.join('\n');
+            const info = document.getElementById('logPageInfo');
+            const totalLines = (page && (page.totalLines || page.TotalLines)) || lines.length;
+            if (info) info.textContent = totalLines + ' lines · page ' + logPageNumber + ' of ' + logTotalPages;
+            const older = document.getElementById('logOlder');
+            const newer = document.getElementById('logNewer');
+            if (older) older.disabled = logPageNumber <= 1;
+            if (newer) newer.disabled = logOnTail;
+            if (logOnTail) logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        async function loadLogPage(pageNumber) {
+            const response = await fetch(logsUrl + '?id=' + encodeURIComponent(runId) + '&pageNumber=' + pageNumber + '&pageSize=200', { headers: { 'Accept': 'application/json' } });
+            if (!response.ok) return;
+            renderLogPage(await response.json());
+        }
+
+        function appendLog(line) {
+            if (!line || !logOnTail) return;
+            logBox.textContent += (logBox.textContent ? '\n' : '') + line;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function formatNumber(value) {
+            return Number(value || 0).toFixed(2);
+        }
+
+        function formatActiveDuration(seconds) {
+            const value = Number(seconds);
+            if (!Number.isFinite(value) || value <= 0) return '—';
+            if (value < 1) return '< 1s';
+            if (value < 60) return `${Math.round(value)}s`;
+            const minutes = Math.floor(value / 60);
+            const secs = Math.round(value % 60);
+            if (minutes < 60) return `${minutes}m ${secs}s`;
+            const hours = Math.floor(minutes / 60);
+            return `${hours}h ${minutes % 60}m ${secs}s`;
+        }
+
+        function activeDurationOf(section) {
+            return formatActiveDuration(section?.activeDurationSeconds ?? section?.ActiveDurationSeconds);
+        }
+
+        function escapeHtml(value) {
+            const s = String(value || '');
+            return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+        }
+
+        function toLabel(key) {
+            if (!key) return '';
+            const spaced = String(key)
+                .replaceAll('_', ' ')
+                .replace(/([a-z])([A-Z])/g, '$1 $2');
+            return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+        }
+
+        const measureShortNames = {
+            NhsnAcuteCareHospitalMonthlyInitialPopulation: 'ACH Monthly',
+            NhsnAcuteCareHospitalDailyInitialPopulation: 'ACH Daily',
+            NhsnGlycemicControlHypoglycemicInitialPopulation: 'Hypoglycemic'
+        };
+
+        const scheduledPatternShortNames = {
+            AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → after',
+            AdmittedBeforePeriodDischargedDuringPeriod: 'Before → during',
+            AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → after',
+            AdmittedDuringPeriodDischargedDuringPeriod: 'During → during',
+            AdmittedAndDischargedBeforePeriod: 'Entirely before',
+            AdmittedAndDischargedAfterPeriod: 'Entirely after'
+        };
+        const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
+
+        function patientConfigLabel(cohort) {
+            const id = cohort?.patientConfigurationId;
+            if (!id) return 'No configuration';
+            const hit = (patientConfigurationCatalog || []).find(function (c) { return c.id === id; });
+            return hit ? hit.name : String(id).slice(0, 8);
+        }
+
+        function formatScheduledPattern(value) {
+            if (value === null || value === undefined || value === '')
+                return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+            const key = String(value).trim();
+            if (!key) return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+            if (scheduledPatternShortNames[key]) return escapeHtml(scheduledPatternShortNames[key]);
+            if (/^\d+$/.test(key)) {
+                const index = Number.parseInt(key, 10);
+                const keys = Object.keys(scheduledPatternShortNames);
+                if (index >= 0 && index < keys.length)
+                    return escapeHtml(scheduledPatternShortNames[keys[index]]);
+            }
+            return escapeHtml(toLabel(key));
+        }
+
+        async function renderConfigProperties(rawJson) {
+            const container = document.getElementById('runConfigProps');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const summaryOrgIdEl = document.getElementById('nhsnOrganizationIdSummary');
+
+            const cohortCard = document.getElementById('cohortSummaryCard');
+            const cohortBody = document.getElementById('cohortSummaryBody');
+            if (cohortCard) cohortCard.style.display = 'none';
+            if (cohortBody) cohortBody.innerHTML = '';
+
+            const errorRow = document.getElementById('errorRow');
+            const errorSpan = document.getElementById('error');
+
+            if (!rawJson) return;
+
+            let parsed;
+            try { parsed = JSON.parse(rawJson); } catch { return; }
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+            const queryPlanTemplateId = (parsed.queryPlanTemplateId ?? parsed.QueryPlanTemplateId ?? '').toString().trim();
+            if (queryPlanTemplateId && !parsed.queryPlanTemplateName)
+                parsed.queryPlanTemplateName = await resolveTemplateName(queryPlanGetJsonUrl, queryPlanTemplateId);
+
+            const normalizationSuiteId = (parsed.normalizationSuiteId ?? parsed.NormalizationSuiteId ?? '').toString().trim();
+            if (normalizationSuiteId && !parsed.normalizationSuiteName)
+                parsed.normalizationSuiteName = await resolveTemplateName(normalizationSuiteGetJsonUrl, normalizationSuiteId);
+
+            const organizationResourceMapTemplateId = (parsed.organizationResourceMapTemplateId ?? parsed.OrganizationResourceMapTemplateId ?? '').toString().trim();
+            if (organizationResourceMapTemplateId && !parsed.organizationResourceMapTemplateName)
+                parsed.organizationResourceMapTemplateName = await resolveTemplateName(orgResourceMapGetJsonUrl, organizationResourceMapTemplateId);
+
+            if (summaryOrgIdEl) {
+                const orgId = (parsed.nhsnOrganizationId ?? parsed.NhsnOrganizationId ?? '').toString().trim();
+                if (orgId) summaryOrgIdEl.textContent = orgId;
+            }
+
+            const importedIdCount = Array.isArray(parsed.importedPatientIds) ? parsed.importedPatientIds.length : 0;
+            const importedBundleCount = Array.isArray(parsed.importedPatientBundles) ? parsed.importedPatientBundles.length : 0;
+            const rawPatientCount = parsed.patientCount;
+            const parsedPatientCount = typeof rawPatientCount === 'number'
+                ? rawPatientCount
+                : Number.parseFloat(String(rawPatientCount ?? '0'));
+            const basePatientCount = Number.isFinite(parsedPatientCount) ? parsedPatientCount : 0;
+            const effectivePatientCount = basePatientCount + importedIdCount + importedBundleCount;
+
+            function formatArrayItem(item, key, index) {
+                if (item === null || item === undefined) return '';
+                if (typeof item !== 'object') return escapeHtml(String(item));
+
+                if (key === 'importedPatientIds') {
+                    const patientId = item.patientId || item.PatientId;
+                    return escapeHtml(String(patientId || `Patient ${index + 1}`));
+                }
+
+                if (key === 'importedPatientBundles') {
+                    const fileName = item.fileName || item.FileName;
+                    const patientId = item.patientId || item.PatientId;
+                    return escapeHtml(String(fileName || patientId || `Bundle ${index + 1}`));
+                }
+
+                const fallback = item.name ?? item.id ?? item.patientId ?? item.fileName;
+                if (fallback !== undefined && fallback !== null)
+                    return escapeHtml(String(fallback));
+
+                try { return escapeHtml(JSON.stringify(item)); }
+                catch { return escapeHtml(String(item)); }
+            }
+
+            // Keys rendered elsewhere or otherwise not surfaced as plain key/value pairs.
+            const skip = new Set([
+                'id', 'isSystemScenario',
+                'patientCohorts',
+                'resourcesPerPatientMin', 'resourcesPerPatientMax',
+                'queryPlanTemplateId', 'QueryPlanTemplateId',
+                'normalizationSuiteId', 'NormalizationSuiteId',
+                'organizationResourceMapTemplateId', 'OrganizationResourceMapTemplateId',
+                'updatedAt'
+            ]);
+
+            const labels = {
+                name: 'Test Name',
+                description: 'Description',
+                reportMethod: 'Report Method',
+                selectedMeasures: 'Measures',
+                seed: 'Seed',
+                patientCount: 'Patients',
+                importedPatientIds: 'Imported Patient IDs',
+                importedPatientBundles: 'Imported Patient Bundles',
+                nhsnOrganizationId: 'NHSN Organization ID',
+                queryPlanTemplateName: 'Query Plan',
+                normalizationSuiteName: 'Normalization Suite',
+                organizationResourceMapTemplateName: 'Org Resource Map',
+                cleanupServiceData: 'Cleanup Service Data',
+                cleanupFhirData: 'Cleanup FHIR Data'
+            };
+
+            Object.entries(parsed).forEach(([k, v]) => {
+                if (skip.has(k)) return;
+                if (v === null || v === undefined || v === '') return;
+
+                let display;
+                if (Array.isArray(v)) {
+                    if (v.length === 0) return;
+                    if (k === 'selectedMeasures') {
+                        display = v.map(m => escapeHtml(measureShortNames[m] || toLabel(m))).join(', ');
+                    } else {
+                        display = v.map((item, index) => formatArrayItem(item, k, index)).join(', ');
+                    }
+                } else if (k === 'patientCount') {
+                    display = escapeHtml(String(effectivePatientCount));
+                } else if (typeof v === 'boolean') {
+                    display = v ? '<i class="bi bi-check-circle-fill text-success"></i> Yes' : '<i class="bi bi-x-circle text-muted"></i> No';
+                } else if (typeof v === 'object') {
+                    return;
+                } else {
+                    display = escapeHtml(String(v));
+                }
+
+                const label = labels[k] || toLabel(k);
+                const col = document.createElement('div');
+                col.className = 'col-md-3';
+
+                const valueClass = k === 'importedPatientIds'
+                    ? 'au-value text-break'
+                    : 'au-value';
+
+                col.innerHTML = `<div class="au-summary-item"><span class="au-label">${escapeHtml(label)}</span><span class="${valueClass}">${display}</span></div>`;
+                container.appendChild(col);
+            });
+
+            // Show error row only if there is an actual error.
+            if (errorRow && errorSpan) {
+                const hasError = errorSpan.textContent && errorSpan.textContent !== '-';
+                errorRow.style.display = hasError ? '' : 'none';
+            }
+
+            // Show the test config card if any properties were rendered.
+            const testConfigCard = document.getElementById('testConfigCard');
+            if (testConfigCard && container.children.length > 0) {
+                testConfigCard.style.display = '';
+            }
+
+            // Render cohort summary as a compact table.
+            if (cohortCard && cohortBody && Array.isArray(parsed.patientCohorts) && parsed.patientCohorts.length > 0) {
+                const allMeasures = [...new Set(parsed.patientCohorts.flatMap(c => c.measureEligibilities ? Object.keys(c.measureEligibilities) : []))];
+                const measureCols = allMeasures.map(m => `<th>${escapeHtml(measureShortNames[m] || toLabel(m))}</th>`).join('');
+
+                const rows = parsed.patientCohorts.map((c, idx) => {
+                    const eligCells = allMeasures.map(m => {
+                        const v = c.measureEligibilities?.[m];
+                        const isQ = v === 'Qualifying' || v === 0 || v === '0';
+                        return `<td><span class="badge ${window.luStatusPills.forFlag(isQ)}">${isQ ? 'Q' : 'NQ'}</span></td>`;
+                    }).join('');
+                    const min = c?.resourcesPerPatientMin ?? '-';
+                    const max = c?.resourcesPerPatientMax ?? '-';
+                    const inpatientPattern = formatScheduledPattern(c?.scheduledInpatientPattern);
+                    const configLabel = patientConfigLabel(c);
+                    return `<tr><td class="fw-semibold">${idx + 1}</td><td>${c?.patientCount ?? '-'}</td><td>${escapeHtml(String(min))}\u2013${escapeHtml(String(max))}</td><td>${escapeHtml(configLabel)}</td><td>${inpatientPattern}</td>${eligCells}</tr>`;
+                }).join('');
+
+                cohortBody.innerHTML =
+                    `<table class="au-cohort-summary-table"><thead><tr><th>#</th><th>Patients</th><th>Resources</th><th>Patient config</th><th>Inpatient Pattern</th>${measureCols}</tr></thead><tbody>${rows}</tbody></table>`;
+                cohortCard.style.display = '';
+            }
+        }
+
+        function fitChart(canvas) {
+            if (window.luChartFrame) window.luChartFrame.fit(canvas);
+        }
+
+        function palette() {
+            return window.luChartPalette;
+        }
+
+        function upsertChart(canvasId, config) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            fitChart(canvas);
+            config.options = config.options || {};
+            config.options.responsive = true;
+            config.options.maintainAspectRatio = false;
+            if (charts[canvasId]) {
+                charts[canvasId].data = config.data;
+                charts[canvasId].options = config.options;
+                charts[canvasId].update('none');
+                return;
+            }
+
+            charts[canvasId] = new Chart(canvas, config);
+        }
+
+        function renderStageChart(canvasId, legendId, counts, colorMap) {
+            renderDoughnut(canvasId, legendId, counts, colorMap);
+        }
+
+        function renderResourceMix(canvasId, counts) {
+            const items = counts || [];
+            if (!items.length) {
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                    delete charts[canvasId];
+                }
+                if (window.luChartFrame) window.luChartFrame.collapseEmpty(canvasId);
+                return;
+            }
+            if (window.luChartFrame) window.luChartFrame.reveal(canvasId);
+
+            upsertChart(canvasId, {
+                type: 'bar',
+                data: {
+                    labels: items.map(x => x.status || 'Unknown'),
+                    datasets: [{
+                        data: items.map(x => x.count || 0),
+                        backgroundColor: palette().resourceMix,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 2.2,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { precision: 0 } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderTimeline(canvasId, buckets, color) {
+            const items = buckets || [];
+            if (!items.length) {
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                    delete charts[canvasId];
+                }
+                if (window.luChartFrame) window.luChartFrame.collapseEmpty(canvasId);
+                return;
+            }
+            if (window.luChartFrame) window.luChartFrame.reveal(canvasId);
+
+            upsertChart(canvasId, {
+                type: 'line',
+                data: {
+                    labels: items.map(x => x.label || ''),
+                    datasets: [{
+                        data: items.map(x => x.count || 0),
+                        borderColor: color,
+                        backgroundColor: `${color}33`,
+                        fill: true,
+                        pointRadius: 2,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 2.6,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 6 } },
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+        }
+
+        function renderDoughnut(canvasId, legendId, items, colorMap, preserveOnEmpty = false) {
+            const total = (items || []).reduce((sum, x) => sum + (x.count || 0), 0);
+            const legend = document.getElementById(legendId);
+
+            if (!items || items.length === 0 || total === 0) {
+                if (preserveOnEmpty && charts[canvasId]) {
+                    return;
+                }
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                    delete charts[canvasId];
+                }
+                if (legend) legend.innerHTML = '<span class="text-muted small">No data yet.</span>';
+                if (window.luChartFrame) window.luChartFrame.collapseEmpty(canvasId, false);
+                return;
+            }
+            if (window.luChartFrame) window.luChartFrame.reveal(canvasId);
+
+            const labels = [];
+            const values = [];
+            const colors = [];
+            const fallbackPalette = palette().fallback;
+            let legendHtml = '';
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const value = item.count || 0;
+                const color = colorMap[(item.status || '').toLowerCase()] || fallbackPalette[i % fallbackPalette.length];
+                labels.push(item.status || 'Unknown');
+                values.push(value);
+                colors.push(color);
+                legendHtml += `<div class="small"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px;"></span>${item.status}: ${value}</div>`;
+            }
+
+            upsertChart(canvasId, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 1.2,
+                    animation: false,
+                    cutout: '65%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            legend.innerHTML = legendHtml;
+        }
+
+        function validationStatusCount(snapshot, name) {
+            const counts = (snapshot && snapshot.validation && snapshot.validation.statusCounts) || [];
+            return counts.reduce((sum, item) => {
+                const status = String(item.status || item.Status || '').toLowerCase();
+                if (status !== name)
+                    return sum;
+                return sum + Number(item.count || item.Count || 0);
+            }, 0);
+        }
+
+        function noteValidationSnapshot(snapshot) {
+            const pending = validationStatusCount(snapshot, 'pendingvalidation');
+            const passed = validationStatusCount(snapshot, 'passedvalidation');
+            const failed = validationStatusCount(snapshot, 'failedvalidation');
+            const key = `${pending}|${passed}|${failed}`;
+            validationPatientsOpen = pending;
+            if (!validationCountsSeen) {
+                validationCountsSeen = true;
+                validationCountKey = key;
+                return;
+            }
+            if (key !== validationCountKey) {
+                validationCountKey = key;
+                validationMovedAt = Date.now();
+            }
+        }
+
+        function validationWorkIsMoving() {
+            return validationPatientsOpen > 0
+                && validationMovedAt > 0
+                && (Date.now() - validationMovedAt) <= validationQuietMs;
+        }
+
+        function showValidationHold() {
+            const banner = document.getElementById('validationHoldBanner');
+            const badge = document.getElementById('validationOngoingBadge');
+            const pending = !isRunComplete(currentRunStatus) && validationPatientsOpen > 0;
+            const moving = pending && validationWorkIsMoving();
+            if (badge)
+                badge.style.display = pending ? '' : 'none';
+            if (!banner)
+                return;
+            banner.style.display = pending ? '' : 'none';
+            if (!pending)
+                return;
+            const noun = validationPatientsOpen === 1 ? 'patient is' : 'patients are';
+            const text = document.getElementById('validationHoldText');
+            if (!text)
+                return;
+            text.textContent = moving
+                ? `${validationPatientsOpen} ${noun} still pending validation. This run stays up while that work is moving. Cancel the run to stop it.`
+                : `${validationPatientsOpen} ${noun} still pending validation.`;
+        }
+
+        function isRunComplete(status) {
+            const value = String(status || '').toLowerCase();
+            return value === 'succeeded' || value === 'failed' || value === 'cancelled' || value === '3' || value === '4' || value === '2';
+        }
+
+        function isCollectingMetrics(status) {
+            const value = String(status || '').toLowerCase();
+            return value === 'collectingmetrics' || value === '7';
+        }
+
+        function displayStatus(status) {
+            if (isCollectingMetrics(status)) return 'Collecting';
+            const value = String(status || '').toLowerCase();
+            if (value === 'reportfinalization' || value === '6') return 'Finalizing';
+            if (value === 'livewindowopen' || value === '5') return 'Live window';
+            if (value === 'succeeded' || value === '3') return 'Succeeded';
+            if (value === 'failed' || value === '4') return 'Failed';
+            if (value === 'cancelled' || value === '2') return 'Cancelled';
+            if (value === 'running' || value === '1') return 'Running';
+            if (value === 'queued' || value === '0') return 'Queued';
+            return String(status || 'Unknown');
+        }
+
+        function isLiveWindowOpen(status) {
+            const value = String(status || '').toLowerCase();
+            return value === 'livewindowopen' || value === '5';
+        }
+
+        function parseRunConfig() {
+            try { return JSON.parse(runConfigurationJson || '{}'); } catch { return {}; }
+        }
+
+        const liveConfig = parseRunConfig();
+        const isLiveSimulationRun = !!liveConfig.isLiveSimulation;
+        const liveStateUrl = '@Url.Action("LivePatientState", "Automation")';
+        const liveEventsUrl = '@Url.Action("LiveEvents", "Automation")';
+        const liveAdmitUrl = '@Url.Action("AdmitJson", "Automation")';
+        const liveDischargeUrl = '@Url.Action("DischargeJson", "Automation")';
+        const liveGenerateUrl = '@Url.Action("GeneratePoolJson", "Automation")';
+        const liveUploadUrl = '@Url.Action("UploadPoolJson", "Automation")';
+        const liveReferenceUrl = '@Url.Action("ReferencePoolJson", "Automation")';
+        let liveWindowTimer = null;
+        let liveExpectedPopulation = [];
+        let livePoolSnapshot = { pool: [], accepting: false };
+
+        function renderExpectedPopulationList() {
+            const listBox = document.getElementById('liveExpectedList');
+            const filterInput = document.getElementById('liveExpectedFilter');
+            const shownCount = document.getElementById('liveExpectedShownCount');
+            if (!listBox || !filterInput || !shownCount) return;
+
+            const query = (filterInput.value || '').trim().toLowerCase();
+            const filtered = query
+                ? liveExpectedPopulation.filter(id => String(id || '').toLowerCase().includes(query))
+                : liveExpectedPopulation;
+
+            shownCount.textContent = `${filtered.length} of ${liveExpectedPopulation.length}`;
+
+            if (!filtered.length) {
+                listBox.innerHTML = '<span class="text-muted">No matching patients.</span>';
+                return;
+            }
+
+            listBox.innerHTML = filtered
+                .map(id => `<div class="py-1 border-bottom">${window.luLabeledId('Patient', id)}</div>`)
+                .join('');
+        }
+
+        function setLiveCardVisible(visible) {
+            const card = document.getElementById('liveSimulationCard');
+            if (card) card.style.display = visible ? '' : 'none';
+        }
+
+        function formatUtc(value) {
+            if (!value) return '-';
+            if (window.luLocalInstant) return window.luLocalInstant(value).text;
+            return String(value);
+        }
+
+        function censusStateName(value) {
+            const raw = String(value ?? '');
+            if (raw === '0' || raw.toLowerCase() === 'notadmitted') return 'NotAdmitted';
+            if (raw === '1' || raw.toLowerCase() === 'admitted') return 'Admitted';
+            if (raw === '2' || raw.toLowerCase() === 'dischargedduringwindow') return 'DischargedDuringWindow';
+            return raw || 'Unknown';
+        }
+
+        function censusStateBadge(census) {
+            var tone = window.luStatusPills ? window.luStatusPills.forCensus(census) : 'au-badge-muted';
+            if (census === 'Admitted')
+                return { label: 'Admitted', css: 'badge ' + tone };
+            if (census === 'DischargedDuringWindow')
+                return { label: 'Discharged', css: 'badge ' + tone };
+            return { label: 'Not admitted', css: 'badge ' + tone };
+        }
+
+        function eventTypeName(value) {
+            const raw = String(value ?? '');
+            if (raw === '0' || raw.toLowerCase() === 'admit') return 'Admit';
+            if (raw === '1' || raw.toLowerCase() === 'discharge') return 'Discharge';
+            if (raw === '2' || raw.toLowerCase() === 'inject') return 'Inject';
+            return raw || 'Event';
+        }
+
+        function eventTypeBadgeClass(name) {
+            var tone = window.luStatusPills ? window.luStatusPills.forEvent(name) : 'au-badge-muted';
+            return 'badge ' + tone;
+        }
+
+        function formatLogTime(value) {
+            if (!value) return '-';
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return String(value);
+            const part = (n) => String(n).padStart(2, '0');
+            return d.getUTCFullYear() + '-' + part(d.getUTCMonth() + 1) + '-' + part(d.getUTCDate())
+                + ' ' + part(d.getUTCHours()) + ':' + part(d.getUTCMinutes()) + ':' + part(d.getUTCSeconds()) + 'Z';
+        }
+
+        function originName(value) {
+            const map = { 0: 'Cohort', 1: 'Import', 2: 'Generated', 3: 'Upload', 4: 'FhirId' };
+            if (map[value] !== undefined) return map[value];
+            return String(value || '');
+        }
+
+        function patternLabel(value) {
+            if (value === null || value === undefined || value === '') return '';
+            const labels = {
+                0: 'Before → after',
+                1: 'Before → during',
+                2: 'During → after',
+                3: 'During → during',
+                4: 'Entirely before',
+                5: 'Entirely after',
+                'AdmittedBeforePeriodRemainsInpatientAfterPeriod': 'Before → after',
+                'AdmittedBeforePeriodDischargedDuringPeriod': 'Before → during',
+                'AdmittedDuringPeriodRemainsInpatientAfterPeriod': 'During → after',
+                'AdmittedDuringPeriodDischargedDuringPeriod': 'During → during',
+                'AdmittedAndDischargedBeforePeriod': 'Entirely before',
+                'AdmittedAndDischargedAfterPeriod': 'Entirely after'
+            };
+            return labels[value] || String(value);
+        }
+
+        function poolSearchText(entry) {
+            const id = entry.patientId || entry.PatientId || '';
+            const origin = originName(entry.origin ?? entry.Origin);
+            const pattern = patternLabel(entry.pattern ?? entry.Pattern);
+            const census = censusStateName(entry.censusState ?? entry.CensusState);
+            const expected = !!(entry.expectedInReport ?? entry.ExpectedInReport);
+            return `${id} ${origin} ${pattern} ${census} ${expected ? 'report expected' : 'not expected'}`.toLowerCase();
+        }
+
+        function renderLivePool(state, accepting) {
+            const body = document.getElementById('livePoolBody');
+            if (!body) return;
+            const pool = state.pool || state.Pool || [];
+            livePoolSnapshot = { pool, accepting };
+            const totals = state.poolTotals || state.PoolTotals || {};
+            document.getElementById('livePoolCount').textContent = totals.total ?? totals.Total ?? pool.length;
+            document.getElementById('liveNotAdmittedCount').textContent = totals.notAdmitted ?? totals.NotAdmitted ?? pool.filter(p => censusStateName(p.censusState ?? p.CensusState) === 'NotAdmitted').length;
+
+            const filterInput = document.getElementById('livePoolFilter');
+            const shownCount = document.getElementById('livePoolShownCount');
+            const query = (filterInput?.value || '').trim().toLowerCase();
+            const filtered = query
+                ? pool.filter(entry => poolSearchText(entry).includes(query))
+                : pool;
+            if (shownCount)
+                shownCount.textContent = `${filtered.length} of ${pool.length}`;
+
+            if (!pool.length) {
+                body.innerHTML = '<tr><td colspan="5" class="text-muted">No pool patients yet.</td></tr>';
+                return;
+            }
+            if (!filtered.length) {
+                body.innerHTML = '<tr><td colspan="5" class="text-muted">No matching patients.</td></tr>';
+                return;
+            }
+            body.innerHTML = filtered.map(entry => {
+                const id = entry.patientId || entry.PatientId || '';
+                const origin = originName(entry.origin ?? entry.Origin);
+                const pattern = patternLabel(entry.pattern ?? entry.Pattern);
+                const census = censusStateName(entry.censusState ?? entry.CensusState);
+                const expected = !!(entry.expectedInReport ?? entry.ExpectedInReport);
+                const stateBadge = censusStateBadge(census);
+                let action = '';
+                if (accepting && census === 'NotAdmitted')
+                    action = `<button type="button" class="btn btn-success btn-sm lu-icon-btn live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}" title="Admit" aria-label="Admit"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Admit</span></button>`;
+                else if (accepting && census === 'Admitted')
+                    action = `<button type="button" class="btn btn-danger btn-sm lu-icon-btn live-pool-discharge" data-patient-id="${escapeHtml(id)}" title="Discharge" aria-label="Discharge"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="ms-1">Discharge</span></button>`;
+                else if (accepting && census === 'DischargedDuringWindow')
+                    action = `<button type="button" class="btn btn-success btn-sm lu-icon-btn live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}" title="Re-admit" aria-label="Re-admit"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Re-admit</span></button>`;
+                return `<tr>
+                    <td>
+                        ${window.luLabeledId('Patient', id)}
+                        ${expected ? '' : '<div class="small text-muted">Not expected in report</div>'}
+                    </td>
+                    <td class="text-muted">${escapeHtml(origin)}</td>
+                    <td class="text-muted">${escapeHtml(pattern)}</td>
+                    <td><span class="${stateBadge.css}">${escapeHtml(stateBadge.label)}</span></td>
+                    <td>${action}</td>
+                </tr>`;
+            }).join('');
+            body.querySelectorAll('.live-pool-admit').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const patientId = btn.getAttribute('data-patient-id');
+                    const expected = btn.getAttribute('data-expected') === 'true';
+                    const admit = () => postLiveEvent(liveAdmitUrl, { id: runId, patientId, notes: null })
+                        .then(() => refreshLiveSimulation())
+                        .catch(err => alert(err.message));
+                    if (!expected) {
+                        if (!window.luHoldConfirm) return;
+                        window.luHoldConfirm.ask(btn, "Admit unexpected patient", `${patientId} is not expected in the report (outside-period / non-qualifying data). Admitting publishes a live census event and can cause this patient to appear in ABS, failing validation.`, ["The patient can appear in ABS and fail validation."], admit);
+                        return;
+                    }
+                    admit();
+                });
+            });
+            body.querySelectorAll('.live-pool-discharge').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    postLiveEvent(liveDischargeUrl, { id: runId, patientId: btn.getAttribute('data-patient-id'), notes: null })
+                        .then(() => refreshLiveSimulation())
+                        .catch(err => alert(err.message));
+                });
+            });
+        }
+
+        function renderLiveState(state) {
+            if (!state) return;
+            const admitted = state.admitted || state.Admitted || [];
+            const discharged = state.dischargedDuringWindow || state.DischargedDuringWindow || [];
+            const expected = state.expectedPopulation || state.ExpectedPopulation || [];
+            const accepting = !!(state.acceptingInjections ?? state.AcceptingInjections);
+            document.getElementById('liveAdmittedCount').textContent = admitted.length;
+            document.getElementById('liveDischargedCount').textContent = discharged.length;
+            document.getElementById('liveExpectedCount').textContent = expected.length;
+            const headerCount = document.getElementById('liveExpectedHeaderCount');
+            if (headerCount) headerCount.textContent = expected.length;
+            const acceptingLabel = document.getElementById('liveAcceptingLabel');
+            if (acceptingLabel) {
+                acceptingLabel.textContent = accepting ? 'Injections accepting' : 'Injections closed';
+                acceptingLabel.className = 'badge ' + window.luStatusPills.forAccepting(accepting);
+            }
+            liveExpectedPopulation = Array.isArray(expected) ? expected : [];
+            renderExpectedPopulationList();
+            renderLivePool(state, accepting);
+
+            const injectControls = document.getElementById('liveInjectControls');
+            if (injectControls)
+                injectControls.querySelectorAll('input, select, button').forEach(el => { el.disabled = !accepting; });
+
+            startLiveCountdown(state.windowEndUtc || state.WindowEndUtc, accepting);
+        }
+
+        function renderLiveEvents(events) {
+            const box = document.getElementById('liveEventLog');
+            const list = [...(events || [])].reverse();
+            if (!list.length) {
+                box.innerHTML = '<span class="text-muted">No events yet.</span>';
+                return;
+            }
+            box.innerHTML = list.map(evt => {
+                const type = eventTypeName(evt.eventType ?? evt.EventType);
+                const ts = formatLogTime(evt.timestampUtc || evt.TimestampUtc);
+                const patient = evt.patientId || evt.PatientId || '';
+                const source = evt.source || evt.Source || '';
+                const notes = evt.notes || evt.Notes || '';
+                return `<div class="d-flex flex-wrap align-items-baseline gap-2 py-1 border-bottom">
+                    <span class="au-live-log-time">${escapeHtml(ts)}</span>
+                    <span class="${eventTypeBadgeClass(type)}">${escapeHtml(type)}</span>
+                    ${window.luLabeledId('Patient', patient)}
+                    <span class="text-muted">${escapeHtml(String(source))}</span>
+                    ${notes ? `<span class="text-muted">— ${escapeHtml(notes)}</span>` : ''}
+                </div>`;
+            }).join('');
+            if (window.luPaintTimes) window.luPaintTimes(box);
+            box.scrollTop = 0;
+        }
+
+        function startLiveCountdown(windowEnd, accepting) {
+            const label = document.getElementById('liveWindowCountdown');
+            if (liveWindowTimer) {
+                clearInterval(liveWindowTimer);
+                liveWindowTimer = null;
+            }
+            if (!windowEnd) {
+                label.textContent = accepting ? 'Window open' : 'Window closed';
+                return;
+            }
+            const endMs = Date.parse(windowEnd);
+            const tick = () => {
+                const remaining = endMs - Date.now();
+                if (remaining <= 0) {
+                    label.textContent = 'Window closed';
+                    if (liveWindowTimer) {
+                        clearInterval(liveWindowTimer);
+                        liveWindowTimer = null;
+                    }
+                    return;
+                }
+                const mins = Math.floor(remaining / 60000);
+                const secs = Math.floor((remaining % 60000) / 1000);
+                label.textContent = `Closes in ${mins}:${String(secs).padStart(2, '0')}`;
+            };
+            tick();
+            if (accepting) liveWindowTimer = setInterval(tick, 1000);
+        }
+
+        async function refreshLiveSimulation() {
+            const statusHint = isLiveSimulationRun
+                || isLiveWindowOpen(currentRunStatus)
+                || String(currentRunStatus || '').toLowerCase() === 'reportfinalization';
+            try {
+                const [stateResp, eventsResp] = await Promise.all([
+                    fetch(`${liveStateUrl}?id=${encodeURIComponent(runId)}`),
+                    fetch(`${liveEventsUrl}?id=${encodeURIComponent(runId)}`)
+                ]);
+                const state = stateResp.ok ? await stateResp.json() : null;
+                const events = eventsResp.ok ? await eventsResp.json() : [];
+                const hasLiveData = !!(state && (state.windowStartUtc || state.WindowStartUtc || (state.expectedPopulation || state.ExpectedPopulation || []).length))
+                    || (Array.isArray(events) && events.length > 0);
+                if (!statusHint && !hasLiveData)
+                    return;
+                setLiveCardVisible(true);
+                if (state) renderLiveState(state);
+                renderLiveEvents(events);
+            } catch (err) {
+                console.error('Live simulation refresh failed', err);
+            }
+        }
+
+        function postLiveEvent(url, body) {
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': antiforgeryToken()
+                },
+                body: JSON.stringify(body)
+            }).then(async r => {
+                const payload = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(payload.error || payload.Error || 'Live event failed');
+                return payload;
+            });
+        }
+
+        document.getElementById('btnLiveGenerate').addEventListener('click', function () {
+            postLiveEvent(liveGenerateUrl, { id: runId })
+                .then(() => refreshLiveSimulation())
+                .catch(err => alert(err.message));
+        });
+
+        document.getElementById('btnLiveReference').addEventListener('click', function () {
+            const patientId = window.prompt('Enter an existing FHIR patient ID');
+            if (!patientId) return;
+            postLiveEvent(liveReferenceUrl, { id: runId, patientId: patientId.trim() })
+                .then(() => refreshLiveSimulation())
+                .catch(err => alert(err.message));
+        });
+
+        document.getElementById('btnLiveUpload').addEventListener('click', function () {
+            document.getElementById('liveUploadFile').click();
+        });
+
+        document.getElementById('liveUploadFile').addEventListener('change', function () {
+            const file = this.files && this.files[0];
+            this.value = '';
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function () {
+                postLiveEvent(liveUploadUrl, { id: runId, content: String(reader.result || ''), fileName: file.name })
+                    .then(() => refreshLiveSimulation())
+                    .catch(err => alert(err.message));
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('liveExpectedFilter').addEventListener('input', renderExpectedPopulationList);
+        document.getElementById('livePoolFilter').addEventListener('input', () => {
+            renderLivePool({ pool: livePoolSnapshot.pool }, livePoolSnapshot.accepting);
+        });
+
+        if (isLiveSimulationRun || isLiveWindowOpen(currentRunStatus) || String(currentRunStatus || '').toLowerCase() === 'reportfinalization')
+            setLiveCardVisible(true);
+
+        function stopSnapshotPolling() {
+            if (snapshotTimer) {
+                clearInterval(snapshotTimer);
+                snapshotTimer = null;
+            }
+        }
+
+        function stopStatusPolling() {
+            if (statusPollTimer) {
+                clearInterval(statusPollTimer);
+                statusPollTimer = null;
+            }
+        }
+
+        function isSafeTestRailUrl(value) {
+            if (typeof value !== 'string') return false;
+            if (!/^https?:\/\//i.test(value)) return false;
+            try {
+                const url = new URL(value);
+                return url.protocol === 'https:' || url.protocol === 'http:';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function renderTestRailRuns(runs) {
+            const el = document.getElementById('testRailRuns');
+            if (!el || runs == null) return;
+            const items = Array.isArray(runs) ? runs : [];
+            const links = items.filter(run => {
+                const id = Number(run && (run.runId != null ? run.runId : run.RunId));
+                const url = run && (run.url || run.Url);
+                return id > 0 && isSafeTestRailUrl(url);
+            });
+            el.replaceChildren();
+            if (!links.length) {
+                el.textContent = 'Not published';
+                return;
+            }
+            links.forEach((run, index) => {
+                if (index > 0) el.appendChild(document.createTextNode(', '));
+                const id = Number(run.runId != null ? run.runId : run.RunId);
+                const url = run.url || run.Url;
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = 'R' + id;
+                link.title = 'Open TestRail run R' + id;
+                el.appendChild(link);
+                const testId = Number(run.testId != null ? run.testId : run.TestId);
+                const testUrl = run.testUrl || run.TestUrl;
+                if (testId > 0 && isSafeTestRailUrl(testUrl)) {
+                    el.appendChild(document.createTextNode(' '));
+                    const testLink = document.createElement('a');
+                    testLink.href = testUrl;
+                    testLink.target = '_blank';
+                    testLink.rel = 'noopener noreferrer';
+                    testLink.className = 'ms-1';
+                    testLink.textContent = 'T' + testId;
+                    testLink.title = 'Open TestRail test T' + testId;
+                    el.appendChild(testLink);
+                }
+            });
+        }
+
+        renderTestRailRuns(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            TestRailRunLinks.Copy(Model.TestRailRuns),
+            new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            })));
+
+        var failureDetailBlocks = [];
+        try {
+            var failureSource = document.getElementById('failureDetailsSource');
+            if (failureSource && failureSource.textContent)
+                failureDetailBlocks = JSON.parse(failureSource.textContent) || [];
+        } catch (e) {
+            failureDetailBlocks = [];
+        }
+
+        function splitFailureBlock(block) {
+            var marker = '\nTechnical details:\n';
+            var index = block.indexOf(marker);
+            if (index < 0)
+                return { before: block, technical: null, search: '' };
+            var before = block.slice(0, index);
+            var rest = block.slice(index + marker.length);
+            var searchMarker = '\nSearch: ';
+            var searchIndex = rest.lastIndexOf(searchMarker);
+            if (searchIndex < 0)
+                return { before: before, technical: rest, search: '' };
+            return {
+                before: before,
+                technical: rest.slice(0, searchIndex),
+                search: rest.slice(searchIndex + 1)
+            };
+        }
+
+        function renderFailureHost(items) {
+            var host = document.getElementById('failureDetailsHost');
+            if (!host) return;
+            host.replaceChildren();
+            items.forEach(function (block) {
+                var parts = splitFailureBlock(block);
+                var record = document.createElement('div');
+                record.className = 'failure-record mb-3';
+                var before = document.createElement('pre');
+                before.className = 'mb-2 small';
+                before.style.whiteSpace = 'pre-wrap';
+                before.textContent = parts.before;
+                record.appendChild(before);
+                if (parts.technical != null) {
+                    var details = document.createElement('details');
+                    details.className = 'mb-2';
+                    var summary = document.createElement('summary');
+                    summary.className = 'small';
+                    summary.textContent = 'Technical details';
+                    var technical = document.createElement('pre');
+                    technical.className = 'mb-0 small mt-2';
+                    technical.style.whiteSpace = 'pre-wrap';
+                    technical.textContent = parts.technical;
+                    details.appendChild(summary);
+                    details.appendChild(technical);
+                    record.appendChild(details);
+                }
+                if (parts.search) {
+                    var search = document.createElement('pre');
+                    search.className = 'mb-0 small';
+                    search.style.whiteSpace = 'pre-wrap';
+                    search.textContent = parts.search;
+                    record.appendChild(search);
+                }
+                host.appendChild(record);
+            });
+        }
+
+        function renderFailureDetails(run) {
+            if (!run || !Object.prototype.hasOwnProperty.call(run, 'failureDetails')) return;
+            const card = document.getElementById('failureDetailsCard');
+            if (!card) return;
+            const items = Array.isArray(run.failureDetails) ? run.failureDetails.filter(function (item) { return item; }) : [];
+            failureDetailBlocks = items;
+            if (items.length === 0) {
+                card.style.display = 'none';
+                renderFailureHost([]);
+                return;
+            }
+            renderFailureHost(items);
+            card.style.display = '';
+        }
+
+        function copyFailureText(value) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(value).catch(function () { copyFailureTextFallback(value); });
+                return;
+            }
+            copyFailureTextFallback(value);
+        }
+
+        function copyFailureTextFallback(value) {
+            var area = document.createElement('textarea');
+            area.value = value;
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            area.remove();
+        }
+
+        var copyFailuresBtn = document.getElementById('btnCopyFailures');
+        if (copyFailuresBtn) {
+            copyFailuresBtn.addEventListener('click', function () {
+                copyFailureText(failureDetailBlocks.join('\n\n'));
+            });
+        }
+
+        function applyRunStatus(run) {
+            if (!run) return;
+            currentRunStatus = run.status || currentRunStatus;
+            document.getElementById('runName').textContent = run.runName;
+            document.getElementById('facilityId').textContent = run.facilityId || '-';
+            const orgSummary = document.getElementById('nhsnOrganizationIdSummary');
+            if (orgSummary) {
+                const orgValue = (run.facilityId || run.runId || '').toString().trim();
+                if (orgValue && orgValue !== '-') orgSummary.textContent = orgValue;
+            }
+            const reportIdFromStatus = run.reportId || '-';
+            const headerReport = document.getElementById('headerReportId');
+            if (headerReport) headerReport.textContent = reportIdFromStatus;
+            const statusNode = document.getElementById('status');
+            if (statusNode) {
+                statusNode.textContent = displayStatus(run.status);
+                statusNode.className = 'badge ' + window.luStatusPills.forRun(run.status);
+            }
+            showValidationHold();
+            document.getElementById('error').textContent = run.error || '-';
+            const errorRowLive = document.getElementById('errorRow');
+            if (errorRowLive) {
+                const errorText = run.error || '';
+                errorRowLive.style.display = errorText && errorText !== '-' ? '' : 'none';
+            }
+            renderFailureDetails(run);
+            const retention = document.getElementById('runRetention');
+            if (retention) {
+                retention.textContent = run.retentionNotice || '';
+                retention.classList.toggle('d-none', !run.retentionNotice);
+            }
+            document.getElementById('started').textContent = run.startedAt || '-';
+            document.getElementById('finished').textContent = run.finishedAt || '-';
+            if (window.luPaintTimes) window.luPaintTimes(document.getElementById('started'));
+            if (window.luPaintTimes) window.luPaintTimes(document.getElementById('finished'));
+            document.getElementById('pipelineDuration').textContent = run.duration || '-';
+            if (Object.prototype.hasOwnProperty.call(run, 'testRailRuns') || Object.prototype.hasOwnProperty.call(run, 'TestRailRuns'))
+                renderTestRailRuns(run.testRailRuns != null ? run.testRailRuns : run.TestRailRuns);
+            currentFinishedAt = run.finishedAt || currentFinishedAt;
+            if (isRunComplete(currentRunStatus)) stopLiveConnection();
+
+            if (isRunComplete(currentRunStatus) && !runCompletedAtMs) {
+                runCompletedAtMs = Date.now();
+            }
+
+            if (isCollectingMetrics(currentRunStatus)) {
+                setFinalizingBadge(true, 'Collecting step timings…');
+                startStatusPolling();
+            } else if (isRunComplete(currentRunStatus)) {
+                stopStatusPolling();
+                if (window.auPulseStop) window.auPulseStop();
+                swapCancelToDelete();
+                startAdvancedPerformancePolling();
+            }
+        }
+
+        async function pollRunStatus() {
+            try {
+                const response = await fetch(statusUrl, { headers: { 'Accept': 'application/json' } });
+                if (!response.ok) return;
+                const payload = await response.json();
+                const run = payload && payload.run ? payload.run : payload;
+                applyRunStatus(run);
+                refreshSnapshot();
+            } catch (e) { /* ignore transient status poll errors */ }
+        }
+
+        function startStatusPolling() {
+            if (statusPollTimer) return;
+            statusPollTimer = setInterval(pollRunStatus, 2000);
+        }
+
+        function setFinalizingBadge(visible, text) {
+            var badge = document.getElementById('finalizingBadge');
+            if (!badge) return;
+            var label = document.getElementById('finalizingBadgeText');
+            if (label && text) label.textContent = text;
+            badge.style.display = visible ? '' : 'none';
+        }
+
+        function getMilestone(milestones, name) {
+            return (milestones || []).find(m => String(m.name || m.Name || '').toLowerCase() === String(name).toLowerCase());
+        }
+
+        function isReportSettled(snapshot) {
+            if (!snapshot) return false;
+
+            const scheduleStatus = String(snapshot.report?.schedule?.scheduleStatus || '').toLowerCase();
+            const submittedMilestone = getMilestone(snapshot.report?.milestones || [], 'Submitted');
+            const submittedCompleted = submittedMilestone && (submittedMilestone.completed === true || submittedMilestone.Completed === true);
+
+            // Failed/cancelled runs may not progress report schedule to Submitted.
+            const runStatus = String(currentRunStatus || '').toLowerCase();
+            if (runStatus === 'failed' || runStatus === 'cancelled') {
+                return true;
+            }
+
+            return submittedCompleted
+                || scheduleStatus === 'submitted'
+                || scheduleStatus === 'endofperiod';
+        }
+
+        function renderValidatorResults(results) {
+            const card = document.getElementById('validatorResultsCard');
+            const grid = document.getElementById('validatorResultsGrid');
+            const summary = document.getElementById('validatorResultsSummary');
+
+            if (!isRunComplete(currentRunStatus) && !currentFinishedAt) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = '';
+            const items = (results || []).filter(x => !(x.name || '').startsWith('[Snapshot]'));
+            if (!items.length) {
+                summary.textContent = 'No validator output was captured for this run.';
+                grid.innerHTML = '<div class="col-12 text-muted small">No validator results available.</div>';
+                return;
+            }
+
+            const passed = items.filter(x => (x.outcome || '').toLowerCase() === 'passed').length;
+            const advisory = items.filter(x =>
+                (x.outcome || '').toLowerCase() === 'failed'
+                && (x.name || '').toUpperCase() === 'VALIDATION RESULTS (API)').length;
+            const failed = items.length - passed - advisory;
+            summary.textContent = `${passed} passed, ${advisory} advisory, ${failed} failed.`;
+
+            grid.innerHTML = items.map(item => {
+                const outcome = (item.outcome || 'Unknown');
+                const isPass = outcome.toLowerCase() === 'passed';
+                const isAdvisory = !isPass && (item.name || '').toUpperCase() === 'VALIDATION RESULTS (API)';
+                const badge = window.luStatusPills.forCheck(isPass, isAdvisory);
+                const badgeText = isPass ? 'Passed' : isAdvisory ? 'Advisory' : outcome;
+                const issueText = isPass ? 'No issues' : `${item.issueCount || 0} issue(s)`;
+
+                return `<div class="col-md-4">
+                    <div class="border rounded p-2 h-100">
+                        <div class="fw-semibold small">${escapeHtml(item.name)}</div>
+                        <div class="mt-1"><span class="badge ${badge}">${escapeHtml(badgeText)}</span></div>
+                        <div class="small text-muted mt-1">${issueText}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function getServiceError(summaryItems, serviceName) {
+            return (summaryItems || []).find(x =>
+                String(x.serviceName || x.ServiceName || '').toLowerCase() === serviceName.toLowerCase());
+        }
+
+        function toCountItems(groupItems) {
+            return (groupItems || []).map(x => ({
+                status: x.status || x.Status,
+                count: x.count ?? x.Count ?? 0
+            }));
+        }
+
+        function animateCounter(elementId, targetValue) {
+            const el = document.getElementById(elementId);
+            const startValue = Number(el.dataset.current || 0);
+            const endValue = Number(targetValue || 0);
+
+            if (startValue === endValue) {
+                el.textContent = String(endValue);
+                return;
+            }
+
+            const durationMs = 350;
+            const startTs = performance.now();
+
+            function step(ts) {
+                const progress = Math.min(1, (ts - startTs) / durationMs);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const value = Math.round(startValue + ((endValue - startValue) * eased));
+                el.textContent = String(value);
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    el.textContent = String(endValue);
+                    el.dataset.current = String(endValue);
+                }
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        function renderServiceErrorSummary(summaryItems) {
+            if (!serviceErrorLines._summaries) serviceErrorLines._summaries = {};
+
+            const targets = [
+                { name: 'Data Acquisition', countId: 'serviceErrorCountDataAcq', buttonId: 'serviceErrorBtnDataAcq' },
+                { name: 'Normalization', countId: 'serviceErrorCountNormalization', buttonId: 'serviceErrorBtnNormalization' },
+                { name: 'Measure Eval', countId: 'serviceErrorCountMeasureEval', buttonId: 'serviceErrorBtnMeasureEval' },
+                { name: 'Validation', countId: 'serviceErrorCountValidation', buttonId: 'serviceErrorBtnValidation' },
+                { name: 'Report', countId: 'serviceErrorCountReport', buttonId: 'serviceErrorBtnReport' }
+            ];
+
+            for (const target of targets) {
+                const service = getServiceError(summaryItems, target.name);
+                const total = Number(service?.totalErrors ?? service?.TotalErrors ?? 0);
+                const errorLines = service?.errorLines || service?.ErrorLines || [];
+                serviceErrorLines[target.name] = errorLines;
+                serviceErrorLines._summaries[target.name] = service || { errorLines: [], errorGroups: [], totalErrors: 0 };
+
+                animateCounter(target.countId, total);
+
+                const btn = document.getElementById(target.buttonId);
+                btn.disabled = total <= 0;
+                btn.classList.toggle('text-danger', total > 0);
+            }
+        }
+
+        function renderMilestones(milestones) {
+            const host = document.getElementById('reportMilestones');
+            const orderedMilestones = [
+                'Report Scheduled',
+                'Data Acquired',
+                'Normalized',
+                'Measure Evaluated',
+                'Validation',
+                'Submitted',
+                'Test Validation'
+            ];
+            const normalized = new Map();
+            for (const m of (milestones || [])) {
+                const name = m.name || m.Name;
+                if (!name) continue;
+                normalized.set(name, {
+                    name,
+                    completed: m.completed === true || m.Completed === true,
+                    failed: m.failed === true || m.Failed === true
+                });
+            }
+
+            host.innerHTML = '';
+            for (const stepName of orderedMilestones) {
+                const m = normalized.get(stepName) || { name: stepName, completed: false, failed: false };
+                const div = document.createElement('span');
+                const failed = m.failed === true;
+                const completed = m.completed === true;
+                const tone = window.luStatusPills.forMilestone(failed, completed);
+                div.className = 'rounded-pill d-inline-flex align-items-center justify-content-center ' + tone;
+                div.style.width = '136px';
+                div.style.height = '30px';
+                div.style.fontSize = '0.8rem';
+                div.style.fontWeight = '600';
+                div.style.lineHeight = '1';
+                div.style.whiteSpace = 'nowrap';
+                div.textContent = m.name;
+                host.appendChild(div);
+            }
+        }
+
+        function setFlyout(title, errors) {
+            const flyout = document.getElementById('errorFlyout');
+            document.getElementById('errorFlyoutTitle').textContent = title;
+            const body = document.getElementById('errorFlyoutBody');
+            if (!errors || errors.length === 0) {
+                body.innerHTML = '<div class="text-muted">No errors.</div>';
+            } else {
+                body.innerHTML = errors.map(x => `<div class="border-bottom py-2 small">${x.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div>`).join('');
+            }
+            flyout.style.right = '0';
+        }
+
+        // --- Service Exception Modal ---
+        let _exModalAllItems = [];
+        let _exModalGroups = [];
+        let _exModalActiveGroup = null;
+
+        function openServiceExceptionModal(serviceName) {
+            const summary = (serviceErrorLines._summaries || {})[serviceName];
+            if (!summary) return;
+
+            const lines = summary.errorLines || summary.ErrorLines || [];
+            const groups = (summary.errorGroups || summary.ErrorGroups || []).map(g => ({
+                label: g.status || g.Status || 'Unknown',
+                count: g.count ?? g.Count ?? 0
+            })).sort((a, b) => b.count - a.count);
+            const totalErrors = summary.totalErrors ?? summary.TotalErrors ?? lines.length;
+
+            document.getElementById('serviceExceptionModalLabel').textContent = `${serviceName} Exceptions`;
+            document.getElementById('serviceExceptionSubtitle').textContent = `${totalErrors} total exception(s) captured`;
+
+            _exModalAllItems = lines.map((line, i) => {
+                const parsed = parseExceptionLine(line);
+                return { id: i, raw: line, ...parsed };
+            });
+            _exModalGroups = groups;
+            _exModalActiveGroup = null;
+
+            renderExModalGroupChips();
+            applyExModalFilter();
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('serviceExceptionModal'));
+            modal.show();
+        }
+
+        function parseExceptionLine(line) {
+            let cleaned = line;
+            const componentMatch = cleaned.match(/^\[([^\]]+)\]\s*/);
+            const component = componentMatch ? componentMatch[1] : '';
+            if (componentMatch) cleaned = cleaned.slice(componentMatch[0].length);
+
+            let level = 'ERROR';
+            const levelMatch = cleaned.match(/^(ERROR|WARN|WARNING|FATAL|INFO)\b\s*\|?\s*/i);
+            if (levelMatch) {
+                level = levelMatch[1].toUpperCase();
+                cleaned = cleaned.slice(levelMatch[0].length);
+            }
+
+            // Split on ||| delimiter — left side is summary, right side is full detail
+            let summary = cleaned;
+            let detail = '';
+            const tripleIdx = cleaned.indexOf('|||');
+            if (tripleIdx >= 0) {
+                summary = cleaned.slice(0, tripleIdx).trim();
+                detail = cleaned.slice(tripleIdx + 3).trim();
+            }
+
+            let headline = summary;
+            if (!detail) {
+                // No triple-pipe detail — try splitting on first pipe for headline/detail
+                const pipeIdx = summary.indexOf(' | ');
+                if (pipeIdx > 0) {
+                    headline = summary.slice(0, pipeIdx).trim();
+                    detail = summary.slice(pipeIdx + 3).trim();
+                } else if (summary.length > 120) {
+                    headline = summary.slice(0, 120).trim() + '…';
+                    detail = summary;
+                }
+            } else {
+                // Shorten the summary for the collapsed header
+                if (summary.length > 160) {
+                    headline = summary.slice(0, 160).trim() + '…';
+                }
+            }
+
+            return { component, level, headline, detail, full: line };
+        }
+
+        function renderExModalGroupChips() {
+            const host = document.getElementById('exModalGroupChips');
+            if (!_exModalGroups.length) { host.innerHTML = ''; return; }
+
+            const allActive = _exModalActiveGroup === null;
+            let html = `<button class="btn btn-sm ${allActive ? 'btn-au-link active' : 'btn-au-link'} ex-group-chip" data-group="">All</button>`;
+            for (const g of _exModalGroups) {
+                const active = _exModalActiveGroup === g.label;
+                html += `<button class="btn btn-sm ${active ? 'btn-au-link active' : 'btn-au-link'} ex-group-chip" data-group="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}">${truncate(g.label, 50)} <span class="ms-1">${g.count}</span></button>`;
+            }
+            host.innerHTML = html;
+
+            for (const btn of host.querySelectorAll('.ex-group-chip')) {
+                btn.addEventListener('click', () => {
+                    _exModalActiveGroup = btn.dataset.group || null;
+                    renderExModalGroupChips();
+                    applyExModalFilter();
+                });
+            }
+        }
+
+        function applyExModalFilter() {
+            const searchTerm = (document.getElementById('exModalSearch').value || '').toLowerCase();
+            const accordion = document.getElementById('exModalAccordion');
+            const emptyMsg = document.getElementById('exModalEmpty');
+
+            let filtered = _exModalAllItems;
+            if (_exModalActiveGroup) {
+                const groupLower = _exModalActiveGroup.toLowerCase();
+                filtered = filtered.filter(item => item.raw.toLowerCase().includes(groupLower));
+            }
+            if (searchTerm) {
+                filtered = filtered.filter(item => item.raw.toLowerCase().includes(searchTerm));
+            }
+
+            document.getElementById('exModalVisibleCount').textContent = String(filtered.length);
+
+            if (!filtered.length) {
+                accordion.innerHTML = '';
+                emptyMsg.style.display = '';
+                return;
+            }
+            emptyMsg.style.display = 'none';
+
+            const maxRender = 200;
+            const items = filtered.slice(0, maxRender);
+
+            accordion.innerHTML = items.map(item => {
+                const levelClass = window.luStatusPills.forLevel(item.level);
+                const collapseId = `exCollapse${item.id}`;
+                const headerId = `exHeader${item.id}`;
+                const hasDetail = !!item.detail;
+
+                return `<div class="accordion-item">
+                    <h2 class="accordion-header" id="${headerId}">
+                        <button class="accordion-button collapsed py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}" style="font-size:.82rem;">
+                            <span class="badge ${levelClass} me-2" style="font-size:.65rem;">${item.level}</span>
+                            <span class="text-muted me-2" style="flex-shrink:0;font-size:.72rem;">${escapeHtml(item.component)}</span>
+                            <span class="text-truncate">${escapeHtml(item.headline)}</span>
+                        </button>
+                    </h2>
+                    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
+                        <div class="accordion-body p-3" style="background:#f8f8f8;">
+                            ${hasDetail
+                                ? `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.detail)}</pre>`
+                                : `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.full)}</pre>`}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') + (filtered.length > maxRender ? `<div class="text-center text-muted small p-3">${filtered.length - maxRender} more items not shown. Use the search filter to narrow results.</div>` : '');
+        }
+
+        function truncate(str, len) {
+            return str.length > len ? str.slice(0, len) + '…' : str;
+        }
+
+        document.getElementById('exModalSearch').addEventListener('input', applyExModalFilter);
+
+        async function refreshSnapshot() {
+            try {
+                const response = await fetch(`${snapshotUrl}?id=${encodeURIComponent(runId)}`);
+                if (response.status === 204) {
+                    appendLog('[snapshot] no snapshot content yet (204).');
+                    return;
+                }
+                if (response.status === 404) {
+                    appendLog('[snapshot] snapshot endpoint returned 404.');
+                    return;
+                }
+                if (!response.ok) {
+                    appendLog(`[snapshot] HTTP error ${response.status}.`);
+                    throw new Error(`Snapshot HTTP ${response.status}`);
+                }
+                const snapshot = await response.json();
+                if (!snapshot) {
+                    appendLog('[snapshot] empty snapshot payload.');
+                    return;
+                }
+
+                const snapshotIsFinal = snapshot.isFinal === true || snapshot.IsFinal === true;
+
+                probeManifest();
+                renderMilestones(snapshot.report?.milestones || []);
+                renderValidatorResults(snapshot.validatorResults || []);
+
+                const schedule = snapshot.report?.schedule;
+                const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || '-';
+                const effectiveReportId = snapshot.reportId || snapshot.ReportId || '-';
+                const headerReportId = document.getElementById('headerReportId');
+                if (headerReportId) headerReportId.textContent = effectiveReportId;
+                document.getElementById('scheduleFrequency').textContent = schedule?.frequency || '-';
+                document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
+                document.getElementById('scheduleEnd').textContent = schedule?.endDate || '-';
+                document.getElementById('scheduleAdhoc').textContent = schedule?.adHocType || '-';
+                document.getElementById('scheduleCreated').textContent = schedule?.reportCreated || '-';
+                document.getElementById('scheduleSubmitted').textContent = schedule?.submittedAt || '-';
+                document.getElementById('scheduleDuration').textContent = schedule?.duration || '-';
+                ['scheduleStart', 'scheduleEnd', 'scheduleCreated', 'scheduleSubmitted', 'started', 'finished'].forEach(function (id) {
+                    const node = document.getElementById(id);
+                    if (node && window.luPaintTimes) window.luPaintTimes(node);
+                });
+
+                const statusPill = document.getElementById('scheduleStatusPill');
+                statusPill.className = `badge ${window.luStatusPills.forSchedule(schedule?.scheduleStatus)}`;
+                statusPill.textContent = schedule?.scheduleStatus || 'Unknown';
+
+                renderDoughnut('entriesDonut', 'entriesLegend', snapshot.report?.entrySubmissionStatuses || [], palette().entryStatus);
+
+                document.getElementById('populationSummary').textContent = snapshot.report?.populationSummary || 'No population data yet.';
+
+                const dataAcqCandidate = snapshot.dataAcquisition || {};
+                const dataAcqHasData = (dataAcqCandidate.statusCounts || []).length > 0
+                    || (dataAcqCandidate.resourceTypeCounts || []).length > 0
+                    || (dataAcqCandidate.throughputBuckets || []).length > 0
+                    || Number(dataAcqCandidate.resourceCount || 0) > 0;
+
+                if (dataAcqHasData) {
+                    lastDataAcqSnapshot = dataAcqCandidate;
+                }
+
+                const dataAcq = lastDataAcqSnapshot || dataAcqCandidate;
+
+                renderDoughnut('dataAcqDonut', 'dataAcqLegend', dataAcq.statusCounts || [], palette().dataAcqStatus, true);
+
+                document.getElementById('dataAcqRate').textContent = formatNumber(dataAcq.completionRatePerSecond);
+                document.getElementById('dataAcqResourceCount').textContent = dataAcq.resourceCount || 0;
+                document.getElementById('dataAcqResPerSec').textContent = formatNumber(dataAcq.averageResourcesPerSecond);
+                document.getElementById('dataAcqActiveDuration').textContent = activeDurationOf(dataAcq);
+                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], palette().dataAcquisitionLine);
+                renderResourceMix('dataAcqResourceMixChart', dataAcq.resourceTypeCounts || []);
+                dataAcqErrors = dataAcq.errors || [];
+                document.getElementById('dataAcqErrorsBtn').style.display = dataAcqErrors.length > 0 ? '' : 'none';
+
+                const totalLogCount = (dataAcq.statusCounts || []).reduce((sum, x) => sum + (x.count || 0), 0);
+                document.getElementById('dataAcqTotalLogs').textContent = totalLogCount;
+
+                renderServiceErrorSummary(snapshot.serviceErrorSummary || snapshot.ServiceErrorSummary || []);
+
+                document.getElementById('normalizationRate').textContent = formatNumber(snapshot.normalization?.completionRatePerSecond);
+                document.getElementById('normalizationResourceCount').textContent = snapshot.normalization?.resourceCount || 0;
+                document.getElementById('normalizationResPerSec').textContent = formatNumber(snapshot.normalization?.averageResourcesPerSecond);
+                document.getElementById('normalizationActiveDuration').textContent = activeDurationOf(snapshot.normalization);
+                renderResourceMix('normalizationResourceMixChart', snapshot.normalization?.resourceTypeCounts || []);
+                renderTimeline('normalizationTimeline', snapshot.normalization?.throughputBuckets || [], palette().normalizationLine);
+
+                normalizationErrors = snapshot.normalization?.errors || [];
+                document.getElementById('normalizationErrorsBtn').style.display = normalizationErrors.length > 0 ? '' : 'none';
+                loadNormalizationResults(false);
+
+                document.getElementById('measureRate').textContent = formatNumber(snapshot.measureEval?.completionRatePerSecond);
+                document.getElementById('measureResourceCount').textContent = snapshot.measureEval?.resourceCount || 0;
+                document.getElementById('measureResPerSec').textContent = formatNumber(snapshot.measureEval?.averageResourcesPerSecond);
+                document.getElementById('measureActiveDuration').textContent = activeDurationOf(snapshot.measureEval);
+                renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], palette().measureFunnel);
+                renderResourceMix('measureResourceMixChart', snapshot.measureEval?.resourceTypeCounts || []);
+                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], palette().measureLine);
+
+                measureErrors = snapshot.measureEval?.errors || [];
+                document.getElementById('measureErrorsBtn').style.display = measureErrors.length > 0 ? '' : 'none';
+
+                const validationFunnel = snapshot.validation?.funnelCounts || [];
+                const validationTotal = validationFunnel.reduce((acc, item) => acc + (item.count || 0), 0);
+                const validationPassed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'passedvalidation') || {}).count || 0;
+                const validationFailed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'failedvalidation') || {}).count || 0;
+
+                noteValidationSnapshot(snapshot);
+                showValidationHold();
+
+                document.getElementById('validationPatientCount').textContent = validationTotal;
+                document.getElementById('validationPassedCount').textContent = validationPassed;
+                document.getElementById('validationFailedCount').textContent = validationFailed;
+                document.getElementById('validationActiveDuration').textContent = activeDurationOf(snapshot.validation);
+                renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, palette().validationFunnel);
+                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], palette().validationLine);
+
+                validationErrors = snapshot.validation?.errors || [];
+                document.getElementById('validationErrorsBtn').style.display = validationErrors.length > 0 ? '' : 'none';
+
+                const runIsComplete = isRunComplete(currentRunStatus);
+                if (runIsComplete && !runCompletedAtMs) {
+                    runCompletedAtMs = Date.now();
+                }
+
+                if (isCollectingMetrics(currentRunStatus)) {
+                    setFinalizingBadge(true, 'Collecting step timings…');
+                    stopSnapshotPolling();
+                } else if (runIsComplete) {
+                    const elapsedMs = runCompletedAtMs ? (Date.now() - runCompletedAtMs) : 0;
+                    const settled = isReportSettled(snapshot);
+                    const finishedMs = Date.parse(currentFinishedAt || '');
+                    const finishedBeforeOpen = !Number.isNaN(finishedMs) && (Date.now() - finishedMs) > 30000;
+
+                    setFinalizingBadge(!settled && !finishedBeforeOpen, 'Finalizing…');
+
+                    // Keep polling briefly after completion so final persisted schedule/milestones
+                    // can catch up in the UI. A run that finished before this page opened
+                    // has already had that window.
+                    if (finishedBeforeOpen || (snapshotIsFinal && settled && elapsedMs >= 2000) || elapsedMs >= 30000) {
+                        setFinalizingBadge(false);
+                        stopSnapshotPolling();
+                    }
+                    startAdvancedPerformancePolling();
+                } else {
+                    setFinalizingBadge(false);
+                }
+            } catch (err) {
+                const message = err && err.message ? err.message : String(err || 'Unknown snapshot error');
+                appendLog(`[snapshot] ERROR: ${message}`);
+                console.error('refreshSnapshot failed', err);
+            }
+        }
+
+        connection.on('log', appendLog);
+        connection.on('status', (run) => {
+            applyRunStatus(run);
+
+            if (isLiveSimulationRun || isLiveWindowOpen(currentRunStatus) || String(currentRunStatus || '').toLowerCase() === 'reportfinalization') {
+                setLiveCardVisible(true);
+                refreshLiveSimulation();
+            }
+
+            refreshSnapshot();
+        });
+
+        connection.on('PatientEventInjected', () => refreshLiveSimulation());
+        connection.on('PoolPatientAdded', () => refreshLiveSimulation());
+        connection.on('PatientStateChanged', (state) => {
+            setLiveCardVisible(true);
+            renderLiveState(state);
+        });
+        connection.on('LiveWindowClosing', () => {
+            const label = document.getElementById('liveWindowCountdown');
+            if (label) label.textContent = 'Window closing…';
+        });
+        connection.on('LiveWindowClosed', () => refreshLiveSimulation());
+
+        document.getElementById('measureErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Measure Eval'));
+        document.getElementById('validationErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Validation'));
+        document.getElementById('dataAcqErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Data Acquisition'));
+        document.getElementById('normalizationErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Normalization'));
+        for (const btn of document.querySelectorAll('.service-error-btn')) {
+            btn.addEventListener('click', () => {
+                const service = btn.getAttribute('data-service');
+                openServiceExceptionModal(service);
+            });
+        }
+        document.getElementById('closeFlyout').addEventListener('click', () => {
+            document.getElementById('errorFlyout').style.right = '-480px';
+        });
+
+        function stopLiveConnection() {
+            const badge = document.getElementById('liveStatus');
+            if (badge) badge.remove();
+            if (connection.state && connection.state !== 'Disconnected')
+                connection.stop();
+        }
+
+        if (isRunComplete(currentRunStatus)) {
+            stopLiveConnection();
+        } else {
+            connection.start()
+                .then(() => connection.invoke('SubscribeRun', runId))
+                .catch(err => appendLog('[signalr] ' + err));
+        }
+
+        renderConfigProperties(runConfigurationJson);
+        loadNormalizationResults(true);
+        refreshSnapshot();
+        refreshLiveSimulation();
+        if (isCollectingMetrics(currentRunStatus)) {
+            setFinalizingBadge(true, 'Collecting step timings…');
+            startStatusPolling();
+        }
+        const openedFinishedMs = Date.parse(currentFinishedAt || '');
+        const openedRecentlyFinished = isRunComplete(currentRunStatus)
+            && !Number.isNaN(openedFinishedMs)
+            && (Date.now() - openedFinishedMs) <= 30000;
+        if (openedRecentlyFinished || (!isRunComplete(currentRunStatus) && !currentFinishedAt && !isCollectingMetrics(currentRunStatus)))
+            snapshotTimer = setInterval(refreshSnapshot, 2000);
+
+        // Probe for manifest availability (repeated until found).
+        let manifestButtonVisible = false;
+        function probeManifest() {
+            if (manifestButtonVisible) return;
+            fetch(`${manifestUrl}?id=${runId}`).then(r => {
+                if (r.ok && r.status !== 204) {
+                    manifestButtonVisible = true;
+                    tryShowManifestButton();
+                }
+            }).catch(() => {});
+        }
+        probeManifest();
+
+        // --- Normalization execution details ---
+        // Loaded on demand: once with the page, then again on a snapshot refresh only while
+        // evidence is still pending, at most every 15 seconds.
+        function loadNormalizationResults(force) {
+            if (normalizationResultsRequest) return;
+            if (!force && lastNormalizationResults) {
+                if (lastNormalizationResults.evidenceState !== 'pending') return;
+                if (Date.now() - normalizationResultsLoadedAt < 15000) return;
+            }
+            normalizationResultsLoadedAt = Date.now();
+            normalizationResultsRequest = fetch(`${normalizationResultsUrl}?id=${encodeURIComponent(runId)}`, { headers: { 'Accept': 'application/json' } })
+                .then(response => response.ok ? response.json() : null)
+                .then(data => {
+                    if (!data) {
+                        if (!lastNormalizationResults) markNormalizationUnavailable();
+                        return;
+                    }
+                    lastNormalizationResults = data;
+                    renderNormalizationStrip(data);
+                    renderNormalizationModal(data);
+                })
+                .catch(() => {
+                    if (!lastNormalizationResults) markNormalizationUnavailable();
+                })
+                .finally(() => { normalizationResultsRequest = null; });
+        }
+
+        function markNormalizationUnavailable() {
+            ['normalizationSuiteValue', 'normalizationOrmValue', 'normalizationPatientValue', 'normalizationEvidenceValue'].forEach(id => {
+                const node = document.getElementById(id);
+                if (node && node.textContent === 'Loading…')
+                    node.innerHTML = '<span class="text-muted">Unavailable</span>';
+            });
+            const body = document.getElementById('normalizationResultsBody');
+            if (body) body.innerHTML = '<p class="text-muted mb-0">Normalization details could not be loaded.</p>';
+        }
+
+        function renderNormalizationStrip(data) {
+            const suite = document.getElementById('normalizationSuiteValue');
+            if (suite) suite.innerHTML = normalizationArtifactLink(data.suiteState, data.suiteName, !!data.suite, 'normalizationSuiteModal', 'Selected suite');
+            const orm = document.getElementById('normalizationOrmValue');
+            if (orm) orm.innerHTML = normalizationArtifactLink(data.organizationMapState, data.organizationMapName, !!data.organizationMap, 'normalizationOrmModal', 'Selected organization map');
+            const patients = document.getElementById('normalizationPatientValue');
+            if (patients) patients.innerHTML = patientSourceBadges(data);
+            const evidence = document.getElementById('normalizationEvidenceValue');
+            if (evidence) evidence.innerHTML = normalizationEvidenceLabel(data);
+        }
+
+        function patientSourceBadges(data) {
+            const source = data.patientSource || 'unknown';
+            const generated = Number(data.generatedPatientCount || 0);
+            const uploaded = Number(data.uploadedPatientCount || 0);
+            const gen = `<span class="badge au-badge-automation">Generated</span> <span class="small me-1">${generated}</span>`;
+            const up = `<span class="badge au-badge-active">Uploaded</span> <span class="small">${uploaded}</span>`;
+            if (source === 'generated') return gen;
+            if (source === 'uploaded') return up;
+            if (source === 'mixed') return gen + up;
+            return '<span class="text-muted">Not recorded</span>';
+        }
+
+        function normalizationArtifactLink(state, name, hasSummary, modalId, fallback) {
+            if (state === 'not-configured')
+                return '<span class="text-muted">Not configured</span>';
+            const label = escapeHtml(name || fallback);
+            if (state === 'unavailable' || !hasSummary)
+                return `${label} ${normalizationPill('unavailable', 'Unavailable')}`;
+            return `<span class="fw-semibold text-break">${label}</span> <button type="button" class="btn btn-sm btn-au-link lu-icon-btn ms-1" data-bs-toggle="modal" data-bs-target="#${modalId}" title="View ${label}"><i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">View</span></button>`;
+        }
+
+        function normalizationArtifactText(state, name, fallback) {
+            if (state === 'not-configured') return '<span class="text-muted">Not configured</span>';
+            const label = escapeHtml(name || fallback);
+            if (state === 'unavailable') return `${label} ${normalizationPill('unavailable', 'Unavailable')}`;
+            return label;
+        }
+
+        function normalizationEvidenceLabel(data) {
+            const state = data.evidenceState || 'none';
+            if (state === 'found')
+                return `${normalizationPill('found', 'Found')} <span class="small text-muted">${escapeHtml(data.evidenceMessage || '')}</span>`;
+            if (state === 'pending')
+                return `${normalizationPill('pending', 'Pending')} <span class="small text-muted">Not collected yet</span>`;
+            return normalizationPill('no-evidence', 'No evidence found');
+        }
+
+        function normalizationPill(state, text) {
+            return `<span class="badge ${window.luStatusPills.forNormalization(state)}">${escapeHtml(text)}</span>`;
+        }
+
+        function suiteDefinitionBadge(data) {
+            const source = data.suiteDefinitionSource || '';
+            if (source === 'snapshot') return normalizationPill('recorded', 'Recorded for this run');
+            if (source === 'current') return normalizationPill('current', 'Current definition');
+            return '';
+        }
+
+        function suiteDefinitionNote(data) {
+            const note = data.suiteDefinitionNote || '';
+            return note ? `<div class="small text-muted mt-1">${escapeHtml(note)}</div>` : '';
+        }
+
+        const normalizationConfirmationText = {
+            'confirmed': 'Confirmed',
+            'pending': 'Pending',
+            'not-recorded': 'Not recorded',
+            'no-evidence': 'No evidence found',
+            'not-applicable': 'Not applicable'
+        };
+
+        function normalizationConfirmationBadge(state) {
+            const text = normalizationConfirmationText[state];
+            return text ? normalizationPill(state, text) : '';
+        }
+
+        function normalizationOperationStep(op) {
+            const types = (op.resourceTypes || []).filter(Boolean).map(escapeHtml).join(', ');
+            const missing = op.missing ? ` ${normalizationPill('missing', 'Missing')}` : '';
+            return `<li><strong>${escapeHtml(op.name || 'Operation')}</strong> <span class="text-muted">${escapeHtml(op.operationType || '')}</span>${types ? ` <span class="small">(${types})</span>` : ''}${missing}</li>`;
+        }
+
+        function renderNormalizationModal(data) {
+            const body = document.getElementById('normalizationResultsBody');
+            if (!body) return;
+            const operations = data.operations || [];
+            const inventory = data.evidenceInventory || [];
+            const operationItems = operations.length
+                ? '<ul class="mb-0">' + operations.map(normalizationOperationStep).join('') + '</ul>'
+                : '<p class="text-muted mb-0">No operations were recorded for this run.</p>';
+            const inventoryItems = inventory.length
+                ? '<ul class="mb-0">' + inventory.map(line => `<li><code class="text-break">${escapeHtml(line)}</code></li>`).join('') + '</ul>'
+                : (data.evidenceState === 'found'
+                    // The Found label already carries the evidence message.
+                    ? ''
+                    : `<p class="text-muted mb-0">${escapeHtml(data.evidenceMessage || 'No evidence found.')}</p>`);
+            body.innerHTML = `
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4"><div class="small text-muted">Normalization Suite</div><div class="fw-semibold text-break">${normalizationArtifactText(data.suiteState, data.suiteName, 'Selected suite')}</div>${suiteDefinitionBadge(data)}${suiteDefinitionNote(data)}</div>
+                    <div class="col-md-4"><div class="small text-muted">Organization Map</div><div class="fw-semibold text-break">${normalizationArtifactText(data.organizationMapState, data.organizationMapName, 'Selected organization map')}</div></div>
+                    <div class="col-md-4"><div class="small text-muted">Patients</div><div>${patientSourceBadges(data)}</div></div>
+                </div>
+                <div class="mb-3" data-normalization-generated>
+                    <div class="small text-muted">Generated patients</div>
+                    <div>${normalizationConfirmationBadge(data.generatedConfirmationState)}</div>
+                    <div>${escapeHtml(data.generatedConfirmation || '')}</div>
+                </div>
+                <div class="mb-3" data-normalization-uploaded>
+                    <div class="small text-muted">Uploaded patients</div>
+                    <div>${normalizationConfirmationBadge(data.uploadedConfirmationState)}</div>
+                    <div>${escapeHtml(data.uploadedConfirmation || '')}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted">Execution evidence</div>
+                    <div class="mb-1">${normalizationEvidenceLabel(data)}</div>
+                    ${inventoryItems}
+                </div>
+                <div>
+                    <div class="small text-muted mb-1">Operations</div>
+                    ${operationItems}
+                </div>`;
+        }
+
+        function renderSuiteSummary(data) {
+            const body = document.getElementById('normalizationSuiteBody');
+            if (!body) return;
+            const suite = data?.suite;
+            if (!suite) {
+                body.innerHTML = '<p class="text-muted mb-0">Not configured.</p>';
+                return;
+            }
+            const flags = [
+                suite.isSystem && '<span class="badge au-badge-muted">System</span>',
+                suite.isDefault && '<span class="badge au-badge-active">Default</span>'
+            ].filter(Boolean).join(' ');
+            const sequences = (suite.sequences || []).map(sequence => {
+                const steps = (sequence.operations || []).map(normalizationOperationStep).join('');
+                return `<div class="mb-3"><div class="fw-semibold">${escapeHtml(sequence.name || 'Sequence')}</div><ul class="mb-0">${steps || '<li class="text-muted">No operations</li>'}</ul></div>`;
+            }).join('');
+            const standalone = (suite.operations || []).map(normalizationOperationStep).join('');
+            body.innerHTML = `
+                <div class="mb-2">${suiteDefinitionBadge(data)}${suiteDefinitionNote(data)}</div>
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold text-break">${escapeHtml(suite.name || 'Selected suite')}</div>
+                        ${suite.description ? `<div class="small text-muted">${escapeHtml(suite.description)}</div>` : ''}
+                    </div>
+                    <div>${flags}</div>
+                </div>
+                ${sequences || '<p class="text-muted">No sequences.</p>'}
+                ${standalone ? `<div class="fw-semibold">Standalone operations</div><ul class="mb-0">${standalone}</ul>` : ''}`;
+        }
+
+        function renderOrganizationMapSummary(data) {
+            const body = document.getElementById('normalizationOrmBody');
+            if (!body) return;
+            const map = data?.organizationMap;
+            if (!map) {
+                body.innerHTML = '<p class="text-muted mb-0">Not configured.</p>';
+                return;
+            }
+            const flags = [
+                map.isSystem && '<span class="badge au-badge-muted">System</span>',
+                map.isDefault && '<span class="badge au-badge-active">Default</span>'
+            ].filter(Boolean).join(' ');
+            const conditions = (map.conditions || []).map(condition =>
+                `<li><span class="text-muted">#${Number(condition.priority) || 0}</span> <code class="text-break">${escapeHtml(condition.fhirPath || '')}</code></li>`
+            ).join('');
+            body.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold text-break">${escapeHtml(map.name || 'Selected organization map')}</div>
+                        ${map.description ? `<div class="small text-muted">${escapeHtml(map.description)}</div>` : ''}
+                    </div>
+                    <div>${flags}</div>
+                </div>
+                ${conditions ? `<ul class="mb-0">${conditions}</ul>` : '<p class="text-muted mb-0">No conditions.</p>'}`;
+        }
+
+        document.getElementById('normalizationSuiteModal')?.addEventListener('show.bs.modal', () => renderSuiteSummary(lastNormalizationResults));
+        document.getElementById('normalizationOrmModal')?.addEventListener('show.bs.modal', () => renderOrganizationMapSummary(lastNormalizationResults));
+        document.getElementById('normalizationResultsModal')?.addEventListener('show.bs.modal', () => loadNormalizationResults(true));
+
+        // --- Patient Manifest ---
+        const manifestPageUrl = '@Url.Action("Manifest", "Automation")';
+
+        function tryShowManifestButton() {
+            var btn = document.getElementById('btnViewManifest');
+            if (btn) {
+                btn.style.display = '';
+                btn.href = manifestPageUrl + "?id=" + encodeURIComponent(runId) + "&returnUrl=" + encodeURIComponent(window.location.pathname + window.location.search);
+            }
+            // Ensure the parent card is visible even if no config properties were rendered.
+            var card = document.getElementById('testConfigCard');
+            if (card) card.style.display = '';
+        }
+
+        window.refreshStoredLogs = function () {
+            if (logOnTail) loadLogPage(0);
+        };
+        window.refreshRunPanels = function () { refreshSnapshot(); };
+        const logOlderBtn = document.getElementById('logOlder');
+        const logNewerBtn = document.getElementById('logNewer');
+        if (logOlderBtn) logOlderBtn.addEventListener('click', function () {
+            if (logPageNumber > 1) loadLogPage(logPageNumber - 1);
+        });
+        if (logNewerBtn) logNewerBtn.addEventListener('click', function () {
+            if (!logOnTail) loadLogPage(logPageNumber + 1);
+        });
+        loadLogPage(0);
+    })();
+</script>

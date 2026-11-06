@@ -1,4 +1,4 @@
-﻿using Flurl.Http;
+using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -25,6 +25,15 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
             bearerOptions, tokenServiceSettings, tokenService)
     {
     }
+
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public DmrpServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    { }
 
     public Task<LinkApiResponse<DmrpStatusModel>> GetDmrpStatusAsync(CancellationToken cancellationToken = default) =>
         SendAsync<DmrpStatusModel>(() => Request("/dmrp/dmrp-status")

@@ -121,6 +121,8 @@ namespace IntegrationTests.DMRP
             builder.Services.AddSingleton<IFacilityExistence>(FacilityExistenceMock.Object);
             builder.Services.AddSingleton<IFacilityTimeZoneSource>(FacilityDirectoryMock.Object);
             builder.Services.AddSingleton<IFacilityDirectory>(FacilityDirectoryMock.Object);
+        // DmrpNightlyJob produces through this factory; the fixture never publishes, so a mock satisfies DI validation.
+        builder.Services.AddSingleton(new Mock<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string, object>>().Object);
 
             // The module puts its own behavior in front of the host's facility operations rather than
             // supplying them, so the fixture stands in for the host here as it does for the facility
