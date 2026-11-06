@@ -61,6 +61,22 @@ public class RetentionScheduleRegistrationTests
         Assert.Equal("Report", Assert.Single(participants.Participants).ServiceName);
     }
 
+    [Fact]
+    public async Task AddRetentionSchedule_Configured_RegistersRetentionCheckSettings()
+    {
+        await using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["Retention:Window"] = "P1Y",
+            ["Retention:MaxReportsPerCleanup"] = "10"
+        });
+
+        var settings = provider.GetRequiredService<RetentionCheckSettings>();
+
+        Assert.True(settings.IsValid);
+        Assert.Equal(12, settings.Window!.Count);
+        Assert.Equal(10, settings.MaxReportsPerCleanup);
+    }
+
     private static ServiceProvider BuildProvider(Dictionary<string, string?> values)
     {
         var configuration = new ConfigurationBuilder()

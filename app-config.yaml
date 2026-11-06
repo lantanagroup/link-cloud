@@ -899,6 +899,14 @@ services:
       description: "The services expected to reply to every retention cleanup, each with a ServiceName (the name it puts in RetentionCheckComplete) and a Scope of Report (one result per report) or Cutoff (one result per cleanup). Copied onto each cleanup when it is created, so a change never affects existing cleanups. Read at startup. An empty list, a missing ServiceName or Scope, an unknown Scope, a duplicate name, or no participant with Scope Report makes the whole list invalid: Report logs an error at startup and records every cleanup Failed without sending a request."
       required: false
       defaultValue: '[{"ServiceName":"Report","Scope":"Report"},{"ServiceName":"MeasureEval","Scope":"Report"},{"ServiceName":"Validation","Scope":"Report"},{"ServiceName":"DataAcquisition","Scope":"Report"}]'
+    - key: "Retention:Window"
+      description: "How long a report's clinical data is kept after the report finishes (or, for a report that never finished, after it was soft-deleted), as one ISO-8601 years, months, weeks or days value: P3M, P1Y, P2W or P90D. Years count as 12 months and weeks as 7 days; months are calendar months, never a fixed number of days. At most 36 months or 1095 days. Read at startup. An invalid value does not fall back to the default: Report logs an error at startup and every scheduled retention check does nothing until it is fixed."
+      required: false
+      defaultValue: "P3M"
+    - key: "Retention:MaxReportsPerCleanup"
+      description: "The most reports one retention cleanup may hold. A scheduled check with more eligible reports splits them across several cleanups, each its own RetentionCheckRequested message, so no participant gets a request too large to finish within its Kafka poll interval. A whole number of at least 1. Read at startup; an invalid value stops the retention check, as for Retention:Window."
+      required: false
+      defaultValue: "25"
   Submission:
     - key: "SubmissionServiceConfig:SubmissionDirectory"
       description: "The local or network path where submission files are stored."
