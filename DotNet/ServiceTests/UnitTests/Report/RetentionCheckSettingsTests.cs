@@ -73,6 +73,7 @@ public class RetentionCheckSettingsTests
     [InlineData("2.5")]
     [InlineData("")]
     [InlineData("99999999999")]
+    [InlineData("1001")]
     public void FromConfiguration_InvalidCap_IsInvalid(string value)
     {
         var settings = Read(new Dictionary<string, string?>
@@ -83,6 +84,20 @@ public class RetentionCheckSettingsTests
         Assert.False(settings.IsValid);
         Assert.Equal(0, settings.MaxReportsPerCleanup);
         Assert.StartsWith("Retention:MaxReportsPerCleanup", Assert.Single(settings.Errors));
+    }
+
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("1000", 1000)]
+    public void FromConfiguration_CapAtTheLimits_IsValid(string value, int expected)
+    {
+        var settings = Read(new Dictionary<string, string?>
+        {
+            ["Retention:MaxReportsPerCleanup"] = value
+        });
+
+        Assert.True(settings.IsValid);
+        Assert.Equal(expected, settings.MaxReportsPerCleanup);
     }
 
     [Fact]

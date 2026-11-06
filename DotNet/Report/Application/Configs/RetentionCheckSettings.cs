@@ -33,6 +33,12 @@ public sealed class RetentionCheckSettings
     /// </summary>
     public const int DefaultMaxReportsPerCleanup = 25;
 
+    /// <summary>
+    /// The largest cap allowed. One cleanup is one Kafka message, at most about 350 bytes per report, so this
+    /// keeps a request near 350 KB, well under Kafka's 1 MB default message size.
+    /// </summary>
+    public const int MaxAllowedReportsPerCleanup = 1000;
+
     private RetentionCheckSettings(string windowText,
                                    RetentionWindow? window,
                                    int maxReportsPerCleanup,
@@ -100,9 +106,13 @@ public sealed class RetentionCheckSettings
             return DefaultMaxReportsPerCleanup;
         }
 
-        if (!int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var cap) || cap < 1)
+        // A cleanup the broker rejects as too large would leave its reports claimed but never sent.
+        if (!int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var cap) ||
+            cap < 1 ||
+            cap > MaxAllowedReportsPerCleanup)
         {
-            errors.Add($"{MaxReportsPerCleanupKey} '{text}' is not a whole number of at least 1.");
+            errors.Add($"{MaxReportsPerCleanupKey} '{text}' is not a whole number from 1 to " +
+                       $"{MaxAllowedReportsPerCleanup}.");
             return 0;
         }
 

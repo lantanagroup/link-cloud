@@ -25,7 +25,7 @@ step 1.
 | Key                              | Default | Meaning                                                                 |
 |----------------------------------|---------|-------------------------------------------------------------------------|
 | `Retention:Window`               | `P3M`   | How long clinical data is kept, as one ISO-8601 years, months, weeks or days value. |
-| `Retention:MaxReportsPerCleanup` | `25`    | The most reports one cleanup, and so one request message, may hold.     |
+| `Retention:MaxReportsPerCleanup` | `25`    | The most reports one cleanup, and so one request message, may hold: 1 to 1000. |
 
 `RetentionWindowParser` reads the window:
 
@@ -35,6 +35,10 @@ step 1.
 - The result is the contract's `RetentionWindow { Unit, Count }`, in months or days. Months stay calendar
   months. Never read the value with `XmlConvert.ToTimeSpan` or `TimeSpan`: both turn `P3M` into a flat
   90 days.
+
+The cap is limited to 1000 because a cleanup is one Kafka message. A report adds at most about 350 bytes,
+so 1000 keeps a request near 350 KB, under Kafka's default 1 MB message size. A request the broker rejects
+would leave its reports claimed and unsent.
 
 An invalid value never falls back to the default, because retention deletes data. Report still starts:
 `RetentionScheduleHostedService` logs the errors at `Error`, and every firing logs an error and does nothing
