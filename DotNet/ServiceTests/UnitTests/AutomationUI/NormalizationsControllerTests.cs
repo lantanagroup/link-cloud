@@ -552,6 +552,8 @@ public class NormalizationsControllerTests
     public async Task SaveOperation_HslocMap_RejectsNonLocationResourceType()
     {
         var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((NormalizationOperationDefinition?)null);
         var sut = new NormalizationsController(store.Object);
         var model = new NormalizationOperationDefinition
         {
@@ -581,6 +583,8 @@ public class NormalizationsControllerTests
     public async Task SaveOperation_HslocMap_RejectsNonHslocTargetSystem()
     {
         var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((NormalizationOperationDefinition?)null);
         var sut = new NormalizationsController(store.Object);
         var model = new NormalizationOperationDefinition
         {
@@ -610,6 +614,8 @@ public class NormalizationsControllerTests
     public async Task SaveOperation_HslocMap_RejectsNonTypeFhirPath()
     {
         var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((NormalizationOperationDefinition?)null);
         var sut = new NormalizationsController(store.Object);
         var model = new NormalizationOperationDefinition
         {
@@ -634,6 +640,157 @@ public class NormalizationsControllerTests
         result.Should().BeOfType<BadRequestObjectResult>()
             .Which.Value.Should().Be("HSLOCMap FhirPath must be type.");
         store.Verify(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveOperation_HslocMap_Update_KeepsStoredTargetSystem()
+    {
+        const string hslocUrl = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var existing = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Facility HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = hslocUrl,
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        };
+
+        NormalizationOperationDefinition? saved = null;
+        var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(existing.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        store.Setup(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()))
+            .Callback<NormalizationOperationDefinition, CancellationToken>((model, _) => saved = model)
+            .Returns(Task.CompletedTask);
+
+        var sut = new NormalizationsController(store.Object);
+        var result = await sut.SaveOperation(new NormalizationOperationDefinition
+        {
+            Id = existing.Id,
+            Name = "Facility HSLOC Map renamed",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "http://example.org/changed",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                },
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://example.org/new-source",
+                    TargetSystem = "http://example.org/also-changed",
+                    CodeMaps = { ["ER"] = new NormalizationCodeMapEntry { Code = "1108-0", Display = "Emergency Department" } }
+                }
+            ]
+        }, CancellationToken.None);
+
+        result.Should().BeOfType<JsonResult>();
+        saved.Should().NotBeNull();
+        saved!.Name.Should().Be("Facility HSLOC Map renamed");
+        saved.CodeSystemMaps.Should().HaveCount(2);
+        saved.CodeSystemMaps[0].TargetSystem.Should().Be(hslocUrl);
+        saved.CodeSystemMaps[1].TargetSystem.Should().Be(hslocUrl);
+    }
+
+    [Fact]
+    public async Task SaveOperation_CodeMap_Create_KeepsSubmittedTargetSystem()
+    {
+        const string target = "http://example.org/codes";
+        NormalizationOperationDefinition? saved = null;
+        var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((NormalizationOperationDefinition?)null);
+        store.Setup(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()))
+            .Callback<NormalizationOperationDefinition, CancellationToken>((model, _) => saved = model)
+            .Returns(Task.CompletedTask);
+
+        var sut = new NormalizationsController(store.Object);
+        var result = await sut.SaveOperation(new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Location code map",
+            OperationType = "CodeMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type.coding",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "urn:local",
+                    TargetSystem = target,
+                    CodeMaps = { ["A"] = new NormalizationCodeMapEntry { Code = "B", Display = "B" } }
+                }
+            ]
+        }, CancellationToken.None);
+
+        result.Should().BeOfType<JsonResult>();
+        saved.Should().NotBeNull();
+        saved!.CodeSystemMaps.Should().ContainSingle().Which.TargetSystem.Should().Be(target);
+    }
+
+    [Fact]
+    public async Task SaveOperation_CodeMap_Update_StillAcceptsANewTargetSystem()
+    {
+        var existing = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Location code map",
+            OperationType = "CodeMap",
+            ResourceTypes = ["Location"],
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "urn:local",
+                    TargetSystem = "http://example.org/old",
+                    CodeMaps = { ["A"] = new NormalizationCodeMapEntry { Code = "B", Display = "B" } }
+                }
+            ]
+        };
+
+        NormalizationOperationDefinition? saved = null;
+        var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(existing.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        store.Setup(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()))
+            .Callback<NormalizationOperationDefinition, CancellationToken>((model, _) => saved = model)
+            .Returns(Task.CompletedTask);
+
+        var sut = new NormalizationsController(store.Object);
+        var result = await sut.SaveOperation(new NormalizationOperationDefinition
+        {
+            Id = existing.Id,
+            Name = "Location code map",
+            OperationType = "CodeMap",
+            ResourceTypes = ["Location"],
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "urn:local",
+                    TargetSystem = "http://example.org/new",
+                    CodeMaps = { ["A"] = new NormalizationCodeMapEntry { Code = "B", Display = "B" } }
+                }
+            ]
+        }, CancellationToken.None);
+
+        result.Should().BeOfType<JsonResult>();
+        saved.Should().NotBeNull();
+        saved!.CodeSystemMaps.Should().ContainSingle()
+            .Which.TargetSystem.Should().Be("http://example.org/new");
     }
 
     private static NormalizationOperationDefinition MakeOperation(string name)
