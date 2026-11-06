@@ -94,6 +94,34 @@ public class AutomationRunManager : IAutomationRunManager
             liveInjector);
     }
 
+    /// <summary>
+    /// Records TestRail links against a store and hub without starting a run.
+    /// </summary>
+    internal AutomationRunManager(
+        IHubContext<RunHub> hub,
+        ILogger<AutomationRunManager> logger,
+        ISnapshotStore snapshotStore)
+    {
+        _hub = hub;
+        _logger = logger;
+        _snapshotStore = snapshotStore;
+        _automationConfig = new AutomationConfig();
+        _hostServices = null!;
+        _orchestrator = null!;
+        _queryPlanResolver = null!;
+        _normalizationSuiteResolver = null!;
+        _organizationResourceMapResolver = null!;
+        _dashboardAggregator = null!;
+        _runExecutor = null!;
+        _liveInjector = null!;
+        _patientConfigurationStore = null!;
+        _measureTemplateStore = null!;
+        _facilityTemplateStore = null!;
+        _testRailPublisher = null!;
+    }
+
+    internal void TrackRun(MutableRunState state) => _runs[state.RunId] = state;
+
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
@@ -371,6 +399,7 @@ public class AutomationRunManager : IAutomationRunManager
             _logger.LogError(ex, "TestRail publish failed for zombie scenario run {RunId}.", runId);
         }
 
+        var persistedLinks = TestRailRunLinks.Copy(summary.TestRailRuns);
         if (TestRailRunLinks.AddDistinct(summary.TestRailRuns, published))
         {
             try
@@ -381,6 +410,7 @@ public class AutomationRunManager : IAutomationRunManager
             }
             catch (Exception ex)
             {
+                summary.TestRailRuns = persistedLinks;
                 _logger.LogError(ex, "Failed to persist the TestRail run link for zombie scenario run {RunId}.", runId);
             }
         }
@@ -879,7 +909,7 @@ public class AutomationRunManager : IAutomationRunManager
     /// Stores TestRail runs that accepted this automation run's results.
     /// The same run id is kept once. A missing automation run is left unchanged.
     /// </summary>
-    private async Task RecordTestRailRunsAsync(
+    internal async Task RecordTestRailRunsAsync(
         Guid runId,
         IReadOnlyList<TestRailRunReference> runs,
         CancellationToken cancellationToken = default)
@@ -895,7 +925,10 @@ public class AutomationRunManager : IAutomationRunManager
             if (!added)
                 return;
 
-            await PersistRunSummaryAsync(state);
+            // The hub must not advertise a link the summary write did not keep.
+            if (!await TryPersistRunSummaryAsync(state))
+                return;
+
             try
             {
                 await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state), cancellationToken);
@@ -966,11 +999,15 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    private async Task PersistRunSummaryAsync(MutableRunState state)
+    private Task PersistRunSummaryAsync(MutableRunState state) =>
+        TryPersistRunSummaryAsync(state);
+
+    private async Task<bool> TryPersistRunSummaryAsync(MutableRunState state)
     {
         try
         {
             await WriteRunSummaryAsync(state, CancellationToken.None);
+            return true;
         }
         catch (Exception ex)
         {
@@ -983,6 +1020,7 @@ public class AutomationRunManager : IAutomationRunManager
                 "on the dashboard KPIs (via the in-memory merge) but will NOT appear " +
                 "in the Recent Runs table until a successful upsert lands.",
                 state.RunId);
+            return false;
         }
     }
 
