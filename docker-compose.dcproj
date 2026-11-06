@@ -85,4 +85,6 @@
   <ItemGroup>
     <Folder Include="Tests\AutomationUI.Pipeline\" />
   </ItemGroup>
+  <!-- Fetches the Shared_BOTW_Feed token before Visual Studio runs docker compose. See Scripts/LinkCloud.FeedToken.targets. -->
+  <Import Project="Scripts\LinkCloud.FeedToken.targets" Condition="'$(LinkCloudFeedTokenImported)' != 'true' and Exists('Scripts\LinkCloud.FeedToken.targets')" />
 </Project>

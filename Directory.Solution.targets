@@ -1,0 +1,5 @@
+<Project>
+  <!-- A solution restore runs NuGet in the solution's own build, so it needs the feed-token step too. -->
+  <Import Project="$(MSBuildThisFileDirectory)Scripts\LinkCloud.FeedToken.targets"
+          Condition="'$(LinkCloudFeedTokenImported)' != 'true' and Exists('$(MSBuildThisFileDirectory)Scripts\LinkCloud.FeedToken.targets')" />
+</Project>

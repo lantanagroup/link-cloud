@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    Projects that restore LantanaGroup.Thetis.* from Shared_BOTW_Feed, directly or through a
+    ProjectReference. Only these import the local feed-token step, so every other project pays
+    for one property comparison. Add a project here if it starts to depend on Automation.
+  -->
+  <PropertyGroup>
+    <LinkCloudUsesSharedFeed Condition="'$(LinkCloudUsesSharedFeed)' == '' and ('$(MSBuildProjectName)' == 'Automation' or '$(MSBuildProjectName)' == 'Automation.Link' or '$(MSBuildProjectName)' == 'Automation.UI' or '$(MSBuildProjectName)' == 'MockFhirServer' or '$(MSBuildProjectName)' == 'ServiceTests' or '$(MSBuildProjectName)' == 'BackendE2ETests')">true</LinkCloudUsesSharedFeed>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)Scripts\LinkCloud.FeedToken.targets"
+          Condition="'$(LinkCloudUsesSharedFeed)' == 'true' and '$(LinkCloudFeedTokenImported)' != 'true' and Exists('$(MSBuildThisFileDirectory)Scripts\LinkCloud.FeedToken.targets')" />
+</Project>

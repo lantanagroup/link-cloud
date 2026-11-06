@@ -1,17 +1,13 @@
-﻿# Automation
+# Automation
 
 `Automation` is the platform-agnostic foundation library for deterministic synthetic FHIR
 generation, predictive pipeline modeling, and reusable automation primitives. It has no
 dependency on any Link-specific service; host projects compose it with environment-specific
 orchestration.
 
-Thetis generation packages (`LantanaGroup.Thetis.Generation.Abstractions` / `Engine`) come from Azure Artifacts feed `Shared_BOTW_Feed`. Authenticate once per machine before `dotnet restore` of Automation / Automation.UI / MockFhirServer. You can add `Shared_BOTW_Feed` as a NuGet source in Visual Studio and sign into Azure DevOps, or create a Packaging-Read PAT and set `AZURE_ARTIFACTS_PAT` for CLI restore and docker compose. Both are in `DEVELOPMENT.md`.
+Thetis generation packages (`LantanaGroup.Thetis.Generation.Abstractions` / `Engine`) come from Azure Artifacts feed `Shared_BOTW_Feed`. Do not write a PAT into the tracked `nuget.config`. `dotnet restore` and `dotnet build` fetch the feed token on their own; see `DEVELOPMENT.md`. For `docker compose`, run `./Scripts/compose.ps1` or `bash ./Scripts/compose.sh` with the usual arguments, for example `./Scripts/compose.ps1 build automation-ui`. No setup is needed. The optional profile line in `DEVELOPMENT.md` (`powershell -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"`, or `bash ./Scripts/docker-compose.feed-token-install.sh`) makes plain `docker compose` do the same. Both store a short-lived Azure CLI token in gitignored `.azure-artifacts.env` and pass it only as the BuildKit secret `feed_accesstoken`. If `AZURE_ARTIFACTS_PAT` is set in the shell, or in the root `.env` when Azure CLI cannot fetch a token, docker compose uses that value instead. If Azure CLI cannot be installed, that setup prints the reason; install it for the current user from https://aka.ms/installazurecliwindows and run the fetch script again. Visual Studio restore still works after you sign into the `lantanagroup` Azure DevOps org, and it does not write credentials into `nuget.config`. If `Get-ExecutionPolicy -List` shows `Restricted` or `AllSigned`, set `CurrentUser` to `RemoteSigned` unless group policy locks it, as described in `DEVELOPMENT.md`.
 
-```
-dotnet nuget update source Shared_BOTW_Feed --username az --password %AZURE_ARTIFACTS_PAT% --store-password-in-clear-text --configfile nuget.config
-```
-
-Other Link services still restore from nuget.org. Restoring the whole solution still needs that PAT because Directory.Packages.props pins Thetis.
+Other Link services still restore from nuget.org. Restoring the whole solution still needs feed access because Directory.Packages.props pins Thetis.
 
 This README is the comprehensive reference for the project. It is aimed at three audiences:
 

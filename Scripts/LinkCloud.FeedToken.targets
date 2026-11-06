@@ -1,0 +1,257 @@
+<Project>
+  <!--
+    Local developer builds only. Before NuGet restore, make sure a Shared_BOTW_Feed token
+    exists in the gitignored .azure-artifacts.env (fetched with Azure CLI by
+    Scripts/docker-compose.feed-token.ps1 or Scripts/docker-compose.feed-token-fetch.sh when it is
+    missing or has less than 10 minutes left). The token is handed to NuGet through
+    NuGetPackageSourceCredentials_Shared_BOTW_Feed for this build process only, and to docker
+    compose as AZURE_ARTIFACTS_PAT. The tracked nuget.config is never written. The token is never
+    logged. Any failure is a warning: restore continues with whatever credentials already exist.
+
+    Imported by Directory.Build.targets (projects that restore from Shared_BOTW_Feed),
+    Directory.Solution.targets (solution restore) and docker-compose.dcproj.
+    Opt out with LINK_CLOUD_FEED_TOKEN_SKIP=1 or /p:LinkCloudFeedTokenEnabled=false.
+  -->
+  <PropertyGroup>
+    <LinkCloudFeedTokenImported>true</LinkCloudFeedTokenImported>
+    <LinkCloudFeedTokenRepoRoot Condition="'$(LinkCloudFeedTokenRepoRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</LinkCloudFeedTokenRepoRoot>
+    <LinkCloudFeedTokenSource Condition="'$(LinkCloudFeedTokenSource)' == ''">Shared_BOTW_Feed</LinkCloudFeedTokenSource>
+    <LinkCloudFeedTokenTimeoutSeconds Condition="'$(LinkCloudFeedTokenTimeoutSeconds)' == ''">900</LinkCloudFeedTokenTimeoutSeconds>
+    <LinkCloudFeedTokenEnabled Condition="'$(LinkCloudFeedTokenEnabled)' == ''">true</LinkCloudFeedTokenEnabled>
+    <LinkCloudFeedTokenEnabled Condition="'$(TF_BUILD)' != '' or '$(GITHUB_ACTIONS)' != '' or ('$(CI)' != '' and '$(CI)' != 'false' and '$(CI)' != '0')">false</LinkCloudFeedTokenEnabled>
+    <LinkCloudFeedTokenEnabled Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' == 'true' or '$(LINK_CLOUD_FEED_TOKEN_SKIP)' == '1'">false</LinkCloudFeedTokenEnabled>
+    <!-- Visual Studio has no console for device-code sign-in, so it only uses an existing az session. -->
+    <LinkCloudFeedTokenAllowLogin Condition="'$(LinkCloudFeedTokenAllowLogin)' == '' and ('$(BuildingInsideVisualStudio)' == 'true' or '$(LINK_CLOUD_FEED_TOKEN_NO_LOGIN)' == '1')">false</LinkCloudFeedTokenAllowLogin>
+    <LinkCloudFeedTokenAllowLogin Condition="'$(LinkCloudFeedTokenAllowLogin)' == ''">true</LinkCloudFeedTokenAllowLogin>
+  </PropertyGroup>
+
+  <UsingTask TaskName="LinkCloudEnsureFeedToken"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll"
+             Condition="'$(LinkCloudFeedTokenEnabled)' == 'true'">
+    <ParameterGroup>
+      <RepoRoot ParameterType="System.String" Required="true" />
+      <SourceName ParameterType="System.String" Required="true" />
+      <AllowLogin ParameterType="System.Boolean" />
+      <TimeoutSeconds ParameterType="System.Int32" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Class" Language="cs"><![CDATA[
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
+
+public class LinkCloudEnsureFeedToken : Task
+{
+    private const string OwnerVariable = "LINK_CLOUD_FEED_TOKEN_OWNER";
+    private const string PatVariable = "AZURE_ARTIFACTS_PAT";
+    private const long RefreshSeconds = 600;
+
+    [Required] public string RepoRoot { get; set; }
+    [Required] public string SourceName { get; set; }
+    public bool AllowLogin { get; set; }
+    public int TimeoutSeconds { get; set; }
+
+    private string Hint
+    {
+        get
+        {
+            return " Restore continues with any credentials you already have. To fetch the token by hand, run "
+                + "'powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token.ps1' "
+                + "or 'bash ./Scripts/docker-compose.feed-token-fetch.sh' (after 'az login'), then build again. "
+                + "Set LINK_CLOUD_FEED_TOKEN_SKIP=1 to turn this step off.";
+        }
+    }
+
+    public override bool Execute()
+    {
+        try
+        {
+            Run();
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(null, "LINKFEED001", null, null, 0, 0, 0, 0,
+                "The " + SourceName + " token step failed: " + ex.GetType().Name + "." + Hint);
+        }
+        return true;
+    }
+
+    private void Run()
+    {
+        string credentialVariable = "NuGetPackageSourceCredentials_" + SourceName;
+        string owner = Environment.GetEnvironmentVariable(OwnerVariable) ?? string.Empty;
+        bool ownsCredential = owner.Contains("nuget");
+        bool ownsPat = owner.Contains("pat");
+
+        if (!ownsCredential && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(credentialVariable)))
+        {
+            Log.LogMessage(MessageImportance.Low, credentialVariable + " is already set. The feed token step was skipped.");
+            return;
+        }
+
+        string existingPat = Environment.GetEnvironmentVariable(PatVariable);
+        if (!ownsPat && !string.IsNullOrEmpty(existingPat))
+        {
+            Environment.SetEnvironmentVariable(credentialVariable, "Username=az;Password=" + existingPat);
+            Environment.SetEnvironmentVariable(OwnerVariable, "nuget");
+            Log.LogMessage(MessageImportance.Normal, "Using the existing " + PatVariable + " for " + SourceName + ".");
+            return;
+        }
+
+        string envFile = Path.Combine(RepoRoot, ".azure-artifacts.env");
+        string token;
+        long expires;
+        ReadTokenFile(envFile, out token, out expires);
+        if (!IsFresh(token, expires))
+        {
+            string lockPath = Path.Combine(RepoRoot, ".azure-artifacts.lock");
+            using (FileStream gate = AcquireLock(lockPath))
+            {
+                // Another build process may have refreshed the file while this one waited.
+                ReadTokenFile(envFile, out token, out expires);
+                if (!IsFresh(token, expires))
+                {
+                    Log.LogMessage(MessageImportance.High,
+                        "Getting a " + SourceName + " token with Azure CLI. It is cached in the gitignored .azure-artifacts.env.");
+                    int code = Fetch();
+                    ReadTokenFile(envFile, out token, out expires);
+                    if (code != 0 || !IsUnexpired(token, expires))
+                    {
+                        string reason = code == 0 ? "the token file has no unexpired token" : "the token script exited with " + code;
+                        Log.LogWarning(null, "LINKFEED002", null, null, 0, 0, 0, 0,
+                            "Could not get a " + SourceName + " token (" + reason + ")." + Hint);
+                        return;
+                    }
+                }
+            }
+        }
+
+        Environment.SetEnvironmentVariable(credentialVariable, "Username=az;Password=" + token);
+        Environment.SetEnvironmentVariable(PatVariable, token);
+        Environment.SetEnvironmentVariable(OwnerVariable, "nuget,pat");
+        Log.LogMessage(MessageImportance.Normal, "Supplied the cached " + SourceName + " token to NuGet restore.");
+    }
+
+    private static bool IsFresh(string token, long expires)
+    {
+        return !string.IsNullOrEmpty(token) && expires - DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= RefreshSeconds;
+    }
+
+    // A refresh can hand back the cached token while it is still valid. That result is usable.
+    private static bool IsUnexpired(string token, long expires)
+    {
+        return !string.IsNullOrEmpty(token) && expires - DateTimeOffset.UtcNow.ToUnixTimeSeconds() > 0;
+    }
+
+    private static void ReadTokenFile(string path, out string token, out long expires)
+    {
+        token = string.Empty;
+        expires = 0;
+        if (!File.Exists(path)) { return; }
+        foreach (string raw in File.ReadAllLines(path))
+        {
+            string line = raw.TrimEnd('\r');
+            if (line.StartsWith("AZURE_ARTIFACTS_PAT_EXPIRES_ON=", StringComparison.Ordinal))
+            {
+                long parsed;
+                if (long.TryParse(line.Substring("AZURE_ARTIFACTS_PAT_EXPIRES_ON=".Length), out parsed)) { expires = parsed; }
+            }
+            else if (line.StartsWith("AZURE_ARTIFACTS_PAT=", StringComparison.Ordinal))
+            {
+                token = line.Substring("AZURE_ARTIFACTS_PAT=".Length);
+            }
+        }
+    }
+
+    private FileStream AcquireLock(string path)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(Math.Max(TimeoutSeconds, 30));
+        while (true)
+        {
+            try
+            {
+                return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                if (DateTime.UtcNow > deadline) { throw; }
+                Thread.Sleep(500);
+            }
+        }
+    }
+
+    private int Fetch()
+    {
+        var info = new ProcessStartInfo();
+        info.UseShellExecute = false;
+        info.WorkingDirectory = RepoRoot;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            info.FileName = "powershell.exe";
+            info.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \""
+                + Path.Combine(RepoRoot, "Scripts", "docker-compose.feed-token.ps1") + "\" -RepoRoot \"" + RepoRoot.TrimEnd('\\') + "\"";
+        }
+        else
+        {
+            info.FileName = "bash";
+            info.Arguments = "\"" + Path.Combine(RepoRoot, "Scripts", "docker-compose.feed-token-fetch.sh") + "\" \"" + RepoRoot + "\"";
+        }
+        if (!AllowLogin)
+        {
+            info.EnvironmentVariables["LINK_CLOUD_FEED_TOKEN_NO_LOGIN"] = "1";
+            info.RedirectStandardOutput = true;
+            info.RedirectStandardError = true;
+            info.RedirectStandardInput = true;
+        }
+        // With sign-in allowed the script shares this console, so the device-code prompt is visible.
+        // The scripts never print the token.
+        using (Process process = new Process())
+        {
+            process.StartInfo = info;
+            if (!AllowLogin)
+            {
+                process.OutputDataReceived += (s, e) => { if (e.Data != null) Log.LogMessage(MessageImportance.Normal, e.Data); };
+                process.ErrorDataReceived += (s, e) => { if (e.Data != null) Log.LogMessage(MessageImportance.Normal, e.Data); };
+            }
+            process.Start();
+            if (!AllowLogin)
+            {
+                process.StandardInput.Close();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+            }
+            int timeout = TimeoutSeconds > 0 ? TimeoutSeconds : 900;
+            if (!process.WaitForExit(timeout * 1000))
+            {
+                try { process.Kill(); } catch (Exception) { }
+                Log.LogMessage(MessageImportance.High, "The token script did not finish within " + timeout + " seconds.");
+                return 124;
+            }
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+    }
+}
+]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!--
+    Restore and _GenerateRestoreGraph cover dotnet restore/build. CollectPackageReferences runs in
+    Visual Studio design-time builds, which happen in the Visual Studio process before its restore.
+    The dcproj names cover the Visual Studio docker-compose project. Unknown names are ignored.
+  -->
+  <Target Name="LinkCloudEnsureFeedToken"
+          BeforeTargets="Restore;_GenerateRestoreGraph;CollectPackageReferences;DockerComposeBuild;DockerPrepareForLaunch;Build"
+          Condition="'$(LinkCloudFeedTokenEnabled)' == 'true'">
+    <LinkCloudEnsureFeedToken RepoRoot="$(LinkCloudFeedTokenRepoRoot)"
+                              SourceName="$(LinkCloudFeedTokenSource)"
+                              AllowLogin="$(LinkCloudFeedTokenAllowLogin)"
+                              TimeoutSeconds="$(LinkCloudFeedTokenTimeoutSeconds)" />
+  </Target>
+</Project>
