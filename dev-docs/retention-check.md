@@ -58,7 +58,7 @@ cutoff. `RetentionEligibilityQuery` applies that rule:
 - Results come oldest first, then by id, up to the cap.
 
 The query only reads. A report it returns can still be taken by another cleanup first; the cleanup manager
-claims reports one at a time and skips those.
+claims a batch's reports atomically, in one `UPDATE`, and skips those already taken.
 
 ## The cutoff
 
@@ -121,9 +121,9 @@ decide access. Nothing about a cleanup's safety depends on it.
 | The settings are invalid | Logs an error and does nothing. | Nothing. |
 | `Retention:Participants` is invalid | The manager records the cleanup `Failed` with the reason and sends nothing; the run logs a warning and stops, since every further batch would fail the same way. | One `Failed` cleanup; its reports stay `None` and are selected again once the list is fixed. |
 | A report is selected a second time in one run | Logs an error and stops. This should never happen; it guards against looping forever. | Whatever the run had finished. |
-| Publishing fails | Logs an error naming the cleanup and rethrows; the job logs the failure and waits for the next firing. | The cleanup is recorded with no send time, and its reports are `PendingDeletion`, so no later run selects them; the re-send picks the cleanup up. |
-| Recording the send fails after a successful publish | The exception reaches the job. | The participants have the request, but it is recorded as unsent, so a re-send asks again. Participants answer a repeated request harmlessly. |
-| The run is canceled | Stops between batches. | Every cleanup finished so far is recorded and sent. |
+| Publishing fails | Logs an error naming the cleanup and rethrows; the job logs the failure and waits for the next firing. | The cleanup is recorded with no send time, and its reports are `PendingDeletion`, so no later run selects them. Re-sending is not built yet, so until it is, nothing sends that cleanup and its reports keep their data past the window. Nothing is deleted early. |
+| Recording the send fails after a successful publish | The exception reaches the job. | The participants have the request, but it is recorded as unsent. Once re-sending exists it asks again, and participants answer a repeated request harmlessly. |
+| The run is canceled | Stops at the next step that observes the cancellation: between batches, or inside one, because every call takes the job's token. | Every earlier cleanup is recorded and sent. A cancellation inside a batch can leave its cleanup recorded but unpublished, or published but recorded as unsent; either way it is left as after a failed publish or a failed send record. |
 
 ## Replays, recovery and concurrency
 
@@ -133,7 +133,7 @@ Only one retention run happens at a time across all Report instances: the job is
 A replayed or recovered firing cannot clean a report twice. The cleanup manager takes a report only while
 it is `None`, in a single `UPDATE`, so a report already in a cleanup is skipped. A run that crashed after
 recording a cleanup but before publishing it leaves that cleanup unsent rather than lost, and the recovery
-does not select its reports again.
+does not select its reports again. It stays unsent until re-sending is built.
 
 Manual and single-report cleanups are not built yet. When they are, they must create their cleanups through
 the same `CreateAsync`, so that if one runs at the same time as the scheduled check, whichever claims a
@@ -144,9 +144,10 @@ report first takes it and the other skips it.
 `RetentionCheckRequestedProducer` publishes on `RetentionCheckRequested`, keyed by the `RetentionCleanupId`
 with the same value in the `X-Correlation-Id` header. It waits for the broker to acknowledge each message and
 throws on a failed delivery, so a request is never recorded as sent unless Kafka has it. The producer is
-created the first time it is needed, from the `KafkaConnection` Report already registers, with the client id
-`Report_RetentionCheckRequested`. `AddRetentionSchedule` registers the producer, the publisher, the worker
-and the re-send placeholder.
+created the first time it is needed, from the `KafkaConnection` Report already registers. It asks for the
+client id `Report_RetentionCheckRequested`, but the shared `KafkaProducerFactory` replaces every producer's
+client id with `KafkaConnection`'s, so it runs under that one, like Report's other producers.
+`AddRetentionSchedule` registers the producer, the publisher, the worker and the re-send placeholder.
 
 ## Tests
 
