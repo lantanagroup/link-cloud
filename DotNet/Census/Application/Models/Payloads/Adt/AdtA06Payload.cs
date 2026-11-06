@@ -5,7 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 namespace LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 
 /// <summary>
-/// Change an outpatient to an inpatient: the new class in PV1-2 is applied with the details common to every message.
+/// Change an outpatient to an inpatient: nothing beyond the details common to every message. PV1-2 is kept in the payload.
 /// </summary>
 public class AdtA06Payload : AdtPayload
 {

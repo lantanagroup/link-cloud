@@ -24,6 +24,12 @@ public static class AdtEventMapper
     private static readonly Hl7Path PriorAlternateVisitId = Hl7Path.Parse("MRG-6.1");
 
     /// <summary>
+    /// Events whose MRG segment says what the patient or visit was known as before: patient merges, and visit merges,
+    /// moves and number changes.
+    /// </summary>
+    private static readonly HashSet<string> EventsWithMrg = ["A18", "A30", "A34", "A36", "A39", "A40", "A42", "A45", "A50"];
+
+    /// <summary>
     /// The message control id (MSH-10), for identifying a message in logs without any patient data.
     /// </summary>
     public static string? GetMessageControlId(Hl7Message message) => message.GetValue(MessageControlId);
@@ -33,6 +39,23 @@ public static class AdtEventMapper
     /// </summary>
     public static string? GetMessageType(Hl7Message message) =>
         (message.GetValue(TriggerEvent) ?? message.GetValue(EventTypeCode))?.ToUpperInvariant();
+
+    /// <summary>
+    /// Splits a message that can carry several merges into one message per merge, each mapped to its own entry. A39, A40
+    /// and A42 repeat a PID/MRG group, one per patient or visit merged, and A45 repeats MRG/PV1 for each visit moved.
+    /// Every other message is returned as it is.
+    /// </summary>
+    public static IReadOnlyList<Hl7Message> SplitIntoEvents(Hl7Message message)
+    {
+        var groupStart = GetMessageType(message) switch
+        {
+            "A39" or "A40" or "A42" => "PID",
+            "A45" => "MRG",
+            _ => null
+        };
+
+        return groupStart is null ? [message] : message.SplitGroups(groupStart);
+    }
 
     /// <summary>
     /// Maps a message to an entry. <see cref="AdtEventEntry.FhirPatientId"/> is left for the caller to set.
@@ -52,7 +75,7 @@ public static class AdtEventMapper
             PatientClass = message.GetValue(PatientClass),
             AdmitDateTime = Hl7Message.ParseTimestamp(message.GetValue(AdmitDateTime)),
             DischargeDateTime = Hl7Message.ParseTimestamp(message.GetValue(DischargeDateTime)),
-            Merge = messageType == "A18" && message.HasSegment("MRG")
+            Merge = EventsWithMrg.Contains(messageType) && message.HasSegment("MRG")
                 ? new AdtMergeInformation
                 {
                     PriorPatientIdentifierList = GetIdentifiers(message, "MRG", 1),

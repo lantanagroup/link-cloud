@@ -39,6 +39,13 @@ public abstract class AdtPayload : IPayload
     [JsonIgnore]
     public virtual bool ImpliesAdmission => true;
 
+    /// <summary>
+    /// Whether the encounter now belongs to another patient altogether, so that the identifiers and MRN of the patient
+    /// it belonged to are dropped rather than kept beside this message's.
+    /// </summary>
+    [JsonIgnore]
+    protected virtual bool ReplacesPatient => false;
+
     protected AdtPayload()
     {
     }
@@ -78,7 +85,20 @@ public abstract class AdtPayload : IPayload
 
     public PatientEncounter UpdatePatientEncounter(PatientEncounter patientEncounter)
     {
-        patientEncounter.MedicalRecordNumber = MedicalRecordNumber ?? patientEncounter.MedicalRecordNumber;
+        if (ReplacesPatient)
+        {
+            patientEncounter.MedicalRecordNumber = MedicalRecordNumber;
+            var adtSource = SourceType.ADT.ToString();
+            foreach (var identifier in patientEncounter.PatientIdentifiers.Where(x => x.SourceType == adtSource).ToList())
+            {
+                patientEncounter.PatientIdentifiers.Remove(identifier);
+            }
+        }
+        else
+        {
+            patientEncounter.MedicalRecordNumber = MedicalRecordNumber ?? patientEncounter.MedicalRecordNumber;
+        }
+
         patientEncounter.ModifyDate = DateTime.UtcNow;
 
         SetFhirPatientIdentifier(patientEncounter);
@@ -100,7 +120,7 @@ public abstract class AdtPayload : IPayload
     /// </summary>
     protected virtual void ApplyVisitDetails(PatientEncounter patientEncounter)
     {
-        AddVisitIdentifierIfMissing(patientEncounter);
+        AddVisitIdentifierIfMissing(patientEncounter, EncounterId);
     }
 
     /// <summary>
@@ -147,9 +167,20 @@ public abstract class AdtPayload : IPayload
         }
     }
 
-    private void AddVisitIdentifierIfMissing(PatientEncounter patientEncounter)
+    /// <summary>
+    /// Removes visit identifiers the encounter is no longer known by.
+    /// </summary>
+    protected static void RemoveVisitIdentifiers(PatientEncounter patientEncounter, IReadOnlyCollection<string> identifiers)
     {
-        if (string.IsNullOrWhiteSpace(EncounterId) || patientEncounter.PatientVisitIdentifiers.Any(x => x.Identifier == EncounterId))
+        foreach (var visitIdentifier in patientEncounter.PatientVisitIdentifiers.Where(x => identifiers.Contains(x.Identifier)).ToList())
+        {
+            patientEncounter.PatientVisitIdentifiers.Remove(visitIdentifier);
+        }
+    }
+
+    protected static void AddVisitIdentifierIfMissing(PatientEncounter patientEncounter, string? visitIdentifier)
+    {
+        if (string.IsNullOrWhiteSpace(visitIdentifier) || patientEncounter.PatientVisitIdentifiers.Any(x => x.Identifier == visitIdentifier))
         {
             return;
         }
@@ -158,7 +189,7 @@ public abstract class AdtPayload : IPayload
         {
             Id = Guid.NewGuid().ToString(),
             PatientEncounterId = patientEncounter.Id,
-            Identifier = EncounterId,
+            Identifier = visitIdentifier,
             SourceType = SourceType.ADT.ToString(),
             CreateDate = DateTime.UtcNow
         });

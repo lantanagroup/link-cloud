@@ -53,7 +53,9 @@ public class AdtEventEntry
     /// <summary>PV1-45, discharge date/time.</summary>
     public DateTime? DischargeDateTime { get; set; }
 
-    /// <summary>The MRG segment. Only set for A18 events.</summary>
+    /// <summary>
+    /// The MRG segment. Only set for patient merges (A18, A30, A34, A36, A39, A40) and visit changes (A42, A45, A50).
+    /// </summary>
     public AdtMergeInformation? Merge { get; set; }
 }
 
@@ -73,7 +75,7 @@ public class AdtPatientIdentifier
 }
 
 /// <summary>
-/// The MRG segment of a merge event. Prior patient name (MRG-7) is left out on purpose: nothing consumes it.
+/// The MRG segment of a merge, move or visit change. Prior patient name (MRG-7) is left out on purpose: nothing consumes it.
 /// </summary>
 public class AdtMergeInformation
 {

@@ -181,6 +181,29 @@ public class Hl7AdtProcessorTests
         _resolver.Verify(r => r.SearchByMrnAsync(FacilityId, MrnSystem, "M1", It.IsAny<FhirQueryConfigurationModel>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task A40_WithSeveralMerges_IsOneEventPerMerge_EachWithItsOwnPatient()
+    {
+        SetupFile(
+            "MSH|^~\\&|EHR|HOSP|LINK|NHSN|20260102103000||ADT^A40^ADT_A39|C1|P|2.5\rEVN|A40\r" +
+            "PID|1||M2^^^HOSP^MR\rMRG|M1^^^HOSP^MR\r" +
+            "PID|1||M4^^^HOSP^MR\rMRG|M3^^^HOSP^MR\r" +
+            "PID|1||M6^^^HOSP^MR\rMRG|M5^^^HOSP^MR\r" +
+            Hl7("A01", "M2", control: "C2"));
+        SetupSearch("M2", 1, "fhir-2");
+        SetupSearch("M4", 1, "fhir-4");
+        SetupSearch("M6", 0);
+
+        await Process(MrnSearch());
+
+        // The merge whose surviving patient is not found is left out alone
+        var events = Assert.Single(_produced).Events;
+        Assert.Equal(["A40", "A40", "A01"], events.Select(e => e.MessageType));
+        Assert.Equal(["fhir-2", "fhir-4", "fhir-2"], events.Select(e => e.FhirPatientId));
+        Assert.Equal(["M1", "M3"], events.Take(2).Select(e => e.Merge!.PriorPatientIdentifierList.Single().Id));
+        VerifyErrorLogged("returned no results", Times.Once());
+    }
+
     [Theory]
     [InlineData(0, "returned no results")]
     [InlineData(2, "returned more than one result")]

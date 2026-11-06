@@ -14,5 +14,16 @@ public enum EventType
     A07,
     A11,
     A13,
-    A18
+    A18,
+    A04,
+    A08,
+    A23,
+    A30,
+    A34,
+    A36,
+    A39,
+    A40,
+    A42,
+    A45,
+    A50
 }

@@ -26,8 +26,9 @@ public interface IAdtEventService
 /// <item>The first tracked message of a stay emits Admit, whatever its type, because a feed can start mid-stay. A later
 /// A01 for that open stay fills in its details but does not emit a second Admit.</item>
 /// <item>An A03 emits Discharge, so an A03 that is also the first message of a stay emits Admit and Discharge.</item>
-/// <item>A11 and A18 never imply a stay, and A11, A13 and A18 emit nothing: downstream has no way to take back an
-/// Admit or Discharge it has already received.</item>
+/// <item>A08, A11, A23, merges and visit changes never imply a stay, and nothing but an A01, A03, A04, A06, A07 or A13 that
+/// opens a stay, or an A03 that closes one, emits anything: downstream has no way to take back an Admit or Discharge it has
+/// already received.</item>
 /// </list>
 /// </summary>
 public class AdtEventService : IAdtEventService
@@ -99,13 +100,17 @@ public class AdtEventService : IAdtEventService
                     continue;
                 }
 
-                if (payload is AdtA18Payload merge)
+                switch (payload)
                 {
-                    await ProcessMerge(facilityId, merge, cancellationToken);
-                }
-                else
-                {
-                    await ProcessEncounterEvent(facilityId, payload, messages, cancellationToken);
+                    case AdtPatientMergePayload merge:
+                        await ProcessMerge(facilityId, merge, cancellationToken);
+                        break;
+                    case AdtVisitChangePayload visitChange:
+                        await ProcessVisitChange(facilityId, visitChange, cancellationToken);
+                        break;
+                    default:
+                        await ProcessEncounterEvent(facilityId, payload, messages, cancellationToken);
+                        break;
                 }
             }
 
@@ -134,7 +139,9 @@ public class AdtEventService : IAdtEventService
 
             if (!payload.ImpliesAdmission)
             {
-                _logger.LogWarning("ADT {EventType} message for facility {FacilityId} matched no encounter", payload.EventType, facilityId.SanitizeForLog());
+                // An A08 is sent for every kind of visit, most of which Census never tracks
+                _logger.Log(payload is AdtA08Payload ? LogLevel.Debug : LogLevel.Warning,
+                    "ADT {EventType} message for facility {FacilityId} matched no encounter", payload.EventType, facilityId.SanitizeForLog());
                 return;
             }
 
@@ -167,16 +174,13 @@ public class AdtEventService : IAdtEventService
     /// A merge updates every encounter of the patient merged away, with one PatientEvent per encounter so that each can
     /// be rebuilt from its own events. It has no stay of its own, so it emits nothing and opens nothing.
     /// </summary>
-    private async Task ProcessMerge(string facilityId, AdtA18Payload payload, CancellationToken cancellationToken)
+    private async Task ProcessMerge(string facilityId, AdtPatientMergePayload payload, CancellationToken cancellationToken)
     {
-        var priorIdentifiers = payload.GetPriorIdentifiers();
-        var encounters = priorIdentifiers.Count == 0
-            ? []
-            : await _patientEncounterQueries.GetTrackedEncountersByIdentifiers(facilityId, priorIdentifiers, cancellationToken);
+        var encounters = await GetEncountersByIdentifiers(facilityId, payload.GetPriorIdentifiers(), cancellationToken);
 
         if (encounters.Count == 0)
         {
-            _logger.LogWarning("ADT A18 message for facility {FacilityId} matched no encounter", facilityId.SanitizeForLog());
+            _logger.LogWarning("ADT {EventType} message for facility {FacilityId} matched no encounter", payload.EventType, facilityId.SanitizeForLog());
             await _patientEventManager.AddPatientEvent(payload.CreatePatientEvent(facilityId, Guid.NewGuid().ToString()), cancellationToken);
             return;
         }
@@ -189,6 +193,51 @@ public class AdtEventService : IAdtEventService
 
         await _patientEncounterQueries.SaveTrackedChanges(cancellationToken);
     }
+
+    /// <summary>
+    /// A visit change applies to the one encounter its prior visit number names: the patient's own for a merge or change of
+    /// visit number, the prior patient's for a move. It opens nothing and emits nothing. One already applied, so that the
+    /// encounter carries the new number, is applied again harmlessly.
+    /// </summary>
+    private async Task ProcessVisitChange(string facilityId, AdtVisitChangePayload payload, CancellationToken cancellationToken)
+    {
+        var encounters = payload is AdtA45Payload move
+            ? await GetEncountersByIdentifiers(facilityId, move.GetPriorIdentifiers(), cancellationToken)
+            : await _patientEncounterQueries.GetTrackedEncountersByFhirPatientId(facilityId, payload.PatientId, cancellationToken);
+
+        var priorVisitIds = payload.GetVisitIdentifiersToMatch();
+        var encounter = encounters.FirstOrDefault(e => e.PatientVisitIdentifiers.Any(v => priorVisitIds.Contains(v.Identifier)))
+            ?? (string.IsNullOrWhiteSpace(payload.EncounterId) || payload is AdtA45Payload
+                ? null
+                : encounters.FirstOrDefault(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == payload.EncounterId)));
+
+        if (encounter is null)
+        {
+            _logger.LogWarning("ADT {EventType} message for facility {FacilityId} matched no encounter", payload.EventType, facilityId.SanitizeForLog());
+            await _patientEventManager.AddPatientEvent(payload.CreatePatientEvent(facilityId, Guid.NewGuid().ToString()), cancellationToken);
+            return;
+        }
+
+        // A visit merged into one tracked as an encounter of its own: the prior encounter is closed, and the surviving one
+        // takes the prior visit numbers
+        if (payload is AdtA42Payload visitMerge
+            && encounters.FirstOrDefault(e => e != encounter && e.PatientVisitIdentifiers.Any(v => v.Identifier == payload.EncounterId)) is { } surviving)
+        {
+            var mergedAway = visitMerge.ForMergedAwayEncounter();
+            await _patientEventManager.AddPatientEvent(mergedAway.CreatePatientEvent(facilityId, encounter.CorrelationId), cancellationToken);
+            mergedAway.UpdatePatientEncounter(encounter);
+            encounter = surviving;
+        }
+
+        await _patientEventManager.AddPatientEvent(payload.CreatePatientEvent(facilityId, encounter.CorrelationId), cancellationToken);
+        payload.UpdatePatientEncounter(encounter);
+        await _patientEncounterQueries.SaveTrackedChanges(cancellationToken);
+    }
+
+    private async Task<List<PatientEncounter>> GetEncountersByIdentifiers(string facilityId, IReadOnlyCollection<string> identifiers, CancellationToken cancellationToken) =>
+        identifiers.Count == 0
+            ? []
+            : await _patientEncounterQueries.GetTrackedEncountersByIdentifiers(facilityId, identifiers, cancellationToken);
 
     /// <summary>
     /// Finds the stay a message belongs to, from the patient's encounters with the most recently admitted first.

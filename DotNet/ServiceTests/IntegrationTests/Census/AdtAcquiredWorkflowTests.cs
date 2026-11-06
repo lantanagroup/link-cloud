@@ -192,6 +192,7 @@ public class AdtAcquiredWorkflowTests
     [InlineData("A06")]
     [InlineData("A07")]
     [InlineData("A13")]
+    [InlineData("A04")]
     public async Task AnotherEvent_AsFirstEvent_EmitsAdmit(string type)
     {
         var messages = await Process(Entry(type));
@@ -301,12 +302,14 @@ public class AdtAcquiredWorkflowTests
         Assert.Null(encounter.EncounterStatus);
     }
 
-    [Fact]
-    public async Task A11_ClosesTheEncounter_WithoutMessages_AndALaterA01StartsAnother()
+    [Theory]
+    [InlineData("A11")]
+    [InlineData("A23")]
+    public async Task Cancellation_ClosesTheEncounter_WithoutMessages_AndALaterA01StartsAnother(string type)
     {
         await Process(Entry("A01"));
 
-        Assert.Empty(await Process(Entry("A11")));
+        Assert.Empty(await Process(Entry(type)));
 
         var cancelled = Assert.Single(await Encounters());
         Assert.Null(cancelled.EncounterStatus);
@@ -348,22 +351,27 @@ public class AdtAcquiredWorkflowTests
         Assert.Contains(await Encounters(), e => e.DischargeDate == discharge);
     }
 
-    [Fact]
-    public async Task A01_AfterA11_InTheSameFile_StartsAnotherStay()
+    [Theory]
+    [InlineData("A11")]
+    [InlineData("A23")]
+    public async Task A01_AfterACancellation_InTheSameFile_StartsAnotherStay(string type)
     {
-        var messages = await Process(Entry("A01"), Entry("A11"), Entry("A01"));
+        var messages = await Process(Entry("A01"), Entry(type), Entry("A01"));
 
         Assert.Equal([nameof(PatientEvents.Admit), nameof(PatientEvents.Admit)], messages);
         Assert.Equal(2, (await Encounters()).Count);
     }
 
-    [Fact]
-    public async Task A11_AsFirstEvent_IsRecordedButOpensNothing()
+    [Theory]
+    [InlineData("A11")]
+    [InlineData("A23")]
+    [InlineData("A08")]
+    public async Task UpdateOrCancellation_AsFirstEvent_IsRecordedButOpensNothing(string type)
     {
-        Assert.Empty(await Process(Entry("A11")));
+        Assert.Empty(await Process(Entry(type)));
 
         Assert.Empty(await Encounters());
-        Assert.Equal(EventType.A11, Assert.Single(await Events()).EventType);
+        Assert.Equal(Enum.Parse<EventType>(type), Assert.Single(await Events()).EventType);
     }
 
     [Fact]
@@ -487,8 +495,223 @@ public class AdtAcquiredWorkflowTests
     }
 
     [Theory]
-    [InlineData("A04")]
-    [InlineData("A08")]
+    [InlineData("A40")]
+    [InlineData("A34")]
+    [InlineData("A36")]
+    [InlineData("A39")]
+    [InlineData("A30")]
+    public async Task PatientMerges_AreHandledAsA18(string type)
+    {
+        await Process(Entry("A01"));
+
+        Assert.Empty(await Process(Entry(type, patientId: "fhir-2", visitId: null, configure: e =>
+        {
+            e.MedicalRecordNumber = "mrn-2";
+            e.PatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-2", IdentifierType = "MR" }];
+            e.Merge = new AdtMergeInformation { PriorPatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-1" }] };
+        })));
+
+        var encounter = Assert.Single(await Encounters());
+        Assert.Equal("mrn-2", encounter.MedicalRecordNumber);
+        Assert.Equal("fhir-2", encounter.GetIdentifierByType(SourceType.ADT_FHIR).Identifier);
+
+        var merge = Assert.Single(await Events(), e => e.EventType == Enum.Parse<EventType>(type));
+        Assert.Equal(encounter.CorrelationId, merge.CorrelationId);
+        Assert.IsAssignableFrom<AdtPatientMergePayload>(merge.Payload);
+
+        Assert.Equal(Discharge, await Process(Entry("A03", patientId: "fhir-2")));
+    }
+
+    [Fact]
+    public async Task A04_SetsTheAdmitDate_AndItsA03DischargesTheSameStay()
+    {
+        var admitDate = new DateTime(2026, 2, 1, 7, 30, 0);
+
+        Assert.Equal(Admit, await Process(Entry("A04", configure: e => { e.PatientClass = "E"; e.AdmitDateTime = admitDate; })));
+        Assert.Equal(Discharge, await Process(Entry("A03", configure: e => e.PatientClass = "E")));
+
+        var encounter = Assert.Single(await Encounters());
+        Assert.Equal(admitDate, encounter.AdmitDate);
+        Assert.NotNull(encounter.DischargeDate);
+    }
+
+    [Fact]
+    public async Task A08_CorrectsTheAdmitDateAndIdentifiers_WithoutMessages()
+    {
+        await Process(Entry("A01", configure: e => e.AdmitDateTime = new DateTime(2026, 2, 1, 7, 0, 0)));
+        var corrected = new DateTime(2026, 1, 31, 22, 0, 0);
+
+        Assert.Empty(await Process(Entry("A08", configure: e =>
+        {
+            e.AdmitDateTime = corrected;
+            e.DischargeDateTime = new DateTime(2026, 2, 3);
+            e.PatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-1", IdentifierType = "MR" }, new AdtPatientIdentifier { Id = "ssn-1", IdentifierType = "SS" }];
+        })));
+
+        var encounter = Assert.Single(await Encounters());
+        Assert.Equal(corrected, encounter.AdmitDate);
+        // Only an A03 discharges
+        Assert.Null(encounter.DischargeDate);
+        Assert.Contains(encounter.PatientIdentifiers, i => i.Identifier == "ssn-1" && i.SourceType == nameof(SourceType.ADT));
+
+        Assert.Equal(Discharge, await Process(Entry("A03")));
+    }
+
+    [Fact]
+    public async Task A08_CorrectsTheDischargeDate_OfADischargedStay()
+    {
+        var corrected = new DateTime(2026, 2, 4, 9, 0, 0);
+        await Process(Entry("A01"), Entry("A03", configure: e => e.DischargeDateTime = new DateTime(2026, 2, 4, 12, 0, 0)));
+
+        Assert.Empty(await Process(Entry("A08", configure: e => e.DischargeDateTime = corrected)));
+
+        Assert.Equal(corrected, Assert.Single(await Encounters()).DischargeDate);
+    }
+
+    private static Action<AdtEventEntry> PriorVisit(string priorVisitId, string? priorMrn = null) => e =>
+        e.Merge = new AdtMergeInformation
+        {
+            PriorVisitNumber = priorVisitId,
+            PriorPatientIdentifierList = priorMrn is null ? [] : [new AdtPatientIdentifier { Id = priorMrn, IdentifierType = "MR" }]
+        };
+
+    private async Task RebuildEncounters()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>().RebuildPatientEncounterTable(_facilityId);
+    }
+
+    [Theory]
+    [InlineData("A50", new[] { "visit-2" })]
+    // A merged visit is known by both numbers, so a late message with the prior one still reaches it
+    [InlineData("A42", new[] { "visit-1", "visit-2" })]
+    public async Task VisitNumberChange_RenamesTheVisit_SoItsNextMessageFollowsTheSameStay(string type, string[] visitIds)
+    {
+        await Process(Entry("A01", visitId: "visit-1"));
+
+        Assert.Empty(await Process(Entry(type, visitId: "visit-2", configure: PriorVisit("visit-1"))));
+
+        async Task AssertRenamed()
+        {
+            var encounter = Assert.Single(await Encounters());
+            Assert.Equal(visitIds, encounter.PatientVisitIdentifiers.Select(v => v.Identifier).Order());
+            Assert.Null(encounter.DischargeDate);
+        }
+
+        await AssertRenamed();
+        await RebuildEncounters();
+        await AssertRenamed();
+
+        // Without the rename, this A03 would open a second stay and emit Admit too
+        Assert.Equal(Discharge, await Process(Entry("A03", visitId: "visit-2")));
+        Assert.Single(await Encounters());
+    }
+
+    [Fact]
+    public async Task A42_IntoAVisitAlreadyTracked_ClosesThePriorStay_AndKeepsTheSurvivingOne()
+    {
+        var survivingAdmit = new DateTime(2026, 2, 1, 6, 0, 0);
+        await Process(
+            Entry("A01", visitId: "visit-er"),
+            Entry("A01", visitId: "visit-in", configure: e => e.AdmitDateTime = survivingAdmit));
+
+        Assert.Empty(await Process(Entry("A42", visitId: "visit-in", configure: PriorVisit("visit-er"))));
+
+        async Task AssertMerged()
+        {
+            var encounters = await Encounters();
+            Assert.Equal(2, encounters.Count);
+
+            var surviving = Assert.Single(encounters, e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "visit-in"));
+            Assert.Equal(["visit-er", "visit-in"], surviving.PatientVisitIdentifiers.Select(v => v.Identifier).Order());
+            Assert.Equal(survivingAdmit, surviving.AdmitDate);
+            Assert.Null(surviving.DischargeDate);
+
+            var prior = Assert.Single(encounters, e => e.Id != surviving.Id);
+            Assert.Empty(prior.PatientVisitIdentifiers);
+            Assert.Equal(prior.AdmitDate, prior.DischargeDate);
+        }
+
+        await AssertMerged();
+        Assert.Equal(2, (await Events()).Count(e => e.EventType == EventType.A42));
+        await RebuildEncounters();
+        await AssertMerged();
+
+        // Messages for either visit number now reach the surviving stay alone
+        Assert.Equal(Discharge, await Process(Entry("A03", visitId: "visit-er")));
+        Assert.Empty(await Process(Entry("A03", visitId: "visit-in")));
+        Assert.Equal(2, (await Encounters()).Count);
+    }
+
+    [Fact]
+    public async Task A45_MovesOneVisitToAnotherPatient_AndDropsThePriorPatientsIdentifiers()
+    {
+        await Process(
+            Entry("A01", visitId: "visit-1", configure: e => e.PatientIdentifierList =
+                [new AdtPatientIdentifier { Id = "mrn-1", IdentifierType = "MR" }, new AdtPatientIdentifier { Id = "ssn-1", IdentifierType = "SS" }]),
+            Entry("A01", visitId: "visit-2"));
+
+        var messages = await Process(Entry("A45", patientId: "fhir-2", visitId: "visit-1", configure: e =>
+        {
+            e.MedicalRecordNumber = "mrn-2";
+            e.PatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-2", IdentifierType = "MR" }, new AdtPatientIdentifier { Id = "ssn-2", IdentifierType = "SS" }];
+            PriorVisit("visit-1", priorMrn: "mrn-1")(e);
+        }));
+
+        Assert.Empty(messages);
+
+        async Task AssertMoved()
+        {
+            var encounters = await Encounters();
+            Assert.Equal(2, encounters.Count);
+
+            var moved = encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "visit-1"));
+            Assert.Equal("mrn-2", moved.MedicalRecordNumber);
+            Assert.Equal("fhir-2", moved.GetIdentifierByType(SourceType.ADT_FHIR).Identifier);
+            Assert.Equal(["ssn-2"], moved.PatientIdentifiers.Where(i => i.SourceType == nameof(SourceType.ADT)).Select(i => i.Identifier));
+
+            // The prior patient's other visit stays theirs
+            var kept = encounters.Single(e => e.PatientVisitIdentifiers.Any(v => v.Identifier == "visit-2"));
+            Assert.Equal("mrn-1", kept.MedicalRecordNumber);
+            Assert.Equal(PatientId, kept.GetIdentifierByType(SourceType.ADT_FHIR).Identifier);
+        }
+
+        await AssertMoved();
+        await RebuildEncounters();
+        await AssertMoved();
+
+        Assert.Equal(Discharge, await Process(Entry("A03", patientId: "fhir-2", visitId: "visit-1")));
+    }
+
+    [Fact]
+    public async Task A45_WithoutAPriorVisitNumber_MovesTheVisitWithTheMessagesEncounterId()
+    {
+        await Process(Entry("A01", visitId: "visit-1"));
+
+        await Process(Entry("A45", patientId: "fhir-2", visitId: "visit-1", configure: e =>
+            e.Merge = new AdtMergeInformation { PriorPatientIdentifierList = [new AdtPatientIdentifier { Id = "mrn-1" }] }));
+
+        Assert.Equal("fhir-2", Assert.Single(await Encounters()).GetIdentifierByType(SourceType.ADT_FHIR).Identifier);
+    }
+
+    [Theory]
+    [InlineData("A42")]
+    [InlineData("A45")]
+    [InlineData("A50")]
+    public async Task VisitChange_MatchingNothing_IsRecordedButOpensNothing(string type)
+    {
+        await Process(Entry("A01", visitId: "visit-1"));
+
+        Assert.Empty(await Process(Entry(type, visitId: "visit-3", configure: PriorVisit("unknown", priorMrn: "mrn-1"))));
+
+        var encounter = Assert.Single(await Encounters());
+        Assert.Equal(["visit-1"], encounter.PatientVisitIdentifiers.Select(v => v.Identifier));
+        Assert.Equal(2, (await Events()).Count);
+    }
+
+    [Theory]
+    [InlineData("A05")]
+    [InlineData("A31")]
     [InlineData("A103")]
     [InlineData("A02")]
     [InlineData("A12")]

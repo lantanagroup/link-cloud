@@ -98,22 +98,11 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                     return JsonSerializer.Deserialize<CernerListDischargePayload>(document);
                 case "CernerListUpdate":
                     return JsonSerializer.Deserialize<CernerListUpdatePayload>(document);
-                case "A01":
-                    return JsonSerializer.Deserialize<AdtA01Payload>(document);
-                case "A03":
-                    return JsonSerializer.Deserialize<AdtA03Payload>(document);
-                case "A06":
-                    return JsonSerializer.Deserialize<AdtA06Payload>(document);
-                case "A07":
-                    return JsonSerializer.Deserialize<AdtA07Payload>(document);
-                case "A11":
-                    return JsonSerializer.Deserialize<AdtA11Payload>(document);
-                case "A13":
-                    return JsonSerializer.Deserialize<AdtA13Payload>(document);
-                case "A18":
-                    return JsonSerializer.Deserialize<AdtA18Payload>(document);
                 default:
-                    return null;
+                    // Each ADT message type has its own payload class
+                    return AdtPayloadFactory.GetPayloadType(payloadType) is { } adtPayloadType
+                        ? (IPayload)JsonSerializer.Deserialize(document, adtPayloadType)
+                        : null;
             }
         }
 

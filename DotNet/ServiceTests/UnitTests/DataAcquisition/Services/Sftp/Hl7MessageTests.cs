@@ -144,12 +144,21 @@ public class Hl7MessageTests
         Assert.Null(entry.Merge);
     }
 
-    [Fact]
-    public void Map_A18_ReadsTheMrgSegment()
+    [Theory]
+    [InlineData("A18")]
+    [InlineData("A30")]
+    [InlineData("A34")]
+    [InlineData("A36")]
+    [InlineData("A39")]
+    [InlineData("A40")]
+    [InlineData("A42")]
+    [InlineData("A45")]
+    [InlineData("A50")]
+    public void Map_MergeOrVisitChange_ReadsTheMrgSegment(string type)
     {
         var message = Message("MSH|^~\\&|EHR\rPID|1||MRN2^^^HOSP^MR\rMRG|MRN1^^^HOSP^MR~OLD2||ACCT1|PRIOR1|VISIT1|ALTV1\r");
 
-        var merge = AdtEventMapper.Map(message, "A18", Hl7Path.Parse("PID-3.1"), Hl7Path.Parse("PV1-19.1")).Merge;
+        var merge = AdtEventMapper.Map(message, type, Hl7Path.Parse("PID-3.1"), Hl7Path.Parse("PV1-19.1")).Merge;
 
         Assert.NotNull(merge);
         Assert.Equal(["MRN1", "OLD2"], merge.PriorPatientIdentifierList.Select(x => x.Id));
@@ -165,6 +174,67 @@ public class Hl7MessageTests
         var message = Message("MSH|^~\\&|EHR\rPID|1||MRN2\rMRG|MRN1\r");
 
         Assert.Null(AdtEventMapper.Map(message, "A01", Hl7Path.Parse("PID-3.1"), Hl7Path.Parse("PV1-19.1")).Merge);
+    }
+
+    [Theory]
+    [InlineData("A39")]
+    [InlineData("A40")]
+    [InlineData("A42")]
+    public void SplitIntoEvents_RepeatedPatientGroups_AreOneEventEach(string type)
+    {
+        var message = Message(
+            $"MSH|^~\\&|EHR||||||ADT^{type}|C1\rEVN|{type}\r" +
+            "PID|1||MRN2\rMRG|MRN1||||V1\rPV1|1|I|||||||||||||||||V2\r" +
+            "PID|1||MRN4\rMRG|MRN3||||V3\rPV1|1|I|||||||||||||||||V4\r");
+
+        var events = AdtEventMapper.SplitIntoEvents(message);
+
+        Assert.Equal(2, events.Count);
+        Assert.All(events, e =>
+        {
+            Assert.Equal(type, AdtEventMapper.GetMessageType(e));
+            Assert.Equal("C1", AdtEventMapper.GetMessageControlId(e));
+            Assert.Equal(message.Position, e.Position);
+        });
+
+        var entries = events.Select(e => AdtEventMapper.Map(e, type, Hl7Path.Parse("PID-3.1"), Hl7Path.Parse("PV1-19.1"))).ToList();
+        Assert.Equal(["MRN2", "MRN4"], entries.Select(e => e.MedicalRecordNumber));
+        Assert.Equal(["MRN1", "MRN3"], entries.Select(e => e.Merge!.PriorPatientIdentifierList.Single().Id));
+        Assert.Equal(["V1", "V3"], entries.Select(e => e.Merge!.PriorVisitNumber));
+        Assert.Equal(["V2", "V4"], entries.Select(e => e.EncounterId));
+    }
+
+    [Fact]
+    public void SplitIntoEvents_A45_IsOneEventForEachVisitMoved_WithTheSamePatient()
+    {
+        var message = Message(
+            "MSH|^~\\&|EHR||||||ADT^A45|C1\rEVN|A45\rPID|1||MRN2\r" +
+            "MRG|MRN1||||V1\rPV1|1|I|||||||||||||||||V1\r" +
+            "MRG|MRN1||||V3\rPV1|1|I|||||||||||||||||V3\r");
+
+        var entries = AdtEventMapper.SplitIntoEvents(message)
+            .Select(e => AdtEventMapper.Map(e, "A45", Hl7Path.Parse("PID-3.1"), Hl7Path.Parse("PV1-19.1")))
+            .ToList();
+
+        Assert.Equal(["MRN2", "MRN2"], entries.Select(e => e.MedicalRecordNumber));
+        Assert.Equal(["V1", "V3"], entries.Select(e => e.Merge!.PriorVisitNumber));
+        Assert.Equal(["V1", "V3"], entries.Select(e => e.EncounterId));
+    }
+
+    [Theory]
+    [InlineData("A40")]
+    [InlineData("A01")]
+    [InlineData("A18")]
+    public void SplitIntoEvents_OneGroupOrAnotherType_IsTheMessageItself(string type)
+    {
+        var message = Message($"MSH|^~\\&|EHR||||||ADT^{type}\rPID|1||MRN2\rMRG|MRN1\rPID|1||MRN4\r");
+        var single = Message($"MSH|^~\\&|EHR||||||ADT^{type}\rPID|1||MRN2\rMRG|MRN1\r");
+
+        Assert.Same(single, Assert.Single(AdtEventMapper.SplitIntoEvents(single)));
+        if (type != "A40")
+        {
+            Assert.Same(message, Assert.Single(AdtEventMapper.SplitIntoEvents(message)));
+        }
     }
 
     [Fact]

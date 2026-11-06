@@ -124,10 +124,13 @@ public partial class Hl7AdtProcessor(
             await foreach (var message in parser.ParseAsync(fileStream, acquisitionConfig.ParsingConfiguration, cancellationToken))
             {
                 messageCount++;
-                var entry = await MapMessageAsync(message, file.Name, log.FacilityId, context, cancellationToken);
-                if (entry is not null)
+                foreach (var eventMessage in AdtEventMapper.SplitIntoEvents(message))
                 {
-                    entries.Add(entry);
+                    var entry = await MapMessageAsync(eventMessage, file.Name, log.FacilityId, context, cancellationToken);
+                    if (entry is not null)
+                    {
+                        entries.Add(entry);
+                    }
                 }
             }
             benchmark?.EndParse(entries.Count);

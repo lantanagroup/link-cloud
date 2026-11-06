@@ -145,6 +145,36 @@ public sealed partial class Hl7Message
     /// </summary>
     public bool HasSegment(string segmentName) => _segments.Any(s => s.Name == segmentName);
 
+    /// <summary>
+    /// Splits a message whose repeating group starts at <paramref name="groupStartSegment"/>, such as the PID/MRG pairs of an
+    /// A40, into one message per group. Each keeps the segments before the first group, such as MSH and EVN, and its
+    /// <see cref="Position"/>. A message with at most one group is returned as it is.
+    /// </summary>
+    public IReadOnlyList<Hl7Message> SplitGroups(string groupStartSegment)
+    {
+        var starts = _segments
+            .Select((segment, index) => (segment, index))
+            .Where(x => x.segment.Name == groupStartSegment)
+            .Select(x => x.index)
+            .ToList();
+
+        if (starts.Count <= 1)
+        {
+            return [this];
+        }
+
+        var header = _segments.Take(starts[0]).ToList();
+
+        return starts
+            .Select((start, i) =>
+            {
+                var end = i + 1 < starts.Count ? starts[i + 1] : _segments.Count;
+                var segments = header.Concat(_segments.Skip(start).Take(end - start)).ToList();
+                return new Hl7Message(segments, _fieldSeparator, _component, _repetition, _escape, _subcomponent, Position);
+            })
+            .ToList();
+    }
+
     private Hl7Segment? SelectSegment(Hl7Path path)
     {
         var candidates = _segments.Where(s => s.Name == path.SegmentName);

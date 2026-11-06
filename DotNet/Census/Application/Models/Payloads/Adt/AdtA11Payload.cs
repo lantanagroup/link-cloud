@@ -5,7 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 namespace LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 
 /// <summary>
-/// Cancel admit/visit: the encounter is kept, marked cancelled and closed at its admit date so it no longer counts as admitted.
+/// Cancel admit/visit: the encounter is kept and closed at its admit date so it no longer counts as admitted.
 /// </summary>
 public class AdtA11Payload : AdtPayload
 {

@@ -453,7 +453,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
     }
 
     /// <summary>
-    /// Gets a patient's encounters, most recently admitted first and leaving out any an A11 cancelled, as tracked entities for
+    /// Gets a patient's encounters, most recently admitted first and leaving out any an A11 or A23 cancelled, as tracked entities for
     /// <see cref="SaveTrackedChanges"/>.
     /// </summary>
     public async Task<List<PatientEncounter>> GetTrackedEncountersByFhirPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default)
@@ -464,7 +464,8 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             .Include(e => e.PatientIdentifiers)
             .Include(e => e.PatientVisitIdentifiers)
             .Where(e => e.FacilityId == facilityId
-                && !_context.PatientEvents.Any(x => x.FacilityId == facilityId && x.CorrelationId == e.CorrelationId && x.EventType == EventType.A11)
+                && !_context.PatientEvents.Any(x => x.FacilityId == facilityId && x.CorrelationId == e.CorrelationId
+                    && (x.EventType == EventType.A11 || x.EventType == EventType.A23))
                 && e.PatientIdentifiers.Any(i => i.SourceType == fhirSourceType && i.Identifier == patientId))
             .OrderByDescending(e => e.AdmitDate)
             .ToListAsync(cancellationToken);
