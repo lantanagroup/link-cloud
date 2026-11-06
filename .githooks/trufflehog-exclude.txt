@@ -1,0 +1,8 @@
+# Paths whose TruffleHog findings the secret scans ignore, one regular expression per line.
+#
+# Each pattern is searched for in the path relative to the repository root, written with forward
+# slashes, so anchor it: ^docker-compose\.yml$ rather than docker-compose.yml. Blank lines and lines
+# starting with # are skipped.
+#
+# The pull request check reads this file from the base branch, so a new pattern takes effect only
+# once it has merged. See dev-docs/secret-scanning.md before adding one.
