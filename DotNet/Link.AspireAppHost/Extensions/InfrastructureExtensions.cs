@@ -4,7 +4,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
-namespace Link.AspireAppHost;
+namespace Link.AspireAppHost.Extensions;
 
 /// <summary>
 /// The containers every service depends on, and the addresses services use to reach them from the host.

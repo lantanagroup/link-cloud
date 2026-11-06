@@ -21,6 +21,7 @@ internal static class Ports
     public const int AzuriteBlob = 11000;
     public const int Loki = 13100;
     public const int HapiFhir = 16157;
+    public const int Keycloak = 18443;
 
     // .NET services
     public const int Account = 18060;

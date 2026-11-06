@@ -1,11 +1,12 @@
 using System.Xml.Linq;
+using Link.AspireAppHost.Security;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 
-namespace Link.AspireAppHost;
+namespace Link.AspireAppHost.Extensions;
 
 /// <summary>
 /// Builds the Java services with Maven and runs MeasureEval and Validation the way docker-compose
@@ -16,7 +17,9 @@ internal static class JavaServiceExtensions
     public static (IResourceBuilder<ExecutableResource> MeasureEval, IResourceBuilder<ExecutableResource> Validation) AddJavaServices(
         this IDistributedApplicationBuilder builder,
         LinkInfrastructure infrastructure,
-        IResourceBuilder<SqlServerDatabaseResource> validationDatabase)
+        IResourceBuilder<SqlServerDatabaseResource> validationDatabase,
+        bool requireToken,
+        LinkKeycloak? keycloak)
     {
         var javaDirectory = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "Java"));
         var javaHome = FindJavaHome(builder.Configuration);
@@ -38,7 +41,7 @@ internal static class JavaServiceExtensions
         var validationJdbcUrl =
             $"jdbc:sqlserver://localhost:{Ports.SqlServer};databaseName={validationDatabase.Resource.DatabaseName};encrypt=true;trustServerCertificate=true"; // trufflehog:ignore
 
-        var measureEval = builder.AddJavaService("measureeval", Ports.MeasureEval, javaCommand, javaHome, javaDirectory, version, build)
+        var measureEval = builder.AddJavaService("measureeval", Ports.MeasureEval, javaCommand, javaHome, javaDirectory, version, build, requireToken)
             .WithEnvironment("spring.data.mongodb.uri", mongoUri)
             .WithEnvironment("spring.data.mongodb.database", "link-measureeval")
             .WithEnvironment("resource-cache.blob-storage.connection-string", LinkInfrastructure.BlobConnectionString)
@@ -47,7 +50,7 @@ internal static class JavaServiceExtensions
             .WithEnvironment("link.data-acquisition.base-url", DotNetServiceExtensions.Url(Ports.DataAcquisition))
             .WaitFor(infrastructure.Mongo);
 
-        var validation = builder.AddJavaService("validation", Ports.Validation, javaCommand, javaHome, javaDirectory, version, build)
+        var validation = builder.AddJavaService("validation", Ports.Validation, javaCommand, javaHome, javaDirectory, version, build, requireToken)
             .WithEnvironment("spring.datasource.url", validationJdbcUrl)
             .WithEnvironment("spring.datasource.username", "sa")
             .WithEnvironment("spring.datasource.password", infrastructure.Sql.Resource.PasswordParameter)
@@ -56,6 +59,12 @@ internal static class JavaServiceExtensions
             .WithEnvironment("LINK_TERMINOLOGYSERVICEURL", DotNetServiceExtensions.Url(Ports.Terminology))
             .WaitFor(validationDatabase)
             .WithValidationMigrationCommand(javaDirectory, validationDatabase);
+
+        if (requireToken && keycloak is not null)
+        {
+            measureEval.WaitFor(keycloak.Container);
+            validation.WaitFor(keycloak.Container);
+        }
 
         return (measureEval, validation);
     }
@@ -68,7 +77,8 @@ internal static class JavaServiceExtensions
         string? javaHome,
         string javaDirectory,
         string version,
-        IResourceBuilder<ExecutableResource> build) =>
+        IResourceBuilder<ExecutableResource> build,
+        bool requireToken) =>
         builder.AddExecutable(module, javaCommand, Path.Combine(javaDirectory, module), "-jar", Path.Combine("target", $"{module}-{version}.jar"))
             .WithJavaHome(javaHome)
             .WithHttpEndpoint(port: port, isProxied: false)
@@ -82,6 +92,11 @@ internal static class JavaServiceExtensions
             .WithEnvironment("internal-blob-storage.connection-string", LinkInfrastructure.BlobConnectionString)
             .WithEnvironment("internal-blob-storage.blob-container-name", LinkInfrastructure.InternalContainer)
             .WithEnvironment("authentication.signing-key", DotNetServiceExtensions.LocalSigningKey)
+            // The docker profile serves requests anonymously. When it does not, incoming tokens are checked
+            // against the signing key, and the tokens these services send Report must carry the issuer the
+            // .NET services accept (authentication.authority defaults to https://localhost:7004).
+            .WithEnvironment("authentication.anonymous", requireToken ? "false" : "true")
+            .WithEnvironment("authentication.authority", LinkSystemToken.Issuer)
             .WithEnvironment("link.report.base-url", DotNetServiceExtensions.Url(Ports.Report))
             .WithEnvironment("loki.url", LinkInfrastructure.LokiUrl)
             // The services read their collector address from telemetry.exporterEndpoint. Aspire's

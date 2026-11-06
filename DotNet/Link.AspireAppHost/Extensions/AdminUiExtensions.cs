@@ -1,29 +1,28 @@
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
 
-namespace Link.AspireAppHost;
+namespace Link.AspireAppHost.Extensions;
 
 /// <summary>
 /// Runs the Admin UI under <c>ng serve</c>, proxying <c>/api</c> to the Admin BFF, as developers run it
-/// on its own. Only the proxy file differs: <c>admin-ui.proxy.mjs</c> in this folder reads the BFF's
+/// on its own. Only the proxy file differs: <c>AdminUi/proxy.mjs</c> reads the BFF's
 /// address from the environment, and the UI's own <c>proxy.conf.json</c> is not touched.
 /// </summary>
 internal static class AdminUiExtensions
 {
+    /// <param name="builder">The AppHost.</param>
+    /// <param name="adminBff">The Admin BFF, which <c>/api</c> is proxied to.</param>
+    /// <param name="authRequired">
+    /// Whether the UI asks people to sign in. True when Keycloak signs people in to the Admin BFF. Under
+    /// anonymous access the Admin BFF maps no login endpoint, so a sign-in page would 404.
+    /// </param>
     public static IResourceBuilder<ExecutableResource> AddAdminUi(
-        this IDistributedApplicationBuilder builder, IResourceBuilder<ProjectResource> adminBff)
+        this IDistributedApplicationBuilder builder, IResourceBuilder<ProjectResource> adminBff, bool authRequired)
     {
         var uiDirectory = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "Web", "Admin.UI"));
-        var proxyConfig = Path.Combine(builder.AppHostDirectory, "admin-ui.proxy.mjs");
+        var proxyConfig = Path.Combine(builder.AppHostDirectory, "AdminUi", "proxy.mjs");
 
-        // Merged over src/assets/app.config.json by the UI (see admin-ui.proxy.mjs). The services run with
-        // anonymous access, and the Admin BFF does not map its login endpoints then, so the UI must not
-        // send people to a login page that would 404. Set AdminUi:AuthRequired to true once local
-        // authentication is configured.
-        var uiConfig = JsonSerializer.Serialize(new
-        {
-            authRequired = builder.Configuration.GetValue("AdminUi:AuthRequired", false)
-        });
+        // Merged over src/assets/app.config.json by the UI (see AdminUi/proxy.mjs).
+        var uiConfig = JsonSerializer.Serialize(new { authRequired });
 
         var ui = builder.AddExecutable(
                 "admin-ui", "node", uiDirectory,

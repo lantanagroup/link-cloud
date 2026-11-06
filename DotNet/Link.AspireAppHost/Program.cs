@@ -1,6 +1,8 @@
 using Link.AspireAppHost;
+using Link.AspireAppHost.Extensions;
+using Link.AspireAppHost.Security;
 using Microsoft.Extensions.Configuration;
-using static Link.AspireAppHost.DotNetServiceExtensions;
+using static Link.AspireAppHost.Extensions.DotNetServiceExtensions;
 
 // The optional local orchestrator for link-cloud. It starts the infrastructure in containers on ports
 // of its own, then every service the way docker-compose runs it, with compose's hostnames swapped for
@@ -9,6 +11,18 @@ using static Link.AspireAppHost.DotNetServiceExtensions;
 var builder = DistributedApplication.CreateBuilder(args);
 
 var infrastructure = builder.AddLinkInfrastructure();
+
+// Auth:Mode decides how people sign in to the Admin UI. Anonymous (the default, and the http launch
+// profile) runs every service with anonymous access. Keycloak (the https launch profile) adds a local
+// Keycloak that signs people in to the Admin BFF, and the backend services require Link bearer tokens.
+var keycloak = builder.Configuration.GetAuthMode() is AuthMode.Keycloak ? builder.AddLinkKeycloak() : null;
+
+// Keycloak mode is "as deployed": the backend services require a Link bearer token too. Terminology
+// is anonymous by design, and Automation UI serves nothing but 503s with authentication on, so both
+// stay anonymous, as does the mock DMRP API, which stands in for an external system.
+var requireToken = keycloak is not null;
+if (keycloak is not null)
+    LinkSystemToken.Issuer = LinkKeycloak.Authority;
 
 // ---------------------------------------------------------------------------------------------------
 // .NET services
@@ -30,7 +44,7 @@ builder.AddLinkService<Projects.MockFhirServer>("mock-fhir-server", Ports.MockFh
 var tenant = builder.AddLinkService<Projects.Tenant>("tenant", Ports.Tenant)
     .WithKafka(infrastructure)
     .WithDatabase(infrastructure.Database("tenant"))
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithEnvironment("ServiceRegistry__MeasureServiceUrl", Url(Ports.MeasureEval))
     .WithEnvironment("ServiceRegistry__ReportServiceUrl", Url(Ports.Report))
     .WithEnvironment("ServiceRegistry__NormalizationServiceUrl", Url(Ports.Normalization))
@@ -42,21 +56,22 @@ var tenant = builder.AddLinkService<Projects.Tenant>("tenant", Ports.Tenant)
     .WithEnvironment("MockDmrpApi__Enabled", "true")
     .WaitFor(mockDmrp);
 
-builder.AddLinkService<Projects.Account>("account", Ports.Account)
+var account = builder.AddLinkService<Projects.Account>("account", Ports.Account)
     .WithKafka(infrastructure)
     .WithDatabase(infrastructure.Database("account"))
     .WithRedis(infrastructure)
-    .WithLocalAuthentication();
+    .WithLocalAuthentication(requireToken, keycloak)
+    .WithSeedData();
 
 builder.AddLinkService<Projects.Audit>("audit", Ports.Audit)
     .WithKafka(infrastructure)
     .WithDatabase(infrastructure.Database("audit"))
-    .WithLocalAuthentication();
+    .WithLocalAuthentication(requireToken, keycloak);
 
 builder.AddLinkService<Projects.Census>("census", Ports.Census)
     .WithKafka(infrastructure)
     .WithDatabase(infrastructure.Database("census"))
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithTenantService()
     .WaitFor(tenant);
 
@@ -67,7 +82,7 @@ var dataAcquisition = builder.AddLinkService<Projects.DataAcquisition>("dataacq"
     .WithDatabase(dataAcquisitionDatabase)
     .WithRedis(infrastructure)
     .WithResourceCache(infrastructure)
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithTenantService()
     .WaitFor(tenant);
 
@@ -76,7 +91,7 @@ builder.AddLinkService<Projects.DataAcquisition_AcquisitionWorker>("dataacq-work
     .WithDatabase(dataAcquisitionDatabase, autoMigrate: false)
     .WithRedis(infrastructure)
     .WithResourceCache(infrastructure)
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithTenantService()
     .WaitFor(dataAcquisition);
 
@@ -85,14 +100,14 @@ builder.AddLinkService<Projects.Normalization>("normalization", Ports.Normalizat
     .WithDatabase(infrastructure.Database("normalization"))
     .WithRedis(infrastructure)
     .WithResourceCache(infrastructure)
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithTenantService();
 
 // appsettings.Docker.json gives QueryDispatch Tenant's address with /api on the end; the others without.
 builder.AddLinkService<Projects.QueryDispatch>("querydispatch", Ports.QueryDispatch)
     .WithKafka(infrastructure)
     .WithDatabase(infrastructure.Database("querydispatch"))
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithTenantService("/api");
 
 var report = builder.AddLinkService<Projects.Report>("report", Ports.Report)
@@ -100,7 +115,7 @@ var report = builder.AddLinkService<Projects.Report>("report", Ports.Report)
     .WithDatabase(infrastructure.Database("report"))
     .WithRedis(infrastructure)
     .WithInternalBlobStorage(infrastructure)
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithTenantService()
     .WithEnvironment("ServiceRegistry__CensusServiceUrl", Url(Ports.Census))
     .WithEnvironment("PatientAggregator__IncludeOrganizationResource", "true");
@@ -109,7 +124,7 @@ builder.AddLinkService<Projects.Submission>("submission", Ports.Submission)
     .WithKafka(infrastructure)
     .WithDatabase(infrastructure.Database("submission"))
     .WithInternalBlobStorage(infrastructure)
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithEnvironment("ExternalBlobStorage__ConnectionString", LinkInfrastructure.BlobConnectionString)
     .WithEnvironment("ExternalBlobStorage__BlobContainerName", LinkInfrastructure.ExternalContainer)
     .WithEnvironment("ExternalBlobStorage__FlattenHierarchy", "false")
@@ -128,7 +143,7 @@ var terminology = builder.AddLinkService<Projects.Terminology>("terminology", Po
 // Java services
 // ---------------------------------------------------------------------------------------------------
 
-var (measureEval, validation) = builder.AddJavaServices(infrastructure, infrastructure.Database("validation"));
+var (measureEval, validation) = builder.AddJavaServices(infrastructure, infrastructure.Database("validation"), requireToken, keycloak);
 measureEval.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(infrastructure.Azurite);
 validation.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(infrastructure.Azurite).WaitFor(terminology);
 
@@ -154,7 +169,7 @@ validation.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(i
 var adminBff = builder.AddLinkService<Projects.Admin_BFF>("admin-bff", Ports.AdminBff, healthPath: "/api/health")
     .WithKafka(infrastructure)
     .WithRedis(infrastructure)
-    .WithLocalAuthentication()
+    .WithLocalAuthentication(requireToken, keycloak)
     .WithEnvironment("Authentication__DefaultChallengeScheme", "link_cookie")
     .WithEnvironment("Authentication__Schemas__Oauth2__Enabled", "false")
     .WithEnvironment("Authentication__Schemas__OpenIdConnect__Enabled", "false")
@@ -171,14 +186,33 @@ foreach (var (name, cluster, port) in proxiedServices)
         .WithEnvironment($"ReverseProxy__Clusters__{cluster}__Destinations__destination1__Address", Url(port));
 }
 
+if (keycloak is not null)
+{
+    // Creating a user only means something when people sign in, so the command exists in Keycloak mode only.
+    account.WithCreateUserCommand(keycloak);
+
+    // The Admin BFF signs people in through Keycloak, then finds their Account user by the email claim.
+    // WithLocalAuthentication(requireToken) above already turned anonymous access off.
+    adminBff
+        .WithEnvironment("Authentication__DefaultChallengeScheme", "link_openid_connect")
+        .WithEnvironment("Authentication__Schemas__OpenIdConnect__Enabled", "true")
+        .WithEnvironment("Authentication__Schemas__OpenIdConnect__Authority", LinkKeycloak.Authority)
+        .WithEnvironment("Authentication__Schemas__OpenIdConnect__ClientId", LinkKeycloak.ClientId)
+        .WithEnvironment("Authentication__Schemas__OpenIdConnect__ClientSecret", keycloak.ClientSecret)
+        .WithEnvironment("Authentication__Schemas__OpenIdConnect__CallbackPath", "/api/signin-oidc")
+        .WithEnvironment("Authentication__Schemas__OpenIdConnect__NameClaimType", "email")
+        .WaitFor(keycloak.Container);
+}
+
 if (builder.Configuration.GetValue("AdminUi:Enabled", true))
-    builder.AddAdminUi(adminBff);
+    builder.AddAdminUi(adminBff, authRequired: keycloak is not null || builder.Configuration.GetValue("AdminUi:AuthRequired", false));
 
 var automationUi = builder.AddLinkService<Projects.Automation_UI>("automation-ui", Ports.AutomationUi, healthPath: "/")
     .WithKafka(infrastructure)
     .WithRedis(infrastructure)
     .WithLocalAuthentication()
-    .WithEnvironment("Authentication__UseBearerForServiceCalls", "false")
+    // Automation UI stays anonymous itself, but sends Link bearer tokens to services that require them.
+    .WithEnvironment("Authentication__UseBearerForServiceCalls", requireToken ? "true" : "false")
     .WithEnvironment("ApiHealth__EnableAdminBffAuthSuite", "true")
     .WithEnvironment("PatientAggregator__IncludeOrganizationResource", "true")
     .WithEnvironment("pre-qualification.write-pre-qual-operation-outcome", "false")

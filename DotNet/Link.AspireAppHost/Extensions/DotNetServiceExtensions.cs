@@ -1,4 +1,6 @@
-namespace Link.AspireAppHost;
+using Link.AspireAppHost.Security;
+
+namespace Link.AspireAppHost.Extensions;
 
 /// <summary>
 /// Runs a .NET service the way docker-compose runs it, with the hostnames swapped for this host's.
@@ -94,10 +96,32 @@ internal static class DotNetServiceExtensions
     public static IResourceBuilder<ProjectResource> WithTenantService(this IResourceBuilder<ProjectResource> service, string pathSuffix = "") =>
         service.WithEnvironment("ServiceRegistry__TenantService__TenantServiceUrl", Url(Ports.Tenant) + pathSuffix);
 
-    /// <summary>Anonymous access and the shared local signing key, as compose gives every service.</summary>
-    public static IResourceBuilder<ProjectResource> WithLocalAuthentication(this IResourceBuilder<ProjectResource> service) =>
+    /// <summary>
+    /// Link's own service authentication: the shared local signing key and token issuer, and whether the
+    /// service requires a Link bearer token.
+    /// </summary>
+    /// <param name="service">The service.</param>
+    /// <param name="requireToken">
+    /// False serves requests anonymously, as compose does. True requires a valid Link bearer token, as in a
+    /// deployed environment: the Admin BFF attaches one to everything it forwards, and the services create
+    /// system tokens for the calls they make to each other. True in Auth:Mode Keycloak.
+    /// </param>
+    public static IResourceBuilder<ProjectResource> WithLocalAuthentication(
+        this IResourceBuilder<ProjectResource> service, bool requireToken = false, LinkKeycloak? keycloak = null)
+    {
         service
-            .WithEnvironment("Authentication__EnableAnonymousAccess", "true")
-            .WithEnvironment("LinkTokenService__Authority", LocalTokenAuthority)
+            .WithEnvironment("Authentication__EnableAnonymousAccess", requireToken ? "false" : "true")
+            // The issuer tokens are created with, and the issuer the services accept. With tokens required, the
+            // shared validation treats the second as an OpenID Connect authority: it must be HTTPS outside
+            // Development, and its metadata is fetched to validate a token. Keycloak's realm is both, so in
+            // Auth:Mode Keycloak that is the issuer; otherwise it is compose's LinkServiceAdmin.
+            .WithEnvironment("LinkTokenService__Authority", LinkSystemToken.Issuer)
+            .WithEnvironment("Authentication__Schemas__LinkBearer__Authority", LinkSystemToken.Issuer)
             .WithEnvironment("LinkTokenService__SigningKey", LocalSigningKey);
+
+        // The first token a service validates fetches the authority's metadata, so it must be answering.
+        if (requireToken && keycloak is not null)
+            service.WaitFor(keycloak.Container);
+        return service;
+    }
 }
