@@ -235,6 +235,10 @@ internal sealed class RunExecutor
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
+            // Fail early when a required dependency is already unavailable.
+            // Avoid generating and uploading patient data for a run that cannot complete.
+            await ValidateRequiredServicesAsync(output, cancellationToken);
+
             var isLiveSimulation = state.Options.IsLiveSimulation;
             var usesScheduledWorkflow = ReportExecution.UsesCensusScheduleKickoff(state.Options.ReportMethod);
 
@@ -1582,6 +1586,77 @@ internal sealed class RunExecutor
             runServices?.Dispose();
         }
     }
+
+
+    private async Task ValidateRequiredServicesAsync(
+        IAutomationOutput output,
+        CancellationToken cancellationToken)
+    {
+        using var healthClient = _hostServices
+            .GetRequiredService<IHttpClientFactory>()
+            .CreateClient();
+
+        healthClient.Timeout = TimeSpan.FromSeconds(5);
+
+        var requiredStartupServices = GetRequiredStartupServices(
+            _monitoredServiceHealthUrls);
+
+        await ValidateRequiredServicesCoreAsync(
+            requiredStartupServices,
+            (url, ct) => CheckHealthAsync(healthClient, url, ct),
+            output.WriteLine,
+            cancellationToken);
+    }
+
+    internal static IReadOnlyList<(string Name, string Url)> GetRequiredStartupServices(
+        IReadOnlyList<(string Name, string Url)> monitoredServices)
+    {
+        return monitoredServices
+            .Where(service =>
+                string.Equals(
+                    service.Name,
+                    "Terminology",
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    internal static async Task ValidateRequiredServicesCoreAsync(
+        IReadOnlyList<(string Name, string Url)> services,
+        Func<string, CancellationToken, Task<bool?>> checkHealth,
+        Action<string> writeLine,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (services.Count == 0)
+        {
+            writeLine(
+                "[Service Health] No dependency health URLs configured; skipping pre-flight check.");
+            return;
+        }
+
+        foreach (var (name, url) in services)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            writeLine(
+                $"[Service Health] Checking {name} before starting automation...");
+
+            var healthy = await checkHealth(url, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (healthy != true)
+            {
+                throw new InvalidOperationException(
+                    $"{name} service is unavailable during pre-flight health check. " +
+                    "Automation run cannot proceed.");
+            }
+
+            writeLine($"[Service Health] {name} is healthy.");
+        }
+    }
+
 
     internal static async Task<bool?> CheckHealthAsync(
     HttpClient client,

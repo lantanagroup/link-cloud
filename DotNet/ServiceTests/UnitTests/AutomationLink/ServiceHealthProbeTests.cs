@@ -330,28 +330,31 @@ public class ServiceHealthProbeTests
     }
 
     [Fact]
-    public async Task NeverHealthyService_DoesNotStartOutageTimer()
+    public async Task NeverHealthyService_TriggersCriticalFailureAtThreshold()
     {
         var clock = new TestTimeProvider();
 
         var probe = CreateProbe(() => false, clock);
 
-        // Service is unhealthy from the very first check.
+        // Service is unavailable from the first health check.
         var initialResult = await ExecuteAsync(probe);
 
         initialResult.HasCriticalFailure.Should().BeFalse();
 
-        // Advance well beyond the configured outage threshold.
-        clock.Advance(OutageThreshold + TimeSpan.FromMinutes(5));
+        initialResult.Issues.Should().ContainSingle(issue =>
+            issue.Key == "service-health-outage:Terminology" &&
+            issue.Severity == MonitorIssueSeverity.Warning);
+
+        // Advance to the configured outage threshold.
+        clock.Advance(OutageThreshold);
 
         var result = await ExecuteAsync(probe);
 
-        // An outage is not counted until the service
-        // has been observed healthy at least once.
-        result.HasCriticalFailure.Should().BeFalse();
+        result.HasCriticalFailure.Should().BeTrue();
 
-        result.Issues.Should().NotContain(issue =>
-            issue.Key == "service-health-timeout:Terminology");
+        result.Issues.Should().ContainSingle(issue =>
+            issue.Key == "service-health-timeout:Terminology" &&
+            issue.Severity == MonitorIssueSeverity.Critical);
     }
 
     private static ServiceHealthProbe CreateProbe(Func<bool?> healthCheck, TimeProvider clock)
