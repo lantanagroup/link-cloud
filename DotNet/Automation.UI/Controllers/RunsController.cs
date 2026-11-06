@@ -925,7 +925,24 @@ public class RunsController(
             ?? RunConfigurationReader.Read(run.RunConfigurationJson).OrganizationMapId;
         OrganizationResourceMapTemplate? map = null;
         if (mapId.HasValue)
-            map = await organizationResourceMapTemplateStore.GetByIdAsync(mapId.Value, cancellationToken);
+        {
+            try
+            {
+                map = await organizationResourceMapTemplateStore.GetByIdAsync(mapId.Value, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Could not read organization resource map {MapId} for suggested workaround on run {RunId}.",
+                    mapId,
+                    run.RunId);
+            }
+        }
 
         return SuggestedWorkaroundBuilder.Match(new SuggestedWorkaroundInput
         {
