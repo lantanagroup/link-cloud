@@ -91,6 +91,45 @@ public class HSLOCManagerTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Update_CountsWhatTheImportChanged()
+    {
+        using var context = CreateContext();
+        context.HSLOCS.AddRange(
+            new HSLOC { HSLOCCode = "A1", Version = "2025", ShortDescription = "old" },
+            new HSLOC { HSLOCCode = "A2", Version = "2025" },
+            new HSLOC { HSLOCCode = "GONE", Version = "2025" });
+        await context.SaveChangesAsync();
+        var manager = CreateManager(context);
+
+        await using var csv = CreateCsv("cdc,new,A1,long", "cdc,short,A2,long", "cdc,short,NEW1,long");
+        var changes = await manager.Update("2025", "2026", csv);
+
+        //A1 and A2 matched the import, NEW1 was not there before, and GONE was left out of it.
+        Assert.Equal(2, changes.Updated);
+        Assert.Equal(1, changes.Added);
+        Assert.Equal(1, changes.Deactivated);
+    }
+
+    [Fact]
+    public async Task DeleteById_ReturnsTheRowItRemoved_ThenNothing()
+    {
+        using var context = CreateContext();
+        var code = new HSLOC { HSLOCCode = "A1", Version = "2025" };
+        context.HSLOCS.Add(code);
+        await context.SaveChangesAsync();
+        var manager = CreateManager(context);
+
+        var deleted = await manager.DeleteById(code.Id);
+
+        Assert.NotNull(deleted);
+        Assert.Equal("A1", deleted.HSLOCCode);
+        Assert.Equal("2025", deleted.Version);
+
+        //the note must not name a code the second request did not remove.
+        Assert.Null(await manager.DeleteById(code.Id));
+    }
+
     private static MemoryStream CreateCsv(params string[] rows)
     {
         var csv = string.Join(Environment.NewLine,

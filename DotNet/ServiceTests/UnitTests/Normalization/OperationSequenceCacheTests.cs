@@ -144,7 +144,7 @@ public class OperationSequenceCacheTests
             ResourceType = "Patient"
         });
 
-        Assert.True(deleted);
+        Assert.NotEmpty(deleted);
         Assert.Empty(await harness.WriterQueries.Search(Typed(facilityId)));
         Assert.Empty(await harness.ReaderQueries.Search(All(facilityId)));
         Assert.Empty(await harness.GetAsync(harness.ReaderController, facilityId, "Patient"));
@@ -171,7 +171,7 @@ public class OperationSequenceCacheTests
         }, CancellationToken.None, hydrateVendors: false)).Records.Select(record => record.Id).OrderBy(id => id).ToList();
 
         harness.WriterCounter.OperationLockIds.Clear();
-        Assert.True(await harness.WriterManager.DeleteOperation(new DeleteOperationModel { FacilityId = facilityId }));
+        Assert.NotEmpty(await harness.WriterManager.DeleteOperation(new DeleteOperationModel { FacilityId = facilityId }));
 
         var locked = harness.WriterCounter.OperationLockIds;
         Assert.Equal(expected, locked.Distinct().ToList());

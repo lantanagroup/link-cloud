@@ -159,6 +159,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.RegisterQuartzDatabase(databaseConnectionString);
     }
 
+    builder.Services.AddLinkAuditing<NormalizationDbContext>();
+
     builder.Services.AddDbContext<NormalizationDbContext>((sp, options) =>
     {
 
@@ -168,7 +170,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
                 options
                     .UseSqlServer(databaseConnectionString)
-                    .AddInterceptors(updateBaseEntityInterceptor);
+                    .AddInterceptors(updateBaseEntityInterceptor)
+                    .AddLinkAuditInterceptor(sp);
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");

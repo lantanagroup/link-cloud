@@ -4,7 +4,9 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Que
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Filters;
+using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +20,11 @@ public class VendorVersionOperationPresetsController : ControllerBase
 {
     private readonly IVendorVersionOperationPresetManager _presetManager;
     private readonly IVendorVersionOperationPresetQueries _presetQueries;
+
+    /// <summary>
+    /// The request's audit context. Null when the controller is constructed directly, outside a request.
+    /// </summary>
+    private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
 
     public VendorVersionOperationPresetsController(
         IVendorVersionOperationPresetManager presetManager,
@@ -72,6 +79,7 @@ public class VendorVersionOperationPresetsController : ControllerBase
     }
 
     [HttpPost]
+    [Auditable(AuditEventType.Create, "VendorVersionOperationPresets")]
     [ValidateAntiForgeryOrBearerToken]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionOperationPresetModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -96,6 +104,11 @@ public class VendorVersionOperationPresetsController : ControllerBase
                 OperationResourceTypeId = model.OperationResourceTypeId.Value
             }, cancellationToken);
 
+            if (Audit is { } audit)
+            {
+                audit.RecordId = preset.Id.ToString();
+            }
+
             return CreatedAtAction(nameof(Get), new { presetId = preset.Id }, preset);
         }
         catch (InvalidOperationException exception)
@@ -113,6 +126,7 @@ public class VendorVersionOperationPresetsController : ControllerBase
     }
 
     [HttpDelete("{vendorVersionId:guid}/{presetId:guid}")]
+    [Auditable(AuditEventType.Delete, "VendorVersionOperationPresets", RecordIdRouteKey = "presetId")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default)

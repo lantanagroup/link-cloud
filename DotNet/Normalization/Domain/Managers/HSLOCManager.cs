@@ -13,10 +13,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
     public interface IHSLOCManager
     {
-        Task Update(string oldVersion, string newVersion, Stream csv, CancellationToken cancellationToken = default);
-        Task DeleteAll(CancellationToken cancellationToken = default);
-        Task DeleteByVersion(string version, CancellationToken cancellationToken = default);
-        Task DeleteById(Guid id, CancellationToken cancellationToken = default);
+        Task<HSLOCUpdateResult> Update(string oldVersion, string newVersion, Stream csv, CancellationToken cancellationToken = default);
+        Task<int> DeleteAll(CancellationToken cancellationToken = default);
+        Task<int> DeleteByVersion(string version, CancellationToken cancellationToken = default);
+        Task<HSLOCDeletedRow?> DeleteById(Guid id, CancellationToken cancellationToken = default);
     }
 
     public class HSLOCManager : IHSLOCManager
@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             _lookupCache = lookupCache;
         }
 
-        public async Task Update(
+        public async Task<HSLOCUpdateResult> Update(
             string oldVersion,
             string newVersion,
             Stream csv,
@@ -98,8 +98,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     oldRow.IsActive = false;
                 }
 
+                //counted from the data already in hand: the audit note summarises the import rather
+                //than carrying a property change per code.
+                var matched = importedRows.Count(row => oldRowsByCode.ContainsKey(row.HSLOCCode));
+                var deactivated = oldRows.Count(row => !importedCodes.Contains(row.HSLOCCode));
+
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 _lookupCache.Invalidate();
+
+                return new HSLOCUpdateResult(matched, importedRows.Count - matched, deactivated);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -121,12 +128,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 : value;
         }
 
-        public async Task DeleteAll(CancellationToken cancellationToken = default)
+        public async Task<int> DeleteAll(CancellationToken cancellationToken = default)
         {
             try
             {
-                await _dbContext.HSLOCS.ExecuteDeleteAsync(cancellationToken);
+                var deleted = await _dbContext.HSLOCS.ExecuteDeleteAsync(cancellationToken);
                 _lookupCache.Invalidate();
+
+                return deleted;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -139,12 +148,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        public async Task DeleteByVersion(string version, CancellationToken cancellationToken = default)
+        public async Task<int> DeleteByVersion(string version, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _dbContext.HSLOCS.Where(q => q.Version == version).ExecuteDeleteAsync(cancellationToken);
+                var deleted = await _dbContext.HSLOCS.Where(q => q.Version == version).ExecuteDeleteAsync(cancellationToken);
                 _lookupCache.Invalidate();
+
+                return deleted;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -157,12 +168,21 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        public async Task DeleteById(Guid id, CancellationToken cancellationToken = default)
+        public async Task<HSLOCDeletedRow?> DeleteById(Guid id, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _dbContext.HSLOCS.Where(q => q.Id == id).ExecuteDeleteAsync(cancellationToken);
+                var row = await _dbContext.HSLOCS
+                    .Where(q => q.Id == id)
+                    .Select(q => new HSLOCDeletedRow(q.HSLOCCode, q.Version))
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                var deleted = await _dbContext.HSLOCS.Where(q => q.Id == id).ExecuteDeleteAsync(cancellationToken);
                 _lookupCache.Invalidate();
+
+                //the row could have gone between the read and the delete, and the note must not
+                //name a code this request did not remove.
+                return deleted > 0 ? row : null;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

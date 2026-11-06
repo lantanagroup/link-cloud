@@ -1,7 +1,9 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Filters;
+using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +17,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
     {
         private readonly IResourceManager _resourceManager;
         private readonly IResourceQueries _resourceQueries;
+
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
+
         public ResourceController(IResourceManager resourceManager, IResourceQueries resourceQueries)
         {
             _resourceManager = resourceManager;
@@ -77,6 +85,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPost("initialize")]
+        [Auditable(AuditEventType.Create, "Resource", "Bulk resource initialization")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
@@ -99,6 +108,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPost("{resource}")]
+        [Auditable(AuditEventType.Create, "Resource")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -120,6 +130,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Conflict($"Resource '{resource}' already exists.");
                 }
 
+                if (Audit is { } audit)
+                {
+                    audit.RecordId = createdResource.ResourceTypeId.ToString();
+                }
+
                 return Created("", createdResource);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -133,6 +148,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPost("{resource}/bypass")]
+        [Auditable(AuditEventType.Create, "Resource")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -153,6 +169,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return null;
                 }
 
+                if (Audit is { } audit)
+                {
+                    audit.RecordId = foundResource.ResourceTypeId.ToString();
+                }
+
                 return Created("", foundResource);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -166,6 +187,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("{resource}")]
+        [Auditable(AuditEventType.Delete, "Resource", "{resource} deleted")]
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -179,7 +201,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                await _resourceManager.DeleteResource(resource, cancellationToken);
+                var deletedResourceTypeId = await _resourceManager.DeleteResource(resource, cancellationToken);
+
+                if (Audit is { } audit)
+                {
+                    //the route carries the resource name, not the row's id.
+                    audit.RecordId = deletedResourceTypeId.ToString();
+                }
+
 
                 return Accepted();
             }

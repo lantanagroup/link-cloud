@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Controllers;
 using LantanaGroup.Link.Normalization.Domain.Entities;
@@ -79,7 +80,7 @@ public class HSLOCControllerTests
                 using var reader = new StreamReader(csv, Encoding.UTF8, leaveOpen: true);
                 uploadedCsv = reader.ReadToEnd();
             })
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(new HSLOCUpdateResult(1, 0, 0));
         var controller = CreateController(manager, queries);
 
         var result = await controller.Update(CreateUpdateModel(), CancellationToken.None);

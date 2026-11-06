@@ -4,6 +4,8 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Que
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Auditing;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -20,6 +22,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly IOperationManager _operationManager;
         private readonly IOperationSequenceQueries _operationSequenceQueries;
         private readonly ITenantApiService _tenantApiService;
+
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
 
         public OperationSequenceController(IOperationManager operationManager, IOperationSequenceQueries operationSequenceQueries, ITenantApiService tenantApiService)
         {
@@ -70,6 +77,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPost("")]
+        [Auditable(AuditEventType.Create, "OperationSequence")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(List<OperationSequenceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -111,6 +119,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }, cancellationToken);
 
 
+                if (Audit is { } audit)
+                {
+                    audit.FacilityId = facilityId;
+                }
+
                 return Created("", sequences);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -124,6 +137,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("")]
+        [Auditable(AuditEventType.Delete, "OperationSequence", "{resource} deleted")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -149,6 +163,22 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = facilityId,
                     ResourceType = resourceType
                 }, cancellationToken);
+
+                if (Audit is { } audit)
+                {
+                    //the facility was checked against Tenant above; the resource type is unvalidated
+                    //free text, so it is sanitised before it reaches the note.
+                    audit.FacilityId = facilityId;
+
+                    if (string.IsNullOrWhiteSpace(resourceType))
+                    {
+                        audit.SuppressNote = true;
+                    }
+                    else
+                    {
+                        audit.Set("resource", resourceType.SanitizeAndRemove());
+                    }
+                }
 
                 if (deleted)
                     return NoContent();

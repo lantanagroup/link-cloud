@@ -8,8 +8,10 @@ using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Filters;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -36,6 +38,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly CopyLocationOperationService _copyLocationOperationService;
         private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
         private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
+
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
 
         public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, HSLOCMapOperationService hslocMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
         {
@@ -206,6 +213,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPost("")]
+        [Auditable(AuditEventType.Create, "Operations")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(OperationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
@@ -273,6 +281,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     }
                 }
 
+                if (Audit is { } audit && taskResult.ObjectResult is OperationModel created)
+                {
+                    audit.RecordId = created.Id.ToString();
+                    audit.FacilityId = string.IsNullOrWhiteSpace(model.FacilityId) ? null : model.FacilityId;
+                }
+
                 return Created("", taskResult.ObjectResult);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -286,6 +300,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPut("")]
+        [Auditable(AuditEventType.Update, "Operations")]
         [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(OperationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
@@ -345,6 +360,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (!taskResult.IsSuccess)
                 {
                     return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+
+                if (Audit is { } audit)
+                {
+                    audit.RecordId = model.Id.Value.ToString();
+                    audit.FacilityId = string.IsNullOrWhiteSpace(model.FacilityId) ? null : model.FacilityId;
                 }
 
                 return Accepted("", taskResult.ObjectResult);
@@ -475,6 +496,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("facility/{facilityId}")]
+        [Auditable(AuditEventType.Delete, "Operations", "Operations deleted for facility: {ids}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
@@ -489,15 +511,27 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(detail: "Request must include a valid facilityId and/or operationId", statusCode: StatusCodes.Status400BadRequest);
                 }
 
-                var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
+                var deletedOperationIds = await _operationManager.DeleteOperation(new DeleteOperationModel()
                 {
                     FacilityId = facilityId,
                     OperationId = operationId,
                     ResourceType = resourceType
                 }, cancellationToken);
 
-                if (result)
+                if (deletedOperationIds.Count > 0)
                 {
+                    if (Audit is { } audit)
+                    {
+                        audit.Set("ids", string.Join(", ", deletedOperationIds));
+
+                        //the cascaded resource types, presets and sequences are not recorded: this
+                        //event names the Operations resource, so only operation ids belong in it.
+                        if (deletedOperationIds.Count == 1)
+                        {
+                            audit.RecordId = deletedOperationIds[0].ToString();
+                        }
+                    }
+
                     return NoContent();
                 }
                 else
@@ -516,6 +550,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpDelete("vendor-version/{vendorVersionId:guid}")]
+        [Auditable(AuditEventType.Delete, "Operations", "Operations deleted for vendor version: {ids}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
@@ -525,15 +560,25 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
+                var deletedOperationIds = await _operationManager.DeleteOperation(new DeleteOperationModel()
                 {
                     VendorVersionId = vendorVersionId,
                     OperationId = operationId,
                     ResourceType = resourceType
                 }, cancellationToken);
 
-                if (result)
+                if (deletedOperationIds.Count > 0)
                 {
+                    if (Audit is { } audit)
+                    {
+                        audit.Set("ids", string.Join(", ", deletedOperationIds));
+
+                        if (deletedOperationIds.Count == 1)
+                        {
+                            audit.RecordId = deletedOperationIds[0].ToString();
+                        }
+                    }
+
                     return NoContent();
                 }
                 else

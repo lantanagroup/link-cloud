@@ -400,14 +400,14 @@ namespace IntegrationTests.Normalization
             var deleteModel = new DeleteOperationModel { FacilityId = facilityId };
             var result = await operationManager.DeleteOperation(deleteModel);
 
-            Assert.True(result);
+            Assert.NotEmpty(result);
 
             var search = await operationQueries.Search(new OperationSearchModel { FacilityId = facilityId });
             Assert.Empty(search.Records);
         }
 
         [Fact]
-        public async Task DeleteOperation_NonExisting_ReturnsFalse()
+        public async Task DeleteOperation_NonExisting_ReturnsNoIds()
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
@@ -415,7 +415,7 @@ namespace IntegrationTests.Normalization
             var deleteModel = new DeleteOperationModel { FacilityId = Guid.NewGuid().ToString() };
             var result = await operationManager.DeleteOperation(deleteModel);
 
-            Assert.False(result);
+            Assert.Empty(result);
         }
 
         [Fact]

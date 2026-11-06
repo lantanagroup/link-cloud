@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         Task<List<ResourceModel>> InitializeResources(CancellationToken cancellationToken = default);
         Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false, CancellationToken cancellationToken = default);
-        Task DeleteResource(string resource, CancellationToken cancellationToken = default);
+        Task<Guid> DeleteResource(string resource, CancellationToken cancellationToken = default);
     }
 
     public class ResourceManager : IResourceManager
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        public async Task DeleteResource(string resource, CancellationToken cancellationToken = default)
+        public async Task<Guid> DeleteResource(string resource, CancellationToken cancellationToken = default)
         {
             var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource, cancellationToken);
 
@@ -114,10 +114,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 preset => preset.OperationResourceType.ResourceType.Name == resource,
                 cancellationToken);
             presets.ForEach(_database.VendorVersionOperationPresets.Remove);
-            _database.ResourceTypes.Remove(resourceEntity.Single());
+            var deletedResourceType = resourceEntity.Single();
+            _database.ResourceTypes.Remove(deletedResourceType);
             await _database.SaveChangesAsync(cancellationToken);
             await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+
+            return deletedResourceType.Id;
         }
 
         public async Task<List<ResourceModel>> InitializeResources(CancellationToken cancellationToken = default)
