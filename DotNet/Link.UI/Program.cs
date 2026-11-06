@@ -1,6 +1,7 @@
 using System.Reflection;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -29,10 +30,21 @@ if (!string.IsNullOrEmpty(externalConfigSource))
         .GetSection("ServiceInformation:ServiceName")
         .Get<string>() ?? "Link UI";
 
-    builder.AddExternalConfiguration(serviceName);
+    // Tenant validates facility ids from FacilityIdSettings:NumericOnlyFacilityId.
+    // An unlabeled row is already loaded for every service. This adds the Tenant
+    // label for that one key so a Tenant-labeled row overrides it here too.
+    builder.AddExternalConfiguration(
+        serviceName,
+        FacilityIdFormatSettings.TenantOverrideLabels());
 }
 
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+builder.Services.Configure<FacilityIdFormatSettings>(builder.Configuration.GetSection(FacilityIdFormatSettings.SectionName));
+// Read by TestRailOptionsBinder rather than the default binder so a malformed value turns
+// publishing off with a startup warning instead of stopping the service.
+builder.Services.AddOptions<TestRailOptions>()
+    .Configure<IConfiguration>((options, configuration) =>
+        TestRailOptionsBinder.Bind(configuration.GetSection(TestRailOptions.SectionName), options));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));
 builder.Services.Configure<LinkUiFeatureOptions>(options =>
 {
@@ -197,7 +209,11 @@ if (telemetryEnabled)
     });
 }
 
+AutomationSerilog.Use(builder);
+
 var app = builder.Build();
+
+TestRailStartupReport.Log(app.Logger, app.Services.GetRequiredService<IOptions<TestRailOptions>>().Value);
 
 app.UseForwardedHeaders();
 

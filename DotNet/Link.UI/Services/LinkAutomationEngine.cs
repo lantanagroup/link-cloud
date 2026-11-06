@@ -1,5 +1,6 @@
 using Automation.UI.Services;
 using Automation.UI.Services.ApiHealth;
+using Automation.UI.Services.TestRail;
 using Automation.UI.Services.ApiHealth.Seeding;
 using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.ConfigurationGeneration;
@@ -114,6 +115,7 @@ public static class LinkAutomationEngine
         }
 
         services.Configure<AutomationConfig>(configuration.GetSection("Automation"));
+        services.Configure<FacilityIdFormatSettings>(configuration.GetSection(FacilityIdFormatSettings.SectionName));
         services.PostConfigure<AutomationConfig>(cfg =>
         {
             cfg.LokiBaseUrl = lokiUrl!.TrimEnd('/');
@@ -217,6 +219,15 @@ public static class LinkAutomationEngine
         services.AddSingleton<IApiHealthSeedOrchestrator, ApiHealthSeedOrchestrator>();
         services.AddHostedService<ApiHealthStartupRecoveryService>();
         services.AddHttpClient("ApiHealthTest");
+        services.AddHttpClient("TestRail", (sp, client) =>
+        {
+            var configured = sp.GetRequiredService<IOptions<TestRailOptions>>().Value.RequestTimeoutSeconds;
+            var seconds = configured > 0 ? configured : TestRailOptions.DefaultRequestTimeoutSeconds;
+            client.Timeout = TimeSpan.FromSeconds(seconds);
+        });
+        services.AddSingleton<ITestRailApiClient, TestRailApiClient>();
+        services.AddSingleton<ITestRailPublisher, TestRailPublisher>();
+        services.AddHostedService<TestRailStartupCheckService>();
 
         return new LinkAutomationEngineStatus { Ready = true };
     }
