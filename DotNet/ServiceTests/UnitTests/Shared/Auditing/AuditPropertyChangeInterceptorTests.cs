@@ -530,5 +530,64 @@ namespace UnitTests.Shared.Auditing
                 CultureInfo.CurrentCulture = original;
             }
         }
+
+        [Fact]
+        public async Task AnUpdateOfSeveralRows_TellsThemApartByTheirKey()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var first = ASavedVendor(fixture);
+            var second = new TestVendor { Name = "Cerner" };
+            fixture.Context.Vendors.Add(second);
+            await fixture.Context.SaveChangesAsync();
+            audit.PropertyChanges.Clear();
+
+            first.Name = "Epic Systems";
+            second.Name = "Oracle Health";
+            await fixture.Context.SaveChangesAsync();
+
+            //without the row key these two would be an unordered pair of Name changes, and nothing
+            //would say which vendor either of them belonged to.
+            Assert.Equal(2, audit.PropertyChanges.Count);
+            Assert.All(audit.PropertyChanges, change => Assert.Equal(nameof(TestVendor), change.Entity));
+
+            var byRow = audit.PropertyChanges.ToDictionary(change => change.RowKey!);
+            Assert.Equal("Epic Systems", byRow[first.Id].NewPropertyValue);
+            Assert.Equal("Oracle Health", byRow[second.Id].NewPropertyValue);
+        }
+
+        [Fact]
+        public async Task AGuidKey_ReadsAsItsInvariantText()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var user = new TestAccountUser();
+            fixture.Context.AccountUsers.Add(user);
+            await fixture.Context.SaveChangesAsync();
+            audit.PropertyChanges.Clear();
+
+            user.IsActive = false;
+            await fixture.Context.SaveChangesAsync();
+
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(nameof(TestAccountUser), change.Entity);
+            Assert.Equal(user.Id.ToString(), change.RowKey);
+        }
+
+        [Fact]
+        public async Task AMaskedKey_LeavesTheRowsOfThatEntityIndistinguishable()
+        {
+            //what an entity keyed by something personal would do - an email address, say.
+            var (fixture, audit) = Build(options => options.MaskedPropertyNames.Add(nameof(TestVendor.Id)));
+            using var _ = fixture;
+            var vendor = ASavedVendor(fixture);
+            audit.PropertyChanges.Clear();
+
+            vendor.Name = "Cerner";
+            await fixture.Context.SaveChangesAsync();
+
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(AuditOptions.MaskedValue, change.RowKey);
+        }
     }
 }
