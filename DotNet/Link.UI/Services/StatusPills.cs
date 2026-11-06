@@ -174,6 +174,7 @@ public static class StatusPills
             return "au-badge-muted";
         if (status.Equals("Failed", StringComparison.OrdinalIgnoreCase)
             || status.Equals("MaxRetriesReached", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("AccessDenied", StringComparison.OrdinalIgnoreCase)
             || status.Contains("error", StringComparison.OrdinalIgnoreCase)
             || status.Contains("fail", StringComparison.OrdinalIgnoreCase))
             return "au-badge-danger";
