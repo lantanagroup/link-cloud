@@ -58,6 +58,7 @@ internal sealed class MutableRunState(
     public CancellationTokenSource RunCancellation { get; } = new();
     public bool CancelRequested { get; set; }
     public int TestRailPublished;
+    public List<TestRailRunReference> TestRailRuns { get; } = [];
     public Task? ExecutionTask { get; set; }
     public FhirDataLoader? FhirDataLoader { get; set; }
     public Guid? GeneratedTemplateCacheVersionId { get; set; }

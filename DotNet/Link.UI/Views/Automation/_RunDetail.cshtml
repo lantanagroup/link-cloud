@@ -2,10 +2,39 @@
 @using LantanaGroup.Link.Automation.Link.Models
 @using Automation.UI.Models
 @using Automation.UI.Models.Metrics
+@using Automation.UI.Services.TestRail
 @using LantanaGroup.Automation.Generation
+@functions {
+    private static void SplitFailureBlock(string block, out string before, out string? technical, out string? search)
+    {
+        before = block;
+        technical = null;
+        search = null;
+        const string marker = "\nTechnical details:\n";
+        var index = block.IndexOf(marker, StringComparison.Ordinal);
+        if (index < 0)
+            return;
+
+        before = block[..index];
+        var rest = block[(index + marker.Length)..];
+        const string searchMarker = "\nSearch: ";
+        var searchIndex = rest.LastIndexOf(searchMarker, StringComparison.Ordinal);
+        if (searchIndex < 0)
+        {
+            technical = rest;
+            return;
+        }
+
+        technical = rest[..searchIndex];
+        search = rest[(searchIndex + 1)..];
+    }
+}
 @{
     // Embedded on the report page: that page owns the title, back link and the report cards.
     var embedded = ViewData["RunEmbedded"] is true;
+    var failureBlocks = Model.FailureDetails ?? Array.Empty<string>();
+    var failureBlocksJson = System.Text.Json.JsonSerializer.Serialize(failureBlocks)
+        .Replace("<", "\\u003c", StringComparison.Ordinal);
     if (!embedded)
     {
         ViewData["Title"] = "Run Details";
@@ -61,10 +90,11 @@
             <div class="row g-3" id="runSummaryGrid">
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value"><span class="badge @StatusPills.ForRun(Model.Status.ToString())" id="status">@(string.IsNullOrWhiteSpace(Model.Status.ToDisplayName()) ? "Unknown" : Model.Status.ToDisplayName())</span></span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, CopyLabel = "Copy facility id", ValueElementId = "facilityId" })" /></div></div>
-                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">NHSN Organization ID</span><code class="au-value" id="nhsnOrganizationIdSummary">-</code></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">NHSN Organization ID</span><code class="au-value" id="nhsnOrganizationIdSummary">@RunNhsnOrganizationId.For(Model)</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt is null ? "-" : LinkUiTime.Display(Model.StartedAt.Value))</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt is null ? "-" : LinkUiTime.Display(Model.FinishedAt.Value))</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">TestRail</span><span class="au-value" id="testRailRuns">@TestRailRunLinks.NotPublished</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">FHIR generator</span><span class="au-value" id="fhirGenerator">Thetis Engine</span></div></div>
                 @{
                     var templateCacheVersion = ViewBag.TemplateCacheVersionNumber as int?;
@@ -74,7 +104,7 @@
                     <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Generation templates</span><span class="au-value" id="generationTemplateVersion">v@(templateCacheVersion.Value)</span></div></div>
                 }
             </div>
-            <div id="errorRow" class="mt-3" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
+            <div id="errorRow" class="mt-3" style="@(string.IsNullOrWhiteSpace(Model.Error) ? "display:none;" : "")"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
             <div id="runRetention" class="alert au-note mt-3 mb-0 py-2 small @(string.IsNullOrWhiteSpace(Model.RetentionNotice) ? "d-none" : "")" role="status">@Model.RetentionNotice</div>
             <div id="validationHoldBanner" class="alert au-note mt-3 mb-0 py-2 small" style="display:none;" role="status">
                 <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
@@ -85,6 +115,34 @@
                 <span id="finalizingBadgeText">Finalizing…</span>
             </span>
         </div>
+    </div>
+
+    <div class="au-card" id="failureDetailsCard" style="@(failureBlocks.Count == 0 ? "display:none;" : "")">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-bug me-2"></i>Failures</span>
+            <button type="button" class="btn btn-sm btn-au-link lu-icon-btn" id="btnCopyFailures" title="Copy failures" aria-label="Copy failures"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Copy</span></button>
+        </div>
+        <div class="card-body" id="failureDetailsHost">
+            @foreach (var block in failureBlocks)
+            {
+                SplitFailureBlock(block, out var before, out var technical, out var search);
+                <div class="failure-record mb-3">
+                    <pre class="mb-2 small" style="white-space:pre-wrap;">@before</pre>
+                    @if (technical != null)
+                    {
+                        <details class="mb-2">
+                            <summary class="small">Technical details</summary>
+                            <pre class="mb-0 small mt-2" style="white-space:pre-wrap;">@technical</pre>
+                        </details>
+                    }
+                    @if (!string.IsNullOrEmpty(search))
+                    {
+                        <pre class="mb-0 small" style="white-space:pre-wrap;">@search</pre>
+                    }
+                </div>
+            }
+        </div>
+        <script type="application/json" id="failureDetailsSource">@Html.Raw(failureBlocksJson)</script>
     </div>
 
     @if (Model.IsMetricsRun)
