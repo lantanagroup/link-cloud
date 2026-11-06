@@ -87,6 +87,13 @@
                 }
             </div>
             <div id="errorRow" class="mt-3" style="@(string.IsNullOrWhiteSpace(Model.Error) ? "display:none;" : "")"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
+            <div id="suggestedWorkaround" class="mt-2" style="display:none;">
+                <details class="au-help-panel au-workaround-panel mb-0">
+                    <summary><i class="bi bi-lightbulb"></i><span>Suggested workaround</span></summary>
+                    <div class="au-help-body" id="suggestedWorkaroundBody"></div>
+                </details>
+            </div>
+            <script type="application/json" id="suggestedWorkaroundSource">@Html.Raw((string?)ViewData["SuggestedWorkaroundJson"] ?? "null")</script>
             <div id="validationHoldBanner" class="alert alert-info mt-3 mb-0 py-2 small" style="display:none;" role="status">
                 <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
                 <span id="validationHoldText"></span>
@@ -745,6 +752,7 @@
             startAdvancedPerformancePolling();
 
         const normalizationResultsUrl = '@Url.Action("NormalizationResults", "Runs")';
+        const suggestedWorkaroundUrl = '@Url.Action("SuggestedWorkaround", "Runs")';
         let lastNormalizationResults = null;
         let normalizationResultsRequest = null;
         const queryPlanGetJsonUrl = '@Url.Action("GetJson", "QueryPlans")';
@@ -1360,6 +1368,11 @@
             return value === 'succeeded' || value === 'failed' || value === 'cancelled' || value === '3' || value === '4' || value === '2';
         }
 
+        function isFailedStatus(status) {
+            const value = String(status || '').toLowerCase();
+            return value === 'failed' || value === '4';
+        }
+
         function isCollectingMetrics(status) {
             const value = String(status || '').toLowerCase();
             return value === 'collectingmetrics' || value === '7';
@@ -1863,6 +1876,147 @@
             });
         }
 
+        var suggestedWorkaroundRequest = null;
+        var suggestedWorkaroundResolved = false;
+        var suggestedWorkaroundAttempts = 0;
+
+        function renderSuggestedWorkaround(model) {
+            var host = document.getElementById('suggestedWorkaround');
+            var body = document.getElementById('suggestedWorkaroundBody');
+            if (!host || !body) return;
+            if (!model || !model.cause) {
+                host.style.display = 'none';
+                body.replaceChildren();
+                return;
+            }
+
+            var details = host.querySelector('details');
+            var wasOpen = details ? details.open : false;
+            body.replaceChildren();
+
+            var cause = document.createElement('p');
+            cause.textContent = model.cause;
+            body.appendChild(cause);
+
+            var counts = document.createElement('dl');
+            counts.className = 'au-workaround-counts';
+            (model.counts || []).forEach(function (count) {
+                var row = document.createElement('div');
+                var label = document.createElement('dt');
+                label.textContent = count.label || '';
+                var value = document.createElement('dd');
+                value.textContent = String(count.value != null ? count.value : 0);
+                row.appendChild(label);
+                row.appendChild(value);
+                counts.appendChild(row);
+            });
+            body.appendChild(counts);
+
+            if (model.organizationMapName) {
+                var mapLine = document.createElement('p');
+                mapLine.appendChild(document.createTextNode('Organization resource map: '));
+                var mapName = document.createElement('strong');
+                mapName.textContent = model.organizationMapName;
+                mapLine.appendChild(mapName);
+                body.appendChild(mapLine);
+            }
+
+            var conditions = model.conditions || [];
+            if (conditions.length) {
+                var heading = document.createElement('div');
+                heading.className = 'small text-muted mb-1';
+                heading.textContent = 'Mapping conditions';
+                body.appendChild(heading);
+                var list = document.createElement('ul');
+                var lines = [];
+                conditions.forEach(function (condition) {
+                    var item = document.createElement('li');
+                    var priority = document.createElement('span');
+                    priority.className = 'text-muted';
+                    priority.textContent = '#' + (Number(condition.priority) || 0) + ' ';
+                    var code = document.createElement('code');
+                    code.textContent = condition.fhirPath || '';
+                    item.appendChild(priority);
+                    item.appendChild(code);
+                    list.appendChild(item);
+                    if (condition.fhirPath) lines.push(condition.fhirPath);
+                });
+                body.appendChild(list);
+                if (lines.length) {
+                    var copy = document.createElement('button');
+                    copy.type = 'button';
+                    copy.className = 'btn btn-sm btn-outline-secondary mb-2';
+                    copy.textContent = 'Copy conditions';
+                    copy.addEventListener('click', function () { copyFailureText(lines.join('\n')); });
+                    body.appendChild(copy);
+                }
+            }
+
+            if (model.conditionsNote) {
+                var note = document.createElement('p');
+                note.className = 'text-muted';
+                note.textContent = model.conditionsNote;
+                body.appendChild(note);
+            }
+
+            var steps = document.createElement('ol');
+            (model.steps || []).forEach(function (step) {
+                var item = document.createElement('li');
+                item.textContent = step;
+                steps.appendChild(item);
+            });
+            body.appendChild(steps);
+
+            if (model.organizationMapsUrl) {
+                var link = document.createElement('a');
+                link.href = model.organizationMapsUrl;
+                link.className = 'btn btn-sm btn-au-action';
+                link.textContent = 'Open Organization Resource Maps';
+                body.appendChild(link);
+            }
+
+            if (details) details.open = wasOpen;
+            host.style.display = '';
+        }
+
+        function loadSuggestedWorkaroundFromPage() {
+            var source = document.getElementById('suggestedWorkaroundSource');
+            if (!source || !source.textContent) {
+                renderSuggestedWorkaround(null);
+                return;
+            }
+            try {
+                var model = JSON.parse(source.textContent);
+                if (model && model.cause)
+                    suggestedWorkaroundResolved = true;
+                renderSuggestedWorkaround(model);
+            } catch (e) {
+                renderSuggestedWorkaround(null);
+            }
+        }
+
+        function refreshSuggestedWorkaround() {
+            if (suggestedWorkaroundResolved || suggestedWorkaroundRequest) return;
+            if (!isFailedStatus(currentRunStatus)) return;
+            if (suggestedWorkaroundAttempts >= 4) {
+                suggestedWorkaroundResolved = true;
+                return;
+            }
+            suggestedWorkaroundAttempts++;
+            suggestedWorkaroundRequest = fetch(suggestedWorkaroundUrl + '?id=' + encodeURIComponent(runId), { headers: { 'Accept': 'application/json' } })
+                .then(function (response) {
+                    if (response.status === 204 || !response.ok) return null;
+                    return response.json();
+                })
+                .then(function (model) {
+                    if (!model || !model.cause) return;
+                    suggestedWorkaroundResolved = true;
+                    renderSuggestedWorkaround(model);
+                })
+                .catch(function () { /* the next status update can try again */ })
+                .finally(function () { suggestedWorkaroundRequest = null; });
+        }
+
         function applyRunStatus(run) {
             if (!run) return;
             currentRunStatus = run.status || currentRunStatus;
@@ -1882,6 +2036,8 @@
                 errorRowLive.style.display = errorText && errorText !== '-' ? '' : 'none';
             }
             renderFailureDetails(run);
+            if (isFailedStatus(run.status))
+                refreshSuggestedWorkaround();
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
             document.getElementById('pipelineDuration').textContent = run.duration || '-';
@@ -2481,6 +2637,7 @@
             .catch(err => appendLog('[signalr] ' + err));
 
         renderConfigProperties(runConfigurationJson);
+        loadSuggestedWorkaroundFromPage();
         loadNormalizationResults();
         refreshSnapshot();
         refreshLiveSimulation();
