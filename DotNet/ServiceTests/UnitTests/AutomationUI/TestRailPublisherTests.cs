@@ -1369,7 +1369,7 @@ public class TestRailPublisherTests
     }
 
     [Fact]
-    public async Task Cancelled_api_health_posts_blocked_for_mapped_endpoints_once()
+    public async Task Cancelled_api_health_keeps_finished_statuses_and_blocks_endpoints_that_never_ran()
     {
         IReadOnlyList<TestRailCaseResult>? posted = null;
         var api = new Mock<ITestRailApiClient>();
@@ -1384,6 +1384,12 @@ public class TestRailPublisherTests
             ServiceName = "Tenant",
             EndpointName = "Create Facility",
             TestRailCaseId = 1
+        };
+        var failed = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Delete Facility",
+            TestRailCaseId = 4
         };
         var notRun = new ApiEndpointDefinition
         {
@@ -1434,6 +1440,15 @@ public class TestRailPublisherTests
                     Passed = true,
                     DurationMs = 1500
                 },
+                [failed.Key] = new()
+                {
+                    EndpointKey = failed.Key,
+                    EndpointName = failed.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = false,
+                    DurationMs = 500,
+                    ErrorMessage = "boom"
+                },
                 [skipped.Key] = new()
                 {
                     EndpointKey = skipped.Key,
@@ -1464,7 +1479,7 @@ public class TestRailPublisherTests
             ConfiguredOptions(),
             apiHealthStore: store.Object,
             registry: new ApiEndpointRegistry([
-                new FakeSuite(passed, notRun, skipped, unmapped, informational, sameCasePass, sameCaseFail)]));
+                new FakeSuite(passed, failed, notRun, skipped, unmapped, informational, sameCasePass, sameCaseFail)]));
 
         await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with
         {
@@ -1474,33 +1489,113 @@ public class TestRailPublisherTests
         });
 
         posted.Should().NotBeNull();
-        posted!.Should().HaveCount(3);
-        posted.Should().OnlyContain(result => result.StatusId == TestRailStatusMapper.Blocked);
-        posted.Select(result => result.CaseId).Should().BeEquivalentTo([1, 2, 7]);
+        posted!.Should().HaveCount(4);
+        posted.Select(result => result.CaseId).Should().BeEquivalentTo([1, 2, 4, 7]);
+        posted.Count(result => result.Attachment is { Length: > 0 }).Should().Be(2);
 
         var passedResult = posted.Single(result => result.CaseId == 1);
+        passedResult.StatusId.Should().Be(TestRailStatusMapper.Passed);
         passedResult.Comment.Should().Contain("Create Facility");
-        passedResult.Comment.Should().Contain("Result: Passed");
         passedResult.Comment.Should().Contain("ApiHealthScenario seed run was cancelled.");
+        passedResult.Comment.Should().NotContain("Result:");
         passedResult.Elapsed.Should().Be("2s");
-        passedResult.Attachment.Should().NotBeNull();
+        passedResult.Attachment.Should().BeNull();
+
+        var failedResult = posted.Single(result => result.CaseId == 4);
+        failedResult.StatusId.Should().Be(TestRailStatusMapper.Failed);
+        failedResult.Comment.Should().Contain("Delete Facility");
+        failedResult.Comment.Should().Contain("Error: boom");
+        failedResult.Comment.Should().Contain("ApiHealthScenario seed run was cancelled.");
+        failedResult.Elapsed.Should().Be("1s");
+        failedResult.Attachment.Should().NotBeNull();
 
         var notRunResult = posted.Single(result => result.CaseId == 2);
+        notRunResult.StatusId.Should().Be(TestRailStatusMapper.Blocked);
         notRunResult.Comment.Should().Contain("Get Facility");
-        notRunResult.Comment.Should().NotContain("Result:");
         notRunResult.Comment.Should().Contain("ApiHealthScenario seed run was cancelled.");
-        notRunResult.Attachment.Should().NotBeNull();
+        notRunResult.Attachment.Should().BeNull();
 
         var collapsed = posted.Single(result => result.CaseId == 7);
+        collapsed.StatusId.Should().Be(TestRailStatusMapper.Failed);
         collapsed.Comment.Should().Contain("List Facilities");
-        collapsed.Comment.Should().Contain("Result: Passed");
         collapsed.Comment.Should().Contain("Update Facility");
-        collapsed.Comment.Should().Contain("Result: Failed");
-        collapsed.Comment.Should().NotContain("Posted as Failed");
+        collapsed.Comment.Should().Contain("Posted as Failed");
+        collapsed.Comment.Should().NotContain("Result:");
         collapsed.AttachmentFileName.Should().Be("api-health-c7.txt");
 
         api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
         api.Verify(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Interrupted_api_health_run_keeps_finished_statuses_and_blocks_the_rest()
+    {
+        IReadOnlyList<TestRailCaseResult>? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results)
+            .ReturnsAsync([]);
+
+        var passed = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Create Facility", TestRailCaseId = 1 };
+        var failed = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Delete Facility", TestRailCaseId = 4 };
+        var notRun = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Get Facility", TestRailCaseId = 2 };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [passed.Key] = new()
+                {
+                    EndpointKey = passed.Key,
+                    EndpointName = passed.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = true
+                },
+                [failed.Key] = new()
+                {
+                    EndpointKey = failed.Key,
+                    EndpointName = failed.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = false,
+                    ErrorMessage = "boom"
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            ConfiguredOptions(),
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(passed, failed, notRun)]));
+
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with
+        {
+            Cancelled = true,
+            Failed = true,
+            Error = "API Health run was interrupted by application restart and has been cancelled."
+        });
+
+        posted.Should().NotBeNull();
+        posted!.Should().HaveCount(3);
+        posted.Count(result => result.Attachment is { Length: > 0 }).Should().Be(1);
+
+        var passedResult = posted.Single(result => result.CaseId == 1);
+        passedResult.StatusId.Should().Be(TestRailStatusMapper.Passed);
+        passedResult.Attachment.Should().BeNull();
+        passedResult.Comment.Should().Contain("application restart");
+
+        var failedResult = posted.Single(result => result.CaseId == 4);
+        failedResult.StatusId.Should().Be(TestRailStatusMapper.Failed);
+        failedResult.Attachment.Should().NotBeNull();
+        failedResult.Comment.Should().Contain("Error: boom");
+
+        var notRunResult = posted.Single(result => result.CaseId == 2);
+        notRunResult.StatusId.Should().Be(TestRailStatusMapper.Blocked);
+        notRunResult.Attachment.Should().BeNull();
+        notRunResult.Comment.Should().Contain("Get Facility");
+        notRunResult.Comment.Should().Contain("application restart");
+
+        api.Verify(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -144,10 +144,10 @@ public sealed class TestRailPublisher(
 
             if (request.Cancelled)
             {
-                // The run may have been cancelled before any endpoint stored a result.
-                // Post Blocked for every mapped endpoint that was in scope. A stored
-                // pass or fail stays in the comment; the result status is Blocked.
-                // Skipped and informational endpoints stay unpublished.
+                // A finished endpoint keeps the status, comment, and attachment a
+                // completed run would post. An endpoint that never stored a result
+                // is Blocked with the cancel reason and no attachment. Skipped and
+                // informational endpoints stay unpublished.
                 foreach (var definition in defByKey.Values)
                 {
                     resultsByKey.TryGetValue(definition.Key, out var result);
@@ -162,18 +162,33 @@ public sealed class TestRailPublisher(
                     if (caseId is null)
                         continue;
 
-                    var comment = result is null
-                        ? BuildCancelledEndpointComment(definition, request.Error)
-                        : BuildApiHealthComment(result, request.Error, includeResultStatus: true);
-                    var attachment = Encoding.UTF8.GetBytes(comment ?? "Blocked");
+                    if (result is null)
+                    {
+                        caseResults.Add(new TestRailCaseResult
+                        {
+                            CaseId = caseId.Value,
+                            StatusId = TestRailStatusMapper.Blocked,
+                            Comment = BuildCancelledEndpointComment(definition, request.Error)
+                        });
+                        continue;
+                    }
+
+                    var statusId = TestRailStatusMapper.FromApiHealthResult(result.Passed, result.Skipped);
+                    if (statusId is null)
+                        continue;
+
+                    var comment = BuildApiHealthComment(result, request.Error);
+                    var attachment = ShouldAttach(statusId.Value)
+                        ? Encoding.UTF8.GetBytes(comment ?? result.ErrorMessage ?? "Failed")
+                        : null;
                     caseResults.Add(new TestRailCaseResult
                     {
                         CaseId = caseId.Value,
-                        StatusId = TestRailStatusMapper.Blocked,
+                        StatusId = statusId.Value,
                         Comment = comment,
-                        Elapsed = result is { DurationMs: > 0 } ? FormatElapsedMs(result.DurationMs) : null,
+                        Elapsed = result.DurationMs > 0 ? FormatElapsedMs(result.DurationMs) : null,
                         Attachment = attachment,
-                        AttachmentFileName = $"api-health-{SanitizeFileName(result?.EndpointKey ?? definition.Key)}.txt"
+                        AttachmentFileName = attachment is null ? null : $"api-health-{SanitizeFileName(result.EndpointKey)}.txt"
                     });
                 }
             }
@@ -276,7 +291,9 @@ public sealed class TestRailPublisher(
             var comment = BuildCollapsedComment(group, sameStatus);
             byte[]? attachment = null;
             string? attachmentFileName = null;
-            if (ShouldAttach(statusId))
+            // A completed run attaches the combined comment only when the posted
+            // status is Failed. Blocked rows are endpoints that never ran.
+            if (statusId == TestRailStatusMapper.Failed)
             {
                 attachment = Encoding.UTF8.GetBytes(comment ?? "Failed");
                 attachmentFileName = $"api-health-c{group[0].CaseId}.txt";
@@ -723,12 +740,10 @@ public sealed class TestRailPublisher(
         return Truncate(sb.ToString());
     }
 
-    private static string? BuildApiHealthComment(ApiTestRunResult result, string? runError, bool includeResultStatus = false)
+    private static string? BuildApiHealthComment(ApiTestRunResult result, string? runError)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"{result.ServiceName} :: {result.EndpointName}");
-        if (includeResultStatus)
-            sb.AppendLine(result.Passed ? "Result: Passed" : "Result: Failed");
         var failureBlock = ApiHealthFailureText.Format(result);
         if (!string.IsNullOrWhiteSpace(failureBlock))
         {
