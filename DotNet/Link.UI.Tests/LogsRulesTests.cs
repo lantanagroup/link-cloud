@@ -15,6 +15,7 @@ public class LogsRulesTests
         LogsRules.CanProcess("Completed").Should().BeFalse();
         LogsRules.CanProcess("Skipped").Should().BeFalse();
         LogsRules.CanProcess("Failed").Should().BeTrue();
+        LogsRules.CanProcess("AccessDenied").Should().BeTrue();
         LogsRules.CanProcess("Cancelled").Should().BeTrue();
         LogsRules.CanProcess(" ").Should().BeFalse();
     }
@@ -28,6 +29,7 @@ public class LogsRulesTests
         LogsRules.CanCancel("Pending", created, 0, Noon).Should().BeTrue();
         LogsRules.CanCancel("Cancelled", created, 0, Noon).Should().BeFalse();
         LogsRules.CanCancel("Completed", created, 0, Noon).Should().BeFalse();
+        LogsRules.CanCancel("AccessDenied", created, 0, Noon).Should().BeFalse();
         LogsRules.CanCancel("Ready", null, 24, Noon).Should().BeFalse();
     }
 

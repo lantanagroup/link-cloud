@@ -23,7 +23,7 @@ public static class LogsRules
     public static readonly string[] Statuses =
     [
         "Pending", "Ready", "Queued", "Processing", "Completed", "Failed",
-        "MaxRetriesReached", "Skipped", "ConfigurationRequired", "Cancelled",
+        "MaxRetriesReached", "AccessDenied", "Skipped", "ConfigurationRequired", "Cancelled",
         "ConfigurationMissing", "NotReportable"
     ];
 
@@ -76,7 +76,7 @@ public static class LogsRules
 
     private static readonly HashSet<string> Terminal = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Completed", "MaxRetriesReached", "ConfigurationMissing", "Skipped", "Cancelled", "NotReportable"
+        "Completed", "MaxRetriesReached", "AccessDenied", "ConfigurationMissing", "Skipped", "Cancelled", "NotReportable"
     };
 
     public static int ClampPageSize(int pageSize) =>
