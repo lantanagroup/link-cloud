@@ -259,7 +259,8 @@ public sealed class TestRailPublisher(
 
     /// <summary>
     /// A TestRail run has one test per case. Endpoints that share a case id post one result.
-    /// When their statuses differ, that result is Failed and the comment names each endpoint.
+    /// When finished endpoints disagree, that result is Failed and the comment names each one.
+    /// A Blocked row is an endpoint that never ran, so it does not replace a finished status.
     /// </summary>
     private List<TestRailCaseResult> CollapseApiHealthResults(List<TestRailCaseResult> results)
     {
@@ -286,9 +287,18 @@ public sealed class TestRailPublisher(
                 continue;
             }
 
-            var sameStatus = group.All(result => result.StatusId == group[0].StatusId);
-            var statusId = sameStatus ? group[0].StatusId : TestRailStatusMapper.Failed;
-            var comment = BuildCollapsedComment(group, sameStatus);
+            var posting = group.Any(result => result.StatusId != TestRailStatusMapper.Blocked)
+                ? group.Where(result => result.StatusId != TestRailStatusMapper.Blocked).ToList()
+                : group;
+            if (posting.Count == 1)
+            {
+                collapsed.Add(posting[0]);
+                continue;
+            }
+
+            var sameStatus = posting.All(result => result.StatusId == posting[0].StatusId);
+            var statusId = sameStatus ? posting[0].StatusId : TestRailStatusMapper.Failed;
+            var comment = BuildCollapsedComment(posting, sameStatus);
             byte[]? attachment = null;
             string? attachmentFileName = null;
             // A completed run attaches the combined comment only when the posted
@@ -296,18 +306,18 @@ public sealed class TestRailPublisher(
             if (statusId == TestRailStatusMapper.Failed)
             {
                 attachment = Encoding.UTF8.GetBytes(comment ?? "Failed");
-                attachmentFileName = $"api-health-c{group[0].CaseId}.txt";
+                attachmentFileName = $"api-health-c{posting[0].CaseId}.txt";
             }
 
             logger.LogInformation(
                 "TestRail case C{CaseId} is mapped from {EndpointCount} API Health endpoints. Posting one {Status} result.",
-                group[0].CaseId,
-                group.Count,
+                posting[0].CaseId,
+                posting.Count,
                 StatusLabel(statusId));
 
             collapsed.Add(new TestRailCaseResult
             {
-                CaseId = group[0].CaseId,
+                CaseId = posting[0].CaseId,
                 StatusId = statusId,
                 Comment = comment,
                 Attachment = attachment,

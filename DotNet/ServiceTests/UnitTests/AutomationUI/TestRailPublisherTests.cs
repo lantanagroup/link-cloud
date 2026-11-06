@@ -1427,6 +1427,30 @@ public class TestRailPublisherTests
             EndpointName = "Update Facility",
             TestRailCaseId = 7
         };
+        var sharedPass = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Search Facility",
+            TestRailCaseId = 8
+        };
+        var sharedNotRun = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Search Facility Missing",
+            TestRailCaseId = 8
+        };
+        var blockedA = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "First Missing",
+            TestRailCaseId = 11
+        };
+        var blockedB = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Second Missing",
+            TestRailCaseId = 11
+        };
 
         var store = new Mock<IApiHealthRunStore>();
         store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
@@ -1471,6 +1495,13 @@ public class TestRailPublisherTests
                     ServiceName = "Tenant",
                     Passed = false,
                     ErrorMessage = "nope"
+                },
+                [sharedPass.Key] = new()
+                {
+                    EndpointKey = sharedPass.Key,
+                    EndpointName = sharedPass.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = true
                 }
             });
 
@@ -1479,7 +1510,7 @@ public class TestRailPublisherTests
             ConfiguredOptions(),
             apiHealthStore: store.Object,
             registry: new ApiEndpointRegistry([
-                new FakeSuite(passed, failed, notRun, skipped, unmapped, informational, sameCasePass, sameCaseFail)]));
+                new FakeSuite(passed, failed, notRun, skipped, unmapped, informational, sameCasePass, sameCaseFail, sharedPass, sharedNotRun, blockedA, blockedB)]));
 
         await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest() with
         {
@@ -1489,8 +1520,8 @@ public class TestRailPublisherTests
         });
 
         posted.Should().NotBeNull();
-        posted!.Should().HaveCount(4);
-        posted.Select(result => result.CaseId).Should().BeEquivalentTo([1, 2, 4, 7]);
+        posted!.Should().HaveCount(6);
+        posted.Select(result => result.CaseId).Should().BeEquivalentTo([1, 2, 4, 7, 8, 11]);
         posted.Count(result => result.Attachment is { Length: > 0 }).Should().Be(2);
 
         var passedResult = posted.Single(result => result.CaseId == 1);
@@ -1522,6 +1553,19 @@ public class TestRailPublisherTests
         collapsed.Comment.Should().Contain("Posted as Failed");
         collapsed.Comment.Should().NotContain("Result:");
         collapsed.AttachmentFileName.Should().Be("api-health-c7.txt");
+
+        var keptPass = posted.Single(result => result.CaseId == 8);
+        keptPass.StatusId.Should().Be(TestRailStatusMapper.Passed);
+        keptPass.Attachment.Should().BeNull();
+        keptPass.Comment.Should().Contain("Search Facility");
+        keptPass.Comment.Should().NotContain("Search Facility Missing");
+        keptPass.Comment.Should().NotContain("Posted as Failed");
+
+        var blockedPair = posted.Single(result => result.CaseId == 11);
+        blockedPair.StatusId.Should().Be(TestRailStatusMapper.Blocked);
+        blockedPair.Attachment.Should().BeNull();
+        blockedPair.Comment.Should().Contain("First Missing");
+        blockedPair.Comment.Should().Contain("Second Missing");
 
         api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Once);
         api.Verify(a => a.AddResultsForCasesAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()), Times.Once);
