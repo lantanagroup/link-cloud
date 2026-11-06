@@ -17,14 +17,15 @@ public static class RetentionScheduleRegistration
     /// in registration order, and the retention job must be settled before the scheduler starts.
     /// </summary>
     /// <remarks>
-    /// Retention:Participants is read here, once. A change takes effect when Report restarts and never alters a
-    /// cleanup that already exists.
+    /// Retention:Participants, Retention:Window and Retention:MaxReportsPerCleanup are read here, once. A change
+    /// takes effect when Report restarts and never alters a cleanup that already exists.
     /// </remarks>
     public static IServiceCollection AddRetentionSchedule(this IServiceCollection services,
                                                           IConfiguration configuration)
     {
         services.Configure<RetentionScheduleSettings>(configuration.GetSection(RetentionScheduleSettings.Key));
         services.TryAddSingleton(RetentionParticipants.FromConfiguration(configuration));
+        services.TryAddSingleton(RetentionCheckSettings.FromConfiguration(configuration));
 
         services.AddScoped<IRetentionCheckWorker, LoggingRetentionCheck>();
         services.AddSingleton<IRetentionScheduleReconciler, RetentionScheduleReconciler>();
