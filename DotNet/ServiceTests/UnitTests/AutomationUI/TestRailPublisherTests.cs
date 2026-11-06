@@ -298,6 +298,7 @@ public class TestRailPublisherTests
         comment.Should().NotBeNullOrEmpty();
         comment!.Length.Should().BeLessThanOrEqualTo(20_000);
         comment.Should().Contain("The complete log is attached as");
+        comment.Should().NotContain("Some lines may be missing");
         comment.Should().Contain($"scenario-run-{runId:D}.log");
         comment.Should().NotContain("FIRST-LOG-ENTRY");
         comment.Should().NotContain("LAST-LOG-ENTRY");
@@ -312,6 +313,52 @@ public class TestRailPublisherTests
         middle.Should().BeGreaterThan(first);
         last.Should().BeGreaterThan(middle);
         attached.Should().Contain(new string('E', 30_000));
+    }
+
+    [Fact]
+    public async Task Incomplete_scenario_log_does_not_call_the_attachment_complete()
+    {
+        var logs = new List<string>(250);
+        for (var i = 0; i < 250; i++)
+        {
+            var marker = i == 0 ? "FIRST-LOG-ENTRY" : i == 249 ? "LAST-LOG-ENTRY" : $"MIDDLE-{i:D3}";
+            logs.Add(marker + new string('.', 100));
+        }
+
+        TestRailCaseResult? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var scenarioId = Guid.NewGuid();
+        var runId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            RunId = runId,
+            ScenarioId = scenarioId,
+            Status = AutomationRunStatus.Succeeded,
+            Error = new string('E', 30_000),
+            Logs = logs,
+            LogsMayBeIncomplete = true
+        });
+
+        posted.Should().NotBeNull();
+        var comment = posted!.Comment;
+        comment.Should().NotBeNullOrEmpty();
+        comment!.Length.Should().BeLessThanOrEqualTo(20_000);
+        comment.Should().Contain("Some lines may be missing");
+        comment.Should().NotContain("The complete log is attached as");
+        comment.Should().Contain($"scenario-run-{runId:D}.log");
+        comment.Should().NotContain("FIRST-LOG-ENTRY");
+        comment.Should().NotContain("LAST-LOG-ENTRY");
+        posted.AttachmentFileName.Should().Be($"scenario-run-{runId:D}.log");
+        posted.Attachment.Should().NotBeNull();
     }
 
     [Fact]

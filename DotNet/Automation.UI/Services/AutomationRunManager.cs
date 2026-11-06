@@ -874,6 +874,9 @@ public class AutomationRunManager : IAutomationRunManager
 
     private static readonly TimeSpan LogPublishWait = TimeSpan.FromSeconds(15);
 
+    private Task<(IReadOnlyList<string> Lines, bool MayBeIncomplete)> ReadLogsForPublishAsync(MutableRunState state)
+        => ReadLogsForPublishAsync(state, _snapshotStore, _logger);
+
     /// <summary>
     /// The Run Details page shows the persisted log once the run is no longer in memory,
     /// and the open page has every line as it was written. The in-memory list drops the
@@ -881,9 +884,15 @@ public class AutomationRunManager : IAutomationRunManager
     /// A stuck store must not block the result post, so the wait is bounded. When the in-memory
     /// log is still complete, a timed-out or failed append uses that list: the store is missing
     /// those lines. Once the in-memory list has been trimmed, the store is the only copy of the
-    /// earlier lines. The store read uses the same budget and stops when the run is cancelled.
+    /// earlier lines. The store read uses the same budget on its own token. A cancelled run has
+    /// already cancelled <see cref="MutableRunState.RunCancellation"/>, and linking that token
+    /// would skip the store and publish the trimmed list. When the list has been trimmed and an
+    /// append failed, neither copy has every line, and the publish request says so.
     /// </summary>
-    private async Task<IReadOnlyList<string>> ReadLogsForPublishAsync(MutableRunState state)
+    internal static async Task<(IReadOnlyList<string> Lines, bool MayBeIncomplete)> ReadLogsForPublishAsync(
+        MutableRunState state,
+        ISnapshotStore snapshotStore,
+        ILogger logger)
     {
         var appendsSettled = true;
         try
@@ -893,7 +902,7 @@ public class AutomationRunManager : IAutomationRunManager
         catch (Exception ex)
         {
             appendsSettled = false;
-            _logger.LogWarning(ex,
+            logger.LogWarning(ex,
                 "Persisted logs for run {RunId} were still writing when TestRail publish started. Using the in-memory log.",
                 state.RunId);
         }
@@ -907,29 +916,28 @@ public class AutomationRunManager : IAutomationRunManager
         }
 
         // Untrimmed memory still has every line. Prefer it when the store is short.
+        // Trimmed memory plus a failed append means neither copy is complete.
+        var mayBeIncomplete = trimmed && failedAppends > 0;
         var memoryIsComplete = !trimmed && (!appendsSettled || failedAppends > 0);
         if (!memoryIsComplete)
         {
             try
             {
                 using var readTimeout = new CancellationTokenSource(LogPublishWait);
-                using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                    state.RunCancellation.Token,
-                    readTimeout.Token);
-                var persisted = await _snapshotStore.GetLogsAsync(state.RunId, readCancellation.Token);
+                var persisted = await snapshotStore.GetLogsAsync(state.RunId, readTimeout.Token);
                 if (persisted.Count > 0)
-                    return persisted;
+                    return (persisted, mayBeIncomplete);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
+                logger.LogWarning(ex,
                     "Could not read persisted logs for TestRail publish of run {RunId}. Using the in-memory log.",
                     state.RunId);
             }
         }
 
         lock (state.Sync)
-            return state.Logs.ToList();
+            return (state.Logs.ToList(), mayBeIncomplete);
     }
 
     private async Task BroadcastStatus(MutableRunState state)
@@ -948,7 +956,7 @@ public class AutomationRunManager : IAutomationRunManager
 
         try
         {
-            var logs = await ReadLogsForPublishAsync(state);
+            var (logs, logsMayBeIncomplete) = await ReadLogsForPublishAsync(state);
             await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
             {
                 RunId = state.RunId,
@@ -957,6 +965,7 @@ public class AutomationRunManager : IAutomationRunManager
                 Status = state.Status,
                 Error = state.Error,
                 Logs = logs,
+                LogsMayBeIncomplete = logsMayBeIncomplete,
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt
             });

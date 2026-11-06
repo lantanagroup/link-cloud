@@ -19,7 +19,7 @@ public sealed class TestRailPublisher(
     /// Largest result comment we post. The TestRail result comment is a text field with no
     /// documented maximum. A full run log can still be large enough to fail the result call,
     /// and the attachment is uploaded only after that call succeeds, so the comment stays
-    /// inside this size and the complete log goes in the attachment.
+    /// inside this size and the log goes in the attachment.
     /// </summary>
     private const int MaxCommentChars = 20_000;
     internal const string SharedScenarioRunName = "Link Automation UI - Scenario suite";
@@ -652,11 +652,15 @@ public sealed class TestRailPublisher(
     /// <summary>
     /// The comment names the attachment instead of pasting a partial log. A partial log
     /// drops the lines that do not fit, which is the gap this publisher used to ship.
+    /// When neither copy of the log is complete, the comment says so.
     /// </summary>
     private static string BuildLogOverflowComment(ScenarioTestRailPublishRequest request, string attachmentFileName)
     {
+        var logNote = request.LogsMayBeIncomplete
+            ? $"The log is attached as {attachmentFileName}. Some lines may be missing."
+            : $"The complete log is attached as {attachmentFileName}.";
         var note = request.Logs.Count > 0
-            ? $"The run log is {request.Logs.Count} lines and does not fit in this result comment. The complete log is attached as {attachmentFileName}."
+            ? $"The run log is {request.Logs.Count} lines and does not fit in this result comment. {logNote}"
             : $"The result text does not fit in this result comment. The complete text is attached as {attachmentFileName}.";
         if (note.Length > MaxCommentChars)
             return note[..MaxCommentChars];
