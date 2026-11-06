@@ -1,5 +1,4 @@
 using System.IO;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Xunit;
 
 namespace Link.UI.Tests;
@@ -39,24 +38,6 @@ public class LastIssuesFixesTests
     }
 
     [Fact]
-    public void Broker_id_cell_is_a_plain_link()
-    {
-        var view = Dot("Link.UI", "Views", "Operations", "_Brokers.cshtml");
-        Assert.DoesNotContain("Label = \"Broker\", Value = row.Id", view);
-        Assert.Contains("title=\"Open broker @row.Id\">@row.Id</a></td>", view);
-    }
-
-    [Fact]
-    public void Produce_form_is_disabled_up_front_for_a_topic_outside_the_catalog()
-    {
-        var view = Dot("Link.UI", "Views", "Operations", "_ProduceMessage.cshtml");
-        Assert.Contains("KafkaBrowseAllowList.Admit(topicName, null).Allowed", view);
-        Assert.Contains("<fieldset id=\"produce-fields\" disabled=\"@refused\">", view); Assert.Contains("id=\"kafka-produce-refused\"", view);
-        Assert.False(KafkaBrowseAllowList.Admit("loadtest-scratch", null).Allowed);
-        Assert.True(KafkaBrowseAllowList.Admit("ResourcesAcquired", null).Allowed);
-    }
-
-    [Fact]
     public void Normalization_default_suite_retries_write_conflicts()
     {
         var source = Dot("Link.UI", "Engine", "Services", "Persistence", "MongoNormalizationStore.cs");
@@ -64,14 +45,6 @@ public class LastIssuesFixesTests
         body = body.Substring(0, body.IndexOf("DeleteSuiteAsync", StringComparison.Ordinal));
         Assert.Contains("WithTransactionAsync", body);
         Assert.DoesNotContain("StartTransaction()", body);
-    }
-
-    [Fact]
-    public void Migration_reconcile_logs_a_repeated_failure_once()
-    {
-        var source = Dot("Operations", "Application", "KafkaOps", "Migration", "MigrationRuntime.cs");
-        Assert.Contains("Interlocked.Exchange(ref _reconcileFailure, reason) != reason", source);
-        Assert.Contains("_logger.LogTrace(\"Migration reconcile still not finished", source);
     }
 
     [Fact]
@@ -92,12 +65,6 @@ public class LastIssuesFixesTests
     [Fact]
     public void Wide_tables_move_secondary_columns_to_their_detail_views()
     {
-        var groups = Dot("Link.UI", "Views", "Operations", "_Consumers.cshtml");
-        var listHead = groups.Substring(0, groups.IndexOf("Members (", StringComparison.Ordinal));
-        Assert.DoesNotContain("<th>Client</th>", listHead);
-        Assert.Contains("<th>Client</th>", groups.Substring(groups.IndexOf("Members (", StringComparison.Ordinal)));
-        var messages = Dot("Link.UI", "Views", "Operations", "_Messages.cshtml");
-        Assert.DoesNotContain(">Summary</th>", messages);
         var facility = Dot("Link.UI", "Views", "Tenants", "_ViewReports.cshtml");
         Assert.DoesNotContain(">Measures</th>", facility);
         Assert.Contains("Census / IP", facility);

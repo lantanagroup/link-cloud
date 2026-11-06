@@ -7,7 +7,6 @@ public sealed class LogsHomePage
 {
     public bool AcquisitionConfigured { get; init; }
     public bool AuditConfigured { get; init; }
-    public string? KafkaUrl { get; init; }
     public string? GrafanaUrl { get; init; }
 }
 
@@ -493,11 +492,6 @@ public sealed class AuditChangeRow
     public string Name { get; init; } = string.Empty;
     public string Before { get; init; } = string.Empty;
     public string After { get; init; } = string.Empty;
-}
-
-public sealed class KafkaPage
-{
-    public string? Url { get; init; }
 }
 
 public sealed class LogsAction

@@ -67,8 +67,6 @@ public class HoldConfirmTests
         Read("Views", "Tenants", "Facility.cshtml").Should().Contain("au-badge-test\">Test facility");
         StatusPills.ForKafkaHealth("Needs attention").Should().Be("au-badge-attention");
         StatusPills.ForKafkaHealth("ISR short").Should().Be("au-badge-warning");
-        var kafka = Read("Views", "Logs", "Kafka.cshtml");
-        kafka.Should().Contain("The Kafka console is in this app").And.Contain("Open the Kafka console").And.NotContain("separate tool");
         Read("wwwroot", "js", "facility-save.js").Should().Contain("luHoldConfirm.ask").And.Contain("beforeunload");
     }
 
@@ -91,28 +89,4 @@ public class HoldConfirmTests
         script.Should().NotContain("confirm('Cancel this running test");
     }
 
-    [Fact]
-    public void Kafka_console_has_no_type_the_name_fields_and_risky_actions_hold()
-    {
-        foreach (var file in new[] { "_ProduceMessage.cshtml", "_Migrate.cshtml", "_ReplicationFactor.cshtml", "_Brokers.cshtml" })
-        {
-            var view = Read("Views", "Operations", file);
-            view.Should().NotContain("Type the topic name", file);
-            view.Should().NotContain("Type the backup topic name", file);
-            view.Should().Contain("data-hold=\"@Hold.Of(", file);
-        }
-        var migrate = Read("Views", "Operations", "_Migrate.cshtml");
-        migrate.Should().Contain("id=\"plan-submit\" type=\"submit\" data-hold=").And.Contain("formaction=\"/Operations/Kafka/migrations\" data-hold=").And.Contain("formaction=\"/Operations/Kafka/family\" data-hold=");
-        System.Text.RegularExpressions.Regex.Matches(migrate, "data-hold=\"@Hold.Of\\(").Count.Should().BeGreaterThanOrEqualTo(8);
-        Read("Views", "Operations", "_Brokers.cshtml").Should().Contain("brokers/decommission\" data-hold=").And.Contain("brokers/rebalance\" data-hold=").And.Contain("type=\"submit\" data-hold=\"@Hold.Of(\"Add a broker\"");
-        Read("Views", "Operations", "_ReplicationFactor.cshtml").Should().Contain("replication-factor\" data-hold=");
-        Read("wwwroot", "js", "kafka-ops.js").Should().NotContain("plan-confirm").And.NotContain("produce-confirm");
-    }
-
-    [Fact]
-    public void Approve_and_execute_only_show_while_they_can_run()
-    {
-        var view = Read("Views", "Operations", "_ChangeRequest.cshtml");
-        view.Should().Contain("@if (KafkaChangeActions.CanApprove(request))").And.Contain("@if (KafkaChangeActions.CanExecute(request))").And.Contain("data-hold=\"@KafkaChangeActions.ExecuteHold(request)\"");
-    }
 }

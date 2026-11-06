@@ -45,10 +45,6 @@ public sealed class AutomationRunsApiController(
         {
             runId = await runManager.StartAsync(startRequest, cancellationToken);
         }
-        catch (TopicHeldException ex)
-        {
-            return Conflict(new { error = ex.Message });
-        }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message });

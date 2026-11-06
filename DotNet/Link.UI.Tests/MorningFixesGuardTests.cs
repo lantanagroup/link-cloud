@@ -73,10 +73,6 @@ public class MorningFixesGuardTests
         css.Should().Contain("--au-success-rgb: 40, 167, 69;");
         File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "chart-palette.js"))
             .Should().Contain("getPropertyValue(\"--au-success\")");
-        // Kafka charts use one neutral grey, so they carry no success green at all.
-        var kafkaScript = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "kafka-ops.js"));
-        kafkaScript.Should().Contain("#6c757d");
-        kafkaScript.Should().NotContain("--au-success");
     }
 
     [Fact]
@@ -130,24 +126,13 @@ public class MorningFixesGuardTests
         copy.Should().NotContain("querySelectorAll('td')");
         copy.Should().NotContain("rows.forEach");
 
-        var allowedCopy = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "_MessageDetail.cshtml",
-            "_TopicPicker.cshtml",
-            "_Consumers.cshtml",
-            "_Brokers.cshtml"
-        };
+        var allowedCopy = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var copyPartials = ProductFiles("*.cshtml", "Views")
             .Where(file => File.ReadAllText(file).Contains("name=\"_CopyButton\"", StringComparison.Ordinal)
                 && !allowedCopy.Contains(Path.GetFileName(file)))
             .Select(Rel)
             .ToList();
         copyPartials.Should().BeEmpty();
-        var messageDetail = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_MessageDetail.cshtml"));
-        messageDetail.Should().Contain("Copy headers");
-        messageDetail.Should().Contain("Copy key");
-        messageDetail.Should().Contain("Copy value");
-        messageDetail.Should().Contain("Copy all");
 
         var inline = ProductFiles("*.cshtml", "Views")
             .Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js")))
@@ -263,57 +248,6 @@ public class MorningFixesGuardTests
         var script = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "cell-copy.js"));
         script.Should().Contain("document.addEventListener(type, onDocument)");
         Regex.Matches(script, "document.addEventListener").Count.Should().Be(1);
-    }
-
-    [Fact]
-    public void Kafka_operations_buttons_use_the_shared_colors()
-    {
-
-        var kafka = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "Kafka.cshtml"));
-        kafka.Should().NotContain("btn btn-au-execute\" type=\"submit\">Search");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml")).Should().NotContain("btn btn-au-execute\" type=\"submit\">Search");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Consumers.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Brokers.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Messages.cshtml")).Should().Contain("btn btn-au-execute\" type=\"submit\">Search");
-
-        var overview = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Overview.cshtml"));
-        overview.Should().Contain("btn btn-sm btn-au-link");
-        overview.Should().Contain("@item.Action");
-        overview.Should().NotContain(">Migrate</a>");
-        overview.Should().NotContain("btn-au-neutral");
-        File.ReadAllText(Path.Combine(Root(), "Services", "KafkaConsoleRules.cs")).Should().Contain("Open group");
-
-        var topic = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Topic.cshtml"));
-        topic.Should().Contain("btn-au-link");
-        topic.Should().Contain("id=\"kafka-lag-by-group\"");
-        topic.Should().NotContain("kafkaLagChart");
-        topic.Should().NotContain("Retry @topic.RetryPartitions. Error");
-        topic.Should().NotContain("Migrate instead");
-        topic.Should().NotContain(">Preview increase</span>");
-
-        var consumers = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Consumers.cshtml"));
-        consumers.Should().Contain(">Open</span>");
-        var brokers = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Brokers.cshtml"));
-        brokers.Should().Contain(">Open</span>");
-        brokers.Should().Contain(">Rebalance</span>");
-
-        var migrate = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_Migrate.cshtml"));
-        migrate.Should().Contain("aria-label=\"Preview increase\"");
-        migrate.Should().Contain("btn-au-execute lu-icon-btn\" type=\"submit\" data-partition-btn=\"migrate\" formaction=\"/Operations/Kafka/migrations/plan\"");
-        migrate.Should().Contain("btn-warning\" href=");
-        migrate.Should().Contain("btn-au-execute\" type=\"submit\" aria-label=\"Execute migration\">Execute");
-        migrate.Should().Contain("btn-au-execute\" type=\"submit\">Go");
-        migrate.Should().Contain("btn-au-execute\" type=\"submit\" name=\"action\" value=\"forward\">Continue forward");
-        migrate.Should().Contain("btn-warning\" type=\"submit\" aria-label=\"Abort migration\">Abort");
-        migrate.Should().Contain("btn-au-execute\" type=\"submit\" name=\"action\" value=\"original\">Recover original");
-        migrate.Should().Contain("btn-danger\" type=\"submit\">Delete backup");
-        migrate.Should().Contain("btn-danger\" type=\"submit\" name=\"action\" value=\"deleteForeign\">Delete empty foreign topic");
-
-        var change = File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_ChangeRequest.cshtml"));
-        change.Should().Contain(">Execute</span>");
-        change.Should().Contain("btn-au-execute");
-        change.Should().Contain(">Cancel</span>");
-        change.Should().Contain("btn-warning");
     }
 
     [Fact]

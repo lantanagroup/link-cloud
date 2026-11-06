@@ -24,7 +24,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.KafkaAdmin.Migration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.Shared.Application.Factories;
 using Link.Authorization.Policies;
@@ -109,8 +108,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { AllowAutoCreateTopics = false });
 
-    // The Kafka operations console runs in the Operations service; /api/ops/kafka is proxied there (see ReverseProxy).
-
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
@@ -170,10 +167,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
 
-    // Topic migrations run in the Operations service. The integration producers ask it which topics are held.
     builder.Services.AddHttpContextAccessor();
-    builder.Services.AddHttpClient(OperationsMigrationHolds.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(5));
-    builder.Services.AddSingleton<IMigrationHoldRegistry, OperationsMigrationHolds>();
 
     builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 

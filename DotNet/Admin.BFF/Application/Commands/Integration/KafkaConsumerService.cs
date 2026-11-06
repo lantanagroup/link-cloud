@@ -1,4 +1,3 @@
-using LantanaGroup.Link.Shared.KafkaAdmin.Migration;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -12,16 +11,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<KafkaConsumerService> _logger;
         private readonly ICacheService _cache;
-        private readonly IMigrationHoldRegistry? _holds;
 
 
         public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory,
-            ILogger<KafkaConsumerService> logger, IMigrationHoldRegistry? holds = null)
+            ILogger<KafkaConsumerService> logger)
         {
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache;
-            _holds = holds;
         }
 
         public async Task StartConsumer(string groupId, List<string> topics, string reportTrackingId,
@@ -32,8 +29,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             using (consumer)
             {
-                foreach (var topic in topics)
-                    await MigrationHoldGuard.RefuseIfHeldAsync(_holds, topic, cancellationToken);
                 consumer.Subscribe(topics);
                 try
                 {

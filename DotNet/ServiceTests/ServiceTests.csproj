@@ -64,7 +64,6 @@
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\MockDmrpApi\MockDmrpApi.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
-    <ProjectReference Include="..\Operations\Operations.csproj" />
     <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />

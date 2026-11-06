@@ -109,7 +109,6 @@ public class AutomationRunManager : IAutomationRunManager
             _patientConfigurationStore,
             cancellationToken);
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
-        await RefuseIfProduceHeldAsync(cancellationToken);
         var initiator = await ResolveInitiatorAsync(cancellationToken);
         MutableRunState state;
         if (_numericOnlyFacilityId)
@@ -205,26 +204,6 @@ public class AutomationRunManager : IAutomationRunManager
             _logger.LogWarning(ex, "The signed-in user could not be read. The run is recorded as started by the system.");
             return AutomationRunInitiator.System;
         }
-    }
-
-    private async Task RefuseIfProduceHeldAsync(CancellationToken cancellationToken)
-    {
-        var source = _hostServices.GetService<IKafkaTopicHoldSource>();
-        if (source is null)
-            return;
-        IReadOnlyList<string> holds;
-        try
-        {
-            holds = await source.GetHeldTopicsAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogWarning(ex, "Kafka holds could not be read. The run was allowed to start.");
-            return;
-        }
-
-        if (holds.Contains(nameof(KafkaTopic.ReportScheduled), StringComparer.Ordinal))
-            throw new TopicHeldException(nameof(KafkaTopic.ReportScheduled));
     }
 
     private async Task<HashSet<string>> TakenOrganizationIdsAsync(CancellationToken cancellationToken)

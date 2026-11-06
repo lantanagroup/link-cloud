@@ -183,17 +183,6 @@ public static class KafkaTopicCatalog
     public static bool IsError(string? topic) =>
         !string.IsNullOrWhiteSpace(topic) && topic.Contains("-Error", StringComparison.Ordinal) && !IsRetry(topic) && !IsRedrive(topic);
 
-    public static string BackupTopicName(string topic, Guid migrationId)
-    {
-        var id = migrationId.ToString("N");
-        var suffix = id.Length >= 8 ? id[..8] : id;
-        return "_linkmig-" + MainName(topic) + "-" + suffix;
-    }
-
-    public const string JournalTopicName = "_linkmig-journal";
-
-    public const string MigrationHeader = "x-link-migration";
-
     private static KafkaTopicCatalogEntry Entry(
         string topic,
         KafkaTopicKeyClass keyClass,
@@ -210,6 +199,7 @@ public static class KafkaTopicCatalog
         Add(map, "AuditableEventOccurred", false, "Account and Tenant produce to this topic. Slice 2.", false, "Audit", "",
             Producers(
                 Site("Account", "DotNet/Account/Application/Commands/AuditEvent/CreateAuditEvent.cs"),
+                Site("Shared", "DotNet/Shared/Application/Auditing/KafkaAuditPublisher.cs"),
                 Site("Tenant", "DotNet/Tenant/Commands/CreateAuditEventCommand.cs"),
                 Site("Notification", "DotNet/Notification/Application/Notification/Commands/CreateAuditEventCommand/CreateAuditEventCommand.cs"),
                 Site("Report", "DotNet/Report/KafkaProducers/AuditableEventOccurredProducer.cs"),
@@ -219,9 +209,7 @@ public static class KafkaTopicCatalog
                 Site("QueryDispatch", "DotNet/QueryDispatch/Listeners/ReportScheduledEventListener.cs"),
                 Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/ScheduledReportManager.cs"),
                 Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/QueryDispatchConfigurationManager.cs"),
-                Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/PatientDispatchManager.cs"),
-                Site("Operations", "DotNet/Operations/Application/KafkaOps/KafkaOpsService.cs", control: true),
-                Site("Operations", "DotNet/Operations/Application/KafkaOps/Browse/KafkaMessageBrowser.cs", control: true)),
+                Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/PatientDispatchManager.cs")),
             Consumers(Site("Audit", "DotNet/Audit/Listeners/AuditEventListener.cs")));
         Add(map, "CernerPatientsAcquired", true, "", false, "Census", "",
             Producers(Site("DataAcquisition", "DotNet/DataAcquisition.Domain/Application/Services/Sftp/Processors/CernerCCLExtractProcessor.cs")),

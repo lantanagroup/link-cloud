@@ -44,7 +44,7 @@ public static class BackLinkRules
     // Pages the sidebar opens directly. They are where navigation starts, so they never show a back button.
     private static readonly HashSet<string> TopLevel = new(StringComparer.OrdinalIgnoreCase)
     {
-        "/", "/Home", "/Operations", "/Operations/Kafka", "/Tenants", "/Reports", "/Configuration", "/Logs", "/Automation", "/System"
+        "/", "/Home", "/Tenants", "/Reports", "/Configuration", "/Logs", "/Automation", "/System"
     };
 
     public static bool IsTopLevel(string? path) => TopLevel.Contains(StripIndex(ReturnUrlRules.CanonicalPath(path)));

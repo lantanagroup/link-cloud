@@ -8,6 +8,5 @@ public sealed class LogsLinkOptions
 {
     public const string SectionName = "LinkUi";
 
-    public string? KafkaUiUrl { get; set; }
     public string? GrafanaUrl { get; set; }
 }

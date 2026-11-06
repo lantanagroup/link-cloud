@@ -10,8 +10,6 @@ public class TopLevelBackButtonTests
     [Theory]
     [InlineData("/")]
     [InlineData("/Home")]
-    [InlineData("/Operations")]
-    [InlineData("/Operations/Kafka")]
     [InlineData("/Tenants")]
     [InlineData("/Reports/Index")]
     [InlineData("/Configuration")]
@@ -50,16 +48,6 @@ public class TopLevelBackButtonTests
             var path = "/" + link.Groups[1].Value + (link.Groups[2].Value == "Index" ? "" : "/" + link.Groups[2].Value);
             BackLinkRules.IsTopLevel(path).Should().BeTrue(path);
         }
-    }
-
-    [Fact]
-    public void Operations_opens_the_Kafka_console_directly()
-    {
-        File.Exists(RepoFile("DotNet/Link.UI/Views/Operations/Index.cshtml")).Should().BeFalse();
-        File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"))
-            .Should().Contain("asp-controller=\"Operations\" asp-action=\"Kafka\"");
-        File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/OperationsController.cs"))
-            .Should().Contain("RedirectToAction(nameof(Kafka))");
     }
 
     [Fact]

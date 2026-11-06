@@ -10,7 +10,6 @@ public class BackLinkRulesTests
     [InlineData("/Logs/Acquisition", "/Logs", null, false)]
     [InlineData("/Logs/Sftp", "/Logs", null, false)]
     [InlineData("/Logs/Audit", "/Logs", null, false)]
-    [InlineData("/Logs/Kafka", "/Logs", null, false)]
     [InlineData("/Logs", "/Logs", null, false)]
     [InlineData("/Configuration/Vendors", "/Configuration", null, false)]
     [InlineData("/System/Health", "/System", null, false)]

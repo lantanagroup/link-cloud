@@ -47,8 +47,7 @@
         "ServiceRegistry__ValidationServiceUrl": "http://localhost:8075",
         "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
         "ServiceRegistry__AdminBffServiceUrl": "http://localhost:8063",
-        "ServiceRegistry__AuditServiceUrl": "http://localhost:8062",
-        "LinkUi__KafkaUiUrl": "http://localhost:9095"
+        "ServiceRegistry__AuditServiceUrl": "http://localhost:8062"
       }
     }
   }

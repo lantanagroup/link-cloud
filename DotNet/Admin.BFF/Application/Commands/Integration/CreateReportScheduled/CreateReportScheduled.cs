@@ -1,4 +1,3 @@
-using LantanaGroup.Link.Shared.KafkaAdmin.Migration;
 using Confluent.Kafka;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
@@ -15,15 +14,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     {
         private readonly ILogger<CreateReportScheduled> _logger;
         private readonly IProducer<string, object> _producer;
-        private readonly IMigrationHoldRegistry? _holds;
         private const double DEFAULT_DELAY_MINUTES = 5;
         private const double MAX_DELAY_MINUTES = 60 * 24;
 
-        public CreateReportScheduled(ILogger<CreateReportScheduled> logger, IProducer<string, object> producer, IMigrationHoldRegistry? holds = null)
+        public CreateReportScheduled(ILogger<CreateReportScheduled> logger, IProducer<string, object> producer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _producer = producer ?? throw new ArgumentNullException(nameof(producer));
-            _holds = holds;
         }
 
         public async Task<string> Execute(ReportScheduled model, string? userId = null)
@@ -94,7 +91,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     }
                 };
 
-                await MigrationHoldGuard.RefuseIfHeldAsync(_holds, nameof(KafkaTopic.ReportScheduled), CancellationToken.None);
                 await _producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);
                 _logger.LogKafkaProducerReportScheduled(correlationId);
 
