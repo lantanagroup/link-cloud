@@ -250,6 +250,7 @@ public static class GeneralStartupExtensions
     public static void RegisterFhirAuthHandlers(this IServiceCollection services)
     {
         //Fhir Authentication Handlers
+        services.AddSingleton<FacilityAccessTokenCache>();
         services.AddSingleton<EpicAuth>();
         services.AddSingleton<BasicAuth>();
         services.AddSingleton<CustomHeaderAuth>();

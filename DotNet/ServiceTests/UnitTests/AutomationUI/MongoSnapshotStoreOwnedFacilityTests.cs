@@ -35,4 +35,29 @@ public class MongoSnapshotStoreOwnedFacilityTests
 
         MongoSnapshotStore.DistinctOwnedFacilityIds(summary).Should().Equal(facilityId, runId.ToString());
     }
+
+    [Fact]
+    public void Five_digit_facility_is_kept_and_the_run_id_is_not()
+    {
+        var summary = new AutomationRunSummary
+        {
+            RunId = Guid.NewGuid(),
+            FacilityId = "48291",
+            AutomationCreatedFacility = true
+        };
+
+        MongoSnapshotStore.DistinctOwnedFacilityIds(summary).Should().Equal("48291");
+    }
+
+    [Fact]
+    public void Five_digit_facility_without_the_created_marker_owns_nothing()
+    {
+        var summary = new AutomationRunSummary
+        {
+            RunId = Guid.NewGuid(),
+            FacilityId = "48291"
+        };
+
+        MongoSnapshotStore.DistinctOwnedFacilityIds(summary).Should().BeEmpty();
+    }
 }

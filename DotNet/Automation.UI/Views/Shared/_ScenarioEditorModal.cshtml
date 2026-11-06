@@ -72,6 +72,11 @@
                             <textarea class="form-control" id="ScenarioDescription" maxlength="500" rows="2"></textarea>
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label" for="TestRailCaseId">TestRail case</label>
+                            <input class="form-control" id="TestRailCaseId" maxlength="16" inputmode="text" autocomplete="off" placeholder="Optional" />
+                            <div class="form-text">Optional. Enter a case id such as 123 or C123.</div>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label" for="ReportMethod">Report Method</label>
                             <select class="form-select" id="ReportMethod">
                                 <option value="Adhoc">Adhoc</option>
@@ -194,11 +199,6 @@
                         <div class="col-md-3">
                             <label class="form-label" for="PatientCount">Total Patients</label>
                             <input class="form-control" type="number" id="PatientCount" value="10" readonly title="Sum of cohort patients + imported patients (read-only)." />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label" for="NhsnOrganizationId">NHSN Organization ID</label>
-                            <input class="form-control" type="text" id="NhsnOrganizationId" maxlength="64" />
-                            <div id="nhsnOrganizationHint" class="form-text"></div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label d-block">DMRP</label>
@@ -455,10 +455,15 @@
     .au-cohort-table-wrap {
         overflow: visible;
     }
+    /* The wrapper is not clipped (row dropdowns open past it), so the table must fit its width. */
+    .au-cohort-table-wrap .au-cohort-table {
+        min-width: 0;
+    }
 </style>
 
 <script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script src="~/js/patient-configuration-editor.js" asp-append-version="true"></script>
+<script src="~/js/testrail-case-id.js" asp-append-version="true"></script>
 <script>
     (function () {
         var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
@@ -562,14 +567,6 @@
         }
 
         function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
-        function generateRandomNhsnOrganizationId() {
-            var arr = new Uint32Array(1);
-            if (window.crypto && window.crypto.getRandomValues) {
-                window.crypto.getRandomValues(arr);
-                return String(10000 + (arr[0] % 90000));
-            }
-            return String(10000 + Math.floor(Math.random() * 90000));
-        }
         function esc(s) {
             return String(s == null ? '' : s)
                 .replace(/&/g, '&amp;')
@@ -822,26 +819,6 @@
         function clearFieldErrors() {
             document.querySelectorAll('#scenarioConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
             document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
-        }
-
-        function getUploadedOrganizationConflictMessage() {
-            return null;
-        }
-
-        function getSingleUploadedOrganizationId() {
-            return null;
-        }
-
-        function syncNhsnOrganizationFromUploadedPatients() {
-            var input = document.getElementById('NhsnOrganizationId');
-            var hint = document.getElementById('nhsnOrganizationHint');
-            if (!input || !hint) return;
-
-            input.classList.remove('is-invalid', 'bg-light');
-            hint.className = 'form-text';
-            hint.textContent = '';
-
-            input.readOnly = false;
         }
 
         function selectDefaultNormalizationSuite() {
@@ -1460,9 +1437,6 @@
         document.getElementById('IsMetricsRun').addEventListener('change', function () {
             syncMetricsRunUi();
         });
-        document.getElementById('EnableDmrp').addEventListener('change', function () {
-            syncDmrpUi();
-        });
         document.getElementById('FacilityModeFacility').addEventListener('change', function () {
             legacyFacilityMode = false;
             syncFacilityModeUi();
@@ -1513,22 +1487,6 @@
             if (value == null || String(value).trim() === '') return null;
             var n = parseInt(value, 10);
             return isNaN(n) ? null : n;
-        }
-
-        function syncDmrpUi() {
-            var toggle = document.getElementById('EnableDmrp');
-            var input = document.getElementById('NhsnOrganizationId');
-            var hint = document.getElementById('nhsnOrganizationHint');
-
-            if (!toggle || !input || !hint) return;
-
-            if (toggle.checked) {
-                input.required = true;
-                hint.textContent = 'Required when DMRP enrollment is enabled.';
-            } else {
-                input.required = false;
-                hint.textContent = '';
-            }
         }
 
         // ---- Imported Patients ----
@@ -1816,7 +1774,7 @@
             renderImportedEncounterCell(tr);
             reindexImported();
             updateImportedSummary();
-            syncNhsnOrganizationFromUploadedPatients();
+
         }
 
         // Renders the encounter-dates cell with an in/out-of-period indicator. Called whenever
@@ -1906,7 +1864,7 @@
                         : (res.organizationId ? String(res.organizationId).trim() : '');
                     renderImportedEncounterCell(row);
                     updateImportedSummary();
-                    syncNhsnOrganizationFromUploadedPatients();
+        
                 }
             } catch (err) {
                 showError('Classification failed: ' + (err.message || 'Unknown error'));
@@ -2059,7 +2017,7 @@
 
         importedRows.addEventListener('click', function (e) {
             var rm = e.target.closest('.btn-remove-imported');
-            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); syncNhsnOrganizationFromUploadedPatients(); return; }
+            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); return; }
             var det = e.target.closest('.btn-detect-imported');
             if (det) { classifyImportedRow(det.closest('tr')); return; }
         });
@@ -2111,6 +2069,7 @@
                 id: idInput.value || null,
                 name: document.getElementById('ScenarioName').value,
                 description: document.getElementById('ScenarioDescription').value,
+                testRailCaseId: parseTestRailCaseId(document.getElementById('TestRailCaseId').value).id,
                 isSystemScenario: false,
                 reportMethod: document.getElementById('ReportMethod').value,
                 selectedMeasures: selectedMeasureTypes(),
@@ -2121,7 +2080,6 @@
                 // configured; including imported patients here would inflate that fallback.
                 patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
                 patientCohorts: cohorts,
-                nhsnOrganizationId: (document.getElementById('NhsnOrganizationId').value || '').trim(),
                 enableDmrp: document.getElementById('EnableDmrp').checked,
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
@@ -2151,6 +2109,7 @@
             isSystemInput.value = data.isSystemScenario ? 'true' : 'false';
             document.getElementById('ScenarioName').value = data.name || '';
             document.getElementById('ScenarioDescription').value = data.description || '';
+            document.getElementById('TestRailCaseId').value = data.testRailCaseId != null ? String(data.testRailCaseId) : '';
             document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
             document.getElementById('IsLiveSimulation').checked = !!data.isLiveSimulation;
             document.getElementById('ReportingWindowMinutes').value = String(data.reportingWindowMinutes || 10);
@@ -2162,7 +2121,6 @@
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
-            document.getElementById('NhsnOrganizationId').value = (data.nhsnOrganizationId || '').trim() || generateRandomNhsnOrganizationId();
             document.getElementById('EnableDmrp').checked = !!data.enableDmrp;
             var facilityMode = data.facilityConfigurationMode;
             legacyFacilityMode = !facilityMode || facilityMode === 'Unspecified';
@@ -2265,8 +2223,7 @@
             });
             updateImportedSummary();
             syncCount();
-            syncNhsnOrganizationFromUploadedPatients();
-            syncDmrpUi();
+
             syncReportPeriodPolicyUi();
             syncLiveSimulationUi();
             syncMetricsRunUi();
@@ -2304,6 +2261,7 @@
                 setEditable(true);
                 document.getElementById('ScenarioName').value = '';
                 document.getElementById('ScenarioDescription').value = '';
+                document.getElementById('TestRailCaseId').value = '';
                 document.getElementById('ReportMethod').value = 'Adhoc';
                 document.getElementById('IsLiveSimulation').checked = false;
                 document.getElementById('ReportingWindowMinutes').value = '10';
@@ -2315,7 +2273,6 @@
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
-                document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('EnableDmrp').checked = false;
                 legacyFacilityMode = false;
                 legacyPieceIds = null;
@@ -2338,8 +2295,7 @@
                 importedRows.innerHTML = '';
                 updateImportedSummary();
                 syncCount();
-                syncNhsnOrganizationFromUploadedPatients();
-                syncDmrpUi();
+
                 syncReportPeriodPolicyUi();
                 syncLiveSimulationUi();
                 syncMetricsRunUi();
@@ -2362,15 +2318,16 @@
                 valid = false;
             }
 
-            if (model.facilityConfigurationMode === 'AlaCarte' && !model.queryPlanTemplateId) {
-                markFieldError('QueryPlanTemplate', 'Ala carte needs a query plan.');
+            var caseParsed = parseTestRailCaseId(document.getElementById('TestRailCaseId').value);
+            if (!caseParsed.ok) {
+                markFieldError('TestRailCaseId', 'TestRail case id must be a positive integer, such as 123 or C123.');
                 valid = false;
+            } else {
+                model.testRailCaseId = caseParsed.id;
             }
 
-            if (model.enableDmrp && !(model.nhsnOrganizationId || '').trim()) {
-                markFieldError(
-                    'NhsnOrganizationId',
-                    'NHSN Organization ID is required when DMRP is enabled.');
+            if (model.facilityConfigurationMode === 'AlaCarte' && !model.queryPlanTemplateId) {
+                markFieldError('QueryPlanTemplate', 'Ala carte needs a query plan.');
                 valid = false;
             }
 

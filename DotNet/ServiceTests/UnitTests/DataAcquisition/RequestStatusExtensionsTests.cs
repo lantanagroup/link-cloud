@@ -14,6 +14,7 @@ public class RequestStatusExtensionsTests
         RequestStatus.Cancelled,
         RequestStatus.ConfigurationMissing,
         RequestStatus.NotReportable,
+        RequestStatus.AccessDenied,
     ];
 
     private static readonly RequestStatus[] ExpectedCancellable =
@@ -79,6 +80,7 @@ public class RequestStatusExtensionsTests
     [InlineData(RequestStatus.Cancelled, true)]
     [InlineData(RequestStatus.ConfigurationMissing, true)]
     [InlineData(RequestStatus.NotReportable, true)]
+    [InlineData(RequestStatus.AccessDenied, true)]
     [InlineData(RequestStatus.Pending, false)]
     [InlineData(RequestStatus.Ready, false)]
     [InlineData(RequestStatus.Queued, false)]
@@ -103,6 +105,7 @@ public class RequestStatusExtensionsTests
     [InlineData(RequestStatus.Cancelled, false)]
     [InlineData(RequestStatus.ConfigurationMissing, false)]
     [InlineData(RequestStatus.NotReportable, false)]
+    [InlineData(RequestStatus.AccessDenied, false)]
     public void IsCancellable_ReturnsExpected(RequestStatus status, bool expected)
     {
         Assert.Equal(expected, status.IsCancellable());
