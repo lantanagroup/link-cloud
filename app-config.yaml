@@ -904,7 +904,7 @@ services:
       required: false
       defaultValue: "P3M"
     - key: "Retention:MaxReportsPerCleanup"
-      description: "The most reports one retention cleanup may hold. A scheduled check with more eligible reports splits them across several cleanups, each its own RetentionCheckRequested message, so no participant gets a request too large to finish within its Kafka poll interval. A whole number of at least 1. Read at startup; an invalid value stops the retention check, as for Retention:Window."
+      description: "The most reports one retention cleanup may hold. A scheduled check with more eligible reports splits them across several cleanups, each its own RetentionCheckRequested message, so no participant gets a request too large to finish within its Kafka poll interval. A whole number from 1 to 1000; the upper limit keeps one request message near 350 KB, under Kafka's default 1 MB message size. Read at startup; an invalid value stops the retention check, as for Retention:Window."
       required: false
       defaultValue: "25"
   Submission:

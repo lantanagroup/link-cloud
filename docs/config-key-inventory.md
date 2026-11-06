@@ -1540,9 +1540,9 @@ value set in a store can never take effect.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:186` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:191` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:192` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:187` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:192` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:193` |
 | `AutoMigrate` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
@@ -1568,7 +1568,7 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:99` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:193` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Report/Program.cs:194` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:158` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:44` |
@@ -1619,12 +1619,12 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `Retention:MaxReportsPerCleanup` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionCheckSettings.cs:84` |
+| `Retention:MaxReportsPerCleanup` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionCheckSettings.cs:90` |
 | `Retention:Participants` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionParticipants.cs:72` |
-| `Retention:Schedule` | dotnet | - | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:26` |
-| `Retention:Schedule:Cron` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:26` |
-| `Retention:Schedule:Enabled` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:26` |
-| `Retention:Window` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionCheckSettings.cs:83` |
+| `Retention:Schedule` | dotnet | - | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
+| `Retention:Schedule:Cron` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
+| `Retention:Schedule:Enabled` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:33` |
+| `Retention:Window` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionCheckSettings.cs:89` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
