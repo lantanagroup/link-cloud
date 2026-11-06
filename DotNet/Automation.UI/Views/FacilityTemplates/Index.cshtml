@@ -5,6 +5,12 @@
     var suites = (List<NormalizationSuiteDefinition>?)ViewBag.NormalizationSuites ?? [];
     var maps = (List<OrganizationResourceMapTemplate>?)ViewBag.OrganizationResourceMaps ?? [];
     var patients = (List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? [];
+    var currentPage = (int)ViewBag.CurrentPage;
+    var pageSize = (int)ViewBag.PageSize;
+    var totalCount = (long)ViewBag.TotalCount;
+    var totalPages = (int)ViewBag.TotalPages;
+    var firstRecord = totalCount == 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    var lastRecord = Math.Min((long)currentPage * pageSize, totalCount);
     string PieceName<T>(IEnumerable<T> items, Guid? id, Func<T, Guid> idOf, Func<T, string> nameOf) where T : class
     {
         if (!id.HasValue) return "Not configured";
@@ -34,49 +40,128 @@
                     </tr>
                 </thead>
                 <tbody>
-                @foreach (var t in Model)
-                {
-                    <tr data-name="@t.Name" data-vendor="@(t.VendorName ?? "")" data-type="@(t.IsSystem ? "System" : "Custom")">
-                        <td>
-                            <strong>@t.Name</strong>
-                            @if (t.IsDefault)
+                    @foreach (var t in Model)
+                    {
+                        <tr data-name="@t.Name" data-vendor="@(t.VendorName ?? "")" data-type="@(t.IsSystem ? "System" : "Custom")">
+                            <td>
+                                <strong>@t.Name</strong>
+                                @if (t.IsDefault)
+                                {
+                                    <span class="badge bg-success ms-1">System config</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(t.Description))
+                                {
+                                    <br />
+                            
+                                    <small class="text-muted">@t.Description</small>
+                                }
+                            </td>
+                            <td>@(string.IsNullOrWhiteSpace(t.VendorName) ? "None" : t.VendorName)</td>
+                            <td class="small">
+                                Query plan: @PieceName(queryPlans, t.QueryPlanTemplateId, q => q.Id, q => q.Name)<br />
+                                Normalization: @PieceName(suites, t.NormalizationSuiteId, s => s.Id, s => s.Name)<br />
+                                Org map: @(t.EnableOrganizationLocationMapping? PieceName(maps, t.OrganizationResourceMapTemplateId, m => m.Id, m => m.Name) : "Off")<br />
+                                Other patient configs: @(t.AllowPatientConfigurationsOutsideSet ? "Allowed" : "Not allowed")
+                            </td>
+                            <td>
+                                @if (t.IsSystem)
+                                {
+                                    <span class="badge bg-dark">System</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark border">Custom</span>
+                                }
+                            </td>
+                            <td class="text-nowrap">
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">@(t.IsSystem ? "View" : "Edit")</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-facility-clone" data-id="@t.Id">Clone</button>
+                                @if (!t.IsSystem)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-facility-delete" data-id="@t.Id">Delete</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+
+            </table>
+        </div>
+
+        <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-3">
+
+            <div class="text-muted small">
+                Showing @firstRecord–@lastRecord of @totalCount facility templates
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+
+                <form method="get"
+                      asp-controller="FacilityTemplates"
+                      asp-action="Index"
+                      class="d-flex align-items-center gap-2">
+
+                    <label for="facilityPageSize" class="small text-nowrap">
+                        Rows per page:
+                    </label>
+
+                    <select id="facilityPageSize"
+                            name="pageSize"
+                            class="form-select form-select-sm"
+                            style="width:auto;"
+                            onchange="this.form.submit()">
+
+                        @foreach (var size in new[] { 10, 25, 50, 100 })
+                        {
+                            if (size == pageSize)
                             {
-                                <span class="badge bg-success ms-1">System config</span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(t.Description))
-                            {
-                                <br /><small class="text-muted">@t.Description</small>
-                            }
-                        </td>
-                        <td>@(string.IsNullOrWhiteSpace(t.VendorName) ? "None" : t.VendorName)</td>
-                        <td class="small">
-                            Query plan: @PieceName(queryPlans, t.QueryPlanTemplateId, q => q.Id, q => q.Name)<br />
-                            Normalization: @PieceName(suites, t.NormalizationSuiteId, s => s.Id, s => s.Name)<br />
-                            Org map: @(t.EnableOrganizationLocationMapping ? PieceName(maps, t.OrganizationResourceMapTemplateId, m => m.Id, m => m.Name) : "Off")<br />
-                            Other patient configs: @(t.AllowPatientConfigurationsOutsideSet ? "Allowed" : "Not allowed")
-                        </td>
-                        <td>
-                            @if (t.IsSystem)
-                            {
-                                <span class="badge bg-dark">System</span>
+                                <option value="@size" selected>@size</option>
                             }
                             else
                             {
-                                <span class="badge bg-light text-dark border">Custom</span>
+                                <option value="@size">@size</option>
                             }
-                        </td>
-                        <td class="text-nowrap">
-                            <button type="button" class="btn btn-sm btn-outline-primary btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">@(t.IsSystem ? "View" : "Edit")</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-facility-clone" data-id="@t.Id">Clone</button>
-                            @if (!t.IsSystem)
-                            {
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-facility-delete" data-id="@t.Id">Delete</button>
-                            }
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
+                        }
+                    </select>
+
+                    <input type="hidden" name="page" value="1" />
+                </form>
+
+                <nav aria-label="Facility template pagination">
+                    <ul class="pagination pagination-sm mb-0">
+
+                        <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-controller="FacilityTemplates"
+                               asp-action="Index"
+                               asp-route-page="@(currentPage - 1)"
+                               asp-route-pageSize="@pageSize"
+                               aria-label="Previous">
+                                Previous
+                            </a>
+                        </li>
+
+                        <li class="page-item disabled">
+                            <span class="page-link">
+                                Page @currentPage of @totalPages
+                            </span>
+                        </li>
+
+                        <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-controller="FacilityTemplates"
+                               asp-action="Index"
+                               asp-route-page="@(currentPage + 1)"
+                               asp-route-pageSize="@pageSize"
+                               aria-label="Next">
+                                Next
+                            </a>
+                        </li>
+
+                    </ul>
+                </nav>
+
+            </div>
         </div>
     </div>
 </div>
@@ -164,150 +249,150 @@
 
 @Html.AntiForgeryToken()
 <script>
-(function () {
-    const modal = document.getElementById('facilityModal');
-    const backdrop = document.getElementById('facilityBackdrop');
-    const errors = document.getElementById('facilityFormErrors');
-    const saveUrl = '@Url.Action("SaveInline", "FacilityTemplates")';
-    const getUrl = '@Url.Action("GetJson", "FacilityTemplates")';
-    const cloneUrl = '@Url.Action("CloneInline", "FacilityTemplates")';
-    const deleteUrl = '@Url.Action("DeleteInline", "FacilityTemplates")';
-    function token() {
-        const field = document.querySelector('input[name="__RequestVerificationToken"]');
-        return field ? field.value : '';
-    }
-    function show() { modal.style.display = ''; backdrop.style.display = ''; }
-    function hide() { modal.style.display = 'none'; backdrop.style.display = 'none'; errors.style.display = 'none'; }
-    async function post(url, body) {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
-            body: JSON.stringify(body)
-        });
-        if (!response.ok) throw new Error((await response.text()) || ('Server ' + response.status));
-        return response.headers.get('content-type')?.includes('json') ? response.json() : null;
-    }
-    function setEditable(editable) {
-        modal.querySelectorAll('input, select, textarea').forEach(function (el) {
-            if (el.id === 'facilityId') return;
-            el.disabled = !editable;
-        });
-        document.getElementById('facilitySave').style.display = editable ? '' : 'none';
-    }
-    function selectedPatients() {
-        return Array.prototype.filter.call(document.getElementById('facilityPatients').options, function (option) {
-            return option.selected;
-        }).map(function (option) { return option.value; });
-    }
-    function applyPatients(ids) {
-        const wanted = new Set((ids || []).map(function (id) { return String(id).toLowerCase(); }));
-        Array.prototype.forEach.call(document.getElementById('facilityPatients').options, function (option) {
-            option.selected = wanted.has(String(option.value).toLowerCase());
-        });
-    }
-    function blank() {
-        document.getElementById('facilityId').value = '';
-        document.getElementById('facilityName').value = '';
-        document.getElementById('facilityVendor').value = '';
-        document.getElementById('facilityDescription').value = '';
-        document.getElementById('facilityQueryPlan').value = '';
-        document.getElementById('facilityNormalization').value = '';
-        document.getElementById('facilityOrm').value = '';
-        document.getElementById('facilityOrgMapping').checked = false;
-        document.getElementById('facilityAllowOutside').checked = true;
-        applyPatients([]);
-    }
-    function fill(model) {
-        document.getElementById('facilityId').value = model.id || '';
-        document.getElementById('facilityName').value = model.name || '';
-        document.getElementById('facilityVendor').value = model.vendorName || '';
-        document.getElementById('facilityDescription').value = model.description || '';
-        document.getElementById('facilityQueryPlan').value = model.queryPlanTemplateId || '';
-        document.getElementById('facilityNormalization').value = model.normalizationSuiteId || '';
-        document.getElementById('facilityOrm').value = model.organizationResourceMapTemplateId || '';
-        document.getElementById('facilityOrgMapping').checked = !!model.enableOrganizationLocationMapping;
-        document.getElementById('facilityAllowOutside').checked = model.allowPatientConfigurationsOutsideSet !== false;
-        applyPatients(model.allowedPatientConfigurationIds || []);
-    }
-    document.getElementById('btnNewFacility').addEventListener('click', function () {
-        blank();
-        setEditable(true);
-        document.getElementById('facilityModalTitle').textContent = 'New facility template';
-        show();
-    });
-    document.getElementById('facilityModalClose').addEventListener('click', hide);
-    document.getElementById('facilityCancel').addEventListener('click', hide);
-    document.getElementById('facilityBackdrop').addEventListener('click', hide);
-    document.getElementById('facilitySave').addEventListener('click', async function () {
-        errors.style.display = 'none';
-        if (!document.getElementById('facilityQueryPlan').value) {
-            errors.textContent = 'A facility template needs a query plan.';
-            errors.style.display = '';
-            return;
+    (function () {
+        const modal = document.getElementById('facilityModal');
+        const backdrop = document.getElementById('facilityBackdrop');
+        const errors = document.getElementById('facilityFormErrors');
+        const saveUrl = '@Url.Action("SaveInline", "FacilityTemplates")';
+        const getUrl = '@Url.Action("GetJson", "FacilityTemplates")';
+        const cloneUrl = '@Url.Action("CloneInline", "FacilityTemplates")';
+        const deleteUrl = '@Url.Action("DeleteInline", "FacilityTemplates")';
+        function token() {
+            const field = document.querySelector('input[name="__RequestVerificationToken"]');
+            return field ? field.value : '';
         }
-        if (document.getElementById('facilityOrgMapping').checked && !document.getElementById('facilityOrm').value) {
-            errors.textContent = 'Organization location mapping is on, so an organization resource map is required.';
-            errors.style.display = '';
-            return;
+        function show() { modal.style.display = ''; backdrop.style.display = ''; }
+        function hide() { modal.style.display = 'none'; backdrop.style.display = 'none'; errors.style.display = 'none'; }
+        async function post(url, body) {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) throw new Error((await response.text()) || ('Server ' + response.status));
+            return response.headers.get('content-type')?.includes('json') ? response.json() : null;
         }
-        if (!document.getElementById('facilityAllowOutside').checked && selectedPatients().length === 0) {
-            errors.textContent = 'A closed patient configuration set needs at least one patient configuration.';
-            errors.style.display = '';
-            return;
+        function setEditable(editable) {
+            modal.querySelectorAll('input, select, textarea').forEach(function (el) {
+                if (el.id === 'facilityId') return;
+                el.disabled = !editable;
+            });
+            document.getElementById('facilitySave').style.display = editable ? '' : 'none';
         }
-        const body = {
-            id: document.getElementById('facilityId').value || '00000000-0000-0000-0000-000000000000',
-            name: document.getElementById('facilityName').value,
-            description: document.getElementById('facilityDescription').value,
-            vendorName: document.getElementById('facilityVendor').value,
-            queryPlanTemplateId: document.getElementById('facilityQueryPlan').value || null,
-            normalizationSuiteId: document.getElementById('facilityNormalization').value || null,
-            organizationResourceMapTemplateId: document.getElementById('facilityOrm').value || null,
-            enableOrganizationLocationMapping: document.getElementById('facilityOrgMapping').checked,
-            allowPatientConfigurationsOutsideSet: document.getElementById('facilityAllowOutside').checked,
-            allowedPatientConfigurationIds: selectedPatients()
-        };
-        if (!body.id || body.id === '00000000-0000-0000-0000-000000000000')
-            body.id = crypto.randomUUID();
-        try {
-            await post(saveUrl, body);
-            window.location.reload();
-        } catch (err) {
-            errors.textContent = err.message || 'Save failed';
-            errors.style.display = '';
+        function selectedPatients() {
+            return Array.prototype.filter.call(document.getElementById('facilityPatients').options, function (option) {
+                return option.selected;
+            }).map(function (option) { return option.value; });
         }
-    });
-    document.querySelectorAll('.btn-facility-open').forEach(function (button) {
-        button.addEventListener('click', async function () {
-            const response = await fetch(getUrl + '?id=' + encodeURIComponent(button.dataset.id));
-            if (!response.ok) { alert(await response.text()); return; }
-            fill(await response.json());
-            const view = button.dataset.mode === 'view';
-            setEditable(!view);
-            document.getElementById('facilityModalTitle').textContent = view ? 'View facility template' : 'Edit facility template';
+        function applyPatients(ids) {
+            const wanted = new Set((ids || []).map(function (id) { return String(id).toLowerCase(); }));
+            Array.prototype.forEach.call(document.getElementById('facilityPatients').options, function (option) {
+                option.selected = wanted.has(String(option.value).toLowerCase());
+            });
+        }
+        function blank() {
+            document.getElementById('facilityId').value = '';
+            document.getElementById('facilityName').value = '';
+            document.getElementById('facilityVendor').value = '';
+            document.getElementById('facilityDescription').value = '';
+            document.getElementById('facilityQueryPlan').value = '';
+            document.getElementById('facilityNormalization').value = '';
+            document.getElementById('facilityOrm').value = '';
+            document.getElementById('facilityOrgMapping').checked = false;
+            document.getElementById('facilityAllowOutside').checked = true;
+            applyPatients([]);
+        }
+        function fill(model) {
+            document.getElementById('facilityId').value = model.id || '';
+            document.getElementById('facilityName').value = model.name || '';
+            document.getElementById('facilityVendor').value = model.vendorName || '';
+            document.getElementById('facilityDescription').value = model.description || '';
+            document.getElementById('facilityQueryPlan').value = model.queryPlanTemplateId || '';
+            document.getElementById('facilityNormalization').value = model.normalizationSuiteId || '';
+            document.getElementById('facilityOrm').value = model.organizationResourceMapTemplateId || '';
+            document.getElementById('facilityOrgMapping').checked = !!model.enableOrganizationLocationMapping;
+            document.getElementById('facilityAllowOutside').checked = model.allowPatientConfigurationsOutsideSet !== false;
+            applyPatients(model.allowedPatientConfigurationIds || []);
+        }
+        document.getElementById('btnNewFacility').addEventListener('click', function () {
+            blank();
+            setEditable(true);
+            document.getElementById('facilityModalTitle').textContent = 'New facility template';
             show();
         });
-    });
-    document.querySelectorAll('.btn-facility-clone').forEach(function (button) {
-        button.addEventListener('click', async function () {
+        document.getElementById('facilityModalClose').addEventListener('click', hide);
+        document.getElementById('facilityCancel').addEventListener('click', hide);
+        document.getElementById('facilityBackdrop').addEventListener('click', hide);
+        document.getElementById('facilitySave').addEventListener('click', async function () {
+            errors.style.display = 'none';
+            if (!document.getElementById('facilityQueryPlan').value) {
+                errors.textContent = 'A facility template needs a query plan.';
+                errors.style.display = '';
+                return;
+            }
+            if (document.getElementById('facilityOrgMapping').checked && !document.getElementById('facilityOrm').value) {
+                errors.textContent = 'Organization location mapping is on, so an organization resource map is required.';
+                errors.style.display = '';
+                return;
+            }
+            if (!document.getElementById('facilityAllowOutside').checked && selectedPatients().length === 0) {
+                errors.textContent = 'A closed patient configuration set needs at least one patient configuration.';
+                errors.style.display = '';
+                return;
+            }
+            const body = {
+                id: document.getElementById('facilityId').value || '00000000-0000-0000-0000-000000000000',
+                name: document.getElementById('facilityName').value,
+                description: document.getElementById('facilityDescription').value,
+                vendorName: document.getElementById('facilityVendor').value,
+                queryPlanTemplateId: document.getElementById('facilityQueryPlan').value || null,
+                normalizationSuiteId: document.getElementById('facilityNormalization').value || null,
+                organizationResourceMapTemplateId: document.getElementById('facilityOrm').value || null,
+                enableOrganizationLocationMapping: document.getElementById('facilityOrgMapping').checked,
+                allowPatientConfigurationsOutsideSet: document.getElementById('facilityAllowOutside').checked,
+                allowedPatientConfigurationIds: selectedPatients()
+            };
+            if (!body.id || body.id === '00000000-0000-0000-0000-000000000000')
+                body.id = crypto.randomUUID();
             try {
-                await post(cloneUrl, { id: button.dataset.id });
+                await post(saveUrl, body);
                 window.location.reload();
             } catch (err) {
-                alert(err.message || 'Clone failed');
+                errors.textContent = err.message || 'Save failed';
+                errors.style.display = '';
             }
         });
-    });
-    document.querySelectorAll('.btn-facility-delete').forEach(function (button) {
-        button.addEventListener('click', async function () {
-            if (!window.confirm('Delete this facility template?')) return;
-            try {
-                await post(deleteUrl, { id: button.dataset.id });
-                window.location.reload();
-            } catch (err) {
-                alert(err.message || 'Delete failed');
-            }
+        document.querySelectorAll('.btn-facility-open').forEach(function (button) {
+            button.addEventListener('click', async function () {
+                const response = await fetch(getUrl + '?id=' + encodeURIComponent(button.dataset.id));
+                if (!response.ok) { alert(await response.text()); return; }
+                fill(await response.json());
+                const view = button.dataset.mode === 'view';
+                setEditable(!view);
+                document.getElementById('facilityModalTitle').textContent = view ? 'View facility template' : 'Edit facility template';
+                show();
+            });
         });
-    });
-})();
+        document.querySelectorAll('.btn-facility-clone').forEach(function (button) {
+            button.addEventListener('click', async function () {
+                try {
+                    await post(cloneUrl, { id: button.dataset.id });
+                    window.location.reload();
+                } catch (err) {
+                    alert(err.message || 'Clone failed');
+                }
+            });
+        });
+        document.querySelectorAll('.btn-facility-delete').forEach(function (button) {
+            button.addEventListener('click', async function () {
+                if (!window.confirm('Delete this facility template?')) return;
+                try {
+                    await post(deleteUrl, { id: button.dataset.id });
+                    window.location.reload();
+                } catch (err) {
+                    alert(err.message || 'Delete failed');
+                }
+            });
+        });
+    })();
 </script>

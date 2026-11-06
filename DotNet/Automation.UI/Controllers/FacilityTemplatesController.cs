@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,15 +12,61 @@ public class FacilityTemplatesController(
     IPatientConfigurationStore patientConfigurationStore,
     IScenarioStore scenarioStore) : Controller
 {
+
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken ct)
+    public async Task<IActionResult> Index(
+        int page = 1,
+        int pageSize = 25,
+        CancellationToken ct = default)
     {
-        ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
-        ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
-        ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
-        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(ct);
-        return View(await store.GetAllAsync(ct));
+        // Validate pagination parameters.
+        page = Math.Max(1, page);
+
+        if (pageSize is not (10 or 25 or 50 or 100))
+            pageSize = 25;
+
+        // Get the total number of facility templates.
+        var totalCount = await store.CountAsync(ct);
+
+        // Calculate the total number of pages.
+        var totalPages = Math.Max(
+            1,
+            (int)Math.Ceiling(totalCount / (double)pageSize));
+
+        // Keep the requested page within valid bounds.
+        page = Math.Min(page, totalPages);
+
+        // Calculate the offset.
+        var skip = (page - 1) * pageSize;
+
+        // Retrieve only the requested page.
+        var templates = await store.GetPageAsync(
+            skip,
+            pageSize,
+            ct);
+
+        // Expose pagination information to the view.
+        ViewBag.CurrentPage = page;
+        ViewBag.PageSize = pageSize;
+        ViewBag.TotalCount = totalCount;
+        ViewBag.TotalPages = totalPages;
+
+        // Preserve existing dropdown data.
+        ViewBag.QueryPlanTemplates =
+            await queryPlanTemplateStore.GetAllAsync(ct);
+
+        ViewBag.NormalizationSuites =
+            await normalizationStore.GetAllSuitesAsync(ct);
+
+        ViewBag.OrganizationResourceMaps =
+            await organizationResourceMapTemplateStore.GetAllAsync(ct);
+
+        ViewBag.PatientConfigurations =
+            await patientConfigurationStore.GetAllAsync(ct);
+
+        return View(templates);
     }
+
 
     [HttpGet]
     public async Task<IActionResult> GetJson(Guid id, CancellationToken ct)

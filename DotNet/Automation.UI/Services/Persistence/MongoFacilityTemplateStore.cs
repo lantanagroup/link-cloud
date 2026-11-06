@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using MongoDB.Driver;
 
 namespace Automation.UI.Services.Persistence;
@@ -19,6 +19,34 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
         var docs = await _collection.Find(FilterDefinition<FacilityTemplateDocument>.Empty)
             .SortBy(d => d.Name)
             .ToListAsync(ct);
+        return docs.Select(ToModel).ToList();
+    }
+
+    public async Task<long> CountAsync(CancellationToken ct = default)
+    {
+        return await _collection.CountDocumentsAsync(
+            FilterDefinition<FacilityTemplateDocument>.Empty,
+            cancellationToken: ct);
+    }
+
+    public async Task<List<FacilityTemplate>> GetPageAsync(
+        int skip,
+        int take,
+        CancellationToken ct = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
+
+        var docs = await _collection
+            .Find(FilterDefinition<FacilityTemplateDocument>.Empty)
+            .Sort(
+                Builders<FacilityTemplateDocument>.Sort
+                    .Ascending(d => d.Name)
+                    .Ascending(d => d.Id))
+            .Skip(skip)
+            .Limit(take)
+            .ToListAsync(ct);
+
         return docs.Select(ToModel).ToList();
     }
 
