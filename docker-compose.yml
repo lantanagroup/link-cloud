@@ -20,6 +20,7 @@
 ## census: 8064
 ## dataacq: 8065
 ## dataacq-worker: 8078
+## admin-ui: 8066
 ## link-ui: 5258
 ## measureeval: 8067
 ## normalization: 8068
@@ -729,7 +730,24 @@ services:
        start_period: 3s
        interval: 3s
        retries: 10
-  
+
+  admin-ui:
+    image: link-admin-ui
+    container_name: link-admin-ui
+    ports:
+      - "8066:80"
+    build:
+      context: Web/Admin.UI
+    environment:
+      LINK_AUTH_REQUIRED: ${LOCAL_ADMIN_UI_AUTH_REQUIRED:-false}
+      LINK_BASE_API_URL: http://localhost:8063/api
+      GRAFANA_URL: http://localhost:3000
+      KAFKA_URL: http://localhost:9095
+    networks:
+      - link-nw
+    depends_on:
+      - admin-bff
+
   link-ui:
     image: link-ui
     container_name: link-ui
