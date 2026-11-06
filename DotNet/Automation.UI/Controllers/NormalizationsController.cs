@@ -47,10 +47,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (existing is { IsSystem: true })
             return StatusCode(StatusCodes.Status403Forbidden, "System operations cannot be modified.");
 
-        // A full-object save posts every code-system map. Keep the target system already stored
-        // on an HSLOC Map so that save cannot change it. New rows use the canonical URL.
-        if (existing != null)
-            PreserveHslocTargetSystems(model, existing);
+        // HSLOC Map always stores the NHSN URL. A posted or previously stored target
+        // cannot override it, including when rows are added or reordered.
+        ApplyHslocTargetSystems(model);
 
         var hslocError = GetHslocMapSaveError(model);
         if (hslocError != null)
@@ -140,36 +139,16 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (model.CodeSystemMaps.Count == 0)
             return "HSLOCMap requires at least one Code System Map.";
 
-        for (var i = 0; i < model.CodeSystemMaps.Count; i++)
-        {
-            var target = model.CodeSystemMaps[i].TargetSystem?.Trim() ?? string.Empty;
-            if (!string.Equals(target, MappingTargetSystems.HslocUrl, StringComparison.Ordinal))
-                return $"Code System Map #{i + 1} target system must be {MappingTargetSystems.HslocUrl}.";
-        }
-
         return null;
     }
 
-    internal static void PreserveHslocTargetSystems(
-        NormalizationOperationDefinition model,
-        NormalizationOperationDefinition existing)
+    internal static void ApplyHslocTargetSystems(NormalizationOperationDefinition model)
     {
-        if (!string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(existing.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
             return;
 
-        var incoming = model.CodeSystemMaps;
-        if (incoming.Count == 0)
-            return;
-
-        var stored = existing.CodeSystemMaps;
-        for (var i = 0; i < incoming.Count; i++)
-        {
-            var kept = i < stored.Count ? stored[i].TargetSystem?.Trim() : null;
-            incoming[i].TargetSystem = string.IsNullOrEmpty(kept)
-                ? MappingTargetSystems.HslocUrl
-                : kept;
-        }
+        foreach (var map in model.CodeSystemMaps)
+            map.TargetSystem = MappingTargetSystems.HslocUrl;
     }
 
     // ===== Sequences =====

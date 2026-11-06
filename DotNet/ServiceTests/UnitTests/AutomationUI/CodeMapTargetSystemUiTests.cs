@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using FluentAssertions;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace UnitTests.AutomationUI;
 
@@ -25,7 +27,18 @@ public class CodeMapTargetSystemUiTests
         script.Should().Contain("function lockTargetSystemInput");
         script.Should().Contain("dataset.codeMapTarget");
         script.Should().Contain("return hslocTargetSystemUrl");
-        script.Should().Contain("https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html");
+        script.Should().Contain(MappingTargetSystems.HslocUrl);
+    }
+
+    [Fact]
+    public void Js_hsloc_url_matches_MappingTargetSystems()
+    {
+        var script = File.ReadAllText(FindRepoFile(Path.Combine(
+            "DotNet", "Automation.UI", "wwwroot", "js", "code-map-target-system.js")));
+        var matches = Regex.Matches(script, @"hslocTargetSystemUrl = '([^']*)'");
+
+        matches.Count.Should().Be(1);
+        matches[0].Groups[1].Value.Should().Be(MappingTargetSystems.HslocUrl);
     }
 
     private static string FindRepoFile(string relativePath)
