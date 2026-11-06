@@ -20,6 +20,8 @@ the SFTP configuration. Exactly one of the first two is required:
 | `encounterIdLocation` | Optional. Where to read the encounter id. Defaults to `PV1-19.1`. |
 
 The acquisition must also have a processed directory or `removeAfterProcessing`, so a file is not read again on every run.
+With `mrnIdentifierSystem`, the facility must already have a FHIR Query Configuration, or saving the SFTP configuration
+returns 400: the search has no FHIR server to query without one.
 
 ### Locations
 

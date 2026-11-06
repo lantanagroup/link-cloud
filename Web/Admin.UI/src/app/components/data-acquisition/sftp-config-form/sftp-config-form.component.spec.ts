@@ -2,7 +2,7 @@ import { ChangeDetectorRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormGroup } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { DataAcquisitionService } from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
 import {
@@ -157,6 +157,20 @@ describe('SftpConfigFormComponent ADT configuration', () => {
     component.addAcquisitionConfiguration();
 
     expect(submitted().acquisitionConfigurations[0].adtConfiguration).toBeUndefined();
+  });
+
+  it('shows the detail of a rejected save', () => {
+    const detail = 'ADT Patient MRN search queries the facility\'s FHIR server.';
+    service.createSftpConfiguration.and.returnValue(throwError(() => ({
+      status: 400,
+      error: { title: 'One or more validation errors occurred.', status: 400, detail, errors: {} }
+    })));
+    const open = spyOn((component as any).snackBar, 'open');
+
+    component.addAcquisitionConfiguration();
+    component.submitConfiguration();
+
+    expect(open).toHaveBeenCalledWith(detail, '', jasmine.any(Object));
   });
 
   it('loads an existing MRN search configuration', () => {

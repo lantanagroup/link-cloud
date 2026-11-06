@@ -410,6 +410,23 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
     this.remoteDirectoryControl.updateValueAndValidity();
   }
 
+  /**
+   * The message of a failed save: a plain-text body, or the detail of an RFC Problem Details body.
+   */
+  private saveErrorMessage(err: any, fallback: string): string {
+    const body = err?.error;
+
+    if (typeof body === 'string' && body.trim().length > 0) {
+      return body;
+    }
+
+    if (typeof body?.detail === 'string' && body.detail.trim().length > 0) {
+      return body.detail;
+    }
+
+    return fallback;
+  }
+
   submitConfiguration(): void {
     if (this.configForm.valid) {
       const config: ICreateSftpConfigurationModel = {
@@ -443,7 +460,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
             this.submittedConfiguration.emit({ id: response.id, message: 'SFTP Configuration Created' });
           },
           error: (err) => {
-            this.snackBar.open(err.error || 'Failed to create SFTP configuration', '', {
+            this.snackBar.open(this.saveErrorMessage(err, 'Failed to create SFTP configuration'), '', {
               duration: 3500,
               panelClass: 'error-snackbar',
               horizontalPosition: 'end',
@@ -477,7 +494,7 @@ export class SftpConfigFormComponent implements OnInit, OnChanges {
             }
           },
           error: (err) => {
-            this.snackBar.open(err.error || 'Failed to update SFTP configuration', '', {
+            this.snackBar.open(this.saveErrorMessage(err, 'Failed to update SFTP configuration'), '', {
               duration: 3500,
               panelClass: 'error-snackbar',
               horizontalPosition: 'end',
