@@ -41,6 +41,22 @@ public static class RetentionCleanupRules
     }
 
     /// <summary>
+    /// Whether the summary and every report result in the completion carry a defined status. The JSON
+    /// converter also accepts numbers, so a status such as <c>2</c> reaches Report unless it is rejected here.
+    /// </summary>
+    public static bool HasDefinedStatuses(RetentionCheckCompleteValue completion)
+    {
+        ArgumentNullException.ThrowIfNull(completion);
+
+        if (completion.Summary is not null && !Enum.IsDefined(completion.Summary.Status))
+        {
+            return false;
+        }
+
+        return completion.Reports is null || completion.Reports.All(r => r is not null && Enum.IsDefined(r.Status));
+    }
+
+    /// <summary>
     /// Applies one reply to a result. Returns false when the reply is a duplicate or stale and changes nothing.
     /// </summary>
     /// <remarks>

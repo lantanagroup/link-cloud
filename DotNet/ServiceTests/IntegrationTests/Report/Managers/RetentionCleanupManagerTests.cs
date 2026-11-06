@@ -470,6 +470,57 @@ public class RetentionCleanupManagerTests
     }
 
     [Fact]
+    public async Task ApplyCompletionAsync_OnlyCutoffScopedParticipants_ScrubsTheReports()
+    {
+        var first = await SeedScheduleAsync();
+        var second = await SeedScheduleAsync();
+        var participants = Participants(new Dictionary<string, string?>
+        {
+            ["Retention:Participants:0:ServiceName"] = "Audit",
+            ["Retention:Participants:0:Scope"] = "Cutoff"
+        });
+        var cleanupId = (await CreateAsync(ScheduledRequest(first, second), participants))
+            .RetentionCleanupId!.Value;
+
+        var outcome = await ApplyAsync(cleanupId, new RetentionCheckCompleteValue
+        {
+            RetentionCleanupId = cleanupId.ToString(),
+            ServiceName = "Audit",
+            CompletedDateTime = Now,
+            Summary = new RetentionReportResult
+            {
+                Status = RetentionResultStatus.Completed,
+                RecordsAffected = 40,
+                CompletedDateTime = Now
+            }
+        });
+
+        Assert.Equal(RetentionCompletionOutcome.Applied, outcome);
+        Assert.Equal(RetentionCleanupStatus.Completed, (await LoadCleanupAsync(cleanupId)).Status);
+        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(first));
+        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(second));
+    }
+
+    [Fact]
+    public async Task ApplyCompletionAsync_UndefinedStatus_ThrowsAndChangesNothing()
+    {
+        var report = await SeedScheduleAsync();
+        var cleanupId = (await CreateAsync(ScheduledRequest(report), ReportAndMeasureEval()))
+            .RetentionCleanupId!.Value;
+        var reply = Completed(report, 3);
+        reply.Status = (RetentionResultStatus)2;
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => ApplyAsync(cleanupId, ReportCompletion(cleanupId, "Report", reply)));
+
+        var cleanup = await LoadCleanupAsync(cleanupId);
+        Assert.Equal(RetentionCleanupStatus.InProgress, cleanup.Status);
+        Assert.All(cleanup.Participants.SelectMany(p => p.Results),
+                   r => Assert.Equal(RetentionCleanupResultStatus.Pending, r.Status));
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, await RetentionStatusAsync(report));
+    }
+
+    [Fact]
     public async Task ApplyCompletionAsync_ParticipantsReplyConcurrently_EndsCompleted()
     {
         var reports = new List<Guid>();

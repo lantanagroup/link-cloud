@@ -153,10 +153,10 @@ moves `Partial` to `Completed`.
 
 `RetentionCheckCompleteListener` consumes `RetentionCheckComplete` and hands each completion to
 `IRetentionCleanupManager.ApplyCompletionAsync`. It commits offsets manually and routes failures through the
-shared handlers: a malformed message (no `ServiceName`, or a `RetentionCleanupId` that is not a UUID) goes to
-`RetentionCheckComplete-Error`, and anything else, such as a database fault, goes to
-`RetentionCheckComplete-Retry`. When the key and the value's `RetentionCleanupId` differ, it logs a warning
-and uses the value.
+shared handlers: a malformed message (no `ServiceName`, a `RetentionCleanupId` that is not a UUID, or a
+`Status` that is not `Completed` or `Failed`) goes to `RetentionCheckComplete-Error`, and anything else, such
+as a database fault, goes to `RetentionCheckComplete-Retry`. When the key and the value's `RetentionCleanupId`
+differ, it logs a warning and uses the value.
 
 In one transaction, the manager:
 
@@ -178,7 +178,8 @@ In one transaction, the manager:
      that result missing.
 4. Recalculates `Status` (see *Status rules*), and sets `CompletedDateTime` the first time it is `Completed`.
 5. Moves each report from `PendingDeletion` to `Scrubbed` once every report-scoped participant has
-   `Completed` it, whatever the rest of the cleanup is doing.
+   `Completed` it, whatever the rest of the cleanup is doing. When every participant is cutoff-scoped, the
+   reports move to `Scrubbed` with the first completion applied.
 
 A duplicate completion is applied like any other and changes nothing, so redelivery is harmless.
 `RecordsAffected` comes from the latest reply that changed the result, so a failure followed by a successful

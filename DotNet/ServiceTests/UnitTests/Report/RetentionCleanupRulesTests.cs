@@ -179,6 +179,53 @@ public class RetentionCleanupRulesTests
         Assert.Equal(Earlier, result.CompletedDateTime);
     }
 
+    [Fact]
+    public void HasDefinedStatuses_CompletedAndFailed_ReturnsTrue()
+    {
+        var completion = Completion(Reply(RetentionResultStatus.Completed, 1, Later),
+                                    Reply(RetentionResultStatus.Failed, 0, Later, "x"));
+
+        Assert.True(RetentionCleanupRules.HasDefinedStatuses(completion));
+    }
+
+    [Fact]
+    public void HasDefinedStatuses_UndefinedReportStatus_ReturnsFalse()
+    {
+        var completion = Completion(Reply(RetentionResultStatus.Completed, 1, Later),
+                                    Reply((RetentionResultStatus)2, 0, Later));
+
+        Assert.False(RetentionCleanupRules.HasDefinedStatuses(completion));
+    }
+
+    [Fact]
+    public void HasDefinedStatuses_UndefinedSummaryStatus_ReturnsFalse()
+    {
+        var completion = Completion();
+        completion.Reports = null;
+        completion.Summary = Reply((RetentionResultStatus)2, 0, Later);
+
+        Assert.False(RetentionCleanupRules.HasDefinedStatuses(completion));
+    }
+
+    [Fact]
+    public void HasDefinedStatuses_NullReportEntry_ReturnsFalse()
+    {
+        var completion = Completion(new RetentionReportResult[] { null! });
+
+        Assert.False(RetentionCleanupRules.HasDefinedStatuses(completion));
+    }
+
+    private static RetentionCheckCompleteValue Completion(params RetentionReportResult[] reports)
+    {
+        return new RetentionCheckCompleteValue
+        {
+            RetentionCleanupId = Guid.NewGuid().ToString(),
+            ServiceName = "MeasureEval",
+            CompletedDateTime = Later,
+            Reports = [.. reports]
+        };
+    }
+
     private static RetentionCleanupResult Result(RetentionCleanupResultStatus status,
                                                  DateTimeOffset? completedDateTime = null,
                                                  string? errorMessage = null,

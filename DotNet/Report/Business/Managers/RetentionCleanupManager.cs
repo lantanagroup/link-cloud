@@ -109,8 +109,9 @@ public class RetentionCleanupManager : IRetentionCleanupManager
             return new RetentionCleanupCreation { SkippedReportScheduleIds = skippedIds };
         }
 
+        var includedIdSet = includedIds.ToHashSet();
         var included = request.Reports
-            .Where(r => includedIds.Contains(r.ReportScheduleId))
+            .Where(r => includedIdSet.Contains(r.ReportScheduleId))
             .ToList();
         var cleanup = BuildCleanup(request, included, now);
 
@@ -154,6 +155,12 @@ public class RetentionCleanupManager : IRetentionCleanupManager
         if (string.IsNullOrWhiteSpace(completion.ServiceName))
         {
             throw new ArgumentException("A completion needs the participant's service name.", nameof(completion));
+        }
+
+        if (!RetentionCleanupRules.HasDefinedStatuses(completion))
+        {
+            throw new ArgumentException("Every status in a completion must be Completed or Failed.",
+                                        nameof(completion));
         }
 
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
@@ -206,7 +213,7 @@ public class RetentionCleanupManager : IRetentionCleanupManager
             "Applied the retention completion from {ServiceName} to cleanup {RetentionCleanupId}: {Changed} " +
             "results changed, {Unchanged} unchanged, {Missing} missing and recorded Failed, {Unknown} unknown " +
             "reports ignored. Status {PreviousStatus} -> {Status}; {ScrubbedCount} reports now Scrubbed.",
-            participant.ServiceName,
+            participant.ServiceName.SanitizeForLog(),
             cleanup.Id,
             tally.Changed,
             tally.Unchanged,
@@ -467,11 +474,14 @@ public class RetentionCleanupManager : IRetentionCleanupManager
     {
         var (changed, unchanged, missing, unknown) = (0, 0, 0, 0);
         var replies = new Dictionary<Guid, RetentionReportResult>();
+        var reportScheduleIds = cleanup.Reports
+            .Select(r => r.ReportScheduleId)
+            .ToHashSet();
 
         foreach (var reply in completion.Reports ?? [])
         {
             if (Guid.TryParse(reply.ReportScheduleId, out var id) &&
-                cleanup.Reports.Any(r => r.ReportScheduleId == id) &&
+                reportScheduleIds.Contains(id) &&
                 replies.TryAdd(id, reply))
             {
                 continue;
@@ -511,7 +521,7 @@ public class RetentionCleanupManager : IRetentionCleanupManager
                 "The retention completion from {ServiceName} for cleanup {RetentionCleanupId} listed {Count} " +
                 "reports that are not in the cleanup, are not valid ids, or appear more than once; they were " +
                 "ignored.",
-                participant.ServiceName,
+                participant.ServiceName.SanitizeForLog(),
                 cleanup.Id,
                 unknown);
         }
@@ -534,20 +544,19 @@ public class RetentionCleanupManager : IRetentionCleanupManager
         }
     }
 
-    // Cutoff-scoped participants have no per-report result, so they never hold a report back.
+    // Cutoff-scoped participants have no per-report result, so they never hold a report back. With no
+    // report-scoped participant at all, every report is ready.
     private static List<Guid> ReportsReadyToScrub(RetentionCleanup cleanup)
     {
-        var reportResults = cleanup.Participants
+        var resultsByReport = cleanup.Participants
             .Where(p => p.Scope == RetentionParticipantScope.Report)
             .SelectMany(p => p.Results)
-            .ToList();
+            .Where(r => r.RetentionCleanupReportId.HasValue)
+            .ToLookup(r => r.RetentionCleanupReportId!.Value);
 
         return cleanup.Reports
-            .Where(report =>
-            {
-                var results = reportResults.Where(r => r.RetentionCleanupReportId == report.Id).ToList();
-                return results.Count > 0 && results.All(r => r.Status == RetentionCleanupResultStatus.Completed);
-            })
+            .Where(report => resultsByReport[report.Id]
+                .All(r => r.Status == RetentionCleanupResultStatus.Completed))
             .Select(report => report.ReportScheduleId)
             .ToList();
     }

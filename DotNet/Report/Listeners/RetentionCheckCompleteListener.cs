@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
@@ -83,11 +84,12 @@ public class RetentionCheckCompleteListener : BackgroundService
 
         if (completion is null ||
             string.IsNullOrWhiteSpace(completion.ServiceName) ||
-            !Guid.TryParse(completion.RetentionCleanupId, out var retentionCleanupId))
+            !Guid.TryParse(completion.RetentionCleanupId, out var retentionCleanupId) ||
+            !RetentionCleanupRules.HasDefinedStatuses(completion))
         {
             throw new DeadLetterException(
-                "Invalid RetentionCheckComplete message: it needs a ServiceName and a RetentionCleanupId " +
-                "that is a UUID.");
+                "Invalid RetentionCheckComplete message: it needs a ServiceName, a RetentionCleanupId that is " +
+                "a UUID, and a Status of Completed or Failed on every result.");
         }
 
         if (!string.Equals(result.Message.Key, completion.RetentionCleanupId, StringComparison.OrdinalIgnoreCase))
