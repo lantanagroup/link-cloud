@@ -589,5 +589,70 @@ namespace UnitTests.Shared.Auditing
             var change = Assert.Single(audit.PropertyChanges);
             Assert.Equal(AuditOptions.MaskedValue, change.RowKey);
         }
+
+        private static TestFacility ASavedFacility(AuditInterceptorFixture fixture)
+        {
+            var facility = new TestFacility
+            {
+                FacilityName = "St Jude",
+                ScheduledReports = new TestScheduledReports { Daily = ["AcuteCare"] },
+                Channels = [new TestChannel { Name = "Email", Enabled = false }]
+            };
+
+            fixture.Context.Facilities.Add(facility);
+            fixture.Context.SaveChanges();
+
+            return facility;
+        }
+
+        [Fact]
+        public async Task AnOwnedTypeAndItsOwner_AreToldApartByTheEntityAndNotTheRowKey()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var facility = ASavedFacility(fixture);
+            audit.PropertyChanges.Clear();
+
+            //Tenant's audited facility PUT does exactly this: the owner's own column and the owned
+            //schedule both change in one save.
+            facility.FacilityName = "St Jude Children's";
+            facility.ScheduledReports.Daily = ["AcuteCare", "HSLOC"];
+            await fixture.Context.SaveChangesAsync();
+
+            Assert.Equal(2, audit.PropertyChanges.Count);
+
+            var owner = Assert.Single(audit.PropertyChanges,
+                change => change.PropertyName == nameof(TestFacility.FacilityName));
+            var owned = Assert.Single(audit.PropertyChanges,
+                change => change.PropertyName == nameof(TestScheduledReports.Daily));
+
+            Assert.Equal(nameof(TestFacility), owner.Entity);
+            Assert.Equal(nameof(TestScheduledReports), owned.Entity);
+
+            //an owned entry's primary key is the owner's, so the row key cannot tell these two
+            //apart - which is the whole reason a change names the entity it belongs to.
+            Assert.Equal(facility.Id, owner.RowKey);
+            Assert.Equal(facility.Id, owned.RowKey);
+        }
+
+        [Fact]
+        public async Task AnOwnedCollectionsRow_CarriesTheOwnersKey()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var facility = ASavedFacility(fixture);
+            audit.PropertyChanges.Clear();
+
+            facility.Channels[0].Enabled = true;
+            await fixture.Context.SaveChangesAsync();
+
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(nameof(TestChannel), change.Entity);
+            Assert.Equal(nameof(TestChannel.Enabled), change.PropertyName);
+            //an owned collection's key is the owner's plus Entity Framework's synthesized ordinal,
+            //counted from 1. It is the row's position rather than an id of its own, so reordering
+            //the collection moves it - it identifies the row within this save, not across saves.
+            Assert.Equal($"{facility.Id}|1", change.RowKey);
+        }
     }
 }
