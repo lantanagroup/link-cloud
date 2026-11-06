@@ -68,6 +68,11 @@ public class RetentionCheckCompleteListener : BackgroundService
         _transientExceptionHandler.Topic = KafkaTopic.RetentionCheckCompleteRetry.GetStringValue();
     }
 
+    /// <summary>
+    /// How long the listener waits before polling again while <c>RetentionCheckComplete</c> does not exist yet.
+    /// </summary>
+    public TimeSpan MissingTopicRetryDelay { get; init; } = TimeSpan.FromSeconds(30);
+
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -117,6 +122,7 @@ public class RetentionCheckCompleteListener : BackgroundService
         });
 
         kafkaConsumer.Subscribe(nameof(KafkaTopic.RetentionCheckComplete));
+        var missingTopicReported = false;
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -124,6 +130,8 @@ public class RetentionCheckCompleteListener : BackgroundService
             {
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                 {
+                    missingTopicReported = false;
+
                     if (result is null)
                     {
                         throw new DeadLetterException(
@@ -157,13 +165,34 @@ public class RetentionCheckCompleteListener : BackgroundService
             catch (OperationCanceledException)
             {
             }
-            catch (ConsumeException ex)
+            catch (ConsumeException ex) when (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
             {
-                if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                // Topics are created by a sync run by hand, so Report can start before this one exists. Letting
+                // the error escape would stop the whole Report host; wait and poll again instead.
+                if (!missingTopicReported)
                 {
-                    throw new OperationCanceledException(ex.Error.Reason, ex);
+                    _logger.LogError(
+                        "Topic {Topic} does not exist yet, so retention completions cannot be consumed; " +
+                        "polling again every {RetryDelay}.",
+                        nameof(KafkaTopic.RetentionCheckComplete),
+                        MissingTopicRetryDelay);
+                    missingTopicReported = true;
+                }
+                else
+                {
+                    _logger.LogDebug("Topic {Topic} still does not exist.", nameof(KafkaTopic.RetentionCheckComplete));
                 }
 
+                try
+                {
+                    await Task.Delay(MissingTopicRetryDelay, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                }
+            }
+            catch (ConsumeException ex)
+            {
                 _consumeExceptionHandler.HandleConsumeException(ex, NoFacility);
                 var offset = ex.ConsumerRecord?.TopicPartitionOffset;
 

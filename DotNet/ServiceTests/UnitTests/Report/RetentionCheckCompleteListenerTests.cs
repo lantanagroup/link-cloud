@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Models.Retention;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using UnitTests.Shared.Auditing;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Report;
@@ -135,6 +136,81 @@ public class RetentionCheckCompleteListenerTests
         await Assert.ThrowsAsync<DeadLetterException>(() => ConsumeAsync(Message(CleanupId.ToString(), null)));
 
         _manager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task StartConsumerLoop_TopicMissing_LogsOnceAndKeepsPolling()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var missingTopic = new ConsumeException(new ConsumeResult<byte[], byte[]>(),
+                                                new Error(ErrorCode.UnknownTopicOrPart));
+        var consumer = new Mock<IConsumer<string, RetentionCheckCompleteValue>>();
+        var calls = 0;
+        consumer
+            .Setup(item => item.Consume(It.IsAny<CancellationToken>()))
+            .Returns<CancellationToken>(_ =>
+            {
+                calls++;
+                if (calls <= 2)
+                {
+                    throw missingTopic;
+                }
+
+                cancellation.Cancel();
+                throw new OperationCanceledException(cancellation.Token);
+            });
+        var logger = new CapturingLogger<RetentionCheckCompleteListener>();
+        var listener = CreateListener(consumer.Object, logger);
+
+        var exception = await Record.ExceptionAsync(() => RunConsumerLoopAsync(listener, cancellation.Token));
+
+        Assert.Null(exception);
+        Assert.Equal(3, calls);
+        var error = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.Contains("does not exist yet", error.Message);
+        Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Debug);
+        _consumeHandler.Verify(item => item.HandleConsumeException(It.IsAny<ConsumeException>(), It.IsAny<string>()),
+                               Times.Never);
+    }
+
+    private RetentionCheckCompleteListener CreateListener(IConsumer<string, RetentionCheckCompleteValue> consumer,
+                                                          ILogger<RetentionCheckCompleteListener> logger)
+    {
+        var consumerFactory = new Mock<IKafkaConsumerFactory<string, RetentionCheckCompleteValue>>();
+        consumerFactory
+            .Setup(item => item.CreateConsumer(It.IsAny<ConsumerConfig>(),
+                                               It.IsAny<IDeserializer<string>>(),
+                                               It.IsAny<IDeserializer<RetentionCheckCompleteValue>>()))
+            .Returns(consumer);
+
+        return new RetentionCheckCompleteListener(
+            logger,
+            consumerFactory.Object,
+            new ServiceInformation { ServiceConfigName = "Report" },
+            _consumeHandler.Object,
+            _deadLetterHandler.Object,
+            _transientHandler.Object,
+            Mock.Of<IExceptionLogger<RetentionCheckCompleteListener>>(),
+            Mock.Of<IServiceScopeFactory>())
+        {
+            MissingTopicRetryDelay = TimeSpan.Zero
+        };
+    }
+
+    private static async Task RunConsumerLoopAsync(RetentionCheckCompleteListener listener,
+                                                   CancellationToken cancellationToken)
+    {
+        var method = typeof(RetentionCheckCompleteListener)
+            .GetMethod("StartConsumerLoop", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        try
+        {
+            await (Task)method.Invoke(listener, [cancellationToken])!;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            throw ex.InnerException;
+        }
     }
 
     private static RetentionCheckCompleteValue Completion(string retentionCleanupId, string serviceName)
