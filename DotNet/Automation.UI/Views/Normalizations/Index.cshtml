@@ -318,7 +318,7 @@
                         </div>
 
                         <div class="col-12 op-field op-field-HSLOCMap">
-                            <p class="small text-muted mb-0">HSLOCMap copies Location identifier and alias (including partOf ancestors) onto type, then applies Code System Maps. Target system must be the NHSN HSLOC URL. Do not map a parent hospital identifier if children partOf that hospital.</p>
+                            <p class="small text-muted mb-0">HSLOCMap copies Location identifier and alias (including partOf ancestors) onto type, then applies Code System Maps. Target system is the NHSN HSLOC URL and cannot be changed. Do not map a parent hospital identifier if children partOf that hospital.</p>
                         </div>
 
                         @* --- CodeMap / HSLOCMap fields --- *@
@@ -457,6 +457,7 @@
 
 @section Scripts {
 <script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
+<script src="~/js/code-map-target-system.js" asp-append-version="true"></script>
 <script>
     // -- Data from server --
     const allOperations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(operations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
@@ -544,7 +545,7 @@
         fhirPath: 'type',
         resourceType: 'Location',
         roleCodeSystem: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode',
-        hslocUrl: 'https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html',
+        hslocUrl: hslocTargetSystemUrl,
         roleCodeMaps: {
             ICU: { code: '1025-6', display: 'Trauma Critical Care' },
             ER: { code: '1108-0', display: 'Emergency Department' },
@@ -572,6 +573,14 @@
             fhirPath.value = hslocMapUiDefaults.fhirPath;
             applyHslocMapDefaultsIfEmpty();
         }
+        lockDisplayedHslocTargets();
+    }
+
+    function lockDisplayedHslocTargets() {
+        const operationType = document.getElementById('OpType').value;
+        document.querySelectorAll('#opCodeSystemMapRows .csm-target-system').forEach(input => {
+            lockTargetSystemInput(input, operationType);
+        });
     }
 
     function applyHslocMapDefaultsIfEmpty() {
@@ -648,7 +657,9 @@
         card.querySelector('.csm-add-code-map').addEventListener('click', () => addCodeMapEntryRow(entriesHost, '', { code: '', display: '' }));
 
         card.querySelector('.csm-source-system').value = item?.sourceSystem || item?.SourceSystem || '';
-        card.querySelector('.csm-target-system').value = item?.targetSystem || item?.TargetSystem || '';
+        const targetInput = card.querySelector('.csm-target-system');
+        targetInput.value = item?.targetSystem || item?.TargetSystem || '';
+        lockTargetSystemInput(targetInput, document.getElementById('OpType').value);
 
         const maps = item?.codeMaps || item?.CodeMaps || {};
         const entries = Object.entries(maps);
@@ -681,7 +692,8 @@
 
         return cards.map((card, index) => {
             const sourceSystem = (card.querySelector('.csm-source-system').value || '').trim();
-            const targetSystem = (card.querySelector('.csm-target-system').value || '').trim();
+            const targetInput = card.querySelector('.csm-target-system');
+            const targetSystem = (targetSystemDraft(targetInput) || '').trim();
             if (!sourceSystem) throw new Error(`Code System Map #${index + 1} requires Source System.`);
             if (!targetSystem) throw new Error(`Code System Map #${index + 1} requires Target System.`);
 
@@ -836,6 +848,7 @@
     document.getElementById('btnCodeMapLoadFromJson').addEventListener('click', () => {
         const parsed = parseCodeSystemMapsOrError();
         setCodeSystemMapCards(parsed);
+        lockDisplayedHslocTargets();
     });
 
     document.getElementById('btnCodeMapSyncJson').addEventListener('click', () => {
@@ -853,9 +866,11 @@
             });
         });
 
-        const codeSystemMapsFromCards = buildCodeSystemMapsFromCardsOrError();
-        const codeSystemMaps = codeSystemMapsFromCards ?? parseCodeSystemMapsOrError();
         const operationType = document.getElementById('OpType').value;
+        const codeSystemMapsFromCards = buildCodeSystemMapsFromCardsOrError();
+        const codeSystemMaps = normalizeCodeSystemMapsForSave(
+            operationType,
+            codeSystemMapsFromCards ?? parseCodeSystemMapsOrError());
         const resourceTypes = document.getElementById('OpResourceTypes').value.split(',').map(s => s.trim()).filter(Boolean);
 
         if (operationType === 'HSLOCMap') {
