@@ -41,7 +41,6 @@ public class ReviewItemsFixesTests
         var overview = Read("Views", "Home", "_Overview.cshtml");
         Assert.DoesNotContain(">UTC days<", overview);
         Assert.Contains("home-trend-axis", overview);
-        Assert.Contains("@Counts.Of(Model.BrokerCount, \"broker\")", Read("Views", "Operations", "_Brokers.cshtml"));
     }
 
     [Fact]
@@ -65,51 +64,8 @@ public class ReviewItemsFixesTests
     public void Navigating_row_actions_use_the_go_to_page_icon_and_modal_actions_keep_the_eye()
     {
         Assert.Contains("bi-box-arrow-up-right\" aria-hidden=\"true\"></i><span class=\"ms-1\">View</span></a>", Read("Views", "Tenants", "Facility.cshtml"));
-        Assert.Contains("title=\"Open record\"", Read("Views", "Operations", "_Messages.cshtml"));
-        Assert.Contains("title=\"Open group\"", Read("Views", "Operations", "_TopicConsumers.cshtml"));
         Assert.Contains("cleanup-open-report\" data-report-id=\"@report.Id\" title=\"View\"", Read("Views", "Cleanup", "Index.cshtml"));
         Assert.Contains("bi-eye", Read("Views", "Cleanup", "Index.cshtml"));
     }
 
-    [Fact]
-    public void Topic_picker_button_says_load()
-    {
-        var picker = Read("Views", "Operations", "_TopicPicker.cshtml");
-        Assert.Contains("<button class=\"btn btn-au-link\" type=\"submit\">Load</button>", picker);
-        Assert.DoesNotContain(">Open</button>", picker);
-    }
-
-    [Fact]
-    public void Topic_picker_is_a_client_side_combo_box()
-    {
-        var picker = Read("Views", "Operations", "_TopicPicker.cshtml");
-        Assert.Contains("role=\"combobox\"", picker);
-        Assert.Contains("role=\"listbox\"", picker);
-        Assert.Contains("id=\"topic-pick-toggle\"", picker);
-        Assert.Contains("id=\"topic-pick-data\"", picker);
-        Assert.Contains("OrderBy(row => row.link ? 0 : 1)", picker); Assert.Contains("KafkaTopicCatalog.PipelineStep(row.topic)", picker);
-        Assert.DoesNotContain("col-lg-8", picker);
-        var js = Read("wwwroot", "js", "kafka-ops.js");
-        Assert.Contains("aria-activedescendant", js);
-        Assert.DoesNotContain("searchTopics", js);
-        Assert.Contains(".lu-combo-list { position: absolute;", Read("wwwroot", "css", "site.css"));
-    }
-
-    [Fact]
-    public void Replica_review_summary_is_one_valid_string()
-    {
-        var js = Read("wwwroot", "js", "kafka-ops.js");
-        Assert.Contains("(lines.length === 1 ? \" header.\" : \" headers.\") + \" Nothing is produced until you hold to confirm.\";", js);
-        Assert.DoesNotContain("\" headers.\") Nothing", js);
-    }
-
-    [Fact]
-    public void Combo_keeps_the_selected_topic_and_restage_follows_its_link_without_a_form()
-    {
-        var js = Read("wwwroot", "js", "kafka-ops.js");
-        Assert.Contains("input.select(); render(input.value);", js);
-        Assert.Contains("if (term && current && term === current.toLowerCase()) term = \"\";", js);
-        Assert.Contains("li.classList.add(\"is-current\")", js);
-        Assert.Contains("if (document.getElementById(\"kafka-produce\")) {", js);
-    }
 }

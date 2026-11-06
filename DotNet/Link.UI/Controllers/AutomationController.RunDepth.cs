@@ -52,16 +52,6 @@ public sealed partial class AutomationController
             q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "total",
             stage, stageMeasure, popPage, tab);
         const string path = "/Automation/manifest";
-        var fixture = _services.GetService<KafkaOpsFixture>();
-        if (id == ReportManifestRules.SampleId && (!_engine.Ready || _manager is null) && fixture?.Active == true)
-        {
-            ViewData["Title"] = "Patient manifest";
-            ViewData["AutomationSection"] = "runs";
-            return View(
-                "~/Views/Automation/Manifest.cshtml",
-                ReportManifestRules.SampleAutomation(query, path, Url.Action(nameof(DownloadGeneratedBundle), new { id })));
-        }
-
         if (EngineOff() is { } off)
             return off;
 

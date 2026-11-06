@@ -15,10 +15,10 @@ public class DismissMarkTests
         var solidDismiss = views.Where(path => File.ReadAllText(path).Contains("btn-warning lu-result-dismiss", StringComparison.Ordinal)).ToList();
         solidDismiss.Should().BeEmpty();
 
-        foreach (var name in new[] { "_Messages.cshtml", "_Migrate.cshtml", "_Consumers.cshtml", "_ReplicationFactor.cshtml", "_Brokers.cshtml" })
+        foreach (var name in new[] { "System\\_Alerts.cshtml", "Configuration\\_Alerts.cshtml", "Logs\\_Alerts.cshtml" })
         {
-            var text = File.ReadAllText(Directory.GetFiles(Path.Combine(root, "Views"), name, SearchOption.AllDirectories).Single());
-            text.Should().Contain("class=\"lu-dismiss lu-result-dismiss\" aria-label=\"Dismiss\"");
+            var text = File.ReadAllText(Path.Combine(root, "Views", name));
+            text.Should().Contain("class=\"lu-dismiss\" aria-label=\"Dismiss\"");
             text.Should().Contain("&times;");
         }
 

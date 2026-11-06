@@ -1,8 +1,0 @@
-@model KafkaWindowPager
-<div class="lu-kafka-pager">
-    <span>Page @Model.Page of @Model.Pages. @Model.Note</span>
-    <span class="d-flex gap-2">
-        <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Previous, Enabled = !string.IsNullOrEmpty(Model.Previous) })" />
-        <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Next, Enabled = !string.IsNullOrEmpty(Model.Next) })" />
-    </span>
-</div>

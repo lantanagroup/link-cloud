@@ -75,21 +75,6 @@ public class TableLayoutGuardTests
         wrap.Groups["body"].Value.Should().Contain("overflow-wrap: break-word");
         css.Should().Contain("td:has(.btn:not(.lu-cell-copy))", "the hover copy button must not turn a value cell into an action cell");
         css.Should().NotContain("td:has(.btn),");
-        var ops = Path.Combine(root, "Views", "Operations");
-        File.ReadAllText(Path.Combine(ops, "_Messages.cshtml")).Should().Contain("<th class=\"lu-shrink\">Partition</th>");
-        File.ReadAllText(Path.Combine(ops, "_Messages.cshtml")).Should().Contain("<th class=\"lu-wrap lu-key\">Key</th>");
-        File.ReadAllText(Path.Combine(ops, "_Brokers.cshtml")).Should().Contain("<th class=\"lu-flex\">Host</th>");
-        File.ReadAllText(Path.Combine(ops, "_Topic.cshtml")).Should().Contain("<th class=\"lu-wrap\">End offset</th>");
-    }
-
-    [Fact]
-    public void Kafka_tabs_have_no_select_a_row_hint_boxes()
-    {
-        var ops = Path.Combine(Root(), "Views", "Operations");
-        File.ReadAllText(Path.Combine(ops, "_Consumers.cshtml")).Should().NotContain("Select a group to add or remove replicas.");
-        var brokers = File.ReadAllText(Path.Combine(ops, "_Brokers.cshtml"));
-        brokers.Should().NotContain("Select a broker to preview");
-        brokers.Should().NotContain("<div class=\"alert alert-secondary\" role=\"status\">@Model.Cluster.LogDirDetail</div>");
     }
 
     private static string Root()

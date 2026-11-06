@@ -201,14 +201,6 @@ public sealed class LogsController : Controller
         return View(await _logs.LoadAuditDetailAsync(id, cancellationToken));
     }
 
-    [HttpGet("Kafka")]
-    public IActionResult Kafka()
-    {
-        ViewData["Title"] = "Kafka";
-        ViewData["LogsSection"] = "kafka";
-        return View(_logs.LoadKafka());
-    }
-
     private IActionResult? RejectWideAutomation(AcquisitionQuery query)
     {
         if (!AutomationMarkRules.IsAutomation(query.Scope) || !string.IsNullOrWhiteSpace(query.FacilityId))

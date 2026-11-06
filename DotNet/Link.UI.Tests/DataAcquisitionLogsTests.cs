@@ -114,8 +114,7 @@ public class DataAcquisitionLogsTests
             "DotNet/Link.UI/Views/Logs/Audit.cshtml",
             "DotNet/Link.UI/Views/Logs/Sftp.cshtml",
             "DotNet/Link.UI/Views/Logs/SftpDetail.cshtml",
-            "DotNet/Link.UI/Views/Logs/Index.cshtml",
-            "DotNet/Link.UI/Views/Logs/Kafka.cshtml"
+            "DotNet/Link.UI/Views/Logs/Index.cshtml"
         };
         foreach (var page in pages)
         {

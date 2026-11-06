@@ -82,21 +82,13 @@ public sealed class LogsService
 
     public LogsHomePage LoadHome()
     {
-        LogsRules.TryExternalUrl(_links.KafkaUiUrl, out var kafka);
         LogsRules.TryExternalUrl(_links.GrafanaUrl, out var grafana);
         return new LogsHomePage
         {
             AcquisitionConfigured = _acquisition is not null,
             AuditConfigured = _audit is not null,
-            KafkaUrl = string.IsNullOrEmpty(kafka) ? null : kafka,
             GrafanaUrl = string.IsNullOrEmpty(grafana) ? null : grafana
         };
-    }
-
-    public KafkaPage LoadKafka()
-    {
-        LogsRules.TryExternalUrl(_links.KafkaUiUrl, out var kafka);
-        return new KafkaPage { Url = string.IsNullOrEmpty(kafka) ? null : kafka };
     }
 
     public async Task<AcquisitionCountLoad> LoadAcquisitionCountsAsync(int days, CancellationToken cancellationToken)

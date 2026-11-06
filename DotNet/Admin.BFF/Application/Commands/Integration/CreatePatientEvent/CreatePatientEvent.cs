@@ -1,4 +1,3 @@
-using LantanaGroup.Link.Shared.KafkaAdmin.Migration;
 using Confluent.Kafka;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
@@ -15,13 +14,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     {
         private readonly ILogger<CreatePatientEvent> _logger;
         private readonly IProducer<string, object> _producer;
-        private readonly IMigrationHoldRegistry? _holds;
 
-        public CreatePatientEvent(ILogger<CreatePatientEvent> logger, IProducer<string, object> producer, IMigrationHoldRegistry? holds = null)
+        public CreatePatientEvent(ILogger<CreatePatientEvent> logger, IProducer<string, object> producer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _producer = producer ?? throw new ArgumentNullException(nameof(producer));
-            _holds = holds;
         }
 
         public async Task<string> Execute(PatientEvent model, string? userId = null)
@@ -48,7 +45,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers
                 };
 
-                await MigrationHoldGuard.RefuseIfHeldAsync(_holds, nameof(KafkaTopic.PatientEvent), CancellationToken.None);
                 await _producer.ProduceAsync(nameof(KafkaTopic.PatientEvent), message);
                 _logger.LogKafkaProducerPatientEvent(correlationId);
 

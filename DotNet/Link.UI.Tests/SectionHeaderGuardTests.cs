@@ -31,9 +31,6 @@ public class SectionHeaderGuardTests
         body.Should().Contain("float: none");
         body.Should().Contain("width: 100%");
         body.Should().NotContain("margin-top: -");
-
-        File.ReadAllText(Path.Combine(Root(), "Views", "Operations", "_ProduceMessage.cshtml"))
-            .Should().Contain("<h2 class=\"card-header h5 mb-0\">Produce a message");
     }
 
     [Fact]

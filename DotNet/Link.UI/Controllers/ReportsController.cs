@@ -13,7 +13,6 @@ public sealed class ReportsController : Controller
     private readonly FacilityViewService _view;
     private readonly FacilityTestLookup _tests;
     private readonly IOptions<LinkUiFeatureOptions> _features;
-    private readonly KafkaOpsFixture _fixture;
     private readonly PatientSubmissionReader _submission;
 
     public ReportsController(
@@ -21,14 +20,12 @@ public sealed class ReportsController : Controller
         FacilityViewService view,
         FacilityTestLookup tests,
         IOptions<LinkUiFeatureOptions> features,
-        KafkaOpsFixture fixture,
         PatientSubmissionReader submission)
     {
         _reports = reports;
         _view = view;
         _tests = tests;
         _features = features;
-        _fixture = fixture;
         _submission = submission;
     }
 
@@ -247,33 +244,22 @@ public sealed class ReportsController : Controller
             q, sort, dir, typeQ, cmpQ, page, pageSize, typePage, typeSize, cmpPage, cmpSize, cmpType, "status",
             stage, stageMeasure, popPage, tab);
         var returnUrl = ReturnUrlRules.FromQuery(Request);
-        ReportManifestPage model;
-        var scale = _fixture.Active && string.Equals(Request.Query["scale"], "1", StringComparison.Ordinal);
-        if (_fixture.Active && ReportManifestRules.IsSample(facilityId, reportId))
-        {
-            model = scale
-                ? ReportManifestRules.ScaleReport(query, returnUrl)
-                : ReportManifestRules.SampleReport(query, returnUrl);
-        }
-        else
-        {
-            var route = new Dictionary<string, string>();
-            if (!string.IsNullOrWhiteSpace(facilityId))
-                route["facilityId"] = facilityId.Trim();
-            if (!string.IsNullOrWhiteSpace(reportId))
-                route["reportId"] = reportId.Trim();
-            if (!string.IsNullOrWhiteSpace(returnUrl))
-                route["returnUrl"] = returnUrl;
+        var route = new Dictionary<string, string>();
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            route["facilityId"] = facilityId.Trim();
+        if (!string.IsNullOrWhiteSpace(reportId))
+            route["reportId"] = reportId.Trim();
+        if (!string.IsNullOrWhiteSpace(returnUrl))
+            route["returnUrl"] = returnUrl;
 
-            model = await _reports.LoadManifestAsync(
-                facilityId,
-                reportId,
-                query,
-                "/Reports/Manifest",
-                route,
-                patientId => PatientMeasureHref(facilityId, reportId, patientId, returnUrl),
-                cancellationToken);
-        }
+        var model = await _reports.LoadManifestAsync(
+            facilityId,
+            reportId,
+            query,
+            "/Reports/Manifest",
+            route,
+            patientId => PatientMeasureHref(facilityId, reportId, patientId, returnUrl),
+            cancellationToken);
 
         ViewData["Title"] = "Report manifest";
         return View(model);
@@ -298,26 +284,14 @@ public sealed class ReportsController : Controller
 
         var facility = (facilityId ?? string.Empty).Sanitize().Trim();
         var report = (reportId ?? string.Empty).Sanitize().Trim();
-        var scale = _fixture.Active
-            && ReportManifestRules.IsSample(facility, report)
-            && string.Equals(Request.Query["scale"], "1", StringComparison.Ordinal);
-        var key = facility + "|" + report + "|" + patient + "|" + (scale ? "1" : "0");
+        var key = facility + "|" + report + "|" + patient;
         var index = ResourceGraphRules.Recall(key);
-        var sample = _fixture.Active && ReportManifestRules.IsSample(facility, report);
-        if (index is null && !sample)
+        if (index is null)
         {
             var streamed = await TrySubmissionAsync(facility, report, patient, which: (part ?? "summary").Sanitize().Trim().ToLowerInvariant(), key, cancellationToken);
             if (streamed.Handled)
                 return streamed.Result!;
             index = streamed.Index;
-        }
-
-        if (index is null && sample)
-        {
-            if (!ResourceGraphRules.TryFixture(patient, scale, out var spec))
-                return Problem(detail: "That patient is not on this report.", statusCode: StatusCodes.Status404NotFound);
-            index = ResourceGraphRules.Build(spec, cancellationToken);
-            ResourceGraphRules.Remember(key, index);
         }
 
         // Resources load only from the submitted patient file. There is no MeasureEval fallback.

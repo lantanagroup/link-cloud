@@ -29,7 +29,6 @@
 ## tenant: 8074
 ## validation: 8075
 ## terminology: 8076
-## operations: 8091
 ## nhsn-app-bff: 8079
 ## nhsn-app-ui: 8090
 
@@ -496,7 +495,6 @@ services:
       LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
       LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       ServiceRegistry__TerminologyServiceUrl: http://terminology:8076
-      ServiceRegistry__OperationsServiceUrl: http://operations:8079
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Redis__Password: ${REDIS_PASS}
@@ -532,43 +530,8 @@ services:
         condition: service_healthy
       terminology:
         condition: service_healthy
-      operations:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
-
-  operations:
-    image: link-operations
-    container_name: link-operations
-    environment:
-      ASPNETCORE_ENVIRONMENT: Docker
-      Authentication__EnableAnonymousAccess: ${LOCAL_AUTH_ENABLE_ANONYMOUS_ACCESS:-true}
-      LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
-      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
-      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
-      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      Redis__Password: ${REDIS_PASS}
-      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433; Initial Catalog=link-operations;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-    ports:
-      - "8091:8079"
-    build:
-      context: .
-      dockerfile: DotNet/Operations/Dockerfile
-    networks:
-      - link-nw
-    depends_on:
-      kafka_init:
-        condition: service_completed_successfully
-      mssql_init:
-        condition: service_completed_successfully
-      redis_cache:
-        condition: service_healthy
-      otel-collector:
-        condition: service_started
-      loki:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8079/health"]
 
   nhsn-app-bff:
     image: link-nhsn-app-bff
