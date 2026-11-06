@@ -1,7 +1,10 @@
 ﻿using LantanaGroup.Automation.Configuration;
+using LantanaGroup.Automation.Diagnostics;
 using LantanaGroup.Automation.Helpers;
+using Microsoft.Extensions.Logging;
 using RestSharp;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Nodes;
@@ -44,6 +47,14 @@ public class FhirDataLoader
     public Uri FhirServerBase => _baseUri;
     private readonly OAuthConfig? _oauthConfig;
     private readonly BasicAuthConfig? _basicAuthConfig;
+    private FhirOperationContext? _operationContext;
+
+    /// <summary>
+    /// Attaches run id, facility, and the logger used when a sequential upload fails.
+    /// One loader is shared by concurrent patient uploads, so the context must not
+    /// keep per-request state.
+    /// </summary>
+    public void UseOperationContext(FhirOperationContext context) => _operationContext = context;
 
     private const int MaxRetries = 3;
     private const int MaxConcurrentUploads = 4;
@@ -329,11 +340,12 @@ public class FhirDataLoader
             var bundleJson = await reader.ReadToEndAsync();
 
             var shortName = resourceName.Split(".fhir_server_data.").LastOrDefault() ?? resourceName;
-            var response = await PostBundleWithRetryAsync(bundleJson, shortName, "", output);
+            var attempt = await PostBundleWithRetryAsync(bundleJson, shortName, "", output);
+            var response = attempt.Response;
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
-                output.WriteLine("Failed response: " + response.Content);
+                ReportUploadFailure(output, shortName, "", "Load embedded bundle", attempt, record: false);
                 continue;
             }
 
@@ -468,12 +480,13 @@ public class FhirDataLoader
             {
                 var (name, json) = bundle;
                 var progress = $"[{Interlocked.Increment(ref completed)}/{bundles.Count}]";
-                var response = await PostBundleWithRetryAsync(json, name, progress, output);
+                var attempt = await PostBundleWithRetryAsync(json, name, progress, output);
+                var response = attempt.Response;
 
                 if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
                 {
                     Interlocked.Increment(ref failCount);
-                    output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
+                    ReportUploadFailure(output, name, "", "Upload transaction bundle", attempt, record: false);
                     return;
                 }
 
@@ -513,11 +526,12 @@ public class FhirDataLoader
                 ? $"[{i + 1}/{bundles.Count}]"
                 : $"{progressPrefix}[{i + 1}/{bundles.Count}]";
 
-            var response = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts, cancellationToken);
+            var attempt = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts, cancellationToken);
+            var response = attempt.Response;
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
-                output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
+                var failure = ReportUploadFailure(output, name, progressPrefix, step: null, attempt, record: true);
 
                 // Abort the sequence — later bundles depend on earlier ones.
                 for (var j = i + 1; j < bundles.Count; j++)
@@ -528,7 +542,7 @@ public class FhirDataLoader
                     output.WriteLine($"  {skippedProgress} SKIPPED {bundles[j].Name} (dependency failed)");
                 }
 
-                return false;
+                throw new OperationFailedException(failure);
             }
 
             TrackCreatedResources(response.Content, name, progress, output);
@@ -970,7 +984,9 @@ public class FhirDataLoader
         return null;
     }
 
-    private async Task<RestResponse> PostBundleWithRetryAsync(
+    private readonly record struct BundlePost(RestResponse Response, string? SentTraceId);
+
+    private async Task<BundlePost> PostBundleWithRetryAsync(
         string bundleJson,
         string name,
         string progress,
@@ -980,6 +996,7 @@ public class FhirDataLoader
     {
         var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
+        string? sentTraceId = null;
 
         for (var attempt = 1; attempt <= MaxRetries; attempt++)
         {
@@ -990,6 +1007,7 @@ public class FhirDataLoader
             if (!string.IsNullOrEmpty(_authorization))
                 request.AddHeader("Authorization", _authorization);
 
+            sentTraceId = AddExistingTraceParent(request);
             request.AddStringBody(bundleJson, DataFormat.Json);
 
             lastResponse = await _restClient.ExecuteAsync(request, cancellationToken);
@@ -1003,28 +1021,113 @@ public class FhirDataLoader
                     else
                         output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode}");
                 }
-                return lastResponse;
+                return new BundlePost(lastResponse, sentTraceId);
             }
 
             var statusCode = (int)lastResponse.StatusCode;
+            LogPostAttempt(name, attempt, statusCode);
             if (statusCode != 0 && statusCode < 500)
-            {
-                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (non-retryable)");
-                return lastResponse;
-            }
+                return new BundlePost(lastResponse, sentTraceId);
 
             if (attempt < MaxRetries)
             {
-                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, retrying in {delay.TotalSeconds:F0}s...)");
                 await Task.Delay(delay, cancellationToken);
                 delay *= 2;
             }
-            else
-            {
-                output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, giving up)");
-            }
         }
 
-        return lastResponse!;
+        return new BundlePost(lastResponse!, sentTraceId);
+    }
+
+    /// <summary>
+    /// Forwards the current activity's W3C trace id when one already exists.
+    /// Does not create an activity or invent an id.
+    /// </summary>
+    private static string? AddExistingTraceParent(RestRequest request)
+    {
+        var activity = Activity.Current;
+        if (activity == null || activity.TraceId == default)
+            return null;
+
+        var sent = activity.TraceId.ToString();
+        var flags = activity.Recorded ? "01" : "00";
+        request.AddHeader("traceparent", $"00-{sent}-{activity.SpanId}-{flags}");
+        return sent;
+    }
+
+    private void LogPostAttempt(string name, int attempt, int statusCode)
+    {
+        var logger = _operationContext?.Logger;
+        if (logger == null || !logger.IsEnabled(LogLevel.Debug))
+            return;
+
+        logger.LogDebug(
+            "FHIR POST {Name} attempt {Attempt} of {MaxRetries} returned {StatusCode}.",
+            name,
+            attempt,
+            MaxRetries,
+            statusCode);
+    }
+
+    private OperationFailure ReportUploadFailure(
+        IAutomationOutput output,
+        string name,
+        string progressPrefix,
+        string? step,
+        BundlePost attempt,
+        bool record)
+    {
+        var response = attempt.Response;
+        var failure = OperationFailureFactory.FromHttp(new OperationFailureInput
+        {
+            Name = name,
+            ProgressPrefix = progressPrefix,
+            Step = step,
+            Method = "POST",
+            Endpoint = _baseUri.AbsoluteUri,
+            StatusCode = response.StatusCode == 0 ? null : (int)response.StatusCode,
+            ReasonPhrase = FailureReason(response),
+            ResponseBody = response.Content,
+            TraceParent = HeaderValue(response, "traceparent"),
+            TraceIdHeader = HeaderValue(response, "X-Trace-Id"),
+            CorrelationId = HeaderValue(response, "X-Correlation-Id"),
+            RequestId = HeaderValue(response, "X-Request-Id"),
+            SentTraceId = attempt.SentTraceId,
+            RunId = _operationContext?.RunId,
+            FacilityId = _operationContext?.FacilityId?.Invoke(),
+            RespondingSystem = "FHIR server"
+        });
+
+        OperationFailureLog.Write(_operationContext?.Logger, failure);
+        output.WriteLine(failure.FormattedBlock);
+        if (record)
+            _operationContext?.Record?.Invoke(failure);
+        return failure;
+    }
+
+    private static string? FailureReason(RestResponse response)
+    {
+        if (!string.IsNullOrWhiteSpace(response.StatusDescription))
+            return response.StatusDescription;
+        if (response.StatusCode == 0)
+            return null;
+        return response.StatusCode.ToString();
+    }
+
+    private static string? HeaderValue(RestResponse response, string name)
+    {
+        if (response.Headers == null)
+            return null;
+
+        foreach (var header in response.Headers)
+        {
+            if (header?.Name == null || !header.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var value = header.Value?.ToString();
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
     }
 }

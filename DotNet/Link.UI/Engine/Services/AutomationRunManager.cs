@@ -1,5 +1,9 @@
-﻿using Automation.UI.Models;
+﻿using System.Text.Json;
+using System.Text.Json.Nodes;
+using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
+using LantanaGroup.Automation.Diagnostics;
 using Link.UI.Services;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -32,7 +36,10 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IPatientConfigurationStore _patientConfigurationStore;
     private readonly IMeasureTemplateStore _measureTemplateStore;
     private readonly IFacilityTemplateStore _facilityTemplateStore;
+    private readonly ITestRailPublisher _testRailPublisher;
+    private readonly bool _numericOnlyFacilityId;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
+    private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
 
     public AutomationRunManager(
         IHubContext<RunHub> hub,
@@ -51,7 +58,9 @@ public class AutomationRunManager : IAutomationRunManager
         ILivePatientEventInjector liveInjector,
         IPatientConfigurationStore patientConfigurationStore,
         IMeasureTemplateStore measureTemplateStore,
-        IFacilityTemplateStore facilityTemplateStore)
+        IFacilityTemplateStore facilityTemplateStore,
+        ITestRailPublisher testRailPublisher,
+        IOptions<FacilityIdFormatSettings> facilityIdSettings)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -67,6 +76,10 @@ public class AutomationRunManager : IAutomationRunManager
         _patientConfigurationStore = patientConfigurationStore;
         _measureTemplateStore = measureTemplateStore;
         _facilityTemplateStore = facilityTemplateStore;
+        _testRailPublisher = testRailPublisher;
+        // Tenant copies this flag into a singleton at startup. Read it the same way
+        // so a run does not disagree with the check Tenant will apply.
+        _numericOnlyFacilityId = facilityIdSettings.Value.NumericOnlyFacilityId;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -93,17 +106,41 @@ public class AutomationRunManager : IAutomationRunManager
             resolved,
             _patientConfigurationStore,
             cancellationToken);
-
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
-        var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson)
-        {
-            Initiator = await ResolveInitiatorAsync(cancellationToken)
-        };
         await RefuseIfProduceHeldAsync(cancellationToken);
-        _runs[runId] = state;
+        var initiator = await ResolveInitiatorAsync(cancellationToken);
+        MutableRunState state;
+        if (_numericOnlyFacilityId)
+            await _organizationIdGate.WaitAsync(cancellationToken);
+        try
+        {
+            var taken = _numericOnlyFacilityId
+                ? await TakenOrganizationIdsAsync(cancellationToken)
+                : new HashSet<string>(StringComparer.Ordinal);
+            var organizationId = RunOrganizationIdAllocator.Choose(
+                _numericOnlyFacilityId,
+                runId,
+                taken);
+            options = options with { NhsnOrganizationId = organizationId };
+            StampRunOrganizationId(request, organizationId);
 
-        await PersistRunInputAsync(runId, request);
-        await PersistRunSummaryAsync(state);
+            state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson)
+            {
+                FacilityId = organizationId,
+                Initiator = initiator
+            };
+            _runs[runId] = state;
+
+            // Persist before releasing the gate so the next numeric-only start,
+            // including one in another process, sees this id as ongoing.
+            await PersistRunInputAsync(runId, request);
+            await PersistRunSummaryAsync(state);
+        }
+        finally
+        {
+            if (_numericOnlyFacilityId)
+                _organizationIdGate.Release();
+        }
 
         state.ExecutionTask = Task.Run(async () =>
         {
@@ -130,14 +167,22 @@ public class AutomationRunManager : IAutomationRunManager
                 if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
                 {
                     _logger.LogInformation("Run {RunId} threw after cancellation: {Message}", state.RunId, ex.Message);
-                    return;
                 }
-
-                _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
-                state.Status = AutomationRunStatus.Failed;
-                state.Error = ex.Message;
-                state.FinishedAt = DateTimeOffset.UtcNow;
-                await BroadcastStatus(state);
+                else
+                {
+                    _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = ex.Message;
+                    state.FinishedAt = DateTimeOffset.UtcNow;
+                    await BroadcastStatus(state);
+                }
+            }
+            finally
+            {
+                // Terminal status is broadcast before the executor writes its last lines
+                // ("Run completed successfully", failure text, quiesce). Publish after
+                // those writes so TestRail gets the same log the run page shows.
+                await TryPublishToTestRailAsync(state);
             }
         }, CancellationToken.None);
 
@@ -178,6 +223,63 @@ public class AutomationRunManager : IAutomationRunManager
 
         if (holds.Contains(nameof(KafkaTopic.ReportScheduled), StringComparer.Ordinal))
             throw new TopicHeldException(nameof(KafkaTopic.ReportScheduled));
+    }
+
+    private async Task<HashSet<string>> TakenOrganizationIdsAsync(CancellationToken cancellationToken)
+    {
+        var ongoing = new List<(string? FacilityId, string? OrganizationId, bool Ongoing)>();
+        foreach (var state in _runs.Values)
+        {
+            lock (state.Sync)
+            {
+                ongoing.Add((state.FacilityId, state.Options.NhsnOrganizationId, !state.Status.IsTerminal()));
+            }
+        }
+
+        foreach (var facilityId in await _snapshotStore.GetOngoingFacilityIdsAsync(cancellationToken))
+            ongoing.Add((facilityId, null, true));
+
+        var taken = RunOrganizationIdAllocator.CollectInUse(ongoing);
+
+        // Create still rejects a soft-deleted row, and the default list hides those.
+        // CheckFacilityExistsAsync is not this check: it reports 200 without calling
+        // Tenant when CheckIfTenantExists is off.
+        using var scope = _hostServices.CreateScope();
+        var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();
+        var response = await facilityClient.GetFacilityListAsync(
+            includeDeleted: true,
+            cancellationToken: cancellationToken);
+        var existing = RunCleanupHelper.RequireFacilityList(response);
+        return RunOrganizationIdAllocator.WithExistingFacilities(taken, existing.Keys);
+    }
+
+    /// <summary>
+    /// Records this run's organization id on the input snapshot. The value is the
+    /// id allocated for the run. A scenario cannot supply a different one.
+    /// </summary>
+    private static void StampRunOrganizationId(StartScenarioRequest request, string organizationId)
+    {
+        JsonObject obj;
+        if (string.IsNullOrWhiteSpace(request.RunConfigurationJson))
+        {
+            obj = new JsonObject();
+        }
+        else
+        {
+            try
+            {
+                if (JsonNode.Parse(request.RunConfigurationJson) is not JsonObject parsed)
+                    return;
+                obj = parsed;
+            }
+            catch (JsonException)
+            {
+                return;
+            }
+        }
+
+        obj["nhsnOrganizationId"] = organizationId;
+        request.RunConfigurationJson = obj.ToJsonString();
     }
 
     private async Task PersistRunInputAsync(Guid runId, StartScenarioRequest request)
@@ -292,6 +394,36 @@ public class AutomationRunManager : IAutomationRunManager
         await _snapshotStore.UpsertRunSummaryAsync(summary, summary.FacilityId, summary.ReportId, cancellationToken);
         await _snapshotStore.CompleteRunAsync(runId, duration: null, ct: cancellationToken);
         await _orchestrator.CompleteRunAsync(runId);
+        Guid? scenarioId = null;
+        try
+        {
+            var input = await _snapshotStore.GetRunInputAsync(runId, cancellationToken);
+            scenarioId = input?.ScenarioId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not load the scenario id for TestRail publish of run {RunId}.", runId);
+        }
+
+        try
+        {
+            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            {
+                RunId = runId,
+                ScenarioId = scenarioId,
+                RunName = summary.RunName,
+                Status = summary.Status,
+                Error = summary.Error,
+                FailureDetails = summary.FailureDetails ?? [],
+                Logs = summary.Logs ?? [],
+                StartedAt = summary.StartedAt,
+                FinishedAt = summary.FinishedAt
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "TestRail publish failed for zombie scenario run {RunId}.", runId);
+        }
 
         QueueCancellationCleanup(
             runId,
@@ -728,6 +860,10 @@ public class AutomationRunManager : IAutomationRunManager
         }
         catch (Exception ex)
         {
+            var operationFailures = OperationFailedException.Collect(ex);
+            if (operationFailures.Count > 0)
+                throw new LiveInjectionException(operationFailures[0].OneLineSummary, StatusCodes.Status500InternalServerError);
+
             logFault(ex);
             throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
         }
@@ -749,17 +885,142 @@ public class AutomationRunManager : IAutomationRunManager
         {
             state.Logs.Add(line);
             if (state.Logs.Count > 4000)
+            {
                 state.Logs.RemoveRange(0, 500);
+                state.LogTrimmed = true;
+            }
+
+            BeginLogAppend(state);
+            // The store assigns a sequence number only after its Mongo calls. Overlapping
+            // appends can take those numbers out of write order, and publish sorts by them.
+            var prior = state.LogPersistChain ?? Task.CompletedTask;
+            state.LogPersistChain = prior.ContinueWith(
+                _ => PersistLogLineAsync(state, line),
+                CancellationToken.None,
+                TaskContinuationOptions.RunContinuationsAsynchronously,
+                TaskScheduler.Default).Unwrap();
         }
 
         _ = _hub.Clients.Group(state.RunId.ToString()).SendAsync("log", line);
+    }
 
-        // Persist to store (fire-and-forget, best effort)
-        _ = Task.Run(async () =>
+    private static void BeginLogAppend(MutableRunState state)
+    {
+        if (state.PendingLogAppends == 0)
+            state.LogAppendIdle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        state.PendingLogAppends++;
+    }
+
+    private void FinishLogAppend(MutableRunState state)
+    {
+        TaskCompletionSource? completed = null;
+        lock (state.Sync)
         {
-            try { await _snapshotStore.AppendLogsAsync(state.RunId, [line]); }
-            catch { /* log persistence is best-effort */ }
-        });
+            state.PendingLogAppends--;
+            if (state.PendingLogAppends == 0)
+            {
+                completed = state.LogAppendIdle;
+                state.LogAppendIdle = null;
+            }
+        }
+
+        completed?.TrySetResult();
+    }
+
+    private async Task PersistLogLineAsync(MutableRunState state, string line)
+    {
+        try
+        {
+            await _snapshotStore.AppendLogsAsync(state.RunId, [line]);
+        }
+        catch
+        {
+            // log persistence is best-effort
+            lock (state.Sync)
+                state.FailedLogAppends++;
+        }
+        finally
+        {
+            FinishLogAppend(state);
+        }
+    }
+
+    private static Task WaitForLogAppendsAsync(MutableRunState state)
+    {
+        lock (state.Sync)
+        {
+            if (state.PendingLogAppends == 0)
+                return Task.CompletedTask;
+            return state.LogAppendIdle?.Task ?? Task.CompletedTask;
+        }
+    }
+
+    private static readonly TimeSpan LogPublishWait = TimeSpan.FromSeconds(15);
+
+    private Task<(IReadOnlyList<string> Lines, bool MayBeIncomplete)> ReadLogsForPublishAsync(MutableRunState state)
+        => ReadLogsForPublishAsync(state, _snapshotStore, _logger);
+
+    /// <summary>
+    /// The Run Details page shows the persisted log once the run is no longer in memory,
+    /// and the open page has every line as it was written. The in-memory list drops the
+    /// oldest lines once it passes 4,000, so publish reads the store after those appends finish.
+    /// A stuck store must not block the result post, so the wait is bounded. When the in-memory
+    /// log is still complete, a timed-out or failed append uses that list: the store is missing
+    /// those lines. Once the in-memory list has been trimmed, the store is the only copy of the
+    /// earlier lines. The store read uses the same budget on its own token. A cancelled run has
+    /// already cancelled <see cref="MutableRunState.RunCancellation"/>, and linking that token
+    /// would skip the store and publish the trimmed list. When the list has been trimmed and an
+    /// append failed, neither copy has every line, and the publish request says so.
+    /// </summary>
+    internal static async Task<(IReadOnlyList<string> Lines, bool MayBeIncomplete)> ReadLogsForPublishAsync(
+        MutableRunState state,
+        ISnapshotStore snapshotStore,
+        ILogger logger)
+    {
+        var appendsSettled = true;
+        try
+        {
+            await WaitForLogAppendsAsync(state).WaitAsync(LogPublishWait);
+        }
+        catch (Exception ex)
+        {
+            appendsSettled = false;
+            logger.LogWarning(ex,
+                "Persisted logs for run {RunId} were still writing when TestRail publish started. Using the in-memory log.",
+                state.RunId);
+        }
+
+        bool trimmed;
+        int failedAppends;
+        lock (state.Sync)
+        {
+            trimmed = state.LogTrimmed;
+            failedAppends = state.FailedLogAppends;
+        }
+
+        // Untrimmed memory still has every line. Prefer it when the store is short.
+        // Trimmed memory plus a failed append means neither copy is complete.
+        var mayBeIncomplete = trimmed && failedAppends > 0;
+        var memoryIsComplete = !trimmed && (!appendsSettled || failedAppends > 0);
+        if (!memoryIsComplete)
+        {
+            try
+            {
+                using var readTimeout = new CancellationTokenSource(LogPublishWait);
+                var persisted = await snapshotStore.GetLogsAsync(state.RunId, readTimeout.Token);
+                if (persisted.Count > 0)
+                    return (persisted, mayBeIncomplete);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Could not read persisted logs for TestRail publish of run {RunId}. Using the in-memory log.",
+                    state.RunId);
+            }
+        }
+
+        lock (state.Sync)
+            return (state.Logs.ToList(), mayBeIncomplete);
     }
 
     private async Task BroadcastStatus(MutableRunState state)
@@ -767,6 +1028,40 @@ public class AutomationRunManager : IAutomationRunManager
         await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", ToSummary(state));
         await PersistRunSummaryAsync(state);
+    }
+
+    private async Task TryPublishToTestRailAsync(MutableRunState state)
+    {
+        if (!state.Status.IsTerminal())
+            return;
+        if (Interlocked.Exchange(ref state.TestRailPublished, 1) != 0)
+            return;
+
+        try
+        {
+            var (logs, logsMayBeIncomplete) = await ReadLogsForPublishAsync(state);
+            List<string> failureDetails;
+            lock (state.Sync)
+                failureDetails = state.FailureDetails.ToList();
+
+            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            {
+                RunId = state.RunId,
+                ScenarioId = state.ScenarioId,
+                RunName = state.RunNameOverride ?? state.Scenario.ToString(),
+                Status = state.Status,
+                Error = state.Error,
+                FailureDetails = failureDetails,
+                Logs = logs,
+                LogsMayBeIncomplete = logsMayBeIncomplete,
+                StartedAt = state.StartedAt,
+                FinishedAt = state.FinishedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "TestRail publish failed for scenario run {RunId}.", state.RunId);
+        }
     }
 
     private async Task PersistOwnershipAsync(MutableRunState state)
@@ -905,6 +1200,7 @@ public class AutomationRunManager : IAutomationRunManager
                 RetentionNotice = state.RetentionNotice,
                 InitiatedById = state.Initiator.Id,
                 InitiatedByName = state.Initiator.Name,
+                FailureDetails = state.FailureDetails.ToList(),
                 FacilityId = state.FacilityId,
                 AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,

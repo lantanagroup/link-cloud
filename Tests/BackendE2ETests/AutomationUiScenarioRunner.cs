@@ -80,6 +80,7 @@ internal static class AutomationUiScenarioRunner
     internal static Guid MultiMeasureScenarioId => new("00000000-0000-0000-0000-000000000006");
     internal static Guid MegaMultiPatientScenarioId => new("00000000-0000-0000-0000-000000000007");
     internal static Guid AdhocReportDailyAchScenarioId => new("00000000-0000-0000-0000-000000000009");
+    internal static Guid DmrpScheduledReportScenarioId => new("00000000-0000-0000-0000-000000000010");
 
     private sealed class StartScenarioApiRequest
     {

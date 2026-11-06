@@ -112,6 +112,11 @@ public interface IDataAcquisitionLogQueries
 
     Task<AcquisitionActivityCounts> GetActivityCountsAsync(int days, DateTime utcNow, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns true when any note already recorded for the log contains <paramref name="text"/>.
+    /// </summary>
+    Task<bool> HasNoteContainingAsync(long logId, string text, CancellationToken cancellationToken = default);
+
 }
 
 public sealed record AcquiredResourceCountByPatient(string PatientId, string ResourceType, int Count);
@@ -1221,6 +1226,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         return logs;
+    }
+
+    public async Task<bool> HasNoteContainingAsync(long logId, string text, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.DataAcquisitionLogNotes
+            .AsNoTracking()
+            .AnyAsync(n => n.DataAcquisitionLogId == logId && n.Note.Contains(text), cancellationToken);
     }
 
     public async Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default)

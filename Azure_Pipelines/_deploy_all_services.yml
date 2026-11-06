@@ -128,6 +128,14 @@ jobs:
         serviceName: measure
         repoName: measureeval
 
+      nhsn-app-bff:
+        serviceName: nhsn-app-bff
+        repoName: nhsn-app-bff
+
+      nhsn-app-ui:
+        serviceName: nhsn-app-ui
+        repoName: nhsn-app-ui
+
       normalization:
         serviceName: normalization
         repoName: normalization
@@ -169,7 +177,7 @@ jobs:
       script: |
         set -e
 
-        GIT_COMMIT=$(git rev-parse --short HEAD)
+        GIT_COMMIT=$(git rev-parse --short=8 HEAD | tr -d '\r\n')
         IMAGE_TAG="$(Build.SourceBranchName)-${GIT_COMMIT}"
 
         echo "Git commit: ${GIT_COMMIT}"
@@ -329,7 +337,7 @@ jobs:
       inputs:
         targetType: 'inline'
         script: |
-          GIT_COMMIT=$(git rev-parse --short HEAD)
+          GIT_COMMIT=$(git rev-parse --short=8 HEAD | tr -d '\r\n')
           echo "GIT_COMMIT: ${GIT_COMMIT}"
           echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 

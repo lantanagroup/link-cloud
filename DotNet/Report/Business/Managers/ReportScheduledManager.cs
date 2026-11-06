@@ -199,7 +199,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entity.Frequency = model.Frequency;
             entity.PayloadRootUri = model.PayloadRootUri;
             entity.Status = model.Status;
-            entity.IsDeleted = model.IsDeleted;
+            // Only delete/restore operations change deletion state; this model may be stale.
             StampCompletedDate(entity, now);
 
             var existingTypes = entity.ReportTypes.ToList();
@@ -217,7 +217,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 entity.ReportTypes.Remove(orphan);
             }
 
-            _context.Update(entity);
+            // The query tracks changes, so concurrent deletion fields are not written back.
             // The model does not carry the claim columns. A status update must not clear a claim
             // that another statement just wrote, including a stale tracked value.
             var entry = _context.Entry(entity);
@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entry.Property(e => e.ManifestClaimToken).IsModified = false;
             entry.Property(e => e.ManifestClaimedAt).IsModified = false;
             await _context.SaveChangesAsync(cancellationToken);
-            return model;
+            return await SingleAsync(r => r.Id == model.Id, cancellationToken);
         }
 
         public async Task<ManifestClaimResult> TryClaimManifestAsync(Guid reportScheduleId, Guid claimToken, CancellationToken cancellationToken = default)
@@ -534,13 +534,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            // Batching for Submitted reports
+            // Batching for reports
             List<ReportSchedule> batch;
             do
             {
                 batch = await _context.ReportSchedule
                     .Where(r => r.FacilityId == facilityId &&
-                                ScheduleStatusExtensions.TerminalStatuses.Contains(r.Status) &&
+                                (ScheduleStatusExtensions.TerminalStatuses.Contains(r.Status) ||
+                                 (deleted && (r.Status == ScheduleStatus.New || r.Status == ScheduleStatus.EndOfPeriod))) &&
                                 (deleted
                                     ? !r.IsDeleted.HasValue || r.IsDeleted == false
                                     : r.IsDeleted == true))
@@ -551,16 +552,25 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
                 foreach (var r in batch)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (deleted)
+                    {
+                        // A tracked report may have completed since it was loaded.
+                        await _context.Entry(r).ReloadAsync(cancellationToken);
+                    }
+
                     r.IsDeleted = deleted;
                     r.ModifyDate = now.UtcDateTime;
-                    // A finished report ages from CompletedDate, so deleting it records no date, and restoring clears any.
-                    if (!deleted)
+                    if (deleted)
+                    {
+                        StampSoftDeletedDate(r, now);
+                    }
+                    else
                     {
                         r.SoftDeletedDate = null;
                     }
                 }
 
-                _context.ReportSchedule.UpdateRange(batch);
                 await _context.SaveChangesAsync(cancellationToken);
             }
             while (batch.Count == BatchSize);

@@ -23,12 +23,14 @@ public class AutomationRunSummary
     /// <summary>Who started the run (Admin.BFF user email or id). Sent as the audit initiator on background service calls.</summary>
     public string? InitiatedById { get; set; }
     public string? InitiatedByName { get; set; }
+    /// <summary>Formatted operation-failure blocks, capped when recorded. Empty when the run had none.</summary>
+    public IReadOnlyList<string> FailureDetails { get; set; } = [];
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
     public string? Duration { get; set; }
     public string? FacilityId { get; set; }
     /// <summary>
-    /// True when this run created <see cref="FacilityId"/>. A differing id that already
-    /// existed, such as a DMRP NHSN organization, is not an Automation leftover.
+    /// True when this run created <see cref="FacilityId"/>. Leftover cleanup deletes a
+    /// facility id other than the run id only when this is set.
     /// </summary>
     public bool AutomationCreatedFacility { get; set; }
     public string? ReportId { get; set; }

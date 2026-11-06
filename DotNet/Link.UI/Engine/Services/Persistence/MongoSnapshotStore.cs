@@ -123,6 +123,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.Set(r => r.FinishedAt, summary.FinishedAt),
             Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
             Builders<AutomationRunDocument>.Update.Set(r => r.RetentionNotice, summary.RetentionNotice),
+            Builders<AutomationRunDocument>.Update.Set(r => r.FailureDetails, summary.FailureDetails?.ToList() ?? []),
             Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status.IsInProgress() && summary.Status != AutomationRunStatus.CollectingMetrics),
@@ -172,6 +173,21 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var docs = await _runs.Find(r => r.IsActive).ToListAsync(ct);
         return docs.Select(ToMeta).ToList();
+    }
+
+    public async Task<IReadOnlyCollection<string>> GetOngoingFacilityIdsAsync(CancellationToken ct = default)
+    {
+        var terminal = new[]
+        {
+            AutomationRunStatus.Succeeded.ToString(),
+            AutomationRunStatus.Failed.ToString(),
+            AutomationRunStatus.Cancelled.ToString()
+        };
+        var filter = Builders<AutomationRunDocument>.Filter.And(
+            Builders<AutomationRunDocument>.Filter.Nin(r => r.Status, terminal),
+            Builders<AutomationRunDocument>.Filter.Ne(r => r.FacilityId, string.Empty));
+
+        return await _runs.Find(filter).Project(r => r.FacilityId).ToListAsync(ct);
     }
 
     public async Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default)
@@ -530,6 +546,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             RetentionNotice = doc.RetentionNotice,
             InitiatedById = doc.InitiatedById,
             InitiatedByName = doc.InitiatedByName,
+            FailureDetails = doc.FailureDetails ?? [],
             Duration = Link.UI.Services.RunDuration.Resolve(
                 doc.Duration,
                 doc.Status,
