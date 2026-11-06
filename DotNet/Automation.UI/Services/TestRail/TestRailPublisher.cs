@@ -631,6 +631,18 @@ public sealed class TestRailPublisher(
             sb.AppendLine($"Run: {request.RunName}");
         if (!string.IsNullOrWhiteSpace(request.Error))
             sb.AppendLine($"Error: {request.Error}");
+
+        if (request.FailureDetails.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Failure details:");
+            foreach (var block in request.FailureDetails)
+            {
+                sb.AppendLine(block);
+                sb.AppendLine();
+            }
+        }
+
         return sb.ToString().TrimEnd();
     }
 
@@ -684,6 +696,13 @@ public sealed class TestRailPublisher(
     {
         var sb = new StringBuilder();
         sb.AppendLine($"{result.ServiceName} :: {result.EndpointName}");
+        var failureBlock = ApiHealthFailureText.Format(result);
+        if (!string.IsNullOrWhiteSpace(failureBlock))
+        {
+            sb.AppendLine();
+            sb.AppendLine(failureBlock);
+            sb.AppendLine();
+        }
         if (result.Skipped)
             sb.AppendLine($"Skipped: {result.SkipReason}");
         if (!string.IsNullOrWhiteSpace(result.ErrorMessage))

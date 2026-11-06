@@ -2,6 +2,7 @@
 using System.Text.Json.Nodes;
 using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Automation.Diagnostics;
 using Automation.UI.Services.TestRail;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -365,6 +366,7 @@ public class AutomationRunManager : IAutomationRunManager
                 RunName = summary.RunName,
                 Status = summary.Status,
                 Error = summary.Error,
+                FailureDetails = summary.FailureDetails ?? [],
                 Logs = summary.Logs ?? [],
                 StartedAt = summary.StartedAt,
                 FinishedAt = summary.FinishedAt
@@ -781,6 +783,10 @@ public class AutomationRunManager : IAutomationRunManager
         }
         catch (Exception ex)
         {
+            var operationFailures = OperationFailedException.Collect(ex);
+            if (operationFailures.Count > 0)
+                throw new LiveInjectionException(operationFailures[0].OneLineSummary, StatusCodes.Status500InternalServerError);
+
             logFault(ex);
             throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
         }
@@ -957,6 +963,10 @@ public class AutomationRunManager : IAutomationRunManager
         try
         {
             var (logs, logsMayBeIncomplete) = await ReadLogsForPublishAsync(state);
+            List<string> failureDetails;
+            lock (state.Sync)
+                failureDetails = state.FailureDetails.ToList();
+
             await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
             {
                 RunId = state.RunId,
@@ -964,6 +974,7 @@ public class AutomationRunManager : IAutomationRunManager
                 RunName = state.RunNameOverride ?? state.Scenario.ToString(),
                 Status = state.Status,
                 Error = state.Error,
+                FailureDetails = failureDetails,
                 Logs = logs,
                 LogsMayBeIncomplete = logsMayBeIncomplete,
                 StartedAt = state.StartedAt,
@@ -1109,6 +1120,7 @@ public class AutomationRunManager : IAutomationRunManager
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
+                FailureDetails = state.FailureDetails.ToList(),
                 FacilityId = state.FacilityId,
                 AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,

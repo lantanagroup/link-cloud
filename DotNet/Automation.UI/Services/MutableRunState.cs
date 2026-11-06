@@ -38,6 +38,7 @@ internal sealed class MutableRunState(
     public string? ReportId { get; set; }
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
     public string? Error { get; set; }
+    public List<string> FailureDetails { get; } = [];
     public List<string> Logs { get; } = [];
     /// <summary>
     /// Appends still writing this run's log to the store. Publish waits on
