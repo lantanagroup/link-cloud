@@ -35,6 +35,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IMeasureTemplateStore _measureTemplateStore;
     private readonly IFacilityTemplateStore _facilityTemplateStore;
     private readonly ITestRailPublisher _testRailPublisher;
+    private readonly TestRailRunLinkRecorder _testRailRunLinks;
     private readonly bool _numericOnlyFacilityId;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
     private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
@@ -92,35 +93,8 @@ public class AutomationRunManager : IAutomationRunManager
             configuration,
             _logger,
             liveInjector);
+        _testRailRunLinks = new TestRailRunLinkRecorder(_hub, _logger, _snapshotStore);
     }
-
-    /// <summary>
-    /// Records TestRail links against a store and hub without starting a run.
-    /// </summary>
-    internal AutomationRunManager(
-        IHubContext<RunHub> hub,
-        ILogger<AutomationRunManager> logger,
-        ISnapshotStore snapshotStore)
-    {
-        _hub = hub;
-        _logger = logger;
-        _snapshotStore = snapshotStore;
-        _automationConfig = new AutomationConfig();
-        _hostServices = null!;
-        _orchestrator = null!;
-        _queryPlanResolver = null!;
-        _normalizationSuiteResolver = null!;
-        _organizationResourceMapResolver = null!;
-        _dashboardAggregator = null!;
-        _runExecutor = null!;
-        _liveInjector = null!;
-        _patientConfigurationStore = null!;
-        _measureTemplateStore = null!;
-        _facilityTemplateStore = null!;
-        _testRailPublisher = null!;
-    }
-
-    internal void TrackRun(MutableRunState state) => _runs[state.RunId] = state;
 
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
@@ -909,62 +883,19 @@ public class AutomationRunManager : IAutomationRunManager
     /// Stores TestRail runs that accepted this automation run's results.
     /// The same run id is kept once. A missing automation run is left unchanged.
     /// </summary>
-    internal async Task RecordTestRailRunsAsync(
+    internal Task RecordTestRailRunsAsync(
         Guid runId,
         IReadOnlyList<TestRailRunReference> runs,
         CancellationToken cancellationToken = default)
     {
-        if (runs == null || runs.Count == 0)
-            return;
-
-        if (_runs.TryGetValue(runId, out var state))
-        {
-            bool added;
-            lock (state.Sync)
-                added = TestRailRunLinks.AddDistinct(state.TestRailRuns, runs);
-            if (!added)
-                return;
-
-            // The hub must not advertise a link the summary write did not keep.
-            if (!await TryPersistRunSummaryAsync(state))
-                return;
-
-            try
-            {
-                await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state), cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not push the TestRail run link for {RunId}.", runId);
-            }
-
-            return;
-        }
-
-        var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
-        if (summary == null || !TestRailRunLinks.AddDistinct(summary.TestRailRuns, runs))
-            return;
-
-        try
-        {
-            // A disconnect on the status request must not drop a link that was already published.
-            await _snapshotStore.UpsertRunSummaryAsync(
-                summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to persist the TestRail run link for {RunId}.", runId);
-            return;
-        }
-
-        try
-        {
-            await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not push the TestRail run link for {RunId}.", runId);
-        }
+        _runs.TryGetValue(runId, out var state);
+        return _testRailRunLinks.RecordAsync(
+            runId,
+            runs,
+            state,
+            TryPersistRunSummaryAsync,
+            ToSummary,
+            cancellationToken);
     }
 
     private async Task PersistOwnershipAsync(MutableRunState state)
