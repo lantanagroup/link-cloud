@@ -14,7 +14,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers;
 public class RetentionCheckRequestedProducer : IRetentionCheckRequestedPublisher
 {
     /// <summary>
-    /// The Kafka client id of the producer.
+    /// The Kafka client id requested for the producer. The shared KafkaProducerFactory currently replaces it
+    /// with KafkaConnection's client id, as it does for every Report producer.
     /// </summary>
     public const string ClientId = "Report_RetentionCheckRequested";
 
