@@ -319,7 +319,8 @@ public static class OperationFailureFactory
         if (string.IsNullOrWhiteSpace(traceParent))
             return null;
 
-        // W3C traceparent: version-trace-id-parent-id-flags. Version ff and an all-zero id are invalid.
+        // W3C traceparent: version-trace-id-parent-id-flags, all lowercase hex.
+        // Version ff and an all-zero id are invalid.
         var parts = traceParent.Split('-', StringSplitOptions.TrimEntries);
         if (parts.Length != 4)
             return null;
@@ -328,13 +329,13 @@ public static class OperationFailureFactory
         var traceId = parts[1];
         var parentId = parts[2];
         var flags = parts[3];
-        if (!IsHex(version, 2, lowerOnly: false) || version.Equals("ff", StringComparison.OrdinalIgnoreCase))
+        if (!IsHex(version, 2, lowerOnly: true) || version.Equals("ff", StringComparison.Ordinal))
             return null;
         if (!IsHex(traceId, 32, lowerOnly: true) || IsAllZero(traceId))
             return null;
-        if (!IsHex(parentId, 16, lowerOnly: false) || IsAllZero(parentId))
+        if (!IsHex(parentId, 16, lowerOnly: true) || IsAllZero(parentId))
             return null;
-        if (!IsHex(flags, 2, lowerOnly: false))
+        if (!IsHex(flags, 2, lowerOnly: true))
             return null;
 
         return traceId;

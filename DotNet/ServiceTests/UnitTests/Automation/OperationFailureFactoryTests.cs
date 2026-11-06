@@ -149,6 +149,9 @@ public class OperationFailureFactoryTests
     [InlineData("00-00000000000000000000000000000000-bbbbbbbbbbbbbbbb-01")]
     [InlineData("00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-0000000000000000-01")]
     [InlineData("00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-0g")]
+    [InlineData("00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-BBBBBBBBBBBBBBBB-01")]
+    [InlineData("00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-0A")]
+    [InlineData("0A-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01")]
     public void Malformed_or_all_zero_traceparent_falls_back_to_the_response_trace_header(string traceParent)
     {
         var failure = OperationFailureFactory.FromHttp(Sample(
@@ -180,9 +183,7 @@ public class OperationFailureFactoryTests
     [Fact]
     public void Sanitizer_strips_userinfo_bearer_tokens_and_secret_query_values()
     {
-        var body = """
-            {"resourceType":"OperationOutcome","issue":[{"diagnostics":"see Authorization: Bearer secret-token and access_token"}]} // trufflehog:ignore
-            """;
+        var body = "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"diagnostics\":\"see Authorization: Bearer secret-token and access_token Bearer secret-token \"}],\"password\":\"hunter2\",\"client_secret\":\"s3cret\"}"; // trufflehog:ignore
         var failure = OperationFailureFactory.FromHttp(new OperationFailureInput
         {
             Name = "patient-1_chunk01",
@@ -190,7 +191,7 @@ public class OperationFailureFactoryTests
             Method = "POST",
             Endpoint = "https://user:pass@fhir.example/fhir?token=abc&access_token=def&code=ghi&patient=1", // trufflehog:ignore
             StatusCode = 500,
-            ResponseBody = body + " Bearer secret-token {\"password\":\"hunter2\",\"client_secret\":\"s3cret\"}", // trufflehog:ignore
+            ResponseBody = body,
             CorrelationId = "corr-1",
             RequestId = "req-1",
             RunId = "run-1",
@@ -208,6 +209,7 @@ public class OperationFailureFactoryTests
         failure.TechnicalDetails.Should().NotContain("s3cret"); // trufflehog:ignore
         failure.TechnicalDetails.Should().Contain("Bearer [redacted]");
         failure.TechnicalDetails.Should().Contain("\"password\":\"[redacted]\"");
+        failure.Details.Should().Be("see Authorization: [redacted] and access_token Bearer [redacted]");
         failure.Details.Should().NotContain("secret-token"); // trufflehog:ignore
         failure.FormattedBlock.Should().NotContain("patient-1_chunk01\":");
     }
