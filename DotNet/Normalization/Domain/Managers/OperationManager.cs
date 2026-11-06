@@ -109,6 +109,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     await _database.Operations.AddAsync(created, cancellationToken);
                     await _database.SaveChangesAsync(cancellationToken);
 
+                    // Operation row first, then its resource types, then vendor presets.
+                    await _operationSequenceQueries.LockOperationAsync(created.Id, cancellationToken);
                     await UpdateOperationResourceTypesForOperation(created.Id, model.ResourceTypes, cancellationToken);
                     await UpdateVendorPresetsForOperation(created.Id, model.VendorVersionIds, cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
@@ -277,6 +279,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 return;
             }
 
+            // Facility creates send an empty list. There is nothing to write, and locking
+            // the operation to scan preset rows deadlocks other creates. An empty list still
+            // clears presets when this operation already has some.
+            if (vendorVersionIds.Count == 0 && !await OperationHasVendorPresetsAsync(operationId, cancellationToken))
+            {
+                return;
+            }
+
             var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(vendorVersionIds, cancellationToken);
             var ownsTransaction = !_database.HasActiveTransaction;
             var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
@@ -305,6 +315,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     await transaction.DisposeAsync();
                 }
             }
+        }
+
+        private Task<bool> OperationHasVendorPresetsAsync(Guid operationId, CancellationToken cancellationToken)
+        {
+            return _database.VendorVersionOperationPresets.AnyAsync(
+                preset => preset.OperationResourceType.OperationId == operationId,
+                cancellationToken);
         }
 
         private async Task SaveVendorPresetsAsync(Guid operationId, List<Guid> vendorVersionIds, IEnumerable<Guid> resolvedVendorVersionIds, CancellationToken cancellationToken)
@@ -772,14 +789,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         private async Task<T> ExecuteWithDeadlockRetryAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
         {
-            const int maxAttempts = 8;
             for (var attempt = 1; ; attempt++)
             {
                 try
                 {
                     return await action();
                 }
-                catch (Exception ex) when (attempt < maxAttempts && IsSqlDeadlock(ex))
+                catch (Exception ex) when (attempt < SqlDeadlock.MaxAttempts && SqlDeadlock.IsDeadlock(ex))
                 {
                     if (_database.HasActiveTransaction)
                     {
@@ -797,26 +813,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(25, 80) * attempt), cancellationToken);
                 }
             }
-        }
-
-        private static bool IsSqlDeadlock(Exception exception)
-        {
-            for (var current = exception; current != null; current = current.InnerException)
-            {
-                if (current.GetType().Name == "SqlException"
-                    && current.GetType().GetProperty("Number")?.GetValue(current) is int number
-                    && number == 1205)
-                {
-                    return true;
-                }
-
-                if (current.Message.Contains("was deadlocked", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         public async Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel model, CancellationToken cancellationToken = default)
