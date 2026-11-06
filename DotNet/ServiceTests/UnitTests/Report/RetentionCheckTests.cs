@@ -200,6 +200,77 @@ public class RetentionCheckTests
     }
 
     [Fact]
+    public async Task RunAsync_SomeReportsAlreadyTaken_PublishesTheRestAndCountsBoth()
+    {
+        var batch = Reports(3);
+        SetupBatches(batch);
+        var cleanupId = Guid.NewGuid();
+        _manager
+            .Setup(m => m.CreateAsync(It.IsAny<RetentionCleanupRequest>(), It.IsAny<CancellationToken>()))
+            .Callback(() => _calls.Add("create"))
+            .ReturnsAsync((RetentionCleanupRequest request, CancellationToken _) =>
+                Created(cleanupId, request) with
+                {
+                    IncludedReportScheduleIds = batch.Take(2).Select(r => r.ReportScheduleId).ToList(),
+                    SkippedReportScheduleIds = [batch[2].ReportScheduleId]
+                });
+
+        await CreateCheck().RunAsync(Run(), CancellationToken.None);
+
+        Assert.Equal(["resend", "find", "create", $"publish {cleanupId}", $"sent {cleanupId}", "find"], _calls);
+        var summary = Assert.Single(_logger.Entries, e => e.Level == LogLevel.Information);
+        Assert.Contains("1 cleanups requested for 2 reports; 1 reports skipped", summary.Message);
+    }
+
+    [Fact]
+    public async Task RunAsync_MarkingSentFails_ThrowsAfterPublishing()
+    {
+        SetupBatches(Reports(1), Reports(1));
+        var cleanupId = SetupCreatesCleanup();
+        _manager
+            .Setup(m => m.RecordSentAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("database unreachable"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateCheck().RunAsync(Run(),
+                                                                                       CancellationToken.None));
+
+        Assert.Equal(["resend", "find", "create", $"publish {cleanupId}"], _calls);
+    }
+
+    [Fact]
+    public async Task RunAsync_ResendFails_LogsErrorAndStillSelects()
+    {
+        SetupBatches(Reports(1));
+        var cleanupId = SetupCreatesCleanup();
+        _resender
+            .Setup(r => r.ResendAsync(It.IsAny<RetentionCheckRun>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("resend broke"));
+
+        await CreateCheck().RunAsync(Run(), CancellationToken.None);
+
+        var error = Assert.Single(_logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains("Re-sending unanswered retention requests failed", error.Message);
+        Assert.Equal(["find", "create", $"publish {cleanupId}", $"sent {cleanupId}", "find"], _calls);
+    }
+
+    [Fact]
+    public async Task RunAsync_CanceledDuringResend_StopsBeforeSelecting()
+    {
+        using var cancellation = new CancellationTokenSource();
+        SetupBatches(Reports(1));
+        _resender
+            .Setup(r => r.ResendAsync(It.IsAny<RetentionCheckRun>(), It.IsAny<CancellationToken>()))
+            .Callback(() => cancellation.Cancel())
+            .ThrowsAsync(new OperationCanceledException(cancellation.Token));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateCheck().RunAsync(Run(),
+                                                                                          cancellation.Token));
+
+        _query.VerifyNoOtherCalls();
+        Assert.DoesNotContain(_logger.Entries, e => e.Level == LogLevel.Error);
+    }
+
+    [Fact]
     public async Task RunAsync_SameReportSelectedTwice_StopsWithAnError()
     {
         var stuck = Reports(1);

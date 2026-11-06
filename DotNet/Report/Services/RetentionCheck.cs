@@ -13,7 +13,8 @@ namespace LantanaGroup.Link.Report.Services;
 
 /// <summary>
 /// The scheduled retention check: re-sends unanswered requests, then records and requests a cleanup for every
-/// report past the retention window, in batches. See dev-docs/retention-check.md.
+/// report past the retention window, in batches. A re-send failure is logged and does not stop the new
+/// cleanups. See dev-docs/retention-check.md.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -87,8 +88,7 @@ public class RetentionCheck : IRetentionCheckWorker
         var runId = RetentionRunIds.For(run.ScheduledFireTimeUtc);
         activity?.SetTag("retention.run_id", runId);
 
-        // Re-sends first, so a request that went unanswered is not left waiting behind a large new backlog.
-        await _resender.ResendAsync(run, cancellationToken);
+        await ResendAsync(run, runId, cancellationToken);
 
         var window = _settings.Window!;
         var cutoff = RetentionCutoff.From(_timeProvider.GetUtcNow(), window);
@@ -110,6 +110,27 @@ public class RetentionCheck : IRetentionCheckWorker
             cleanups,
             reports,
             skipped);
+    }
+
+    // Re-sends come first so an unanswered request is not left waiting behind a large new backlog. New reports
+    // do not depend on them, so a re-send failure is logged rather than stopping every cleanup until it is fixed.
+    private async Task ResendAsync(RetentionCheckRun run, Guid runId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _resender.ResendAsync(run, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Re-sending unanswered retention requests failed for run {RunId}; new eligible reports are still " +
+                "selected.",
+                runId);
+        }
     }
 
     private async Task<(int Cleanups, int Reports, int Skipped)> RequestCleanupsAsync(
