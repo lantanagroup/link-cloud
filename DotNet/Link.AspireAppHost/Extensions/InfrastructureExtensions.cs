@@ -33,8 +33,14 @@ internal sealed record LinkInfrastructure(
 
     public const string KafkaBootstrapServers = "localhost:19092";
 
-    /// <summary>Redis runs without a password, as it does under dev-infrastructure.</summary>
-    public static readonly string RedisConnectionString = $"localhost:{Ports.Redis},abortConnect=false";
+    /// <summary>
+    /// Redis runs without a password, as it does under dev-infrastructure. The address is 127.0.0.1, not localhost:
+    /// Docker publishes the port on the IPv4 loopback only, localhost resolves to ::1 first on Windows, and
+    /// StackExchange.Redis gives up on ::1 (ConnectTimeout) instead of falling back to IPv4. <c>allowAdmin=true</c>, as
+    /// compose's connection strings have it: the acquisition worker's memory check runs <c>INFO memory</c>, which
+    /// StackExchange.Redis refuses without it.
+    /// </summary>
+    public static readonly string RedisConnectionString = $"127.0.0.1:{Ports.Redis},abortConnect=false,allowAdmin=true";
 
     /// <summary>
     /// Directly to the one replica set member. Automation.UI uses transactions, which need a replica set,
@@ -152,14 +158,29 @@ internal static class InfrastructureExtensions
     /// Aspire's Kafka integration runs <c>confluentinc/confluent-local</c>, which bundles parts under a
     /// source-available license, so the official Apache image is used instead (as in link-lbw). That
     /// image drops its own single-node settings as soon as any setting is given, and Aspire gives the
-    /// listeners, so the KRaft settings are set here. Nothing is kept between runs: topics are created
-    /// again on every start.
+    /// listeners, so the KRaft settings are set here.
+    /// <para>
+    /// Kafka keeps its data in the <c>link-aspire-kafka</c> volume, as compose keeps it in <c>kafka_data</c>, so topics,
+    /// messages and consumer groups' committed offsets survive restarts. Most Link consumers set no
+    /// <c>AutoOffsetReset</c>, so Kafka's default <c>latest</c> applies: a consumer group with no committed offset skips
+    /// whatever is already on its topic. With nothing kept between runs every group was new on every start, and a
+    /// message sent before its consumer joined was lost; Report replaying a stored report at startup lost its
+    /// acquisition requests that way. Now only the very first run is exposed, as under compose.
+    /// </para>
+    /// <para>
+    /// The image runs as a non-root user, and its default log directory (<c>/tmp/kraft-combined-logs</c>) does not exist
+    /// in it, so a volume mounted there would be owned by root. <c>/var/lib/kafka/data</c> exists and belongs to that
+    /// user, so a new volume mounted over it is writable. The image formats the storage on first start and accepts it
+    /// as already formatted afterwards, which needs the fixed <c>CLUSTER_ID</c> below.
+    /// </para>
     /// </remarks>
     private static IResourceBuilder<KafkaServerResource> AddLinkKafka(this IDistributedApplicationBuilder builder)
     {
         var kafka = builder.AddKafka("kafka", port: Ports.Kafka)
             .WithImage(KafkaImage, KafkaTag)
             .WithEnvironment("CLUSTER_ID", "bGluay1jbG91ZC1rYWZrYQ")
+            .WithEnvironment("KAFKA_LOG_DIRS", "/var/lib/kafka/data")
+            .WithVolume("link-aspire-kafka", "/var/lib/kafka/data")
             .WithEnvironment("KAFKA_NODE_ID", "1")
             .WithEnvironment("KAFKA_PROCESS_ROLES", "broker,controller")
             .WithEnvironment("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@localhost:29093")

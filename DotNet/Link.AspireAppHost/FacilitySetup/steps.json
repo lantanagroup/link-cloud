@@ -1,0 +1,148 @@
+{
+  "$comment": "The requests that create and configure a test facility, in order. Taken from the QA Postman collection's 'Test Data Creation Facility' folder. Each step calls a service directly (not through the Admin BFF) with the AppHost's Link system token. {{name}} placeholders in paths and payloads are filled from 'variables', the Create test facility form, and values captured from earlier responses. existsCheck: a GET answering 200 with a body that holds something (for a paged search result, a non-empty 'records' array) means the thing exists and the step is skipped; 204 or 404 means it runs; anything else stops the command. alreadyExistsStatuses: response statuses of the step itself that mean it already existed.",
+  "variables": {
+    "facilityId": "dev-facility",
+    "facilityName": "Dev Facility",
+    "timeZone": "America/Chicago",
+    "measure": "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+    "fhirServerBaseUrl": "https://ehr-test.nhsnlink.org/fhir"
+  },
+  "steps": [
+    {
+      "name": "DMRP measure mapping",
+      "$comment": "Tenant runs with the Mock DMRP write-through in the AppHost, and refuses a scheduled measure that has no mapping. Measure and dQM are the same value, as Automation does it. Tenant answers 400 both for a duplicate and for a measure MeasureEval does not have, so 400 is not treated as already existing.",
+      "service": "tenant",
+      "method": "POST",
+      "path": "/api/dmrp/measure-mappings",
+      "body": "Tenant/dmrp-measure-mapping.json",
+      "existsCheck": "/api/dmrp/measure-mappings/search?Measure={{measure}}&Frequency=Monthly"
+    },
+    {
+      "name": "Facility",
+      "service": "tenant",
+      "method": "POST",
+      "path": "/api/Facility",
+      "body": "Tenant/facility.json",
+      "existsCheck": "/api/Facility/{{facilityId}}"
+    },
+    {
+      "name": "Census configuration",
+      "$comment": "Created disabled, as Automation does: an enabled config pulls the patient lists every 4 hours.",
+      "service": "census",
+      "method": "POST",
+      "path": "/api/census/config",
+      "body": "Census/config.json",
+      "existsCheck": "/api/census/config/{{facilityId}}"
+    },
+    {
+      "name": "Query dispatch configuration",
+      "service": "querydispatch",
+      "method": "POST",
+      "path": "/api/querydispatch/configuration",
+      "body": "QueryDispatch/config.json",
+      "existsCheck": "/api/querydispatch/configuration/facility/{{facilityId}}"
+    },
+    {
+      "name": "Query plan (Monthly)",
+      "$comment": "Used by scheduled end-of-month reports.",
+      "service": "data-acquisition",
+      "method": "POST",
+      "path": "/api/data-acquisition/{{facilityId}}/QueryPlan",
+      "body": "DataAcquisition/query-plan-monthly.json",
+      "existsCheck": "/api/data-acquisition/{{facilityId}}/QueryPlan?type=Monthly"
+    },
+    {
+      "name": "Query plan (Discharge)",
+      "$comment": "Used by discharge events and ad-hoc reports.",
+      "service": "data-acquisition",
+      "method": "POST",
+      "path": "/api/data-acquisition/{{facilityId}}/QueryPlan",
+      "body": "DataAcquisition/query-plan-discharge.json",
+      "existsCheck": "/api/data-acquisition/{{facilityId}}/QueryPlan?type=Discharge"
+    },
+    {
+      "name": "FHIR query configuration",
+      "service": "data-acquisition",
+      "method": "POST",
+      "path": "/api/data-acquisition/fhirQueryConfiguration",
+      "body": "DataAcquisition/fhir-query-configuration.json",
+      "alreadyExistsStatuses": [ 409 ]
+    },
+    {
+      "name": "FHIR query list",
+      "$comment": "The patient List resources census reads. The FhirIds are lists on the QA FHIR server (ehr-test.nhsnlink.org); another FHIR server needs its own list ids.",
+      "service": "data-acquisition",
+      "method": "POST",
+      "path": "/api/data-acquisition/fhirQueryList",
+      "body": "DataAcquisition/fhir-query-list.json",
+      "alreadyExistsStatuses": [ 409 ]
+    },
+    {
+      "name": "Normalization: Encounter copy property",
+      "group": "normalization",
+      "service": "normalization",
+      "method": "POST",
+      "path": "/api/normalization/operations",
+      "body": "Normalization/encounter-copy-property.json",
+      "capture": { "copyPropertyEncOpId": "id" }
+    },
+    {
+      "name": "Normalization: Encounter conditional transform",
+      "group": "normalization",
+      "service": "normalization",
+      "method": "POST",
+      "path": "/api/normalization/operations",
+      "body": "Normalization/encounter-conditional-transform.json",
+      "capture": { "conditionalTransformEncOpId": "id" }
+    },
+    {
+      "name": "Normalization: Encounter class code map",
+      "group": "normalization",
+      "service": "normalization",
+      "method": "POST",
+      "path": "/api/normalization/operations",
+      "body": "Normalization/encounter-code-map.json",
+      "capture": { "codeMapEncOpId": "id" }
+    },
+    {
+      "name": "Normalization: Encounter sequence",
+      "group": "normalization",
+      "service": "normalization",
+      "method": "POST",
+      "path": "/api/normalization/OperationSequence?FacilityId={{facilityId}}&ResourceType=Encounter",
+      "body": "Normalization/encounter-sequence.json"
+    },
+    {
+      "name": "Normalization: Location copy location",
+      "group": "normalization",
+      "service": "normalization",
+      "method": "POST",
+      "path": "/api/normalization/operations",
+      "body": "Normalization/location-copy-location.json",
+      "capture": { "copyPropertyLocOpId": "id" }
+    },
+    {
+      "name": "Normalization: Location type code map",
+      "group": "normalization",
+      "service": "normalization",
+      "method": "POST",
+      "path": "/api/normalization/operations",
+      "body": "Normalization/location-code-map.json",
+      "capture": { "codeMapLocOpId": "id" }
+    },
+    {
+      "name": "Normalization: Location sequence",
+      "group": "normalization",
+      "service": "normalization",
+      "method": "POST",
+      "path": "/api/normalization/OperationSequence?FacilityId={{facilityId}}&ResourceType=Location",
+      "body": "Normalization/location-sequence.json"
+    }
+  ],
+  "groups": {
+    "normalization": {
+      "$comment": "Creating an operation twice makes a duplicate, so the whole group is skipped when the facility already has operations.",
+      "existsCheck": "/api/normalization/Operations/facility/{{facilityId}}"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "FacilityId": "{{facilityId}}",
+  "FhirServerBaseUrl": "{{fhirServerBaseUrl}}",
+  "Authentication": null,
+  "MaxConcurrentRequests": 2,
+  "TimeZone": "{{timeZone}}"
+}

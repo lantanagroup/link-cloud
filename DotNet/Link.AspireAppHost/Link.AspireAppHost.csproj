@@ -49,6 +49,8 @@
   <ItemGroup>
     <None Update="AdminUi\proxy.mjs" CopyToOutputDirectory="Never" />
     <None Update="Keycloak\link-realm.json" CopyToOutputDirectory="Never" />
+    <None Update="FacilitySetup\**\*.json" CopyToOutputDirectory="Never" />
+    <None Update="SeedData\**\*" CopyToOutputDirectory="Never" />
   </ItemGroup>
 
 </Project>

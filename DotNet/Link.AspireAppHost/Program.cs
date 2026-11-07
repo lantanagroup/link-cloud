@@ -60,8 +60,7 @@ var account = builder.AddLinkService<Projects.Account>("account", Ports.Account)
     .WithKafka(infrastructure)
     .WithDatabase(infrastructure.Database("account"))
     .WithRedis(infrastructure)
-    .WithLocalAuthentication(requireToken, keycloak)
-    .WithSeedData();
+    .WithLocalAuthentication(requireToken, keycloak);
 
 builder.AddLinkService<Projects.Audit>("audit", Ports.Audit)
     .WithKafka(infrastructure)
@@ -147,6 +146,7 @@ var (measureEval, validation) = builder.AddJavaServices(infrastructure, infrastr
 measureEval.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(infrastructure.Azurite);
 validation.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(infrastructure.Azurite).WaitFor(terminology);
 
+
 // ---------------------------------------------------------------------------------------------------
 // Admin BFF, Admin UI and Automation UI
 // ---------------------------------------------------------------------------------------------------
@@ -185,6 +185,12 @@ foreach (var (name, cluster, port) in proxiedServices)
         .WithEnvironment($"ServiceRegistry__Public{name}ServiceUrl", Url(port))
         .WithEnvironment($"ReverseProxy__Clusters__{cluster}__Destinations__destination1__Address", Url(port));
 }
+
+// Commands that span several services sit on the Admin BFF, the platform's front door. Seed data also runs
+// per service as each turns healthy (Account roles, Validation artifacts and categories, measures).
+adminBff
+    .WithSeedDataCommand(account, measureEval, validation)
+    .WithCreateFacilityCommand();
 
 if (keycloak is not null)
 {

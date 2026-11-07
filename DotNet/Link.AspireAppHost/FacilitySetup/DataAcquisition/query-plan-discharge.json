@@ -1,0 +1,231 @@
+{
+  "PlanName": "{{measure}}",
+  "FacilityId": "{{facilityId}}",
+  "EHRDescription": "Epic",
+  "LookBack": "P0D",
+  "Type": "Discharge",
+  "InitialQueries": {
+    "0": {
+      "ResourceType": "Encounter",
+      "QueryConfigType": "Parameter",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "_include",
+          "Literal": "Encounter:location"
+        }
+      ]
+    },
+    "1": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "MedicationRequest",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authoredon",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authoredon",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "intent",
+          "Literal": "order"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "_include",
+          "Literal": "MedicationRequest:medication"
+        }
+      ]
+    }
+  },
+  "SupplementalQueries": {
+    "0": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Condition",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "recorded-date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "recorded-date",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "category",
+          "Literal": "encounter-diagnosis,health-concern,problem-list-item"
+        }
+      ]
+    },
+    "1": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Coverage",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        }
+      ]
+    },
+    "2": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Observation",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "category",
+          "Literal": "imaging,laboratory,social-history,vital-signs"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "_include",
+          "Literal": "Observation:specimen"
+        }
+      ]
+    },
+    "3": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "Procedure",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        }
+      ]
+    },
+    "4": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "ServiceRequest",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authored",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "authored",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "_include",
+          "Literal": "ServiceRequest:specimen"
+        }
+      ]
+    },
+    "5": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "DiagnosticReport",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        },
+        {
+          "ParameterType": "Literal",
+          "Name": "category",
+          "Literal": "LAB,LP29708-2,LP7839-6,LP29684-5"
+        }
+      ]
+    }
+  }
+}

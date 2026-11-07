@@ -1,0 +1,14 @@
+[
+  {
+    "OperationId": "{{copyPropertyEncOpId}}",
+    "Sequence": 1
+  },
+  {
+    "OperationId": "{{conditionalTransformEncOpId}}",
+    "Sequence": 2
+  },
+  {
+    "OperationId": "{{codeMapEncOpId}}",
+    "Sequence": 3
+  }
+]

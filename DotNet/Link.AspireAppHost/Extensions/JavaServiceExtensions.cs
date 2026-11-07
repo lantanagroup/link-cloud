@@ -55,6 +55,9 @@ internal static class JavaServiceExtensions
             .WithEnvironment("spring.datasource.username", "sa")
             .WithEnvironment("spring.datasource.password", infrastructure.Sql.Resource.PasswordParameter)
             .WithEnvironment("spring.kafka.producer.properties.max.request.size", "10485760")
+            // The rubric Seed data publishes (SeedData/Validation). The shadow comparison evaluates every patient against
+            // it, beside the legacy validation, which still decides pass or fail: vaas.bridge.enabled stays false.
+            .WithEnvironment("vaas.bridge.rubric-id", SeedDataExtensions.ReadRubricIdentity(SeedDataExtensions.RubricFile(builder.AppHostDirectory)).Id)
             // Validation adds /api/terminology/fhir itself.
             .WithEnvironment("LINK_TERMINOLOGYSERVICEURL", DotNetServiceExtensions.Url(Ports.Terminology))
             .WaitFor(validationDatabase)
@@ -87,7 +90,8 @@ internal static class JavaServiceExtensions
             // The docker profile names kafka_b over SASL; this broker is local and plain.
             .WithEnvironment("spring.kafka.bootstrap-servers", LinkInfrastructure.KafkaBootstrapServers)
             .WithEnvironment("spring.kafka.properties.security.protocol", "PLAINTEXT")
-            .WithEnvironment("spring.data.redis.host", "localhost")
+            // IPv4, as for the .NET services: the port is published on 127.0.0.1 only.
+            .WithEnvironment("spring.data.redis.host", "127.0.0.1")
             .WithEnvironment("spring.data.redis.port", Ports.Redis.ToString())
             .WithEnvironment("internal-blob-storage.connection-string", LinkInfrastructure.BlobConnectionString)
             .WithEnvironment("internal-blob-storage.blob-container-name", LinkInfrastructure.InternalContainer)
@@ -148,7 +152,8 @@ internal static class JavaServiceExtensions
         return validation.WithCommand(
             name: "validation-migrations",
             displayName: "Apply Validation migrations",
-            executeCommand: async context =>
+            executeCommand: context => CommandNotifications.RunWithNotificationsAsync(context, "Apply Validation migrations",
+                "Applying Validation's database migrations.", async () =>
             {
                 var logger = context.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Link.ValidationMigrations");
                 var connectionString = await database.Resource.ConnectionStringExpression.GetValueAsync(context.CancellationToken);
@@ -162,14 +167,14 @@ internal static class JavaServiceExtensions
                         await using var command = new SqlCommand(await File.ReadAllTextAsync(script, context.CancellationToken), connection) { CommandTimeout = 300 };
                         await command.ExecuteNonQueryAsync(context.CancellationToken);
                     }
-                    return CommandResults.Success();
+                    return CommandResults.Success("Validation's migrations are applied.");
                 }
                 catch (SqlException ex)
                 {
                     logger.LogError("Applying the Validation migrations failed: {Error}", ex.Message);
                     return CommandResults.Failure("Applying the Validation migrations failed. The AppHost console has the details.");
                 }
-            },
+            }),
             commandOptions: new CommandOptions
             {
                 UpdateState = context => context.ResourceSnapshot.HealthStatus is HealthStatus.Healthy

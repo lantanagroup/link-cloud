@@ -1,0 +1,14 @@
+{
+  "resourceTypes": [
+    "Encounter"
+  ],
+  "facilityId": "{{facilityId}}",
+  "operation": {
+    "OperationType": "CopyProperty",
+    "Name": "Latest Copy Location Identifier to Type",
+    "Description": "Latest New copy property for Enc",
+    "SourceFhirPath": "identifier.value",
+    "TargetFhirPath": "serviceType.text"
+  },
+  "VendorIds": []
+}

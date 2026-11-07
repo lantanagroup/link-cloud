@@ -107,7 +107,7 @@ compose port plus 10000.
 | SQL Server | `tcp:127.0.0.1,14333`, user `sa`, trust the server certificate (see below) |
 | Kafka / Kafka UI / REST proxy | `localhost:19092` / http://localhost:19080 / http://localhost:18082 |
 | MongoDB (replica set `rs0`) | `mongodb://localhost:37017/?directConnection=true` |
-| Redis (no password) | `localhost:16379` |
+| Redis (no password) | `127.0.0.1:16379` (IPv4: the port is published on 127.0.0.1 only) |
 | Azurite blob | http://127.0.0.1:11000/devstoreaccount1 |
 | Loki | http://localhost:13100 |
 | Keycloak (https profile only) | https://localhost:18443, realm `link` |
@@ -149,6 +149,7 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | `Ports.cs` | Every fixed host port |
 | `Security/LinkSystemToken.cs` | The Link bearer token the AppHost's own commands send |
 | `Security/AuthMode.cs` | `Auth:Mode`: Anonymous (http profile) or Keycloak (https profile) |
+| `Security/LinkServiceClient.cs` | HTTP clients for the AppHost's own calls to services, carrying the Link system token |
 | `Security/LinkKeycloak.cs` | Keycloak's URLs and parameters, its admin token, and creating users |
 | `Extensions/InfrastructureExtensions.cs` | The containers: SQL Server, Kafka and its topics, Mongo, Redis, Azurite, Loki, HAPI FHIR |
 | `Extensions/DotNetServiceExtensions.cs` | How a .NET service is run and configured |
@@ -157,16 +158,47 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | `Extensions/KeycloakExtensions.cs` | Reads `Auth:Mode`, and adds Keycloak with the development certificate |
 | `Extensions/SeedDataExtensions.cs` | Seed data and the **Seed data** command |
 | `Extensions/AccountUserExtensions.cs` | The **Create user** command |
+| `Extensions/FacilitySetupExtensions.cs` | The **Create test facility** command, which runs `FacilitySetup/steps.json` |
 | `AdminUi/proxy.mjs` | The Admin UI's `ng serve` proxy |
 | `Keycloak/link-realm.json` | The `link` realm Keycloak imports |
+| `FacilitySetup/` | `steps.json` and the request payloads, by service, that **Create test facility** sends |
+| `SeedData/Validation/bare-minimum-requirements.yaml` | The validation rubric **Seed data** publishes, and Validation's shadow comparison uses |
 
 ## Dashboard commands
 
-- **Seed data** (on `account`): creates the local seed data that's missing, currently the `LinkUser`
-  role with the `IsLinkAdmin` permission. Link doesn't seed reference data through migrations, so a
-  new Account database has no roles. This step also runs automatically each time Account turns
-  healthy. It only creates what's missing and never changes existing data, and it goes through
-  Account's own API. Add more seed steps in `SeedDataExtensions.cs`.
+Commands that span several services are on `admin-bff`, the platform's front door. A command that
+belongs to one service is on that service. While a command runs, a notice at the top of the dashboard says so. It's
+replaced by a green notice on success or a red one on failure, which stays until dismissed.
+
+- **Seed data** (on `admin-bff`): creates the local seed data that's missing. Link doesn't seed reference
+  data through migrations, so a new environment has none of it. There are three parts, and each one
+  also runs automatically when its service turns healthy:
+  - **Roles (Account):** `LinkUser`, with the `IsLinkAdmin` permission.
+  - **Validation:** its artifacts and categories, initialised from the files it ships with, when
+    Validation has none yet. Then the rubric in `SeedData/Validation/` is registered and published if
+    it isn't already. The AppHost sets `vaas.bridge.rubric-id` to that rubric's id, so the shadow
+    comparison has a published rubric to use.
+  - **Measures (MeasureEval):** the three bundles in `DotNet/Automation/measures/`. Before a bundle is
+    stored, each of its value sets is expanded through Terminology, since the bundles ship without
+    expansions and MeasureEval otherwise falls back to the compose definition. A value set Terminology
+    doesn't know is left as it is. A measure is loaded if MeasureEval doesn't have it, and reloaded if
+    the stored copy has fewer expanded value sets. Tenant refuses a facility that schedules a measure
+    MeasureEval doesn't know.
+
+  Every part goes through the service's own API and only adds what's missing: the one change to
+  existing data is reloading a measure to add expansions. Add more parts in
+  `Extensions/SeedDataExtensions.cs`.
+- **Create test facility** (on `admin-bff`): a form for facility id and name, time zone, measure (from
+  the ones MeasureEval has) and FHIR server. It then runs `FacilitySetup/steps.json`, which:
+  - creates the DMRP measure mapping and the facility in Tenant;
+  - configures Census (disabled), QueryDispatch, DataAcquisition (Discharge and Monthly query plans
+    using `_include`, the FHIR query configuration and the patient lists) and Normalization.
+
+  The steps and payloads come from the QA Postman collections. They're read when the command runs,
+  so editing them needs no rebuild. Running it again for the same facility only creates what's
+  missing. The default FHIR server is QA's `https://ehr-test.nhsnlink.org/fhir`, where the query
+  list's patient lists exist. See `FacilitySetup/steps.json` for the format: placeholders,
+  existence checks, captured ids and groups.
 - **Create user** (on `account`, Keycloak mode only): a form for first name, last name, email,
   username, role and password. The roles are read from Account. It creates the user in Keycloak, to
   sign in with, and in Account, through Account's own `POST /api/account/user`. Each side is tried
@@ -181,9 +213,14 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 - **Don't run the same service under the AppHost and from your IDE at once.** They use different
   Kafka brokers, so they won't share a consumer group, but they would each process their own copy
   of everything.
-- **Data.** SQL Server, MongoDB and Azurite keep their data in Docker volumes (`link-aspire-*`)
-  between runs. Kafka, Redis and the HAPI FHIR server start empty each time. To reset everything,
-  stop the AppHost and run `docker volume rm link-aspire-sql link-aspire-mongo link-aspire-azurite`.
+- **Data.** SQL Server, MongoDB, Azurite, Kafka and Keycloak keep their data in Docker volumes
+  (`link-aspire-*`) between runs. Redis and the HAPI FHIR server start empty each time.
+  - **Kafka keeps its consumer groups' committed offsets, as compose does.** Most Link consumers start
+    a new group at the latest message, so with nothing kept, every run's groups were new. A message
+    sent before its consumer joined was then lost; Report replaying a stored report at startup lost
+    its acquisition requests that way. Now only the very first run is exposed.
+  - **To reset everything,** stop the AppHost and run
+    `docker volume rm link-aspire-sql link-aspire-mongo link-aspire-azurite link-aspire-kafka link-aspire-keycloak`.
 - **The Admin UI** runs `ng serve` with `AdminUi/proxy.mjs`, which proxies `/api` to the Admin BFF.
   It also answers `/assets/app.config.local.json`, which the UI merges over `app.config.json`, with
   the AppHost's overrides (`authRequired`). Nothing is written into `Web/Admin.UI`, and

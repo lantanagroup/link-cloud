@@ -129,17 +129,21 @@ internal static class AccountUserExtensions
             Username: string.IsNullOrWhiteSpace(answers["username"].Value) ? answers["email"].Value!.Trim() : answers["username"].Value!.Trim(),
             Role: answers["role"].Value!);
 
-        // Each place is tried whatever happened in the other, so a user missing from only one of them
-        // (after Keycloak's or SQL Server's data was reset, say) can be added there by running this again.
-        var (accountOutcome, accountMessage) = await CreateAccountUserAsync(http, user, logger, context.CancellationToken);
+        var password = answers["password"].Value!;
+        return await CommandNotifications.RunWithNotificationsAsync(context, "Create user",
+            $"Creating {user.Email} in Keycloak and the Account service.", async () =>
+        {
+            // Each place is tried whatever happened in the other, so a user missing from only one of them
+            // (after Keycloak's or SQL Server's data was reset, say) can be added there by running this again.
+            var (accountOutcome, accountMessage) = await CreateAccountUserAsync(http, user, logger, context.CancellationToken);
+            var (keycloakOutcome, keycloakMessage) = await CreateKeycloakUserAsync(keycloak, user, password, logger, context.CancellationToken);
 
-        var (keycloakOutcome, keycloakMessage) =
-            await CreateKeycloakUserAsync(keycloak, user, answers["password"].Value!, logger, context.CancellationToken);
-        var message = $"{accountMessage} {keycloakMessage}";
-        return accountOutcome is not Outcome.Failed && keycloakOutcome is not Outcome.Failed
-               && (accountOutcome is Outcome.Created || keycloakOutcome is Outcome.Created)
-            ? CommandResults.Success(message)
-            : CommandResults.Failure(message);
+            var message = $"{accountMessage} {keycloakMessage}";
+            return accountOutcome is not Outcome.Failed && keycloakOutcome is not Outcome.Failed
+                   && (accountOutcome is Outcome.Created || keycloakOutcome is Outcome.Created)
+                ? CommandResults.Success(message)
+                : CommandResults.Failure(message);
+        });
     }
 
     private sealed record NewUser(string FirstName, string LastName, string Email, string Username, string Role);

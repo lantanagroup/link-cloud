@@ -1,0 +1,6 @@
+{
+  "facilityId": "{{facilityId}}",
+  "operation": {
+    "OperationType": "CopyLocation"
+  }
+}

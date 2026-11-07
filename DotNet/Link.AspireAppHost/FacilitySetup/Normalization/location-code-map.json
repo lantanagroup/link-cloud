@@ -1,0 +1,43 @@
+{
+  "FacilityId": "{{facilityId}}",
+  "Description": "Location Code Map Operation",
+  "ResourceTypes": [
+    "Location"
+  ],
+  "Operation": {
+    "OperationType": "CodeMap",
+    "Name": "Map coding name and code",
+    "FhirPath": "type.coding",
+    "CodeSystemMaps": [
+      {
+        "SourceSystem": "urn:oid:1.2.840.114350.1.13.277.3.7.2.686990",
+        "TargetSystem": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+        "CodeMaps": {
+          "100011801": {
+            "Code": "1063-7",
+            "Display": "Neurosurgical Ward"
+          },
+          "52": {
+            "Code": "1065-2",
+            "Display": "Orthopedic Ward"
+          }
+        }
+      },
+      {
+        "SourceSystem": "urn:oid:1.2.840.114350.1.13.277.3.7.2.686551",
+        "TargetSystem": "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+        "CodeMaps": {
+          "10001182": {
+            "Code": "1068-6",
+            "Display": "Postpartum Ward"
+          },
+          "67": {
+            "Code": "1046-2",
+            "Display": "Pediatric Neurosurgical Critical Care"
+          }
+        }
+      }
+    ]
+  },
+  "VendorIds": []
+}
