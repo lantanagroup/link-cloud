@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -70,6 +71,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                     await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
                         consumeResult = result;
+                        using var stage = StartPipelineStage(consumeResult);
 
                         try
                         {
@@ -77,21 +79,26 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                             {
                                 await ExecuteListenerAsync(consumeResult, consumeCancellationToken);
                             }
+                            stage?.SetOutcome(PipelineStageOutcome.Completed);
                         }
                         catch (DeadLetterException ex)
                         {
+                            stage?.SetOutcome(PipelineStageOutcome.DeadLettered);
                             DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
                         }
                         catch (TransientException ex)
                         {
+                            stage?.SetOutcome(PipelineStageOutcome.Retried);
                             TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
                         }
                         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                         {
+                            stage?.SetOutcome(PipelineStageOutcome.Cancelled);
                             throw;
                         }
                         catch (Exception ex)
                         {
+                            stage?.SetOutcome(PipelineStageOutcome.Retried);
                             Logger.LogError(ex,
                                 "Unhandled exception in listener for {ServiceName} on topic {Topic}",
                                 ServiceInformation.ServiceConfigName, this.TopicName);
@@ -146,6 +153,51 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
             Logger.LogError(ex, "BaseListener Exception Encountered: {Message}", ex.Message);
             throw;
         }
+    }
+
+    /// <summary>
+    /// The pipeline stage this listener is, for the per-patient stage log line (see
+    /// <see cref="PipelineStageLog"/>). Null, the default, writes no line: a listener that handles many
+    /// messages per patient, or isn't a pipeline stage, should leave it null.
+    /// </summary>
+    protected virtual string? PipelineStageName => null;
+
+    /// <summary>
+    /// The patient, report ids and phase of a message, for the stage line. Called only when
+    /// <see cref="PipelineStageName"/> is set; it must not throw.
+    /// </summary>
+    protected virtual (string? PatientId, IEnumerable<string?>? ReportIds, string? Phase) DescribePipelineMessage(
+        ConsumeResult<ConsumeKeyType, ConsumeValueType> consumeResult) => (null, null, null);
+
+    private PipelineStageLog? StartPipelineStage(ConsumeResult<ConsumeKeyType, ConsumeValueType>? consumeResult)
+    {
+        if (PipelineStageName is not { } stageName || consumeResult is null)
+        {
+            return null;
+        }
+
+        string? facilityId = null, correlationId = null, patientId = null, phase = null;
+        IEnumerable<string?>? reportIds = null;
+        try
+        {
+            facilityId = ExtractFacilityId(consumeResult);
+            correlationId = ExtractCorrelationId(consumeResult);
+        }
+        catch (Exception)
+        {
+            // A message without these ids is dead-lettered by the listener; the stage line still records it.
+        }
+
+        try
+        {
+            (patientId, reportIds, phase) = DescribePipelineMessage(consumeResult);
+        }
+        catch (Exception)
+        {
+            // Describing the message is for logging only and must never stop it being processed.
+        }
+
+        return PipelineStageLog.Start(Logger, stageName, consumeResult, facilityId, patientId, correlationId, reportIds, phase);
     }
 
     protected abstract ConsumerConfig CreateConsumerConfig();

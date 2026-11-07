@@ -3,6 +3,7 @@ using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -15,13 +16,15 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
+        private readonly ILogger<DataAcquisitionRequestedProducer> _logger;
 
         private static readonly ActivitySource _fallbackActivitySource = new ActivitySource("FallbackSource");
 
-        public DataAcquisitionRequestedProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer)
+        public DataAcquisitionRequestedProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer, ILogger<DataAcquisitionRequestedProducer>? logger = null)
         {
             _serviceScopeFactory = serviceScopeFactory;
             _dataAcqProducer = dataAcqProducer;
+            _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DataAcquisitionRequestedProducer>.Instance;
         }
 
         public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null, CancellationToken cancellationToken = default, string? metricsMode = null)
@@ -34,6 +37,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 patientsToEvaluate = (await _database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.ReportingStatus == ReportingStatus.PatientIdentified)).Select(x => x.PatientId).Distinct().ToList();
             }
 
+            var stopwatch = Stopwatch.StartNew();
             string reportableEvent = string.Empty;
 
             switch (schedule.Frequency)
@@ -140,6 +144,12 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             // the broker acknowledge the whole batch in parallel rather than one patient at
             // a time.
             _dataAcqProducer.Flush(cancellationToken);
+
+            stopwatch.Stop();
+            _logger.Log(deliveryFailures.IsEmpty ? LogLevel.Information : LogLevel.Warning,
+                "Requested data acquisition for {PatientCount} patients for report {ReportId} (facility {FacilityId:l}, {Frequency}): {DeliveredCount} delivered, {FailedCount} failed, in {TookMs} ms",
+                patientsToEvaluate.Count, schedule.Id, schedule.FacilityId.SanitizeForLog(), schedule.Frequency,
+                patientsToEvaluate.Count - deliveryFailures.Count, deliveryFailures.Count, stopwatch.ElapsedMilliseconds);
 
             if (!deliveryFailures.IsEmpty)
             {

@@ -89,23 +89,31 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
 
                             facilityId = result.Message.Key;
+                            using var stage = PipelineStageLog.Start(_logger, "ReportValidationResult", result,
+                                facilityId, result.Message.Value?.PatientId,
+                                PipelineStageLog.Header(result.Message.Headers, "X-Correlation-Id"),
+                                [result.Message.Value?.ReportTrackingId]);
                             try
                             {
                                 await ProcessMessageAsync(result, consumeCancellationToken);
+                                stage.Outcome = PipelineStageOutcome.Completed;
                                 consumer.SafeCommit(result, _logger);
                             }
                             catch (DeadLetterException ex)
                             {
+                                stage.Outcome = PipelineStageOutcome.DeadLettered;
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                                 consumer.SafeCommit(result, _logger);
                             }
                             catch (TransientException ex)
                             {
+                                stage.Outcome = PipelineStageOutcome.Retried;
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                                 consumer.SafeCommit(result, _logger);
                             }
                             catch (TimeoutException ex)
                             {
+                                stage.Outcome = PipelineStageOutcome.Retried;
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
@@ -113,10 +121,12 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
+                                stage.Outcome = PipelineStageOutcome.Cancelled;
                                 throw;
                             }
                             catch (Exception ex)
                             {
+                                stage.Outcome = PipelineStageOutcome.Retried;
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                                 consumer.SafeCommit(result, _logger);
                             }

@@ -84,6 +84,19 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// Records when DataAcquisition picks up a patient's request and turns it into query logs. The
+    /// acquisition itself is recorded by the worker, when the last of those logs completes.
+    /// </summary>
+    protected override string? PipelineStageName => "AcquisitionRequested";
+
+    protected override (string? PatientId, IEnumerable<string?>? ReportIds, string? Phase) DescribePipelineMessage(
+        ConsumeResult<string, DataAcquisitionRequested> consumeResult)
+    {
+        var value = consumeResult.Message?.Value;
+        return (value?.PatientId, value?.ScheduledReports?.Select(r => r.ReportTrackingId), value?.QueryType);
+    }
+
     protected override ConsumerConfig CreateConsumerConfig()
     {
         var settings = new ConsumerConfig

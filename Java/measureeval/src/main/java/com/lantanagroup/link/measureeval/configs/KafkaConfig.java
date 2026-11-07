@@ -7,6 +7,7 @@ import com.lantanagroup.link.measureeval.records.*;
 import com.lantanagroup.link.measureeval.services.AbsResourceService;
 import com.lantanagroup.link.measureeval.services.RedisResourceService;
 import com.lantanagroup.link.measureeval.services.ResourceCacheCleanup;
+import com.lantanagroup.link.shared.kafka.ConsumerStartPositionLogger;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecoverer;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
@@ -352,6 +353,8 @@ public class KafkaConfig {
         factory.setConsumerFactory(consumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         factory.getContainerProperties().setAsyncAcks(true);
+        factory.getContainerProperties().setConsumerRebalanceListener(
+                ConsumerStartPositionLogger.forConfig(consumerFactory.getConfigurationProperties()));
         factory.setCommonErrorHandler(errorHandler);
         return factory;
     }

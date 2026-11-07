@@ -6,7 +6,7 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%date [%-20.20thread] %-5level %-40.40logger{40} %message%n</pattern>
+            <pattern>%date [%-20.20thread] %-5level %-40.40logger{40} %message%X{link}%n</pattern>
         </encoder>
     </appender>
 
@@ -20,7 +20,7 @@
                     component=MeasureEval
                 </labels>
                 <message>
-                    <pattern>[%-20.20thread] %-5level %-40.40logger{40} %message%n</pattern>
+                    <pattern>[%-20.20thread] %-5level %-40.40logger{40} %message%X{link}%n</pattern>
                 </message>
                 <http>
                     <url>${loki.url}/loki/api/v1/push</url>

@@ -11,6 +11,7 @@ import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.logging.PipelineStageLog;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import com.lantanagroup.link.shared.utils.LogUtils;
@@ -128,6 +129,20 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
 
     @Override
     protected void process(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
+        ReadyForValidation.Key key = record != null ? record.key() : null;
+        ReadyForValidation value = record != null ? record.value() : null;
+        try (PipelineStageLog stage = PipelineStageLog.start(_logger, "Validation", record,
+                key != null ? key.getFacilityId() : null,
+                value != null ? value.getPatientId() : null,
+                PipelineStageLog.header(record, Headers.CORRELATION_ID),
+                value != null && value.getReportTrackingId() != null ? List.of(value.getReportTrackingId()) : List.of(),
+                bridgeEnabled ? "rubric" : "legacy")) {
+            processRecord(record);
+            stage.setOutcome(PipelineStageLog.COMPLETED);
+        }
+    }
+
+    private void processRecord(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
         _logger.info("Processing {} message for facility {}, patient {}, report {}",
                 LogUtils.sanitize(record.topic()),
