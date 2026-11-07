@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ValueSetCheckExecutorTest {
@@ -154,6 +156,21 @@ class ValueSetCheckExecutorTest {
         assertThat(executor.execute(
                 check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"),
                 contextWithCoding("http://loinc.org", "1234-5"))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("membership is asked with system and code only, never the coding's display")
+    void membershipIsAskedWithoutDisplay() {
+        IValidationSupport.CodeValidationResult member = mock(IValidationSupport.CodeValidationResult.class);
+        when(member.isOk()).thenReturn(true);
+        when(chain.validateCode(any(), any(), eq("http://loinc.org"), eq("6690-2"), eq(null), eq("http://x/vs")))
+                .thenReturn(member);
+
+        assertThat(executor.execute(
+                check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"),
+                contextWithCoding("http://loinc.org", "6690-2"))).isEmpty();
+
+        verify(chain, never()).validateCode(any(), any(), any(), any(), eq("display"), any());
     }
 
     @Test

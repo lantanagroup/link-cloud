@@ -115,7 +115,12 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                     checked++;
                     IValidationSupport.CodeValidationResult result;
                     try {
-                        result = validationSupportChain.validateCode(supportContext, options, system, code, display, valueSet);
+                        // Membership is a question about system and code; the display is not sent. Given a display,
+                        // $validate-code asks whether the code *and* the display are valid, and a terminology server
+                        // answers result=false for a member code whose display differs from its own (FHIR R4), which
+                        // this check would report as "not in value set". HAPI's own default is the same:
+                        // ConceptValidationOptions doesn't validate displays unless asked.
+                        result = validationSupportChain.validateCode(supportContext, options, system, code, null, valueSet);
                     } catch (Exception e) {
                         log.info("VALUESET check '{}': validateCode threw for {}|{} in {} — skipping this code: {}",
                                 check.getCheckLocalId(), system, code, valueSet, e.getMessage());
