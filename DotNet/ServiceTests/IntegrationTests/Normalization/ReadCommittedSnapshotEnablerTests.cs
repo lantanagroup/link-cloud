@@ -1,8 +1,10 @@
 using System.Data;
+using System.Diagnostics;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
@@ -42,10 +44,12 @@ public class ReadCommittedSnapshotEnablerTests
                 Assert.Equal(1, await probe.ExecuteScalarAsync());
             }
 
-            var result = await EnsureAsync(side);
+            var logger = new ListLogger();
+            var result = await EnsureAsync(side, logger: logger);
 
             Assert.Equal(ReadCommittedSnapshotResult.AlreadyEnabled, result);
             Assert.True(await SnapshotReadsEnabledAsync(admin, databaseName));
+            Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
             await using (var probe = blocker.CreateCommand())
             {
                 probe.Transaction = transaction;
@@ -69,10 +73,12 @@ public class ReadCommittedSnapshotEnablerTests
         {
             Assert.False(await SnapshotReadsEnabledAsync(admin, databaseName));
 
-            var result = await EnsureAsync(SideConnection(databaseName));
+            var logger = new ListLogger();
+            var result = await EnsureAsync(SideConnection(databaseName), logger: logger);
 
             Assert.Equal(ReadCommittedSnapshotResult.Enabled, result);
             Assert.True(await SnapshotReadsEnabledAsync(admin, databaseName));
+            Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
         }
         finally
         {
@@ -94,11 +100,44 @@ public class ReadCommittedSnapshotEnablerTests
             hold.CommandText = "SELECT 1";
             Assert.Equal(1, await hold.ExecuteScalarAsync());
 
-            var result = await EnsureAsync(SideConnection(databaseName), TimeSpan.FromSeconds(1));
+            var logger = new ListLogger();
+            var result = await EnsureAsync(
+                SideConnection(databaseName),
+                FastRetry(maxAttempts: 2),
+                logger);
 
             Assert.Equal(ReadCommittedSnapshotResult.SkippedBlocked, result);
             Assert.False(await SnapshotReadsEnabledAsync(admin, databaseName));
-            Assert.Equal(ConnectionState.Open, blocker.State);
+            Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Information && entry.Message.Contains("Skipping this attempt", StringComparison.Ordinal));
+            await AssertSessionStillUsableAsync(blocker);
+        }
+        finally
+        {
+            await DropDatabaseAsync(admin, databaseName);
+        }
+    }
+
+    [Fact]
+    public async Task WhenOtherSessionsRemain_ExhaustsRetriesAndContinues()
+    {
+        var databaseName = SafeName("rcsiretry");
+        var admin = AdminConnection();
+        await CreateDatabaseAsync(admin, databaseName);
+        try
+        {
+            await using var blocker = new SqlConnection(SideConnection(databaseName));
+            await blocker.OpenAsync();
+
+            var logger = new ListLogger();
+            var result = await EnsureAsync(
+                SideConnection(databaseName),
+                FastRetry(maxAttempts: 3),
+                logger);
+
+            Assert.Equal(ReadCommittedSnapshotResult.SkippedBlocked, result);
+            Assert.False(await SnapshotReadsEnabledAsync(admin, databaseName));
+            Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("Startup continues", StringComparison.Ordinal));
+            await AssertSessionStillUsableAsync(blocker);
         }
         finally
         {
@@ -123,10 +162,19 @@ public class ReadCommittedSnapshotEnablerTests
                 Password = password
             }.ConnectionString;
 
-            var result = await EnsureAsync(limited);
+            var started = Stopwatch.StartNew();
+            var result = await EnsureAsync(limited, new ReadCommittedSnapshotRetry
+            {
+                MaxAttempts = 3,
+                Delay = TimeSpan.FromSeconds(5),
+                Jitter = TimeSpan.Zero,
+                AlterTimeout = TimeSpan.FromSeconds(1)
+            });
+            started.Stop();
 
             Assert.Equal(ReadCommittedSnapshotResult.SkippedPermission, result);
             Assert.False(await SnapshotReadsEnabledAsync(admin, databaseName));
+            Assert.True(started.Elapsed < TimeSpan.FromSeconds(6), $"Permission denial retried and took {started.Elapsed}.");
         }
         finally
         {
@@ -135,15 +183,59 @@ public class ReadCommittedSnapshotEnablerTests
         }
     }
 
-    private async Task<ReadCommittedSnapshotResult> EnsureAsync(string connectionString, TimeSpan? lockTimeout = null)
+    private static ReadCommittedSnapshotRetry FastRetry(int maxAttempts = 3)
+    {
+        return new ReadCommittedSnapshotRetry
+        {
+            MaxAttempts = maxAttempts,
+            Delay = TimeSpan.FromMilliseconds(30),
+            Jitter = TimeSpan.Zero,
+            AlterTimeout = TimeSpan.FromSeconds(1)
+        };
+    }
+
+    private async Task<ReadCommittedSnapshotResult> EnsureAsync(
+        string connectionString,
+        ReadCommittedSnapshotRetry? retry = null,
+        ILogger? logger = null)
     {
         var options = new DbContextOptionsBuilder<NormalizationDbContext>().UseSqlServer(connectionString).Options;
         await using var context = new NormalizationDbContext(options);
         return await ReadCommittedSnapshotEnabler.EnsureAsync(
             context,
-            NullLogger.Instance,
-            lockTimeout ?? ReadCommittedSnapshotEnabler.DefaultLockTimeout,
+            logger ?? NullLogger.Instance,
+            retry ?? FastRetry(),
             CancellationToken.None);
+    }
+
+    private static async Task AssertSessionStillUsableAsync(SqlConnection blocker)
+    {
+        Assert.Equal(ConnectionState.Open, blocker.State);
+        await using var probe = blocker.CreateCommand();
+        probe.CommandText = "SELECT 1";
+        Assert.Equal(1, await probe.ExecuteScalarAsync());
+    }
+
+    private sealed class ListLogger : ILogger
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = new();
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add((logLevel, formatter(state, exception)));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+            public void Dispose()
+            {
+            }
+        }
     }
 
     private string AdminConnection()

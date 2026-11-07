@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using System.Reflection;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,6 @@ internal enum ReadCommittedSnapshotResult
 {
     AlreadyEnabled,
     Enabled,
-    SkippedInProgress,
     SkippedBlocked,
     SkippedPermission,
     SkippedError,
@@ -18,29 +18,46 @@ internal enum ReadCommittedSnapshotResult
 }
 
 /// <summary>
+/// How startup retries enabling snapshot reads. The default is a few attempts spread over about 10 to 15 seconds.
+/// </summary>
+internal sealed class ReadCommittedSnapshotRetry
+{
+    public int MaxAttempts { get; init; } = 4;
+
+    public TimeSpan Delay { get; init; } = TimeSpan.FromMilliseconds(3500);
+
+    public TimeSpan Jitter { get; init; } = TimeSpan.FromSeconds(1);
+
+    public TimeSpan AlterTimeout { get; init; } = TimeSpan.FromSeconds(2);
+
+    public static ReadCommittedSnapshotRetry Default { get; } = new();
+}
+
+/// <summary>
 /// Turns on snapshot reads for the Normalization database only.
-/// A migration cannot do this safely: SQL Server needs exclusive access to flip the option,
-/// a failed migration is either recorded and never retried or it fails startup, and
-/// WITH ROLLBACK IMMEDIATE would kill the other replicas during a rolling deploy.
+/// Deployments restart every Normalization replica together, so no old replica is holding a session.
+/// A replica that is waiting still counts as a session, and SQL Server will not change this option while
+/// another user session is connected. There is no cross-replica application lock for that reason.
+/// Each attempt reads the flag and, when it is off, counts other user sessions. If any exist, this process
+/// disconnects and waits a short jittered delay so one of the starting replicas can find a quiet window.
+/// The alter uses a short lock timeout and never WITH ROLLBACK IMMEDIATE. When the tries are used up, or the
+/// login cannot alter the database, a warning is logged and startup continues.
 /// Azure SQL already has the option on, so the check returns before any alter.
 /// </summary>
 internal static class ReadCommittedSnapshotEnabler
 {
-    public static readonly TimeSpan DefaultLockTimeout = TimeSpan.FromSeconds(5);
-    private const string LockResource = "link-normalization-rcsi";
-
-    public static async Task<ReadCommittedSnapshotResult> EnsureAsync(
+    public static Task<ReadCommittedSnapshotResult> EnsureAsync(
         NormalizationDbContext context,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        return await EnsureAsync(context, logger, DefaultLockTimeout, cancellationToken);
+        return EnsureAsync(context, logger, ReadCommittedSnapshotRetry.Default, cancellationToken);
     }
 
     public static async Task<ReadCommittedSnapshotResult> EnsureAsync(
         NormalizationDbContext context,
         ILogger logger,
-        TimeSpan lockTimeout,
+        ReadCommittedSnapshotRetry retry,
         CancellationToken cancellationToken)
     {
         if (!context.Database.IsRelational())
@@ -50,95 +67,164 @@ internal static class ReadCommittedSnapshotEnabler
 
         var connection = context.Database.GetDbConnection();
         var openedHere = connection.State != ConnectionState.Open;
-        if (openedHere)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        var lockHeld = false;
         var timeoutChanged = false;
-        var lockTimeoutMs = (int)Math.Clamp(lockTimeout.TotalMilliseconds, 1, 60_000);
+        var alterTimeoutMs = (int)Math.Clamp(retry.AlterTimeout.TotalMilliseconds, 1, 60_000);
+        var maxAttempts = Math.Max(1, retry.MaxAttempts);
+
         try
         {
-            var enabled = await ReadEnabledAsync(connection, cancellationToken);
-            if (enabled == true)
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                logger.LogDebug("Normalization database {Database} already uses snapshot reads.", connection.Database);
-                return ReadCommittedSnapshotResult.AlreadyEnabled;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (connection.State != ConnectionState.Open)
+                {
+                    await connection.OpenAsync(cancellationToken);
+                    openedHere = true;
+                }
+
+                try
+                {
+                    var enabled = await ReadEnabledAsync(connection, cancellationToken);
+                    if (enabled == true)
+                    {
+                        logger.LogDebug("Normalization database {Database} already uses snapshot reads.", connection.Database);
+                        return ReadCommittedSnapshotResult.AlreadyEnabled;
+                    }
+
+                    if (enabled == null)
+                    {
+                        logger.LogWarning("Could not read snapshot-read state for Normalization database {Database}. Continuing without changing it.", connection.Database);
+                        return ReadCommittedSnapshotResult.SkippedError;
+                    }
+
+                    var others = await CountOtherUserSessionsAsync(connection, logger, cancellationToken);
+                    if (others is > 0)
+                    {
+                        if (attempt == maxAttempts)
+                        {
+                            logger.LogWarning(
+                                "Snapshot reads were not enabled on Normalization database {Database} because other sessions are connected. Startup continues.",
+                                connection.Database);
+                            return ReadCommittedSnapshotResult.SkippedBlocked;
+                        }
+
+                        logger.LogInformation(
+                            "Other sessions are connected to Normalization database {Database}. Skipping this attempt to enable snapshot reads.",
+                            connection.Database);
+                        await DisconnectAndWaitAsync();
+                        continue;
+                    }
+
+                    await ExecuteNonQueryAsync(connection, $"SET LOCK_TIMEOUT {alterTimeoutMs}", alterTimeoutMs, cancellationToken);
+                    timeoutChanged = true;
+                    await ExecuteNonQueryAsync(
+                        connection,
+                        "ALTER DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON",
+                        alterTimeoutMs,
+                        cancellationToken);
+
+                    logger.LogInformation("Enabled snapshot reads on Normalization database {Database}.", connection.Database);
+                    return ReadCommittedSnapshotResult.Enabled;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (IsPermission(ex))
+                {
+                    logger.LogWarning(ex, "This login cannot alter Normalization database {Database}, so snapshot reads stay as they are. Continuing.", connection.Database);
+                    return ReadCommittedSnapshotResult.SkippedPermission;
+                }
+                catch (Exception ex) when (IsBlocked(ex))
+                {
+                    if (attempt == maxAttempts)
+                    {
+                        logger.LogWarning(
+                            ex,
+                            "Snapshot reads were not enabled on Normalization database {Database} because another session is connected. Startup continues.",
+                            connection.Database);
+                        return ReadCommittedSnapshotResult.SkippedBlocked;
+                    }
+
+                    logger.LogInformation(ex, "Snapshot reads could not be enabled yet on Normalization database {Database}. Retrying.", connection.Database);
+                    await DisconnectAndWaitAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Snapshot reads were not enabled on Normalization database {Database}. Continuing.", connection.Database);
+                    return ReadCommittedSnapshotResult.SkippedError;
+                }
             }
 
-            if (enabled == null)
-            {
-                logger.LogWarning("Could not read snapshot-read state for Normalization database {Database}. Continuing without changing it.", connection.Database);
-                return ReadCommittedSnapshotResult.SkippedError;
-            }
-
-            var lockResult = await AppLockAsync(connection, lockTimeoutMs, cancellationToken);
-            if (lockResult < 0)
-            {
-                logger.LogWarning(
-                    "Another Normalization replica is enabling snapshot reads on {Database} (sp_getapplock result {LockResult}). Continuing.",
-                    connection.Database,
-                    lockResult);
-                return ReadCommittedSnapshotResult.SkippedInProgress;
-            }
-
-            lockHeld = true;
-            enabled = await ReadEnabledAsync(connection, cancellationToken);
-            if (enabled == true)
-            {
-                logger.LogDebug("Normalization database {Database} already uses snapshot reads.", connection.Database);
-                return ReadCommittedSnapshotResult.AlreadyEnabled;
-            }
-
-            await ExecuteNonQueryAsync(connection, $"SET LOCK_TIMEOUT {lockTimeoutMs}", lockTimeout, cancellationToken);
-            timeoutChanged = true;
-            await ExecuteNonQueryAsync(
-                connection,
-                "ALTER DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON",
-                lockTimeout,
-                cancellationToken);
-
-            logger.LogInformation("Enabled snapshot reads on Normalization database {Database}.", connection.Database);
-            return ReadCommittedSnapshotResult.Enabled;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsPermission(ex))
-        {
-            logger.LogWarning(ex, "This login cannot alter Normalization database {Database}, so snapshot reads stay as they are. Continuing.", connection.Database);
-            return ReadCommittedSnapshotResult.SkippedPermission;
-        }
-        catch (Exception ex) when (IsBlocked(ex))
-        {
-            logger.LogWarning(
-                ex,
-                "Snapshot reads were not enabled on Normalization database {Database} because another session is connected. This start continues. The next start tries again.",
-                connection.Database);
+            logger.LogWarning("Snapshot reads were not enabled on Normalization database {Database}. Continuing.", connection.Database);
             return ReadCommittedSnapshotResult.SkippedBlocked;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Snapshot reads were not enabled on Normalization database {Database}. Continuing.", connection.Database);
-            return ReadCommittedSnapshotResult.SkippedError;
         }
         finally
         {
-            if (lockHeld)
-            {
-                await TryReleaseLockAsync(connection, cancellationToken);
-            }
-
             if (timeoutChanged)
             {
                 await TryExecuteNonQueryAsync(connection, "SET LOCK_TIMEOUT -1", cancellationToken);
             }
+
             if (openedHere && connection.State == ConnectionState.Open)
             {
                 await connection.CloseAsync();
             }
+        }
+
+        async Task DisconnectAndWaitAsync()
+        {
+            if (timeoutChanged && connection.State == ConnectionState.Open)
+            {
+                await TryExecuteNonQueryAsync(connection, "SET LOCK_TIMEOUT -1", cancellationToken);
+                timeoutChanged = false;
+            }
+
+            // Close our own pooled sessions before waiting. Another replica is a different process and is left alone.
+            // Returning a connection to the pool would keep a session open and block that replica's alter.
+            ReleaseThisProcessPool(connection);
+            if (connection.State == ConnectionState.Open)
+            {
+                await connection.CloseAsync();
+            }
+
+            var wait = NextDelay(retry);
+            if (wait > TimeSpan.Zero)
+            {
+                await Task.Delay(wait, cancellationToken);
+            }
+        }
+    }
+
+    private static TimeSpan NextDelay(ReadCommittedSnapshotRetry retry)
+    {
+        var jitterMs = 0;
+        if (retry.Jitter > TimeSpan.Zero)
+        {
+            var upper = (int)Math.Clamp(retry.Jitter.TotalMilliseconds, 0, 60_000);
+            jitterMs = Random.Shared.Next(0, upper + 1);
+        }
+
+        var delay = retry.Delay + TimeSpan.FromMilliseconds(jitterMs);
+        return delay > TimeSpan.Zero ? delay : TimeSpan.Zero;
+    }
+
+    private static void ReleaseThisProcessPool(DbConnection connection)
+    {
+        try
+        {
+            var type = connection.GetType();
+            var clearPool = type.GetMethod(
+                "ClearPool",
+                BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                types: new[] { type },
+                modifiers: null);
+            clearPool?.Invoke(null, new object[] { connection });
+        }
+        catch (Exception)
+        {
+            // Closing this connection is still required. Other processes are not affected by this pool.
         }
     }
 
@@ -164,60 +250,45 @@ internal static class ReadCommittedSnapshotEnabler
         };
     }
 
-    private static async Task<int> AppLockAsync(DbConnection connection, int lockTimeoutMs, CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = """
-            DECLARE @result int;
-            EXEC @result = sp_getapplock
-                @Resource = @resource,
-                @LockMode = 'Exclusive',
-                @LockOwner = 'Session',
-                @LockTimeout = @lockTimeoutMs,
-                @DbPrincipal = 'public';
-            SELECT @result;
-            """;
-        command.CommandTimeout = 30;
-        AddParameter(command, "@resource", LockResource);
-        AddParameter(command, "@lockTimeoutMs", lockTimeoutMs);
-        var raw = await command.ExecuteScalarAsync(cancellationToken);
-        return Convert.ToInt32(raw);
-    }
-
-    private static async Task TryReleaseLockAsync(DbConnection connection, CancellationToken cancellationToken)
+    private static async Task<int?> CountOtherUserSessionsAsync(
+        DbConnection connection,
+        ILogger logger,
+        CancellationToken cancellationToken)
     {
         try
         {
             await using var command = connection.CreateCommand();
             command.CommandText = """
-                EXEC sp_releaseapplock
-                    @Resource = @resource,
-                    @LockOwner = 'Session',
-                    @DbPrincipal = 'public';
+                SELECT COUNT(*)
+                FROM sys.dm_exec_sessions
+                WHERE database_id = DB_ID()
+                  AND session_id <> @@SPID
+                  AND is_user_process = 1
                 """;
             command.CommandTimeout = 30;
-            AddParameter(command, "@resource", LockResource);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            var raw = await command.ExecuteScalarAsync(cancellationToken);
+            return Convert.ToInt32(raw);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // The session lock ends when this connection closes.
+            logger.LogInformation(ex, "Could not count other sessions on Normalization database {Database}. This attempt will try the alter.", connection.Database);
+            return null;
         }
     }
 
     private static async Task ExecuteNonQueryAsync(
         DbConnection connection,
         string sql,
-        TimeSpan lockTimeout,
+        int timeoutMs,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
-        command.CommandTimeout = (int)Math.Ceiling(lockTimeout.TotalSeconds) + 2;
+        command.CommandTimeout = Math.Max(1, (int)Math.Ceiling(timeoutMs / 1000.0));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -243,14 +314,6 @@ internal static class ReadCommittedSnapshotEnabler
         {
             // Restoring the session default must not hide the enable result.
         }
-    }
-
-    private static void AddParameter(DbCommand command, string name, object value)
-    {
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = name;
-        parameter.Value = value;
-        command.Parameters.Add(parameter);
     }
 
     private static bool IsPermission(Exception exception)
