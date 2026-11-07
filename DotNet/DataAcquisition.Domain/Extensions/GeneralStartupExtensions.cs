@@ -58,6 +58,7 @@ using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -116,6 +117,8 @@ public static class GeneralStartupExtensions
         builder.Logging.ClearProviders();
 
         var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
+        // Names this instance on every line (Serilog:Properties:ServiceInstance), to tell scaled-out copies apart.
+        builder.Configuration.AddServiceInstanceLogProperty();
         var serilogConfig = new LoggerConfiguration()
             .ReadFrom.Configuration(builder.Configuration, loggerOptions)
             .Filter.ByExcluding("RequestPath like '/health%'")

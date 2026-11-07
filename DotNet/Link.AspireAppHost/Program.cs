@@ -189,7 +189,7 @@ foreach (var (name, cluster, port) in proxiedServices)
 // Commands that span several services sit on the Admin BFF, the platform's front door. Seed data also runs
 // per service as each turns healthy (Account roles, Validation artifacts and categories, measures).
 adminBff
-    .WithSeedDataCommand(account, measureEval, validation)
+    .WithSeedDataCommand(account, measureEval.Primary, validation.Primary)
     .WithCreateFacilityCommand();
 
 if (keycloak is not null)

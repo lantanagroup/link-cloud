@@ -23,19 +23,54 @@ internal static class DotNetServiceExtensions
 
     public static string Url(int port) => $"http://localhost:{port}";
 
+    /// <summary>
+    /// Adds a .NET service. Aspire's proxy listens on <paramref name="port"/>, so every URL this host hands
+    /// out stays the same, and the service listens behind it on a port Aspire picks.
+    /// </summary>
+    /// <remarks>
+    /// The proxy is what lets a service run as several replicas, as a deployed service scales out behind its
+    /// ingress: the proxy spreads requests across them, and each replica listens on its own port. The number
+    /// comes from <c>Replicas:&lt;name&gt;</c> (see <see cref="ReplicaExtensions"/>). Only the
+    /// services go through it. The infrastructure containers keep Docker's published ports, because under
+    /// load the proxy has been seen to stop accepting connections and not recover (link-lbw, at about 400
+    /// SQL Server connections).
+    /// </remarks>
     public static IResourceBuilder<ProjectResource> AddLinkService<TProject>(
         this IDistributedApplicationBuilder builder, string name, int port, string healthPath = "/health")
-        where TProject : IProjectMetadata, new() =>
+        where TProject : IProjectMetadata, new()
+    {
         // No launch profile: the port is this host's, and launchSettings.json stays the IDE's.
-        builder.AddProject<TProject>(name, launchProfileName: null)
-            .WithHttpEndpoint(port: port, isProxied: false)
+        var service = builder.AddProject<TProject>(name, launchProfileName: null)
+            .WithHttpEndpoint(port: port);
+
+        // appsettings.Docker.json names a Kestrel endpoint, which outranks ASPNETCORE_URLS, so it is pointed at
+        // the port Aspire picked. With replicas, each one gets its own.
+        var endpoint = service.GetEndpoint("http");
+        var replicas = builder.ReplicaCount(name);
+        if (replicas > 1)
+            service.WithReplicas(replicas);
+
+        // The name every log line carries (ServiceInstance; see ServiceInstanceLoggingExtensions). With replicas, each
+        // gets the suffix the dashboard shows it with (dataacq-worker-rynurthc): Aspire's process launcher fills in the
+        // per-replica id, as it does for the OpenTelemetry service.instance.id it passes.
+        service.WithEnvironment("LINK_SERVICE_INSTANCE",
+            replicas > 1 ? name + "-{{- index .Annotations \"otel-service-instance-id\" -}}" : name);
+
+        return service
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Docker")
             .WithEnvironment("DOTNET_ENVIRONMENT", "Docker")
-            // appsettings.Docker.json names a Kestrel endpoint, which outranks ASPNETCORE_URLS.
-            .WithEnvironment("Kestrel__Endpoints__http__Url", Url(port))
+            .WithEnvironment("Kestrel__Endpoints__http__Url",
+                ReferenceExpression.Create($"http://localhost:{endpoint.Property(EndpointProperty.TargetPort)}"))
             .WithEnvironment("Serilog__WriteTo__0__Args__uri", LinkInfrastructure.LokiUrl)
+            // Every service here runs as the same user, so they share LocalSecretManager's one file
+            // (%LOCALAPPDATA%\Link\Secrets), which DataAcquisition and its worker also use to pass facility
+            // credentials. It is readable only under the key ring that wrote it, and the Admin BFF's
+            // appsettings.json sets the ring to "" where the others fall back to "Link"; a service that
+            // can't read the file starts empty and writes over it. One ring for all keeps it readable.
+            .WithEnvironment("DataProtection__KeyRing", "Link")
             .WithDashboardTelemetry()
             .WithHttpHealthCheck(healthPath);
+    }
 
     /// <summary>
     /// Sends the service's OpenTelemetry to the Aspire dashboard. The services read their collector

@@ -44,6 +44,7 @@ dotnet user-secrets set "Java:Home" "C:\Program Files\Eclipse Adoptium\jdk-21.0.
 | `AdminUi:Enabled` | `true` | `false` leaves the Admin UI out |
 | `Auth:Mode` | `Anonymous` (`Keycloak` in the https profile) | How people sign in; see below |
 | `AdminUi:AuthRequired` | `false` | The UI's `authRequired`. Keycloak mode turns it on. Under anonymous access the Admin BFF maps no login endpoint, so `true` on its own sends people to a page that 404s |
+| `Replicas:<service>` | `1` | How many copies of a service run; see [Scaling a service out](#scaling-a-service-out) |
 
 The SQL Server password is generated on the first run and kept in the same user secrets
 (`Parameters:sql-password`).
@@ -92,6 +93,12 @@ with the http profile's dashboard.
 Every port differs from compose's, so both stacks can run at the same time. Each service is on its
 compose port plus 10000.
 
+The services' ports belong to Aspire's proxy, which passes requests to the service listening behind it
+on a port Aspire picks. That is what lets a service run as several replicas, as a deployed service
+scales out behind its ingress (see [Scaling a service out](#scaling-a-service-out)). The infrastructure containers are not proxied: their ports are the ones
+Docker publishes, because under heavy connection load the proxy has been seen to stop accepting
+connections and not recover.
+
 | Resource | URL / port |
 |---|---|
 | Dashboard | http://localhost:15190 |
@@ -111,6 +118,33 @@ compose port plus 10000.
 | Azurite blob | http://127.0.0.1:11000/devstoreaccount1 |
 | Loki | http://localhost:13100 |
 | Keycloak (https profile only) | https://localhost:18443, realm `link` |
+
+### Scaling a service out
+
+`Replicas:<service>` in `appsettings.json` (or user secrets, or `Replicas__validation=3` in the
+environment) runs that many copies of a service, as a deployed environment scales one horizontally. The
+name is the resource's name in the dashboard; every service is listed in `appsettings.json` at `1`.
+
+```powershell
+dotnet user-secrets set "Replicas:validation" "3"
+```
+
+- **Every copy is the same service.** Same code, same settings, same Kafka consumer groups, so a topic's
+  partitions are split between the copies. Whatever a service does at startup (migrations, Hibernate's
+  schema update, Quartz jobs) each copy does, as it would deployed. If a service misbehaves with two
+  copies here, it would with two deployed: that is a finding, not something the AppHost hides.
+- **Three is the useful limit for a Kafka consumer.** Every topic has three partitions, and a consumer
+  group gives each partition to one copy, so a fourth copy sits idle. The AppHost logs a warning above 3.
+- **.NET services** use Aspire's replicas: one resource in the dashboard with several instances, behind
+  the proxy on the service's usual port, which spreads requests across them.
+- **MeasureEval and Validation** are Java executables, which Aspire's replicas don't cover, so each copy
+  is a resource of its own: `validation`, `validation-2`, `validation-3`. The first keeps the usual port
+  and receives every HTTP call and the dashboard commands; the others are on ports Aspire picks. Their
+  value is the extra Kafka consumers.
+- **Every log line says which copy wrote it.** .NET lines carry a `ServiceInstance` property
+  (`dataacq-worker-rynurthc`, the name the dashboard shows the replica with), and Java lines end with
+  `[instance=validation-2]`. The AppHost sets `LINK_SERVICE_INSTANCE` on each copy; deployed, where nothing sets
+  it, the services use `HOSTNAME`, which Kubernetes sets to the pod's name.
 
 ### Connecting to SQL Server from SSMS or another tool
 
@@ -147,6 +181,7 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 |---|---|
 | `Program.cs` | Wires every resource together: infrastructure, services, and how sign-in works |
 | `Ports.cs` | Every fixed host port |
+| `Extensions/ReplicaExtensions.cs` | `Replicas:<service>`: how many copies of each service run |
 | `Security/LinkSystemToken.cs` | The Link bearer token the AppHost's own commands send |
 | `Security/AuthMode.cs` | `Auth:Mode`: Anonymous (http profile) or Keycloak (https profile) |
 | `Security/LinkServiceClient.cs` | HTTP clients for the AppHost's own calls to services, carrying the Link system token |
@@ -213,6 +248,14 @@ replaced by a green notice on success or a red one on failure, which stays until
 - **Don't run the same service under the AppHost and from your IDE at once.** They use different
   Kafka brokers, so they won't share a consumer group, but they would each process their own copy
   of everything.
+- **Local secrets.** The .NET services keep secrets in one file per Windows user,
+  `%LOCALAPPDATA%\Link\Secrets\link-local-secrets.enc`, which DataAcquisition also uses to hand a
+  facility's FHIR credentials to its worker. The AppHost gives every service the same Data Protection
+  key ring (`Link`), so all of them can read it. A service that can't decrypt it won't write over it:
+  it logs "Failed to decrypt secrets file ... It will not be written over" and keeps its own secrets
+  in memory, and saving a facility's credentials fails. That happens when the file was written under
+  another key ring, for example by a service run from your IDE with different settings. **Delete the
+  file**, even with the services running: the next one to save a secret writes a new one.
 - **Data.** SQL Server, MongoDB, Azurite, Kafka and Keycloak keep their data in Docker volumes
   (`link-aspire-*`) between runs. Redis and the HAPI FHIR server start empty each time.
   - **Kafka keeps its consumer groups' committed offsets, as compose does.** Most Link consumers start

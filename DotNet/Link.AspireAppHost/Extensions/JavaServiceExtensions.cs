@@ -14,7 +14,7 @@ namespace Link.AspireAppHost.Extensions;
 /// </summary>
 internal static class JavaServiceExtensions
 {
-    public static (IResourceBuilder<ExecutableResource> MeasureEval, IResourceBuilder<ExecutableResource> Validation) AddJavaServices(
+    public static (JavaService MeasureEval, JavaService Validation) AddJavaServices(
         this IDistributedApplicationBuilder builder,
         LinkInfrastructure infrastructure,
         IResourceBuilder<SqlServerDatabaseResource> validationDatabase,
@@ -41,16 +41,16 @@ internal static class JavaServiceExtensions
         var validationJdbcUrl =
             $"jdbc:sqlserver://localhost:{Ports.SqlServer};databaseName={validationDatabase.Resource.DatabaseName};encrypt=true;trustServerCertificate=true"; // trufflehog:ignore
 
-        var measureEval = builder.AddJavaService("measureeval", Ports.MeasureEval, javaCommand, javaHome, javaDirectory, version, build, requireToken)
+        var measureEval = builder.AddJavaService("measureeval", Ports.MeasureEval, javaCommand, javaHome, javaDirectory, version, build, requireToken, copy => copy
             .WithEnvironment("spring.data.mongodb.uri", mongoUri)
             .WithEnvironment("spring.data.mongodb.database", "link-measureeval")
             .WithEnvironment("resource-cache.blob-storage.connection-string", LinkInfrastructure.BlobConnectionString)
             .WithEnvironment("resource-cache.blob-storage.blob-container-name", LinkInfrastructure.InternalContainer)
             .WithEnvironment("resource-cache.blob-storage.blob-root", LinkInfrastructure.ResourceCacheBlobRoot)
             .WithEnvironment("link.data-acquisition.base-url", DotNetServiceExtensions.Url(Ports.DataAcquisition))
-            .WaitFor(infrastructure.Mongo);
+            .WaitFor(infrastructure.Mongo));
 
-        var validation = builder.AddJavaService("validation", Ports.Validation, javaCommand, javaHome, javaDirectory, version, build, requireToken)
+        var validation = builder.AddJavaService("validation", Ports.Validation, javaCommand, javaHome, javaDirectory, version, build, requireToken, copy => copy
             .WithEnvironment("spring.datasource.url", validationJdbcUrl)
             .WithEnvironment("spring.datasource.username", "sa")
             .WithEnvironment("spring.datasource.password", infrastructure.Sql.Resource.PasswordParameter)
@@ -60,8 +60,9 @@ internal static class JavaServiceExtensions
             .WithEnvironment("vaas.bridge.rubric-id", SeedDataExtensions.ReadRubricIdentity(SeedDataExtensions.RubricFile(builder.AppHostDirectory)).Id)
             // Validation adds /api/terminology/fhir itself.
             .WithEnvironment("LINK_TERMINOLOGYSERVICEURL", DotNetServiceExtensions.Url(Ports.Terminology))
-            .WaitFor(validationDatabase)
-            .WithValidationMigrationCommand(javaDirectory, validationDatabase);
+            .WaitFor(validationDatabase));
+        // A dashboard command, so on the first copy only: the copies share one database.
+        validation.Primary.WithValidationMigrationCommand(javaDirectory, validationDatabase);
 
         if (requireToken && keycloak is not null)
         {
@@ -72,7 +73,18 @@ internal static class JavaServiceExtensions
         return (measureEval, validation);
     }
 
-    private static IResourceBuilder<ExecutableResource> AddJavaService(
+    /// <summary>
+    /// Adds a Java service as <c>Replicas:&lt;module&gt;</c> copies, one by default, each given the same
+    /// settings by <paramref name="configure"/>.
+    /// </summary>
+    /// <remarks>
+    /// Aspire's replicas are for .NET projects only, so each copy is a resource of its own: the first is
+    /// named <paramref name="module"/> and holds the fixed port behind Aspire's proxy, as the .NET services
+    /// do; the others are <c>&lt;module&gt;-2</c> and so on, on ports Aspire picks. Every HTTP call goes to
+    /// the first copy, since a proxy cannot be shared between resources. What the copies add is consumers:
+    /// they share the service's Kafka consumer groups and split the topics' partitions between them.
+    /// </remarks>
+    private static JavaService AddJavaService(
         this IDistributedApplicationBuilder builder,
         string module,
         int port,
@@ -81,12 +93,38 @@ internal static class JavaServiceExtensions
         string javaDirectory,
         string version,
         IResourceBuilder<ExecutableResource> build,
+        bool requireToken,
+        Func<IResourceBuilder<ExecutableResource>, IResourceBuilder<ExecutableResource>> configure)
+    {
+        var count = builder.ReplicaCount(module);
+        var copies = new List<IResourceBuilder<ExecutableResource>>();
+        for (var copy = 1; copy <= count; copy++)
+        {
+            var name = copy == 1 ? module : $"{module}-{copy}";
+            var resource = builder.AddExecutable(name, javaCommand,
+                    Path.Combine(javaDirectory, module), "-jar", Path.Combine("target", $"{module}-{version}.jar"))
+                // The name logback appends to every Loki line ([instance=validation-2]).
+                .WithEnvironment("LINK_SERVICE_INSTANCE", name);
+            // Aspire passes the port it picked for the copy in server.port. The first copy's sits behind the
+            // proxy, which holds the fixed port.
+            resource = copy == 1
+                ? resource.WithHttpEndpoint(port: port, env: "server.port")
+                : resource.WithHttpEndpoint(env: "server.port", isProxied: false);
+            copies.Add(configure(resource.WithJavaSettings(javaHome, build, requireToken)));
+        }
+
+        return new JavaService(copies);
+    }
+
+    /// <summary>The settings every copy of every Java service gets.</summary>
+    private static IResourceBuilder<ExecutableResource> WithJavaSettings(
+        this IResourceBuilder<ExecutableResource> resource,
+        string? javaHome,
+        IResourceBuilder<ExecutableResource> build,
         bool requireToken) =>
-        builder.AddExecutable(module, javaCommand, Path.Combine(javaDirectory, module), "-jar", Path.Combine("target", $"{module}-{version}.jar"))
+        resource
             .WithJavaHome(javaHome)
-            .WithHttpEndpoint(port: port, isProxied: false)
             .WithEnvironment("SPRING_PROFILES_ACTIVE", "docker")
-            .WithEnvironment("server.port", port.ToString())
             // The docker profile names kafka_b over SASL; this broker is local and plain.
             .WithEnvironment("spring.kafka.bootstrap-servers", LinkInfrastructure.KafkaBootstrapServers)
             .WithEnvironment("spring.kafka.properties.security.protocol", "PLAINTEXT")
@@ -107,7 +145,7 @@ internal static class JavaServiceExtensions
             // WithOtlpExporter() is not used: it also sets OTEL_RESOURCE_ATTRIBUTES and
             // OTEL_EXPORTER_OTLP_HEADERS, which the OpenTelemetry Spring starter binds to Map properties
             // and fails to start on ("No converter found ... to type Map<String, String>").
-            .WithEnvironment("TELEMETRY_EXPORTERENDPOINT", builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"] ?? "")
+            .WithEnvironment("TELEMETRY_EXPORTERENDPOINT", resource.ApplicationBuilder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"] ?? "")
             .WithHttpHealthCheck("/health")
             .WaitForCompletion(build);
 
@@ -183,5 +221,23 @@ internal static class JavaServiceExtensions
                 IconName = "DatabaseArrowUp",
                 IconVariant = IconVariant.Filled
             });
+    }
+}
+
+/// <summary>
+/// The copies of one Java service (see <c>Replicas</c>). <see cref="Primary"/> is the one HTTP calls reach and
+/// dashboard commands belong to; a dependency every copy needs is added with <see cref="WaitFor{T}"/>.
+/// </summary>
+internal sealed class JavaService(IReadOnlyList<IResourceBuilder<ExecutableResource>> copies)
+{
+    public IResourceBuilder<ExecutableResource> Primary => copies[0];
+
+    public IReadOnlyList<IResourceBuilder<ExecutableResource>> Copies => copies;
+
+    public JavaService WaitFor<T>(IResourceBuilder<T> dependency) where T : class, IResource
+    {
+        foreach (var copy in copies)
+            copy.WaitFor(dependency);
+        return this;
     }
 }
