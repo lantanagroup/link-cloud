@@ -55,9 +55,13 @@ internal static class JavaServiceExtensions
             .WithEnvironment("spring.datasource.username", "sa")
             .WithEnvironment("spring.datasource.password", infrastructure.Sql.Resource.PasswordParameter)
             .WithEnvironment("spring.kafka.producer.properties.max.request.size", "10485760")
-            // The rubric Seed data publishes (SeedData/Validation). The shadow comparison evaluates every patient against
-            // it, beside the legacy validation, which still decides pass or fail: vaas.bridge.enabled stays false.
+            // The rubric Seed data publishes (SeedData/Validation), used by the rubric engine and the shadow comparison.
             .WithEnvironment("vaas.bridge.rubric-id", SeedDataExtensions.ReadRubricIdentity(SeedDataExtensions.RubricFile(builder.AppHostDirectory)).Id)
+            // Which engine decides pass or fail (Validation:Engine), and whether the other one also runs on every
+            // patient for comparison (Validation:ShadowComparison).
+            .WithEnvironment("vaas.bridge.enabled", ValidationEngineIsRubric(builder).ToString().ToLowerInvariant())
+            .WithEnvironment("vaas.bridge.shadow-enabled",
+                (builder.Configuration.GetValue<bool?>("Validation:ShadowComparison") ?? true).ToString().ToLowerInvariant())
             // Resource types the legacy validator leaves out, from Validation:ExcludedResourceTypes in this host's
             // settings. Spring reads the comma-separated value as a list; an empty one validates every entry.
             .WithEnvironment("link.validation-excluded-resource-types",
@@ -168,6 +172,22 @@ internal static class JavaServiceExtensions
             return configured.TrimEnd('\\', '/');
         var environment = Environment.GetEnvironmentVariable("JAVA_HOME");
         return string.IsNullOrWhiteSpace(environment) ? null : environment.TrimEnd('\\', '/');
+    }
+
+    /// <summary>
+    /// Whether <c>Validation:Engine</c> picks the rubric engine to decide pass or fail; <c>Legacy</c> (the default)
+    /// keeps HAPI's validator.
+    /// </summary>
+    private static bool ValidationEngineIsRubric(IDistributedApplicationBuilder builder)
+    {
+        var engine = builder.Configuration["Validation:Engine"] ?? "Legacy";
+        return engine.ToLowerInvariant() switch
+        {
+            "legacy" => false,
+            "rubric" => true,
+            _ => throw new InvalidOperationException(
+                $"Validation:Engine is '{engine}'; use Legacy (HAPI's validator) or Rubric (the rubric engine)."),
+        };
     }
 
     /// <summary>The version in <c>Java/pom.xml</c>, which names the jars Maven builds.</summary>

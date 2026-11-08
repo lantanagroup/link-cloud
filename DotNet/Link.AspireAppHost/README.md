@@ -44,6 +44,8 @@ dotnet user-secrets set "Java:Home" "C:\Program Files\Eclipse Adoptium\jdk-21.0.
 | `AdminUi:Enabled` | `true` | `false` leaves the Admin UI out |
 | `Auth:Mode` | `Anonymous` (`Keycloak` in the https profile) | How people sign in; see below |
 | `AdminUi:AuthRequired` | `false` | The UI's `authRequired`. Keycloak mode turns it on. Under anonymous access the Admin BFF maps no login endpoint, so `true` on its own sends people to a page that 404s |
+| `Validation:Engine` | `Legacy` | Which engine decides whether a patient passes validation: `Legacy` (HAPI's validator) or `Rubric` (the rubric engine, with the rubric Seed data publishes). Sets Validation's `vaas.bridge.enabled` |
+| `Validation:ShadowComparison` | `true` | Also run the other engine on every patient and log whether the two agree. Doubles validation work; `false` runs only the engine above. Sets `vaas.bridge.shadow-enabled` |
 | `Validation:ExcludedResourceTypes` | `["MeasureReport"]` | Resource types Validation's legacy validator leaves out of each patient bundle. Validating the MeasureReport costs more than the rest of the patient and its findings aren't used; `[]` validates everything |
 | `Replicas:<service>` | `1` | How many copies of a service run; see [Scaling a service out](#scaling-a-service-out) |
 
