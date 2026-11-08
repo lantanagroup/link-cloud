@@ -71,12 +71,6 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final boolean shadowEnabled;
     private final String rubricId;
 
-    private static final Set<RubricResultStatus> VALID_STATUSES = Set.of(
-            RubricResultStatus.ACCEPTABLE,
-            RubricResultStatus.ACCEPTABLE_WITH_WARNINGS,
-            RubricResultStatus.INCONCLUSIVE
-    );
-
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
             ReportClient reportClient,
@@ -190,7 +184,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         if (shadowEnabled) {
             try {
                 publishShadowCompareEvent(requestId, correlationId, facilityId, patientId, reportId, payloadUri,
-                        bridgeEnabled, results);
+                        bridgeEnabled, isValid, results);
             } catch (Exception e) {
                 _logger.warn("Failed to publish ShadowCompareEvent for report {}; skipping shadow comparison",
                         LogUtils.sanitize(reportId), e);
@@ -208,7 +202,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
      */
     private void publishShadowCompareEvent(
             UUID requestId, String correlationId, String facilityId, String patientId, String reportId,
-            String payloadUri, boolean ranNewEngine, List<Result> results) {
+            String payloadUri, boolean ranNewEngine, boolean isValid, List<Result> results) {
         ShadowCompareEvent event = new ShadowCompareEvent();
         event.setRequestId(requestId);
         event.setCorrelationId(correlationId);
@@ -217,6 +211,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         event.setReportId(reportId);
         event.setPayloadUri(payloadUri);
         event.setRanNewEngine(ranNewEngine);
+        event.setAuthoritativeValid(isValid);
         event.setAuthoritativeResult(results.stream().map(ShadowFindingDto::from).toList());
 
         org.apache.kafka.common.header.Headers headers = new RecordHeaders();
@@ -487,11 +482,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
      */
     boolean checkIsValid(List<Result> results, RubricResultStatus status) {
         if (bridgeEnabled && status != null) {
-            return VALID_STATUSES.contains(status);
+            return ValidationVerdict.rubricValid(status);
         }
-        return results.stream()
-                .flatMap(res -> res.getCategories() == null
-                        ? java.util.stream.Stream.empty() : res.getCategories().stream())
-                .allMatch(Category::isAcceptable);
+        return ValidationVerdict.legacyValid(results);
     }
 }

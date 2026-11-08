@@ -1000,6 +1000,7 @@ public class ReadyForValidationConsumerTest {
         ShadowCompareEvent event = captor.getValue().value();
         assertFalse(event.isRanNewEngine());
         assertEquals(1, event.getAuthoritativeResult().size());
+        assertEquals(Boolean.TRUE, event.getAuthoritativeValid(), "the primary engine's verdict travels with the event");
         assertEquals(FACILITY_ID, captor.getValue().key());
         assertNull(event.getRequestId(), "legacy engine has no request id to share, unlike the rubric engine");
         assertEquals(CORRELATION_ID, event.getCorrelationId(),
@@ -1027,6 +1028,7 @@ public class ReadyForValidationConsumerTest {
 
         ShadowCompareEvent event = captor.getValue().value();
         assertTrue(event.isRanNewEngine());
+        assertEquals(Boolean.TRUE, event.getAuthoritativeValid(), "an ACCEPTABLE rubric status is a pass");
         assertEquals(rubricRequestId, event.getRequestId(),
                 "the rubric engine's own request id (already on its rubric_result row) should be forwarded as-is");
         assertEquals(CORRELATION_ID, event.getCorrelationId(),

@@ -1,5 +1,7 @@
 package com.lantanagroup.link.validation.services;
 
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
+import com.lantanagroup.link.validation.entities.Category;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -120,8 +122,10 @@ class ShadowValidationConsumerTest {
                 eq(PATIENT_ID), eq(REPORT_ID), eq(List.of(legacyResult)), any(), any());
 
         ArgumentCaptor<List<Result>> newResultsCaptor = ArgumentCaptor.forClass(List.class);
+        // Legacy's verdict comes from its own (uncategorized, so passing) results; the rubric's from the event, unset here.
         verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
-                eq(REPORT_ID), eq(RUBRIC_ID), eq(true), eq(List.of(legacyResult)), newResultsCaptor.capture());
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(true), eq(true), isNull(), eq(List.of(legacyResult)),
+                newResultsCaptor.capture());
         assertEquals(1, newResultsCaptor.getValue().size());
     }
 
@@ -144,7 +148,45 @@ class ShadowValidationConsumerTest {
         verify(validationService, never()).validate(any());
         verify(legacyShadowResultPersister, never()).persist(any(), any(), any(), any(), any(), any(), any(), any());
         verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
-                eq(REPORT_ID), eq(RUBRIC_ID), eq(false), any(List.class), eq(Collections.emptyList()));
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(false), isNull(), isNull(), any(List.class), eq(Collections.emptyList()));
+    }
+
+    @Test
+    void ranNewEngineFalse_comparesTheLegacyVerdictFromTheEventWithTheRubricStatus() {
+        stubRestRetrieval();
+        IParser jsonParser = org.mockito.Mockito.mock(IParser.class);
+        when(fhirContext.newJsonParser()).thenReturn(jsonParser);
+        when(jsonParser.encodeResourceToString(bundle)).thenReturn("{\"resourceType\":\"Bundle\"}");
+        ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID)))
+                .thenReturn(envelope);
+        when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
+                .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.UNACCEPTABLE));
+        ConsumerRecord<String, ShadowCompareEvent> record = buildRecord(false, List.of(authoritativeFinding()));
+        record.value().setAuthoritativeValid(true);
+
+        consumer.process(record);
+
+        verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(false), eq(true), eq(false), any(), any());
+    }
+
+    @Test
+    void ranNewEngineTrue_legacyFailsWhenAFindingIsInAnUnacceptableCategory() {
+        stubRestRetrieval();
+        Category unacceptable = new Category();
+        unacceptable.setAcceptable(false);
+        Result legacyResult = new Result();
+        legacyResult.setSeverity(OperationOutcome.IssueSeverity.ERROR);
+        legacyResult.setCategories(List.of(unacceptable));
+        when(validationService.validate(bundle)).thenReturn(List.of(legacyResult));
+        ConsumerRecord<String, ShadowCompareEvent> record = buildRecord(true, List.of(authoritativeFinding()));
+        record.value().setAuthoritativeValid(true);
+
+        consumer.process(record);
+
+        verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(true), eq(false), eq(true), any(), any());
     }
 
     @Test
