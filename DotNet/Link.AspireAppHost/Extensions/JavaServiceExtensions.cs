@@ -58,6 +58,10 @@ internal static class JavaServiceExtensions
             // The rubric Seed data publishes (SeedData/Validation). The shadow comparison evaluates every patient against
             // it, beside the legacy validation, which still decides pass or fail: vaas.bridge.enabled stays false.
             .WithEnvironment("vaas.bridge.rubric-id", SeedDataExtensions.ReadRubricIdentity(SeedDataExtensions.RubricFile(builder.AppHostDirectory)).Id)
+            // Resource types the legacy validator leaves out, from Validation:ExcludedResourceTypes in this host's
+            // settings. Spring reads the comma-separated value as a list; an empty one validates every entry.
+            .WithEnvironment("link.validation-excluded-resource-types",
+                string.Join(",", builder.Configuration.GetSection("Validation:ExcludedResourceTypes").Get<string[]>() ?? []))
             // Validation adds /api/terminology/fhir itself.
             .WithEnvironment("LINK_TERMINOLOGYSERVICEURL", DotNetServiceExtensions.Url(Ports.Terminology))
             .WaitFor(validationDatabase));
