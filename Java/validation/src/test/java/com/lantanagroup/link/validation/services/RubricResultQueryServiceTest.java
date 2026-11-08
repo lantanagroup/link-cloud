@@ -1,6 +1,8 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.ValidationPolicyConfig;
+import com.lantanagroup.link.validation.models.FindingDto;
 import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.entities.RubricFinding;
 import com.lantanagroup.link.validation.entities.RubricResult;
@@ -35,8 +37,70 @@ class RubricResultQueryServiceTest {
     private final RubricCheckRepository checkRepository = mock(RubricCheckRepository.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private final ValidationPolicyConfig policyConfig = new ValidationPolicyConfig();
+
     private final RubricResultQueryService service =
-            new RubricResultQueryService(resultRepository, findingRepository, checkRepository, objectMapper);
+            new RubricResultQueryService(resultRepository, findingRepository, checkRepository, objectMapper, policyConfig);
+
+    private RubricFinding storedFinding(long findingId, Long resultId, Severity severity, Severity originalSeverity) {
+        return RubricFinding.builder()
+                .findingId(findingId)
+                .resultId(resultId)
+                .checkId(100L)
+                .dimension(PiqiDimension.TERMINOLOGY)
+                .severity(severity)
+                .originalSeverity(originalSeverity)
+                .code("valueset-membership-failed")
+                .message("not in value set")
+                .location("Observation/o" + findingId)
+                .expression("Observation.code")
+                .build();
+    }
+
+    private UUID storedResultWith(Long resultId, RubricFinding... findings) {
+        UUID requestId = UUID.randomUUID();
+        RubricResult result = RubricResult.builder()
+                .resultId(resultId)
+                .requestId(requestId)
+                .rubricId("piqi.core")
+                .status(RubricResultStatus.UNACCEPTABLE)
+                .requestedAt(OffsetDateTime.now())
+                .completedAt(OffsetDateTime.now())
+                .durationMs(1L)
+                .build();
+        when(resultRepository.findByRequestId(requestId)).thenReturn(Optional.of(result));
+        when(findingRepository.findByResultId(eq(resultId))).thenReturn(List.of(findings));
+        return requestId;
+    }
+
+    @Test
+    @DisplayName("a stored finding returns both severities, and the override when a category moved it")
+    void returnsBothSeverities() {
+        UUID requestId = storedResultWith(3L,
+                storedFinding(1L, 3L, Severity.ERROR, Severity.WARNING),
+                storedFinding(2L, 3L, Severity.ERROR, Severity.ERROR),
+                storedFinding(3L, 3L, Severity.ERROR, null));
+
+        List<FindingDto> findings = service.findByRequestId(requestId).orElseThrow().getFindings();
+
+        assertThat(findings).extracting(FindingDto::getOriginalSeverity)
+                .containsExactly(Severity.WARNING, Severity.ERROR, null);
+        assertThat(findings).extracting(FindingDto::getOverriddenSeverity)
+                .containsExactly(Severity.ERROR, null, null);
+    }
+
+    @Test
+    @DisplayName("with original severities turned off in the response, a stored finding returns only its severity")
+    void originalSeverityCanBeTurnedOff() {
+        policyConfig.getResponse().setIncludeOriginalSeverity(false);
+        UUID requestId = storedResultWith(4L, storedFinding(1L, 4L, Severity.ERROR, Severity.WARNING));
+
+        FindingDto finding = service.findByRequestId(requestId).orElseThrow().getFindings().get(0);
+
+        assertThat(finding.getSeverity()).isEqualTo(Severity.ERROR);
+        assertThat(finding.getOriginalSeverity()).isNull();
+        assertThat(finding.getOverriddenSeverity()).isNull();
+    }
 
     @Test
     @DisplayName("unknown request id -> empty Optional (controller turns this into a 404)")

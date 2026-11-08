@@ -105,11 +105,11 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                 }
                 if (result.isOk()) {
                     log.info("TERMINOLOGY check '{}': code {}|{} (display '{}') on {} -> VALID",
-                            check.getCheckLocalId(), system, code, coding.getDisplay(), location(resource));
+                            check.getCheckLocalId(), system, code, coding.getDisplay(), FindingLocation.of(resource));
                 } else if (UnresolvedBindingClassifier.isUnresolvable(result) && !validationSupportChain.isCodeSystemSupported(supportContext, system)) {
                     notEvaluated++;
                     log.info("TERMINOLOGY check '{}': code system {} could not be resolved for code {} on {} -> NOT EVALUATED: {}",
-                            check.getCheckLocalId(), system, code, location(resource), result.getMessage());
+                            check.getCheckLocalId(), system, code, FindingLocation.of(resource), result.getMessage());
                     findings.add(RawFinding.builder()
                             .checkLocalId(check.getCheckLocalId())
                             .dimension(check.getDimension())
@@ -117,13 +117,13 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                             .notEvaluated(true)
                             .code("binding-not-evaluated")
                             .message(String.format("Code system '%s' could not be resolved; code '%s' was not evaluated", system, code))
-                            .location(location(resource))
+                            .location(FindingLocation.of(resource))
                             .expression(system + "|" + code)
                             .build());
                 } else {
                     invalid++;
                     log.info("TERMINOLOGY check '{}': code {}|{} (display '{}') on {} -> INVALID: {}",
-                            check.getCheckLocalId(), system, code, coding.getDisplay(), location(resource), result.getMessage());
+                            check.getCheckLocalId(), system, code, coding.getDisplay(), FindingLocation.of(resource), result.getMessage());
                     String detail = result.getMessage() != null ? ": " + result.getMessage() : "";
                     findings.add(RawFinding.builder()
                             .checkLocalId(check.getCheckLocalId())
@@ -131,7 +131,7 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                             .severity(severity)
                             .code("terminology-code-invalid")
                             .message(String.format("Code '%s' in system '%s' is not valid%s", code, system, detail))
-                            .location(location(resource))
+                            .location(FindingLocation.of(resource))
                             .expression(system + "|" + code)
                             .build());
                 }
@@ -152,8 +152,4 @@ public class TerminologyCheckExecutor implements CheckExecutor {
         }
     }
 
-    private String location(IBaseResource resource) {
-        String id = resource.getIdElement() != null ? resource.getIdElement().getIdPart() : null;
-        return (id != null && !id.isBlank()) ? resource.fhirType() + "/" + id : resource.fhirType();
-    }
 }

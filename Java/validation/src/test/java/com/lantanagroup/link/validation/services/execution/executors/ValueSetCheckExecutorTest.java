@@ -79,7 +79,32 @@ class ValueSetCheckExecutorTest {
 
         assertThat(findings).hasSize(1);
         assertThat(findings.get(0).getCode()).isEqualTo("valueset-membership-failed");
-        assertThat(findings.get(0).getLocation()).isEqualTo("Observation.code");
+        assertThat(findings.get(0).getLocation()).isEqualTo("Observation");
+        assertThat(findings.get(0).getExpression()).isEqualTo("Observation.code");
+    }
+
+    @Test
+    @DisplayName("each finding names the bundle entry it is about, not the check's path")
+    void findingsNameTheirResource() {
+        IValidationSupport.CodeValidationResult notMember = mock(IValidationSupport.CodeValidationResult.class);
+        when(notMember.isOk()).thenReturn(false);
+        IValidationSupport.CodeValidationResult member = mock(IValidationSupport.CodeValidationResult.class);
+        when(member.isOk()).thenReturn(true);
+        when(chain.validateCode(any(), any(), eq("http://loinc.org"), eq("9999-9"), any(), eq("http://x/vs"))).thenReturn(notMember);
+        when(chain.validateCode(any(), any(), eq("http://loinc.org"), eq("1234-5"), any(), eq("http://x/vs"))).thenReturn(member);
+
+        Observation good = new Observation();
+        good.setId("good");
+        good.getCode().addCoding(new Coding("http://loinc.org", "1234-5", null));
+        Observation bad = new Observation();
+        bad.setId("bad");
+        bad.getCode().addCoding(new Coding("http://loinc.org", "9999-9", null));
+        ExecutionContext context = ExecutionContext.builder().bundleEntries(List.of(good, bad)).build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"), context);
+
+        assertThat(findings).extracting(RawFinding::getLocation).containsExactly("Observation/bad");
     }
 
     @Test

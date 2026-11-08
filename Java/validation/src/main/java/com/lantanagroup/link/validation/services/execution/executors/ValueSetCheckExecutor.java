@@ -153,7 +153,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                                 .code("binding-not-evaluated")
                                 .message(String.format("Value set %s could not be resolved; membership of code '%s'%s was not evaluated",
                                         valueSet, code, system != null ? " (" + system + ")" : ""))
-                                .location(path)
+                                .location(FindingLocation.of(resource))
                                 .expression(path)
                                 .build());
                     } else {
@@ -168,7 +168,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                                 .code("valueset-membership-failed")
                                 .message(String.format("Code '%s'%s is not in value set %s",
                                         code, system != null ? " (" + system + ")" : "", valueSet))
-                                .location(path)
+                                .location(FindingLocation.of(resource))
                                 .expression(path)
                                 .build());
                     }

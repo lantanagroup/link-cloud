@@ -75,7 +75,7 @@ public class FhirPathCheckExecutor implements CheckExecutor {
                             .severity(severity)
                             .code(code)
                             .message(failureMessage)
-                            .location(resourceLocation(target))
+                            .location(FindingLocation.of(target))
                             .expression(expression)
                             .build());
                 }
@@ -87,7 +87,7 @@ public class FhirPathCheckExecutor implements CheckExecutor {
                         .severity(Severity.ERROR)
                         .code("fhirpath-evaluation-error")
                         .message("FHIRPath evaluation error: " + e.getMessage())
-                        .location(resourceLocation(target))
+                        .location(FindingLocation.of(target))
                         .expression(expression)
                         .build());
             }
@@ -148,8 +148,4 @@ public class FhirPathCheckExecutor implements CheckExecutor {
         return Character.isUpperCase(token.charAt(0)) ? token : null;
     }
 
-    private String resourceLocation(IBaseResource resource) {
-        String id = resource.getIdElement() != null ? resource.getIdElement().getIdPart() : null;
-        return (id != null && !id.isBlank()) ? resource.fhirType() + "/" + id : resource.fhirType();
-    }
 }
