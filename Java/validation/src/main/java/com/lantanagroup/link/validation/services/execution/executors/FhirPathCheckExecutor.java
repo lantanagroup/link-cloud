@@ -103,19 +103,19 @@ public class FhirPathCheckExecutor implements CheckExecutor {
             }
 
             if ("Bundle".equals(root.fhirType())) {
-                return "Bundle".equals(leadingResourceType(expression))
+                return "Bundle".equals(ExpressionTargets.leadingResourceType(expression))
                         ? List.of(root)
                         : Collections.emptyList();
             }
 
-            String singleType = leadingResourceType(expression);
+            String singleType = ExpressionTargets.leadingResourceType(expression);
             if (singleType == null || singleType.equals(root.fhirType())) {
                 return List.of(root);
             }
             return Collections.emptyList();
         }
 
-        String resourceType = leadingResourceType(expression);
+        String resourceType = ExpressionTargets.leadingResourceType(expression);
         if (resourceType == null) {
             return context.getBundleEntries();
         }
@@ -127,25 +127,6 @@ public class FhirPathCheckExecutor implements CheckExecutor {
         return context.getBundleEntries().stream()
                 .filter(e -> e.fhirType().equals(resourceType))
                 .collect(Collectors.toList());
-    }
-
-    private String leadingResourceType(String expression) {
-        int i = 0;
-        while (i < expression.length()
-                && (Character.isWhitespace(expression.charAt(i)) || expression.charAt(i) == '(')) {
-            i++;
-        }
-        int start = i;
-        while (i < expression.length()
-                && (Character.isLetterOrDigit(expression.charAt(i)) || expression.charAt(i) == '_')) {
-            i++;
-        }
-
-        if (start == i || i >= expression.length() || expression.charAt(i) != '.') {
-            return null;
-        }
-        String token = expression.substring(start, i);
-        return Character.isUpperCase(token.charAt(0)) ? token : null;
     }
 
 }

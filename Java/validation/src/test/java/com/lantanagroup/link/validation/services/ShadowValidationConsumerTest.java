@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.models.EvaluateRequestDto;
+import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.BridgeOutcome;
 import com.lantanagroup.link.validation.records.ShadowCompareEvent;
@@ -133,18 +133,15 @@ class ShadowValidationConsumerTest {
     @SuppressWarnings("unchecked")
     void ranNewEngineFalse_runsOnlyModernEngineAndPersistsRubricResultAsUsual() {
         stubRestRetrieval();
-        IParser jsonParser = org.mockito.Mockito.mock(IParser.class);
-        when(fhirContext.newJsonParser()).thenReturn(jsonParser);
-        when(jsonParser.encodeResourceToString(bundle)).thenReturn("{\"resourceType\":\"Bundle\"}");
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID)))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), eq(CORRELATION_ID)))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(new BridgeOutcome(Collections.emptyList(), null));
 
         consumer.process(buildRecord(false, List.of(authoritativeFinding())));
 
-        verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID));
+        verify(rubricExecutionService).evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), eq(CORRELATION_ID));
         verify(validationService, never()).validate(any());
         verify(legacyShadowResultPersister, never()).persist(any(), any(), any(), any(), any(), any(), any(), any());
         verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
@@ -154,11 +151,8 @@ class ShadowValidationConsumerTest {
     @Test
     void ranNewEngineFalse_comparesTheLegacyVerdictFromTheEventWithTheRubricStatus() {
         stubRestRetrieval();
-        IParser jsonParser = org.mockito.Mockito.mock(IParser.class);
-        when(fhirContext.newJsonParser()).thenReturn(jsonParser);
-        when(jsonParser.encodeResourceToString(bundle)).thenReturn("{\"resourceType\":\"Bundle\"}");
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().build();
-        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(EvaluateRequestDto.class), eq(true), eq(CORRELATION_ID)))
+        when(rubricExecutionService.evaluate(eq(RUBRIC_ID), isNull(), any(SubjectDto.class), any(Bundle.class), eq(true), eq(CORRELATION_ID)))
                 .thenReturn(envelope);
         when(legacyResultMapper.toResults(envelope, FACILITY_ID, PATIENT_ID, REPORT_ID))
                 .thenReturn(new BridgeOutcome(Collections.emptyList(), RubricResultStatus.UNACCEPTABLE));

@@ -108,6 +108,22 @@ class ValueSetCheckExecutorTest {
     }
 
     @Test
+    @DisplayName("in a bundle, the path is evaluated only on entries of the type it starts with")
+    void onlyEntriesOfThePathsTypeAreEvaluated() {
+        IFhirPath fhirPath = mock(IFhirPath.class);
+        when(fhirPath.evaluate(any(), any(String.class), eq(org.hl7.fhir.instance.model.api.IBase.class))).thenReturn(List.of());
+        ValueSetCheckExecutor filtering = new ValueSetCheckExecutor(fhirPath, chain, new ObjectMapper(), registryProvider);
+        Observation observation = new Observation();
+        org.hl7.fhir.r4.model.Patient patient = new org.hl7.fhir.r4.model.Patient();
+        ExecutionContext context = ExecutionContext.builder().bundleEntries(List.of(patient, observation, patient)).build();
+
+        filtering.execute(check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"), context);
+
+        verify(fhirPath).evaluate(eq(observation), eq("Observation.code"), any());
+        verify(fhirPath, never()).evaluate(eq(patient), any(String.class), any());
+    }
+
+    @Test
     @DisplayName("an unresolvable value set yields a not-evaluated (INCONCLUSIVE) finding, not a membership failure")
     void unresolvableValueSetIsNotEvaluated() {
         IValidationSupport.CodeValidationResult result = mock(IValidationSupport.CodeValidationResult.class);

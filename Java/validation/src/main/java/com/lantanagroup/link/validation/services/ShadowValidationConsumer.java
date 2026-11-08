@@ -3,16 +3,12 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.exceptions.PayloadParseException;
-import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.records.BridgeOutcome;
@@ -160,24 +156,13 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
     }
 
     private ValidationResultEnvelope runModernValidation(String correlationId, String facilityId, String patientId, String reportId, Bundle bundle) {
-        EvaluateRequestDto request = EvaluateRequestDto.builder()
-                .subject(SubjectDto.builder()
-                        .facilityId(facilityId)
-                        .patientId(patientId)
-                        .reportId(reportId)
-                        .build())
-                .payload(bundleToJsonNode(bundle))
+        SubjectDto subject = SubjectDto.builder()
+                .facilityId(facilityId)
+                .patientId(patientId)
+                .reportId(reportId)
                 .build();
-        return rubricExecutionService.evaluate(rubricId, null, request, true, correlationId);
-    }
-
-    private JsonNode bundleToJsonNode(Bundle bundle) {
-        try {
-            String json = fhirContext.newJsonParser().encodeResourceToString(bundle);
-            return objectMapper.readTree(json);
-        } catch (JsonProcessingException e) {
-            throw new PayloadParseException("Failed to convert bundle to JSON for rubric evaluation", e);
-        }
+        // The bundle as already parsed; encoding it to JSON for the engine to parse again doubled the parsing cost.
+        return rubricExecutionService.evaluate(rubricId, null, subject, bundle, true, correlationId);
     }
 
     private List<Result> toResults(List<ShadowFindingDto> findings) {

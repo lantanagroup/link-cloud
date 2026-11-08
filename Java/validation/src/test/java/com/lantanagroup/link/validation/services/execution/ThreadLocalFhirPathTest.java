@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -119,5 +120,30 @@ class ThreadLocalFhirPathTest {
 
     /** Minimal no-op context; the test only cares that it is accepted by every engine. */
     private static final class RecordingEvaluationContext implements IFhirPathEvaluationContext {
+    }
+
+    @Test
+    void anExpressionIsParsedOncePerThread_andGivesTheSameResults() {
+        ThreadLocalFhirPath fhirPath = new ThreadLocalFhirPath(FHIR_CONTEXT);
+        Patient active = new Patient().setActive(true);
+        Patient inactive = new Patient().setActive(false);
+
+        for (int i = 0; i < 3; i++) {
+            assertEquals(List.of(true), fhirPath.evaluate(active, "Patient.active", BooleanType.class)
+                    .stream().map(BooleanType::booleanValue).toList());
+            assertEquals(false, fhirPath.evaluateFirst(inactive, "Patient.active", BooleanType.class)
+                    .map(BooleanType::booleanValue).orElseThrow());
+        }
+
+        assertEquals(1, fhirPath.parsedExpressionCount(), "one expression, parsed once and reused");
+    }
+
+    @Test
+    void anExpressionThatDoesNotParse_failsAsBefore_everyTime() {
+        ThreadLocalFhirPath fhirPath = new ThreadLocalFhirPath(FHIR_CONTEXT);
+
+        for (int i = 0; i < 2; i++) {
+            assertThrows(Exception.class, () -> fhirPath.evaluate(new Patient(), "Patient.active.(", BooleanType.class));
+        }
     }
 }
