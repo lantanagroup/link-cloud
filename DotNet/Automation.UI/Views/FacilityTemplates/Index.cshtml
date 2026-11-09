@@ -24,14 +24,43 @@
     <p class="text-muted mb-3">A facility template owns the query plan, normalization suite, organization resource map, vendor, and which patient configurations a scenario may use. System Default is what system scenarios run. Epic and Cerner are convenience copies of those customer shapes. Create your own for anything else.</p>
 
     <div class="au-card">
+
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>All templates</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewFacility">New</button>
+
+            <div class="d-flex align-items-center gap-2">
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        id="btnDeleteSelectedFacilities"
+                        disabled>
+                    Delete Selected (0)
+                </button>
+
+                <button type="button"
+                        class="btn btn-sm btn-success"
+                        id="btnNewFacility">
+                    New
+                </button>
+            </div>
         </div>
+
+        <div id="facilityBulkResult"
+             class="alert mx-3 mt-3 mb-0"
+             role="status"
+             aria-live="polite"
+             style="display:none;white-space:pre-line;"></div>
+
         <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0">
+
                 <thead>
                     <tr>
+                        <th style="width:45px">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   id="facilitySelectAll"
+                                   aria-label="Select all deletable templates on this page" />
+                        </th>
                         <th data-sort="name">Name</th>
                         <th data-sort="vendor">Vendor</th>
                         <th>Pieces</th>
@@ -42,7 +71,21 @@
                 <tbody>
                     @foreach (var t in Model)
                     {
-                        <tr data-name="@t.Name" data-vendor="@(t.VendorName ?? "")" data-type="@(t.IsSystem ? "System" : "Custom")">
+                        <tr data-name="@t.Name"
+                            data-vendor="@(t.VendorName ?? "")"
+                            data-type="@(t.IsSystem ? "System" : "Custom")">
+
+                            <td>
+                                @if (!t.IsSystem && !t.IsDefault)
+                                {
+                                    <input type="checkbox"
+                                           class="form-check-input facility-select"
+                                           value="@t.Id"
+                                           data-name="@t.Name"
+                                           aria-label="Select @t.Name" />
+                                }
+                            </td>
+
                             <td>
                                 <strong>@t.Name</strong>
                                 @if (t.IsDefault)
@@ -76,7 +119,7 @@
                             <td class="text-nowrap">
                                 <button type="button" class="btn btn-sm btn-outline-primary btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">@(t.IsSystem ? "View" : "Edit")</button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary btn-facility-clone" data-id="@t.Id">Clone</button>
-                                @if (!t.IsSystem)
+                                @if (!t.IsSystem && !t.IsDefault)
                                 {
                                     <button type="button" class="btn btn-sm btn-outline-danger btn-facility-delete" data-id="@t.Id">Delete</button>
                                 }
@@ -90,7 +133,7 @@
 
         <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-3">
 
-            <div class="text-muted small">
+            <div class="text-muted small" id="facilityRecordCount">
                 Showing @firstRecord–@lastRecord of @totalCount facility templates
             </div>
 
@@ -257,6 +300,7 @@
         const getUrl = '@Url.Action("GetJson", "FacilityTemplates")';
         const cloneUrl = '@Url.Action("CloneInline", "FacilityTemplates")';
         const deleteUrl = '@Url.Action("DeleteInline", "FacilityTemplates")';
+        const bulkDeleteUrl = '@Url.Action("DeleteBulk", "FacilityTemplates")';
         function token() {
             const field = document.querySelector('input[name="__RequestVerificationToken"]');
             return field ? field.value : '';
@@ -394,5 +438,161 @@
                 }
             });
         });
+
+        const selectAll = document.getElementById('facilitySelectAll');
+        const deleteSelectedButton = document.getElementById('btnDeleteSelectedFacilities');
+        const bulkResult = document.getElementById('facilityBulkResult');
+        const recordCount = document.getElementById('facilityRecordCount');
+        const currentPage = @currentPage;
+        const pageSize = @pageSize;
+        const initialTotalCount = @totalCount;
+        const selectionBoxes = Array.from(
+            document.querySelectorAll('.facility-select')
+        );
+
+        let bulkDeleting = false;
+
+            function selectedBoxes() {
+                return selectionBoxes.filter(box => box.isConnected && box.checked);
+            }
+
+        function updateBulkSelection() {
+            const activeBoxes = selectionBoxes.filter(box => box.isConnected);
+            const count = selectedBoxes().length;
+
+            deleteSelectedButton.textContent = `Delete Selected (${count})`;
+            deleteSelectedButton.disabled = bulkDeleting || count === 0;
+
+            selectAll.checked =
+                activeBoxes.length > 0 && count === activeBoxes.length;
+
+            selectAll.indeterminate =
+                count > 0 && count < activeBoxes.length;
+
+            selectAll.disabled = bulkDeleting || activeBoxes.length === 0;
+        }
+
+        function showBulkResult(message, isError) {
+            bulkResult.textContent = message;
+            bulkResult.className =
+                'alert mx-3 mt-3 mb-0 ' +
+                (isError ? 'alert-warning' : 'alert-success');
+            bulkResult.style.display = '';
+        }
+
+        selectAll.addEventListener('change', function () {
+            selectionBoxes
+                .filter(box => box.isConnected)
+                .forEach(box => {
+                    box.checked = selectAll.checked;
+                });
+
+            updateBulkSelection();
+        });
+
+        selectionBoxes.forEach(box => {
+            box.addEventListener('change', updateBulkSelection);
+        });
+
+        deleteSelectedButton.addEventListener('click', async function () {
+            const selected = selectedBoxes();
+
+            if (selected.length === 0 || bulkDeleting)
+                return;
+
+            const names = selected.map(box => box.dataset.name);
+
+            const confirmed = window.confirm(
+                `Delete ${selected.length} selected facility template(s)?\n\n` +
+                names.join('\n') +
+                '\n\nThis action cannot be undone.'
+            );
+
+            if (!confirmed)
+                return;
+
+            bulkDeleting = true;
+            selectionBoxes.forEach(box => box.disabled = true);
+            updateBulkSelection();
+            bulkResult.style.display = 'none';
+
+            try {
+                const result = await post(bulkDeleteUrl, {
+                    ids: selected.map(box => box.value)
+                });
+
+                const deletedIds = new Set(
+                    (result.deletedIds || []).map(id => id.toLowerCase())
+                );
+
+                const failures = result.failures || [];
+
+                // Remove successfully deleted rows from the current page.
+                selectionBoxes.forEach(box => {
+                    if (deletedIds.has(box.value.toLowerCase())) {
+                        box.closest('tr')?.remove();
+                        box.checked = false;
+                    }
+                });
+
+                if (deletedIds.size > 0) {
+                    const updatedTotal = Math.max(0, initialTotalCount - deletedIds.size);
+                    const first = updatedTotal === 0
+                        ? 0
+                        : (currentPage - 1) * pageSize + 1;
+                    const last = Math.min(currentPage * pageSize, updatedTotal);
+
+                    recordCount.textContent =
+                        `Showing ${first}–${last} of ${updatedTotal} facility templates`;
+                }
+
+                if (failures.length === 0) {
+                    // Refresh the record count and pagination after success.
+                    window.location.reload();
+                    return;
+                }
+
+                // Keep failed selections checked so they can be retried.
+                const failedIds = new Set(
+                    failures.map(f => String(f.id).toLowerCase())
+                );
+
+                selectionBoxes.forEach(box => {
+                    box.checked = failedIds.has(box.value.toLowerCase());
+                });
+
+                const failureDetails = failures.map(f => {
+                    const matchingBox = selectionBoxes.find(
+                        box => box.value.toLowerCase() ===
+                            String(f.id).toLowerCase()
+                    );
+
+                    const name = matchingBox?.dataset.name || f.id;
+                    return `${name}: ${f.reason}`;
+                });
+
+                showBulkResult(
+                    `${deletedIds.size} deleted; ${failures.length} failed.\n` +
+                    failureDetails.join('\n'),
+                    true
+                );
+
+            } catch (err) {
+                showBulkResult(
+                    err.message || 'Bulk deletion failed. Please retry.',
+                    true
+                );
+            } finally {
+                bulkDeleting = false;
+                selectionBoxes.forEach(box => {
+                    if (box.isConnected)
+                        box.disabled = false;
+                });
+                updateBulkSelection();
+            }
+        });
+
+        updateBulkSelection();
+
     })();
 </script>
