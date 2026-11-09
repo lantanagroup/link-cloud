@@ -46,6 +46,21 @@ public class RetentionScheduleRegistrationTests
         Assert.False(settings.Enabled);
     }
 
+    [Fact]
+    public async Task AddRetentionSchedule_Configured_RegistersRetentionParticipants()
+    {
+        await using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["Retention:Participants:0:ServiceName"] = "Report",
+            ["Retention:Participants:0:Scope"] = "Report"
+        });
+
+        var participants = provider.GetRequiredService<RetentionParticipants>();
+
+        Assert.True(participants.IsValid);
+        Assert.Equal("Report", Assert.Single(participants.Participants).ServiceName);
+    }
+
     private static ServiceProvider BuildProvider(Dictionary<string, string?> values)
     {
         var configuration = new ConfigurationBuilder()

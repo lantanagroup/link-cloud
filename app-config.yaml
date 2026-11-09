@@ -892,6 +892,13 @@ services:
       description: "Whether the daily retention check job is scheduled. False removes the job and its trigger when Report next starts."
       required: false
       defaultValue: "true"
+    # A list of objects, stored as Retention:Participants:<n>:ServiceName and :Scope rows. Set the
+    # whole list or none of it: .NET merges list entries from different sources by index, which is
+    # why the default lives in code and not in appsettings.json.
+    - key: "Retention:Participants"
+      description: "The services expected to reply to every retention cleanup, each with a ServiceName (the name it puts in RetentionCheckComplete) and a Scope of Report (one result per report) or Cutoff (one result per cleanup). Copied onto each cleanup when it is created, so a change never affects existing cleanups. Read at startup. An empty list, a missing ServiceName or Scope, an unknown Scope, a duplicate name, or no participant with Scope Report makes the whole list invalid: Report logs an error at startup and records every cleanup Failed without sending a request."
+      required: false
+      defaultValue: '[{"ServiceName":"Report","Scope":"Report"},{"ServiceName":"MeasureEval","Scope":"Report"},{"ServiceName":"Validation","Scope":"Report"},{"ServiceName":"DataAcquisition","Scope":"Report"}]'
   Submission:
     - key: "SubmissionServiceConfig:SubmissionDirectory"
       description: "The local or network path where submission files are stored."
