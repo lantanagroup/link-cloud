@@ -59,6 +59,11 @@ public class FacilityTemplatesControllerTests
 
         (await _store.GetByIdAsync(first.Id)).Should().BeNull();
         (await _store.GetByIdAsync(second.Id)).Should().BeNull();
+
+        _scenarioStore.Verify(
+            s => s.GetAllAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
+
     }
 
     [Fact]

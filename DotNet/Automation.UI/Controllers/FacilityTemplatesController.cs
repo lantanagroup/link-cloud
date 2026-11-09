@@ -172,13 +172,16 @@ public class FacilityTemplatesController(
         var deletedIds = new List<Guid>();
         var failures = new List<object>();
 
+        // Load scenarios once for the entire bulk-delete operation.
+        var scenarios = await scenarioStore.GetAllAsync(ct);
+
         foreach (var id in ids)
         {
             ct.ThrowIfCancellationRequested();
 
             try
             {
-                var result = await TryDeleteTemplateAsync(id, ct);
+                var result = await TryDeleteTemplateAsync(id, ct, scenarios);
 
                 if (result == DeleteTemplateResult.Deleted)
                 {
@@ -195,7 +198,7 @@ public class FacilityTemplatesController(
                     DeleteTemplateResult.DefaultProtected =>
                         "The system facility config cannot be deleted.",
                     DeleteTemplateResult.InUse =>
-                        await GetInUseMessageAsync(id, ct),
+                        await GetInUseMessageAsync(id, ct, scenarios),
                     _ => "Deletion failed."
                 };
 
@@ -274,7 +277,8 @@ public class FacilityTemplatesController(
 
     private async Task<DeleteTemplateResult> TryDeleteTemplateAsync(
         Guid id,
-        CancellationToken ct)
+        CancellationToken ct,
+        List<TestScenarioDefinition>? scenarios = null)
     {
         var template = await store.GetByIdAsync(id, ct);
 
@@ -287,7 +291,8 @@ public class FacilityTemplatesController(
         if (template.IsDefault)
             return DeleteTemplateResult.DefaultProtected;
 
-        var scenarios = await scenarioStore.GetAllAsync(ct);
+        // Reuse the bulk-loaded scenarios, or load them for single deletion.
+        scenarios ??= await scenarioStore.GetAllAsync(ct);
 
         var isInUse = scenarios.Any(s =>
             s.FacilityConfigurationMode == FacilityConfigurationMode.Facility
@@ -303,9 +308,12 @@ public class FacilityTemplatesController(
 
     private async Task<string> GetInUseMessageAsync(
         Guid id,
-        CancellationToken ct)
+        CancellationToken ct,
+        List<TestScenarioDefinition>? scenarios = null)
     {
-        var scenarioNames = (await scenarioStore.GetAllAsync(ct))
+        scenarios ??= await scenarioStore.GetAllAsync(ct);
+
+        var scenarioNames = scenarios
             .Where(s =>
                 s.FacilityConfigurationMode == FacilityConfigurationMode.Facility
                 && s.FacilityTemplateId == id)
@@ -315,7 +323,6 @@ public class FacilityTemplatesController(
         return $"This facility template is used by {string.Join(", ", scenarioNames)}. " +
                "Remove it from those scenarios before deleting it.";
     }
-
 
     private async Task<string?> ValidateReferencesAsync(FacilityTemplate model, CancellationToken ct)
     {

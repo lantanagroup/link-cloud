@@ -39,10 +39,7 @@ public sealed class MongoFacilityTemplateStore : IFacilityTemplateStore
 
         var docs = await _collection
             .Find(FilterDefinition<FacilityTemplateDocument>.Empty)
-            .Sort(
-                Builders<FacilityTemplateDocument>.Sort
-                    .Ascending(d => d.Name)
-                    .Ascending(d => d.Id))
+            .SortBy(d => d.Name)
             .Skip(skip)
             .Limit(take)
             .ToListAsync(ct);

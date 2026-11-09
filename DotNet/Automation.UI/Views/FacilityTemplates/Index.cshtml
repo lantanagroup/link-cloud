@@ -442,10 +442,9 @@
         const selectAll = document.getElementById('facilitySelectAll');
         const deleteSelectedButton = document.getElementById('btnDeleteSelectedFacilities');
         const bulkResult = document.getElementById('facilityBulkResult');
-        const recordCount = document.getElementById('facilityRecordCount');
-        const currentPage = @currentPage;
-        const pageSize = @pageSize;
-        const initialTotalCount = @totalCount;
+
+        const bulkResultStorageKey = 'facilityTemplatesBulkDeleteResult';
+
         const selectionBoxes = Array.from(
             document.querySelectorAll('.facility-select')
         );
@@ -478,6 +477,34 @@
                 'alert mx-3 mt-3 mb-0 ' +
                 (isError ? 'alert-warning' : 'alert-success');
             bulkResult.style.display = '';
+        }
+
+        function restoreBulkDeleteResult() {
+            const saved = sessionStorage.getItem(bulkResultStorageKey);
+
+            if (!saved)
+                return;
+
+            sessionStorage.removeItem(bulkResultStorageKey);
+
+            try {
+                const result = JSON.parse(saved);
+
+                showBulkResult(result.message, true);
+
+                const failedIds = new Set(
+                    (result.failedIds || []).map(id =>
+                        String(id).toLowerCase())
+                );
+
+                selectionBoxes.forEach(box => {
+                    box.checked = failedIds.has(box.value.toLowerCase());
+                });
+
+                updateBulkSelection();
+            } catch {
+                // Ignore invalid saved results.
+            }
         }
 
         selectAll.addEventListener('change', function () {
@@ -521,11 +548,59 @@
                     ids: selected.map(box => box.value)
                 });
 
+
                 const deletedIds = new Set(
-                    (result.deletedIds || []).map(id => id.toLowerCase())
+                    (result.deletedIds || []).map(id =>
+                        String(id).toLowerCase())
                 );
 
                 const failures = result.failures || [];
+
+                if (failures.length === 0) {
+                    // Reload to refresh the table, counts, and pagination.
+                    window.location.reload();
+                    return;
+                }
+
+                // Build the failure details before reloading.
+                const failureDetails = failures.map(f => {
+                    const matchingBox = selectionBoxes.find(
+                        box => box.value.toLowerCase() ===
+                            String(f.id).toLowerCase()
+                    );
+
+                    const name = matchingBox?.dataset.name || f.id;
+                    return `${name}: ${f.reason}`;
+                });
+
+                const message =
+                    `${deletedIds.size} deleted; ${failures.length} failed.\n` +
+                    failureDetails.join('\n');
+
+                if (deletedIds.size > 0) {
+                    // Preserve failure information while refreshing page data.
+                    sessionStorage.setItem(
+                        bulkResultStorageKey,
+                        JSON.stringify({
+                            message,
+                            failedIds: failures.map(f => String(f.id))
+                        })
+                    );
+
+                    window.location.reload();
+                    return;
+                }
+
+                // Nothing was deleted, so keep the current page and selections.
+                const failedIds = new Set(
+                    failures.map(f => String(f.id).toLowerCase())
+                );
+
+                selectionBoxes.forEach(box => {
+                    box.checked = failedIds.has(box.value.toLowerCase());
+                });
+
+                showBulkResult(message, true);
 
                 // Remove successfully deleted rows from the current page.
                 selectionBoxes.forEach(box => {
@@ -593,6 +668,7 @@
         });
 
         updateBulkSelection();
+        restoreBulkDeleteResult();
 
     })();
 </script>
