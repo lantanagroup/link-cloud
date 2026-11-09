@@ -359,7 +359,7 @@ namespace UnitTests.Shared.Auditing
         }
 
         [Fact]
-        public async Task AForeignKey_IsNotReportedAsAChange()
+        public async Task AForeignKey_IsReportedAsAChange()
         {
             var (fixture, audit) = Build();
             using var _ = fixture;
@@ -369,11 +369,20 @@ namespace UnitTests.Shared.Auditing
             await fixture.Context.SaveChangesAsync();
             audit.PropertyChanges.Clear();
 
-            //a key identifies the row rather than describing it.
+            //Tenant's audited facility PUT reassigns VendorVersionId exactly like this. A foreign
+            //key says which related row this one points at, so moving it is a configuration change
+            //a reader needs, not an identifier to be skipped with the primary key.
             vendor.TenantId = tenant.Id;
             await fixture.Context.SaveChangesAsync();
 
-            Assert.Empty(audit.PropertyChanges);
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(nameof(TestVendor.TenantId), change.PropertyName);
+            Assert.Equal(nameof(TestVendor), change.Entity);
+            Assert.Equal(vendor.Id, change.RowKey);
+            //an unset key described as empty rather than as the word "null", the way every other
+            //property with no value is.
+            Assert.Equal(string.Empty, change.InitialPropertyValue);
+            Assert.Equal(tenant.Id, change.NewPropertyValue);
         }
 
         [Fact]

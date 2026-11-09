@@ -234,9 +234,11 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
                     continue;
                 }
 
-                //keys identify the row rather than describe it, and the modify timestamp moves on
-                //every save, so it would appear in every event.
-                if (property.Metadata.IsPrimaryKey() || property.Metadata.IsForeignKey())
+                //the primary key identifies the row rather than describing it - and an owned type's
+                //key is its owner's, so skipping it also keeps the owner's id out of the owned
+                //entry's changes. A foreign key is not in the same position: it says which related
+                //row this one points at, which is a configuration change worth recording.
+                if (property.Metadata.IsPrimaryKey())
                 {
                     continue;
                 }
