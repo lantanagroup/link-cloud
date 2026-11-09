@@ -272,6 +272,7 @@ public class TestRailPublisherTests
         }
 
         TestRailCaseResult? posted = null;
+        string? edited = null;
         var api = new Mock<ITestRailApiClient>();
         api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(501);
@@ -279,6 +280,9 @@ public class TestRailPublisherTests
             .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
             .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
         api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        api.Setup(a => a.EditResultCommentAsync(77, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<int, string, CancellationToken>((_, comment, _) => edited = comment)
             .Returns(Task.CompletedTask);
 
         var scenarioId = Guid.NewGuid();
@@ -297,11 +301,16 @@ public class TestRailPublisherTests
         var comment = posted!.Comment;
         comment.Should().NotBeNullOrEmpty();
         comment!.Length.Should().BeLessThanOrEqualTo(20_000);
-        comment.Should().Contain("The complete log is attached as");
+        comment.Should().Contain(TestRailPublisher.LogNotAttachedSentence);
+        comment.Should().NotContain("The complete log is attached as");
         comment.Should().NotContain("Some lines may be missing");
-        comment.Should().Contain($"scenario-run-{runId:D}.log");
         comment.Should().NotContain("FIRST-LOG-ENTRY");
         comment.Should().NotContain("LAST-LOG-ENTRY");
+        edited.Should().NotBeNullOrEmpty();
+        edited!.Length.Should().BeLessThanOrEqualTo(20_000);
+        edited.Should().Contain("The complete log is attached as");
+        edited.Should().Contain($"scenario-run-{runId:D}.log");
+        edited.Should().NotContain(TestRailPublisher.LogNotAttachedSentence);
         posted.AttachmentFileName.Should().Be($"scenario-run-{runId:D}.log");
         posted.Attachment.Should().NotBeNull();
 
@@ -326,6 +335,7 @@ public class TestRailPublisherTests
         }
 
         TestRailCaseResult? posted = null;
+        string? edited = null;
         var api = new Mock<ITestRailApiClient>();
         api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(501);
@@ -333,6 +343,9 @@ public class TestRailPublisherTests
             .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
             .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
         api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        api.Setup(a => a.EditResultCommentAsync(77, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<int, string, CancellationToken>((_, comment, _) => edited = comment)
             .Returns(Task.CompletedTask);
 
         var scenarioId = Guid.NewGuid();
@@ -352,13 +365,52 @@ public class TestRailPublisherTests
         var comment = posted!.Comment;
         comment.Should().NotBeNullOrEmpty();
         comment!.Length.Should().BeLessThanOrEqualTo(20_000);
+        comment.Should().Contain(TestRailPublisher.LogNotAttachedSentence);
         comment.Should().Contain("Some lines may be missing");
         comment.Should().NotContain("The complete log is attached as");
-        comment.Should().Contain($"scenario-run-{runId:D}.log");
+        comment.Should().NotContain("The log is attached as");
         comment.Should().NotContain("FIRST-LOG-ENTRY");
         comment.Should().NotContain("LAST-LOG-ENTRY");
+        edited.Should().Contain("The log is attached as");
+        edited.Should().Contain($"scenario-run-{runId:D}.log");
+        edited.Should().Contain("Some lines may be missing");
+        edited.Should().NotContain("The complete log is attached as");
+        edited.Should().NotContain(TestRailPublisher.LogNotAttachedSentence);
         posted.AttachmentFileName.Should().Be($"scenario-run-{runId:D}.log");
         posted.Attachment.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Scenario_attachment_failure_leaves_the_comment_saying_the_log_was_not_attached()
+    {
+        var logs = new List<string>(250);
+        for (var i = 0; i < 250; i++)
+            logs.Add((i == 0 ? "FIRST-LOG-ENTRY" : "MIDDLE") + new string('.', 100));
+
+        TestRailCaseResult? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("TestRail add_attachment_to_result/77 failed with 400"));
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            ScenarioId = scenarioId,
+            Status = AutomationRunStatus.Failed,
+            Error = "boom",
+            Logs = logs
+        });
+
+        posted!.Comment.Should().Contain(TestRailPublisher.LogNotAttachedSentence);
+        posted.Comment.Should().NotContain("The complete log is attached as");
+        posted.Comment.Should().NotContain("The log is attached as");
+        api.Verify(a => a.EditResultCommentAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -445,9 +497,11 @@ public class TestRailPublisherTests
     public async Task Scenario_failure_logs_warning_when_no_result_matches()
     {
         var api = new Mock<ITestRailApiClient>();
+        TestRailCaseResult? posted = null;
         api.Setup(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(8);
         api.Setup(a => a.AddResultsForCasesAsync(8, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
             .ReturnsAsync([]);
 
         var scenarioId = Guid.NewGuid();
@@ -461,7 +515,10 @@ public class TestRailPublisherTests
             Error = "boom"
         });
 
+        posted!.Comment.Should().Contain(TestRailPublisher.LogNotAttachedSentence);
+        posted.Comment.Should().NotContain("attached as");
         api.Verify(a => a.AddAttachmentToResultAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        api.Verify(a => a.EditResultCommentAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         logs.Entries.Should().Contain(entry =>
             entry.Level == LogLevel.Warning
             && entry.Message.Contains("attachment skipped for case C42", StringComparison.Ordinal));
@@ -1058,7 +1115,106 @@ public class TestRailPublisherTests
         result.Comment.Should().Contain("Create Facility");
         result.Comment.Should().Contain("Get Facility");
         result.Comment.Should().Contain("Posted as Failed");
+        result.Comment.Should().Contain(TestRailPublisher.ResultNotAttachedSentence);
+        result.Comment.Should().NotContain("attached as");
         result.AttachmentFileName.Should().Be("api-health-c7.txt");
+        var attached = Encoding.UTF8.GetString(result.Attachment!);
+        attached.Should().Contain("nope");
+        attached.Should().NotContain(TestRailPublisher.ResultNotAttachedSentence);
+    }
+
+    [Fact]
+    public async Task ApiHealth_attachment_failure_says_the_result_was_not_attached()
+    {
+        TestRailCaseResult? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 90, CaseId = 2 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(90, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("TestRail add_attachment_to_result/90 failed with 400"));
+
+        var definition = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Get Facility",
+            TestRailCaseId = 2
+        };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [definition.Key] = new()
+                {
+                    EndpointKey = definition.Key,
+                    EndpointName = definition.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = false,
+                    ErrorMessage = "nope"
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            ConfiguredOptions(),
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(definition)]));
+
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest());
+
+        posted!.Comment.Should().Contain(TestRailPublisher.ResultNotAttachedSentence);
+        posted.Comment.Should().Contain("nope");
+        posted.Comment.Should().NotContain("attached as");
+        api.Verify(a => a.EditResultCommentAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ApiHealth_attachment_success_restores_the_comment_without_the_failure_sentence()
+    {
+        string? edited = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestRailResultDto { Id = 90, CaseId = 2 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(90, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        api.Setup(a => a.EditResultCommentAsync(90, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<int, string, CancellationToken>((_, comment, _) => edited = comment)
+            .Returns(Task.CompletedTask);
+
+        var definition = new ApiEndpointDefinition
+        {
+            ServiceName = "Tenant",
+            EndpointName = "Get Facility",
+            TestRailCaseId = 2
+        };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [definition.Key] = new()
+                {
+                    EndpointKey = definition.Key,
+                    EndpointName = definition.EndpointName,
+                    ServiceName = "Tenant",
+                    Passed = false,
+                    ErrorMessage = "nope"
+                }
+            });
+
+        var publisher = CreatePublisher(
+            api.Object,
+            ConfiguredOptions(),
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(definition)]));
+
+        await publisher.PublishApiHealthRunAsync(SampleApiHealthRequest());
+
+        edited.Should().Contain("nope");
+        edited.Should().NotContain(TestRailPublisher.ResultNotAttachedSentence);
     }
 
     [Fact]
@@ -1834,6 +1990,25 @@ public class TestRailApiClientTests
         handler.Requests[0].Request.RequestUri!.ToString()
             .Should().Be("https://example.testrail.io/index.php?/api/v2/add_attachment_to_result/10");
         handler.Requests[0].Request.Content!.Headers.ContentType!.MediaType.Should().Be("multipart/form-data");
+        handler.Requests[0].Body.Should().Contain("filename=fail.log");
+        handler.Requests[0].Body.Should().NotContain("filename*");
+    }
+
+    [Fact]
+    public async Task Edit_result_posts_the_comment()
+    {
+        var handler = new ScriptedHandler
+        {
+            Responder = (_, _) => Json(HttpStatusCode.OK, """{"id": 10}""")
+        };
+        var client = CreateClient(handler);
+
+        await client.EditResultCommentAsync(10, "The complete log is attached as scenario-run.log.");
+
+        handler.Requests.Should().ContainSingle();
+        handler.Requests[0].Request.RequestUri!.ToString()
+            .Should().Be("https://example.testrail.io/index.php?/api/v2/edit_result/10");
+        handler.Requests[0].Body.Should().Contain("The complete log is attached as scenario-run.log.");
     }
 
     private static TestRailApiClient CreateClient(ScriptedHandler handler)
