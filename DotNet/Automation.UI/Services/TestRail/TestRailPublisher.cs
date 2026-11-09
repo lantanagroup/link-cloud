@@ -3,6 +3,7 @@ using Automation.UI.Models;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.Extensions.Options;
 
 namespace Automation.UI.Services.TestRail;
@@ -30,7 +31,7 @@ public sealed class TestRailPublisher(
     private readonly Dictionary<(int SuiteId, string RunName), SharedSuiteRun> _sharedRuns = new();
     private readonly TestRailTargetResolver _targets = new(api, logger);
 
-    public async Task PublishScenarioRunAsync(
+    public async Task<IReadOnlyList<TestRailRunReference>> PublishScenarioRunAsync(
         ScenarioTestRailPublishRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -40,7 +41,7 @@ public sealed class TestRailPublisher(
             if (!opts.IsConfigured)
             {
                 logger.LogDebug("TestRail publisher skipped for scenario run {RunId}: not configured.", request.RunId);
-                return;
+                return [];
             }
 
             if (request.Status == AutomationRunStatus.Cancelled)
@@ -48,7 +49,7 @@ public sealed class TestRailPublisher(
                 logger.LogInformation(
                     "TestRail publisher skipped for scenario run {RunId}: cancelled runs are not posted.",
                     request.RunId);
-                return;
+                return [];
             }
 
             if (!opts.HasScenarioSuite)
@@ -56,7 +57,7 @@ public sealed class TestRailPublisher(
                 logger.LogWarning(
                     "TestRail publisher skipped for scenario run {RunId}: ScenarioSuiteId is not configured.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var scenario = request.ScenarioId is Guid scenarioId
@@ -74,7 +75,7 @@ public sealed class TestRailPublisher(
                 logger.LogWarning(
                     "TestRail publisher skipped for scenario run {RunId}: no TestRail case id mapped.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var statusId = TestRailStatusMapper.FromScenarioStatus(request.Status);
@@ -100,7 +101,7 @@ public sealed class TestRailPublisher(
                 ? SharedScenarioRunName
                 : $"Link Automation UI - {request.RunName} - {request.RunId:D}";
 
-            await PublishResultsAsync(
+            return await PublishResultsAsync(
                 opts,
                 opts.ScenarioSuiteId,
                 opts.ScenarioSuiteName,
@@ -113,10 +114,11 @@ public sealed class TestRailPublisher(
         catch (Exception ex)
         {
             logger.LogError(ex, "TestRail publish failed for scenario run {RunId}. Automation run is unaffected.", request.RunId);
+            return [];
         }
     }
 
-    public async Task PublishApiHealthRunAsync(
+    public async Task<IReadOnlyList<TestRailRunReference>> PublishApiHealthRunAsync(
         ApiHealthTestRailPublishRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -126,7 +128,7 @@ public sealed class TestRailPublisher(
             if (!opts.IsConfigured)
             {
                 logger.LogDebug("TestRail publisher skipped for API Health run {RunId}: not configured.", request.RunId);
-                return;
+                return [];
             }
 
             if (request.Cancelled)
@@ -134,7 +136,7 @@ public sealed class TestRailPublisher(
                 logger.LogInformation(
                     "TestRail publisher skipped for API Health run {RunId}: cancelled runs are not posted.",
                     request.RunId);
-                return;
+                return [];
             }
 
             if (!opts.HasApiHealthSuite)
@@ -142,7 +144,7 @@ public sealed class TestRailPublisher(
                 logger.LogWarning(
                     "TestRail publisher skipped for API Health run {RunId}: ApiHealthSuiteId is not configured.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var definitions = string.Equals(request.Scope, "Service", StringComparison.OrdinalIgnoreCase)
@@ -197,14 +199,14 @@ public sealed class TestRailPublisher(
                 logger.LogInformation(
                     "TestRail publisher skipped for API Health run {RunId}: no mapped TestRail case ids.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var runName = opts.UseSharedRun
                 ? SharedApiHealthRunName
                 : $"Link Automation UI - API Health {request.Scope} {request.ServiceName} - {request.RunId:D}".Trim();
 
-            await PublishResultsAsync(
+            return await PublishResultsAsync(
                 opts,
                 opts.ApiHealthSuiteId,
                 opts.ApiHealthSuiteName,
@@ -217,6 +219,7 @@ public sealed class TestRailPublisher(
         catch (Exception ex)
         {
             logger.LogError(ex, "TestRail publish failed for API Health run {RunId}. Automation run is unaffected.", request.RunId);
+            return [];
         }
     }
 
@@ -319,7 +322,7 @@ public sealed class TestRailPublisher(
         _ => statusId.ToString()
     };
 
-    private async Task PublishResultsAsync(
+    private async Task<IReadOnlyList<TestRailRunReference>> PublishResultsAsync(
         TestRailOptions opts,
         int configuredSuiteId,
         string configuredSuiteName,
@@ -341,7 +344,7 @@ public sealed class TestRailPublisher(
         {
             var projectId = await _targets.ResolveProjectIdAsync(opts, cancellationToken);
             if (projectId is null)
-                return;
+                return [];
 
             var suiteId = await _targets.ResolveSuiteIdAsync(
                 projectId.Value,
@@ -350,12 +353,12 @@ public sealed class TestRailPublisher(
                 suiteSettingName,
                 cancellationToken);
             if (suiteId is null)
-                return;
+                return [];
 
             runId = await GetOrCreateRunAsync(opts, projectId.Value, suiteId.Value, runName, caseIds, cancellationToken);
         }
         if (runId is null)
-            return;
+            return [];
 
         IReadOnlyList<TestRailResultDto> posted;
         try
@@ -365,7 +368,17 @@ public sealed class TestRailPublisher(
         catch (Exception ex)
         {
             logger.LogError(ex, "TestRail add_results_for_cases failed for TestRail run {TestRailRunId}.", runId);
-            return;
+            return [];
+        }
+
+        TestRailRunReference? captured = null;
+        if (posted is { Count: > 0 })
+            captured = TestRailRunLinks.Capture(opts.BaseUrl, runId.Value, posted);
+        else
+        {
+            logger.LogWarning(
+                "TestRail add_results_for_cases returned no results for TestRail run {TestRailRunId}.",
+                runId);
         }
 
         for (var index = 0; index < results.Count; index++)
@@ -398,6 +411,8 @@ public sealed class TestRailPublisher(
                 logger.LogWarning(ex, "TestRail add_attachment_to_result failed for result {ResultId}.", postedResult.Id);
             }
         }
+
+        return captured == null ? [] : [captured];
     }
 
     private async Task<int?> EnsurePinnedRunAsync(
