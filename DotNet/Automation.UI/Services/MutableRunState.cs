@@ -38,10 +38,24 @@ internal sealed class MutableRunState(
     public string? ReportId { get; set; }
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
     public string? Error { get; set; }
+    public List<string> FailureDetails { get; } = [];
     public List<string> Logs { get; } = [];
+    /// <summary>
+    /// Appends still writing this run's log to the store. Publish waits on
+    /// <see cref="LogAppendIdle"/> when this is greater than zero.
+    /// </summary>
+    public int PendingLogAppends;
+    /// <summary>Appends that did not land in the store. A non-empty store can still be missing those lines.</summary>
+    public int FailedLogAppends;
+    /// <summary>True after the in-memory log has dropped older lines.</summary>
+    public bool LogTrimmed;
+    public TaskCompletionSource? LogAppendIdle;
+    /// <summary>Tail of the per-run persist chain. Appends run one at a time so store sequence follows write order.</summary>
+    public Task? LogPersistChain;
     public CancellationTokenSource RunCancellation { get; } = new();
     public bool CancelRequested { get; set; }
     public int TestRailPublished;
+    public List<TestRailRunReference> TestRailRuns { get; } = [];
     public Task? ExecutionTask { get; set; }
     public FhirDataLoader? FhirDataLoader { get; set; }
     public Guid? GeneratedTemplateCacheVersionId { get; set; }

@@ -247,6 +247,11 @@
           "System.Diagnostics.EventLog": "6.0.0"
         }
       },
+      "ClosedXML.Parser": {
+        "type": "Transitive",
+        "resolved": "1.2.0",
+        "contentHash": "w+/0tsxABS3lkSH8EUlA7IGme+mq5T/Puf3DbOiTckmSuUpAUO2LK29oXYByCcWkBv6wcRHxgWlQb1lxkwI0Tw=="
+      },
       "DerConverter": {
         "type": "Transitive",
         "resolved": "3.0.0.82",
@@ -327,6 +332,22 @@
           "Docker.DotNet.Enhanced.Handler.Abstractions": "4.2.0"
         }
       },
+      "DocumentFormat.OpenXml": {
+        "type": "Transitive",
+        "resolved": "3.1.1",
+        "contentHash": "2z9QBzeTLNNKWM9SaOSDMegfQk/7hDuElOsmF77pKZMkFRP/GHA/W/4yOAQD9kn15N/FsFxHn3QVYkatuZghiA==",
+        "dependencies": {
+          "DocumentFormat.OpenXml.Framework": "3.1.1"
+        }
+      },
+      "DocumentFormat.OpenXml.Framework": {
+        "type": "Transitive",
+        "resolved": "3.1.1",
+        "contentHash": "6APEp/ElZV58S/4v8mf4Ke3ONEDORs64MqdD64Z7wWpcHANB9oovQsGIwtqjnKihulOj7T0a6IxHIHOfMqKOng==",
+        "dependencies": {
+          "System.IO.Packaging": "8.0.1"
+        }
+      },
       "EntityFramework": {
         "type": "Transitive",
         "resolved": "6.5.1",
@@ -338,6 +359,11 @@
           "System.Configuration.ConfigurationManager": "6.0.1",
           "System.Data.SqlClient": "4.8.6"
         }
+      },
+      "ExcelNumberFormat": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "R3BVHPs9O+RkExbZYTGT0+9HLbi8ZrNij1Yziyw6znd3J7P3uoIR07uwTLGOogtz1p6+0sna66eBoXu7tBiVQA=="
       },
       "FastExpressionCompiler": {
         "type": "Transitive",
@@ -1321,6 +1347,11 @@
           "OpenTelemetry.PersistentStorage.Abstractions": "1.0.2"
         }
       },
+      "RBush": {
+        "type": "Transitive",
+        "resolved": "4.0.0",
+        "contentHash": "j3GeRxxLUQdc+UrZnvythdQxi3bd8ayn87VDjfGXrvfodF550n9wR6SgQvpo+YiAv3GJezsu6lK0l47rRqnbdg=="
+      },
       "RESPite": {
         "type": "Transitive",
         "resolved": "3.1.11",
@@ -1536,6 +1567,11 @@
         "type": "Transitive",
         "resolved": "1.4.2",
         "contentHash": "yjj+3zgz8zgXpiiC3ZdF/iyTBbz2fFvMxZFEBPUcwZjIvXOf37Ylm+K58hqMfIBt5JgU/Z2uoUS67JmTLe973A=="
+      },
+      "SixLabors.Fonts": {
+        "type": "Transitive",
+        "resolved": "1.0.0",
+        "contentHash": "LFQsCZlV0xlUyXAOMUo5kkSl+8zAQXXbbdwWchtk0B4o7zotZhQsQOcJUELGHdfPfm/xDAsz6hONAuV25bJaAg=="
       },
       "Snappier": {
         "type": "Transitive",
@@ -1911,6 +1947,11 @@
         "type": "Transitive",
         "resolved": "10.0.5",
         "contentHash": "8IBJWcCT9+e4Bmevm4T7+fQEiAh133KGiz4oiVTgJckd3Q76OFdR1falgn9lpz7+C4HJvogCDJeAa2QmvbeVtg=="
+      },
+      "System.IO.Packaging": {
+        "type": "Transitive",
+        "resolved": "8.0.1",
+        "contentHash": "KYkIOAvPexQOLDxPO2g0BVoWInnQhPpkFzRqvNrNrMhVT6kqhVr0zEb6KCHlptLFukxnZrjuMVAnxK7pOGUYrw=="
       },
       "System.IO.Pipelines": {
         "type": "Transitive",
@@ -2641,6 +2682,11 @@
           "LinkSdk": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[8.0.27, )",
           "Normalization.Engine": "[1.0.0, )",
+          "Serilog.AspNetCore": "[8.0.3, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
+          "Serilog.Exceptions": "[8.4.0, )",
+          "Serilog.Expressions": "[4.0.0, )",
+          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
           "Swashbuckle.AspNetCore": "[6.9.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
@@ -2813,6 +2859,25 @@
           "Serilog.AspNetCore": "[8.0.3, )",
           "Serilog.Enrichers.Span": "[3.1.0, )",
           "Serilog.Exceptions": "[8.4.0, )",
+          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
+          "Swashbuckle.AspNetCore": "[6.9.0, )",
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
+      "nhsn-app-bff": {
+        "type": "Project",
+        "dependencies": {
+          "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
+          "Azure.Storage.Blobs": "[12.29.0, )",
+          "ClosedXML": "[0.104.2, )",
+          "LinkSdk": "[1.0.0, )",
+          "Microsoft.AspNetCore.OpenApi": "[8.0.27, )",
+          "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
+          "Serilog": "[4.3.1, )",
+          "Serilog.AspNetCore": "[8.0.3, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
+          "Serilog.Expressions": "[4.0.0, )",
+          "Serilog.Sinks.Console": "[6.1.1, )",
           "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
           "Swashbuckle.AspNetCore": "[6.9.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
@@ -3091,6 +3156,19 @@
         "dependencies": {
           "Azure.Core": "1.55.0",
           "Azure.Storage.Common": "12.28.0"
+        }
+      },
+      "ClosedXML": {
+        "type": "CentralTransitive",
+        "requested": "[0.104.2, )",
+        "resolved": "0.104.2",
+        "contentHash": "gOkSjQ152MhpKmw70cBkJV+FnaZAWzDwM36luRf/7FlWYnNeH++9XYdGTd0Y4KQlVPkKVxy948M5MMsnsGC4GQ==",
+        "dependencies": {
+          "ClosedXML.Parser": "[1.2.0, 2.0.0)",
+          "DocumentFormat.OpenXml": "[3.1.1, 4.0.0)",
+          "ExcelNumberFormat": "1.1.0",
+          "RBush": "4.0.0",
+          "SixLabors.Fonts": "1.0.0"
         }
       },
       "CompareNETObjects": {

@@ -227,6 +227,141 @@ public class TestRailPublisherTests
     }
 
     [Fact]
+    public async Task Scenario_comment_keeps_the_first_and_last_log_lines()
+    {
+        var logs = Enumerable.Range(0, 250)
+            .Select(i => $"LINE-{i:D3}")
+            .ToList();
+        TestRailCaseResult? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            ScenarioId = scenarioId,
+            Status = AutomationRunStatus.Succeeded,
+            Logs = logs
+        });
+
+        posted.Should().NotBeNull();
+        var comment = posted!.Comment;
+        comment.Should().NotBeNullOrEmpty();
+        var first = comment!.IndexOf("LINE-000", StringComparison.Ordinal);
+        var middle = comment.IndexOf("LINE-100", StringComparison.Ordinal);
+        var last = comment.IndexOf("LINE-249", StringComparison.Ordinal);
+        first.Should().BeGreaterThanOrEqualTo(0);
+        middle.Should().BeGreaterThan(first);
+        last.Should().BeGreaterThan(middle);
+        posted.Attachment.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Scenario_log_over_the_comment_limit_is_attached_in_full()
+    {
+        var logs = new List<string>(250);
+        for (var i = 0; i < 250; i++)
+        {
+            var marker = i == 0 ? "FIRST-LOG-ENTRY" : i == 249 ? "LAST-LOG-ENTRY" : $"MIDDLE-{i:D3}";
+            logs.Add(marker + new string('.', 100));
+        }
+
+        TestRailCaseResult? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var scenarioId = Guid.NewGuid();
+        var runId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            RunId = runId,
+            ScenarioId = scenarioId,
+            Status = AutomationRunStatus.Succeeded,
+            Error = new string('E', 30_000),
+            Logs = logs
+        });
+
+        posted.Should().NotBeNull();
+        var comment = posted!.Comment;
+        comment.Should().NotBeNullOrEmpty();
+        comment!.Length.Should().BeLessThanOrEqualTo(20_000);
+        comment.Should().Contain("The complete log is attached as");
+        comment.Should().NotContain("Some lines may be missing");
+        comment.Should().Contain($"scenario-run-{runId:D}.log");
+        comment.Should().NotContain("FIRST-LOG-ENTRY");
+        comment.Should().NotContain("LAST-LOG-ENTRY");
+        posted.AttachmentFileName.Should().Be($"scenario-run-{runId:D}.log");
+        posted.Attachment.Should().NotBeNull();
+
+        var attached = Encoding.UTF8.GetString(posted.Attachment!);
+        var first = attached.IndexOf("FIRST-LOG-ENTRY", StringComparison.Ordinal);
+        var middle = attached.IndexOf("MIDDLE-100", StringComparison.Ordinal);
+        var last = attached.IndexOf("LAST-LOG-ENTRY", StringComparison.Ordinal);
+        first.Should().BeGreaterThanOrEqualTo(0);
+        middle.Should().BeGreaterThan(first);
+        last.Should().BeGreaterThan(middle);
+        attached.Should().Contain(new string('E', 30_000));
+    }
+
+    [Fact]
+    public async Task Incomplete_scenario_log_does_not_call_the_attachment_complete()
+    {
+        var logs = new List<string>(250);
+        for (var i = 0; i < 250; i++)
+        {
+            var marker = i == 0 ? "FIRST-LOG-ENTRY" : i == 249 ? "LAST-LOG-ENTRY" : $"MIDDLE-{i:D3}";
+            logs.Add(marker + new string('.', 100));
+        }
+
+        TestRailCaseResult? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var scenarioId = Guid.NewGuid();
+        var runId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            RunId = runId,
+            ScenarioId = scenarioId,
+            Status = AutomationRunStatus.Succeeded,
+            Error = new string('E', 30_000),
+            Logs = logs,
+            LogsMayBeIncomplete = true
+        });
+
+        posted.Should().NotBeNull();
+        var comment = posted!.Comment;
+        comment.Should().NotBeNullOrEmpty();
+        comment!.Length.Should().BeLessThanOrEqualTo(20_000);
+        comment.Should().Contain("Some lines may be missing");
+        comment.Should().NotContain("The complete log is attached as");
+        comment.Should().Contain($"scenario-run-{runId:D}.log");
+        comment.Should().NotContain("FIRST-LOG-ENTRY");
+        comment.Should().NotContain("LAST-LOG-ENTRY");
+        posted.AttachmentFileName.Should().Be($"scenario-run-{runId:D}.log");
+        posted.Attachment.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Non_shared_api_health_run_keeps_hyphenated_automation_run_id()
     {
         var runId = Guid.Parse("8b8c9fab-72c2-4a5b-b200-271587e5d5d3");
@@ -1165,6 +1300,170 @@ public class TestRailPublisherTests
         logs.Entries.Should().Contain(entry =>
             entry.Level == LogLevel.Information
             && entry.Message.Contains("cancelled runs are not posted", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Scenario_publish_records_the_created_run_and_single_test_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestRailResultDto { Id = 1, CaseId = 42, TestId = 16898 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var options = ConfiguredOptions();
+        options.BaseUrl = "https://example.testrail.io///";
+        var publisher = CreatePublisher(api.Object, options, ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Succeeded };
+
+        var publishedRuns = await publisher.PublishScenarioRunAsync(request);
+
+        var published = publishedRuns.Should().ContainSingle().Subject;
+        published.RunId.Should().Be(501);
+        published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/501");
+        published.TestId.Should().Be(16898);
+        published.TestUrl.Should().Be("https://example.testrail.io/index.php?/tests/view/16898");
+    }
+
+    [Fact]
+    public async Task Shared_scenario_publish_records_the_existing_run()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.GetOpenRunsAsync(9, 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new TestRailRunDetails
+                {
+                    Id = 777,
+                    SuiteId = 100,
+                    Name = TestRailPublisher.SharedScenarioRunName,
+                    IncludeAll = true
+                }
+            ]);
+        api.Setup(a => a.GetRunAsync(777, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestRailRunDetails
+            {
+                Id = 777,
+                SuiteId = 100,
+                Name = TestRailPublisher.SharedScenarioRunName,
+                IncludeAll = true
+            });
+        api.Setup(a => a.AddResultsForCasesAsync(777, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TestRailResultDto { Id = 9, CaseId = 42, TestId = 91 }]);
+
+        var scenarioId = Guid.NewGuid();
+        var options = ConfiguredOptions();
+        options.UseSharedRun = true;
+        options.BaseUrl = "https://example.testrail.io/";
+        var publisher = CreatePublisher(api.Object, options, ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId };
+
+        var publishedRuns = await publisher.PublishScenarioRunAsync(request);
+
+        api.Verify(a => a.AddRunAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()), Times.Never);
+        var published = publishedRuns.Should().ContainSingle().Subject;
+        published.RunId.Should().Be(777);
+        published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/777");
+        published.TestUrl.Should().Be("https://example.testrail.io/index.php?/tests/view/91");
+    }
+
+    [Fact]
+    public async Task Api_health_publish_records_the_run_without_a_single_test_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 200, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(44);
+        api.Setup(a => a.AddResultsForCasesAsync(44, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new TestRailResultDto { Id = 1, CaseId = 1, TestId = 10 },
+                new TestRailResultDto { Id = 2, CaseId = 2, TestId = 11 }
+            ]);
+
+        var passDef = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Create Facility", TestRailCaseId = 1 };
+        var failDef = new ApiEndpointDefinition { ServiceName = "Tenant", EndpointName = "Get Facility", TestRailCaseId = 2 };
+        var store = new Mock<IApiHealthRunStore>();
+        store.Setup(s => s.GetLatestResultsForRunAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, ApiTestRunResult>
+            {
+                [passDef.Key] = new() { EndpointKey = passDef.Key, EndpointName = passDef.EndpointName, ServiceName = "Tenant", Passed = true },
+                [failDef.Key] = new() { EndpointKey = failDef.Key, EndpointName = failDef.EndpointName, ServiceName = "Tenant", Passed = false, ErrorMessage = "nope" }
+            });
+
+        var options = ConfiguredOptions();
+        options.BaseUrl = "https://example.testrail.io";
+        var publisher = CreatePublisher(
+            api.Object,
+            options,
+            apiHealthStore: store.Object,
+            registry: new ApiEndpointRegistry([new FakeSuite(passDef, failDef)]));
+        var request = SampleApiHealthRequest();
+
+        var publishedRuns = await publisher.PublishApiHealthRunAsync(request);
+
+        var published = publishedRuns.Should().ContainSingle().Subject;
+        published.RunId.Should().Be(44);
+        published.Url.Should().Be("https://example.testrail.io/index.php?/runs/view/44");
+        published.TestId.Should().BeNull();
+        published.TestUrl.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Unpublished_scenario_run_records_nothing(bool cancelled)
+    {
+        var api = new Mock<ITestRailApiClient>(MockBehavior.Strict);
+        var options = ConfiguredOptions();
+        if (!cancelled)
+            options.Enabled = false;
+        var publisher = CreatePublisher(api.Object, options);
+        var request = SampleScenarioRequest() with
+        {
+            Status = cancelled ? AutomationRunStatus.Cancelled : AutomationRunStatus.Succeeded
+        };
+
+        var published = await publisher.PublishScenarioRunAsync(request);
+
+        published.Should().BeEmpty();
+        api.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Failed_result_post_does_not_record_a_run_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("down"));
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Failed };
+
+        var published = await publisher.PublishScenarioRunAsync(request);
+
+        published.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Empty_result_post_does_not_record_a_run_link()
+    {
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var scenarioId = Guid.NewGuid();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId));
+        var request = SampleScenarioRequest() with { ScenarioId = scenarioId, Status = AutomationRunStatus.Succeeded };
+
+        var published = await publisher.PublishScenarioRunAsync(request);
+
+        published.Should().BeEmpty();
     }
 
     private static IScenarioStore ScenarioStore(Guid scenarioId, int caseId = 42)
