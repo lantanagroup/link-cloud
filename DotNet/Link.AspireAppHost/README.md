@@ -50,7 +50,8 @@ dotnet user-secrets set "Java:Home" "C:\Program Files\Eclipse Adoptium\jdk-21.0.
 | `Replicas:<service>` | `1` | How many copies of a service run; see [Scaling a service out](#scaling-a-service-out) |
 
 The SQL Server password is generated on the first run and kept in the same user secrets
-(`Parameters:sql-password`).
+(`Parameters:sql-password`). So is the SFTP server's password, for its `admin` account
+(`Parameters:sftp-password`); the dashboard's Parameters tab shows it too.
 
 ### Signing in: the http and https profiles
 
@@ -120,6 +121,7 @@ connections and not recover.
 | Redis (no password) | `127.0.0.1:16379` (IPv4: the port is published on 127.0.0.1 only) |
 | Azurite blob | http://127.0.0.1:11000/devstoreaccount1 |
 | Loki | http://localhost:13100 |
+| SFTP server | `127.0.0.1:12222`, user `admin`, generated password (see above), uploads in `data/` (kept between runs) |
 | Keycloak (https profile only) | https://localhost:18443, realm `link` |
 
 ### Scaling a service out
@@ -189,7 +191,7 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | `Security/AuthMode.cs` | `Auth:Mode`: Anonymous (http profile) or Keycloak (https profile) |
 | `Security/LinkServiceClient.cs` | HTTP clients for the AppHost's own calls to services, carrying the Link system token |
 | `Security/LinkKeycloak.cs` | Keycloak's URLs and parameters, its admin token, and creating users |
-| `Extensions/InfrastructureExtensions.cs` | The containers: SQL Server, Kafka and its topics, Mongo, Redis, Azurite, Loki, HAPI FHIR |
+| `Extensions/InfrastructureExtensions.cs` | The containers: SQL Server, Kafka and its topics, Mongo, Redis, Azurite, Loki, HAPI FHIR, SFTP |
 | `Extensions/DotNetServiceExtensions.cs` | How a .NET service is run and configured |
 | `Extensions/JavaServiceExtensions.cs` | The Maven build, MeasureEval, Validation, and the Validation migrations command |
 | `Extensions/AdminUiExtensions.cs` | The Admin UI under `ng serve` |
@@ -283,4 +285,4 @@ replaced by a green notice on success or a red one on failure, which stays until
   API key: Aspire's usual way of passing the key sets variables the OpenTelemetry Spring starter
   cannot read, and they stop the services from starting. Their traces may not show on the dashboard.
   Their logs still reach the console view and Loki.
-- **Not included:** the NHSN app (`nhsn/`), the SFTP server, Grafana, Tempo and Prometheus.
+- **Not included:** the NHSN app (`nhsn/`), Grafana, Tempo and Prometheus.

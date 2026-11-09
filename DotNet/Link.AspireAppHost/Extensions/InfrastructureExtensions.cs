@@ -17,7 +17,9 @@ internal sealed record LinkInfrastructure(
     IResourceBuilder<ContainerResource> Azurite,
     IResourceBuilder<ContainerResource> Loki,
     IResourceBuilder<ContainerResource> HapiFhir,
-    IResourceBuilder<ContainerResource> KafkaRestProxy)
+    IResourceBuilder<ContainerResource> KafkaRestProxy,
+    IResourceBuilder<ContainerResource> Sftp,
+    IResourceBuilder<ParameterResource> SftpPassword)
 {
     /// <summary>The blob container internal artifacts and the resource cache live in.</summary>
     public const string InternalContainer = "internal";
@@ -62,6 +64,18 @@ internal sealed record LinkInfrastructure(
     public static readonly string HapiFhirBaseUrl = $"http://localhost:{Ports.HapiFhir}/fhir";
 
     public static readonly string KafkaRestProxyUrl = $"http://localhost:{Ports.KafkaRestProxy}";
+
+    /// <summary>The SFTP server's one account. Its password is generated: <see cref="SftpPassword"/>.</summary>
+    public const string SftpUser = "admin";
+
+    /// <summary>
+    /// The folder under the SFTP account's home that is writable and kept between runs. The home itself
+    /// belongs to root, as the server's chroot requires, so uploads go here.
+    /// </summary>
+    public const string SftpDirectory = "data";
+
+    /// <summary>The host a facility's SFTP configuration names to reach it, with <see cref="Ports.Sftp"/>.</summary>
+    public const string SftpHost = "127.0.0.1";
 
     /// <summary>
     /// A database on the local SQL Server, created when SQL Server starts. The resource is named
@@ -148,7 +162,60 @@ internal static class InfrastructureExtensions
                 ReferenceExpression.Create($"{kafka.Resource.InternalEndpoint.Property(EndpointProperty.HostAndPort)}"))
             .WaitFor(kafka);
 
-        return new LinkInfrastructure(sql, kafka, mongo, redis, azurite, loki, hapi, restProxy);
+        var sftp = builder.AddLinkSftp();
+
+        return new LinkInfrastructure(sql, kafka, mongo, redis, azurite, loki, hapi, restProxy, sftp.Container, sftp.Password);
+    }
+
+    /// <summary>
+    /// The SFTP server compose runs, for facilities whose patient lists arrive as files. No service is
+    /// pointed at it by configuration: a facility's SFTP configuration in DataAcquisition names it.
+    /// </summary>
+    /// <remarks>
+    /// The account's password is generated on the first run and kept in this AppHost's user secrets,
+    /// like SQL Server's. It has no special characters: the image reads the account from one
+    /// colon-separated argument.
+    /// <para />
+    /// The image leaves a folder that already exists owned by root, and the volume keeps the data folder
+    /// between runs, so <c>Scripts/sftp-setup.sh</c> hands it to the account on each start, as under compose.
+    /// The script is copied in rather than bind-mounted: the image only runs scripts that are executable,
+    /// and a bind mount carries the host's file mode (not executable in a Linux checkout) and line endings.
+    /// </remarks>
+    private static (IResourceBuilder<ContainerResource> Container, IResourceBuilder<ParameterResource> Password)
+        AddLinkSftp(this IDistributedApplicationBuilder builder)
+    {
+        var password = builder.AddParameter("sftp-password",
+            new GenerateParameterDefault { MinLength = 24, Special = false }, secret: true, persist: true);
+
+        var setupScript = File.ReadAllText(Path.Combine(builder.AppHostDirectory, "..", "..", "Scripts", "sftp-setup.sh"))
+            .Replace("\r\n", "\n");
+
+        var container = builder.AddContainer("sftp", "atmoz/sftp")
+            .WithArgs(ReferenceExpression.Create($"{LinkInfrastructure.SftpUser}:{password}:1001:1001:{LinkInfrastructure.SftpDirectory}"))
+            .WithEndpoint(port: Ports.Sftp, targetPort: 22, name: "sftp", scheme: "sftp", isProxied: false)
+            .WithVolume("link-aspire-sftp", $"/home/{LinkInfrastructure.SftpUser}/{LinkInfrastructure.SftpDirectory}")
+            // The image has no /etc/sftp.d of its own, so the folder is created along with the script.
+            .WithContainerFiles("/etc",
+            [
+                new ContainerDirectory
+                {
+                    Name = "sftp.d",
+                    Entries =
+                    [
+                        new ContainerFile
+                        {
+                            Name = "sftp-setup.sh",
+                            Contents = setupScript,
+                            Mode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                                   UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                                   UnixFileMode.OtherRead | UnixFileMode.OtherExecute
+                        }
+                    ]
+                }
+            ])
+            .WithHealthCheck(AddSftpCheck(builder));
+
+        return (container, password);
     }
 
     /// <summary>
@@ -272,6 +339,35 @@ internal static class InfrastructureExtensions
             catch (Exception ex) when (ex is MongoException or TimeoutException)
             {
                 return HealthCheckResult.Unhealthy("MongoDB is not answering yet", ex);
+            }
+        });
+        return checkName;
+    }
+
+    /// <summary>
+    /// Reports healthy once the SFTP server sends its SSH banner. The port alone answers earlier, while
+    /// the container is still creating the account.
+    /// </summary>
+    private static string AddSftpCheck(IDistributedApplicationBuilder builder)
+    {
+        const string checkName = "sftp-banner";
+        builder.Services.AddHealthChecks().AddAsyncCheck(checkName, async cancellationToken =>
+        {
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(3));
+                using var client = new System.Net.Sockets.TcpClient();
+                await client.ConnectAsync(LinkInfrastructure.SftpHost, Ports.Sftp, timeout.Token);
+                var buffer = new byte[4];
+                await client.GetStream().ReadExactlyAsync(buffer, timeout.Token);
+                return System.Text.Encoding.ASCII.GetString(buffer) == "SSH-"
+                    ? HealthCheckResult.Healthy("The SFTP server is accepting connections")
+                    : HealthCheckResult.Unhealthy("The SFTP port answered with something other than SSH");
+            }
+            catch (Exception ex) when (ex is System.Net.Sockets.SocketException or IOException or OperationCanceledException)
+            {
+                return HealthCheckResult.Unhealthy("The SFTP server is not answering yet", ex);
             }
         });
         return checkName;
