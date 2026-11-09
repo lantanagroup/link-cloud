@@ -227,10 +227,16 @@ replaced by a green notice on success or a red one on failure, which stays until
   existing data is reloading a measure to add expansions. Add more parts in
   `Extensions/SeedDataExtensions.cs`.
 - **Create test facility** (on `admin-bff`): a form for facility id and name, time zone, measure (from
-  the ones MeasureEval has) and FHIR server. It then runs `FacilitySetup/steps.json`, which:
+  the ones MeasureEval has), EHR vendor and FHIR server. It then runs `FacilitySetup/steps.json`, which:
   - creates the DMRP measure mapping and the facility in Tenant;
-  - configures Census (disabled), QueryDispatch, DataAcquisition (Discharge and Monthly query plans
-    using `_include`, the FHIR query configuration and the patient lists) and Normalization.
+  - configures Census (disabled), QueryDispatch, DataAcquisition (Discharge and Monthly query plans,
+    the FHIR query configuration and the patient lists) and Normalization.
+
+  The EHR vendor picks the query plans: `query-plan-*-epic.json` or `query-plan-*-cerner.json`, each a
+  copy of the ACH Monthly plan production uses for that vendor. Epic fetches Encounter first and
+  everything else as supplemental data, using `_include` for Locations, Medications and Specimens;
+  Cerner fetches those through Reference queries and also fetches MedicationAdministration. A facility
+  that already has plans keeps them, whichever vendor is picked.
 
   The steps and payloads come from the QA Postman collections. They're read when the command runs,
   so editing them needs no rebuild. Running it again for the same facility only creates what's

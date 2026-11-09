@@ -65,6 +65,13 @@ internal static partial class FacilitySetupExtensions
 
     private enum StepResult { Created, AlreadyThere }
 
+    /// <summary>The vendors with query plans in FacilitySetup/DataAcquisition (query-plan-*-{key}.json).</summary>
+    private static readonly List<KeyValuePair<string, string>> EhrVendors =
+    [
+        KeyValuePair.Create("epic", "Epic"),
+        KeyValuePair.Create("cerner", "Cerner")
+    ];
+
     private static async Task<ExecuteCommandResult> CreateFacilityAsync(ExecuteCommandContext context, string setupDirectory)
     {
         var interaction = context.Services.GetRequiredService<IInteractionService>();
@@ -184,6 +191,16 @@ internal static partial class FacilitySetupExtensions
                 measureInput,
                 new InteractionInput
                 {
+                    Name = "ehr",
+                    Label = "EHR vendor",
+                    InputType = InputType.Choice,
+                    Required = true,
+                    Options = EhrVendors,
+                    Value = EhrVendors.Any(v => v.Key == Default("ehr")) ? Default("ehr") : EhrVendors[0].Key,
+                    Description = "Picks the query plans: a copy of the ACH Monthly plan production uses for that vendor. A facility that already has plans keeps them."
+                },
+                new InteractionInput
+                {
                     Name = "fhirServerBaseUrl",
                     Label = "FHIR server",
                     InputType = InputType.Text,
@@ -252,7 +269,7 @@ internal static partial class FacilitySetupExtensions
         using var request = new HttpRequestMessage(new HttpMethod(step.Method), FillPath(step.Path, variables));
         if (step.Body is not null)
         {
-            var body = FillJson(await File.ReadAllTextAsync(Path.Combine(setupDirectory, step.Body), cancellationToken), variables);
+            var body = FillJson(await File.ReadAllTextAsync(Path.Combine(setupDirectory, FillFileName(step.Body, variables)), cancellationToken), variables);
             request.Content = new StringContent(body, Encoding.UTF8, "application/json");
         }
 
@@ -314,6 +331,15 @@ internal static partial class FacilitySetupExtensions
     /// <summary>Fills {{name}} in a path. Values are escaped for a URL; the path itself starts with a slash.</summary>
     private static string FillPath(string path, Dictionary<string, string> variables) =>
         Fill(path, variables, Uri.EscapeDataString).TrimStart('/');
+
+    /// <summary>
+    /// Fills {{name}} in a payload's file name, as the EHR vendor picks the query plans. A value that would leave the
+    /// file name (a path separator or "..") is refused.
+    /// </summary>
+    private static string FillFileName(string fileName, Dictionary<string, string> variables) =>
+        Fill(fileName, variables, value => value.IndexOfAny(['/', '\\']) < 0 && !value.Contains("..")
+            ? value
+            : throw new InvalidOperationException($"'{value}' can't be used in a payload file name."));
 
     /// <summary>Fills {{name}} in a JSON payload. Every placeholder sits inside a JSON string, so values are escaped for one.</summary>
     private static string FillJson(string json, Dictionary<string, string> variables) =>

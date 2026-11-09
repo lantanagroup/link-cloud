@@ -1,13 +1,13 @@
 {
   "PlanName": "{{measure}}",
   "FacilityId": "{{facilityId}}",
-  "EHRDescription": "Epic",
+  "EHRDescription": "Cerner",
   "LookBack": "P0D",
   "Type": "Monthly",
   "InitialQueries": {
     "0": {
-      "ResourceType": "Encounter",
       "QueryConfigType": "Parameter",
+      "ResourceType": "Encounter",
       "Parameters": [
         {
           "ParameterType": "Variable",
@@ -26,47 +26,14 @@
           "Name": "date",
           "Variable": 3,
           "Format": "le{0}"
-        },
-        {
-          "ParameterType": "Literal",
-          "Name": "_include",
-          "Literal": "Encounter:location"
         }
       ]
     },
     "1": {
-      "QueryConfigType": "Parameter",
-      "ResourceType": "MedicationRequest",
-      "Parameters": [
-        {
-          "ParameterType": "Variable",
-          "Name": "patient",
-          "Variable": 0,
-          "Format": null
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "authoredon",
-          "Variable": 1,
-          "Format": "ge{0}"
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "authoredon",
-          "Variable": 3,
-          "Format": "le{0}"
-        },
-        {
-          "ParameterType": "Literal",
-          "Name": "intent",
-          "Literal": "order"
-        },
-        {
-          "ParameterType": "Literal",
-          "Name": "_include",
-          "Literal": "MedicationRequest:medication"
-        }
-      ]
+      "QueryConfigType": "Reference",
+      "ResourceType": "Location",
+      "OperationType": "SearchPost",
+      "Paged": 100
     }
   },
   "SupplementalQueries": {
@@ -79,23 +46,6 @@
           "Name": "patient",
           "Variable": 0,
           "Format": null
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "recorded-date",
-          "Variable": 1,
-          "Format": "ge{0}"
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "recorded-date",
-          "Variable": 3,
-          "Format": "le{0}"
-        },
-        {
-          "ParameterType": "Literal",
-          "Name": "category",
-          "Literal": "encounter-diagnosis,health-concern,problem-list-item"
         }
       ]
     },
@@ -112,6 +62,66 @@
       ]
     },
     "2": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "DiagnosticReport",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "date",
+          "Variable": 3,
+          "Format": "le{0}"
+        }
+      ]
+    },
+    "3": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "MedicationAdministration",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "effective-time",
+          "Variable": 1,
+          "Format": "ge{0}"
+        },
+        {
+          "ParameterType": "Variable",
+          "Name": "effective-time",
+          "Variable": 3,
+          "Format": "le{0}"
+        }
+      ]
+    },
+    "4": {
+      "QueryConfigType": "Parameter",
+      "ResourceType": "MedicationRequest",
+      "Parameters": [
+        {
+          "ParameterType": "Variable",
+          "Name": "patient",
+          "Variable": 0,
+          "Format": null
+        }
+      ]
+    },
+    "5": {
       "QueryConfigType": "Parameter",
       "ResourceType": "Observation",
       "Parameters": [
@@ -136,16 +146,11 @@
         {
           "ParameterType": "Literal",
           "Name": "category",
-          "Literal": "imaging,laboratory,social-history,vital-signs"
-        },
-        {
-          "ParameterType": "Literal",
-          "Name": "_include",
-          "Literal": "Observation:specimen"
+          "Literal": "imaging,laboratory,procedure,social-history,survey,vital-signs"
         }
       ]
     },
-    "3": {
+    "6": {
       "QueryConfigType": "Parameter",
       "ResourceType": "Procedure",
       "Parameters": [
@@ -169,7 +174,7 @@
         }
       ]
     },
-    "4": {
+    "7": {
       "QueryConfigType": "Parameter",
       "ResourceType": "ServiceRequest",
       "Parameters": [
@@ -178,54 +183,26 @@
           "Name": "patient",
           "Variable": 0,
           "Format": null
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "authored",
-          "Variable": 1,
-          "Format": "ge{0}"
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "authored",
-          "Variable": 3,
-          "Format": "le{0}"
-        },
-        {
-          "ParameterType": "Literal",
-          "Name": "_include",
-          "Literal": "ServiceRequest:specimen"
         }
       ]
     },
-    "5": {
-      "QueryConfigType": "Parameter",
-      "ResourceType": "DiagnosticReport",
-      "Parameters": [
-        {
-          "ParameterType": "Variable",
-          "Name": "patient",
-          "Variable": 0,
-          "Format": null
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "date",
-          "Variable": 1,
-          "Format": "ge{0}"
-        },
-        {
-          "ParameterType": "Variable",
-          "Name": "date",
-          "Variable": 3,
-          "Format": "le{0}"
-        },
-        {
-          "ParameterType": "Literal",
-          "Name": "category",
-          "Literal": "LAB,LP29708-2,LP7839-6,LP29684-5"
-        }
-      ]
+    "8": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Device",
+      "OperationType": "SearchPost",
+      "Paged": 100
+    },
+    "9": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Medication",
+      "OperationType": "SearchPost",
+      "Paged": 100
+    },
+    "10": {
+      "QueryConfigType": "Reference",
+      "ResourceType": "Specimen",
+      "OperationType": "SearchPost",
+      "Paged": 100
     }
   }
 }

@@ -1,10 +1,11 @@
 {
-  "$comment": "The requests that create and configure a test facility, in order. Taken from the QA Postman collection's 'Test Data Creation Facility' folder. Each step calls a service directly (not through the Admin BFF) with the AppHost's Link system token. {{name}} placeholders in paths and payloads are filled from 'variables', the Create test facility form, and values captured from earlier responses. existsCheck: a GET answering 200 with a body that holds something (for a paged search result, a non-empty 'records' array) means the thing exists and the step is skipped; 204 or 404 means it runs; anything else stops the command. alreadyExistsStatuses: response statuses of the step itself that mean it already existed.",
+  "$comment": "The requests that create and configure a test facility, in order. Taken from the QA Postman collection's 'Test Data Creation Facility' folder. Each step calls a service directly (not through the Admin BFF) with the AppHost's Link system token. {{name}} placeholders in paths, payloads and payload file names are filled from 'variables', the Create test facility form, and values captured from earlier responses. existsCheck: a GET answering 200 with a body that holds something (for a paged search result, a non-empty 'records' array) means the thing exists and the step is skipped; 204 or 404 means it runs; anything else stops the command. alreadyExistsStatuses: response statuses of the step itself that mean it already existed.",
   "variables": {
     "facilityId": "dev-facility",
     "facilityName": "Dev Facility",
     "timeZone": "America/Chicago",
     "measure": "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+    "ehr": "epic",
     "fhirServerBaseUrl": "https://ehr-test.nhsnlink.org/fhir"
   },
   "steps": [
@@ -44,20 +45,20 @@
     },
     {
       "name": "Query plan (Monthly)",
-      "$comment": "Used by scheduled end-of-month reports.",
+      "$comment": "Used by scheduled end-of-month reports. {{ehr}} picks the vendor's plan (epic or cerner), each a copy of the ACH Monthly plan production uses for that vendor. An existing plan is kept, whichever vendor it came from.",
       "service": "data-acquisition",
       "method": "POST",
       "path": "/api/data-acquisition/{{facilityId}}/QueryPlan",
-      "body": "DataAcquisition/query-plan-monthly.json",
+      "body": "DataAcquisition/query-plan-monthly-{{ehr}}.json",
       "existsCheck": "/api/data-acquisition/{{facilityId}}/QueryPlan?type=Monthly"
     },
     {
       "name": "Query plan (Discharge)",
-      "$comment": "Used by discharge events and ad-hoc reports.",
+      "$comment": "Used by discharge events and ad-hoc reports. {{ehr}} picks the vendor's plan, as for the monthly plan.",
       "service": "data-acquisition",
       "method": "POST",
       "path": "/api/data-acquisition/{{facilityId}}/QueryPlan",
-      "body": "DataAcquisition/query-plan-discharge.json",
+      "body": "DataAcquisition/query-plan-discharge-{{ehr}}.json",
       "existsCheck": "/api/data-acquisition/{{facilityId}}/QueryPlan?type=Discharge"
     },
     {
