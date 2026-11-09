@@ -577,6 +577,11 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.run_nhsn_ui == 'true' }}
 
+    # npm ci and the test runs execute third-party code, so the token stays read-only and is not
+    # left in .git/config.
+    permissions:
+      contents: read
+
     defaults:
       run:
         working-directory: nhsn/NHSN-App-UI
@@ -584,6 +589,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Download NHSN React Core package from Azure Repos
         shell: bash
