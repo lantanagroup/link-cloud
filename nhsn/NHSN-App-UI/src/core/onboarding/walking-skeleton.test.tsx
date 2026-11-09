@@ -8,7 +8,7 @@ import {ensureI18nInitialized} from '../localization/i18n';
 
 /**
  * Proves the machine turns over: flow -> gating -> provider -> StepHost ->
- * fields -> ApiClient -> draft save -> URL sync.
+ * fields -> ApiClient -> URL sync.
  *
  * The port is what makes this cheap — MockApiClient is injected at the
  * composition root, so there is no fetch interception and no network.
@@ -54,7 +54,9 @@ describe('onboarding walking skeleton', () => {
     expect(currentStepLabel(container)).toBe('Welcome');
   });
 
-  it('advances to the next step, mirrors it to the URL and persists the draft', async () => {
+  // Welcome has no editable fields, and OnboardingProvider only saves a draft with edits, so
+  // this transition writes nothing.
+  it('advances to the next step and mirrors it to the URL', async () => {
     const user = userEvent.setup();
     const {container} = renderApp();
 
@@ -67,16 +69,9 @@ describe('onboarding walking skeleton', () => {
     // The lazily-loaded next step resolves...
     await waitFor(() => expect(currentStepLabel(container)).toBe('Facility Reporting Plan'));
 
-    // ...the URL follows the machine...
+    // ...and the URL follows the machine.
     await waitFor(() => {
       expect(window.location.pathname).toBe('/onboarding/reporting-plan');
-    });
-
-    // ...and the transition was saved, so a reload agrees with where we are.
-    await waitFor(() => {
-      const saved = window.localStorage.getItem('nhsn-app-ui.mockDraft.MOCK-FACILITY-001');
-      expect(saved).toBeTruthy();
-      expect(JSON.parse(saved as string).currentStepId).toBe('reporting-plan');
     });
   });
 

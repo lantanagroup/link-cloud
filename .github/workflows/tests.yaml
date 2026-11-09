@@ -22,6 +22,7 @@ jobs:
     outputs:
       run_job: ${{ steps.should.outputs.run_job }}
       run_admin_ui: ${{ steps.should.outputs.run_admin_ui }}
+      run_nhsn_ui: ${{ steps.should.outputs.run_nhsn_ui }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -38,7 +39,9 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+          # Admin UI image and package changes are included because this job is the only one
+          # that builds the image: the mocked tier runs ng serve on the runner instead.
+          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|Web/Admin\.UI/(Dockerfile|(server/)?package(-lock)?\.json)|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
             echo "run_job=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_job=false" >> "$GITHUB_OUTPUT"
@@ -53,10 +56,17 @@ jobs:
             echo "run_admin_ui=false" >> "$GITHUB_OUTPUT"
           fi
 
+          if echo "$CHANGED_FILES" | grep -Eq '^(nhsn/NHSN-App-UI/|\.github/workflows/tests\.yaml)'; then
+            echo "run_nhsn_ui=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_nhsn_ui=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Show decision
         run: |
           echo "run_job=${{ steps.should.outputs.run_job }}"
           echo "run_admin_ui=${{ steps.should.outputs.run_admin_ui }}"
+          echo "run_nhsn_ui=${{ steps.should.outputs.run_nhsn_ui }}"
 
   backend-e2e-tests:
     # PR-safe Backend E2E against a SINGLE shared docker compose stack
@@ -556,6 +566,71 @@ jobs:
             Web/Admin.UI/playwright-report/
             Web/Admin.UI/test-results/
           if-no-files-found: ignore
+
+  nhsn-ui-tests:
+    # No other pipeline runs these suites: the NHSN App UI Azure pipeline only builds and pushes
+    # the image, and the Backend E2E job only starts it.
+    name: NHSN App UI Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    needs: changes
+    if: ${{ needs.changes.outputs.run_nhsn_ui == 'true' }}
+
+    defaults:
+      run:
+        working-directory: nhsn/NHSN-App-UI
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download NHSN React Core package from Azure Repos
+        shell: bash
+        env:
+          AZDO_PAT: ${{ secrets.AZDO_PAT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AZDO_PAT}" ]]; then
+            echo "AZDO_PAT repository secret is required to download the NHSN React Core package." >&2
+            exit 1
+          fi
+
+          mkdir -p packages
+          curl --fail --show-error --silent --location \
+            --user ":${AZDO_PAT}" \
+            --output packages/nhsn-react-core-2.4.1.tgz \
+            "https://dev.azure.com/lantanagroup/nhsnlink/_apis/git/repositories/nhsnlink/items?path=/nhsn-app-ui/nhsn-react-core-2.4.1.tgz&download=true&api-version=7.1"
+
+          test -s packages/nhsn-react-core-2.4.1.tgz
+
+      # Keep in step with the major version in nhsn/NHSN-App-UI/Dockerfile.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            nhsn/NHSN-App-UI/package-lock.json
+            nhsn/NHSN-App-UI/server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Bundle boundary tests
+        run: npm run test:boundary
+
+      - name: Install server dependencies
+        working-directory: nhsn/NHSN-App-UI/server
+        run: npm ci
+
+      - name: Server tests
+        working-directory: nhsn/NHSN-App-UI/server
+        run: npm test
 
   dotnet-tests:
     name: .NET Tests
