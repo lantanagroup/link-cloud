@@ -30,7 +30,6 @@ public enum KafkaTopic
     ReportFailed,
     ReportRequestRejected,
     ReportScheduled,
-    RetentionCheckScheduled,
     MeasureChanged,
     MeasureEvalFailed,
     FHIRValidationFailed,
