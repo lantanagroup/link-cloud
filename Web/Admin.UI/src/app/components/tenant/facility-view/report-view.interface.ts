@@ -123,12 +123,15 @@ export interface IReportCategoryCount {
   acceptable: boolean;
   submit: boolean;
   issues: number;
-  guidance?: string;
+  guidance?: string | null;
+  severity?: string | null;
 }
 
 export interface IReportCategoryCounts {
   facilityId: string;
-  reportId: string;
+  reportScheduleId: string;
+  reportStatus: ScheduleStatus | null;
+  inProgress: boolean;
   lastUpdated: string;
   categories: IReportCategoryCount[];
 }

@@ -33,6 +33,20 @@ class ResultCsvControllerTest {
                 .andExpect(content().string("resultId,patientId\r\n"));
     }
     @Test
+    void returnsProblemWithoutAttachmentWhenQueryFailsBeforeStreaming() throws Exception {
+        when(service.upperBound("facility", ID))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("Database unavailable"));
+        mvc.perform(get("/api/validation/facilities/facility/reports/" + ID + "/results.csv")
+                        .accept("text/csv"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(header().doesNotExist("Content-Disposition"))
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.detail").value("An unexpected error occurred"));
+        verify(service, never()).write(anyString(), anyString(), any(), any());
+    }
+
+    @Test
     void rejectsInvalidUuidBeforeQuerying() throws Exception {
         mvc.perform(get("/api/validation/facilities/facility/reports/invalid/results.csv")).andExpect(status().isBadRequest());
         verifyNoInteractions(service);

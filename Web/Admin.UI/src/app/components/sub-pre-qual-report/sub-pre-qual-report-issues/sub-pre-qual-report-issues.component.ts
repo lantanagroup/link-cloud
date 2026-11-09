@@ -12,9 +12,9 @@ import {
   SubPreQualReportIssuesTableComponent
 } from '../sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
 import {SubPreQualReportMetaComponent} from '../sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
-import {catchError, combineLatestWith, forkJoin, map, of, Subject, Subscription, switchMap, startWith, tap} from 'rxjs';
+import {catchError, combineLatestWith, forkJoin, map, of, Subject, Subscription, switchMap, startWith, tap, throwError} from 'rxjs';
 import {PageEvent} from '@angular/material/paginator';
-import {ValidationService} from '../../../services/gateway/validation/validation.service';
+import {UNCATEGORIZED_GUIDANCE} from '../validation-category.constants';
 import {MatTabsModule} from '@angular/material/tabs';
 import {MatIconModule} from '@angular/material/icon';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
@@ -40,7 +40,9 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
   facilityId: string = '';
   submissionId: string = '';
   categoryId: string = '';
-  issueCount: number = 0;
+  issueCount: number | undefined;
+  countsUnavailable = false;
+  inProgress = false;
 
   category: IValidationIssueCategory | undefined;
   reportIssues: ICategoryIssue[] = [];
@@ -54,8 +56,7 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
 
   constructor(
     private route: ActivatedRoute,
-    private facilityViewService: FacilityViewService,
-    private validationService: ValidationService
+    private facilityViewService: FacilityViewService
   ) { }
 
   ngOnInit() {
@@ -66,7 +67,9 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
           this.submissionId = params['submissionId'];
           this.categoryId = params['categoryId'];
           this.category = undefined;
-          this.issueCount = 0;
+          this.issueCount = undefined;
+          this.countsUnavailable = false;
+          this.inProgress = false;
           this.reportSummary = undefined;
           this.reportIssues = [];
           this.availableCount = 0;
@@ -74,9 +77,10 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
       }),
       switchMap(() => {
         const metadata = forkJoin({
-          report: this.facilityViewService.getReportSummary(this.facilityId, this.submissionId),
-          counts: this.facilityViewService.getReportCategoryCounts(this.facilityId, this.submissionId),
-          categories: this.validationService.getValidationCategories().pipe(catchError(() => of([])))
+          report: this.facilityViewService.getReportSummary(this.facilityId, this.submissionId, true),
+          counts: this.facilityViewService.getReportCategoryCounts(this.submissionId).pipe(
+            catchError(error => error.status === 404 ? of(null) : throwError(() => error))
+          )
         }).pipe(catchError(() => of(null)));
         const issues = this.pageChanges.pipe(
           startWith({pageIndex: 0, pageSize: 25} as PageEvent),
@@ -101,25 +105,29 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: response => {
         this.isLoading = false;
-        if (!response.metadata || !response.issues) {
+        if (!response.metadata) {
           this.loadError = 'Unable to load validation issues for this category.';
           return;
         }
         this.reportSummary = response.metadata.report;
-        this.reportIssues = response.issues.records;
-        this.availableCount = response.issues.metadata.totalCount;
-        const stored = response.metadata.counts.categories.find(category =>
+        this.countsUnavailable = response.metadata.counts === null;
+        this.inProgress = response.metadata.counts?.inProgress ?? false;
+        const stored = response.metadata.counts?.categories.find(category =>
           category.categoryId.toLowerCase() === this.categoryId.toLowerCase());
-        const current = response.metadata.categories.find(category =>
-          category.id.toLowerCase() === this.categoryId.toLowerCase());
-        this.issueCount = stored?.issues ?? this.availableCount;
+        this.issueCount = this.countsUnavailable ? undefined : stored?.issues ?? 0;
         this.category = {
           id: this.categoryId,
-          title: stored?.title ?? current?.title ?? this.categoryId,
-          acceptable: stored?.acceptable ?? current?.acceptable ?? false,
-          guidance: current?.guidance ?? '',
-          severity: current?.severity ?? ''
+          title: stored?.title ?? this.categoryId,
+          acceptable: stored?.acceptable ?? false,
+          guidance: this.categoryId.toLowerCase() === 'uncategorized' ? UNCATEGORIZED_GUIDANCE : stored?.guidance ?? '',
+          severity: stored?.severity ?? ''
         };
+        if (!response.issues) {
+          this.loadError = 'Unable to load validation issues for this category.';
+          return;
+        }
+        this.reportIssues = response.issues.records;
+        this.availableCount = response.issues.metadata.totalCount;
       }
     });
   }

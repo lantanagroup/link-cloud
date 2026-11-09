@@ -4,6 +4,7 @@ import {MatSort, MatSortModule} from '@angular/material/sort';
 import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {RouterModule} from '@angular/router';
 import {DecimalPipe} from '@angular/common';
+import {UNCATEGORIZED_GUIDANCE} from '../validation-category.constants';
 
 interface CategoryRow {
   id: string;
@@ -39,7 +40,7 @@ export class SubPreQualReportCategoriesTableComponent implements OnChanges {
         id: category.categoryId.toLowerCase() === 'uncategorized' ? 'Uncategorized' : category.categoryId,
         name: category.title,
         quantity: category.issues,
-        guidance: category.guidance ?? ''
+        guidance: category.categoryId.toLowerCase() === 'uncategorized' ? UNCATEGORIZED_GUIDANCE : category.guidance ?? ''
       }));
     this.dataSource.sort = this.sort;
   }

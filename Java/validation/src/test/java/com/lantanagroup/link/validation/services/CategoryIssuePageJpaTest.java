@@ -51,6 +51,10 @@ class CategoryIssuePageJpaTest {
         var empty = service.getCategoryIssuesPage("facility", "report", "missing", 1, 25);
         assertTrue(empty.records().isEmpty());
         assertEquals(0, empty.metadata().totalCount());
+        var beyondEnd = service.getCategoryIssuesPage("facility", "report", "a", 3, 1);
+        assertTrue(beyondEnd.records().isEmpty());
+        assertEquals(2, beyondEnd.metadata().totalCount());
+        assertEquals(2, beyondEnd.metadata().totalPages());
     }
 
     @Test

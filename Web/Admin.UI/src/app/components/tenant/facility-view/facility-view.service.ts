@@ -43,8 +43,9 @@ export class FacilityViewService {
       );
   }
 
-  getReportSummary(facilityId: string, reportId: string): Observable<IReportListSummary> {
-    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/schedules/${reportId}`)
+  getReportSummary(facilityId: string, reportId: string, includeDeleted = false): Observable<IReportListSummary> {
+    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/schedules/${encodeURIComponent(reportId)}`,
+      {params: {includeDeleted}})
       .pipe(
         map((response: IReportListSummary) => {
           return response;
@@ -182,9 +183,9 @@ export class FacilityViewService {
     );
   }
 
-  getReportCategoryCounts(facilityId: string, reportId: string): Observable<IReportCategoryCounts> {
+  getReportCategoryCounts(reportId: string): Observable<IReportCategoryCounts> {
     return this.http.get<IReportCategoryCounts>(
-      `${this.appConfigService.config?.baseApiUrl}/validation/facilities/${encodeURIComponent(facilityId)}/reports/${encodeURIComponent(reportId)}/category-counts`
+      `${this.appConfigService.config?.baseApiUrl}/aggregate/reports/${encodeURIComponent(reportId)}/validation-category-counts`
     );
   }
 }

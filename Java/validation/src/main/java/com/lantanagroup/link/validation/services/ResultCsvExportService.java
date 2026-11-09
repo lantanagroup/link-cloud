@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 
@@ -30,6 +31,7 @@ public class ResultCsvExportService {
         while (after < upperBound) {
             if (Thread.currentThread().isInterrupted()) throw new IOException("Export interrupted");
             long[] last = {after};
+            StringWriter batch = new StringWriter();
             try {
                 // Limit findings before joining categories. No persistence context, offset growth or full-report list.
                 jdbc.query("""
@@ -45,7 +47,7 @@ public class ResultCsvExportService {
                     if (Thread.currentThread().isInterrupted()) throw new UncheckedIOException(new IOException("Export interrupted"));
                     try {
                         for (int column = 1; column <= 16; column++) {
-                            if (column > 1) writer.write(',');
+                            if (column > 1) batch.write(',');
                             String value;
                             if (column == 14 || column == 15) {
                                 boolean flag = row.getBoolean(column);
@@ -53,12 +55,11 @@ public class ResultCsvExportService {
                             } else {
                                 value = row.getString(column);
                             }
-                            writeCell(writer, value);
+                            writeCell(batch, value);
                         }
-                        writer.write("\r\n");
+                        batch.write("\r\n");
                         last[0] = row.getLong(1);
                     } catch (IOException ex) {
-                        // Stop querying immediately when the download connection closes.
                         throw new UncheckedIOException(ex);
                     }
                 }, facilityId, reportId, after, upperBound, BATCH_SIZE);
@@ -66,6 +67,8 @@ public class ResultCsvExportService {
                 throw ex.getCause();
             }
             if (last[0] == after) break;
+            // Release JDBC resources before a slow client can block the response stream.
+            writer.write(batch.toString());
             after = last[0];
             writer.flush();
         }

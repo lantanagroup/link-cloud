@@ -33,12 +33,13 @@ public class ResultService {
         var page = UNCATEGORIZED_CATEGORY_ID.equalsIgnoreCase(categoryId)
                 ? resultRepository.findUncategorizedResults(facilityId, reportId, pageable)
                 : resultRepository.findCategoryResults(facilityId, reportId, categoryId, pageable);
-        var records = page.getContent().stream().map(result -> new CategoryIssueModel(
+        long totalCount = resultRepository.countSavedCategoryResults(facilityId, reportId, categoryId);
+        var records = page.stream().map(result -> new CategoryIssueModel(
                 result.getLocation(), result.getMessage(), result.getCode().toString(),
                 result.getExpression(), result.getPatientId(), result.getProfile())).toList();
         return new CategoryIssuePage(records,
                 new CategoryIssuePage.Metadata(
-                        pageSize, pageNumber, page.getTotalElements(), page.getTotalPages()));
+                        pageSize, pageNumber, totalCount, (int) Math.ceil((double) totalCount / pageSize)));
     }
 
     /**

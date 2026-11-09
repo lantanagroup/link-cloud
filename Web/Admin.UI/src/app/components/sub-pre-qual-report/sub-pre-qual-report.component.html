@@ -24,7 +24,16 @@
   <p role="alert">{{ loadError }}</p>
   } @else {
   <app-sub-pre-qual-report-meta [reportSummary]="reportSummary"></app-sub-pre-qual-report-meta>
+  @if (countsUnavailable) {
+    <p class="counts-warning" role="status">Counts are unavailable for this report. Saved findings can still be downloaded.</p>
+  } @else if (inProgress) {
+    <p class="counts-warning" role="status">This report is still running. These are counts so far and may change.</p>
+    @if (categoryCounts.length === 0) {
+      <p class="counts-warning" role="status">No counts yet.</p>
+    }
+  }
   <app-sub-pre-qual-report-summary (downloadReport)="downloadReport()" [reportIssuesSummary]="reportIssuesSummary"></app-sub-pre-qual-report-summary>
+  @if (!countsUnavailable) {
   <div class="sub-pre-qual-report--tables">
     <div>
       <h4>Unacceptable Categories</h4>
@@ -35,5 +44,6 @@
       <app-sub-pre-qual-report-categories-table [showAcceptable]="true" [categoryCounts]="categoryCounts"></app-sub-pre-qual-report-categories-table>
     </div>
   </div>
+  }
   }
 </div>

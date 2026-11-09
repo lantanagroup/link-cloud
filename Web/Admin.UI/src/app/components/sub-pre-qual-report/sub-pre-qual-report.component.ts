@@ -13,8 +13,7 @@ import {
 } from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
 import {SubPreQualReportMetaComponent} from './sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
 import {SubPreQualReportSummaryComponent} from './sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
-import {catchError, forkJoin, of, Subscription, switchMap, tap} from 'rxjs';
-import {ValidationService} from '../../services/gateway/validation/validation.service';
+import {catchError, forkJoin, of, Subscription, switchMap, tap, throwError} from 'rxjs';
 import {MatTabsModule} from '@angular/material/tabs';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 
@@ -43,14 +42,15 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
   submissionId: string = '';
   categoryCounts: IReportCategoryCount[] = [];
   loadError: string | undefined;
+  countsUnavailable = false;
+  inProgress = false;
   reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
   reportSummary: IReportListSummary | undefined;
   isLoading: boolean = true;
 
   constructor(
     private route: ActivatedRoute,
-    private facilityViewService: FacilityViewService,
-    private validationService: ValidationService
+    private facilityViewService: FacilityViewService
   ) { }
 
   ngOnInit() {
@@ -62,14 +62,17 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
           this.isLoading = true;
           this.loadError = undefined;
           this.categoryCounts = [];
-          this.reportIssuesSummary = [];
+          this.reportIssuesSummary = undefined;
+          this.countsUnavailable = false;
+          this.inProgress = false;
           this.reportSummary = undefined;
         }
       }),
       switchMap(() => forkJoin({
-        report: this.facilityViewService.getReportSummary(this.facilityId, this.submissionId),
-        counts: this.facilityViewService.getReportCategoryCounts(this.facilityId, this.submissionId),
-        categories: this.validationService.getValidationCategories().pipe(catchError(() => of([])))
+        report: this.facilityViewService.getReportSummary(this.facilityId, this.submissionId, true),
+        counts: this.facilityViewService.getReportCategoryCounts(this.submissionId).pipe(
+          catchError(error => error.status === 404 ? of(null) : throwError(() => error))
+        )
       }).pipe(
         catchError(() => {
           this.loadError = 'Unable to load prequalification category counts for this report.';
@@ -82,11 +85,10 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
         return;
       }
       this.reportSummary = response.report;
-      const guidance = new Map(response.categories.map(category => [category.id.toLowerCase(), category.guidance]));
-      this.categoryCounts = response.counts.categories.map(category => ({
-        ...category,
-        guidance: guidance.get(category.categoryId.toLowerCase()) ?? ''
-      }));
+      this.countsUnavailable = response.counts === null;
+      this.inProgress = response.counts?.inProgress ?? false;
+      if (!response.counts) return;
+      this.categoryCounts = response.counts.categories;
       this.reportIssuesSummary = this.categoryCounts.map(category => ({value: category.title, count: category.issues}));
     });
   }
