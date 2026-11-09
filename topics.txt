@@ -52,9 +52,6 @@ RetentionCheckComplete-Retry:3:1
 RetentionCheckRequested:3:1:retention.ms=604800000
 RetentionCheckRequested-Error:3:1
 RetentionCheckRequested-Retry:3:1
-RetentionCheckScheduled:3:1
-RetentionCheckScheduled-Error:3:1
-RetentionCheckScheduled-Retry:3:1
 Service-Healthcheck:3:1
 ShadowCompareEvent:3:1
 ShadowCompareEvent-Error:3:1
