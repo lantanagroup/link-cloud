@@ -137,9 +137,9 @@
                                 <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeFacility" value="Facility" autocomplete="off" checked />
                                 <label class="btn btn-outline-primary" for="FacilityModeFacility">Facility template</label>
                                 <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeAlaCarte" value="AlaCarte" autocomplete="off" />
-                                <label class="btn btn-outline-primary" for="FacilityModeAlaCarte">Ala carte</label>
+                                <label class="btn btn-outline-primary" for="FacilityModeAlaCarte">A La Carte</label>
                             </div>
-                            <div class="form-text">Facility mode uses one template. Ala carte chooses each piece and does not select a facility.</div>
+                            <div class="form-text">Facility mode uses one template. A La Carte chooses each piece and does not select a facility.</div>
                         </div>
                         <div class="col-md-8" id="facilityTemplateGroup">
                             <label class="form-label" for="FacilityTemplate">Facility template</label>
@@ -524,7 +524,7 @@
         var SYSTEM_PNEUMONIA_Q = '00000000-0000-0000-3000-000000000001';
         var SYSTEM_PNEUMONIA_NQ = '00000000-0000-0000-3000-000000000004';
         var pcCohortRow = null;
-        // Legacy scenarios have no facility mode. Opening one shows the ala carte
+        // Legacy scenarios have no facility mode. Opening one shows the A La Carte
         // controls, but a save stays Unspecified until the user changes that mode
         // or the vendor. That keeps the old system-piece fallback and Epic vendor.
         var legacyFacilityMode = false;
@@ -2327,7 +2327,7 @@
             }
 
             if (model.facilityConfigurationMode === 'AlaCarte' && !model.queryPlanTemplateId) {
-                markFieldError('QueryPlanTemplate', 'Ala carte needs a query plan.');
+                markFieldError('QueryPlanTemplate', 'A La Carte needs a query plan.');
                 valid = false;
             }
 
