@@ -359,7 +359,7 @@ namespace UnitTests.Shared.Auditing
         }
 
         [Fact]
-        public async Task AForeignKey_IsNotReportedAsAChange()
+        public async Task AForeignKey_IsReportedAsAChange()
         {
             var (fixture, audit) = Build();
             using var _ = fixture;
@@ -369,11 +369,20 @@ namespace UnitTests.Shared.Auditing
             await fixture.Context.SaveChangesAsync();
             audit.PropertyChanges.Clear();
 
-            //a key identifies the row rather than describing it.
+            //Tenant's audited facility PUT reassigns VendorVersionId exactly like this. A foreign
+            //key says which related row this one points at, so moving it is a configuration change
+            //a reader needs, not an identifier to be skipped with the primary key.
             vendor.TenantId = tenant.Id;
             await fixture.Context.SaveChangesAsync();
 
-            Assert.Empty(audit.PropertyChanges);
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(nameof(TestVendor.TenantId), change.PropertyName);
+            Assert.Equal(nameof(TestVendor), change.Entity);
+            Assert.Equal(vendor.Id, change.RowKey);
+            //an unset key described as empty rather than as the word "null", the way every other
+            //property with no value is.
+            Assert.Equal(string.Empty, change.InitialPropertyValue);
+            Assert.Equal(tenant.Id, change.NewPropertyValue);
         }
 
         [Fact]
@@ -529,6 +538,130 @@ namespace UnitTests.Shared.Auditing
             {
                 CultureInfo.CurrentCulture = original;
             }
+        }
+
+        [Fact]
+        public async Task AnUpdateOfSeveralRows_TellsThemApartByTheirKey()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var first = ASavedVendor(fixture);
+            var second = new TestVendor { Name = "Cerner" };
+            fixture.Context.Vendors.Add(second);
+            await fixture.Context.SaveChangesAsync();
+            audit.PropertyChanges.Clear();
+
+            first.Name = "Epic Systems";
+            second.Name = "Oracle Health";
+            await fixture.Context.SaveChangesAsync();
+
+            //without the row key these two would be an unordered pair of Name changes, and nothing
+            //would say which vendor either of them belonged to.
+            Assert.Equal(2, audit.PropertyChanges.Count);
+            Assert.All(audit.PropertyChanges, change => Assert.Equal(nameof(TestVendor), change.Entity));
+
+            var byRow = audit.PropertyChanges.ToDictionary(change => change.RowKey!);
+            Assert.Equal("Epic Systems", byRow[first.Id].NewPropertyValue);
+            Assert.Equal("Oracle Health", byRow[second.Id].NewPropertyValue);
+        }
+
+        [Fact]
+        public async Task AGuidKey_ReadsAsItsInvariantText()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var user = new TestAccountUser();
+            fixture.Context.AccountUsers.Add(user);
+            await fixture.Context.SaveChangesAsync();
+            audit.PropertyChanges.Clear();
+
+            user.IsActive = false;
+            await fixture.Context.SaveChangesAsync();
+
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(nameof(TestAccountUser), change.Entity);
+            Assert.Equal(user.Id.ToString(), change.RowKey);
+        }
+
+        [Fact]
+        public async Task AMaskedKey_LeavesTheRowsOfThatEntityIndistinguishable()
+        {
+            //what an entity keyed by something personal would do - an email address, say.
+            var (fixture, audit) = Build(options => options.MaskedPropertyNames.Add(nameof(TestVendor.Id)));
+            using var _ = fixture;
+            var vendor = ASavedVendor(fixture);
+            audit.PropertyChanges.Clear();
+
+            vendor.Name = "Cerner";
+            await fixture.Context.SaveChangesAsync();
+
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(AuditOptions.MaskedValue, change.RowKey);
+        }
+
+        private static TestFacility ASavedFacility(AuditInterceptorFixture fixture)
+        {
+            var facility = new TestFacility
+            {
+                FacilityName = "St Jude",
+                ScheduledReports = new TestScheduledReports { Daily = ["AcuteCare"] },
+                Channels = [new TestChannel { Name = "Email", Enabled = false }]
+            };
+
+            fixture.Context.Facilities.Add(facility);
+            fixture.Context.SaveChanges();
+
+            return facility;
+        }
+
+        [Fact]
+        public async Task AnOwnedTypeAndItsOwner_AreToldApartByTheEntityAndNotTheRowKey()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var facility = ASavedFacility(fixture);
+            audit.PropertyChanges.Clear();
+
+            //Tenant's audited facility PUT does exactly this: the owner's own column and the owned
+            //schedule both change in one save.
+            facility.FacilityName = "St Jude Children's";
+            facility.ScheduledReports.Daily = ["AcuteCare", "HSLOC"];
+            await fixture.Context.SaveChangesAsync();
+
+            Assert.Equal(2, audit.PropertyChanges.Count);
+
+            var owner = Assert.Single(audit.PropertyChanges,
+                change => change.PropertyName == nameof(TestFacility.FacilityName));
+            var owned = Assert.Single(audit.PropertyChanges,
+                change => change.PropertyName == nameof(TestScheduledReports.Daily));
+
+            Assert.Equal(nameof(TestFacility), owner.Entity);
+            Assert.Equal(nameof(TestScheduledReports), owned.Entity);
+
+            //an owned entry's primary key is the owner's, so the row key cannot tell these two
+            //apart - which is the whole reason a change names the entity it belongs to.
+            Assert.Equal(facility.Id, owner.RowKey);
+            Assert.Equal(facility.Id, owned.RowKey);
+        }
+
+        [Fact]
+        public async Task AnOwnedCollectionsRow_CarriesTheOwnersKey()
+        {
+            var (fixture, audit) = Build();
+            using var _ = fixture;
+            var facility = ASavedFacility(fixture);
+            audit.PropertyChanges.Clear();
+
+            facility.Channels[0].Enabled = true;
+            await fixture.Context.SaveChangesAsync();
+
+            var change = Assert.Single(audit.PropertyChanges);
+            Assert.Equal(nameof(TestChannel), change.Entity);
+            Assert.Equal(nameof(TestChannel.Enabled), change.PropertyName);
+            //an owned collection's key is the owner's plus Entity Framework's synthesized ordinal,
+            //counted from 1. It is the row's position rather than an id of its own, so reordering
+            //the collection moves it - it identifies the row within this save, not across saves.
+            Assert.Equal($"{facility.Id}|1", change.RowKey);
         }
     }
 }
