@@ -222,7 +222,7 @@ jobs:
         if: ${{ env.RUN_LIVE_UI == 'true' }}
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
           cache-dependency-path: Web/Admin.UI/package-lock.json
 
@@ -496,7 +496,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
           cache-dependency-path: Web/Admin.UI/package-lock.json
 
@@ -609,7 +609,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
           cache-dependency-path: |
             nhsn/NHSN-App-UI/package-lock.json
