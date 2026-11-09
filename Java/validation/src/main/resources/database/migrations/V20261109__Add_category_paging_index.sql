@@ -8,4 +8,4 @@ BEGIN
     CREATE INDEX ix_result_category_category_id_result_id ON result_category (category_id, result_id);
 END;
 
--- Rollback: DROP INDEX IF EXISTS ix_result_category_category_id_result_id ON result_category;
+-- Rollback: U20261109__Add_category_paging_index.sql.
