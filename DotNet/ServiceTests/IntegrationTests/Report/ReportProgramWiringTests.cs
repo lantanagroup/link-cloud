@@ -1,5 +1,7 @@
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -27,6 +29,22 @@ public class ReportProgramWiringTests
 
         Assert.Contains(services, d => d.ServiceType == typeof(IRetentionCheckWorker));
         Assert.Contains(services, d => d.ServiceType == typeof(IRetentionScheduleReconciler));
+    }
+
+    [Fact]
+    public void Program_Registers_RetentionCheckCompleteListenerAndItsRetryTopic()
+    {
+        var services = CaptureReportServices();
+
+        Assert.Contains(services, d => d.ServiceType == typeof(IHostedService) &&
+                                       d.ImplementationType == typeof(RetentionCheckCompleteListener));
+
+        var retrySettings = services
+            .Where(d => d.ServiceType == typeof(RetryListenerSettings))
+            .Select(d => d.ImplementationInstance)
+            .OfType<RetryListenerSettings>()
+            .Single();
+        Assert.Contains("RetentionCheckComplete-Retry", retrySettings.Topics);
     }
 
     [Fact]

@@ -1536,7 +1536,7 @@ value set in a store can never take effect.
 
 ### Report
 
-135 keys.
+136 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1619,9 +1619,10 @@ value set in a store can never take effect.
 | `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `Retention:Schedule` | dotnet | - | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:21` |
-| `Retention:Schedule:Cron` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:21` |
-| `Retention:Schedule:Enabled` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:21` |
+| `Retention:Participants` | dotnet | yes | - | `DotNet/Report/Application/Configs/RetentionParticipants.cs:72` |
+| `Retention:Schedule` | dotnet | - | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:26` |
+| `Retention:Schedule:Cron` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:26` |
+| `Retention:Schedule:Enabled` | dotnet | yes | - | `DotNet/Report/Application/Extensions/RetentionScheduleRegistration.cs:26` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Build` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
