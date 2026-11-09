@@ -414,6 +414,46 @@ public class TestRailPublisherTests
     }
 
     [Fact]
+    public async Task Scenario_edit_failure_after_upload_leaves_the_comment_and_still_publishes()
+    {
+        TestRailCaseResult? posted = null;
+        var api = new Mock<ITestRailApiClient>();
+        api.Setup(a => a.AddRunAsync(9, 100, It.IsAny<string>(), It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(501);
+        api.Setup(a => a.AddResultsForCasesAsync(501, It.IsAny<IReadOnlyList<TestRailCaseResult>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<TestRailCaseResult>, CancellationToken>((_, results, _) => posted = results.Single())
+            .ReturnsAsync([new TestRailResultDto { Id = 77, CaseId = 42 }]);
+        api.Setup(a => a.AddAttachmentToResultAsync(77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        api.Setup(a => a.EditResultCommentAsync(77, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("TestRail edit_result/77 failed with 400"));
+
+        var scenarioId = Guid.NewGuid();
+        var logs = new CaptureLogger<TestRailPublisher>();
+        var publisher = CreatePublisher(api.Object, ConfiguredOptions(), ScenarioStore(scenarioId), logger: logs);
+        var published = await publisher.PublishScenarioRunAsync(SampleScenarioRequest() with
+        {
+            ScenarioId = scenarioId,
+            Status = AutomationRunStatus.Failed,
+            Error = "boom",
+            Logs = ["line 1"]
+        });
+
+        published.Should().ContainSingle();
+        published[0].RunId.Should().Be(501);
+        posted!.Comment.Should().Contain(TestRailPublisher.LogNotAttachedSentence);
+        posted.Comment.Should().NotContain("attached as");
+        api.Verify(a => a.AddAttachmentToResultAsync(
+            77, It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        api.Verify(a => a.EditResultCommentAsync(
+            77, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        logs.Entries.Should().Contain(entry =>
+            entry.Level == LogLevel.Warning
+            && entry.Message.Contains("edit_result failed for result 77", StringComparison.Ordinal)
+            && entry.Message.Contains("left unchanged", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Non_shared_api_health_run_keeps_hyphenated_automation_run_id()
     {
         var runId = Guid.Parse("8b8c9fab-72c2-4a5b-b200-271587e5d5d3");
