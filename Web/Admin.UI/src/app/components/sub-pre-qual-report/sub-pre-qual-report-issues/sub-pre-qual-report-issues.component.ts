@@ -6,7 +6,7 @@ import {FacilityViewService} from '../../tenant/facility-view/facility-view.serv
 import {
   IReportListSummary,
   ICategoryIssue,
-  IValidationIssueCategory
+  IValidationIssueCategoryMetadata
 } from '../../tenant/facility-view/report-view.interface';
 import {
   SubPreQualReportIssuesTableComponent
@@ -44,7 +44,7 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
   countsUnavailable = false;
   inProgress = false;
 
-  category: IValidationIssueCategory | undefined;
+  category: IValidationIssueCategoryMetadata | undefined;
   reportIssues: ICategoryIssue[] = [];
   availableCount = 0;
   pageIndex = 0;
@@ -118,7 +118,7 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
         this.category = {
           id: this.categoryId,
           title: stored?.title ?? this.categoryId,
-          acceptable: stored?.acceptable ?? false,
+          acceptable: stored?.acceptable ?? null,
           guidance: this.categoryId.toLowerCase() === 'uncategorized' ? UNCATEGORIZED_GUIDANCE : stored?.guidance ?? '',
           severity: stored?.severity ?? ''
         };

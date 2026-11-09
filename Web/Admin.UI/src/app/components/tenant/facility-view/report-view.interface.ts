@@ -78,6 +78,10 @@ export interface IValidationIssueCategory {
   requireMatch?: boolean;
 }
 
+export type IValidationIssueCategoryMetadata = Omit<IValidationIssueCategory, 'acceptable'> & {
+  acceptable: boolean | null;
+};
+
 export interface IValidationIssue {
   id: number,
   facilityId: string;

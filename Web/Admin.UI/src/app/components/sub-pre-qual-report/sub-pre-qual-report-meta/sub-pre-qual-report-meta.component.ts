@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 
 import {
   IReportListSummary,
-  IValidationIssueCategory,
+  IValidationIssueCategoryMetadata,
   ScheduleStatus
 } from '../../tenant/facility-view/report-view.interface';
 
@@ -19,7 +19,7 @@ import {DatePipe} from "@angular/common";
 })
 export class SubPreQualReportMetaComponent implements OnInit, OnChanges {
 
-  @Input() category?: IValidationIssueCategory;
+  @Input() category?: IValidationIssueCategoryMetadata;
   @Input() reportSummary?: IReportListSummary;
 
   submissionId = '';

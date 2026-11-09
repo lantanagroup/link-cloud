@@ -99,6 +99,7 @@ describe('SubPreQualReportIssuesComponent', () => {
     expect(component.reportSummary?.id).toBe('r');
     expect(component.reportIssues[0].message).toBe('Saved finding');
     expect(component.countsUnavailable).toBeTrue();
+    expect(component.category?.acceptable).toBeNull();
     expect(component.issueCount).toBeUndefined();
     expect(component.availableCount).toBe(1);
     expect(component.loadError).toBeUndefined();
