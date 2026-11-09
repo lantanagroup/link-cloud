@@ -62,7 +62,8 @@ public sealed class RetentionParticipants
 
     /// <summary>
     /// Reads and validates <c>Retention:Participants</c>. An entry needs a <c>ServiceName</c> and a
-    /// <c>Scope</c> of <c>Report</c> or <c>Cutoff</c>; names must be unique, ignoring case.
+    /// <c>Scope</c> of <c>Report</c> or <c>Cutoff</c>; names must be unique, ignoring case, and at least one
+    /// participant must be report-scoped.
     /// </summary>
     public static RetentionParticipants FromConfiguration(IConfiguration configuration)
     {
@@ -101,6 +102,13 @@ public sealed class RetentionParticipants
         if (errors.Count > 0)
         {
             return Invalid(errors);
+        }
+
+        // Without a report-scoped participant nothing deletes per-report data, yet every report would count
+        // as ready to scrub. Report always deletes its own, so such a list is a misconfiguration.
+        if (participants.All(p => p.Scope != RetentionParticipantScope.Report))
+        {
+            return Invalid([$"{Key} has no participant with Scope Report."]);
         }
 
         return new RetentionParticipants(participants, [], isDefault: false);

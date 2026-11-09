@@ -151,6 +151,23 @@ public class RetentionParticipantsTests
     }
 
     [Fact]
+    public void FromConfiguration_OnlyCutoffScopedParticipants_IsInvalid()
+    {
+        var participants = Read(new Dictionary<string, string?>
+        {
+            ["Retention:Participants:0:ServiceName"] = "Audit",
+            ["Retention:Participants:0:Scope"] = "Cutoff",
+            ["Retention:Participants:1:ServiceName"] = "Notification",
+            ["Retention:Participants:1:Scope"] = "Cutoff"
+        });
+
+        Assert.False(participants.IsValid);
+        Assert.Empty(participants.Participants);
+        Assert.Equal("Retention:Participants has no participant with Scope Report.",
+                     Assert.Single(participants.Errors));
+    }
+
+    [Fact]
     public void FromConfiguration_SeveralProblems_ReportsEachOne()
     {
         var participants = Read(new Dictionary<string, string?>

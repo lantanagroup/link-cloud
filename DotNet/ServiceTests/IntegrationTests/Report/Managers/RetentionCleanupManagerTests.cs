@@ -470,7 +470,7 @@ public class RetentionCleanupManagerTests
     }
 
     [Fact]
-    public async Task ApplyCompletionAsync_OnlyCutoffScopedParticipants_ScrubsTheReports()
+    public async Task ApplyCompletionAsync_OnlyCutoffScopedParticipants_NeverScrubsTheReports()
     {
         var first = await SeedScheduleAsync();
         var second = await SeedScheduleAsync();
@@ -479,8 +479,12 @@ public class RetentionCleanupManagerTests
             ["Retention:Participants:0:ServiceName"] = "Audit",
             ["Retention:Participants:0:Scope"] = "Cutoff"
         });
-        var cleanupId = (await CreateAsync(ScheduledRequest(first, second), participants))
-            .RetentionCleanupId!.Value;
+        var creation = await CreateAsync(ScheduledRequest(first, second), participants);
+        var cleanupId = creation.RetentionCleanupId!.Value;
+
+        Assert.Equal(RetentionCleanupStatus.Failed, creation.Status);
+        Assert.Null(creation.Request);
+        Assert.Contains("no participant with Scope Report", creation.FailureReason);
 
         var outcome = await ApplyAsync(cleanupId, new RetentionCheckCompleteValue
         {
@@ -489,16 +493,17 @@ public class RetentionCleanupManagerTests
             CompletedDateTime = Now,
             Summary = new RetentionReportResult
             {
-                Status = RetentionResultStatus.Completed,
-                RecordsAffected = 40,
+                Status = RetentionResultStatus.Failed,
+                RecordsAffected = 0,
+                ErrorMessage = "Bulk delete failed.",
                 CompletedDateTime = Now
             }
         });
 
-        Assert.Equal(RetentionCompletionOutcome.Applied, outcome);
-        Assert.Equal(RetentionCleanupStatus.Completed, (await LoadCleanupAsync(cleanupId)).Status);
-        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(first));
-        Assert.Equal(ReportRetentionStatus.Scrubbed, await RetentionStatusAsync(second));
+        Assert.Equal(RetentionCompletionOutcome.UnexpectedService, outcome);
+        Assert.Equal(RetentionCleanupStatus.Failed, (await LoadCleanupAsync(cleanupId)).Status);
+        Assert.Equal(ReportRetentionStatus.None, await RetentionStatusAsync(first));
+        Assert.Equal(ReportRetentionStatus.None, await RetentionStatusAsync(second));
     }
 
     [Fact]

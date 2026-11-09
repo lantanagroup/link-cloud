@@ -544,8 +544,7 @@ public class RetentionCleanupManager : IRetentionCleanupManager
         }
     }
 
-    // Cutoff-scoped participants have no per-report result, so they never hold a report back. With no
-    // report-scoped participant at all, every report is ready.
+    // Cutoff-scoped participants have no per-report result, so they never hold a report back.
     private static List<Guid> ReportsReadyToScrub(RetentionCleanup cleanup)
     {
         var resultsByReport = cleanup.Participants

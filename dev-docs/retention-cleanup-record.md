@@ -65,10 +65,12 @@ indices 0 and 1 on top of a four-entry list elsewhere would leave entries 2 and 
 default is in code and not in `appsettings.json`.
 
 The whole list is invalid when it is empty (including an empty JSON array), when an entry has no `ServiceName`
-or no `Scope`, when a `Scope` is not `Report` or `Cutoff`, when a name is longer than 100 characters, or when
-two entries share a name, ignoring case. Report reads the list once at startup and logs every problem as an
-error, but still starts. While the list is invalid, each cleanup is recorded `Failed` with the reason, no
-request is sent, and its reports stay at `None`. A change takes effect when Report restarts.
+or no `Scope`, when a `Scope` is not `Report` or `Cutoff`, when a name is longer than 100 characters, when
+two entries share a name, ignoring case, or when no entry is report-scoped. Without a report-scoped
+participant nothing deletes per-report data, and every report would count as scrubbed. Report reads the list
+once at startup and logs every problem as an error, but still starts. While the list is invalid, each cleanup
+is recorded `Failed` with the reason, no request is sent, and its reports stay at `None`. A change takes
+effect when Report restarts.
 
 ### `RetentionCleanupResult`
 
@@ -178,8 +180,7 @@ In one transaction, the manager:
      that result missing.
 4. Recalculates `Status` (see *Status rules*), and sets `CompletedDateTime` the first time it is `Completed`.
 5. Moves each report from `PendingDeletion` to `Scrubbed` once every report-scoped participant has
-   `Completed` it, whatever the rest of the cleanup is doing. When every participant is cutoff-scoped, the
-   reports move to `Scrubbed` with the first completion applied.
+   `Completed` it, whatever the rest of the cleanup is doing.
 
 A duplicate completion is applied like any other and changes nothing, so redelivery is harmless.
 `RecordsAffected` comes from the latest reply that changed the result, so a failure followed by a successful
