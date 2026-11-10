@@ -71,6 +71,7 @@ public sealed class AcquisitionStatusPublisher(
 
         foreach (var reportId in (reports ?? []).Where(report => report != null)
                      .Select(report => report.ReportTrackingId).Where(id => !string.IsNullOrWhiteSpace(id))
+                     .Select(id => id!.ToLowerInvariant())
                      .Distinct(StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -843,22 +843,34 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            if (tail != null)
+            {
+                await TryReleaseTailClaimAsync(tail.FacilityId, tail.CorrelationId, tail.QueryPhase);
+            }
             throw;
         }
         catch (Exception ex)
         {
             if (tail != null)
             {
-                try
-                {
-                    await RevertTailSentAsync(tail.FacilityId, tail.CorrelationId, tail.QueryPhase, cancellationToken);
-                }
-                catch (Exception revertEx) when (revertEx is not OperationCanceledException)
-                {
-                    _logger.LogError(revertEx, "Failed to release failed acquisition tail claim; recovery will reclaim the lease.");
-                }
+                await TryReleaseTailClaimAsync(tail.FacilityId, tail.CorrelationId, tail.QueryPhase);
             }
             _logger.LogError(ex, "Failed to report terminal acquisition outcome; tail recovery will retry.");
+        }
+    }
+
+    private async Task TryReleaseTailClaimAsync(string facilityId, string correlationId, QueryPhase? queryPhase)
+    {
+        // Caller cancellation must not prevent releasing the claim. Bound cleanup independently
+        // so its failure or timeout cannot replace the original cancellation exception.
+        using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            await RevertTailSentAsync(facilityId, correlationId, queryPhase, cleanupCts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to release failed acquisition tail claim; recovery will reclaim the lease.");
         }
     }
 
@@ -1086,7 +1098,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         {
             try
             {
-                await RevertTailSentAsync(groupInfo.FacilityId, groupInfo.CorrelationId!, groupInfo.QueryPhase, cancellationToken);
+                // Cleanup must survive caller cancellation, but must not delay propagation indefinitely.
+                using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await RevertTailSentAsync(groupInfo.FacilityId, groupInfo.CorrelationId!, groupInfo.QueryPhase, cleanupCts.Token);
             }
             catch (Exception revertEx)
             {

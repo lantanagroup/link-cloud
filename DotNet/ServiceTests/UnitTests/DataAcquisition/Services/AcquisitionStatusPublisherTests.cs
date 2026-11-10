@@ -73,6 +73,40 @@ public class AcquisitionStatusPublisherTests
         Assert.Equal(Partitioner.Murmur2Random, AcquisitionStatusPublisher.CreateConfig().Partitioner);
     }
 
+    [Theory]
+    [InlineData("Initial")]
+    [InlineData("Supplemental")]
+    public async Task IdentifiedAndCompletionNormalizeReportIdsButPreservePatientKeys(string phase)
+    {
+        const string reportId = "abcdef12-3456-7890-abcd-ef1234567890";
+        const string patientId = "Patient/MixedCase-ID";
+        var request = new DataAcquisitionRequested
+        {
+            PatientId = patientId, QueryType = "Initial",
+            ScheduledReports = [new() { ReportTrackingId = reportId.ToUpperInvariant() },
+                new() { ReportTrackingId = reportId }]
+        };
+        var tail = Tail(phase);
+        tail.PatientId = patientId;
+        tail.ResourcesAcquired.ScheduledReports = [new() { ReportTrackingId = reportId },
+            new() { ReportTrackingId = reportId.ToUpperInvariant() }];
+
+        await _publisher.PublishIdentifiedAsync(request, "correlation-1", new Headers(), OccurredAt, CancellationToken.None);
+        await _publisher.PublishCompletionAsync(tail, new Headers(), CancellationToken.None);
+
+        Assert.Equal(2, _sent.Count);
+        Assert.All(_sent, message =>
+        {
+            Assert.Equal(reportId, message.Key.ReportId);
+            Assert.Equal(reportId, message.Value.ReportScheduleId);
+            Assert.Equal(patientId, message.Key.PatientId);
+            Assert.Equal(patientId, message.Value.PatientId);
+        });
+        var serializer = new JsonWithFhirMessageSerializer<ReportStatusUpdatedKey>();
+        var context = new SerializationContext(MessageComponentType.Key, "ReportStatusUpdated");
+        Assert.Equal(serializer.Serialize(_sent[0].Key, context), serializer.Serialize(_sent[1].Key, context));
+    }
+
     [Fact]
     public async Task PatientIdentifiedIsInitialOnlyAndPreservesTimestampAcrossRequestRetries()
     {

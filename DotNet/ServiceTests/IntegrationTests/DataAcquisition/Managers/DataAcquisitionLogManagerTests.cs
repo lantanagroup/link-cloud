@@ -5,6 +5,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -1203,6 +1205,48 @@ public class DataAcquisitionLogManagerTests
         await dbContext.Entry(logs[1]).ReloadAsync();
         Assert.True(logs[0].TailSent);
         Assert.True(logs[1].TailSent);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TailCancellation_ReleasesClaimBeforeRethrowing(bool cancelDuringPublication)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var correlation = Guid.NewGuid().ToString();
+        var logs = await SeedCompleteTailGroupAsync(db, $"CancelTail_{Guid.NewGuid():N}", correlation);
+        using var callerCts = new CancellationTokenSource();
+        var cancellation = new OperationCanceledException(callerCts.Token);
+        var resourceCache = new Mock<IResourceCache>();
+        resourceCache.Setup(c => c.GetCacheTypeForCorrelationIdAsync(correlation, callerCts.Token))
+            .Callback(() => callerCts.Cancel())
+            .ThrowsAsync(cancellation);
+        var publisher = new Mock<IAcquisitionStatusPublisher>();
+        publisher.Setup(p => p.PublishCompletionAsync(It.IsAny<TailCompletionResult>(),
+                It.IsAny<Headers>(), callerCts.Token))
+            .Callback(() => callerCts.Cancel())
+            .ThrowsAsync(cancellation);
+        var manager = new DataAcquisitionLogManager(Mock.Of<ILogger<DataAcquisitionLogManager>>(),
+            scope.ServiceProvider.GetRequiredService<IDatabase>(), db,
+            scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>(),
+            CreateSemaphoreProviderMock(), resourceCache.Object, publisher.Object);
+
+        var thrown = cancelDuringPublication
+            ? await Assert.ThrowsAsync<OperationCanceledException>(() => manager.UpdateStatusBatchAsync(
+                logs.Select(l => l.Id), RequestStatus.MaxRetriesReached, callerCts.Token))
+            : await Assert.ThrowsAsync<OperationCanceledException>(() => manager.TryCompleteTailAsync(
+                logs[0].Id, callerCts.Token));
+
+        Assert.Same(cancellation, thrown);
+        var persisted = await db.DataAcquisitionLogs.AsNoTracking()
+            .Where(l => l.CorrelationId == correlation).ToListAsync();
+        Assert.All(persisted, log =>
+        {
+            Assert.False(log.TailSent);
+            Assert.Null(log.TailClaimedAt);
+        });
+        Assert.NotNull(await CreateManager(scope).TryCompleteTailAsync(logs[0].Id));
     }
 
     private static async Task<List<DataAcquisitionLog>> SeedCompleteTailGroupAsync(
