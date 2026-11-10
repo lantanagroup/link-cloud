@@ -906,6 +906,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `SftpAcquisition:MaxBatchSize` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
@@ -1076,6 +1077,7 @@ value set in a store can never take effect.
 | `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, qa2, qa3, test | `DotNet/Account/Program.cs:79` |
 | `SftpAcquisition` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
+| `SftpAcquisition:AdtMaxMessageBytes` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:140` |
 | `SftpAcquisition:BaseRetryDelaySeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `SftpAcquisition:EnableParallelProcessing` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |
 | `SftpAcquisition:JobIntervalSeconds` | dotnet | - | dev, qa, qa2, qa3, test | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:143` |

@@ -78,4 +78,7 @@ public enum KafkaTopic
     RetentionCheckCompleteRetry,
     [StringValue("RetentionCheckComplete-Error")]
     RetentionCheckCompleteError,
+    ADTAcquired,
+    [StringValue("ADTAcquired-Retry")]
+    ADTAcquiredRetry,
 }
