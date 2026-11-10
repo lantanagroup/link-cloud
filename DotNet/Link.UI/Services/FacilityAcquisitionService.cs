@@ -81,18 +81,23 @@ public sealed class FacilityAcquisitionService
     public async Task<string?> SaveFhirListAsync(FacilityHubViewModel page, FhirListPanel input, CancellationToken cancellationToken)
     {
         page.FhirList.Apply(input);
-        object? preserved = null;
-        if (input.Exists)
+
+        // Exists on the posted form is display state. Create versus update, and any stored
+        // authentication, follow the configuration the server already has.
+        var current = await _client.GetFhirListConfigurationAsync(page.FacilityId!, includePatients: false, cancellationToken);
+        if (!current.IsSuccessStatusCode && !IsMissing(current.StatusCode))
         {
-            var current = await _client.GetFhirListConfigurationAsync(page.FacilityId!, includePatients: false, cancellationToken);
-            if (current.IsSuccessStatusCode)
-                preserved = FacilityAcquisitionRules.ExtractAuthentication(current.RawBody);
+            LogFailure("FHIR list lookup", page.FacilityId, current);
+            return FacilityFormRules.ServiceMessage("Data acquisition", current.StatusCode, current.RawBody);
         }
+
+        var exists = current.IsSuccessStatusCode && !IsMissing(current.StatusCode);
+        var preserved = exists ? FacilityAcquisitionRules.ExtractAuthentication(current.RawBody) : null;
 
         if (!FacilityAcquisitionRules.TryBuildFhirList(input, page.FacilityId!, preserved, out var body, out var error))
             return error;
 
-        var response = await FacilityConfigurationService.SaveFhirListAsync(_client, body!, input.Exists, cancellationToken);
+        var response = await FacilityConfigurationService.SaveFhirListAsync(_client, body!, exists, cancellationToken);
 
         if (!response.Success)
         {

@@ -38,9 +38,9 @@ public static class InitiatedByAudit
     {
         if (user?.Identity?.IsAuthenticated != true)
             return "anonymous";
-        return user.FindFirst("sub")?.Value
-            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? user.Identity?.Name
+        return Clean(user.FindFirst("sub")?.Value)
+            ?? Clean(user.FindFirst(ClaimTypes.NameIdentifier)?.Value)
+            ?? Clean(user.Identity?.Name)
             ?? "authenticated";
     }
 

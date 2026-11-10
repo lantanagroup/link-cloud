@@ -1,5 +1,5 @@
 @model TermInfo
 @if (!string.IsNullOrWhiteSpace(Model.Text))
 {
-    <span class="au-info-icon" data-bs-toggle="tooltip" title="@Model.Text" aria-label="@Model.Label"><i class="bi bi-info-circle" aria-hidden="true"></i></span>
+    <span class="au-info-icon" tabindex="0" data-bs-toggle="tooltip" title="@Model.Text" aria-label="@Model.Label"><i class="bi bi-info-circle" aria-hidden="true"></i></span>
 }

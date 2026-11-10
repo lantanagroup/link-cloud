@@ -47,5 +47,22 @@ namespace UnitTests.Admin.BFF
             Assert.Equal(InitiatedByAudit.MaxValueLength, entry.Value.InitiatedById.Length);
             Assert.Equal("anonymous", entry.Value.Principal);
         }
+
+        [Fact]
+        public void Read_StripsControlCharacters_FromThePrincipal()
+        {
+            var user = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("sub", "sys\r\ntem") }, "link_bearer"));
+
+            var entry = InitiatedByAudit.Read(Context("starter", null, user));
+
+            Assert.NotNull(entry);
+            Assert.Equal("system", entry!.Value.Principal);
+        }
+
+        [Fact]
+        public void Clean_StripsControlCharacters_FromAnHttpMethod()
+        {
+            Assert.Equal("POST", InitiatedByAudit.Clean("PO\r\nST"));
+        }
     }
 }

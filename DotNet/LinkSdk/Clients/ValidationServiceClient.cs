@@ -141,4 +141,55 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
         CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"validation/result/{facilityId}/{reportId}/category")
             .GetAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<string>> GetCategoryIssuesAsync(
+        string facilityId, string reportId, string categoryId, int pageNumber = 1, int pageSize = 25,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reportId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(categoryId);
+        if (pageNumber < 1) throw new ArgumentOutOfRangeException(nameof(pageNumber));
+        if (pageSize is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        return SendStringAsync(() => Request($"validation/facilities/{Uri.EscapeDataString(facilityId)}/reports/{Uri.EscapeDataString(reportId)}/categories/{Uri.EscapeDataString(categoryId)}/issues")
+            .SetQueryParam("pageNumber", pageNumber).SetQueryParam("pageSize", pageSize)
+            .GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public async Task<LinkApiResponse> CopyValidationResultsCsvAsync(
+        string facilityId, Guid reportId, Stream destination, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
+        ArgumentNullException.ThrowIfNull(destination);
+        if (!destination.CanWrite) throw new ArgumentException("Destination must be writable.", nameof(destination));
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            // Read headers first and let the caller's token control long-running exports.
+            using var response = await Request($"validation/facilities/{Uri.EscapeDataString(facilityId)}/reports/{reportId:D}/results.csv")
+                .WithTimeout(Timeout.InfiniteTimeSpan)
+                .GetAsync(System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+            string? error = null;
+            if (response.StatusCode is >= 200 and < 300)
+            {
+                await using var body = await response.ResponseMessage.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                await body.CopyToAsync(destination, 81920, cancellationToken).ConfigureAwait(false);
+            }
+            else error = await response.ResponseMessage.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            return new LinkApiResponse { StatusCode = response.StatusCode, RawBody = error,
+                ContentType = response.ResponseMessage.Content.Headers.ContentType?.ToString() };
+        }
+        catch (FlurlHttpException) when (cancellationToken.IsCancellationRequested)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw;
+        }
+        catch (FlurlHttpException ex) when (ex.StatusCode is not (>= 200 and < 300))
+        {
+            return new LinkApiResponse { StatusCode = ex.StatusCode ?? 0,
+                RawBody = ex.Call.Response is { } errorResponse
+                    ? await errorResponse.ResponseMessage.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
+                    : null };
+        }
+    }
 }
