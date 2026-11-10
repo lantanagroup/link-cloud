@@ -121,7 +121,7 @@
                   <mat-option [value]="subType">{{ subType }}</mat-option>
                 }
               </mat-select>
-              <mat-hint>Specific processor variant (e.g., CernerCCLExtract for Cerner census files)</mat-hint>
+              <mat-hint>Specific processor variant (e.g., CernerCCLExtract for Cerner census files, HL7ADT for files of HL7 v2 ADT messages)</mat-hint>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="form-input">
@@ -150,6 +150,66 @@
                      placeholder="*.dat">
               <mat-hint>Pattern to match files (e.g., "census_*.dat", "*.json"). Leave empty for all files.</mat-hint>
             </mat-form-field>
+
+            @if (config.get('subType')?.value === adtSubType) {
+              @if (!viewOnly && configForm.hasError('adtFilesNotHandled') && !config.get('processedDirectory')?.value?.trim()) {
+                <p class="adt-error">
+                  ADT files must leave the directory once read: set a processed directory or enable "Remove files after processing".
+                </p>
+              }
+
+              <div class="adt-configuration" formGroupName="adtConfiguration">
+                <h5>ADT Patient Identification</h5>
+                <mat-radio-group formControlName="patientIdSource" aria-label="How the FHIR Patient.Id is found">
+                  <mat-radio-button value="adtEvent">Patient.Id on ADT event</mat-radio-button>
+                  <mat-radio-button value="mrnSearch">Patient MRN search</mat-radio-button>
+                </mat-radio-group>
+
+                @if (config.get('adtConfiguration.patientIdSource')?.value === 'adtEvent') {
+                  <mat-form-field appearance="outline" class="form-input">
+                    <mat-label>Patient.Id Location</mat-label>
+                    <input matInput formControlName="patientIdLocation" [readonly]="viewOnly" placeholder="PID-3[5=FHIR].1">
+                    @if (!viewOnly && config.get('adtConfiguration.patientIdLocation')?.hasError('required')) {
+                      <mat-error>Patient.Id location is <strong>required</strong></mat-error>
+                    }
+                    @if (!viewOnly && config.get('adtConfiguration.patientIdLocation')?.hasError('hl7Location')) {
+                      <mat-error>Enter a location such as PID-2, PID-3[5=FHIR].1 or OBX[3.1=FHIRID]-5</mat-error>
+                    }
+                    <mat-hint>Any segment and field: PID-2, PID-3[5=FHIR].1 (the repetition with type FHIR), OBX[3.1=FHIRID]-5 (the OBX with that code)</mat-hint>
+                  </mat-form-field>
+                } @else {
+                  <mat-form-field appearance="outline" class="form-input">
+                    <mat-label>MRN Identifier System</mat-label>
+                    <input matInput formControlName="mrnIdentifierSystem" [readonly]="viewOnly" placeholder="urn:oid:1.2.3.4">
+                    @if (!viewOnly && config.get('adtConfiguration.mrnIdentifierSystem')?.hasError('required')) {
+                      <mat-error>MRN identifier system is <strong>required</strong></mat-error>
+                    }
+                    @if (!viewOnly && config.get('adtConfiguration.mrnIdentifierSystem')?.hasError('pattern')) {
+                      <mat-error>The system cannot contain spaces or "|"</mat-error>
+                    }
+                    <mat-hint>Patients are found with GET /Patient?identifier=&lt;system&gt;|&lt;MRN&gt;, using the facility's FHIR Query configuration</mat-hint>
+                  </mat-form-field>
+                }
+
+                <mat-form-field appearance="outline" class="form-input">
+                  <mat-label>MRN Location</mat-label>
+                  <input matInput formControlName="mrnLocation" [readonly]="viewOnly" placeholder="PID-3[5=MR].1">
+                  @if (!viewOnly && config.get('adtConfiguration.mrnLocation')?.hasError('hl7Location')) {
+                    <mat-error>Enter a location such as PID-18 or PID-3[5=MR].1</mat-error>
+                  }
+                  <mat-hint>Optional override. Defaults to the PID-3 identifier with type MR.</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="form-input">
+                  <mat-label>Encounter Id Location</mat-label>
+                  <input matInput formControlName="encounterIdLocation" [readonly]="viewOnly" placeholder="PV1-19.1">
+                  @if (!viewOnly && config.get('adtConfiguration.encounterIdLocation')?.hasError('hl7Location')) {
+                    <mat-error>Enter a location such as PID-2 or PV1-19.1</mat-error>
+                  }
+                  <mat-hint>Optional override. Defaults to PV1-19, the visit number.</mat-hint>
+                </mat-form-field>
+              </div>
+            }
 
             @if (!viewOnly) {
               <div class="config-actions">

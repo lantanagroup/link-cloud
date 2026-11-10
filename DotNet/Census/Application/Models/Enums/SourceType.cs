@@ -4,5 +4,6 @@ public enum SourceType
 {
     FHIR,
     ADT,
-    SFTP_FHIR
+    SFTP_FHIR,
+    ADT_FHIR
 }

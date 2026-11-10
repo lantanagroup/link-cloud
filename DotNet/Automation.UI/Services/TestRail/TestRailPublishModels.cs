@@ -39,6 +39,13 @@ public sealed class TestRailCaseResult
     public int CaseId { get; init; }
     public int StatusId { get; init; }
     public string? Comment { get; init; }
+
+    /// <summary>
+    /// Comment applied with edit_result after the attachment upload succeeds.
+    /// Null when this result has no attachment. <see cref="Comment"/> does not claim the file is attached.
+    /// </summary>
+    public string? CommentAfterAttachment { get; init; }
+
     public string? Elapsed { get; init; }
     public byte[]? Attachment { get; init; }
     public string? AttachmentFileName { get; init; }
