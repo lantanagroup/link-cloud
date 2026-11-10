@@ -172,6 +172,9 @@
                 var fresh = doc.getElementById(node.id);
                 if (!fresh) return;
                 if (fresh.innerHTML !== node.innerHTML) node.innerHTML = fresh.innerHTML;
+                // The run watch keeps its report URL on the region, not in the body.
+                if (fresh.hasAttribute("data-report-href"))
+                    node.setAttribute("data-report-href", fresh.getAttribute("data-report-href") || "");
                 // A region that reports itself final (finished or missing report) stops polling.
                 if (fresh.hasAttribute("data-au-final")) {
                     node.setAttribute("data-au-final", "");
