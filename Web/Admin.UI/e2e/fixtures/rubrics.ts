@@ -4,6 +4,7 @@ import {
   IRubricDetail,
   IRubricLifecycleEvent,
   IRubricPage,
+  IRubricRunResult,
   IRubricSettings,
   IRubricSummary,
   IRubricValidationResult,
@@ -291,4 +292,49 @@ export function savedDraft(rubricId: string, semver: string, checksum = 'c0ffee'
 export function validationResult(result: Partial<IRubricValidationResult>):
   { status: number; json: IRubricApiResponse<IRubricValidationResult> } {
   return rubricOk<IRubricValidationResult>({ valid: true, errors: [], ...result });
+}
+
+/** What a dry run of the draft finds in a sample: two errors from one check and a warning from another. */
+export const dryRunResult: IRubricRunResult = {
+  rubricId: 'bare-minimum-requirements',
+  rubricVersion: '1.2.0',
+  status: 'UNACCEPTABLE',
+  score: {
+    interpretation: 'UNACCEPTABLE',
+    byDimension: { CONFORMANCE: 'UNACCEPTABLE', TERMINOLOGY: 'ACCEPTABLE' },
+  },
+  summary: { errorCount: 2, warningCount: 1, informationCount: 0 },
+  findings: [
+    {
+      checkId: 'diagnosticreport-category-required', dimension: 'CONFORMANCE', severity: 'ERROR',
+      code: 'diagnosticreport-category-required', message: 'Missing DiagnosticReport.category code.',
+      location: 'Bundle.entry[2].resource', expression: 'DiagnosticReport.category.exists()',
+    },
+    {
+      checkId: 'diagnosticreport-category-required', dimension: 'CONFORMANCE', severity: 'ERROR',
+      code: 'diagnosticreport-category-required', message: 'Missing DiagnosticReport.category code.',
+      location: 'Bundle.entry[5].resource', expression: 'DiagnosticReport.category.exists()',
+    },
+    {
+      checkId: 'patient-name-present', dimension: 'CONFORMANCE', severity: 'WARNING',
+      message: 'Patient has no name', location: 'Bundle.entry[0].resource', expression: 'Patient.name.exists()',
+    },
+  ],
+  trace: {
+    durationMs: 840,
+    checkDurationsMs: {
+      'diagnosticreport-category-required': 3.2,
+      'diagnosticreport-category-terminology': 610.4,
+      'specimen-type-terminology': 201.7,
+      'patient-name-present': 1.1,
+    },
+  },
+};
+
+/** What publishing or retiring answers with: the version in its new status. */
+export function lifecycleResult(semver: string, status: 'PUBLISHED' | 'RETIRED'):
+  { status: number; json: IRubricApiResponse<IRubricVersionSummary> } {
+  return rubricOk<IRubricVersionSummary>({
+    rubricVersionId: 12, rubricId: 'bare-minimum-requirements', semver, status, checksum: CHECKSUM_DRAFT,
+  });
 }

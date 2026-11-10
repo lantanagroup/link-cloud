@@ -188,3 +188,51 @@ export function orderedChecks(definition?: IRubricDefinition | null): IRubricChe
       (a.check.ordinal ?? Number.MAX_SAFE_INTEGER) - (b.check.ordinal ?? Number.MAX_SAFE_INTEGER) || a.index - b.index)
     .map(entry => entry.check);
 }
+
+/** A setting of a check, worded for a reader. */
+export interface CheckSetting {
+  key: string;
+  label: string;
+  value: string;
+}
+
+const SETTING_LABELS: Record<string, string> = {
+  expression: 'Expression',
+  failureMessage: 'Failure message',
+  code: 'Code',
+  profiles: 'Profiles',
+  path: 'Path',
+  valueSet: 'Value set',
+  system: 'Code system',
+  validateCodings: 'Validate codings',
+  valueSetWhitelistRegex: 'Value sets matching',
+  matchMode: 'Passes when',
+  customCheckId: 'Plug-in id',
+  className: 'Plug-in class',
+  min: 'Minimum',
+  max: 'Maximum'
+};
+
+/** The name of a check's setting; one the screens have no wording for is shown as it is written. */
+export const settingLabel = (key: string): string => SETTING_LABELS[key] ?? key;
+
+/** A setting's value as text. */
+export function settingValue(key: string, value: unknown): string {
+  if (key === 'matchMode') {
+    return value === 'ALL' ? 'All of its checks pass' : 'Any of its checks passes';
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  if (Array.isArray(value)) {
+    return value.join('\n');
+  }
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+
+/** A check's settings as label and value, in the order they were written. Child checks are not among them. */
+export function checkSettings(check: IRubricCheck): CheckSetting[] {
+  return Object.entries(check.parameters ?? {})
+    .filter(([key, value]) => key !== 'checks' && value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => ({ key, label: settingLabel(key), value: settingValue(key, value) }));
+}

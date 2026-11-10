@@ -154,4 +154,51 @@ describe('RubricDetailComponent', () => {
     expect(component.notFound).toBeFalse();
     expect(component.rubric?.title).toBe('Other');
   });
+
+  describe('what it offers for each version', () => {
+    const actions = (): string[][] =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('td.mat-column-actions'))
+        .map(cell => Array.from(cell.querySelectorAll('a')).map(link => link.textContent?.trim() ?? ''));
+
+    it('edit, dry run, publish and delete for a draft; dry run and retire for a published version', () => {
+      fixture.detectChanges();
+
+      expect(actions()).toEqual([
+        ['Edit', 'Dry run', 'Publish', 'Delete'],
+        ['Dry run', 'Retire'],
+        ['Dry run', 'Retire']
+      ]);
+    });
+
+    it('nothing for a retired version', () => {
+      rubricService.getRubric.and.returnValue(of({
+        ...rubric,
+        versions: [{ rubricVersionId: 1, rubricId: 'piqi.core', semver: '0.9.0', status: 'RETIRED', checksum: 'z' }]
+      }));
+
+      fixture.detectChanges();
+
+      expect(actions()).toEqual([[]]);
+    });
+
+    it('sends publish, retire and delete to the version\'s page to be confirmed there', () => {
+      fixture.detectChanges();
+
+      const publish = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('td.mat-column-actions a'))
+        .find(link => link.textContent?.trim() === 'Publish') as HTMLAnchorElement;
+
+      expect(publish.getAttribute('href')).toBe('/rubrics/piqi.core/versions/2.0.0?do=publish');
+      expect(publish.getAttribute('aria-label')).toBe('Publish version 2.0.0');
+    });
+
+    it('offers to compare versions only when there is more than one', () => {
+      fixture.detectChanges();
+      expect(text()).toContain('Compare versions');
+
+      rubricService.getRubric.and.returnValue(of({ ...rubric, versions: rubric.versions!.slice(0, 1) }));
+      params.next(convertToParamMap({ rubricId: 'other' }));
+      fixture.detectChanges();
+      expect(text()).not.toContain('Compare versions');
+    });
+  });
 });

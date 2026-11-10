@@ -1,0 +1,264 @@
+<div class="rubric-dry-run">
+  <div class="rubric-dry-run-banner">
+    <div>
+      <div class="rubric-banner-kicker">
+        Configuration &gt; <a routerLink="/rubrics">Validation Rubrics</a>
+        &gt; <a [routerLink]="['/rubrics', rubricId]">{{ rubricId }}</a>
+        &gt; <a [routerLink]="['/rubrics', rubricId, 'versions', semver]">{{ semver }}</a>
+      </div>
+      <h2 class="rubric-banner-heading">Dry run · {{ title }} · {{ version?.semver || semver }}</h2>
+      @if (version) {
+        <div class="rubric-banner-meta">
+          <span [class]="statusChipClass">{{ statusLabel(version.status) }}</span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="rubric-dry-run-body">
+    @if (loading) {
+      <div class="rubric-message">
+        <mat-spinner diameter="32" aria-label="Loading version"></mat-spinner>
+      </div>
+    } @else if (notFound) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The rubric "{{ rubricId }}" has no version {{ semver }}.</strong></p>
+        <p><a class="rubric-link" [routerLink]="['/rubrics', rubricId]">Back to the rubric</a></p>
+      </div>
+    } @else if (error) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The version could not be loaded.</strong></p>
+        <p>{{ error }}</p>
+      </div>
+    } @else if (version) {
+      <section class="rubric-dry-run-panel" aria-labelledby="dryRunSampleHeading">
+        <h4 id="dryRunSampleHeading">Sample</h4>
+        <p class="rubric-dry-run-help">
+          One FHIR resource or a Bundle, as JSON: upload a file or paste it. The sample is sent to the Validation
+          service to be checked and is not kept. Only the outcome and the time are recorded on the version.
+        </p>
+
+        <div class="rubric-dry-run-file">
+          <label for="dryRunFile" class="rubric-button">Choose a file</label>
+          <input id="dryRunFile" type="file" accept=".json" (change)="onFileChosen($event)">
+          @if (file) {
+            <span class="rubric-mono">{{ file.name }}</span>
+            <span class="rubric-muted">{{ fileSize }}</span>
+            <button type="button" class="rubric-dry-run-plain" (click)="removeFile()">Remove</button>
+          }
+        </div>
+
+        @if (!file) {
+          <div class="rubric-dry-run-field">
+            <label for="dryRunText">Or paste the sample</label>
+            <textarea id="dryRunText" rows="10" class="rubric-mono" spellcheck="false" [(ngModel)]="text"
+              (ngModelChange)="onTextChanged()" [attr.aria-invalid]="sampleError !== null"
+              aria-describedby="dryRunSampleError"></textarea>
+          </div>
+        }
+        <span id="dryRunSampleError" class="rubric-dry-run-error" role="alert">{{ sampleError }}</span>
+
+        <div class="rubric-dry-run-actions">
+          <button type="button" class="rubric-button rubric-button--primary" [disabled]="running || !hasSample"
+            (click)="runDryRun()">
+            {{ running ? 'Running…' : 'Run' }}
+          </button>
+          @if (running) {
+            <span class="rubric-dry-run-help">A large Bundle or a rubric with many checks can take a while.</span>
+          }
+        </div>
+      </section>
+
+      @if (failure) {
+        <div class="rubric-message rubric-message--error" role="alert">
+          <p><strong>The dry run could not be completed.</strong></p>
+          <p>{{ failure }}</p>
+        </div>
+      }
+
+      @if (result; as run) {
+        <section class="rubric-dry-run-panel" aria-labelledby="dryRunResultHeading">
+          <h4 id="dryRunResultHeading">Result</h4>
+
+          <div class="rubric-dry-run-outcome">
+            <span [class]="resultChipClass(run.status)">{{ resultLabel(run.status) }}</span>
+            <span>
+              {{ run.summary?.errorCount ?? 0 | number }} {{ (run.summary?.errorCount ?? 0) === 1 ? 'error' : 'errors' }}
+              · {{ run.summary?.warningCount ?? 0 | number }} {{ (run.summary?.warningCount ?? 0) === 1 ? 'warning' : 'warnings' }}
+              · {{ run.summary?.informationCount ?? 0 | number }} information
+            </span>
+            @if (run.trace?.durationMs !== undefined) {
+              <span class="rubric-muted">{{ run.trace?.durationMs | number }} ms</span>
+            }
+            <span class="rubric-muted">{{ sampleDescription }}</span>
+          </div>
+
+          @if (dimensionOutcomes.length > 0) {
+            <div class="rubric-dry-run-dimensions">
+              @for (entry of dimensionOutcomes; track entry.dimension) {
+                <span>{{ dimensionLabel(entry.dimension) }}:
+                  <span [class]="resultChipClass(entry.outcome)">{{ resultLabel(entry.outcome) }}</span>
+                </span>
+              }
+            </div>
+          }
+
+          <p class="rubric-dry-run-help">
+            The dry run completed and is recorded on version {{ run.rubricVersion }}. What it found is about the
+            sample: a rubric that correctly reports a bad sample has done its job, and can be published.
+          </p>
+
+          <div class="rubric-dry-run-actions">
+            <a class="rubric-button" [routerLink]="['/rubrics', rubricId, 'versions', version.semver]">Back to the version</a>
+            @if (version.status === 'DRAFT') {
+              <a class="rubric-button rubric-button--primary" [routerLink]="['/rubrics', rubricId, 'versions', version.semver]"
+                [queryParams]="{ do: 'publish' }">Publish</a>
+            }
+          </div>
+        </section>
+
+        <section class="rubric-dry-run-panel" aria-labelledby="dryRunFindingsHeading">
+          <h4 id="dryRunFindingsHeading">Findings ({{ findings.length | number }})</h4>
+
+          @if (findings.length === 0) {
+            <p class="rubric-dry-run-help">No check found anything in this sample.</p>
+          } @else {
+            <div class="rubric-dry-run-filters">
+              <div class="rubric-dry-run-field">
+                <label for="dryRunCheckFilter">Check</label>
+                <select id="dryRunCheckFilter" [(ngModel)]="checkFilter" (ngModelChange)="applyFilters()">
+                  <option value="">All checks</option>
+                  @for (id of findingChecks; track id) {
+                    <option [value]="id">{{ id }}</option>
+                  }
+                </select>
+              </div>
+              <div class="rubric-dry-run-field">
+                <label for="dryRunSeverityFilter">Severity</label>
+                <select id="dryRunSeverityFilter" [(ngModel)]="severityFilter" (ngModelChange)="applyFilters()">
+                  <option value="">All severities</option>
+                  @for (severity of severities; track severity) {
+                    <option [value]="severity">{{ severityLabel(severity) }}</option>
+                  }
+                </select>
+              </div>
+              <div class="rubric-dry-run-field">
+                <label for="dryRunDimensionFilter">Dimension</label>
+                <select id="dryRunDimensionFilter" [(ngModel)]="dimensionFilter" (ngModelChange)="applyFilters()">
+                  <option value="">All dimensions</option>
+                  @for (dimension of findingDimensions; track dimension) {
+                    <option [value]="dimension">{{ dimensionLabel(dimension) }}</option>
+                  }
+                </select>
+              </div>
+              @if (hasFilter) {
+                <button type="button" class="rubric-dry-run-plain" (click)="clearFilters()">Clear filters</button>
+              }
+            </div>
+
+            <p class="rubric-dry-run-help" role="status">
+              @if (matchingCount === 0) {
+                No finding matches these filters.
+              } @else {
+                Showing {{ shownFindings.length | number }} of {{ matchingCount | number }}
+                {{ hasFilter ? 'matching findings' : 'findings' }}.
+              }
+            </p>
+
+            @if (matchingCount > 0) {
+              <div class="vd-mat-table rubric-dry-run-table">
+                <table mat-table [dataSource]="shownFindings" aria-label="Findings of this dry run">
+                  <ng-container matColumnDef="check">
+                    <th mat-header-cell *matHeaderCellDef>Check</th>
+                    <td mat-cell *matCellDef="let finding"><span class="rubric-mono">{{ finding.checkId }}</span></td>
+                  </ng-container>
+                  <ng-container matColumnDef="severity">
+                    <th mat-header-cell *matHeaderCellDef>Severity</th>
+                    <td mat-cell *matCellDef="let finding">
+                      <span [class]="severityChipClass(finding.severity)">{{ severityLabel(finding.severity) }}</span>
+                      @if (finding.overriddenSeverity) {
+                        <div class="rubric-muted">was {{ severityLabel(finding.originalSeverity) }}</div>
+                      }
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="dimension">
+                    <th mat-header-cell *matHeaderCellDef>Dimension</th>
+                    <td mat-cell *matCellDef="let finding">{{ dimensionLabel(finding.dimension) }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="message">
+                    <th mat-header-cell *matHeaderCellDef>Message</th>
+                    <td mat-cell *matCellDef="let finding">
+                      {{ finding.message }}
+                      @if (finding.code) {
+                        <div class="rubric-mono rubric-muted">{{ finding.code }}</div>
+                      }
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="location">
+                    <th mat-header-cell *matHeaderCellDef>Location</th>
+                    <td mat-cell *matCellDef="let finding"><span class="rubric-mono">{{ finding.location }}</span></td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="findingColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: findingColumns;"></tr>
+                </table>
+              </div>
+              @if (shownFindings.length < matchingCount) {
+                <div class="rubric-dry-run-actions">
+                  <button type="button" class="rubric-button" (click)="showMore()">Show more</button>
+                </div>
+              }
+            }
+          }
+        </section>
+
+        <section class="rubric-dry-run-panel" aria-labelledby="dryRunChecksHeading">
+          <h4 id="dryRunChecksHeading">Checks ({{ checkRuns.length }})</h4>
+          <p class="rubric-dry-run-help">Every check of the version, in the order they ran, and how long each took.</p>
+          <div class="vd-mat-table rubric-dry-run-table">
+            <table mat-table [dataSource]="checkRuns" aria-label="Checks of this dry run">
+              <ng-container matColumnDef="check">
+                <th mat-header-cell *matHeaderCellDef>Check</th>
+                <td mat-cell *matCellDef="let check"><span class="rubric-mono">{{ check.id }}</span></td>
+              </ng-container>
+              <ng-container matColumnDef="outcome">
+                <th mat-header-cell *matHeaderCellDef>Outcome</th>
+                <td mat-cell *matCellDef="let check">
+                  @if (!check.ran) {
+                    <span class="rubric-muted">Disabled, not run</span>
+                  } @else if (check.outcome) {
+                    <span [class]="resultChipClass(check.outcome)">{{ resultLabel(check.outcome) }}</span>
+                  } @else {
+                    {{ check.findings === 0 ? 'Nothing found' : 'Found problems' }}
+                  }
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="findings">
+                <th mat-header-cell *matHeaderCellDef>Findings</th>
+                <td mat-cell *matCellDef="let check">
+                  @if (check.findings > 0) {
+                    <button type="button" class="rubric-dry-run-plain" (click)="showFindingsOf(check.id)"
+                      [attr.aria-label]="'Show the ' + check.findings + ' findings of ' + check.id">
+                      {{ check.findings | number }}
+                    </button>
+                  } @else if (check.ran) {
+                    0
+                  }
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="duration">
+                <th mat-header-cell *matHeaderCellDef>Time</th>
+                <td mat-cell *matCellDef="let check">
+                  @if (check.durationMs !== undefined) {
+                    {{ check.durationMs | number: '1.0-1' }} ms
+                  }
+                </td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="checkColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: checkColumns;"></tr>
+            </table>
+          </div>
+        </section>
+      }
+    }
+  </div>
+</div>

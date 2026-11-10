@@ -292,6 +292,67 @@ describe('RubricService', () => {
     expect(completed).toBeTrue();
   });
 
+  describe('publish and retire', () => {
+    const summary = { rubricVersionId: 2, rubricId: 'piqi.core', semver: '1.1.0', status: 'PUBLISHED', checksum: 'abc' };
+
+    it('posts to the version\'s publish action with no body', () => {
+      let published: unknown;
+      service.publish('piqi.core', '1.1.0').subscribe(result => published = result);
+
+      const request = http.expectOne(`${BASE}/piqi.core/versions/1.1.0/$publish`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toBeNull();
+      request.flush(envelope(summary));
+      expect(published).toEqual(summary);
+    });
+
+    it('posts to the version\'s retire action', () => {
+      service.retire('piqi.core', '1.1.0').subscribe();
+
+      const request = http.expectOne(`${BASE}/piqi.core/versions/1.1.0/$retire`);
+      expect(request.request.method).toBe('POST');
+      request.flush(envelope({ ...summary, status: 'RETIRED' }));
+    });
+
+    it('fails with a conflict when the service refuses, with its reason', () => {
+      let failure: RubricApiError | undefined;
+      service.publish('piqi.core', '1.1.0').subscribe({ error: error => failure = error });
+
+      http.expectOne(`${BASE}/piqi.core/versions/1.1.0/$publish`).flush(
+        { status: 409, message: 'no dry run has been completed for this version' }, { status: 409, statusText: 'Conflict' });
+
+      expect(failure?.conflict).toBeTrue();
+      expect(failure?.message).toBe('no dry run has been completed for this version');
+    });
+  });
+
+  describe('dryRun', () => {
+    const URL = '/api/validation/v2/rubrics/piqi.core/versions/1.1.0/$dry-run';
+
+    it('posts the sample as the payload to the version\'s dry run, and returns what it found', () => {
+      const found = { rubricId: 'piqi.core', rubricVersion: '1.1.0', status: 'ACCEPTABLE', findings: [] };
+      let result: unknown;
+      service.dryRun('piqi.core', '1.1.0', { resourceType: 'Patient' }).subscribe(value => result = value);
+
+      const request = http.expectOne(URL);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual({ payload: { resourceType: 'Patient' } });
+      request.flush(envelope(found));
+      expect(result).toEqual(found);
+    });
+
+    it('fails with the service\'s reason when the sample is not FHIR', () => {
+      let failure: RubricApiError | undefined;
+      service.dryRun('piqi.core', '1.1.0', { resourceType: 'Nope' }).subscribe({ error: error => failure = error });
+
+      http.expectOne(URL).flush(
+        { status: 400, message: 'Failed to parse FHIR payload: Unknown resource name' }, { status: 400, statusText: 'Bad Request' });
+
+      expect(failure?.status).toBe(400);
+      expect(failure?.message).toContain('Unknown resource name');
+    });
+  });
+
   describe('a failed call', () => {
     function failure(run: () => void): RubricApiError {
       let caught: RubricApiError | undefined;

@@ -22,8 +22,12 @@ import {
   scoringLabel,
   statusLabel
 } from '../rubric-display';
+import { ACTION_NAMES, actionsFor } from '../rubric-lifecycle';
 
-/** One rubric: its versions, newest first, and its history. */
+/**
+ * One rubric: its versions, newest first, and its history. What can be done to a version is offered on its
+ * row; publishing, retiring and deleting lead to the version's own page, where each is confirmed.
+ */
 @Component({
   selector: 'app-rubric-detail',
   imports: [
@@ -37,7 +41,7 @@ import {
   styleUrls: ['./rubric-detail.component.scss']
 })
 export class RubricDetailComponent implements OnInit, OnDestroy {
-  readonly versionColumns = ['semver', 'status', 'checks', 'scoring', 'dryRun', 'created', 'published', 'retired'];
+  readonly versionColumns = ['semver', 'status', 'checks', 'scoring', 'dryRun', 'created', 'published', 'retired', 'actions'];
   readonly eventColumns = ['occurredAt', 'action', 'semver', 'actor', 'checksum'];
 
   readonly statusLabel = statusLabel;
@@ -45,6 +49,8 @@ export class RubricDetailComponent implements OnInit, OnDestroy {
   readonly dryRunLabel = dryRunLabel;
   readonly actionLabel = actionLabel;
   readonly pipelineUseTitle = pipelineUseTitle;
+  readonly actionsFor = actionsFor;
+  readonly actionNames = ACTION_NAMES;
 
   rubricId = '';
   rubric: IRubricDetail | null = null;

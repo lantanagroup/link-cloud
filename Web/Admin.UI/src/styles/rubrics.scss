@@ -129,12 +129,96 @@
   }
 }
 
-.rubric-button--primary {
+// Named twice over for the same reason as the banner's: a link worn as the primary button keeps white text.
+.rubric-button--primary,
+.rubric-button.rubric-button--primary {
   background-color: #005EAA;
   color: #ffffff;
 
   &:hover,
   &:focus-visible {
     background-color: #26418F;
+  }
+}
+
+// A link worn as one of the white-text buttons keeps white text in every state. The validation theme
+// colours a link, a visited link and a hovered link, and a component's copy of those rules outranks the
+// classes above, so each state is named here with the element.
+a.rubric-button.rubric-button--on-banner,
+a.rubric-button.rubric-button--primary {
+  &,
+  &:link,
+  &:visited,
+  &:hover,
+  &:visited:hover,
+  &:focus-visible {
+    color: #ffffff;
+  }
+}
+
+// The confirmation before a version is published, retired or deleted: what will happen, then the choice.
+.rubric-action {
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+  border-left: solid 6px #005EAA;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  font-family: Arial, sans-serif;
+
+  &--danger {
+    border-left-color: #7F2A2E;
+  }
+
+  h3 {
+    margin: 0 0 .75rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0 0 .75rem 0;
+  }
+
+  &-consequences {
+    margin: 0 0 .75rem 0;
+    padding-left: 1.25rem;
+
+    li {
+      margin-bottom: .25rem;
+    }
+  }
+
+  &-warning {
+    background-color: #FCEFD4;
+    color: #5C3B00;
+    padding: .5rem .75rem;
+  }
+
+  &-blocked {
+    color: #7F2A2E;
+
+    a {
+      margin-left: .5rem;
+    }
+  }
+
+  &-type {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    margin-bottom: .75rem;
+    max-width: 32rem;
+
+    input {
+      padding: .375rem .5rem;
+      border: solid 1px #767676;
+      font-size: 1rem;
+    }
+  }
+
+  &-buttons {
+    display: flex;
+    gap: .75rem;
+    margin-top: 1rem;
   }
 }

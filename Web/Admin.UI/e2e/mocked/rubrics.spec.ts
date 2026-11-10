@@ -302,7 +302,7 @@ test.describe('rubric page', () => {
     api.mock(`GET ${RUBRIC}/versions/1.1.0`, rubricOk(publishedVersion));
 
     await page.goto('/rubrics/bare-minimum-requirements');
-    await page.getByRole('link', { name: '1.1.0' }).click();
+    await page.getByRole('link', { name: '1.1.0', exact: true }).click();
 
     await expect(page).toHaveURL(/\/rubrics\/bare-minimum-requirements\/versions\/1\.1\.0$/);
   });
@@ -321,8 +321,10 @@ test.describe('rubric page', () => {
 test.describe('version page', () => {
   const VERSION_URL = '/rubrics/bare-minimum-requirements/versions/1.1.0';
 
+  // The version page also reads the rubric, to say which version is active and what an action would change.
   test.beforeEach(async ({ api }) => {
     api.mock(`GET ${RUBRIC}/versions/1.1.0`, rubricOk(publishedVersion));
+    api.mock(`GET ${RUBRIC}`, rubricOk(bareMinimumRubric));
   });
 
   test('shows the status, checksum and who saved and published it', async ({ page }) => {

@@ -9,6 +9,9 @@
       @if (version) {
         <div class="rubric-banner-meta">
           <span [class]="statusChipClass">{{ statusLabel(version.status) }}</span>
+          @if (isActive) {
+            <span class="rubric-chip rubric-chip--active">Active</span>
+          }
           <span class="rubric-mono" title="Checksum of this version's definition">{{ version.checksum }}</span>
         </div>
       }
@@ -23,6 +26,17 @@
           <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'versions', 'new']"
             [queryParams]="{ from: version!.semver }">
             New version from this
+          </a>
+        }
+        @if (version?.status !== 'RETIRED') {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'versions', version!.semver, 'dry-run']">
+            Dry run
+          </a>
+        }
+        @if (compareWith) {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'compare']"
+            [queryParams]="{ from: compareWith, to: version!.semver }">
+            Compare with {{ compareWith }}
           </a>
         }
         <button type="button" class="rubric-button rubric-button--on-banner" [disabled]="exporting !== null"
@@ -59,6 +73,70 @@
           <p>{{ exportError }}</p>
         </div>
       }
+      @if (notice) {
+        <div class="rubric-message rubric-version-notice" role="status">
+          <p><strong>{{ notice }}</strong></p>
+        </div>
+      }
+
+      @if (plan) {
+        <section class="rubric-action" [class.rubric-action--danger]="plan.action !== 'publish'"
+          aria-labelledby="rubricActionHeading">
+          <h3 id="rubricActionHeading">{{ plan.heading }}</h3>
+
+          @if (plan.action === 'publish') {
+            <p class="rubric-action-facts">
+              {{ checks.length }} {{ checks.length === 1 ? 'check' : 'checks' }}, {{ enabledCheckCount }} enabled
+              · Dry run: {{ dryRunLabel(version) }}
+              @if (version.dryRunCompletedAt) {
+                <span class="rubric-muted">{{ version.dryRunCompletedAt | date: 'medium' }}</span>
+              }
+            </p>
+          }
+
+          @if (plan.blocked) {
+            <p class="rubric-action-blocked" role="alert">
+              <strong>{{ plan.blocked }}</strong>
+              @if (plan.needsDryRun) {
+                <a class="rubric-link" [routerLink]="['/rubrics', rubricId, 'versions', version.semver, 'dry-run']">Run a dry run</a>
+              }
+            </p>
+          } @else {
+            <ul class="rubric-action-consequences">
+              @for (consequence of plan.consequences; track consequence) {
+                <li>{{ consequence }}</li>
+              }
+            </ul>
+            @for (warning of plan.warnings; track warning) {
+              <p class="rubric-action-warning">{{ warning }}</p>
+            }
+            @if (plan.typeToConfirm) {
+              <div class="rubric-action-type">
+                <label for="rubricActionConfirm">
+                  Type the rubric's id, <span class="rubric-mono">{{ plan.typeToConfirm }}</span>, to go ahead
+                </label>
+                <input id="rubricActionConfirm" type="text" autocomplete="off" spellcheck="false" [(ngModel)]="confirmText">
+              </div>
+            }
+          }
+
+          @if (actionError) {
+            <p class="rubric-action-blocked" role="alert"><strong>{{ actionError }}</strong></p>
+          }
+
+          <div class="rubric-action-buttons">
+            @if (!plan.blocked) {
+              <button type="button" class="rubric-button rubric-button--primary" [disabled]="!canConfirm" (click)="confirm()">
+                {{ acting ? 'Working…' : plan.confirmLabel }}
+              </button>
+            }
+            <button type="button" class="rubric-button" (click)="cancelAction()">
+              {{ plan.blocked ? 'Close' : 'Cancel' }}
+            </button>
+          </div>
+        </section>
+      }
+
       <dl class="rubric-version-facts">
         <div>
           <dt>Saved</dt>
@@ -89,6 +167,16 @@
             }
           </dd>
         </div>
+        @if (actions.length > 0 && !plan) {
+          <div class="rubric-version-lifecycle">
+            @for (action of actions; track action) {
+              <button type="button" class="rubric-button" [class.rubric-button--primary]="action === 'publish'"
+                (click)="open(action)">
+                {{ actionNames[action] }}
+              </button>
+            }
+          </div>
+        }
       </dl>
 
       @if (!definition) {

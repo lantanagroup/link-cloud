@@ -10,6 +10,7 @@ import {
   IRubricLifecycleEvent,
   IRubricListQuery,
   IRubricPage,
+  IRubricRunResult,
   IRubricSavePrecondition,
   IRubricSettings,
   IRubricSummary,
@@ -199,6 +200,42 @@ export class RubricService {
     return this.http.delete<void>(
       `${this.baseUrl}/${encodeURIComponent(rubricId)}/versions/${encodeURIComponent(semver)}`).pipe(
       map(() => undefined),
+      catchError(RubricService.toApiError)
+    );
+  }
+
+  /**
+   * Publishes a draft. From then on it is the version validation uses, and it can no longer be changed.
+   * Fails with `conflict` when the version is not a draft, or when this environment requires a dry run
+   * and the draft's current definition has not had one.
+   */
+  publish(rubricId: string, semver: string): Observable<IRubricVersionSummary> {
+    return this.lifecycle(rubricId, semver, '$publish');
+  }
+
+  /** Retires a version, so validation no longer uses it. Fails with `conflict` when it is already retired. */
+  retire(rubricId: string, semver: string): Observable<IRubricVersionSummary> {
+    return this.lifecycle(rubricId, semver, '$retire');
+  }
+
+  /**
+   * Runs a version against a sample, a FHIR resource or Bundle, and returns what it found. Nothing of
+   * the result is kept except its outcome and time, which are recorded on the version.
+   */
+  dryRun(rubricId: string, semver: string, sample: unknown): Observable<IRubricRunResult> {
+    return this.http.post<IRubricApiResponse<IRubricRunResult>>(
+      `${this.appConfigService.config?.baseApiUrl}/validation/v2/rubrics/${encodeURIComponent(rubricId)}`
+      + `/versions/${encodeURIComponent(semver)}/$dry-run`,
+      { payload: sample }).pipe(
+      map(response => RubricService.required(response)),
+      catchError(RubricService.toApiError)
+    );
+  }
+
+  private lifecycle(rubricId: string, semver: string, action: string): Observable<IRubricVersionSummary> {
+    return this.http.post<IRubricApiResponse<IRubricVersionSummary>>(
+      `${this.baseUrl}/${encodeURIComponent(rubricId)}/versions/${encodeURIComponent(semver)}/${action}`, null).pipe(
+      map(response => RubricService.required(response)),
       catchError(RubricService.toApiError)
     );
   }

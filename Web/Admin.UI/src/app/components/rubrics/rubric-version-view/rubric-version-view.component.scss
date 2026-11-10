@@ -32,6 +32,26 @@
       flex-wrap: wrap;
       gap: .75rem;
     }
+
+    // Up to five actions; they wrap under each other before they squeeze the heading.
+    .rubric-banner-actions {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      flex-shrink: 1;
+    }
+  }
+
+  &-notice {
+    margin-bottom: 1.25rem;
+    border-left: solid 6px vt.$vd-success-800;
+  }
+
+  // Publish, retire and delete sit at the end of the facts, beside the dry run they depend on.
+  &-lifecycle {
+    margin-left: auto;
+    display: flex;
+    gap: .75rem;
+    align-items: center;
   }
 
   &-body {

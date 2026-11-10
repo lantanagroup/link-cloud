@@ -407,6 +407,7 @@ test.describe('importing a rubric', () => {
     const reviewed = capture(api, `POST ${RUBRICS}/$validate`, validationResult({ definition: imported, checksum: 'new', rubricExists: false }));
     const saved = capture(api, `POST ${RUBRICS}/lab.results/versions`, savedDraft('lab.results', '1.0.0'));
     api.mock(`GET ${RUBRICS}/lab.results/versions/1.0.0`, rubricOk({ ...draftVersion, rubricId: 'lab.results', semver: '1.0.0', definition: imported }));
+    api.mock(`GET ${RUBRICS}/lab.results`, rubricOk({ rubricId: 'lab.results', versions: [] }));
 
     await page.goto('/rubrics');
     await page.getByRole('link', { name: 'Import' }).click();

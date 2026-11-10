@@ -25,8 +25,10 @@
     margin-left: .375rem;
   }
 
-  &-row-action {
-    margin-left: .75rem;
+  &-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem 1rem;
   }
 
   // "Published" and "Active" stay side by side.

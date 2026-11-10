@@ -214,6 +214,48 @@ export interface IRubricSavePrecondition {
   mustNotExist?: boolean;
 }
 
+/** One thing a run of a rubric found in the sample. */
+export interface IRubricFinding {
+  checkId: string;
+  dimension?: RubricDimension;
+  /** The severity that counts: a category's override when one applied, the check's own otherwise. */
+  severity: RubricSeverity;
+  code?: string;
+  message?: string;
+  /** Where in the sample, such as `Bundle.entry[3].resource`. */
+  location?: string;
+  expression?: string;
+  /** The severity the check gave, before any override. */
+  originalSeverity?: RubricSeverity;
+  /** Present only when a category changed the severity. */
+  overriddenSeverity?: RubricSeverity;
+}
+
+/** What running a version against a sample found. A dry run saves none of it but the outcome. */
+export interface IRubricRunResult {
+  rubricId: string;
+  rubricVersion: string;
+  status: RubricResultStatus;
+  score?: {
+    interpretation?: RubricResultStatus;
+    /** The outcome of each dimension, under the dimension scorecard. */
+    byDimension?: Partial<Record<RubricDimension, RubricResultStatus>>;
+    /** The outcome of each check, under the check scorecard. */
+    byCheck?: Record<string, RubricResultStatus>;
+  };
+  summary?: {
+    errorCount: number;
+    warningCount: number;
+    informationCount: number;
+  };
+  findings?: IRubricFinding[];
+  trace?: {
+    durationMs?: number;
+    /** How long each enabled check took, by check id, in the order they ran. */
+    checkDurationsMs?: Record<string, number>;
+  };
+}
+
 /** What the rubric list can be asked for. */
 export interface IRubricListQuery {
   /** Only rubrics with a version in this status. */

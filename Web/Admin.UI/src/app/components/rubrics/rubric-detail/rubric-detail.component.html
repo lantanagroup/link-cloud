@@ -24,6 +24,11 @@
     </div>
     @if (rubric) {
       <div class="rubric-banner-actions">
+        @if (versions.length > 1) {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubric.rubricId, 'compare']">
+            Compare versions
+          </a>
+        }
         <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubric.rubricId, 'versions', 'new']">
           New version
         </a>
@@ -67,11 +72,6 @@
                   <span [class]="chipClass(version)">{{ statusLabel(version.status) }}</span>
                   @if (isActive(version)) {
                     <span class="rubric-chip rubric-chip--active">Active</span>
-                  }
-                  @if (version.status === 'DRAFT') {
-                    <a class="rubric-link rubric-detail-row-action"
-                      [routerLink]="['/rubrics', rubric.rubricId, 'versions', version.semver, 'edit']"
-                      [attr.aria-label]="'Edit draft ' + version.semver">Edit</a>
                   }
                 </td>
               </ng-container>
@@ -131,6 +131,27 @@
                   } @else {
                     <span class="rubric-muted">—</span>
                   }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let version">
+                  <div class="rubric-detail-row-actions">
+                    @if (version.status === 'DRAFT') {
+                      <a class="rubric-link" [routerLink]="['/rubrics', rubric.rubricId, 'versions', version.semver, 'edit']"
+                        [attr.aria-label]="'Edit draft ' + version.semver">Edit</a>
+                    }
+                    @if (version.status !== 'RETIRED') {
+                      <a class="rubric-link" [routerLink]="['/rubrics', rubric.rubricId, 'versions', version.semver, 'dry-run']"
+                        [attr.aria-label]="'Dry run version ' + version.semver">Dry run</a>
+                    }
+                    @for (action of actionsFor(version.status); track action) {
+                      <a class="rubric-link" [routerLink]="['/rubrics', rubric.rubricId, 'versions', version.semver]"
+                        [queryParams]="{ do: action }"
+                        [attr.aria-label]="actionNames[action] + ' version ' + version.semver">{{ actionNames[action] }}</a>
+                    }
+                  </div>
                 </td>
               </ng-container>
 
