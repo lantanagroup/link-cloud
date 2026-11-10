@@ -156,7 +156,7 @@ public class ScenariosController : Controller
         if (model.FacilityConfigurationMode == FacilityConfigurationMode.Facility)
         {
             if (!model.FacilityTemplateId.HasValue)
-                return BadRequest("Select a facility template, or switch to ala carte.");
+                return BadRequest("Select a facility template, or switch to A La Carte.");
 
             var facilityTemplate = await facilityTemplateStore.GetByIdAsync(model.FacilityTemplateId.Value, ct);
             if (facilityTemplate == null)
@@ -177,7 +177,7 @@ public class ScenariosController : Controller
             model.FacilityTemplateId = null;
             model.VendorName = string.IsNullOrWhiteSpace(model.VendorName) ? null : model.VendorName.Trim();
             if (!model.QueryPlanTemplateId.HasValue)
-                return BadRequest("Ala carte needs a query plan.");
+                return BadRequest("A La Carte needs a query plan.");
         }
 
         foreach (var cohort in model.PatientCohorts)
