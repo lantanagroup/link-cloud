@@ -256,4 +256,9 @@ var automationUi = builder.AddLinkService<Projects.Automation_UI>("automation-ui
 foreach (var (name, _, port) in proxiedServices)
     automationUi.WithEnvironment($"ServiceRegistry__{name}ServiceUrl", Url(port));
 
+// Automation UI runs work of its own once it is up. AutomationUi:AutoStart=false leaves it in the dashboard,
+// configured but stopped, until it is started there.
+if (!builder.Configuration.GetValue("AutomationUi:AutoStart", true))
+    automationUi.WithExplicitStart();
+
 builder.Build().Run();

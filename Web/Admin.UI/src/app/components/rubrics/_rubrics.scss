@@ -1,0 +1,183 @@
+@use '../../../styles/validation-theme.scss' as vt;
+
+// What the rubric list, the rubric page and the version page share.
+
+@mixin rubric-page() {
+  background-color: vt.$vd-neutral-50;
+  min-height: 100%;
+  padding-bottom: 80px;
+}
+
+@mixin rubric-banner() {
+  background-image: url('/assets/backgrounds/bg-eggplant-md.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  padding: 35px vt.$vd-container-padding-x;
+  color: vt.$vd-neutral-0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 2rem;
+
+  .rubric-banner-kicker {
+    @include vt.vd-subheading-02();
+    text-transform: uppercase;
+
+    a {
+      color: vt.$vd-neutral-0;
+      text-decoration: underline;
+    }
+  }
+
+  .rubric-banner-heading {
+    @include vt.vd-heading-02();
+    margin-top: .5rem;
+    overflow-wrap: anywhere;
+  }
+
+  .rubric-banner-meta {
+    margin-top: .5rem;
+    font-family: vt.$vd-font-family-sans-serif;
+    overflow-wrap: anywhere;
+  }
+
+  .rubric-banner-actions {
+    display: flex;
+    gap: .75rem;
+    flex-shrink: 0;
+  }
+}
+
+@mixin rubric-body() {
+  margin: vt.$vd-container-margin-x;
+
+  h4 {
+    @include vt.vd-subheading-01();
+    margin-bottom: 1.25rem;
+  }
+}
+
+// The state of the page itself: loading, failed, or nothing to show.
+@mixin rubric-message() {
+  background-color: vt.$vd-neutral-0;
+  box-shadow: vt.$vd-box-shadow-sm;
+  padding: 2rem;
+  font-family: vt.$vd-font-family-sans-serif;
+
+  &.rubric-message--error {
+    border-left: solid 6px vt.$vd-error-800;
+  }
+
+  p {
+    margin: 0 0 .5rem 0;
+  }
+}
+
+// A version's status, and labels like "Active", as a small pill.
+.rubric-chip {
+  display: inline-block;
+  padding: .125rem .625rem;
+  border-radius: 999px;
+  font-family: vt.$vd-font-family-sans-serif;
+  font-size: .8125rem;
+  font-weight: vt.$vd-font-weight-semibold;
+  line-height: 1.5;
+  white-space: nowrap;
+  background-color: vt.$vd-neutral-400;
+  color: vt.$vd-neutral-800;
+
+  &--draft {
+    background-color: #FCEFD4;
+    color: #7A4E00;
+  }
+
+  &--published {
+    background-color: #E2F1D2;
+    color: #35600A;
+  }
+
+  &--retired {
+    background-color: vt.$vd-neutral-400;
+    color: vt.$vd-neutral-700;
+  }
+
+  &--active {
+    background-color: vt.$vd-primary-700;
+    color: vt.$vd-neutral-0;
+  }
+
+  // On the page banner, where the other colours would not stand out from the background.
+  &--on-banner {
+    background-color: vt.$vd-neutral-0;
+    color: vt.$vd-primary-900;
+    margin-left: .5rem;
+  }
+
+  &--error {
+    background-color: #F8DADB;
+    color: #7F2A2E;
+  }
+
+  &--warning {
+    background-color: #FCEFD4;
+    color: #7A4E00;
+  }
+
+  &--information {
+    background-color: vt.$vd-primary-150;
+    color: vt.$vd-primary-900;
+  }
+}
+
+.rubric-muted {
+  color: vt.$vd-neutral-700;
+}
+
+.rubric-mono {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: .875rem;
+  overflow-wrap: anywhere;
+}
+
+.rubric-link {
+  color: vt.$vd-link-color;
+  text-decoration: none;
+  font-weight: vt.$vd-font-weight-semibold;
+
+  &:hover,
+  &:focus-visible {
+    color: vt.$vd-link-hover-color;
+    text-decoration: underline;
+  }
+}
+
+// A plain button for the page's own actions (filters, export, copy).
+.rubric-button {
+  @include vt.vd-button-text-base();
+  cursor: pointer;
+  padding: .5rem 1rem;
+  border: solid 2px vt.$vd-primary-700;
+  background-color: vt.$vd-neutral-0;
+  color: vt.$vd-primary-700;
+
+  &:hover,
+  &:focus-visible {
+    background-color: vt.$vd-primary-100;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: .6;
+  }
+
+  &--on-banner {
+    border-color: vt.$vd-neutral-0;
+    background-color: transparent;
+    color: vt.$vd-neutral-0;
+
+    &:hover,
+    &:focus-visible {
+      background-color: rgba(vt.$vd-neutral-0, .15);
+    }
+  }
+}

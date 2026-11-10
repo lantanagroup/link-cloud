@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -23,4 +24,15 @@ public interface RubricCheckRepository extends JpaRepository<RubricCheck, Long> 
     @Query("update RubricCheck c set c.deleted = true "
             + "where c.rubricVersionId = :rubricVersionId and c.deleted = false")
     int softDeleteByRubricVersionId(@Param("rubricVersionId") Long rubricVersionId);
+
+    // live checks per version, as [rubricVersionId, count] rows. versions with none have no row
+    @Query("select c.rubricVersionId, count(c) from RubricCheck c "
+            + "where c.rubricVersionId in :rubricVersionIds and c.deleted = false group by c.rubricVersionId")
+    List<Object[]> countLiveByRubricVersionIdIn(@Param("rubricVersionIds") Collection<Long> rubricVersionIds);
+
+    // every check of a version, the soft-deleted ones included, so the version itself can be deleted
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from RubricCheck c where c.rubricVersionId = :rubricVersionId")
+    int deleteByRubricVersionId(@Param("rubricVersionId") Long rubricVersionId);
 }

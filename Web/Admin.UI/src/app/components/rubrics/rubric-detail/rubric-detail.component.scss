@@ -1,0 +1,33 @@
+@use '../../../../styles/validation-theme.scss' as vt;
+@use '../rubrics' as rubrics;
+
+.rubric-detail {
+  @include rubrics.rubric-page();
+
+  &-banner {
+    @include rubrics.rubric-banner();
+  }
+
+  &-body {
+    @include rubrics.rubric-body();
+  }
+
+  &-tab {
+    margin-top: 1.25rem;
+    background-color: vt.$vd-neutral-0;
+  }
+
+  .rubric-message {
+    @include rubrics.rubric-message();
+  }
+
+  .rubric-chip + .rubric-chip {
+    margin-left: .375rem;
+  }
+
+  // "Published" and "Active" stay side by side.
+  .mat-column-status,
+  .mat-column-semver {
+    white-space: nowrap;
+  }
+}

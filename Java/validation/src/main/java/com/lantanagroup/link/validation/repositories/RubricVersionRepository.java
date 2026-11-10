@@ -62,4 +62,14 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, Lo
                            @Param("retired") RubricVersionStatus retired,
                            @Param("retiredAt") OffsetDateTime retiredAt,
                            @Param("retiredBy") String retiredBy);
+
+    // guarded delete of a draft: the status check runs under the delete's row lock, so a version that
+    // was published or retired between the caller's read and here is left alone (0 rows)
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from RubricVersion v where v.rubricVersionId = :rubricVersionId and v.status = :expected")
+    int deleteIfStatus(@Param("rubricVersionId") Long rubricVersionId,
+                       @Param("expected") RubricVersionStatus expected);
+
+    long countByRubricId(String rubricId);
 }

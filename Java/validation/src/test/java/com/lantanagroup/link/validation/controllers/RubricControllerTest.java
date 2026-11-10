@@ -9,7 +9,9 @@ import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
+import com.lantanagroup.link.validation.records.RubricSearch;
 import com.lantanagroup.link.validation.services.RubricRegistryService;
+import com.lantanagroup.link.validation.services.RubricSettingsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,9 @@ class RubricControllerTest {
 
     @MockBean
     private RubricRegistryService registry;
+
+    @MockBean
+    private RubricSettingsService settings;
 
     private static final String BASE = "/api/validation/rubrics";
 
@@ -134,7 +139,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("valid payload -> 201 Created with Location and DRAFT status")
         void register_valid() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
 
             mockMvc.perform(post(BASE + "/piqi.core/versions")
@@ -151,7 +156,7 @@ class RubricControllerTest {
         void register_leadingZeroSemverCanonicalized() throws Exception {
             // service returns the persisted (canonical) version; the controller must echo that in
             // both the Location header and the body, never the raw "01.2.0" from the request
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.2.0", RubricVersionStatus.DRAFT));
 
             mockMvc.perform(post(BASE + "/piqi.core/versions")
@@ -176,7 +181,7 @@ class RubricControllerTest {
             // Service stubbed to succeed: if @Pattern on semver were enforced the request would be
             // rejected with 400 *before* the service is ever called. If validation is inert it slips
             // through to a 201, which is the defect this asserts against.
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             expectStatus(post(BASE + "/piqi.core/versions")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -186,7 +191,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("empty checks list -> 400 (bean validation)")
         void register_emptyChecks() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = """
                     { "id": "piqi.core", "semver": "1.0.0", "checks": [] }
@@ -207,7 +212,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("duplicate semver -> 409 (documented)")
         void register_duplicateSemver() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenThrow(new RubricVersionConflictException("piqi.core", "1.0.0"));
             expectStatus(post(BASE + "/piqi.core/versions")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -217,7 +222,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("semantically invalid definition -> 400 (documented)")
         void register_invalidDefinition() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenThrow(new InvalidRubricDefinitionException("Invalid rubric definition",
                             List.of("checks[c1]: FHIRPATH requires parameters.expression")));
             expectStatus(post(BASE + "/piqi.core/versions")
@@ -228,7 +233,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("unknown top-level key (typo 'cheks') -> 400 naming the property")
         void register_unknownTopLevelKey() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = validPayload("piqi.core", "1.0.0").replace("\"checks\":", "\"cheks\":");
             mockMvc.perform(post(BASE + "/piqi.core/versions")
@@ -264,7 +269,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("rubric id not matching the slug pattern -> 400")
         void register_badIdPattern() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             expectStatus(post(BASE + "/PIQI.Core/versions")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -280,7 +285,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("missing dimensions -> 400 (dimensions are required)")
         void register_missingDimensions() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = validPayload("piqi.core", "1.0.0")
                     .replace("\"dimensions\": [\"CONFORMANCE\"],", "");
@@ -292,7 +297,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("negative ordinal -> 400")
         void register_negativeOrdinal() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = validPayload("piqi.core", "1.0.0").replace("\"ordinal\": 0", "\"ordinal\": -1");
             expectStatus(post(BASE + "/piqi.core/versions")
@@ -314,7 +319,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("title longer than 256 chars -> 400 (bean validation, not a SQL truncation 500)")
         void register_titleTooLong() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = """
                     {
@@ -379,7 +384,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("valid YAML payload -> 201 Created (parsed same as JSON, not persisted as YAML)")
         void register_validYaml() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
 
             mockMvc.perform(post(BASE + "/piqi.core/versions")
@@ -393,7 +398,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("YAML with title longer than 256 chars -> 400 (bean validation)")
         void register_yamlTitleTooLong() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = validYamlPayload("piqi.core", "1.0.0")
                     .replace("title: Demo Rubric", "title: " + "x".repeat(257));
@@ -415,7 +420,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("YAML with invalid fields -> 400 (bean validation still applies)")
         void register_yamlBadSemver() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             expectStatus(post(BASE + "/piqi.core/versions")
                     .contentType("application/yaml")
@@ -434,7 +439,7 @@ class RubricControllerTest {
         @DisplayName("duplicate JSON key -> 400 (strict duplicate detection, not silent last-value-wins)")
         void register_duplicateJsonKey() throws Exception {
             // stub success so a 201 here would prove the duplicate slipped through as last-value-wins
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = validPayload("piqi.core", "1.0.0")
                     .replace("\"owner\": \"qa\",", "\"owner\": \"qa\",\n  \"owner\": \"other\",");
@@ -446,7 +451,7 @@ class RubricControllerTest {
         @Test
         @DisplayName("duplicate YAML key -> 400 (strict duplicate detection)")
         void register_duplicateYamlKey() throws Exception {
-            when(registry.registerVersion(any(), any()))
+            when(registry.registerVersion(any(), any(), any()))
                     .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
             String body = validYamlPayload("piqi.core", "1.0.0")
                     .replace("owner: qa", "owner: qa\nowner: other");
@@ -545,7 +550,7 @@ class RubricControllerTest {
         @DisplayName("list rubrics -> 200 paged envelope")
         void listRubrics() throws Exception {
             Page<Rubric> page = new PageImpl<>(List.of(rubric("piqi.core")), Pageable.ofSize(20), 1);
-            when(registry.listRubrics(isNull(), any())).thenReturn(page);
+            when(registry.searchRubrics(eq(RubricSearch.ANY), any())).thenReturn(page);
             when(registry.versionsByRubricId(any(), isNull()))
                     .thenReturn(Map.of("piqi.core", List.of(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT))));
 
@@ -558,7 +563,7 @@ class RubricControllerTest {
         @DisplayName("list rubrics filtered by status -> 200, filter passed through")
         void listRubrics_statusFilter() throws Exception {
             Page<Rubric> page = new PageImpl<>(List.of(rubric("piqi.core")), Pageable.ofSize(20), 1);
-            when(registry.listRubrics(eq(RubricVersionStatus.PUBLISHED), any())).thenReturn(page);
+            when(registry.searchRubrics(eq(new RubricSearch(RubricVersionStatus.PUBLISHED, null, null)), any())).thenReturn(page);
             when(registry.versionsByRubricId(any(), eq(RubricVersionStatus.PUBLISHED)))
                     .thenReturn(Map.of("piqi.core", List.of(version("piqi.core", "1.0.0", RubricVersionStatus.PUBLISHED))));
 

@@ -11,15 +11,19 @@ import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
+import com.lantanagroup.link.validation.exceptions.RubricPreconditionFailedException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
 import com.lantanagroup.link.validation.models.CheckDto;
 import com.lantanagroup.link.validation.models.RubricVersionPayloadDto;
 import com.lantanagroup.link.validation.models.Semver;
 import com.lantanagroup.link.validation.providers.RubricCacheService;
+import com.lantanagroup.link.validation.records.RubricSavePrecondition;
+import com.lantanagroup.link.validation.records.RubricSearch;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.repositories.RubricLifecycleEventRepository;
 import com.lantanagroup.link.validation.repositories.RubricRepository;
+import com.lantanagroup.link.validation.repositories.RubricSpecifications;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +40,7 @@ import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +64,20 @@ public class RubricRegistryService {
 
     @Transactional
     public RubricVersion registerVersion(RubricVersionPayloadDto payload, String actor) {
+        return registerVersion(payload, actor, RubricSavePrecondition.NONE);
+    }
+
+    /**
+     * Registers a version as a DRAFT, or replaces the DRAFT already registered under that semver.
+     *
+     * @param precondition what the caller says the version's state is. A save made on stale knowledge is
+     *                     refused with {@link RubricPreconditionFailedException} instead of replacing a
+     *                     draft the caller has not seen. {@link RubricSavePrecondition#NONE} replaces a
+     *                     draft whatever it holds
+     */
+    @Transactional
+    public RubricVersion registerVersion(RubricVersionPayloadDto payload, String actor,
+                                         RubricSavePrecondition precondition) {
         definitionValidator.validate(payload);
         // "01.2.3" and "1.2.3" are the same version — normalize before it's ever looked up or stored
         payload.setSemver(Semver.normalize(payload.getSemver()));
@@ -74,6 +93,7 @@ public class RubricRegistryService {
             throw new RubricVersionConflictException(
                     payload.getId(), payload.getSemver(), existing.get().getStatus());
         }
+        checkPrecondition(precondition, payload, existing);
 
         // The rubric row is identity only (id, title, owner). Declarative metadata (dimensions,
         // applicableContext, scoringPolicy) is version-scoped and lives on the
@@ -226,6 +246,106 @@ public class RubricRegistryService {
         return v;
     }
 
+    /**
+     * Deletes a version that is still a DRAFT, with its checks. A draft was never published, so nothing
+     * was ever evaluated against it and no result refers to it. When it was the rubric's only version the
+     * rubric goes with it, history included; otherwise the deletion is recorded in the rubric's history.
+     */
+    @Transactional
+    public void deleteDraft(String rubricId, String semver, String deletedBy) {
+        final String normalizedSemver = Semver.normalize(semver);
+        RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
+                .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
+        if (v.getStatus() != RubricVersionStatus.DRAFT) {
+            throw new RubricLifecycleException(rubricId, normalizedSemver, v.getStatus(), "delete");
+        }
+        String checksum = v.getChecksum();
+        rubricCheckRepository.deleteByRubricVersionId(v.getRubricVersionId());
+        // guarded like publish and retire: if it stopped being a DRAFT between our read and here, nothing
+        // is deleted, and throwing rolls the checks' deletion back with the transaction
+        int deleted = rubricVersionRepository.deleteIfStatus(v.getRubricVersionId(), RubricVersionStatus.DRAFT);
+        if (deleted == 0) {
+            RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
+                    .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
+            throw new RubricLifecycleException(rubricId, normalizedSemver, current.getStatus(), "delete");
+        }
+        boolean lastVersion = rubricVersionRepository.countByRubricId(rubricId) == 0;
+        if (lastVersion) {
+            // a rubric with no versions is nothing; its history goes first, the events reference it
+            lifecycleEventRepository.deleteByRubricId(rubricId);
+            rubricRepository.deleteById(rubricId);
+        } else {
+            recordEvent(rubricId, normalizedSemver, RubricLifecycleAction.DELETED, deletedBy, checksum);
+        }
+        rubricCacheService.evictVersion(rubricId, normalizedSemver);
+        logger.info("Deleted draft rubric {} v{} by {}{}",
+                LogUtils.sanitize(rubricId), LogUtils.sanitize(normalizedSemver), LogUtils.sanitize(deletedBy),
+                lastVersion ? " (its only version; the rubric was removed)" : "");
+    }
+
+    /**
+     * What registering this definition would do, without doing it: runs the same rules, and reports the
+     * checksum it would be stored with and the version already registered under its id and semver, if any.
+     * The payload's semver is put in canonical form, as registering does.
+     *
+     * @throws com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionException when registering would be refused
+     */
+    @Transactional(readOnly = true)
+    public DefinitionPreview preview(RubricVersionPayloadDto payload) {
+        definitionValidator.validate(payload);
+        payload.setSemver(Semver.normalize(payload.getSemver()));
+        return new DefinitionPreview(sha256(writeJson(payload)), existingVersion(payload).orElse(null),
+                rubricExists(payload.getId()));
+    }
+
+    /**
+     * The version already registered under a payload's id and semver, when both are usable enough to look
+     * one up. Never throws on a malformed payload: it is also asked about definitions that failed validation.
+     */
+    @Transactional(readOnly = true)
+    public Optional<RubricVersion> existingVersion(RubricVersionPayloadDto payload) {
+        if (payload.getId() == null || payload.getId().isBlank() || payload.getSemver() == null) {
+            return Optional.empty();
+        }
+        try {
+            return rubricVersionRepository.findByRubricIdAndSemver(payload.getId(), Semver.normalize(payload.getSemver()));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty(); // not a semver, so no version can be registered under it
+        }
+    }
+
+    public boolean rubricExists(String rubricId) {
+        return rubricId != null && !rubricId.isBlank() && rubricRepository.existsById(rubricId);
+    }
+
+    /**
+     * @param checksum     the checksum the definition would be stored with
+     * @param existing     the version already registered under the definition's id and semver, or null
+     * @param rubricExists whether a rubric with the definition's id exists
+     */
+    public record DefinitionPreview(String checksum, RubricVersion existing, boolean rubricExists) {
+    }
+
+    /** Rubrics matching the search, paged and sorted as asked. */
+    public Page<Rubric> searchRubrics(RubricSearch search, Pageable pageable) {
+        return rubricRepository.findAll(RubricSpecifications.matching(search), pageable);
+    }
+
+    /** Every owner a rubric has, in order, for a filter to offer. */
+    public List<String> listOwners() {
+        return rubricRepository.findDistinctOwners();
+    }
+
+    /** How many checks each of these versions has. A version with none is absent from the map. */
+    public Map<Long, Integer> checkCounts(Collection<Long> rubricVersionIds) {
+        if (rubricVersionIds.isEmpty()) return Map.of();
+        Map<Long, Integer> counts = new HashMap<>();
+        for (Object[] row : rubricCheckRepository.countLiveByRubricVersionIdIn(rubricVersionIds)) {
+            counts.put((Long) row[0], ((Number) row[1]).intValue());
+        }
+        return counts;
+    }
+
     // status filter is optional: when set, only rubrics having at least one version in
     // that status come back
     public Page<Rubric> listRubrics(RubricVersionStatus status, Pageable pageable) {
@@ -290,6 +410,25 @@ public class RubricRegistryService {
             throw new RubricNotFoundException(rubricId);
         }
         return lifecycleEventRepository.findByRubricIdOrderByOccurredAtDesc(rubricId);
+    }
+
+    // a precondition is checked after the PUBLISHED/RETIRED refusal, so by here an existing version is a DRAFT
+    private void checkPrecondition(RubricSavePrecondition precondition, RubricVersionPayloadDto payload,
+                                   Optional<RubricVersion> existing) {
+        if (precondition == null || precondition.isNone()) {
+            return;
+        }
+        if (precondition.mustNotExist() && existing.isPresent()) {
+            throw RubricPreconditionFailedException.alreadyExists(payload.getId(), payload.getSemver());
+        }
+        if (precondition.expectedChecksum() != null) {
+            if (existing.isEmpty()) {
+                throw RubricPreconditionFailedException.missing(payload.getId(), payload.getSemver());
+            }
+            if (!precondition.expectedChecksum().equalsIgnoreCase(existing.get().getChecksum())) {
+                throw RubricPreconditionFailedException.changed(payload.getId(), payload.getSemver());
+            }
+        }
     }
 
     private void recordEvent(String rubricId, String semver, RubricLifecycleAction action,

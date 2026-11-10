@@ -21,8 +21,9 @@ internal static class AdminUiExtensions
         var uiDirectory = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "Web", "Admin.UI"));
         var proxyConfig = Path.Combine(builder.AppHostDirectory, "AdminUi", "proxy.mjs");
 
-        // Merged over src/assets/app.config.json by the UI (see AdminUi/proxy.mjs).
-        var uiConfig = JsonSerializer.Serialize(new { authRequired });
+        // Merged over src/assets/app.config.json by the UI (see AdminUi/proxy.mjs). grafanaUrl is where the
+        // UI's Logs > Grafana menu entry leads.
+        var uiConfig = JsonSerializer.Serialize(new { authRequired, grafanaUrl = LinkInfrastructure.GrafanaUrl });
 
         var ui = builder.AddExecutable(
                 "admin-ui", "node", uiDirectory,

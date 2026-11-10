@@ -2,10 +2,12 @@ package com.lantanagroup.link.validation.controllers;
 
 import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionException;
+import com.lantanagroup.link.validation.exceptions.InvalidRubricRequestException;
 import com.lantanagroup.link.validation.exceptions.PayloadParseException;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
+import com.lantanagroup.link.validation.exceptions.RubricPreconditionFailedException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
 import com.lantanagroup.link.validation.records.ApiResponse;
@@ -77,11 +79,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return envelope(HttpStatus.CONFLICT, ex.getMessage(), null);
     }
 
+    @ExceptionHandler(RubricPreconditionFailedException.class)
+    public ResponseEntity<Object> handlePreconditionFailed(RubricPreconditionFailedException ex) {
+        logger.warn("Rubric save precondition failed: {}", LogUtils.sanitize(ex.getMessage()));
+        return envelope(HttpStatus.PRECONDITION_FAILED, ex.getMessage(), null);
+    }
+
     @ExceptionHandler(InvalidRubricDefinitionException.class)
     public ResponseEntity<Object> handleInvalidDefinition(InvalidRubricDefinitionException ex) {
         logger.warn("Rejected rubric definition: {} {}",
                 LogUtils.sanitize(ex.getMessage()), LogUtils.sanitize(ex.getErrors()));
         return envelope(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getErrors());
+    }
+
+    @ExceptionHandler(InvalidRubricRequestException.class)
+    public ResponseEntity<Object> handleInvalidRequest(InvalidRubricRequestException ex) {
+        logger.warn("Rejected rubric registry request: {}", LogUtils.sanitize(ex.getMessage()));
+        return envelope(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
     }
 
     @ExceptionHandler(PayloadParseException.class)

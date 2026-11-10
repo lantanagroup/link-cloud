@@ -1,0 +1,181 @@
+<div class="rubric-detail">
+  <div class="rubric-detail-banner">
+    <div>
+      <div class="rubric-banner-kicker">
+        Configuration &gt; <a routerLink="/rubrics">Validation Rubrics</a>
+      </div>
+      <h2 class="rubric-banner-heading">{{ rubric?.title || rubricId }}</h2>
+      @if (rubric) {
+        <div class="rubric-banner-meta">
+          <span class="rubric-mono">{{ rubric.rubricId }}</span>
+          @if (rubric.owner) {
+            · Owner {{ rubric.owner }}
+          }
+          @if (rubric.latestPublishedSemver) {
+            · Active version {{ rubric.latestPublishedSemver }}
+          } @else {
+            · No published version
+          }
+          @if (pipelineUse) {
+            <span class="rubric-chip rubric-chip--on-banner" [title]="pipelineUseTitle(pipelineUse)">In Use</span>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="rubric-detail-body">
+    @if (loading) {
+      <div class="rubric-message">
+        <mat-spinner diameter="32" aria-label="Loading rubric"></mat-spinner>
+      </div>
+    } @else if (notFound) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>There is no rubric with the id "{{ rubricId }}".</strong></p>
+        <p><a class="rubric-link" routerLink="/rubrics">Back to the rubrics</a></p>
+      </div>
+    } @else if (error) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The rubric could not be loaded.</strong></p>
+        <p>{{ error }}</p>
+      </div>
+    } @else if (rubric) {
+      <mat-tab-group animationDuration="0ms">
+        <mat-tab label="Versions ({{ versions.length }})">
+          <div class="vd-mat-table rubric-detail-tab">
+            <table mat-table [dataSource]="versions" aria-label="Versions of this rubric">
+
+              <ng-container matColumnDef="semver">
+                <th mat-header-cell *matHeaderCellDef>Version</th>
+                <td mat-cell *matCellDef="let version">
+                  <a class="rubric-link" [routerLink]="['/rubrics', rubric.rubricId, 'versions', version.semver]">
+                    {{ version.semver }}
+                  </a>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let version">
+                  <span [class]="chipClass(version)">{{ statusLabel(version.status) }}</span>
+                  @if (isActive(version)) {
+                    <span class="rubric-chip rubric-chip--active">Active</span>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="checks">
+                <th mat-header-cell *matHeaderCellDef>Checks</th>
+                <td mat-cell *matCellDef="let version">{{ version.checkCount ?? '—' }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="scoring">
+                <th mat-header-cell *matHeaderCellDef>Scoring</th>
+                <td mat-cell *matCellDef="let version">{{ scoringLabel(version.scoringPolicy) || '—' }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="dryRun">
+                <th mat-header-cell *matHeaderCellDef>Dry run</th>
+                <td mat-cell *matCellDef="let version">
+                  {{ dryRunLabel(version) }}
+                  @if (version.dryRunCompletedAt) {
+                    <div class="rubric-muted">{{ version.dryRunCompletedAt | date: 'medium' }}</div>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="created">
+                <th mat-header-cell *matHeaderCellDef>Saved</th>
+                <td mat-cell *matCellDef="let version">
+                  {{ version.createdAt | date: 'medium' }}
+                  @if (version.createdBy) {
+                    <div class="rubric-muted">{{ version.createdBy }}</div>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="published">
+                <th mat-header-cell *matHeaderCellDef>Published</th>
+                <td mat-cell *matCellDef="let version">
+                  @if (version.publishedAt) {
+                    {{ version.publishedAt | date: 'medium' }}
+                    @if (version.publishedBy) {
+                      <div class="rubric-muted">{{ version.publishedBy }}</div>
+                    }
+                  } @else {
+                    <span class="rubric-muted">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="retired">
+                <th mat-header-cell *matHeaderCellDef>Retired</th>
+                <td mat-cell *matCellDef="let version">
+                  @if (version.retiredAt) {
+                    {{ version.retiredAt | date: 'medium' }}
+                    @if (version.retiredBy) {
+                      <div class="rubric-muted">{{ version.retiredBy }}</div>
+                    }
+                  } @else {
+                    <span class="rubric-muted">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="versionColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: versionColumns;"></tr>
+            </table>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="History ({{ events.length }})">
+          @if (eventsError) {
+            <div class="rubric-message rubric-message--error rubric-detail-tab" role="alert">
+              <p><strong>The history could not be loaded.</strong></p>
+              <p>{{ eventsError }}</p>
+            </div>
+          } @else if (events.length === 0) {
+            <div class="rubric-message rubric-detail-tab">
+              <p>Nothing has been recorded for this rubric.</p>
+            </div>
+          } @else {
+            <div class="vd-mat-table rubric-detail-tab">
+              <table mat-table [dataSource]="events" aria-label="History of this rubric">
+
+                <ng-container matColumnDef="occurredAt">
+                  <th mat-header-cell *matHeaderCellDef>When</th>
+                  <td mat-cell *matCellDef="let event">{{ event.occurredAt | date: 'medium' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="action">
+                  <th mat-header-cell *matHeaderCellDef>What</th>
+                  <td mat-cell *matCellDef="let event">{{ actionLabel(event.action) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="semver">
+                  <th mat-header-cell *matHeaderCellDef>Version</th>
+                  <td mat-cell *matCellDef="let event">{{ event.semver }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="actor">
+                  <th mat-header-cell *matHeaderCellDef>Who</th>
+                  <td mat-cell *matCellDef="let event">{{ event.actor || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="checksum">
+                  <th mat-header-cell *matHeaderCellDef>Checksum</th>
+                  <td mat-cell *matCellDef="let event">
+                    <span class="rubric-mono" [title]="event.checksum || ''">{{ (event.checksum || '').slice(0, 12) }}</span>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="eventColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: eventColumns;"></tr>
+              </table>
+            </div>
+          }
+        </mat-tab>
+      </mat-tab-group>
+    }
+  </div>
+</div>

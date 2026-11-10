@@ -16,6 +16,7 @@ internal sealed record LinkInfrastructure(
     IResourceBuilder<ContainerResource> Redis,
     IResourceBuilder<ContainerResource> Azurite,
     IResourceBuilder<ContainerResource> Loki,
+    IResourceBuilder<ContainerResource> Grafana,
     IResourceBuilder<ContainerResource> HapiFhir,
     IResourceBuilder<ContainerResource> KafkaRestProxy,
     IResourceBuilder<ContainerResource> Sftp,
@@ -60,6 +61,9 @@ internal sealed record LinkInfrastructure(
         $"BlobEndpoint=http://127.0.0.1:{Ports.AzuriteBlob}/devstoreaccount1;";
 
     public static readonly string LokiUrl = $"http://localhost:{Ports.Loki}";
+
+    /// <summary>Grafana, for searching what the services send Loki. It opens without a login.</summary>
+    public static readonly string GrafanaUrl = $"http://localhost:{Ports.Grafana}";
 
     public static readonly string HapiFhirBaseUrl = $"http://localhost:{Ports.HapiFhir}/fhir";
 
@@ -164,8 +168,69 @@ internal static class InfrastructureExtensions
 
         var sftp = builder.AddLinkSftp();
 
-        return new LinkInfrastructure(sql, kafka, mongo, redis, azurite, loki, hapi, restProxy, sftp.Container, sftp.Password);
+        return new LinkInfrastructure(sql, kafka, mongo, redis, azurite, loki, builder.AddLinkGrafana(loki), hapi, restProxy,
+            sftp.Container, sftp.Password);
     }
+
+    /// <summary>
+    /// Grafana with Loki as its one data source, for searching the logs: the dashboard's console view shows
+    /// each service's output, but cannot search across services or back in time.
+    /// </summary>
+    /// <remarks>
+    /// It is set up here, not from compose's <c>.docker/grafana.yml</c>, which also names Tempo and
+    /// Prometheus; this host runs neither. The data source is written into the container as a provisioning
+    /// file, so there is nothing to click through on first use and nothing kept between runs to go stale.
+    /// The file leaves Loki's address to <c>LOKI_URL</c>, which is Loki as this container reaches it, not as
+    /// the host does.
+    /// <para>
+    /// Anyone who can open it is an administrator, as under compose: it is bound to this machine and holds
+    /// nothing but a view of local logs.
+    /// </para>
+    /// </remarks>
+    private static IResourceBuilder<ContainerResource> AddLinkGrafana(
+        this IDistributedApplicationBuilder builder, IResourceBuilder<ContainerResource> loki)
+    {
+        return builder.AddContainer("grafana", "grafana/grafana", "11.4.0")
+            .WithHttpEndpoint(port: Ports.Grafana, targetPort: 3000, name: "http", isProxied: false)
+            .WithEnvironment("LOKI_URL", loki.GetEndpoint("http"))
+            .WithEnvironment("GF_AUTH_ANONYMOUS_ENABLED", "true")
+            .WithEnvironment("GF_AUTH_ANONYMOUS_ORG_ROLE", "Admin")
+            .WithEnvironment("GF_AUTH_DISABLE_LOGIN_FORM", "true")
+            // No calls home from a development machine.
+            .WithEnvironment("GF_ANALYTICS_REPORTING_ENABLED", "false")
+            .WithEnvironment("GF_ANALYTICS_CHECK_FOR_UPDATES", "false")
+            .WithEnvironment("GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES", "false")
+            .WithContainerFiles("/etc/grafana/provisioning/datasources",
+            [
+                new ContainerFile
+                {
+                    Name = "loki.yml",
+                    Contents = GrafanaDataSources,
+                    Mode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead
+                }
+            ])
+            .WithHttpHealthCheck("/api/health")
+            .WaitFor(loki);
+    }
+
+    /// <summary>
+    /// Grafana's provisioned data sources. Grafana fills in <c>${LOKI_URL}</c> from its environment. Every
+    /// log line carries the labels <c>app</c> (link-cloud) and <c>component</c> (the service).
+    /// </summary>
+    private const string GrafanaDataSources = """
+        apiVersion: 1
+        datasources:
+          - name: Loki
+            type: loki
+            uid: loki
+            access: proxy
+            orgId: 1
+            url: ${LOKI_URL}
+            isDefault: true
+            editable: true
+            jsonData:
+              maxLines: 1000
+        """;
 
     /// <summary>
     /// The SFTP server compose runs, for facilities whose patient lists arrive as files. No service is

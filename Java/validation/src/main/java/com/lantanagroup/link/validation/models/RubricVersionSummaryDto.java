@@ -35,9 +35,16 @@ public class RubricVersionSummaryDto {
     private String retiredBy;
     private OffsetDateTime dryRunCompletedAt;
     private RubricResultStatus dryRunStatus;
+    // How many checks the version has. Only on the reads that list versions; absent elsewhere.
+    private Integer checkCount;
 
     public static RubricVersionSummaryDto from(RubricVersion version, ObjectMapper objectMapper) {
+        return from(version, objectMapper, null);
+    }
+
+    public static RubricVersionSummaryDto from(RubricVersion version, ObjectMapper objectMapper, Integer checkCount) {
         return RubricVersionSummaryDto.builder()
+                .checkCount(checkCount)
                 .rubricVersionId(version.getRubricVersionId())
                 .rubricId(version.getRubricId())
                 .semver(version.getSemver())

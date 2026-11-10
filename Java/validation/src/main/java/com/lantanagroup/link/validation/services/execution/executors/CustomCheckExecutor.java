@@ -43,6 +43,11 @@ public class CustomCheckExecutor implements CheckExecutor {
         return CheckType.CUSTOM;
     }
 
+    /** Whether any custom check plug-in is loaded. With none, no CUSTOM check can be registered. */
+    public boolean hasPlugins() {
+        return !byId.isEmpty();
+    }
+
     // registration-time lookup; checks resolve only through the Spring-injected registry —
     // rubric-supplied className values must never reach Class.forName or reflective instantiation
     public boolean canResolve(String customCheckId, String className) {

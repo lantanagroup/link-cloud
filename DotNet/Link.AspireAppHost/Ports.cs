@@ -20,6 +20,7 @@ internal static class Ports
     public const int Redis = 16379;
     public const int AzuriteBlob = 11000;
     public const int Loki = 13100;
+    public const int Grafana = 13000;
     public const int HapiFhir = 16157;
     public const int Keycloak = 18443;
     public const int Sftp = 12222;

@@ -153,9 +153,25 @@ internal static class JavaServiceExtensions
             // WithOtlpExporter() is not used: it also sets OTEL_RESOURCE_ATTRIBUTES and
             // OTEL_EXPORTER_OTLP_HEADERS, which the OpenTelemetry Spring starter binds to Map properties
             // and fails to start on ("No converter found ... to type Map<String, String>").
-            .WithEnvironment("TELEMETRY_EXPORTERENDPOINT", resource.ApplicationBuilder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"] ?? "")
+            .WithEnvironment("TELEMETRY_EXPORTERENDPOINT", JavaTelemetryEndpoint(resource.ApplicationBuilder.Configuration))
             .WithHttpHealthCheck("/health")
             .WaitForCompletion(build);
+
+    /// <summary>
+    /// The dashboard's OTLP address for the Java services, or empty, which turns their telemetry off.
+    /// </summary>
+    /// <remarks>
+    /// Under the https profile the dashboard serves OTLP over HTTPS with the .NET development certificate.
+    /// The JVM does not trust that certificate, and the services build their exporters from the address
+    /// alone, with no way to hand them one, so every export failed and logged "PKIX path building failed"
+    /// for as long as the service ran. With no address the services log once that telemetry is off and
+    /// export nothing. Under the http profile the address is plain HTTP and is passed on as before.
+    /// </remarks>
+    private static string JavaTelemetryEndpoint(IConfiguration configuration)
+    {
+        var endpoint = configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"];
+        return endpoint is not null && endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? endpoint : "";
+    }
 
     private static IResourceBuilder<ExecutableResource> WithJavaHome(this IResourceBuilder<ExecutableResource> resource, string? javaHome) =>
         javaHome is null ? resource : resource.WithEnvironment("JAVA_HOME", javaHome);

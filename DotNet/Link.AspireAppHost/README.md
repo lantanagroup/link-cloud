@@ -48,6 +48,7 @@ dotnet user-secrets set "NhsnApp:ReactCorePackage" "C:\path\to\nhsn-react-core-2
 | `Java:Home` | `JAVA_HOME`, else `java` on `PATH` | The JDK that builds and runs MeasureEval and Validation |
 | `Java:Maven` | `mvn` | The Maven command |
 | `AdminUi:Enabled` | `true` | `false` leaves the Admin UI out |
+| `AutomationUi:AutoStart` | `true` | `false` leaves `automation-ui` in the dashboard, configured but stopped, until you start it there. Automation UI runs work of its own once it is up; nothing else depends on it |
 | `NhsnApp:Enabled` | `false` | `true` adds the NHSN App BFF and the NHSN App UI. Off by default because the UI needs a one-time manual setup; see [The NHSN App](#the-nhsn-app) |
 | `NhsnApp:ReactCorePackage` | empty | Where the NHSN design system's package file is, when it is not already in `nhsn/NHSN-App-UI/packages/`: the file, or the folder that holds it. See [The NHSN App](#the-nhsn-app) |
 | `Auth:Mode` | `Anonymous` (`Keycloak` in the https profile) | How people sign in; see below |
@@ -130,6 +131,7 @@ connections and not recover.
 | Redis (no password) | `127.0.0.1:16379` (IPv4: the port is published on 127.0.0.1 only) |
 | Azurite blob | http://127.0.0.1:11000/devstoreaccount1 |
 | Loki | http://localhost:13100 |
+| Grafana (no login) | http://localhost:13000 |
 | SFTP server | `127.0.0.1:12222`, user `admin`, generated password (see above), uploads in `data/` (kept between runs) |
 | Keycloak (https profile only) | https://localhost:18443, realm `link` |
 
@@ -204,6 +206,28 @@ key is committed.
 - **The BFF runs in the `Docker` environment**, like the other services, so it reads its
   `appsettings.Docker.json`. Its database is `link-nhsn-app-bff` on the AppHost's SQL Server.
 
+### Searching the logs
+
+The dashboard's console view shows each service's output as it happens. To search across services, or
+back in time, use Grafana at http://localhost:13000 (no login), or the Admin UI's **Logs > Grafana**. It
+has one data source, Loki, which every service writes to.
+
+Open **Explore** and query by label. Every line carries `app` (`link-cloud`) and `component` (the
+service):
+
+```
+{component="Validation"} |= "rubric"
+{app="link-cloud"} |~ "(?i)exception"
+{component=~"DataAcquisition.*"} |= "error"
+```
+
+Loki keeps nothing between AppHost runs, so a search only reaches back to the last start. Grafana keeps
+nothing either: its data source is written in on each start, and a dashboard you build there is gone on
+the next one.
+
+The dashboard's Structured logs view stays empty: the services send it traces and metrics, and their
+logs go to the console and to Loki.
+
 ### Scaling a service out
 
 `Replicas:<service>` in `appsettings.json` (or user secrets, or `Replicas__validation=3` in the
@@ -258,7 +282,9 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 - Each service gets its own database, created on start and migrated by the service (`AutoMigrate`),
   as under compose. Validation's schema is updated by Hibernate. The dashboard command **Apply
   Validation migrations** also runs `database/migrations/V*.sql`, as the deployment pipeline does.
-- Telemetry goes to the Aspire dashboard, and logs go to its console view and to Loki.
+- Telemetry goes to the Aspire dashboard, and logs go to its console view and to Loki. Grafana
+  (http://localhost:13000, also the Admin UI's Logs > Grafana) searches Loki; see
+  [Searching the logs](#searching-the-logs).
 
 ### Project layout
 
@@ -271,7 +297,7 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | `Security/AuthMode.cs` | `Auth:Mode`: Anonymous (http profile) or Keycloak (https profile) |
 | `Security/LinkServiceClient.cs` | HTTP clients for the AppHost's own calls to services, carrying the Link system token |
 | `Security/LinkKeycloak.cs` | Keycloak's URLs and parameters, its admin token, and creating users |
-| `Extensions/InfrastructureExtensions.cs` | The containers: SQL Server, Kafka and its topics, Mongo, Redis, Azurite, Loki, HAPI FHIR, SFTP |
+| `Extensions/InfrastructureExtensions.cs` | The containers: SQL Server, Kafka and its topics, Mongo, Redis, Azurite, Loki, Grafana, HAPI FHIR, SFTP |
 | `Extensions/DotNetServiceExtensions.cs` | How a .NET service is run and configured |
 | `Extensions/JavaServiceExtensions.cs` | The Maven build, MeasureEval, Validation, and the Validation migrations command |
 | `Extensions/AdminUiExtensions.cs` | The Admin UI under `ng serve` |
@@ -363,8 +389,11 @@ replaced by a green notice on success or a red one on failure, which stays until
   `proxy.conf.json` is left alone. If you have your own `src/assets/app.config.local.json`, it is
   served first and wins. Packages are installed (`npm ci`) only when
   `node_modules` is missing.
-- **Java telemetry.** MeasureEval and Validation are given the dashboard's OTLP address but not its
-  API key: Aspire's usual way of passing the key sets variables the OpenTelemetry Spring starter
-  cannot read, and they stop the services from starting. Their traces may not show on the dashboard.
-  Their logs still reach the console view and Loki.
-- **Not included:** Grafana, Tempo and Prometheus.
+- **Java telemetry.** Under the http profile MeasureEval and Validation are given the dashboard's OTLP
+  address but not its API key: Aspire's usual way of passing the key sets variables the OpenTelemetry
+  Spring starter cannot read, and they stop the services from starting. Their traces may not show on the
+  dashboard. Under the https profile they are given no address, so their telemetry is off: the dashboard
+  serves OTLP over HTTPS with the .NET development certificate there, which the JVM does not trust, and
+  every export failed with "PKIX path building failed". Each service logs once at startup that
+  telemetry is not set. Their logs reach the console view and Loki under both profiles.
+- **Not included:** Tempo and Prometheus. Traces and metrics are on the Aspire dashboard instead.
