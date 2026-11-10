@@ -113,10 +113,66 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
             false, null, "Original normalization error", It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProduceDeadLetter_WithMissingOrNullErrorHeader_UsesExceptionMessageAndPurges(bool includeNullHeader)
+    {
+        var status = new Mock<INormalizationStatusPublisher>();
+        var purger = new Mock<IResourceCachePurger>();
+        var handler = BuildHandler(purger, out _, status.Object);
+        var result = BuildRetryConsumeResult(JsonSerializer.Serialize(new ResourcesAcquiredValue { CacheKeys = [] }));
+        if (includeNullHeader)
+            result.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, null);
+
+        handler.ProduceDeadLetter(result, "Retry count exceeded");
+
+        status.Verify(p => p.PublishAsync(It.IsAny<ResourceKey>(), It.IsAny<ResourcesAcquiredValue>(),
+            result.Message.Headers, false, null, "Retry count exceeded", It.IsAny<CancellationToken>()), Times.Once);
+        purger.Verify(p => p.PurgeAsync(It.IsAny<ResourcesAcquiredValue>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProduceDeadLetter_WhenStatusPublishingFails_LogsAndStillPurges(bool throwSynchronously)
+    {
+        var status = new Mock<INormalizationStatusPublisher>();
+        var purger = new Mock<IResourceCachePurger>();
+        var logger = new Mock<ILogger<ResourcesAcquiredRetryDeadLetterHandler>>();
+        var failure = new InvalidOperationException("Status publisher failed");
+        var order = new List<string>();
+        var publish = status.Setup(p => p.PublishAsync(It.IsAny<ResourceKey>(), It.IsAny<ResourcesAcquiredValue>(),
+                It.IsAny<Headers>(), false, null, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("status"));
+        if (throwSynchronously)
+            publish.Throws(failure);
+        else
+            publish.Returns(Task.FromException(failure));
+        purger.Setup(p => p.PurgeAsync(It.IsAny<ResourcesAcquiredValue>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("purge"))
+            .Returns(Task.CompletedTask);
+        var handler = BuildHandler(purger, out var producer, status.Object, logger.Object);
+        var value = new ResourcesAcquiredValue { CacheKeys = ["cache-key"] };
+
+        handler.ProduceDeadLetter(BuildRetryConsumeResult(JsonSerializer.Serialize(value)), "Retry count exceeded");
+
+        Assert.Equal(new[] { "status", "purge" }, order);
+        purger.Verify(p => p.PurgeAsync(It.Is<ResourcesAcquiredValue>(v => v.CacheKeys.SequenceEqual(value.CacheKeys)),
+            "retry count exhausted: Retry count exceeded", It.IsAny<CancellationToken>()), Times.Once);
+        producer.Verify(p => p.Produce(It.IsAny<string>(), It.IsAny<Message<string, string>>(),
+            It.IsAny<Action<DeliveryReport<string, string>>>()), Times.Once);
+        logger.Verify(l => l.Log(LogLevel.Error, It.IsAny<EventId>(),
+            It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("Failed to publish normalization failure")),
+            failure, It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
+    }
+
     private static ResourcesAcquiredRetryDeadLetterHandler BuildHandler(
         Mock<IResourceCachePurger> purger,
         out Mock<IProducer<string, string>> producer,
-        INormalizationStatusPublisher? statusPublisher = null)
+        INormalizationStatusPublisher? statusPublisher = null,
+        ILogger<ResourcesAcquiredRetryDeadLetterHandler>? logger = null)
     {
         producer = new Mock<IProducer<string, string>>();
 
@@ -135,7 +191,7 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
             new ServiceInformation { ServiceConfigName = "Normalization" },
             Mock.Of<IExceptionLogger<RetryListener>>(),
             purger.Object,
-            Mock.Of<ILogger<ResourcesAcquiredRetryDeadLetterHandler>>(),
+            logger ?? Mock.Of<ILogger<ResourcesAcquiredRetryDeadLetterHandler>>(),
             statusPublisher ?? Mock.Of<INormalizationStatusPublisher>())
         {
             Topic = "ResourcesAcquired-Error"

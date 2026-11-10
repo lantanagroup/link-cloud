@@ -99,11 +99,21 @@ public class ResourcesAcquiredRetryDeadLetterHandler : DeadLetterExceptionHandle
         }
 
         var error = consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryExceptionMessage, out var bytes)
+            && bytes is not null
             ? System.Text.Encoding.UTF8.GetString(bytes).Split('\n')[0].TrimEnd('\r')
             : exceptionMessage;
-        _statusPublisher.PublishAsync(key, value, consumeResult.Message.Headers,
-                false, null, error, CancellationToken.None)
-            .GetAwaiter().GetResult();
+        try
+        {
+            _statusPublisher.PublishAsync(key, value, consumeResult.Message.Headers,
+                    false, null, error, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to publish normalization failure for a retry-exhausted message from {Topic}. Continuing with resource cache cleanup.",
+                consumeResult.Topic.SanitizeForLog());
+        }
 
         _resourceCachePurger
             .PurgeAsync(value, $"retry count exhausted: {exceptionMessage}")
