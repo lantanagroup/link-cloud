@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          hits=$(git grep -n -i -E 'Shared_BOTW|pkgs\.dev\.azure|feed_accesstoken|AZURE_ARTIFACTS_PAT' || true) # feed-guard-allow
+          hits=$(git grep -n -i -E 'Shared_BOTW|pkgs\.dev\.azure|AZURE_ARTIFACTS_PAT|NuGetAuthenticate|CredentialProvider|credprovider|VSS_NUGET|restore-feed|feed-token|FEED_ACCESSTOKEN|packageSourceCredentials' || true) # feed-guard-allow
           if [ -z "$hits" ]; then
             exit 0
           fi

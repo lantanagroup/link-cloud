@@ -28,7 +28,7 @@ Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, adm
 
 `LantanaGroup.Thetis.Generation.Abstractions` and `LantanaGroup.Thetis.Generation.Engine` come from nuget.org. Both are PolyForm Noncommercial 1.0.0; the license file ships inside each package. Restore and `docker compose build` need no extra NuGet source, token, or sign-in.
 
-If this machine was set up for the old private package feed, remove that NuGet source and any password stored with it. If an install script added a shell profile hook, delete that profile line and the `~/.link-cloud` folder it created.
+If a developer machine still has the old private feed in its own NuGet config, remove that source and any password stored with it (`dotnet nuget list source`, then `dotnet nuget remove source <name>`).
 
 ### .NET
 
