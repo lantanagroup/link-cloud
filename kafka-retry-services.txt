@@ -3,6 +3,7 @@
 # with at least the main topic partition count. It never deletes or shrinks.
 # Prefix a service with ~ to create only {topic}-Redrive-{service}.
 # Use that when the service subscribes to its redrive topic and has no retry consumer.
+ADTAcquired:Census
 AuditableEventOccurred:Audit
 DataAcquisitionRequested:DataAcquisition
 GenerateReportRequested:Report
@@ -14,6 +15,7 @@ PatientEvent:QueryDispatch,Report
 PatientListsAcquired:Census
 CernerPatientsAcquired:Census
 ReportScheduled:Report,QueryDispatch
+RetentionCheckComplete:Report
 ResourcesAcquired:Normalization
 SubmitPayload:Submission
 ValidationComplete:Report

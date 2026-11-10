@@ -155,7 +155,7 @@ public class RetryTopicGuardTests
         Assert.Contains("AuditableEventOccurred-Redrive-Audit", withHome.Topics);
         Assert.Contains("PatientEvent-Retry-Report", withHome.Topics);
         Assert.Contains("PatientEvent-Redrive-QueryDispatch", withHome.Topics);
-        Assert.Equal(34, withHome.Topics.Count);
+        Assert.Equal(38, withHome.Topics.Count);
 
         var empty = RunRetryParse(bash, script, WriteList("X:~"), keepHome: true);
         var embedded = RunRetryParse(bash, script, WriteList("X:a~b"), keepHome: true);
