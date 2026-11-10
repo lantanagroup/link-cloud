@@ -145,6 +145,68 @@ public class CreateOperationConcurrencySqlServerTests
         Assert.Equal(0, remaining);
     }
 
+    /// <summary>
+    /// Patient and Location start absent. Creating them inside the operation
+    /// transaction hangs or fails: the first request inserts Patient and releases
+    /// the process lock before commit, and the next request blocks on that key
+    /// while holding the lock the first request needs for Location.
+    /// </summary>
+    [Fact]
+    public async Task CreateOperations_WhenResourceTypesAreMissing_AllSucceedWithOneRowPerName()
+    {
+        var databaseName = "norm_missing_" + Guid.NewGuid().ToString("N");
+        var connectionString = await _fixture.CreateEmptySnapshotDatabaseAsync(databaseName);
+        const int parallelCreates = 8;
+        try
+        {
+            var failures = new ConcurrentBag<string>();
+            var created = 0;
+            var tasks = Enumerable.Range(0, parallelCreates).Select(async index =>
+            {
+                try
+                {
+                    await using var session = new NormalizationSqlServerFixture.Session(connectionString);
+                    var result = await session.Manager.CreateOperation(new CreateOperationModel
+                    {
+                        FacilityId = "missing-types-" + Guid.NewGuid().ToString("N"),
+                        OperationType = "CopyProperty",
+                        OperationJson = CopyJson,
+                        ResourceTypes = ["Patient", "Location"],
+                        Name = "Missing types " + index,
+                        Description = "missing resource types",
+                        VendorVersionIds = []
+                    });
+
+                    if (!result.IsSuccess || result.ObjectResult is not OperationModel)
+                    {
+                        failures.Add(result.ErrorMessage ?? "CreateOperation failed");
+                        return;
+                    }
+
+                    Interlocked.Increment(ref created);
+                }
+                catch (Exception ex)
+                {
+                    failures.Add(ex.Message);
+                }
+            });
+
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromMinutes(2));
+
+            Assert.Empty(failures);
+            Assert.Equal(parallelCreates, created);
+
+            await using var check = new NormalizationSqlServerFixture.Session(connectionString);
+            var names = await check.Context.ResourceTypes.Select(resource => resource.Name).ToListAsync();
+            Assert.Equal(1, names.Count(name => name == "Patient"));
+            Assert.Equal(1, names.Count(name => name == "Location"));
+        }
+        finally
+        {
+            await _fixture.DropDatabaseAsync(databaseName);
+        }
+    }
+
     private async Task SeedResourceTypesAsync()
     {
         await using var session = _fixture.Open();

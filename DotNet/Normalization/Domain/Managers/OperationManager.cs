@@ -91,6 +91,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     return taskResult;
                 }
 
+                // Each resource type commits on its own, before the operation transaction.
+                // An uncommitted insert keeps the unique Name key after CreateResource
+                // releases its process lock, so the next missing type waits on that lock
+                // while the other request waits on the key.
+                var resources = await ResolveResourceTypesAsync(model.ResourceTypes, cancellationToken);
+
                 var operation = await ExecuteWithDeadlockRetryAsync(async () =>
                 {
                     var created = new Operation()
@@ -111,7 +117,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                     // Operation row first, then its resource types, then vendor presets.
                     await _operationSequenceQueries.LockOperationAsync(created.Id, cancellationToken);
-                    await UpdateOperationResourceTypesForOperation(created.Id, model.ResourceTypes, cancellationToken);
+                    await UpdateOperationResourceTypesForOperation(created.Id, resources, cancellationToken);
                     await UpdateVendorPresetsForOperation(created.Id, model.VendorVersionIds, cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     return created;
@@ -153,6 +159,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 var resourceNames = model.ResourceTypes == null
                     ? null
                     : await _operationSequenceQueries.CanonicalResourceNamesAsync(model.ResourceTypes, cancellationToken);
+
+                var resources = await ResolveResourceTypesAsync(resourceNames ?? model.ResourceTypes, cancellationToken);
 
                 await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
                 if (resourceNames != null)
@@ -225,7 +233,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 await _database.SaveChangesAsync(cancellationToken);
-                await UpdateOperationResourceTypesForOperation(model.Id, resourceNames ?? model.ResourceTypes, cancellationToken);
+                await UpdateOperationResourceTypesForOperation(model.Id, resources, cancellationToken);
                 await UpdateVendorPresetsForOperation(model.Id, model.VendorVersionIds, cancellationToken);
                 await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
@@ -357,6 +365,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task UpdateOperationResourceTypesForOperation(Guid operationId, List<string> resourceTypes, CancellationToken cancellationToken = default)
         {
+            var resources = await ResolveResourceTypesAsync(resourceTypes, cancellationToken);
+            await UpdateOperationResourceTypesForOperation(operationId, resources, cancellationToken);
+        }
+
+        private async Task<List<ResourceModel>> ResolveResourceTypesAsync(List<string>? resourceTypes, CancellationToken cancellationToken)
+        {
             if (resourceTypes == null || resourceTypes.Count == 0)
             {
                 throw new InvalidOperationException("ResourceTypes must be provided.");
@@ -383,7 +397,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Not all provided Resource Types were found.");
             }
 
-            await UpdateOperationResourceTypesForOperation(operationId, resources, cancellationToken);
+            return resources;
         }
 
         public async Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources, CancellationToken cancellationToken = default)

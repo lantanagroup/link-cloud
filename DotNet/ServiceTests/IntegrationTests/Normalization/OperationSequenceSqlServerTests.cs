@@ -211,6 +211,66 @@ public sealed class NormalizationSqlServerFixture : IAsyncLifetime
 
     public Session Open() => new(ConnectionString);
 
+    public async Task<string> CreateEmptySnapshotDatabaseAsync(string databaseName)
+    {
+        var master = MasterConnectionString();
+        await using (var connection = new SqlConnection(master))
+        {
+            await connection.OpenAsync();
+            await using var create = connection.CreateCommand();
+            create.CommandText = $"IF DB_ID(N'{databaseName}') IS NULL CREATE DATABASE [{databaseName}];";
+            await create.ExecuteNonQueryAsync();
+        }
+
+        var side = SideConnectionString(databaseName);
+        var options = new DbContextOptionsBuilder<NormalizationDbContext>().UseSqlServer(side).Options;
+        await using (var context = new NormalizationDbContext(options))
+        {
+            await context.Database.MigrateAsync();
+        }
+
+        // A pooled connection to the new database blocks ALTER DATABASE.
+        SqlConnection.ClearAllPools();
+        await using (var connection = new SqlConnection(master))
+        {
+            await connection.OpenAsync();
+            await using var alter = connection.CreateCommand();
+            alter.CommandText = $"""
+                IF EXISTS (SELECT 1 FROM sys.databases WHERE name = N'{databaseName}' AND is_read_committed_snapshot_on = 0)
+                    ALTER DATABASE [{databaseName}] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
+                """;
+            await alter.ExecuteNonQueryAsync();
+        }
+
+        return side;
+    }
+
+    public async Task DropDatabaseAsync(string databaseName)
+    {
+        SqlConnection.ClearAllPools();
+        await using var connection = new SqlConnection(MasterConnectionString());
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            IF DB_ID(N'{databaseName}') IS NOT NULL
+            BEGIN
+                ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                DROP DATABASE [{databaseName}];
+            END
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private string MasterConnectionString()
+    {
+        return new SqlConnectionStringBuilder(ConnectionString) { InitialCatalog = "master" }.ConnectionString;
+    }
+
+    private string SideConnectionString(string databaseName)
+    {
+        return new SqlConnectionStringBuilder(ConnectionString) { InitialCatalog = databaseName }.ConnectionString;
+    }
+
     public async Task DisposeAsync()
     {
         if (_container != null)
