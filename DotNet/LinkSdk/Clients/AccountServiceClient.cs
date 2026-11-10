@@ -21,6 +21,16 @@ public sealed class AccountServiceClient : LinkApiClientBase, IAccountServiceCli
     {
     }
 
+    /// <summary>Sends this client's calls through Admin.BFF with the same relative paths.</summary>
+    public AccountServiceClient(
+        AdminBffRoute route,
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IOptions<LinkTokenServiceSettings> tokenServiceSettings,
+        ICreateSystemToken tokenService)
+        : base(route, bearerOptions, tokenServiceSettings, tokenService)
+    {
+    }
+
     public Task<LinkApiResponse<PagedAccountUsersApiModel>> SearchUsersAsync(
         string? searchText,
         string? filterFacilityBy,

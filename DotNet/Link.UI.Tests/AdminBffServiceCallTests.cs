@@ -213,6 +213,7 @@ public sealed class AdminBffServiceCallTests : IAsyncLifetime
 
         foreach (var moved in new[]
                  {
+                     typeof(IAccountServiceClient), typeof(IAuditServiceClient), typeof(INotificationServiceClient),
                      typeof(ICensusServiceClient), typeof(IReportServiceClient), typeof(IDataAcquisitionServiceClient),
                      typeof(IFacilityServiceClient), typeof(INormalizationServiceClient), typeof(IQueryDispatchServiceClient),
                      typeof(IMeasureEvalServiceClient), typeof(IValidationServiceClient), typeof(IDmrpServiceClient),
@@ -223,8 +224,28 @@ public sealed class AdminBffServiceCallTests : IAsyncLifetime
                 .Which.ImplementationFactory.Should().NotBeNull(moved.Name + " should be built for Admin.BFF");
         }
 
-        foreach (var kept in new[] { typeof(IAdminBffIntegrationClient), typeof(IAccountServiceClient), typeof(IAuditServiceClient), typeof(INotificationServiceClient) })
-            services.Single(d => d.ServiceType == kept).ImplementationType.Should().NotBeNull(kept.Name + " keeps its own URL");
+        services.Single(d => d.ServiceType == typeof(IAdminBffIntegrationClient)).ImplementationType
+            .Should().NotBeNull("the integration client keeps its own registration");
+    }
+
+    [Fact]
+    public async Task Account_audit_and_notification_forward_the_browser_session()
+    {
+        using var sp = Services(Request("link_cookie=abc", "Bearer user-token"));
+        await sp.GetRequiredService<IAccountServiceClient>().SearchUsersAsync(null, null, null, null, false, false, 10, 1);
+        await sp.GetRequiredService<IAuditServiceClient>().SearchAsync();
+        await sp.GetRequiredService<INotificationServiceClient>().SearchNotificationsAsync();
+
+        var calls = new List<Captured>();
+        while (_requests.TryDequeue(out var call))
+            calls.Add(call);
+
+        calls.Select(call => call.Path).Should().Equal(
+            "/api/account/users",
+            "/api/audit",
+            "/api/notification");
+        calls.Should().OnlyContain(call => call.Cookie == "link_cookie=abc" && call.Authorization == "Bearer user-token");
+        _tokens.Calls.Should().Be(0);
     }
 
     [Fact]

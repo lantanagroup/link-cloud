@@ -91,13 +91,16 @@ public static class AdminBffServiceCallRegistration
 
     /// <summary>
     /// Replaces the LinkSDK service clients Automation and the Link.UI pages use with instances whose
-    /// base URL is Admin.BFF. Paths, models and response handling are unchanged. Account, audit,
-    /// notification and <see cref="IAdminBffIntegrationClient"/> keep their registrations.
+    /// base URL is Admin.BFF. Paths, models and response handling are unchanged. An open browser
+    /// request forwards that session. <see cref="IAdminBffIntegrationClient"/> keeps its registration.
     /// </summary>
     public static IServiceCollection AddServiceCallsThroughAdminBff(this IServiceCollection services)
     {
         services.TryAddSingleton<AdminBffCallCredentialSource>();
 
+        Replace<IAccountServiceClient>(services, (r, sp) => new AccountServiceClient(r, Bearer(sp), Token(sp), Mint(sp)));
+        Replace<IAuditServiceClient>(services, (r, sp) => new AuditServiceClient(r, Bearer(sp), Token(sp), Mint(sp)));
+        Replace<INotificationServiceClient>(services, (r, sp) => new NotificationServiceClient(r, Bearer(sp), Token(sp), Mint(sp)));
         Replace<ICensusServiceClient>(services, (r, sp) => new CensusServiceClient(r, Bearer(sp), Token(sp), Mint(sp)));
         Replace<IReportServiceClient>(services, (r, sp) => new ReportServiceClient(r, Bearer(sp), Token(sp), Mint(sp)));
         Replace<IDataAcquisitionServiceClient>(services, (r, sp) => new DataAcquisitionServiceClient(r, Bearer(sp), Token(sp), Mint(sp)));
