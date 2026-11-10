@@ -22,6 +22,9 @@ using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -64,7 +67,7 @@ public interface IDataAcquisitionLogManager
     Task<TailCompletionResult?> TryCompleteTailAsync(long completedLogId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Marks the group TailSent after ResourcesAcquired has been produced.
+    /// Marks the group TailSent after its status outcome and, on success, ResourcesAcquired are produced.
     /// </summary>
     Task MarkTailSentAsync(string facilityId, string correlationId, QueryPhase? queryPhase, CancellationToken cancellationToken = default);
 
@@ -83,8 +86,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     private readonly IDataAcquisitionLogQueries _logQueries;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly IResourceCache _resourceCache;
+    private readonly IAcquisitionStatusPublisher _statusPublisher;
+    private readonly ICacheService? _cache;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider, IResourceCache resourceCache)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider, IResourceCache resourceCache, IAcquisitionStatusPublisher statusPublisher, ICacheService? cache = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -92,6 +97,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         _logQueries = logQueries;
         _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
+        _statusPublisher = statusPublisher ?? throw new ArgumentNullException(nameof(statusPublisher));
+        _cache = cache;
     }
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
@@ -443,15 +450,19 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateStatusBatchAsync");
         var now = DateTime.UtcNow;
 
-        // High-speed bulk update without fetching entities. 
-        return await _dbContext.DataAcquisitionLogs
-            .Where(l => ids.Contains(l.Id))
+        var idList = ids.ToList();
+        // High-speed bulk update without fetching entities.
+        var updated = await _dbContext.DataAcquisitionLogs
+            .Where(l => idList.Contains(l.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.Status, newStatus)
                 .SetProperty(l => l.RetryAttempts, l => incrementRetry ? l.RetryAttempts + 1 : l.RetryAttempts)
                 .SetProperty(l => l.CompletionDate, l => newStatus == RequestStatus.Completed ? l.CompletionDate ?? now : l.CompletionDate)
                 .SetProperty(l => l.ModifyDate, now),
                 cancellationToken);
+        if (updated > 0 && IsTerminalFailure(newStatus))
+            await ReportCompletedFailuresAsync(idList, cancellationToken);
+        return updated;
     }
 
     public async Task<int> CancelBulkAsync(IEnumerable<long> ids, int minAgeHours, CancellationToken cancellationToken = default)
@@ -476,6 +487,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     .SetProperty(l => l.Status, RequestStatus.Cancelled)
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                     cancellationToken);
+            await ReportCompletedFailuresAsync(batch, cancellationToken);
         }
 
         return cancelledCount;
@@ -560,6 +572,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                         .SetProperty(l => l.Status, RequestStatus.Cancelled)
                         .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                         cancellationToken);
+                await ReportCompletedFailuresAsync(batch, cancellationToken);
             }
         }
 
@@ -655,6 +668,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        if (rowsAffected > 0 && IsTerminalFailure(newStatus))
+            await ReportCompletedFailuresAsync([logId], cancellationToken);
         return rowsAffected > 0;
     }
 
@@ -774,9 +789,77 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             });
             _dbContext.DataAcquisitionLogNotes.AddRange(noteRows);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await ReportCompletedFailuresAsync(idList, cancellationToken);
         }
 
         return updated;
+    }
+
+    private static bool IsTerminalFailure(RequestStatus status) => status is RequestStatus.MaxRetriesReached
+        or RequestStatus.ConfigurationMissing or RequestStatus.Cancelled or RequestStatus.AccessDenied;
+
+    /// <summary>
+    /// Cancellation and scheduler-side terminal transitions have no worker completion callback.
+    /// Check their affected groups now so a failed phase does not wait for tail recovery's age gate.
+    /// The status change is already durable; failed sends leave the tail available for recovery.
+    /// </summary>
+    private async Task ReportCompletedFailuresAsync(IEnumerable<long> logIds, CancellationToken cancellationToken)
+    {
+        var ids = logIds.ToList();
+        TailCompletionResult? tail = null;
+        try
+        {
+            var candidates = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+                .Where(l => ids.Contains(l.Id) && !l.TailSent && l.SiblingCount != null && !l.IsCensus
+                    && (l.QueryPhase == QueryPhase.Initial || l.QueryPhase == QueryPhase.Supplemental)
+                    && (l.Status == RequestStatus.MaxRetriesReached || l.Status == RequestStatus.ConfigurationMissing
+                        || l.Status == RequestStatus.Cancelled || l.Status == RequestStatus.AccessDenied))
+                .GroupBy(l => new { l.FacilityId, l.CorrelationId, l.QueryPhase })
+                .Select(g => g.Min(l => l.Id)).ToListAsync(cancellationToken);
+
+            foreach (var id in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                tail = await TryCompleteTailAsync(id, cancellationToken);
+                if (tail == null) continue;
+                // A concurrent administrative retry may have changed the outcome after candidate selection.
+                if (tail.IsSuccess)
+                {
+                    await RevertTailSentAsync(tail.FacilityId, tail.CorrelationId, tail.QueryPhase, cancellationToken);
+                    tail = null;
+                    continue;
+                }
+                var headers = new Headers();
+                foreach (var report in tail.ResourcesAcquired.ScheduledReports)
+                {
+                    var mode = await ReportMetricsModeCache.TryGetAsync(_cache, tail.FacilityId,
+                        report.ReportTrackingId, cancellationToken);
+                    KafkaHeaderHelper.ApplyIfPerformance(headers, mode);
+                }
+                await _statusPublisher.PublishCompletionAsync(tail, headers, cancellationToken);
+                await MarkTailSentAsync(tail.FacilityId, tail.CorrelationId, tail.QueryPhase, cancellationToken);
+                tail = null;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            if (tail != null)
+            {
+                try
+                {
+                    await RevertTailSentAsync(tail.FacilityId, tail.CorrelationId, tail.QueryPhase, cancellationToken);
+                }
+                catch (Exception revertEx) when (revertEx is not OperationCanceledException)
+                {
+                    _logger.LogError(revertEx, "Failed to release failed acquisition tail claim; recovery will reclaim the lease.");
+                }
+            }
+            _logger.LogError(ex, "Failed to report terminal acquisition outcome; tail recovery will retry.");
+        }
     }
 
     public async Task<int> StampSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int siblingCount, CancellationToken cancellationToken = default)
@@ -901,8 +984,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 && !l.TailSent
                 && (l.TailClaimedAt == null || l.TailClaimedAt <= leaseCutoff))
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.TailClaimedAt, claimedAt)
-                .SetProperty(l => l.ModifyDate, claimedAt),
+                .SetProperty(l => l.TailClaimedAt, claimedAt),
                 cancellationToken);
 
         if (claimed == 0)
@@ -913,13 +995,19 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         try
         {
             // Read the data we need for the tail Kafka message.
-            var representative = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            var group = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(l =>
                     l.FacilityId == groupInfo.FacilityId
                     && l.CorrelationId == groupInfo.CorrelationId
                     && l.QueryPhase == groupInfo.QueryPhase)
                 .Select(l => new
                 {
+                    l.Id,
+                    l.Status,
+                    l.CompletionDate,
+                    l.ModifyDate,
+                    l.CreateDate,
+                    l.CompletionTimeMilliseconds,
                     l.PatientId,
                     l.ReportableEvent,
                     l.TraceId,
@@ -934,13 +1022,23 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                             : new List<string>()
                     } : null,
                 })
-                .FirstOrDefaultAsync(cancellationToken);
+                .ToListAsync(cancellationToken);
 
-            if (representative == null)
+            if (group.Count == 0)
             {
                 await RevertTailSentAsync(groupInfo.FacilityId, groupInfo.CorrelationId!, groupInfo.QueryPhase, cancellationToken);
                 return null;
             }
+
+            var representative = group[0];
+            var failedLogIds = group.Where(l => l.Status is RequestStatus.MaxRetriesReached
+                    or RequestStatus.ConfigurationMissing or RequestStatus.Cancelled or RequestStatus.AccessDenied)
+                .Select(l => l.Id).OrderBy(id => id).ToList();
+            // Tail bookkeeping must not change ModifyDate: it is the occurrence time for terminal
+            // outcomes (such as missing configuration) that have no CompletionDate.
+            var timestamp = group.Max(l => new[] { l.CompletionDate, l.ModifyDate, l.CreateDate }.Max()!.Value);
+            var processingTimes = group.Where(l => l.CompletionTimeMilliseconds.HasValue)
+                .Select(l => l.CompletionTimeMilliseconds!.Value).ToList();
 
             // Candidate cache keys: resource types that had at least one ResourceId recorded.
             // ResourceId rows use "TypeName/id". Org-location strip can empty Encounter after
@@ -965,14 +1063,16 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 CorrelationId = groupInfo.CorrelationId!,
                 QueryPhase = groupInfo.QueryPhase,
                 TraceParentId = representative.TraceId,
+                FailedLogIds = failedLogIds,
+                Timestamp = new DateTimeOffset(DateTime.SpecifyKind(timestamp, DateTimeKind.Utc)),
+                ProcessingTime = processingTimes.Count > 0 ? processingTimes.Sum() : null,
                 ResourcesAcquired = new ResourcesAcquired
                 {
                     QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
                     ReportableEvent = representative.ReportableEvent ?? default,
-                    ScheduledReports = representative.ScheduledReport != null
-                        ? new List<ScheduledReport> { representative.ScheduledReport }
-                        : new List<ScheduledReport>(),
-                    CacheType = await _resourceCache.GetCacheTypeForCorrelationIdAsync(
+                    ScheduledReports = group.Where(l => l.ScheduledReport != null)
+                        .Select(l => l.ScheduledReport!).DistinctBy(r => r.ReportTrackingId).ToList(),
+                    CacheType = failedLogIds.Count > 0 ? default : await _resourceCache.GetCacheTypeForCorrelationIdAsync(
                         groupInfo.CorrelationId ?? string.Empty,
                         cancellationToken),
                     CacheKeys = acquiredResourceTypes
@@ -986,7 +1086,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         {
             try
             {
-                await RevertTailSentAsync(groupInfo.FacilityId, groupInfo.CorrelationId!, groupInfo.QueryPhase, CancellationToken.None);
+                await RevertTailSentAsync(groupInfo.FacilityId, groupInfo.CorrelationId!, groupInfo.QueryPhase, cancellationToken);
             }
             catch (Exception revertEx)
             {
@@ -1043,8 +1143,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 && l.QueryPhase == queryPhase
                 && !l.TailSent)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.TailClaimedAt, (DateTime?)null)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                .SetProperty(l => l.TailClaimedAt, (DateTime?)null),
                 cancellationToken);
     }
 }

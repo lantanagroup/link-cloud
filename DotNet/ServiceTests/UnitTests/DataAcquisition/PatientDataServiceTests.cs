@@ -514,7 +514,7 @@ public class PatientDataServiceTests
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
-        // SiblingCount should not be stamped — no actionable group was created
+        // Terminal configuration failures need a tail so recovery reports the failed phase.
         _mockLogManager.Verify(
             m => m.StampSiblingCountAsync(
                 It.IsAny<string>(),
@@ -522,7 +522,7 @@ public class PatientDataServiceTests
                 It.IsAny<LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase>(),
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>()),
-            Times.Never);
+            Times.Once);
     }
 
     [Fact]

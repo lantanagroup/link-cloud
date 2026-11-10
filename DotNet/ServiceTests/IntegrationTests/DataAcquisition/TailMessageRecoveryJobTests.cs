@@ -280,6 +280,65 @@ public class TailMessageRecoveryJobTests
         Assert.True(stillUnsent);
     }
 
+    [Theory]
+    [InlineData(RequestStatus.Completed, true, false)]
+    [InlineData(RequestStatus.MaxRetriesReached, false, false)]
+    [InlineData(RequestStatus.ConfigurationMissing, false, false)]
+    [InlineData(RequestStatus.Cancelled, false, false)]
+    [InlineData(RequestStatus.AccessDenied, false, false)]
+    [InlineData(RequestStatus.Completed, true, true)]
+    [InlineData(RequestStatus.ConfigurationMissing, false, true)]
+    public async Task Execute_ReportsAcquisitionOutcomeAndOnlyHandsOffSuccessfulGroups(RequestStatus status, bool success, bool failPublication)
+    {
+        _fixture.ResourcesAcquiredProducerMock.Reset();
+        _fixture.StatusProducerMock.Reset();
+        if (failPublication)
+            _fixture.StatusProducerMock.Setup(p => p.ProduceAsync(It.IsAny<string>(),
+                    It.IsAny<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("broker unavailable"));
+        var facility = $"Status_{Guid.NewGuid():N}";
+        var correlation = Guid.NewGuid().ToString();
+        var reportId = Guid.NewGuid();
+        long failedLogId;
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            await db.DataAcquisitionLogs.Where(l => !l.TailSent)
+                .ExecuteUpdateAsync(s => s.SetProperty(l => l.TailSent, true));
+            db.ScheduledReports.Add(new ScheduledReportEntity
+            {
+                ReportTrackingId = reportId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            await SeedTailGroupAsync(db, facility, correlation, 2);
+            var logs = await db.DataAcquisitionLogs.Where(l => l.CorrelationId == correlation).OrderBy(l => l.Id).ToListAsync();
+            logs[0].Status = status;
+            failedLogId = logs[0].Id;
+            foreach (var log in logs) log.ReportTrackingId = reportId;
+            await db.SaveChangesAsync();
+        }
+        var job = new TailMessageRecoveryJob(Mock.Of<ILogger<TailMessageRecoveryJob>>(),
+            _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+            _fixture.ResourcesAcquiredProducerMock.Object,
+            Options.Create(new TailMessageRecoveryJobSettings { MinAgeMinutes = 0, MaxGroupsPerRun = 10, TimeBudgetPerRunSeconds = 30 }));
+        var context = new Mock<IJobExecutionContext>();
+        await job.Execute(context.Object);
+
+        _fixture.StatusProducerMock.Verify(p => p.ProduceAsync("ReportStatusUpdated",
+            It.Is<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(m =>
+                m.Key.ReportId == reportId.ToString() && m.Value.IsSuccess == success
+                && m.Value.Status == LantanaGroup.Link.Shared.Application.Enums.Reporting.PatientReportingStatus.InitialAcquisition
+                && (success || m.Value.ErrorMessage!.Contains(failedLogId.ToString()))),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _fixture.ResourcesAcquiredProducerMock.Verify(p => p.ProduceAsync(It.IsAny<string>(),
+            It.IsAny<Message<ResourceKey, ResourcesAcquired>>(), It.IsAny<CancellationToken>()),
+            success && !failPublication ? Times.Once() : Times.Never());
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        Assert.True(await assertDb.DataAcquisitionLogs.Where(l => l.CorrelationId == correlation)
+            .AllAsync(l => l.TailSent == !failPublication && (failPublication ? l.TailClaimedAt == null : l.TailClaimedAt != null)));
+    }
+
     private static async Task SeedTailGroupAsync(
         DataAcquisitionDbContext db,
         string facilityId,

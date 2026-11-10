@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -52,7 +53,8 @@ public class DataAcquisitionLogManagerTests
     }
 
     private DataAcquisitionLogManager CreateManager() =>
-        new(_logger.Object, _database.Object, _dbContext, _queries.Object, _semaphoreProvider.Object, _resourceCache.Object);
+        new(_logger.Object, _database.Object, _dbContext, _queries.Object, _semaphoreProvider.Object, _resourceCache.Object,
+            Mock.Of<IAcquisitionStatusPublisher>());
 
     [Fact]
     public async Task CreateAsync_NullModel_ThrowsArgumentNull()

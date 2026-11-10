@@ -15,6 +15,8 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -43,7 +45,8 @@ public class DataAcquisitionLogManagerTests
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var semaphoreProvider = CreateSemaphoreProviderMock();
         var resourceCache = scope.ServiceProvider.GetRequiredService<IResourceCache>();
-        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider, resourceCache);
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider, resourceCache,
+            scope.ServiceProvider.GetRequiredService<LantanaGroup.Link.DataAcquisition.Domain.Application.Services.IAcquisitionStatusPublisher>());
     }
 
     private static IDistributedSemaphoreProvider CreateSemaphoreProviderMock()
@@ -1014,6 +1017,148 @@ public class DataAcquisitionLogManagerTests
         Assert.False(logs[0].TailSent);
     }
 
+    [Theory]
+    [InlineData(RequestStatus.MaxRetriesReached)]
+    [InlineData(RequestStatus.ConfigurationMissing)]
+    [InlineData(RequestStatus.Cancelled)]
+    [InlineData(RequestStatus.AccessDenied)]
+    public async Task TryCompleteTailAsync_ReturnsFailedLogIdsAndStableOccurrenceAcrossRecovery(RequestStatus failedStatus)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facility = $"Failure_{Guid.NewGuid():N}";
+        var correlation = Guid.NewGuid().ToString();
+        var logs = await SeedCompleteTailGroupAsync(db, facility, correlation);
+        logs[0].Status = failedStatus;
+        // A prior retry's completion time must not replace the later terminal status time.
+        logs[0].CompletionDate = logs[0].ModifyDate!.Value.AddMinutes(-1);
+        logs[0].CompletionTimeMilliseconds = 12;
+        logs[1].CompletionTimeMilliseconds = 30;
+        await db.SaveChangesAsync();
+        var occurredAt = logs.Max(l => l.ModifyDate!.Value);
+        var manager = CreateManager(scope);
+
+        var first = await manager.TryCompleteTailAsync(logs[0].Id);
+        Assert.NotNull(first);
+        Assert.False(first.IsSuccess);
+        Assert.Equal(new[] { logs[0].Id }, first.FailedLogIds);
+        Assert.Equal(42L, first.ProcessingTime);
+        Assert.Equal(new DateTimeOffset(DateTime.SpecifyKind(occurredAt, DateTimeKind.Utc)), first.Timestamp);
+
+        await manager.RevertTailSentAsync(facility, correlation, QueryPhase.Initial);
+        var recovered = await manager.TryCompleteTailAsync(logs[1].Id);
+        Assert.NotNull(recovered);
+        Assert.Equal(first.Timestamp, recovered.Timestamp);
+        Assert.Equal(first.ProcessingTime, recovered.ProcessingTime);
+        Assert.Equal(first.FailedLogIds, recovered.FailedLogIds);
+    }
+
+    [Theory]
+    [InlineData("bulk", false)]
+    [InlineData("filter", false)]
+    [InlineData("atomic", false)]
+    [InlineData("batch", false)]
+    [InlineData("terminal", false)]
+    [InlineData("bulk", true)]
+    public async Task FinalTerminalTransition_ReportsPreviouslyFailedReferenceWithoutWaitingForRecovery(string path, bool failSend)
+    {
+        _fixture.StatusProducerMock.Reset();
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facility = $"ReferenceFailure_{Guid.NewGuid():N}";
+        var correlation = Guid.NewGuid().ToString();
+        var reportId = Guid.NewGuid();
+        db.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow
+        });
+        var logs = await SeedCompleteTailGroupAsync(db, facility, correlation);
+        logs[0].Status = RequestStatus.MaxRetriesReached;
+        logs[0].ReferenceResourceType = "Location";
+        logs[1].Status = RequestStatus.Pending;
+        foreach (var log in logs) log.ReportTrackingId = reportId;
+        await db.SaveChangesAsync();
+        var manager = CreateManager(scope);
+        // The reference worker cannot complete the phase while its dependent sibling is still active.
+        Assert.Null(await manager.TryCompleteTailAsync(logs[0].Id));
+        if (failSend)
+            _fixture.StatusProducerMock.Setup(p => p.ProduceAsync(It.IsAny<string>(),
+                    It.IsAny<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("broker unavailable"));
+
+        switch (path)
+        {
+            case "bulk": await manager.CancelBulkAsync([logs[1].Id], 0); break;
+            case "filter": await manager.CancelByFilterAsync(new SearchDataAcquisitionLogRequest { FacilityId = facility }, 0); break;
+            case "atomic": await manager.TrySetLogStatusAsync(logs[1].Id, [RequestStatus.Pending], RequestStatus.Cancelled); break;
+            case "batch": await manager.UpdateStatusBatchAsync([logs[1].Id], RequestStatus.MaxRetriesReached, CancellationToken.None); break;
+            case "terminal": await manager.SetMaxRetriesReachedWithNoteBatchAsync([logs[1].Id], "Exhausted retries"); break;
+        }
+
+        var invocation = Assert.Single(_fixture.StatusProducerMock.Invocations);
+        var message = Assert.IsType<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(invocation.Arguments[1]);
+        Assert.Equal("ReportStatusUpdated", invocation.Arguments[0]);
+        Assert.Equal(reportId.ToString(), message.Key.ReportId);
+        Assert.Equal(LantanaGroup.Link.Shared.Application.Enums.Reporting.PatientReportingStatus.InitialAcquisition, message.Value.Status);
+        Assert.False(message.Value.IsSuccess);
+        Assert.Equal($"Acquisition failed for log ID(s): {logs[0].Id}, {logs[1].Id}.", message.Value.ErrorMessage);
+        var persisted = await db.DataAcquisitionLogs.AsNoTracking().Where(l => l.CorrelationId == correlation).ToListAsync();
+        Assert.All(persisted, log => Assert.Equal(!failSend, log.TailSent));
+        if (failSend)
+        {
+            Assert.All(persisted, log => Assert.Null(log.TailClaimedAt));
+            // Publication failure does not undo the durable cancellation or block eventual recovery.
+            Assert.Equal(RequestStatus.Cancelled, persisted.Single(l => l.Id == logs[1].Id).Status);
+            Assert.NotNull(await manager.TryCompleteTailAsync(logs[1].Id));
+        }
+        else
+        {
+            Assert.Null(await manager.TryCompleteTailAsync(logs[1].Id));
+            await manager.CancelBulkAsync([logs[1].Id], 0);
+            Assert.Single(_fixture.StatusProducerMock.Invocations);
+        }
+        _fixture.StatusProducerMock.Reset();
+    }
+
+    [Fact]
+    public async Task TryCompleteTailAsync_IncludesEveryScheduledReportServedByTheGroup()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logs = await SeedCompleteTailGroupAsync(db, $"Multi_{Guid.NewGuid():N}", Guid.NewGuid().ToString());
+        var reportIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        for (var i = 0; i < logs.Count; i++)
+        {
+            db.ScheduledReports.Add(new ScheduledReportEntity
+            {
+                ReportTrackingId = reportIds[i], StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow
+            });
+            logs[i].ReportTrackingId = reportIds[i];
+        }
+        await db.SaveChangesAsync();
+
+        var tail = await CreateManager(scope).TryCompleteTailAsync(logs[0].Id);
+
+        Assert.NotNull(tail);
+        Assert.True(tail.IsSuccess);
+        Assert.Equal(reportIds.Select(id => id.ToString()).OrderBy(id => id),
+            tail.ResourcesAcquired.ScheduledReports.Select(r => r.ReportTrackingId).OrderBy(id => id));
+    }
+
+    [Theory]
+    [InlineData(RequestStatus.Failed)]
+    [InlineData(RequestStatus.Pending)]
+    [InlineData(RequestStatus.Processing)]
+    public async Task TryCompleteTailAsync_DoesNotReportWhileRetryableOrActiveSiblingRemains(RequestStatus status)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var logs = await SeedCompleteTailGroupAsync(db, $"Active_{Guid.NewGuid():N}", Guid.NewGuid().ToString());
+        logs[0].Status = status;
+        await db.SaveChangesAsync();
+        Assert.Null(await CreateManager(scope).TryCompleteTailAsync(logs[1].Id));
+    }
+
     [Fact]
     public async Task TryCompleteTailAsync_WhenClaimIsStale_Reclaims()
     {
@@ -1145,7 +1290,8 @@ public class DataAcquisitionLogManagerTests
             recordingContext,
             scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>(),
             CreateSemaphoreProviderMock(),
-            scope.ServiceProvider.GetRequiredService<IResourceCache>());
+            scope.ServiceProvider.GetRequiredService<IResourceCache>(),
+            scope.ServiceProvider.GetRequiredService<LantanaGroup.Link.DataAcquisition.Domain.Application.Services.IAcquisitionStatusPublisher>());
 
         await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
         {

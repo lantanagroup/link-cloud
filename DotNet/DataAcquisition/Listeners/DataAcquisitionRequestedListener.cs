@@ -64,6 +64,13 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         var patientDataService =
             scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
+        // A stable source occurrence time survives listener retries and excludes consumer lag.
+        var timestamp = consumeResult.Message.Timestamp.Type == TimestampType.NotAvailable
+            ? DateTimeOffset.UtcNow
+            : new DateTimeOffset(consumeResult.Message.Timestamp.UtcDateTime);
+        await scope.ServiceProvider.GetRequiredService<IAcquisitionStatusPublisher>().PublishIdentifiedAsync(
+            consumeResult.Message.Value, correlationId, consumeResult.Message.Headers, timestamp, cancellationToken);
+
         var cache = scope.ServiceProvider.GetService<ICacheService>();
         foreach (var report in consumeResult.Message.Value.ScheduledReports ?? [])
         {

@@ -79,6 +79,34 @@ The patient lifecycle values are `PatientIdentified`, `InitialAcquisition`, `Ini
 `Validation`, `Submission`, `Submitted`, `Failed`, `NotReportable`, and `NotSubmitted`.
 Report lifecycle values are `Pending`, `Completed`, `CompletedNotSubmitted`, `Failure`, and `Canceled`.
 
+## Data Acquisition producer
+
+Data Acquisition emits `PatientIdentified` when it receives an initial `DataAcquisitionRequested`,
+before creating acquisition logs. Supplemental requests do not repeat that event. The original
+request occurrence time is retained in `X-Acquisition-Identified-At` across listener retries.
+
+Once every sibling log in a facility/correlation/phase group is terminal, the inline worker or tail
+recovery emits `InitialAcquisition` or `SupplementalAcquisition` for every distinct scheduled report.
+`MaxRetriesReached`, `ConfigurationMissing`, `Cancelled`, and `AccessDenied` are failed outcomes:
+the event lists their log IDs and **no `ResourcesAcquired` is produced**. Retryable `Failed` logs do
+not complete a phase. `Completed`, `Skipped`, and `NotReportable` retain the successful handoff.
+Missing configuration creates terminal logs stamped for recovery, even though no worker runs them.
+Cancellation and scheduler-side terminal updates also check their affected groups immediately. If
+they finish a phase containing a failed reference log, the failure is reported without waiting for
+the recovery job's minimum age. A failed status send leaves the durable log changes intact and the
+tail available for recovery.
+
+The completion timestamp comes from the latest log completion time (or last modification for a
+terminal log without one). Tail claims and claim release preserve that occurrence time.
+`processingTime`, when available, sums recorded log processing durations, excluding queue wait.
+Both outcome and downstream sends must be acknowledged before the group is marked `TailSent`;
+publication errors leave the group recoverable. Duplicate status delivery remains possible across
+recovery and is handled by Report's timestamp/transition checks. A report being canceled does not
+suppress acquisition outcomes: Report owns terminal-state protection.
+
+The status producer uses the canonical report/patient key and Murmur2 partitioning, and propagates
+correlation and metrics-mode headers. Census/non-reporting phases do not emit patient status events.
+
 ## Normalization producer
 
 Normalization emits `InitialNormalization` or `SupplementalNormalization` on `ReportStatusUpdated`

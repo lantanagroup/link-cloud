@@ -329,6 +329,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFhirApiService, FhirApiService>();
         services.AddTransient<ILocationMappingService, LocationMappingService>();
         services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
+        services.AddTransient<IAcquisitionStatusPublisher, AcquisitionStatusPublisher>();
         services.AddTransient<IPatientDataService, PatientDataService>();
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IEhrPatientListService, EhrPatientListService>();
@@ -406,6 +407,8 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<ResourceKey, ResourceAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<ResourceKey, ResourcesAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<ReportStatusUpdatedKey, ReportStatusUpdatedValue>(
+            kafkaConnection, AcquisitionStatusPublisher.CreateConfig());
         services.RegisterKafkaProducer<ResourceKey, MappingOutcomeEvaluatedValue>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);

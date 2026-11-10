@@ -57,6 +57,7 @@ namespace IntegrationTests.DataAcquisition
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<ResourceKey, ResourcesAcquired>> ResourcesAcquiredProducerMock { get; private set; }
+        public Mock<IProducer<ReportStatusUpdatedKey, ReportStatusUpdatedValue>> StatusProducerMock { get; } = new();
         public Mock<IResourceCache> ResourceCacheMock { get; } = new Mock<IResourceCache>();
         public Mock<IPatientDataService> PatientDataServiceMock { get; } = new Mock<IPatientDataService>();
 
@@ -184,6 +185,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
             builder.Services.AddTransient<ILocationMappingService, LocationMappingService>();
             builder.Services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
+            builder.Services.AddTransient<IAcquisitionStatusPublisher, AcquisitionStatusPublisher>();
+            builder.Services.AddSingleton(StatusProducerMock.Object);
 
             // In-memory cache used by LocationMappingService (read) and invalidated by
             // OrganizationLocationConfigurationManager (write).
