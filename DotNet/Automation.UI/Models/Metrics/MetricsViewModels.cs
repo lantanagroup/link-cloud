@@ -1,3 +1,4 @@
+using System.Globalization;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace Automation.UI.Models.Metrics;
@@ -17,6 +18,9 @@ public class MetricsRunListItem
     public string? SetupSummary { get; set; }
     public double? PatientsPerMinute { get; set; }
     public int PatientCount { get; set; }
+
+    public string PatientCountText =>
+        PatientCount > 0 ? PatientCount.ToString(CultureInfo.InvariantCulture) : "—";
 }
 
 public sealed class MetricsRunDetailViewModel : MetricsRunListItem

@@ -26,6 +26,7 @@ public class MetricsRunPresenterTests
         item.E2eDurationSeconds.Should().Be(90);
         item.BenchmarkPass.Should().BeTrue();
         item.PatientCount.Should().Be(15);
+        item.PatientCountText.Should().Be("15");
     }
 
     [Fact]

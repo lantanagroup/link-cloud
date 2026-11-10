@@ -1,3 +1,4 @@
+using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using FluentAssertions;
 
@@ -66,6 +67,7 @@ public class MetricsCompareClassifierTests
     }
 
     [Theory]
+    [InlineData(100, 101, "1% slower")]
     [InlineData(100, 103, "3% slower")]
     [InlineData(100, 105, "5% slower")]
     [InlineData(100, 97, "3% faster")]
@@ -82,12 +84,12 @@ public class MetricsCompareClassifierTests
     }
 
     [Fact]
-    public void Just_over_five_percent_is_colored_even_when_the_label_rounds_to_five()
+    public void Just_over_five_percent_keeps_one_decimal_and_is_colored()
     {
         var change = MetricsCompareClassifier.Classify(100, 105.4, higherIsBetter: false, MetricsDeltaWording.Amount);
 
         change.Kind.Should().Be(MetricsChangeKind.Degradation);
-        change.Text.Should().Be("5% more");
+        change.Text.Should().Be("5.4% more");
         MetricsCompareClassifier.MatchesFilter(change.Kind, "degradation").Should().BeTrue();
         MetricsCompareClassifier.MatchesFilter(change.Kind, "improvement").Should().BeFalse();
     }
@@ -150,6 +152,55 @@ public class MetricsCompareClassifierTests
 
         change.Kind.Should().Be(MetricsChangeKind.Improvement);
         change.Text.Should().Be("100% faster");
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", "")]
+    [InlineData("   ", "")]
+    [InlineData(null, "   ")]
+    public void Result_with_no_outcome_on_either_run_stays_blank(string? baseline, string? later)
+    {
+        var change = MetricsCompareClassifier.ClassifyResult(baseline, later);
+
+        change.Kind.Should().Be(MetricsChangeKind.Unclassified);
+        change.Text.Should().BeEmpty();
+        change.CssClass.Should().BeEmpty();
+        change.Token.Should().Be("unclassified");
+    }
+
+    public static IEnumerable<object[]> NonFiniteOrNonPositiveValues()
+    {
+        yield return [double.NaN, 100d];
+        yield return [100d, double.NaN];
+        yield return [double.PositiveInfinity, 100d];
+        yield return [100d, double.PositiveInfinity];
+        yield return [double.NegativeInfinity, 100d];
+        yield return [100d, double.NegativeInfinity];
+        yield return [-1d, 100d];
+        yield return [-0.5d, 10d];
+    }
+
+    [Theory]
+    [MemberData(nameof(NonFiniteOrNonPositiveValues))]
+    public void Non_finite_or_non_positive_baseline_stays_unclassified(double baseline, double later)
+    {
+        var change = MetricsCompareClassifier.Classify(baseline, later, higherIsBetter: false, MetricsDeltaWording.Duration);
+
+        change.Kind.Should().Be(MetricsChangeKind.Unclassified);
+        change.Text.Should().BeEmpty();
+        change.Token.Should().Be("unclassified");
+        MetricsCompareClassifier.MatchesFilter(change.Kind, "all").Should().BeTrue();
+        MetricsCompareClassifier.MatchesFilter(change.Kind, "improvement").Should().BeFalse();
+        MetricsCompareClassifier.MatchesFilter(change.Kind, "degradation").Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0, "—")]
+    [InlineData(15, "15")]
+    public void Patient_count_renders_an_em_dash_when_none_is_stored(int count, string text)
+    {
+        new MetricsRunListItem { PatientCount = count }.PatientCountText.Should().Be(text);
     }
 
     [Theory]
