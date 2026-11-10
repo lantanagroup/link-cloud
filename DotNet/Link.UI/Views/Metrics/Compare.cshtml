@@ -218,6 +218,7 @@
     </div>
 </div>
 
+@section Scripts {
 <script>
     (function () {
         var rows = Array.prototype.slice.call(document.querySelectorAll('#compareTable tbody tr[data-change]'));
@@ -260,3 +261,4 @@
         apply(selectedFilter(), false);
     })();
 </script>
+}
