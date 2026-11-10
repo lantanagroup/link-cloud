@@ -74,4 +74,18 @@ public interface IValidationServiceClient
     Task<LinkApiResponse<string>> GetReportCategorySummariesAsync(string facilityId,
                                                                  string reportId,
                                                                  CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Gets saved findings for one category as JSON containing records and paging metadata.
+    /// Pages are one-based, size is 1–100, and empty searches return 200 with empty records.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetCategoryIssuesAsync(string facilityId, string reportId,
+        string categoryId, int pageNumber = 1, int pageSize = 25, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Copies a report's saved findings/category CSV directly into the destination, without buffering it.
+    /// Leaves the destination open. Caller cancellation controls the download timeout. Transfer failures
+    /// can leave a partial file; publish the destination only after successful completion.
+    /// </summary>
+    Task<LinkApiResponse> CopyValidationResultsCsvAsync(string facilityId, Guid reportId, Stream destination,
+        CancellationToken cancellationToken = default);
 }
