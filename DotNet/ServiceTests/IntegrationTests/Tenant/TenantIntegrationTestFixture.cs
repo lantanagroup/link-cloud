@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
 using LantanaGroup.Link.DMRP.Business;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -14,7 +15,6 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
-using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Data.Repository;
@@ -43,6 +43,17 @@ namespace IntegrationTests.Tenant
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
 
+        /// <summary>
+        /// Stands up Tenant's own service graph in a started host, so an integration test exercises
+        /// the service's real wiring instead of hand-built doubles. Everything that would leave the
+        /// process is stubbed - HTTP, both Kafka producer factories, the system-token service and the
+        /// Normalization client - and bearer auth is left anonymous, so no test needs a broker, a
+        /// token service or a network. Audit events are published through
+        /// <see cref="RecordingAuditProducer"/> rather than Kafka, which is what lets a test assert on
+        /// the event a real request would have emitted. Each instance owns a uniquely named SQLite
+        /// file in the temp directory and creates the schema in it, so fixtures never share state;
+        /// <see cref="Dispose"/> drops it again.
+        /// </summary>
         public TenantIntegrationTestFixture()
         {
             var builder = Host.CreateApplicationBuilder();
@@ -63,7 +74,8 @@ namespace IntegrationTests.Tenant
             {
                 var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
                 options.UseSqlite(sqliteConnectionString);
-                options.AddInterceptors(updateBaseEntityInterceptor);
+                options.AddInterceptors(updateBaseEntityInterceptor,
+                    sp.GetRequiredService<AuditPropertyChangeInterceptor>());
             });
 
             // Configure Quartz
@@ -123,12 +135,13 @@ namespace IntegrationTests.Tenant
 
             builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
 
-            // Recording producer for AuditEventCommand, so tests can assert on emitted audit events.
+            // Recording producer, so tests can assert on emitted audit events.
             builder.Services.AddSingleton<RecordingAuditProducer>();
             builder.Services.AddSingleton<IProducer<string, AuditEventMessage>>(sp => sp.GetRequiredService<RecordingAuditProducer>());
 
-            // Add the real CreateAuditEventCommand
-            builder.Services.AddSingleton<CreateAuditEventCommand>();
+            //LEGLINK-1306: the shared audit mechanism, publishing through the recording producer
+            //above, so a test can assert on the event a real request would have emitted.
+            builder.Services.AddLinkAuditing<TenantDbContext>();
 
             // Add logging
             builder.Services.AddLogging();
@@ -153,7 +166,7 @@ namespace IntegrationTests.Tenant
 
             // Add Kafka producer factories (mirrors Program.cs):
             //   <string, GenerateReportValue> -> FacilityController (ad-hoc report path)
-            //   <string, object>              -> ReportScheduledJob / RetentionCheckScheduledJob
+            //   <string, object>              -> ReportScheduledJob
             builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
             builder.Services.AddTransient<IKafkaProducerFactory<string, object>, StubKafkaProducerFactory<string, object>>();
 
@@ -219,9 +232,9 @@ namespace IntegrationTests.Tenant
         }
 
         /// <summary>
-        /// Captures audit events instead of discarding them. CreateAuditEventCommand.Execute is
-        /// async void, so a test awaits <see cref="WaitForAsync"/> rather than assuming the
-        /// message has landed by the time the manager call returns.
+        /// Captures audit events instead of discarding them, so a test can assert on what a real
+        /// request would have published. The shared filter publishes before the response is finished,
+        /// so a controller-driven test can read Produced straight after the call.
         /// </summary>
         public class RecordingAuditProducer : StubProducer<string, AuditEventMessage>
         {
@@ -242,24 +255,6 @@ namespace IntegrationTests.Tenant
             {
                 lock (_produced) { _produced.Add((message.Key, message.Value)); }
                 return base.ProduceAsync(topic, message, cancellationToken);
-            }
-
-            public async Task<IReadOnlyList<(string Key, AuditEventMessage Value)>> WaitForAsync(
-                int count, TimeSpan timeout)
-            {
-                var deadline = DateTime.UtcNow + timeout;
-                while (DateTime.UtcNow < deadline)
-                {
-                    var produced = Produced;
-                    if (produced.Count >= count)
-                    {
-                        return produced;
-                    }
-
-                    await Task.Delay(20);
-                }
-
-                return Produced;
             }
         }
 

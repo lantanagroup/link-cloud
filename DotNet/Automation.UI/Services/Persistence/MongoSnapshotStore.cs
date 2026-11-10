@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using Automation.UI.Services.TestRail;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -104,6 +105,21 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task UpsertRunSummaryAsync(AutomationRunSummary summary, string? facilityId, string? reportId, CancellationToken ct = default)
     {
+        // Links are merged after the summary upsert. Putting them in this $set would let an
+        // older non-empty list replace a newer one, and an empty list must not clear stored links.
+        await _runs.UpdateOneAsync(
+            r => r.RunId == summary.RunId,
+            BuildRunSummaryUpdate(summary, facilityId, reportId),
+            new UpdateOptions { IsUpsert = true },
+            ct);
+        await MergeTestRailRunsAsync(summary.RunId, summary.TestRailRuns, ct);
+    }
+
+    internal static UpdateDefinition<AutomationRunDocument> BuildRunSummaryUpdate(
+        AutomationRunSummary summary,
+        string? facilityId,
+        string? reportId)
+    {
         var hasIdentifiers = !string.IsNullOrWhiteSpace(facilityId)
             && !string.IsNullOrWhiteSpace(reportId);
 
@@ -121,6 +137,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt),
             Builders<AutomationRunDocument>.Update.Set(r => r.FinishedAt, summary.FinishedAt),
             Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
+            Builders<AutomationRunDocument>.Update.Set(r => r.FailureDetails, summary.FailureDetails?.ToList() ?? []),
             Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status.IsInProgress() && summary.Status != AutomationRunStatus.CollectingMetrics),
@@ -140,9 +157,85 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (!string.IsNullOrWhiteSpace(summary.GeneratedTemplateSetHash))
             updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateSetHash, summary.GeneratedTemplateSetHash));
 
-        var update = Builders<AutomationRunDocument>.Update.Combine(updates);
+        return Builders<AutomationRunDocument>.Update.Combine(updates);
+    }
 
-        await _runs.UpdateOneAsync(r => r.RunId == summary.RunId, update, new UpdateOptions { IsUpsert = true }, ct);
+    /// <summary>
+    /// Adds each destination run with <c>$addToSet</c> only when that run id is not already stored.
+    /// Overlapping summaries therefore cannot drop each other's links or store the same run id twice.
+    /// A later publish can fill in a missing test link without adding a second row.
+    /// </summary>
+    internal static IReadOnlyList<TestRailRunMerge> BuildTestRailRunMerges(
+        Guid runId,
+        IReadOnlyList<TestRailRunReference>? runs)
+    {
+        var links = new List<TestRailRunReference>();
+        if (!TestRailRunLinks.AddDistinct(links, runs))
+            return [];
+
+        var merges = new List<TestRailRunMerge>(links.Count * 2);
+        foreach (var link in links)
+        {
+            var destinationRunId = link.RunId;
+            var absent = Builders<AutomationRunDocument>.Filter.And(
+                Builders<AutomationRunDocument>.Filter.Eq(r => r.RunId, runId),
+                Builders<AutomationRunDocument>.Filter.Not(
+                    Builders<AutomationRunDocument>.Filter.ElemMatch(
+                        r => r.TestRailRuns,
+                        existing => existing.RunId == destinationRunId)));
+            merges.Add(new TestRailRunMerge(
+                absent,
+                Builders<AutomationRunDocument>.Update.AddToSetEach(r => r.TestRailRuns, [link]),
+                Options: null));
+
+            if (link.TestId is not > 0 || !TestRailRunLinks.IsHttpUrl(link.TestUrl))
+                continue;
+
+            var testId = link.TestId.Value;
+            var testUrl = link.TestUrl!;
+            merges.Add(new TestRailRunMerge(
+                Builders<AutomationRunDocument>.Filter.Eq(r => r.RunId, runId),
+                Builders<AutomationRunDocument>.Update
+                    .Set("TestRailRuns.$[link].TestId", testId)
+                    .Set("TestRailRuns.$[link].TestUrl", testUrl)
+                    .Set("TestRailRuns.$[link].Url", link.Url),
+                new UpdateOptions
+                {
+                    ArrayFilters =
+                    [
+                        new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument("$and", new BsonArray
+                        {
+                            new BsonDocument("link.RunId", destinationRunId),
+                            new BsonDocument("$or", new BsonArray
+                            {
+                                new BsonDocument("link.TestId", BsonNull.Value),
+                                new BsonDocument("link.TestId", new BsonDocument("$lte", 0))
+                            })
+                        }))
+                    ]
+                }));
+        }
+
+        return merges;
+    }
+
+    internal sealed record TestRailRunMerge(
+        FilterDefinition<AutomationRunDocument> Filter,
+        UpdateDefinition<AutomationRunDocument> Update,
+        UpdateOptions? Options);
+
+    private async Task MergeTestRailRunsAsync(
+        Guid runId,
+        IReadOnlyList<TestRailRunReference>? runs,
+        CancellationToken ct)
+    {
+        foreach (var merge in BuildTestRailRunMerges(runId, runs))
+        {
+            if (merge.Options == null)
+                await _runs.UpdateOneAsync(merge.Filter, merge.Update, cancellationToken: ct);
+            else
+                await _runs.UpdateOneAsync(merge.Filter, merge.Update, merge.Options, ct);
+        }
     }
 
     public Task UpsertRunInputAsync(AutomationRunInputSnapshot input, CancellationToken ct = default)
@@ -533,6 +626,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             StartedAt = doc.StartedAt,
             FinishedAt = doc.FinishedAt,
             Error = doc.Error,
+            FailureDetails = doc.FailureDetails ?? [],
             Duration = doc.Duration,
             FacilityId = doc.FacilityId,
             AutomationCreatedFacility = doc.AutomationCreatedFacility,
@@ -541,6 +635,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             GeneratedTemplateCacheVersionNumber = doc.GeneratedTemplateCacheVersionNumber,
             GeneratedTemplateCacheScenarioKey = doc.GeneratedTemplateCacheScenarioKey,
             GeneratedTemplateSetHash = doc.GeneratedTemplateSetHash,
+            TestRailRuns = TestRailRunLinks.Copy(doc.TestRailRuns),
             Logs = []
         };
     }

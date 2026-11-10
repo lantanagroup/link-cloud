@@ -44,20 +44,16 @@ required:
 # repository, not this one; the tooling defaults to a sibling clone at ../link-cac/Config. A
 # declared environment with no export is an error, not a quietly smaller check.
 #
-# The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2 and test are
+# The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2, qa3 and test are
 # `nhnslink`, with the middle letters transposed. That is in the actual Azure resource names,
 # so anything addressing a store must use it verbatim. The Key Vaults spell it the other way
 # again (`nhsnlink-kv-*`), and dev's vault does not follow the pattern at all.
 environments:
   dev:  { store: "nhsnlink-ac-dev",  keyVault: "link-vault" }
   qa:   { store: "nhnslink-ac-qa",   keyVault: "nhsnlink-kv-qa" }
+  qa2:  { store: "nhnslink-ac-qa2",  keyVault: "nhsnlink-kv-qa2" }
+  qa3:  { store: "nhnslink-ac-qa3",  keyVault: "nhsnlink-kv-qa3" }
   test: { store: "nhnslink-ac-test", keyVault: "nhsnlink-kv-test" }
-  # nhnslink-ac-qa2 exists in Azure but holds no key-values yet, so listing it here would
-  # report all 95 required keys as missing - true, but not actionable until LEGLINK-775
-  # imports into it. Add it with its first export, in that change:
-  #   qa2: { store: "nhnslink-ac-qa2", keyVault: "nhsnlink-kv-qa2" }
-  # The keyVault above is inferred from the qa/test pattern; confirm it from the keyvaultref
-  # values in the export rather than trusting the guess.
 
 serviceMeta:
   Account:               { label: "Account",               runtime: "dotnet" }
@@ -888,6 +884,29 @@ services:
     - key: "PatientAggregator:IncludeOrganizationResource"
       description: "Whether to include the submitting Organization in patient bundles."
       required: false
+    - key: "Retention:Schedule:Cron"
+      description: "Quartz cron expression for the daily retention check job, evaluated in UTC. The job lives in Report's clustered Quartz store, so each firing runs once across all Report instances. Read at startup; a changed value reschedules the job when Report restarts. An invalid expression is logged as an error and falls back to the default."
+      required: false
+      defaultValue: "0 0 2 * * ?"
+    - key: "Retention:Schedule:Enabled"
+      description: "Whether the daily retention check job is scheduled. False removes the job and its trigger when Report next starts."
+      required: false
+      defaultValue: "true"
+    # A list of objects, stored as Retention:Participants:<n>:ServiceName and :Scope rows. Set the
+    # whole list or none of it: .NET merges list entries from different sources by index, which is
+    # why the default lives in code and not in appsettings.json.
+    - key: "Retention:Participants"
+      description: "The services expected to reply to every retention cleanup, each with a ServiceName (the name it puts in RetentionCheckComplete) and a Scope of Report (one result per report) or Cutoff (one result per cleanup). Copied onto each cleanup when it is created, so a change never affects existing cleanups. Read at startup. An empty list, a missing ServiceName or Scope, an unknown Scope, a duplicate name, or no participant with Scope Report makes the whole list invalid: Report logs an error at startup and records every cleanup Failed without sending a request."
+      required: false
+      defaultValue: '[{"ServiceName":"Report","Scope":"Report"},{"ServiceName":"MeasureEval","Scope":"Report"},{"ServiceName":"Validation","Scope":"Report"},{"ServiceName":"DataAcquisition","Scope":"Report"}]'
+    - key: "Retention:Window"
+      description: "How long a report's clinical data is kept after the report finishes (or, for a report that never finished, after it was soft-deleted), as one ISO-8601 years, months, weeks or days value: P3M, P1Y, P2W or P90D. Years count as 12 months and weeks as 7 days; months are calendar months, never a fixed number of days. At most 36 months or 1095 days. Read at startup. An invalid value does not fall back to the default: Report logs an error at startup and every scheduled retention check does nothing until it is fixed."
+      required: false
+      defaultValue: "P3M"
+    - key: "Retention:MaxReportsPerCleanup"
+      description: "The most reports one retention cleanup may hold. A scheduled check with more eligible reports splits them across several cleanups, each its own RetentionCheckRequested message, so no participant gets a request too large to finish within its Kafka poll interval. A whole number from 1 to 1000; the upper limit keeps one request message near 350 KB, under Kafka's default 1 MB message size. Read at startup; an invalid value stops the retention check, as for Retention:Window."
+      required: false
+      defaultValue: "25"
   Submission:
     - key: "SubmissionServiceConfig:SubmissionDirectory"
       description: "The local or network path where submission files are stored."

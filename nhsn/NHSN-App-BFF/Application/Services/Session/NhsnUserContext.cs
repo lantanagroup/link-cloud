@@ -37,9 +37,11 @@ public sealed class NhsnUserContext : INhsnUserContext
         ?? Principal.Identity?.Name
         ?? throw new InvalidOperationException("Unable to resolve user identifier from the authenticated principal.");
 
+    // Falls back to the identifier rather than returning nothing: a handler describing the
+    // signed-in user needs something to show. NhsnActorEmailProvider deliberately does not, because
+    // an identifier is not an address and an audit event's User must not pretend otherwise.
     public string Email =>
-        Principal.FindFirstValue(_jwtSettings.EmailClaimType)
-        ?? Principal.FindFirstValue(ClaimTypes.Email)
+        NhsnClaims.Email(Principal, _jwtSettings)
         ?? ExternalUserId;
 
     public string Name =>
