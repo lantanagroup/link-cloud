@@ -70,18 +70,14 @@ jobs:
           echo "run_admin_ui=${{ steps.should.outputs.run_admin_ui }}"
           echo "run_nhsn_app_ui=${{ steps.should.outputs.run_nhsn_app_ui }}"
 
-      # This step is the only place those feed names may appear. # feed-guard-allow
+      # The pattern has to live in this file, so the search skips it. A hit anywhere else fails the job.
       - name: Reject private NuGet feed references
         shell: bash
         run: |
           set -euo pipefail
-          hits=$(git grep -n -i -E 'Shared_BOTW|pkgs\.dev\.azure|AZURE_ARTIFACTS_PAT|NuGetAuthenticate|CredentialProvider|credprovider|VSS_NUGET|restore-feed|feed-token|FEED_ACCESSTOKEN|packageSourceCredentials' || true) # feed-guard-allow
-          if [ -z "$hits" ]; then
-            exit 0
-          fi
-          leaked=$(printf '%s\n' "$hits" | grep -v 'feed-guard-allow' || true)
-          if [ -n "$leaked" ]; then
-            printf '%s\n' "$leaked"
+          hits=$(git grep -n -i -E 'Shared_BOTW|pkgs\.dev\.azure|pkgs\.visualstudio\.com|_packaging/|AZURE_ARTIFACTS_PAT|NuGetAuthenticate|CredentialProvider|credprovider|VSS_NUGET|restore-feed|feed-token|FEED_ACCESSTOKEN|packageSourceCredentials' -- . ':!.github/workflows/tests.yaml' || true)
+          if [ -n "$hits" ]; then
+            printf '%s\n' "$hits"
             echo "Private NuGet feed reference found."
             exit 1
           fi
