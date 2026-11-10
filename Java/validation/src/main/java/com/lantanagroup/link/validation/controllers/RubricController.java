@@ -43,6 +43,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,8 +62,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+// Rubrics decide what validation enforces for every facility, so reading and changing them is for Link
+// administrators. Enforced when the service does not run with anonymous access (see MethodSecurityConfig).
 @RestController
 @RequestMapping("/api/validation/rubrics")
+@PreAuthorize("hasAuthority('IsLinkAdmin')")
 @SecurityRequirement(name = "bearer-key")
 @Tag(name = "Rubric Registry", description = "Authoring and lifecycle: register, publish, retire")
 public class RubricController {
@@ -79,7 +83,7 @@ public class RubricController {
     private final ObjectMapper objectMapper;
     private final Validator validator;
     // Strict copies used only for request parsing: unknown payload keys are treated as typos,
-// not extensions. The shared Spring ObjectMapper remains lenient for response serialization.
+    // not extensions. The shared Spring ObjectMapper remains lenient for response serialization.
     private final ObjectMapper strictJsonMapper;
     private final YAMLMapper strictYamlMapper;
     // Writes a definition as YAML a person can read and this controller's strict reader takes back unchanged.

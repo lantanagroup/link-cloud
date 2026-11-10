@@ -362,6 +362,47 @@ test.describe('editing a draft', () => {
 
     expect(saved[0].body.checks.at(-1)).toEqual({ ...custom, ordinal: 6 });
   });
+
+  test('a check nested deeper than the form edits is shown read-only and saved exactly as it came', async ({ page, api }) => {
+    const nested = {
+      id: 'either-or-both', type: 'VALUESET' as const, dimension: 'TERMINOLOGY' as const, severityOverride: 'ERROR' as const,
+      ordinal: 6, enabled: true,
+      parameters: {
+        matchMode: 'ANY' as const,
+        checks: [
+          { id: 'no-code', type: 'FHIRPATH' as const, parameters: { expression: 'Observation.code.empty()' } },
+          {
+            id: 'both', type: 'VALUESET' as const,
+            parameters: {
+              matchMode: 'ALL' as const,
+              checks: [
+                { id: 'loinc', type: 'VALUESET' as const, parameters: { path: 'Observation.code', valueSet: 'http://loinc.org/vs' } },
+                { id: 'final', type: 'FHIRPATH' as const, parameters: { expression: 'Observation.status = \'final\'' } },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    api.mock(`GET ${RUBRIC}/versions/1.2.0`, rubricOk({ ...draftVersion, definition: { ...draftDefinition, checks: [...draftDefinition.checks, nested] } }));
+    const saved = capture(api, `POST ${RUBRIC}/versions`, savedDraft('bare-minimum-requirements', '1.2.0'));
+
+    await page.goto(EDIT_URL);
+    await page.getByRole('tab', { name: /Checks/ }).click();
+    await expect(page.getByRole('row', { name: /either-or-both/ })).toContainText('Read-only');
+    // the combined check one level deep, from the fixture, is still editable
+    await expect(page.getByRole('button', { name: 'Edit specimen-type-terminology' })).toBeVisible();
+    await page.getByRole('button', { name: 'View either-or-both' }).click();
+    await expect(page.getByText('Checks nested this deep cannot be edited here.')).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
+
+    await page.getByRole('tab', { name: 'Details' }).click();
+    await page.getByLabel('Owner').fill('lantana');
+    await page.getByRole('button', { name: 'Save draft' }).click();
+    await expect(page.getByRole('status')).toContainText('Draft saved.');
+
+    expect(saved[0].body.checks.at(-1)).toEqual(nested);
+  });
 });
 
 test.describe('leaving the editor', () => {
