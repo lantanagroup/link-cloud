@@ -528,9 +528,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 r.SoftDeletedDate = deleted ? now : null;
             }
 
+            // The reports are tracked, so SaveChanges writes only the columns set above. Update would write every
+            // column and could put back a retention status a cleanup set after they were loaded.
             if (scheduledToUpdate.Count > 0)
             {
-                _context.ReportSchedule.UpdateRange(scheduledToUpdate);
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
@@ -602,10 +603,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             var now = DateTimeOffset.UtcNow;
 
+            // Tracked: SaveChanges writes only these columns, so a concurrent retention claim is kept.
             entity.IsDeleted = true;
             entity.ModifyDate = now.UtcDateTime;
             StampSoftDeletedDate(entity, now);
-            _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);
         }
 
@@ -651,10 +652,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
             }
 
+            // Tracked: SaveChanges writes only these columns, so a concurrent retention claim is kept.
             entity.IsDeleted = false;
             entity.ModifyDate = DateTime.UtcNow;
             entity.SoftDeletedDate = null;
-            _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);
         }
 

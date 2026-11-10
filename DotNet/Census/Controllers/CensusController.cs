@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -70,7 +71,8 @@ public class CensusController : Controller
             foreach (var patient in patients)
             {
 
-                var identifier = patient.PatientIdentifiers.FirstOrDefault();
+                // ADT identifiers are the facility's own, not FHIR ids
+                var identifier = patient.PatientIdentifiers.FirstOrDefault(x => x.SourceType != SourceType.ADT.ToString());
 
                 if (identifier != null)
                 {

@@ -51,4 +51,10 @@ public class SftpAcquisitionSettings
     /// Default: 3600 seconds (1 hour).
     /// </summary>
     public int MaxRetryDelaySeconds { get; set; } = 3600;
+
+    /// <summary>
+    /// Largest ADTAcquired event to produce, in bytes. A file whose events exceed this is split across several
+    /// events in order. Keep it below the Kafka producer's message.max.bytes, which defaults to 1,000,000.
+    /// </summary>
+    public int AdtMaxMessageBytes { get; set; } = 900_000;
 }

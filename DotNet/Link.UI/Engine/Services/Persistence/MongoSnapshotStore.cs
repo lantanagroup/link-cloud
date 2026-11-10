@@ -1,4 +1,4 @@
-﻿using Automation.UI.Services;
+using Automation.UI.Services;
 using Automation.UI.Services.TestRail;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using MongoDB.Bson;

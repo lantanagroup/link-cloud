@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
@@ -15,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Hl7;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -351,9 +352,12 @@ public static class GeneralStartupExtensions
         services.AddTransient<IFileParser<CernerEncounters>, CernerCclExtractParser>();
         // Concrete registration for the SFTP connection test's patient preview, which isn't part of IFileParser<T>
         services.AddTransient<CernerCclExtractParser>();
+        services.AddTransient<IFileParser<Hl7Message>, Hl7AdtFileParser>();
 
         //SFTP Acquisition Processors
         services.AddTransient<ISftpAcquisitionProcessor, CernerCclExtractProcessor>();
+        services.AddTransient<ISftpAcquisitionProcessor, Hl7AdtProcessor>();
+        services.AddTransient<IAdtPatientIdResolver, AdtPatientIdResolver>();
     }
 
     private static void RegisterSecretManager(this IServiceCollection services, IConfiguration configuration)
@@ -406,6 +410,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, ReadyToAcquire>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, CernerPatientsAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, ADTAcquired>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -416,6 +421,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, ReadyToAcquire>, KafkaProducerFactory<string, ReadyToAcquire>>();
         services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();
+        services.AddTransient<IKafkaProducerFactory<string, ADTAcquired>, KafkaProducerFactory<string, ADTAcquired>>();
 
         //Factories - Application
         services.AddTransient<IParameterQueryFactory, ParameterQueryFactory>();

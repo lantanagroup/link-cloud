@@ -23,6 +23,8 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
@@ -608,11 +610,13 @@ internal sealed class RunExecutor
 
             if (state.Options.EnableDmrp)
             {
-                const string nhsnMeasure = "HOB";
+                // Use the dQM ID as a synthetic NHSN-facing name, matching Backend E2E. Measure
+                // mappings are unique by name across the stack, so using a real NHSN name such as
+                // HOB for every scenario would overwrite other runs' mappings and curated QA mappings.
+                // Mock enrollment must use this same name so Tenant can resolve it to the loaded dQM.
+                var nhsnMeasure = GetDmrpMeasureName(measureId);
                 const string component = "MSC";
 
-                // The Automation scenario runs the loaded dQM, while Mock DMRP exposes
-                // the NHSN-facing measure name. Tenant resolves the two through this mapping.
                 var mappingId = await FacilitySetupHelper.EnsureDmrpMeasureMappingAsync(
                     dmrpClient,
                     output,
@@ -1847,6 +1851,19 @@ internal sealed class RunExecutor
             output.WriteLine($"Warning: pipeline quiesce failed: {ex.Message}");
             _logger.LogWarning(ex, "Pipeline quiesce failed for run {RunId} facility {FacilityId}.", state.RunId, state.FacilityId.SanitizeForLog());
         }
+    }
+
+    internal static string GetDmrpMeasureName(string measureId)
+    {
+        // Mock DMRP stores Measure as nvarchar(50). Keep normal IDs identical to Backend E2E,
+        // and hash the full ID so longer IDs with the same prefix get distinct, stable names.
+        const int maxLength = 50;
+        const int hashLength = 16;
+        if (measureId.Length <= maxLength)
+            return measureId;
+
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(measureId)));
+        return $"{measureId[..(maxLength - hashLength - 1)]}-{hash[..hashLength]}";
     }
 
     internal static IReadOnlyList<string> PatientShapeKeys(ResolvedRunOptions options) =>

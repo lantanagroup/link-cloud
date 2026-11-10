@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Queries;
-using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
@@ -35,7 +34,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         private readonly HttpClient _httpClient;
         private readonly IEntityRepository<Facility> _repository;
         private readonly IFacilityQueries _queries;
-        private readonly CreateAuditEventCommand _createAuditEventCommand;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IOptions<MeasureConfig> _measureConfig;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
@@ -48,7 +46,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             HttpClient httpClient,
             IEntityRepository<Facility> repository,
             IFacilityQueries queries,
-            CreateAuditEventCommand createAuditEventCommand,
             IOptions<ServiceRegistry> serviceRegistry,
             IOptions<MeasureConfig> measureConfig,
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig,
@@ -60,8 +57,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
-            _createAuditEventCommand = createAuditEventCommand ??
-                                       throw new ArgumentNullException(nameof(createAuditEventCommand));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _measureConfig = measureConfig ?? throw new ArgumentNullException(nameof(measureConfig));
             _linkTokenServiceConfig =
@@ -124,11 +119,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
                 throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
             }
-
-            // send audit event
-            AuditEventMessage auditMessageEvent = Helper.CreateFacilityAuditEvent(newFacility);
-            _ = Task.Run(() =>
-                _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
         }
 
         public async Task<string> UpdateAsync(Guid id, Facility newFacility,
@@ -165,8 +155,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 await ValidateSchedules(newFacility);
             }
 
-            // audit update facility event
-            AuditEventMessage auditMessageEvent = Helper.UpdateFacilityAuditEvent(newFacility, existingFacility);
 
             try
             {
@@ -208,9 +196,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 throw new ApplicationException($"Facility {newFacility.FacilityId} failed to update. " + ex.Message);
             }
 
-            // audit update facility event          
-            _ = Task.Run(() =>
-                _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
             return id.ToString();
         }
 
@@ -258,11 +243,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 });
                 throw new ApplicationException($"Facility {facilityId} failed to delete. " + ex.Message);
             }
-
-            // audit delete facility event
-            AuditEventMessage auditMessageEvent = Helper.DeleteFacilityAuditEvent(existingFacility);
-            _ = Task.Run(() =>
-                _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
 
             return facilityId;
         }
@@ -346,11 +326,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
                 throw new ApplicationException($"Facility {facilityId} failed to soft delete. " + ex.Message);
             }
 
-            // audit soft delete facility event
-            AuditEventMessage auditMessageEvent = Helper.SoftDeleteFacilityAuditEvent(existingFacility);
-            _ = Task.Run(() =>
-                _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
-
             return facilityId;
         }
 
@@ -406,11 +381,6 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
                 throw new ApplicationException($"Facility {facilityId} failed to restore. " + ex.Message);
             }
-
-            // audit restore facility event
-            AuditEventMessage auditMessageEvent = Helper.RestoreFacilityAuditEvent(existingFacility);
-            _ = Task.Run(() =>
-                _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
 
             return facilityId;
         }
