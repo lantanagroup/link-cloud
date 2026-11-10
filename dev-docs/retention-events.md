@@ -20,9 +20,6 @@ sub-task [LEGLINK-1205](https://lantana.atlassian.net/browse/LEGLINK-1205).
 Each has `-Retry` and `-Error` companions in `topics.txt`, in `KafkaTopic` (.NET) and in `Topics`
 (Java). Keying on the cleanup id puts every message for one cleanup on one partition.
 
-The older `RetentionCheckScheduled` topic and Tenant's `RetentionCheckScheduledJob` are an earlier,
-unfinished attempt and play no part in this.
-
 ## Types
 
 | Message or part           | .NET (`Shared.Application.Models.Retention`) | Java (`shared.kafka.records.retention`) |

@@ -55,6 +55,7 @@ public class CensusPatientEventApiModel
     public string EventType { get; set; } = string.Empty;
     public JsonElement Payload { get; set; }
     public string SourceType { get; set; } = string.Empty;
+    public DateTime EventDate { get; set; }
 }
 
 public class CensusFhirListApiModel

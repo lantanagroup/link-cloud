@@ -3,6 +3,7 @@ using Automation.UI.Models;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.Extensions.Options;
 
 namespace Automation.UI.Services.TestRail;
@@ -15,7 +16,17 @@ public sealed class TestRailPublisher(
     ApiEndpointRegistry endpointRegistry,
     ILogger<TestRailPublisher> logger) : ITestRailPublisher
 {
+    /// <summary>
+    /// Largest result comment we post. The TestRail result comment is a text field with no
+    /// documented maximum. A full run log can still be large enough to fail the result call,
+    /// and the attachment is uploaded only after that call succeeds, so the comment stays
+    /// inside this size and the log goes in the attachment.
+    /// </summary>
     private const int MaxCommentChars = 20_000;
+
+    internal const string LogNotAttachedSentence = "The full log could not be attached.";
+
+    internal const string ResultNotAttachedSentence = "The full result could not be attached.";
     internal const string SharedScenarioRunName = "Link Automation UI - Scenario suite";
     internal const string SharedApiHealthRunName = "Link Automation UI - API Health suite";
     private readonly SemaphoreSlim _sharedRunGate = new(1, 1);
@@ -24,7 +35,7 @@ public sealed class TestRailPublisher(
     private readonly Dictionary<(int SuiteId, string RunName), SharedSuiteRun> _sharedRuns = new();
     private readonly TestRailTargetResolver _targets = new(api, logger);
 
-    public async Task PublishScenarioRunAsync(
+    public async Task<IReadOnlyList<TestRailRunReference>> PublishScenarioRunAsync(
         ScenarioTestRailPublishRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -34,15 +45,7 @@ public sealed class TestRailPublisher(
             if (!opts.IsConfigured)
             {
                 logger.LogDebug("TestRail publisher skipped for scenario run {RunId}: not configured.", request.RunId);
-                return;
-            }
-
-            if (request.Status == AutomationRunStatus.Cancelled)
-            {
-                logger.LogInformation(
-                    "TestRail publisher skipped for scenario run {RunId}: cancelled runs are not posted.",
-                    request.RunId);
-                return;
+                return [];
             }
 
             if (!opts.HasScenarioSuite)
@@ -50,7 +53,7 @@ public sealed class TestRailPublisher(
                 logger.LogWarning(
                     "TestRail publisher skipped for scenario run {RunId}: ScenarioSuiteId is not configured.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var scenario = request.ScenarioId is Guid scenarioId
@@ -68,27 +71,53 @@ public sealed class TestRailPublisher(
                 logger.LogWarning(
                     "TestRail publisher skipped for scenario run {RunId}: no TestRail case id mapped.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var statusId = TestRailStatusMapper.FromScenarioStatus(request.Status);
-            var comment = BuildScenarioComment(request);
+            var attachmentName = $"scenario-run-{request.RunId:D}.log";
+            var fullComment = BuildScenarioComment(request);
+            var commentFits = fullComment.Length <= MaxCommentChars;
+            byte[]? attachment = null;
+            if (!commentFits || ShouldAttach(statusId))
+                attachment = EncodeAttachment(request.Logs, request.Error);
+
+            // The result is posted before the upload, and a result comment cannot be assumed
+            // to change if that upload never lands. Say the file is attached only after it does.
+            string comment;
+            string? commentAfterAttachment = null;
+            if (attachment is null)
+            {
+                comment = commentFits ? fullComment : Truncate(fullComment);
+            }
+            else if (!commentFits)
+            {
+                comment = BuildLogOverflowComment(request, attachmentName, attached: false);
+                commentAfterAttachment = BuildLogOverflowComment(request, attachmentName, attached: true);
+            }
+            else
+            {
+                comment = WithCouldNotAttach(fullComment, LogNotAttachedSentence);
+                commentAfterAttachment = fullComment;
+            }
+
             var elapsed = FormatElapsed(request.StartedAt, request.FinishedAt);
             var result = new TestRailCaseResult
             {
                 CaseId = caseId.Value,
                 StatusId = statusId,
                 Comment = comment,
+                CommentAfterAttachment = commentAfterAttachment,
                 Elapsed = elapsed,
-                Attachment = ShouldAttach(statusId) ? EncodeAttachment(request.Logs, request.Error) : null,
-                AttachmentFileName = ShouldAttach(statusId) ? $"scenario-run-{request.RunId:D}.log" : null
+                Attachment = attachment,
+                AttachmentFileName = attachment is null ? null : attachmentName
             };
 
             var runName = opts.UseSharedRun
                 ? SharedScenarioRunName
                 : $"Link Automation UI - {request.RunName} - {request.RunId:D}";
 
-            await PublishResultsAsync(
+            return await PublishResultsAsync(
                 opts,
                 opts.ScenarioSuiteId,
                 opts.ScenarioSuiteName,
@@ -101,10 +130,11 @@ public sealed class TestRailPublisher(
         catch (Exception ex)
         {
             logger.LogError(ex, "TestRail publish failed for scenario run {RunId}. Automation run is unaffected.", request.RunId);
+            return [];
         }
     }
 
-    public async Task PublishApiHealthRunAsync(
+    public async Task<IReadOnlyList<TestRailRunReference>> PublishApiHealthRunAsync(
         ApiHealthTestRailPublishRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -114,15 +144,7 @@ public sealed class TestRailPublisher(
             if (!opts.IsConfigured)
             {
                 logger.LogDebug("TestRail publisher skipped for API Health run {RunId}: not configured.", request.RunId);
-                return;
-            }
-
-            if (request.Cancelled)
-            {
-                logger.LogInformation(
-                    "TestRail publisher skipped for API Health run {RunId}: cancelled runs are not posted.",
-                    request.RunId);
-                return;
+                return [];
             }
 
             if (!opts.HasApiHealthSuite)
@@ -130,7 +152,7 @@ public sealed class TestRailPublisher(
                 logger.LogWarning(
                     "TestRail publisher skipped for API Health run {RunId}: ApiHealthSuiteId is not configured.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var definitions = string.Equals(request.Scope, "Service", StringComparison.OrdinalIgnoreCase)
@@ -146,36 +168,51 @@ public sealed class TestRailPublisher(
             var defByKey = definitions.ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
             var caseResults = new List<TestRailCaseResult>();
 
-            foreach (var (key, result) in resultsByKey)
+            if (request.Cancelled)
             {
-                defByKey.TryGetValue(key, out var definition);
-                var caseId = TestRailCaseMapper.ResolveApiHealthCaseId(
-                    definition?.TestRailCaseId,
-                    result.EndpointKey,
-                    result.EndpointName,
-                    opts.ApiHealthCaseIds);
-
-                if (caseId is null)
-                    continue;
-
-                var statusId = TestRailStatusMapper.FromApiHealthResult(result.Passed, result.Skipped);
-                if (statusId is null)
-                    continue;
-
-                var comment = BuildApiHealthComment(result, request.Error);
-                var attachment = ShouldAttach(statusId.Value)
-                    ? Encoding.UTF8.GetBytes(comment ?? result.ErrorMessage ?? "Failed")
-                    : null;
-
-                caseResults.Add(new TestRailCaseResult
+                // A finished endpoint keeps the status, comment, and attachment a
+                // completed run would post. An endpoint that never stored a result
+                // is Blocked with the cancel reason and no attachment. Skipped and
+                // informational endpoints stay unpublished.
+                foreach (var definition in defByKey.Values)
                 {
-                    CaseId = caseId.Value,
-                    StatusId = statusId.Value,
-                    Comment = comment,
-                    Elapsed = result.DurationMs > 0 ? FormatElapsedMs(result.DurationMs) : null,
-                    Attachment = attachment,
-                    AttachmentFileName = attachment is null ? null : $"api-health-{SanitizeFileName(result.EndpointKey)}.txt"
-                });
+                    resultsByKey.TryGetValue(definition.Key, out var result);
+                    if (result?.Skipped == true || definition.IsInformational)
+                        continue;
+
+                    if (result is null)
+                    {
+                        var caseId = TestRailCaseMapper.ResolveApiHealthCaseId(
+                            definition.TestRailCaseId,
+                            definition.Key,
+                            definition.EndpointName,
+                            opts.ApiHealthCaseIds);
+                        if (caseId is null)
+                            continue;
+
+                        caseResults.Add(new TestRailCaseResult
+                        {
+                            CaseId = caseId.Value,
+                            StatusId = TestRailStatusMapper.Blocked,
+                            Comment = BuildCancelledEndpointComment(definition, request.Error)
+                        });
+                        continue;
+                    }
+
+                    var finished = BuildFinishedApiHealthResult(opts, definition, result, request.Error);
+                    if (finished is not null)
+                        caseResults.Add(finished);
+                }
+            }
+            else
+            {
+                foreach (var (key, result) in resultsByKey)
+                {
+                    defByKey.TryGetValue(key, out var definition);
+                    var finished = BuildFinishedApiHealthResult(opts, definition, result, request.Error);
+                    if (finished is not null)
+                        caseResults.Add(finished);
+                }
             }
 
             caseResults = CollapseApiHealthResults(caseResults);
@@ -185,14 +222,14 @@ public sealed class TestRailPublisher(
                 logger.LogInformation(
                     "TestRail publisher skipped for API Health run {RunId}: no mapped TestRail case ids.",
                     request.RunId);
-                return;
+                return [];
             }
 
             var runName = opts.UseSharedRun
                 ? SharedApiHealthRunName
                 : $"Link Automation UI - API Health {request.Scope} {request.ServiceName} - {request.RunId:D}".Trim();
 
-            await PublishResultsAsync(
+            return await PublishResultsAsync(
                 opts,
                 opts.ApiHealthSuiteId,
                 opts.ApiHealthSuiteName,
@@ -205,12 +242,57 @@ public sealed class TestRailPublisher(
         catch (Exception ex)
         {
             logger.LogError(ex, "TestRail publish failed for API Health run {RunId}. Automation run is unaffected.", request.RunId);
+            return [];
         }
     }
 
     /// <summary>
+    /// A stored endpoint result, posted the same way a completed run posts it.
+    /// The comment says the file was not attached until the upload succeeds.
+    /// </summary>
+    private static TestRailCaseResult? BuildFinishedApiHealthResult(
+        TestRailOptions opts,
+        ApiEndpointDefinition? definition,
+        ApiTestRunResult result,
+        string? runError)
+    {
+        var caseId = TestRailCaseMapper.ResolveApiHealthCaseId(
+            definition?.TestRailCaseId,
+            result.EndpointKey,
+            result.EndpointName,
+            opts.ApiHealthCaseIds);
+        if (caseId is null)
+            return null;
+
+        var statusId = TestRailStatusMapper.FromApiHealthResult(result.Passed, result.Skipped);
+        if (statusId is null)
+            return null;
+
+        var cleanComment = BuildApiHealthComment(result, runError);
+        var attachment = ShouldAttach(statusId.Value)
+            ? Encoding.UTF8.GetBytes(cleanComment ?? result.ErrorMessage ?? "Failed")
+            : null;
+        var (comment, commentAfterAttachment) = CommentsForAttachment(
+            cleanComment,
+            attachment is not null,
+            ResultNotAttachedSentence);
+
+        return new TestRailCaseResult
+        {
+            CaseId = caseId.Value,
+            StatusId = statusId.Value,
+            Comment = comment,
+            CommentAfterAttachment = commentAfterAttachment,
+            Elapsed = result.DurationMs > 0 ? FormatElapsedMs(result.DurationMs) : null,
+            Attachment = attachment,
+            AttachmentFileName = attachment is null ? null : $"api-health-{SanitizeFileName(result.EndpointKey)}.txt"
+        };
+    }
+
+    /// <summary>
     /// A TestRail run has one test per case. Endpoints that share a case id post one result.
-    /// When their statuses differ, that result is Failed and the comment names each endpoint.
+    /// When finished endpoints disagree, that result is Failed and the comment names each one.
+    /// A Blocked row is an endpoint that never ran, so it does not replace a finished status.
     /// </summary>
     private List<TestRailCaseResult> CollapseApiHealthResults(List<TestRailCaseResult> results)
     {
@@ -237,28 +319,45 @@ public sealed class TestRailPublisher(
                 continue;
             }
 
-            var sameStatus = group.All(result => result.StatusId == group[0].StatusId);
-            var statusId = sameStatus ? group[0].StatusId : TestRailStatusMapper.Failed;
-            var comment = BuildCollapsedComment(group, sameStatus);
+            var posting = group.Any(result => result.StatusId != TestRailStatusMapper.Blocked)
+                ? group.Where(result => result.StatusId != TestRailStatusMapper.Blocked).ToList()
+                : group;
+            if (posting.Count == 1)
+            {
+                collapsed.Add(posting[0]);
+                continue;
+            }
+
+            var sameStatus = posting.All(result => result.StatusId == posting[0].StatusId);
+            var statusId = sameStatus ? posting[0].StatusId : TestRailStatusMapper.Failed;
+            var cleanComment = BuildCollapsedComment(posting, sameStatus);
             byte[]? attachment = null;
             string? attachmentFileName = null;
-            if (ShouldAttach(statusId))
+            // A completed run attaches the combined comment only when the posted
+            // status is Failed. Blocked rows are endpoints that never ran.
+            if (statusId == TestRailStatusMapper.Failed)
             {
-                attachment = Encoding.UTF8.GetBytes(comment ?? "Failed");
-                attachmentFileName = $"api-health-c{group[0].CaseId}.txt";
+                attachment = Encoding.UTF8.GetBytes(cleanComment ?? "Failed");
+                attachmentFileName = $"api-health-c{posting[0].CaseId}.txt";
             }
+
+            var (comment, commentAfterAttachment) = CommentsForAttachment(
+                cleanComment,
+                attachment is not null,
+                ResultNotAttachedSentence);
 
             logger.LogInformation(
                 "TestRail case C{CaseId} is mapped from {EndpointCount} API Health endpoints. Posting one {Status} result.",
-                group[0].CaseId,
-                group.Count,
+                posting[0].CaseId,
+                posting.Count,
                 StatusLabel(statusId));
 
             collapsed.Add(new TestRailCaseResult
             {
-                CaseId = group[0].CaseId,
+                CaseId = posting[0].CaseId,
                 StatusId = statusId,
                 Comment = comment,
+                CommentAfterAttachment = commentAfterAttachment,
                 Attachment = attachment,
                 AttachmentFileName = attachmentFileName
             });
@@ -274,21 +373,25 @@ public sealed class TestRailPublisher(
         {
             sb.AppendLine("These endpoints mapped to the same TestRail case and did not all pass. Posted as Failed.");
             foreach (var result in group)
-                sb.AppendLine($"- {FirstLine(result.Comment)}: {StatusLabel(result.StatusId)}");
+                sb.AppendLine($"- {FirstLine(CleanComment(result))}: {StatusLabel(result.StatusId)}");
             sb.AppendLine();
         }
 
         foreach (var result in group)
         {
-            if (!string.IsNullOrWhiteSpace(result.Comment))
+            var text = CleanComment(result);
+            if (!string.IsNullOrWhiteSpace(text))
             {
-                sb.AppendLine(result.Comment.Trim());
+                sb.AppendLine(text.Trim());
                 sb.AppendLine();
             }
         }
 
         return Truncate(sb.ToString());
     }
+
+    private static string CleanComment(TestRailCaseResult result) =>
+        result.CommentAfterAttachment ?? result.Comment ?? string.Empty;
 
     private static string FirstLine(string? comment)
     {
@@ -307,7 +410,7 @@ public sealed class TestRailPublisher(
         _ => statusId.ToString()
     };
 
-    private async Task PublishResultsAsync(
+    private async Task<IReadOnlyList<TestRailRunReference>> PublishResultsAsync(
         TestRailOptions opts,
         int configuredSuiteId,
         string configuredSuiteName,
@@ -329,7 +432,7 @@ public sealed class TestRailPublisher(
         {
             var projectId = await _targets.ResolveProjectIdAsync(opts, cancellationToken);
             if (projectId is null)
-                return;
+                return [];
 
             var suiteId = await _targets.ResolveSuiteIdAsync(
                 projectId.Value,
@@ -338,12 +441,12 @@ public sealed class TestRailPublisher(
                 suiteSettingName,
                 cancellationToken);
             if (suiteId is null)
-                return;
+                return [];
 
             runId = await GetOrCreateRunAsync(opts, projectId.Value, suiteId.Value, runName, caseIds, cancellationToken);
         }
         if (runId is null)
-            return;
+            return [];
 
         IReadOnlyList<TestRailResultDto> posted;
         try
@@ -353,7 +456,17 @@ public sealed class TestRailPublisher(
         catch (Exception ex)
         {
             logger.LogError(ex, "TestRail add_results_for_cases failed for TestRail run {TestRailRunId}.", runId);
-            return;
+            return [];
+        }
+
+        TestRailRunReference? captured = null;
+        if (posted is { Count: > 0 })
+            captured = TestRailRunLinks.Capture(opts.BaseUrl, runId.Value, posted);
+        else
+        {
+            logger.LogWarning(
+                "TestRail add_results_for_cases returned no results for TestRail run {TestRailRunId}.",
+                runId);
         }
 
         for (var index = 0; index < results.Count; index++)
@@ -384,8 +497,29 @@ public sealed class TestRailPublisher(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "TestRail add_attachment_to_result failed for result {ResultId}.", postedResult.Id);
+                continue;
+            }
+
+            if (result.CommentAfterAttachment is null)
+                continue;
+
+            try
+            {
+                await api.EditResultCommentAsync(
+                    postedResult.Id,
+                    result.CommentAfterAttachment,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "TestRail edit_result failed for result {ResultId}. The result comment was left unchanged.",
+                    postedResult.Id);
             }
         }
+
+        return captured == null ? [] : [captured];
     }
 
     private async Task<int?> EnsurePinnedRunAsync(
@@ -610,7 +744,7 @@ public sealed class TestRailPublisher(
     private static bool ShouldAttach(int statusId) =>
         statusId == TestRailStatusMapper.Failed || statusId == TestRailStatusMapper.Blocked;
 
-    private static string? BuildScenarioComment(ScenarioTestRailPublishRequest request)
+    private static string BuildScenarioHeader(ScenarioTestRailPublishRequest request)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"Automation.UI scenario run {request.RunId:D}");
@@ -620,14 +754,90 @@ public sealed class TestRailPublisher(
         if (!string.IsNullOrWhiteSpace(request.Error))
             sb.AppendLine($"Error: {request.Error}");
 
+        if (request.FailureDetails.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Failure details:");
+            foreach (var block in request.FailureDetails)
+            {
+                sb.AppendLine(block);
+                sb.AppendLine();
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string BuildScenarioComment(ScenarioTestRailPublishRequest request)
+    {
+        var sb = new StringBuilder(BuildScenarioHeader(request));
         if (request.Logs.Count > 0)
         {
             sb.AppendLine();
+            sb.AppendLine();
             sb.AppendLine("Logs:");
-            foreach (var line in request.Logs.TakeLast(200))
+            foreach (var line in request.Logs)
                 sb.AppendLine(line);
         }
 
+        return sb.ToString().Trim();
+    }
+
+    /// <summary>
+    /// The comment names the attachment instead of pasting a partial log. A partial log
+    /// drops the lines that do not fit, which is the gap this publisher used to ship.
+    /// When neither copy of the log is complete, the comment says so.
+    /// <paramref name="attached"/> is false on the comment posted with the result. The
+    /// attached wording is written only after add_attachment_to_result succeeds.
+    /// </summary>
+    private static string BuildLogOverflowComment(
+        ScenarioTestRailPublishRequest request,
+        string attachmentFileName,
+        bool attached)
+    {
+        string logNote;
+        if (!attached)
+        {
+            logNote = request.LogsMayBeIncomplete
+                ? $"{LogNotAttachedSentence} Some lines may be missing."
+                : LogNotAttachedSentence;
+        }
+        else
+        {
+            logNote = request.LogsMayBeIncomplete
+                ? $"The log is attached as {attachmentFileName}. Some lines may be missing."
+                : $"The complete log is attached as {attachmentFileName}.";
+        }
+
+        var note = request.Logs.Count > 0
+            ? $"The run log is {request.Logs.Count} lines and does not fit in this result comment. {logNote}"
+            : attached
+                ? $"The result text does not fit in this result comment. The complete text is attached as {attachmentFileName}."
+                : $"The result text does not fit in this result comment. {LogNotAttachedSentence}";
+        if (note.Length > MaxCommentChars)
+            return note[..MaxCommentChars];
+
+        var header = BuildScenarioHeader(request);
+        var combined = header + "\n\n" + note;
+        if (combined.Length <= MaxCommentChars)
+            return combined;
+
+        const string cutMarker = " [truncated]";
+        var roomForHeader = MaxCommentChars - note.Length - 2;
+        if (roomForHeader <= cutMarker.Length)
+            return note;
+
+        var shortened = header[..(roomForHeader - cutMarker.Length)].TrimEnd() + cutMarker;
+        var fitted = shortened + "\n\n" + note;
+        return fitted.Length <= MaxCommentChars ? fitted : note;
+    }
+
+    private static string BuildCancelledEndpointComment(ApiEndpointDefinition definition, string? runError)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"{definition.ServiceName} :: {definition.EndpointName}");
+        if (!string.IsNullOrWhiteSpace(runError))
+            sb.AppendLine($"Run error: {runError}");
         return Truncate(sb.ToString());
     }
 
@@ -635,6 +845,13 @@ public sealed class TestRailPublisher(
     {
         var sb = new StringBuilder();
         sb.AppendLine($"{result.ServiceName} :: {result.EndpointName}");
+        var failureBlock = ApiHealthFailureText.Format(result);
+        if (!string.IsNullOrWhiteSpace(failureBlock))
+        {
+            sb.AppendLine();
+            sb.AppendLine(failureBlock);
+            sb.AppendLine();
+        }
         if (result.Skipped)
             sb.AppendLine($"Skipped: {result.SkipReason}");
         if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
@@ -696,6 +913,34 @@ public sealed class TestRailPublisher(
         var minutes = seconds / 60;
         var remainder = seconds % 60;
         return remainder == 0 ? $"{minutes}m" : $"{minutes}m {remainder}s";
+    }
+
+    private static (string? Comment, string? CommentAfterAttachment) CommentsForAttachment(
+        string? cleanComment,
+        bool hasAttachment,
+        string failureSentence)
+    {
+        if (!hasAttachment)
+            return (cleanComment, null);
+
+        return (WithCouldNotAttach(cleanComment ?? string.Empty, failureSentence), cleanComment);
+    }
+
+    private static string WithCouldNotAttach(string comment, string sentence)
+    {
+        var trimmed = comment.TrimEnd();
+        if (trimmed.Contains(sentence, StringComparison.Ordinal))
+            return trimmed.Length <= MaxCommentChars ? trimmed : trimmed[..MaxCommentChars];
+
+        var suffix = trimmed.Length == 0 ? sentence : "\n\n" + sentence;
+        if (trimmed.Length + suffix.Length <= MaxCommentChars)
+            return trimmed + suffix;
+
+        var room = MaxCommentChars - suffix.Length;
+        if (room <= 0)
+            return sentence.Length <= MaxCommentChars ? sentence : sentence[..MaxCommentChars];
+
+        return trimmed[..room].TrimEnd() + suffix;
     }
 
     private static string Truncate(string text)

@@ -83,6 +83,7 @@
                         <tr>
                             <th></th>
                             <th data-sort="result">Result</th>
+                            <th data-sort="patients" data-sort-type="number">Total patients</th>
                             <th data-sort="seconds" data-sort-type="number" data-sort-default="desc">Total time</th>
                             <th data-sort="ppm" data-sort-type="number" data-sort-default="desc">Patients / min</th>
                             <th data-sort="finished" data-sort-default="desc">Finished</th>
@@ -92,13 +93,14 @@
                     <tbody>
                     @if (Model.Runs.Count == 0)
                     {
-                        <tr><td colspan="6" class="text-muted text-center py-4">No runs yet.</td></tr>
+                        <tr><td colspan="7" class="text-muted text-center py-4">No runs yet.</td></tr>
                     }
                     else
                     {
                         foreach (var run in Model.Runs)
                         {
                             <tr data-result="@(run.Outcome == "Succeeded" ? "Passed" : run.Outcome)"
+                                data-patients="@run.PatientCount"
                                 data-seconds="@run.E2eDurationSeconds"
                                 data-ppm="@(run.PatientsPerMinute?.ToString("0.0") ?? "")"
                                 data-finished="@(run.FinishedAt?.UtcDateTime.ToString("o") ?? "")">
@@ -118,6 +120,7 @@
                                         <span class="badge bg-light text-dark border ms-1">Partial</span>
                                     }
                                 </td>
+                                <td>@run.PatientCountText</td>
                                 <td>@FormatDuration(run.E2eDurationSeconds)</td>
                                 <td>@(run.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
                                 <td>@FormatWhen(run.FinishedAt)</td>

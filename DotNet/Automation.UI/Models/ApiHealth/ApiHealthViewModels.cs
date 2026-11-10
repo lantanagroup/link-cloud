@@ -9,6 +9,8 @@ public sealed class ApiHealthDashboardViewModel
     public bool HasActiveRun { get; init; }
     public string? LatestRunMode { get; init; }
     public string? LatestRunServiceName { get; init; }
+    /// <summary>TestRail runs for the execution shown on this page. Empty when that run was not published.</summary>
+    public IReadOnlyList<TestRailRunReference> TestRailRuns { get; init; } = [];
 }
 
 /// <summary>

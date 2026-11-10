@@ -50,4 +50,10 @@ public class SftpAcquisitionTypeConfiguration
     /// If null, uses the default parser based on AcquisitionType and file extension.
     /// </summary>
     public FileParsingConfiguration? ParsingConfiguration { get; set; }
+
+    /// <summary>
+    /// How the facility's ADT feed identifies patients. Required when <see cref="SubType"/> is
+    /// <see cref="SftpAcquisitionSubType.HL7ADT"/>, and not allowed otherwise.
+    /// </summary>
+    public AdtConfiguration? AdtConfiguration { get; set; }
 }
