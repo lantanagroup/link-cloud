@@ -222,7 +222,8 @@ public sealed class MetricsRunPresenter
             FinishedAt = document.FinishedAt,
             ScenarioVersion = Math.Max(1, document.ScenarioVersion),
             SetupSummary = document.SetupSummary,
-            PatientsPerMinute = document.Throughput.PatientsPerMinute > 0 ? document.Throughput.PatientsPerMinute : null
+            PatientsPerMinute = document.Throughput.PatientsPerMinute > 0 ? document.Throughput.PatientsPerMinute : null,
+            PatientCount = document.PatientCount
         };
     }
 

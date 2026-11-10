@@ -750,6 +750,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       Automation__LokiBaseUrl: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: link-automation-ui
@@ -794,7 +795,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5257/"]
-
+      
   measureeval:
     image: link-measureeval
     container_name: link-measureeval

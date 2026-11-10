@@ -34,10 +34,12 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Retention;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -136,6 +138,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>, KafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, RetentionCheckCompleteValue>,
+                                  KafkaConsumerFactory<string, RetentionCheckCompleteValue>>();
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -157,6 +161,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     // cannot be constructed and the service fails at startup.
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
 
+    // Republishes a failed RetentionCheckComplete onto its -Error and -Retry topics.
+    builder.Services.AddTransient<IKafkaProducerFactory<string, RetentionCheckCompleteValue>,
+                                  KafkaProducerFactory<string, RetentionCheckCompleteValue>>();
+
     builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
@@ -170,6 +178,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportPopulationManager, ReportPopulationManager>();
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
     builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
+    builder.Services.TryAddSingleton(TimeProvider.System);
+    builder.Services.AddTransient<IRetentionCleanupManager, RetentionCleanupManager>();
+    builder.Services.AddTransient<IRetentionEligibilityQuery, RetentionEligibilityQuery>();
 
     builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 
@@ -246,8 +257,11 @@ static void RegisterServices(WebApplicationBuilder builder)
             KafkaTopic.PayloadSubmittedRetry.GetStringValue(),
             KafkaTopic.ValidationCompleteRetry.GetStringValue(),
             KafkaTopic.MappingOutcomeEvaluatedRetry.GetStringValue(),
+            KafkaTopic.RetentionCheckCompleteRetry.GetStringValue(),
         ]));
 
+    // Before RetryScheduleService: the retention job must be settled before the scheduler starts.
+    builder.Services.AddRetentionSchedule(builder.Configuration);
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<GenerateReportListener>();
@@ -257,6 +271,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<PayloadSubmittedListener>();
     builder.Services.AddHostedService<MeasureReportGeneratedListener>();
     builder.Services.AddHostedService<MappingOutcomeListener>();
+    builder.Services.AddHostedService<RetentionCheckCompleteListener>();
 
     builder.Services.AddTransient<PatientAggregator>();
     builder.Services.AddTransient<MeasureReportAggregator>();
@@ -270,7 +285,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
     builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));

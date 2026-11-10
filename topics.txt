@@ -1,3 +1,6 @@
+ADTAcquired:3:1
+ADTAcquired-Error:3:1
+ADTAcquired-Retry:3:1
 AuditableEventOccurred:3:1
 AuditableEventOccurred-Error:3:1
 AuditableEventOccurred-Retry:3:1
@@ -52,9 +55,6 @@ RetentionCheckComplete-Retry:3:1
 RetentionCheckRequested:3:1:retention.ms=604800000
 RetentionCheckRequested-Error:3:1
 RetentionCheckRequested-Retry:3:1
-RetentionCheckScheduled:3:1
-RetentionCheckScheduled-Error:3:1
-RetentionCheckScheduled-Retry:3:1
 Service-Healthcheck:3:1
 ShadowCompareEvent:3:1
 ShadowCompareEvent-Error:3:1

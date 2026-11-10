@@ -1,6 +1,8 @@
 ﻿using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Hl7;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
@@ -39,6 +41,10 @@ public class CreateSftpConfigurationModelValidator : AbstractValidator<CreateSft
         // Validate nested acquisition configurations
         RuleForEach(x => x.AcquisitionConfigurations)
             .SetValidator(new SftpAcquisitionTypeConfigurationValidator(options));
+
+        RuleForEach(x => x.AcquisitionConfigurations)
+            .Must((model, config) => SftpConfigurationValidationRules.HandlesProcessedAdtFiles(config, model.RemoveAfterProcessing))
+            .WithMessage(SftpConfigurationValidationRules.AdtFilesMustBeHandledMessage);
 
         RuleFor(x => x.Timeout)
             .Must(timeout => timeout >= TimeSpan.Zero && timeout <= TimeSpan.FromMinutes(settings.MaxTimeoutMinutes))
@@ -90,6 +96,10 @@ public class SftpConfigurationModelValidator : AbstractValidator<SftpConfigurati
         RuleForEach(x => x.AcquisitionConfigurations)
             .SetValidator(new SftpAcquisitionTypeConfigurationValidator(options));
 
+        RuleForEach(x => x.AcquisitionConfigurations)
+            .Must((model, config) => SftpConfigurationValidationRules.HandlesProcessedAdtFiles(config, model.RemoveAfterProcessing))
+            .WithMessage(SftpConfigurationValidationRules.AdtFilesMustBeHandledMessage);
+
         RuleFor(x => x.Timeout)
             .Must(timeout => timeout >= TimeSpan.Zero && timeout <= TimeSpan.FromMinutes(settings.MaxTimeoutMinutes))
             .WithMessage($"Timeout must be between 0 and {settings.MaxTimeoutMinutes} minutes.");
@@ -124,7 +134,56 @@ public class SftpAcquisitionTypeConfigurationValidator : AbstractValidator<SftpA
             .Must(SftpConfigurationValidationRules.BeValidRemoteDirectoryPath)
             .WithMessage("Processed directory path contains invalid characters.")
             .When(x => x.ProcessedDirectory is not null);
+
+        RuleFor(x => x.AcquisitionType)
+            .Equal(SftpAcquisitionType.Census)
+            .WithMessage("The HL7ADT sub type is only supported for Census acquisition.")
+            .When(x => x.SubType == SftpAcquisitionSubType.HL7ADT);
+
+        RuleFor(x => x.AdtConfiguration)
+            .NotNull()
+            .WithMessage("An ADT configuration is required for the HL7ADT sub type.")
+            .SetValidator(new AdtConfigurationValidator()!)
+            .When(x => x.SubType == SftpAcquisitionSubType.HL7ADT);
+
+        RuleFor(x => x.AdtConfiguration)
+            .Null()
+            .WithMessage("An ADT configuration is only allowed for the HL7ADT sub type.")
+            .When(x => x.SubType != SftpAcquisitionSubType.HL7ADT);
     }
+}
+
+/// <summary>
+/// Validator for AdtConfiguration (nested within an SFTP acquisition configuration)
+/// </summary>
+public class AdtConfigurationValidator : AbstractValidator<AdtConfiguration>
+{
+    private const int MaxLocationLength = 128;
+    private const int MaxSystemLength = 512;
+
+    public AdtConfigurationValidator()
+    {
+        RuleFor(x => x)
+            .Must(x => string.IsNullOrWhiteSpace(x.PatientIdLocation) != string.IsNullOrWhiteSpace(x.MrnIdentifierSystem))
+            .WithName(nameof(AdtConfiguration))
+            .WithMessage("Provide exactly one of PatientIdLocation (the Patient.Id is on the ADT event) or MrnIdentifierSystem (the Patient.Id is found by MRN search).");
+
+        RuleFor(x => x.PatientIdLocation).Must(BeValidLocation).WithMessage(InvalidLocationMessage("PatientIdLocation"));
+        RuleFor(x => x.MrnLocation).Must(BeValidLocation).WithMessage(InvalidLocationMessage("MrnLocation"));
+        RuleFor(x => x.EncounterIdLocation).Must(BeValidLocation).WithMessage(InvalidLocationMessage("EncounterIdLocation"));
+
+        RuleFor(x => x.MrnIdentifierSystem)
+            .Must(system => system!.Length <= MaxSystemLength && !system.Any(c => char.IsWhiteSpace(c) || c == '|'))
+            .WithMessage($"MrnIdentifierSystem cannot contain whitespace or '|', or exceed {MaxSystemLength} characters.")
+            .When(x => !string.IsNullOrWhiteSpace(x.MrnIdentifierSystem));
+    }
+
+    private static bool BeValidLocation(string? location) =>
+        string.IsNullOrWhiteSpace(location)
+        || (location.Length <= MaxLocationLength && Hl7Path.TryParse(location, out _));
+
+    private static string InvalidLocationMessage(string name) =>
+        $"{name} must be an HL7 location such as PID-2, PID-3[5=MR].1 or OBX[3.1=FHIRID]-5.";
 }
 
 /// <summary>
@@ -201,6 +260,17 @@ public class SftpTestConnectionRequestModelValidator : AbstractValidator<SftpTes
 /// </summary>
 public static class SftpConfigurationValidationRules
 {
+    public const string AdtFilesMustBeHandledMessage =
+        "HL7ADT acquisition requires a processed directory or RemoveAfterProcessing, so that a file of ADT events is not read again on every run.";
+
+    /// <summary>
+    /// Validates that an ADT feed's files leave the directory once read
+    /// </summary>
+    public static bool HandlesProcessedAdtFiles(SftpAcquisitionTypeConfiguration config, bool removeAfterProcessing) =>
+        config.SubType != SftpAcquisitionSubType.HL7ADT
+        || removeAfterProcessing
+        || !string.IsNullOrWhiteSpace(config.ProcessedDirectory);
+
     /// <summary>
     /// Characters that are not allowed in remote directory paths
     /// </summary>

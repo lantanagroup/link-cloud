@@ -208,5 +208,129 @@ namespace IntegrationTests.Census
             Assert.Equal("pat-1", ((PatientEventResponse)processedResponses.First()).PatientEvent.PatientId);
             Assert.Equal(facilityId, ((PatientEventResponse)processedResponses.First()).FacilityId);
         }
+
+        private static CernerEncounters CernerEncounter(string patientId = "pat-1", string encounterId = "enc-1", string status = "arrived") => new()
+        {
+            PatientId = patientId,
+            EncounterId = encounterId,
+            FinNumber = "fin-1",
+            MRN = "mrn-" + patientId,
+            EncounterStatus = status,
+            EncounterType = "ADMS",
+            AdmitDate = new DateTime(2026, 2, 2)
+        };
+
+        /// <summary>
+        /// Processes one extract as the listener does: in its own scope, discharges and then admits.
+        /// </summary>
+        private async Task ProcessExtract(string facilityId, params CernerEncounters[] encounters)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var service = new CernerListService(
+                new Microsoft.Extensions.Logging.Abstractions.NullLogger<LantanaGroup.Link.Census.Application.Services.PatientListService>(),
+                new NullCensusServiceMetrics(),
+                scope.ServiceProvider.GetRequiredService<IPatientEventManager>(),
+                scope.ServiceProvider.GetRequiredService<IPatientEventQueries>(),
+                scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>(),
+                scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>(),
+                scope.ServiceProvider.GetRequiredService<ICensusConfigManager>());
+
+            var extract = new CernerPatientsAcquired { PatientEncounters = [.. encounters] };
+            await service.ProcessDischarges(facilityId, extract, CancellationToken.None);
+            await service.ProcessAdmits(facilityId, extract, CancellationToken.None);
+        }
+
+        private async Task<List<PatientEncounter>> Encounters(string facilityId)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<CensusContext>().PatientEncounters
+                .AsNoTracking()
+                .Include(e => e.PatientIdentifiers)
+                .Include(e => e.PatientVisitIdentifiers)
+                .Where(e => e.FacilityId == facilityId)
+                .ToListAsync();
+        }
+
+        private async Task Rebuild(string facilityId, string? correlationId = null)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<IPatientEncounterQueries>().RebuildPatientEncounterTable(facilityId, correlationId);
+        }
+
+        [Fact]
+        public async Task Rebuild_ReproducesAnOpenCernerEncounter_IncludingItsUpdates()
+        {
+            var facilityId = "TestFacility" + Guid.NewGuid();
+            await ProcessExtract(facilityId, CernerEncounter());
+            await ProcessExtract(facilityId, CernerEncounter(status: "on-leave"));
+            var before = Assert.Single(await Encounters(facilityId));
+
+            await Rebuild(facilityId);
+
+            var after = Assert.Single(await Encounters(facilityId));
+            Assert.Equal(before.CorrelationId, after.CorrelationId);
+            Assert.Equal(before.AdmitDate, after.AdmitDate);
+            Assert.Null(after.DischargeDate);
+            Assert.Equal("mrn-pat-1", after.MedicalRecordNumber);
+            Assert.Equal("on-leave", after.EncounterStatus);
+            Assert.Equal("ADMS", after.EncounterType);
+            Assert.Equal("pat-1", Assert.Single(after.PatientIdentifiers).Identifier);
+            Assert.Equal(nameof(SourceType.SFTP_FHIR), after.PatientIdentifiers.Single().SourceType);
+            Assert.Equal("enc-1", Assert.Single(after.PatientVisitIdentifiers).Identifier);
+            Assert.Equal(nameof(SourceType.SFTP_FHIR), after.PatientVisitIdentifiers.Single().SourceType);
+        }
+
+        [Fact]
+        public async Task Rebuild_ReproducesADischargedCernerEncounter()
+        {
+            var facilityId = "TestFacility" + Guid.NewGuid();
+            await ProcessExtract(facilityId, CernerEncounter());
+            await ProcessExtract(facilityId);
+            var before = Assert.Single(await Encounters(facilityId));
+            Assert.NotNull(before.DischargeDate);
+
+            await Rebuild(facilityId);
+
+            var after = Assert.Single(await Encounters(facilityId));
+            Assert.Equal(before.CorrelationId, after.CorrelationId);
+            Assert.Equal(before.DischargeDate, after.DischargeDate);
+        }
+
+        [Fact]
+        public async Task Rebuild_ByCorrelationId_LeavesOtherCernerEncountersAlone()
+        {
+            var facilityId = "TestFacility" + Guid.NewGuid();
+            await ProcessExtract(facilityId, CernerEncounter("pat-1", "enc-1"), CernerEncounter("pat-2", "enc-2"));
+            var target = (await Encounters(facilityId)).Single(e => e.MedicalRecordNumber == "mrn-pat-1");
+
+            await Rebuild(facilityId, target.CorrelationId);
+
+            Assert.Equal(["mrn-pat-1", "mrn-pat-2"], (await Encounters(facilityId)).Select(e => e.MedicalRecordNumber).Order());
+        }
+
+        [Fact]
+        public async Task DeletingAPatientEvent_KeepsTheFacilitysCernerEncounters()
+        {
+            var facilityId = "TestFacility" + Guid.NewGuid();
+            await ProcessExtract(facilityId, CernerEncounter("pat-1", "enc-1"), CernerEncounter("pat-2", "enc-2"));
+            await ProcessExtract(facilityId, CernerEncounter("pat-1", "enc-1", "on-leave"), CernerEncounter("pat-2", "enc-2"));
+
+            using (var scope = _fixture.ServiceProvider.CreateScope())
+            {
+                var update = await scope.ServiceProvider.GetRequiredService<CensusContext>().PatientEvents
+                    .AsNoTracking()
+                    .SingleAsync(e => e.FacilityId == facilityId && e.EventType == EventType.CernerListUpdate);
+
+                var result = await scope.ServiceProvider.GetRequiredService<LantanaGroup.Link.Census.Controllers.PatientEventsController>()
+                    .DeletePatientEvent(update.Id, CancellationToken.None);
+
+                Assert.IsType<Microsoft.AspNetCore.Mvc.AcceptedResult>(result);
+            }
+
+            // Both stays survive, and the one whose update was deleted goes back to its status before it
+            var encounters = await Encounters(facilityId);
+            Assert.Equal(2, encounters.Count);
+            Assert.Equal("arrived", encounters.Single(e => e.MedicalRecordNumber == "mrn-pat-1").EncounterStatus);
+        }
     }
 }

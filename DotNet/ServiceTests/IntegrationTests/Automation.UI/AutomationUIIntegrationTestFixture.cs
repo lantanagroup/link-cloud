@@ -3,6 +3,7 @@ using Automation.UI.Services.Persistence;
 using Automation.UI.Services.TestRail;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,11 +167,13 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
 
 internal sealed class NoOpTestRailPublisher : ITestRailPublisher
 {
-    public Task PublishScenarioRunAsync(ScenarioTestRailPublishRequest request, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishScenarioRunAsync(
+        ScenarioTestRailPublishRequest request, CancellationToken cancellationToken = default)
+        => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
 
-    public Task PublishApiHealthRunAsync(ApiHealthTestRailPublishRequest request, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishApiHealthRunAsync(
+        ApiHealthTestRailPublishRequest request, CancellationToken cancellationToken = default)
+        => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
 }
 
 internal sealed class RecordingTestRailPublisher : ITestRailPublisher
@@ -181,15 +184,17 @@ internal sealed class RecordingTestRailPublisher : ITestRailPublisher
     public IReadOnlyList<ScenarioTestRailPublishRequest> ScenarioCalls => _scenarios;
     public IReadOnlyList<ApiHealthTestRailPublishRequest> ApiHealthCalls => _apiHealth;
 
-    public Task PublishScenarioRunAsync(ScenarioTestRailPublishRequest request, CancellationToken cancellationToken = default)
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishScenarioRunAsync(
+        ScenarioTestRailPublishRequest request, CancellationToken cancellationToken = default)
     {
         _scenarios.Add(request);
-        return Task.CompletedTask;
+        return System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
     }
 
-    public Task PublishApiHealthRunAsync(ApiHealthTestRailPublishRequest request, CancellationToken cancellationToken = default)
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishApiHealthRunAsync(
+        ApiHealthTestRailPublishRequest request, CancellationToken cancellationToken = default)
     {
         _apiHealth.Add(request);
-        return Task.CompletedTask;
+        return System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
     }
 }
