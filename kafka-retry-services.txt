@@ -5,6 +5,7 @@
 # Use that when the service subscribes to its redrive topic and has no retry consumer.
 # Prefix a service with ! to create only {topic}-Retry-{service}.
 # PayloadSubmitted uses that: redrives are published back onto the main topic.
+ADTAcquired:Census
 AuditableEventOccurred:Audit
 DataAcquisitionRequested:DataAcquisition
 GenerateReportRequested:Report
@@ -16,6 +17,7 @@ PatientEvent:QueryDispatch,Report
 PatientListsAcquired:Census
 CernerPatientsAcquired:Census
 ReportScheduled:Report,QueryDispatch
+RetentionCheckComplete:Report
 ResourcesAcquired:Normalization
 SubmitPayload:Submission
 ValidationComplete:Report
