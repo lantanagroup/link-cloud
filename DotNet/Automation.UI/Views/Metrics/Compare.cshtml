@@ -1,7 +1,9 @@
 @model MetricsCompareViewModel
+@using Automation.UI.Services
 @{
     ViewData["Title"] = "Compare runs";
     var stages = new[] { "acquisition", "normalization", "measureeval", "validation", "submission" };
+    var activeFilter = MetricsCompareClassifier.NormalizeFilter(Context.Request.Query["filter"]);
     string DisplayName(string key) => key switch
     {
         "acquisition" => "Data Acquisition",
@@ -41,44 +43,98 @@
     }
     string FormatWhen(DateTimeOffset? value) =>
         value is null ? "—" : value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
-    string DeltaClass(double? left, double? right)
-    {
-        if (left is null || right is null || left == 0) return "";
-        var change = (right.Value - left.Value) / left.Value;
-        if (change > 0.05) return "text-danger";
-        if (change < -0.05) return "text-success";
-        return "text-muted";
-    }
-    string DeltaText(double? left, double? right)
-    {
-        if (left is null || right is null || left == 0) return "";
-        var change = (right.Value - left.Value) / left.Value * 100;
-        if (Math.Abs(change) < 1) return "about the same";
-        return change > 0 ? $"{change:0}% slower" : $"{Math.Abs(change):0}% faster";
-    }
-    string DeltaAmount(double? left, double? right)
-    {
-        if (left is null || right is null || left == 0) return "";
-        var change = (right.Value - left.Value) / left.Value * 100;
-        if (Math.Abs(change) < 1) return "about the same";
-        return change > 0 ? $"{change:0}% more" : $"{Math.Abs(change):0}% less";
-    }
-    string DeltaThroughputClass(double? left, double? right)
-    {
-        if (left is null || right is null || left == 0) return "";
-        var change = (right.Value - left.Value) / left.Value;
-        if (change > 0.05) return "text-success";
-        if (change < -0.05) return "text-danger";
-        return "text-muted";
-    }
-    string DeltaThroughputText(double? left, double? right)
-    {
-        if (left is null || right is null || left == 0) return "";
-        var change = (right.Value - left.Value) / left.Value * 100;
-        if (Math.Abs(change) < 1) return "about the same";
-        return change > 0 ? $"{change:0}% more throughput" : $"{Math.Abs(change):0}% less throughput";
-    }
+    string Shown(string? value) => string.IsNullOrEmpty(value) ? "—" : value;
     bool BothMissing(bool leftMissing, bool rightMissing) => leftMissing && rightMissing;
+
+    var rows = new List<(string Label, string Earlier, string Later, MetricsChange Change)>();
+    rows.Add((
+        "Result",
+        Shown(MetricsCompareClassifier.DisplayResult(Model.Left.Outcome)),
+        Shown(MetricsCompareClassifier.DisplayResult(Model.Right.Outcome)),
+        MetricsCompareClassifier.ClassifyResult(Model.Left.Outcome, Model.Right.Outcome)));
+    rows.Add((
+        "Total time",
+        FormatDuration(Model.Left.E2eDurationSeconds),
+        FormatDuration(Model.Right.E2eDurationSeconds),
+        MetricsCompareClassifier.Classify(Model.Left.E2eDurationSeconds, Model.Right.E2eDurationSeconds, higherIsBetter: false, MetricsDeltaWording.Duration)));
+    rows.Add((
+        "Patients / min",
+        Model.Left.PatientsPerMinute?.ToString("0.0") ?? "—",
+        Model.Right.PatientsPerMinute?.ToString("0.0") ?? "—",
+        MetricsCompareClassifier.Classify(Model.Left.PatientsPerMinute, Model.Right.PatientsPerMinute, higherIsBetter: true, MetricsDeltaWording.Throughput)));
+
+    foreach (var key in stages)
+    {
+        Model.Left.Stages.TryGetValue(key, out var leftStage);
+        Model.Right.Stages.TryGetValue(key, out var rightStage);
+        leftStage ??= new StageSnapshot { Unavailable = true };
+        rightStage ??= new StageSnapshot { Unavailable = true };
+        if (BothMissing(leftStage.Unavailable, rightStage.Unavailable))
+            continue;
+        rows.Add((
+            $"{DisplayName(key)} (slow)",
+            leftStage.Unavailable ? "—" : FormatMs(leftStage.P95Ms),
+            rightStage.Unavailable ? "—" : FormatMs(rightStage.P95Ms),
+            MetricsCompareClassifier.Classify(
+                leftStage.Unavailable ? null : leftStage.P95Ms,
+                rightStage.Unavailable ? null : rightStage.P95Ms,
+                higherIsBetter: false,
+                MetricsDeltaWording.Duration)));
+    }
+
+    foreach (var key in Model.Left.ProcessUtilization.Select(p => p.Key).Concat(Model.Right.ProcessUtilization.Select(p => p.Key)).Distinct())
+    {
+        var leftProc = Model.Left.ProcessUtilization.FirstOrDefault(p => p.Key == key)
+            ?? new ProcessUtilizationItemView { Unavailable = true };
+        var rightProc = Model.Right.ProcessUtilization.FirstOrDefault(p => p.Key == key)
+            ?? new ProcessUtilizationItemView { Unavailable = true };
+        if (BothMissing(leftProc.Unavailable, rightProc.Unavailable))
+            continue;
+        var name = string.IsNullOrWhiteSpace(leftProc.Name) ? rightProc.Name : leftProc.Name;
+        rows.Add((
+            $"{name} (peak RAM)",
+            leftProc.Unavailable ? "—" : FormatRam(leftProc.PeakMemoryBytes),
+            rightProc.Unavailable ? "—" : FormatRam(rightProc.PeakMemoryBytes),
+            MetricsCompareClassifier.Classify(
+                leftProc.Unavailable ? null : leftProc.PeakMemoryBytes,
+                rightProc.Unavailable ? null : rightProc.PeakMemoryBytes,
+                higherIsBetter: false,
+                MetricsDeltaWording.Amount)));
+        rows.Add((
+            $"{name} (avg CPU)",
+            leftProc.Unavailable ? "—" : FormatPercent(leftProc.AvgCpuPercent),
+            rightProc.Unavailable ? "—" : FormatPercent(rightProc.AvgCpuPercent),
+            MetricsCompareClassifier.Classify(
+                leftProc.Unavailable ? null : leftProc.AvgCpuPercent,
+                rightProc.Unavailable ? null : rightProc.AvgCpuPercent,
+                higherIsBetter: false,
+                MetricsDeltaWording.Amount)));
+    }
+
+    foreach (var apiKey in Model.Left.ApiLatency.Select(a => a.Key).Concat(Model.Right.ApiLatency.Select(a => a.Key)).Distinct())
+    {
+        var leftApi = Model.Left.ApiLatency.FirstOrDefault(a => a.Key == apiKey)
+            ?? new ApiLatencyItemView { Unavailable = true };
+        var rightApi = Model.Right.ApiLatency.FirstOrDefault(a => a.Key == apiKey)
+            ?? new ApiLatencyItemView { Unavailable = true };
+        if (BothMissing(leftApi.Unavailable, rightApi.Unavailable))
+            continue;
+        var apiName = string.IsNullOrWhiteSpace(leftApi.Name) ? rightApi.Name : leftApi.Name;
+        rows.Add((
+            $"{apiName} (API slow)",
+            leftApi.Unavailable ? "—" : FormatMs(leftApi.P95Ms),
+            rightApi.Unavailable ? "—" : FormatMs(rightApi.P95Ms),
+            MetricsCompareClassifier.Classify(
+                leftApi.Unavailable ? null : leftApi.P95Ms,
+                rightApi.Unavailable ? null : rightApi.P95Ms,
+                higherIsBetter: false,
+                MetricsDeltaWording.Duration)));
+    }
+
+    var anyVisible = rows.Any(row => MetricsCompareClassifier.MatchesFilter(row.Change.Kind, activeFilter));
+    string EmptyMessage(string filter) => filter == "degradation"
+        ? "No degradations in this comparison."
+        : "No improvements in this comparison.";
 }
 
 <div class="container mt-4">
@@ -115,9 +171,20 @@
 
     <div class="au-card">
         <div class="card-header">What changed</div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2 border-bottom">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Filter by change">
+                <input type="radio" class="btn-check" name="compareFilter" id="filterAll" value="all" autocomplete="off" checked="@(activeFilter == "all")" />
+                <label class="btn btn-outline-primary" for="filterAll">All</label>
+                <input type="radio" class="btn-check" name="compareFilter" id="filterImprovement" value="improvement" autocomplete="off" checked="@(activeFilter == "improvement")" />
+                <label class="btn btn-outline-primary" for="filterImprovement">Improvement</label>
+                <input type="radio" class="btn-check" name="compareFilter" id="filterDegradation" value="degradation" autocomplete="off" checked="@(activeFilter == "degradation")" />
+                <label class="btn btn-outline-primary" for="filterDegradation">Degradation</label>
+            </div>
+            <span class="small text-muted">Green is an improvement and red is a degradation. Changes of 5% or less stay on All.</span>
+        </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table au-table mb-0">
+                <table class="table au-table mb-0" id="compareTable">
                     <thead>
                         <tr>
                             <th></th>
@@ -127,88 +194,67 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>Result</td>
-                            <td>@(Model.Left.Outcome == "Succeeded" ? "Passed" : Model.Left.Outcome)</td>
-                            <td>@(Model.Right.Outcome == "Succeeded" ? "Passed" : Model.Right.Outcome)</td>
-                            <td></td>
-                        </tr>
-                        <tr>
-                            <td>Total time</td>
-                            <td>@FormatDuration(Model.Left.E2eDurationSeconds)</td>
-                            <td>@FormatDuration(Model.Right.E2eDurationSeconds)</td>
-                            <td class="@DeltaClass(Model.Left.E2eDurationSeconds, Model.Right.E2eDurationSeconds)">@DeltaText(Model.Left.E2eDurationSeconds, Model.Right.E2eDurationSeconds)</td>
-                        </tr>
-                        <tr>
-                            <td>Patients / min</td>
-                            <td>@(Model.Left.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
-                            <td>@(Model.Right.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
-                            <td class="@DeltaThroughputClass(Model.Left.PatientsPerMinute, Model.Right.PatientsPerMinute)">@DeltaThroughputText(Model.Left.PatientsPerMinute, Model.Right.PatientsPerMinute)</td>
-                        </tr>
-                        @foreach (var key in stages)
+                        @foreach (var row in rows)
                         {
-                            Model.Left.Stages.TryGetValue(key, out var leftStage);
-                            Model.Right.Stages.TryGetValue(key, out var rightStage);
-                            leftStage ??= new StageSnapshot { Unavailable = true };
-                            rightStage ??= new StageSnapshot { Unavailable = true };
-                            if (BothMissing(leftStage.Unavailable, rightStage.Unavailable))
-                                continue;
-                            <tr>
-                                <td>@DisplayName(key) (slow)</td>
-                                <td>@(leftStage.Unavailable ? "—" : FormatMs(leftStage.P95Ms))</td>
-                                <td>@(rightStage.Unavailable ? "—" : FormatMs(rightStage.P95Ms))</td>
-                                <td class="@DeltaClass(leftStage.Unavailable ? null : leftStage.P95Ms, rightStage.Unavailable ? null : rightStage.P95Ms)">
-                                    @DeltaText(leftStage.Unavailable ? null : leftStage.P95Ms, rightStage.Unavailable ? null : rightStage.P95Ms)
-                                </td>
+                            var visible = MetricsCompareClassifier.MatchesFilter(row.Change.Kind, activeFilter);
+                            <tr data-change="@row.Change.Token" hidden="@(!visible)">
+                                <td>@row.Label</td>
+                                <td>@row.Earlier</td>
+                                <td>@row.Later</td>
+                                <td class="@row.Change.CssClass">@row.Change.Text</td>
                             </tr>
                         }
-                        @foreach (var key in (Model.Left.ProcessUtilization.Select(p => p.Key).Concat(Model.Right.ProcessUtilization.Select(p => p.Key))).Distinct())
-                        {
-                            var leftProc = Model.Left.ProcessUtilization.FirstOrDefault(p => p.Key == key)
-                                ?? new ProcessUtilizationItemView { Unavailable = true };
-                            var rightProc = Model.Right.ProcessUtilization.FirstOrDefault(p => p.Key == key)
-                                ?? new ProcessUtilizationItemView { Unavailable = true };
-                            if (BothMissing(leftProc.Unavailable, rightProc.Unavailable))
-                                continue;
-                            var name = string.IsNullOrWhiteSpace(leftProc.Name) ? rightProc.Name : leftProc.Name;
-                            <tr>
-                                <td>@name (peak RAM)</td>
-                                <td>@(leftProc.Unavailable ? "—" : FormatRam(leftProc.PeakMemoryBytes))</td>
-                                <td>@(rightProc.Unavailable ? "—" : FormatRam(rightProc.PeakMemoryBytes))</td>
-                                <td class="@DeltaClass(leftProc.Unavailable ? null : leftProc.PeakMemoryBytes, rightProc.Unavailable ? null : rightProc.PeakMemoryBytes)">
-                                    @DeltaAmount(leftProc.Unavailable ? null : leftProc.PeakMemoryBytes, rightProc.Unavailable ? null : rightProc.PeakMemoryBytes)
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>@name (avg CPU)</td>
-                                <td>@(leftProc.Unavailable ? "—" : FormatPercent(leftProc.AvgCpuPercent))</td>
-                                <td>@(rightProc.Unavailable ? "—" : FormatPercent(rightProc.AvgCpuPercent))</td>
-                                <td class="@DeltaClass(leftProc.Unavailable ? null : leftProc.AvgCpuPercent, rightProc.Unavailable ? null : rightProc.AvgCpuPercent)">
-                                    @DeltaAmount(leftProc.Unavailable ? null : leftProc.AvgCpuPercent, rightProc.Unavailable ? null : rightProc.AvgCpuPercent)
-                                </td>
-                            </tr>
-                        }
-                        @foreach (var apiKey in (Model.Left.ApiLatency.Select(a => a.Key).Concat(Model.Right.ApiLatency.Select(a => a.Key))).Distinct())
-                        {
-                            var leftApi = Model.Left.ApiLatency.FirstOrDefault(a => a.Key == apiKey)
-                                ?? new ApiLatencyItemView { Unavailable = true };
-                            var rightApi = Model.Right.ApiLatency.FirstOrDefault(a => a.Key == apiKey)
-                                ?? new ApiLatencyItemView { Unavailable = true };
-                            if (BothMissing(leftApi.Unavailable, rightApi.Unavailable))
-                                continue;
-                            var apiName = string.IsNullOrWhiteSpace(leftApi.Name) ? rightApi.Name : leftApi.Name;
-                            <tr>
-                                <td>@apiName (API slow)</td>
-                                <td>@(leftApi.Unavailable ? "—" : FormatMs(leftApi.P95Ms))</td>
-                                <td>@(rightApi.Unavailable ? "—" : FormatMs(rightApi.P95Ms))</td>
-                                <td class="@DeltaClass(leftApi.Unavailable ? null : leftApi.P95Ms, rightApi.Unavailable ? null : rightApi.P95Ms)">
-                                    @DeltaText(leftApi.Unavailable ? null : leftApi.P95Ms, rightApi.Unavailable ? null : rightApi.P95Ms)
-                                </td>
-                            </tr>
-                        }
+                        <tr id="compareFilterEmpty" hidden="@(activeFilter == "all" || anyVisible)"
+                            data-improvement="No improvements in this comparison."
+                            data-degradation="No degradations in this comparison.">
+                            <td colspan="4" class="text-muted text-center py-4">@EmptyMessage(activeFilter)</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        var rows = Array.prototype.slice.call(document.querySelectorAll('#compareTable tbody tr[data-change]'));
+        var empty = document.getElementById('compareFilterEmpty');
+        var radios = Array.prototype.slice.call(document.querySelectorAll('input[name="compareFilter"]'));
+
+        function selectedFilter() {
+            var selected = radios.filter(function (radio) { return radio.checked; })[0];
+            return selected ? selected.value : 'all';
+        }
+
+        function apply(filter, updateUrl) {
+            var visible = 0;
+            rows.forEach(function (row) {
+                var show = filter === 'all' || row.getAttribute('data-change') === filter;
+                row.hidden = !show;
+                if (show) visible += 1;
+            });
+            if (empty) {
+                var showEmpty = filter !== 'all' && visible === 0;
+                empty.hidden = !showEmpty;
+                if (showEmpty) {
+                    var cell = empty.querySelector('td');
+                    if (cell) cell.textContent = empty.getAttribute('data-' + filter) || 'No rows match this filter.';
+                }
+            }
+            if (updateUrl && window.history && window.history.replaceState) {
+                var url = new URL(window.location.href);
+                if (filter === 'all') url.searchParams.delete('filter');
+                else url.searchParams.set('filter', filter);
+                window.history.replaceState(null, '', url);
+            }
+        }
+
+        radios.forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                if (radio.checked) apply(radio.value, true);
+            });
+        });
+        apply(selectedFilter(), false);
+    })();
+</script>
