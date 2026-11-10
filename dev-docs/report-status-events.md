@@ -96,7 +96,9 @@ expiration rather than retried as a failed normalization stage.
 
 Direct dead letters and exhausted acquisition-message retries emit a failure for the failed phase;
 temporary failures and pipeline aborts/shutdown cancellation do not. Exhausted retries preserve the
-original error message when available. Failure status sends are best effort after Kafka's producer
+original error message when available. Null correlation-header values are treated as missing so
+malformed events can still be dead-lettered and their cache released. Failure status sends are best
+effort after Kafka's producer
 retries, so a diagnostic-send failure is logged and terminal dead-letter/cache cleanup continues.
 Messages lacking a patient id, correlation id, report id, or recognized phase cannot emit a valid
 status event. The status producer uses the canonical report/patient key and Murmur2 partitioning,

@@ -112,6 +112,23 @@ public class NormalizationStatusPublisherTests
         producer.VerifyNoOtherCalls();
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task NullCorrelationHeader_DoesNotPublishOrInterruptFailureHandling(bool success)
+    {
+        var (publisher, producer, _) = CreatePublisher();
+        var headers = new Headers
+        {
+            { KafkaConstants.HeaderConstants.CorrelationId, null }
+        };
+
+        await publisher.PublishAsync(Key(), Value("Initial"), headers,
+            success, null, "invalid input", CancellationToken.None);
+
+        producer.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task CancellationPropagatesEvenWhenReportingFailure()
     {

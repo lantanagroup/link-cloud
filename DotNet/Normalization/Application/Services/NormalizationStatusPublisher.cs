@@ -36,7 +36,13 @@ public sealed class NormalizationStatusPublisher(
     public async Task PublishAsync(ResourceKey? key, ResourcesAcquiredValue? value, Headers? sourceHeaders,
         bool isSuccess, long? processingTime, string? errorMessage, CancellationToken cancellationToken)
     {
-        var correlationId = sourceHeaders == null ? null : KafkaHeaderHelper.GetCorrelationId(sourceHeaders);
+        // Kafka allows null header values. Malformed correlation headers must not interrupt
+        // the listener's dead-letter/cache-cleanup path when it reports the validation failure.
+        var correlationId = sourceHeaders != null
+            && sourceHeaders.TryGetLastBytes(KafkaConstants.HeaderConstants.CorrelationId, out var correlationBytes)
+            && correlationBytes != null
+                ? Encoding.UTF8.GetString(correlationBytes)
+                : null;
         PatientReportingStatus status;
         if (string.Equals(value?.QueryType, "Initial", StringComparison.OrdinalIgnoreCase))
             status = PatientReportingStatus.InitialNormalization;

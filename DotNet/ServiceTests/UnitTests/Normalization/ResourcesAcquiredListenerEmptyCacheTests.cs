@@ -349,13 +349,37 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         status.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task NullCorrelationHeader_StillDeadLettersAndPurgesCache()
+    {
+        var statusProducer = new Mock<IProducer<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>();
+        var statusPublisher = new NormalizationStatusPublisher(statusProducer.Object, TimeProvider.System,
+            Mock.Of<ILogger<NormalizationStatusPublisher>>());
+        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        var purger = new Mock<IResourceCachePurger>();
+        var result = BuildConsumeResult([PatientCacheKey]);
+        result.Message.Headers.Remove(NormalizationConstants.HeaderNames.CorrelationId);
+        result.Message.Headers.Add(NormalizationConstants.HeaderNames.CorrelationId, null);
+        using var cts = new CancellationTokenSource();
+
+        await BuildListener(new Mock<IResourceCache>(), new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>(),
+                purger: purger.Object, statusPublisher: statusPublisher, deadLetterHandler: deadLetterHandler)
+            .ConsumeMessageAsync(result, cts.Token);
+
+        deadLetterHandler.Verify(h => h.HandleException(result,
+            It.Is<DeadLetterException>(ex => ex.Message == "Failed to extract CorrelationId from message."), FacilityId), Times.Once);
+        purger.Verify(p => p.PurgeAsync(result.Message.Value, It.IsAny<string>(), cts.Token), Times.Once);
+        statusProducer.VerifyNoOtherCalls();
+    }
+
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCache> resourceCache,
         Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer,
         IPipelineAbortRegistry? abortRegistry = null,
         IResourceCachePurger? purger = null,
         Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null,
-        INormalizationStatusPublisher? statusPublisher = null)
+        INormalizationStatusPublisher? statusPublisher = null,
+        Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>? deadLetterHandler = null)
     {
         mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var sequenceQueries = new Mock<IOperationSequenceQueries>();
@@ -378,7 +402,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var scopeFactory = new Mock<IServiceScopeFactory>();
         scopeFactory.Setup(item => item.CreateScope()).Returns(scope.Object);
 
-        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        deadLetterHandler ??= new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         deadLetterHandler.SetupProperty(item => item.Topic);
         var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         transientHandler.SetupProperty(item => item.Topic);
