@@ -27,7 +27,7 @@ public class ApiHealthStartupRecoveryTests
         publisher
             .Setup(p => p.PublishApiHealthRunAsync(It.IsAny<ApiHealthTestRailPublishRequest>(), It.IsAny<CancellationToken>()))
             .Callback<ApiHealthTestRailPublishRequest, CancellationToken>((request, _) => published = request)
-            .Returns(Task.CompletedTask);
+            .Returns(() => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]));
 
         var store = new Mock<IApiHealthRunStore>();
         store.Setup(s => s.GetActiveExecutionRunStatusAsync(It.IsAny<CancellationToken>()))
@@ -73,7 +73,7 @@ public class ApiHealthStartupRecoveryTests
         var publisher = new Mock<ITestRailPublisher>();
         publisher
             .Setup(p => p.PublishApiHealthRunAsync(It.IsAny<ApiHealthTestRailPublishRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .Returns(() => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]));
 
         var store = new Mock<IApiHealthRunStore>();
         store.Setup(s => s.GetActiveExecutionRunStatusAsync(It.IsAny<CancellationToken>()))

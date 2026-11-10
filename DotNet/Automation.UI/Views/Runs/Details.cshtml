@@ -1,3 +1,4 @@
+@using Automation.UI.Services.TestRail
 @model LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary
 @functions {
     private static void SplitFailureBlock(string block, out string before, out string? technical, out string? search)
@@ -77,6 +78,7 @@
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">TestRail</span><span class="au-value" id="testRailRuns">@TestRailRunLinks.NotPublished</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">FHIR generator</span><span class="au-value" id="fhirGenerator">Thetis Engine</span></div></div>
                 @{
                     var templateCacheVersion = ViewBag.TemplateCacheVersionNumber as int?;
@@ -1109,6 +1111,8 @@
                     display = v ? '<i class="bi bi-check-circle-fill text-success"></i> Yes' : '<i class="bi bi-x-circle text-muted"></i> No';
                 } else if (typeof v === 'object') {
                     return;
+                } else if (k === 'facilityConfigurationMode' && v === 'AlaCarte') {
+                    display = 'A La Carte';
                 } else {
                     display = escapeHtml(String(v));
                 }
@@ -1759,6 +1763,65 @@
                 el.textContent = value;
         }
 
+        function isSafeTestRailUrl(value) {
+            if (typeof value !== 'string') return false;
+            if (!/^https?:\/\//i.test(value)) return false;
+            try {
+                const url = new URL(value);
+                return url.protocol === 'https:' || url.protocol === 'http:';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function renderTestRailRuns(runs) {
+            const el = document.getElementById('testRailRuns');
+            if (!el || runs == null) return;
+            const items = Array.isArray(runs) ? runs : [];
+            const links = items.filter(run => {
+                const id = Number(run && (run.runId != null ? run.runId : run.RunId));
+                const url = run && (run.url || run.Url);
+                return id > 0 && isSafeTestRailUrl(url);
+            });
+            el.replaceChildren();
+            if (!links.length) {
+                el.textContent = 'Not published';
+                return;
+            }
+            links.forEach((run, index) => {
+                if (index > 0) el.appendChild(document.createTextNode(', '));
+                const id = Number(run.runId != null ? run.runId : run.RunId);
+                const url = run.url || run.Url;
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = 'R' + id;
+                link.title = 'Open TestRail run R' + id;
+                el.appendChild(link);
+                const testId = Number(run.testId != null ? run.testId : run.TestId);
+                const testUrl = run.testUrl || run.TestUrl;
+                if (testId > 0 && isSafeTestRailUrl(testUrl)) {
+                    el.appendChild(document.createTextNode(' '));
+                    const testLink = document.createElement('a');
+                    testLink.href = testUrl;
+                    testLink.target = '_blank';
+                    testLink.rel = 'noopener noreferrer';
+                    testLink.className = 'ms-1';
+                    testLink.textContent = 'T' + testId;
+                    testLink.title = 'Open TestRail test T' + testId;
+                    el.appendChild(testLink);
+                }
+            });
+        }
+
+        renderTestRailRuns(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            TestRailRunLinks.Copy(Model.TestRailRuns),
+            new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            })));
+
         var failureDetailBlocks = [];
         try {
             var failureSource = document.getElementById('failureDetailsSource');
@@ -1885,6 +1948,8 @@
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
             document.getElementById('pipelineDuration').textContent = run.duration || '-';
+            if (Object.prototype.hasOwnProperty.call(run, 'testRailRuns') || Object.prototype.hasOwnProperty.call(run, 'TestRailRuns'))
+                renderTestRailRuns(run.testRailRuns != null ? run.testRailRuns : run.TestRailRuns);
             currentFinishedAt = run.finishedAt || currentFinishedAt;
 
             if (isRunComplete(currentRunStatus) && !runCompletedAtMs) {

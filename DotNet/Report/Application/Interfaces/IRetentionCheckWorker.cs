@@ -3,7 +3,7 @@ using LantanaGroup.Link.Report.Domain.Models;
 namespace LantanaGroup.Link.Report.Application.Interfaces;
 
 /// <summary>
-/// The work the daily retention job runs. LEGLINK-1211 replaces the logging-only default with the real check.
+/// The work the daily retention job runs: the scheduled retention check. See dev-docs/retention-check.md.
 /// </summary>
 public interface IRetentionCheckWorker
 {

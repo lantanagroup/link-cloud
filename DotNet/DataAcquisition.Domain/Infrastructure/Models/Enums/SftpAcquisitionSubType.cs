@@ -7,7 +7,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 public enum SftpAcquisitionSubType
 {
     None,
-    CernerCCLExtract
+    CernerCCLExtract,
+    HL7ADT
 }
 
 public static class SftpAcquisitionSubTypeProvider
