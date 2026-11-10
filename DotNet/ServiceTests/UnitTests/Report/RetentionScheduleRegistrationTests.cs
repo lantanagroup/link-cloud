@@ -1,12 +1,17 @@
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Extensions;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Options;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Shared.Application.Models.Retention;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Moq;
 using Quartz;
 using Task = System.Threading.Tasks.Task;
 
@@ -28,7 +33,26 @@ public class RetentionScheduleRegistrationTests
         Assert.IsType<RetentionScheduleReconciler>(provider.GetRequiredService<IRetentionScheduleReconciler>());
 
         using var scope = provider.CreateScope();
-        Assert.IsType<LoggingRetentionCheck>(scope.ServiceProvider.GetRequiredService<IRetentionCheckWorker>());
+        Assert.IsType<RetentionCheck>(scope.ServiceProvider.GetRequiredService<IRetentionCheckWorker>());
+        Assert.IsType<NoRetentionResends>(scope.ServiceProvider.GetRequiredService<IRetentionPendingResender>());
+    }
+
+    [Fact]
+    public void AddRetentionSchedule_Called_RegistersTheRetentionCheckAndItsPublisher()
+    {
+        // Checked by descriptor: resolving them needs the database and Kafka, which Program.cs registers.
+        var services = new ServiceCollection();
+
+        services.AddRetentionSchedule(new ConfigurationBuilder().Build());
+
+        Assert.Contains(services, d => d.ServiceType == typeof(IRetentionCheckWorker) &&
+                                       d.ImplementationType == typeof(RetentionCheck) &&
+                                       d.Lifetime == ServiceLifetime.Scoped);
+        Assert.Contains(services, d => d.ServiceType == typeof(IRetentionCheckRequestedPublisher) &&
+                                       d.ImplementationType == typeof(RetentionCheckRequestedProducer) &&
+                                       d.Lifetime == ServiceLifetime.Singleton);
+        Assert.Contains(services, d => d.ServiceType == typeof(IProducer<string, RetentionCheckRequestedValue>) &&
+                                       d.Lifetime == ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -61,6 +85,22 @@ public class RetentionScheduleRegistrationTests
         Assert.Equal("Report", Assert.Single(participants.Participants).ServiceName);
     }
 
+    [Fact]
+    public async Task AddRetentionSchedule_Configured_RegistersRetentionCheckSettings()
+    {
+        await using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["Retention:Window"] = "P1Y",
+            ["Retention:MaxReportsPerCleanup"] = "10"
+        });
+
+        var settings = provider.GetRequiredService<RetentionCheckSettings>();
+
+        Assert.True(settings.IsValid);
+        Assert.Equal(12, settings.Window!.Count);
+        Assert.Equal(10, settings.MaxReportsPerCleanup);
+    }
+
     private static ServiceProvider BuildProvider(Dictionary<string, string?> values)
     {
         var configuration = new ConfigurationBuilder()
@@ -76,6 +116,12 @@ public class RetentionScheduleRegistrationTests
             q.SchedulerName = $"retention-registration-tests-{Guid.NewGuid():N}";
             q.UseInMemoryStore();
         });
+
+        // What Program.cs registers for the retention check, faked so no database or broker is needed.
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped(_ => Mock.Of<IRetentionEligibilityQuery>());
+        services.AddScoped(_ => Mock.Of<IRetentionCleanupManager>());
+        services.AddSingleton(Mock.Of<IProducer<string, RetentionCheckRequestedValue>>());
 
         services.AddRetentionSchedule(configuration);
 
