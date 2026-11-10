@@ -31,9 +31,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                         {
                             logger.Information(
                                 "Proxied {Method} {Route} as {Principal}, started by {InitiatedById} ({InitiatedByName})",
-                                transformContext.HttpContext.Request.Method,
+                                InitiatedByAudit.Clean(transformContext.HttpContext.Request.Method) ?? string.Empty,
                                 builderContext.Route.RouteId,
-                                e.Principal,
+                                InitiatedByAudit.Clean(e.Principal) ?? string.Empty,
                                 e.InitiatedById,
                                 e.InitiatedByName ?? string.Empty);
                         }
