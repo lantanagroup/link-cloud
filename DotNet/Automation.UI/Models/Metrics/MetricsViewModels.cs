@@ -1,3 +1,4 @@
+using System.Globalization;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace Automation.UI.Models.Metrics;
@@ -16,6 +17,10 @@ public class MetricsRunListItem
     public int ScenarioVersion { get; set; } = 1;
     public string? SetupSummary { get; set; }
     public double? PatientsPerMinute { get; set; }
+    public int PatientCount { get; set; }
+
+    public string PatientCountText =>
+        PatientCount > 0 ? PatientCount.ToString(CultureInfo.InvariantCulture) : "—";
 }
 
 public sealed class MetricsRunDetailViewModel : MetricsRunListItem
@@ -27,7 +32,6 @@ public sealed class MetricsRunDetailViewModel : MetricsRunListItem
     public bool RunAvailable { get; set; }
 
     public string? BenchmarkKey { get; set; }
-    public int PatientCount { get; set; }
     public double? ResourcesPerSecond { get; set; }
     public string? ThetisGitSha { get; set; }
     public int Seed { get; set; }

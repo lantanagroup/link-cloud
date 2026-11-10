@@ -78,7 +78,8 @@ public class Result {
                             name = "ix_result_category_result_id_category_id",
                             columnList = "result_id, category_id",
                             unique = true),
-                    @Index(name = "ix_result_category_result_id", columnList = "result_id")
+                    @Index(name = "ix_result_category_result_id", columnList = "result_id"),
+                    @Index(name = "ix_result_category_category_id_result_id", columnList = "category_id, result_id")
             })
     private List<Category> categories;
 

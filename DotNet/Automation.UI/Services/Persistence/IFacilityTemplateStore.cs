@@ -1,10 +1,12 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 
 namespace Automation.UI.Services.Persistence;
 
 public interface IFacilityTemplateStore
 {
     Task<List<FacilityTemplate>> GetAllAsync(CancellationToken ct = default);
+    Task<long> CountAsync(CancellationToken ct = default);
+    Task<List<FacilityTemplate>> GetPageAsync(int skip, int take, CancellationToken ct = default);
     Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<FacilityTemplate?> GetDefaultAsync(CancellationToken ct = default);
     Task UpsertAsync(FacilityTemplate template, CancellationToken ct = default);
