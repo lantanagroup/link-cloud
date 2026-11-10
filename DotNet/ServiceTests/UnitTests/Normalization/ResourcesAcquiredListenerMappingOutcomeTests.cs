@@ -491,7 +491,8 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
             resourceCache.Object,
             Mock.Of<IResourceCachePurger>(),
             telemetrySettings.Object,
-            mappingOutcomeProducer.Object);
+            mappingOutcomeProducer.Object,
+            Mock.Of<INormalizationStatusPublisher>());
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult() =>

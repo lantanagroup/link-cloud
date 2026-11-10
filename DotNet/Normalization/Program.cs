@@ -91,6 +91,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>, KafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ReportStatusUpdatedKey, ReportStatusUpdatedValue>, KafkaProducerFactory<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>();
+
+    builder.Services.RegisterKafkaProducer<ReportStatusUpdatedKey, ReportStatusUpdatedValue>(
+        builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        NormalizationStatusPublisher.CreateConfig());
+    builder.Services.AddSingleton<INormalizationStatusPublisher, NormalizationStatusPublisher>();
 
     builder.Services.RegisterKafkaProducer<ResourceKey, ResourcesNormalizedValue>(
         builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),

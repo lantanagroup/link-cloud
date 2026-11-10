@@ -7,6 +7,8 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Application.Error;
@@ -37,6 +39,7 @@ public class ResourcesAcquiredRetryDeadLetterHandler : DeadLetterExceptionHandle
 
     private readonly IResourceCachePurger _resourceCachePurger;
     private readonly ILogger<ResourcesAcquiredRetryDeadLetterHandler> _logger;
+    private readonly INormalizationStatusPublisher _statusPublisher;
 
     public ResourcesAcquiredRetryDeadLetterHandler(
         IKafkaProducerFactory<string, string> producerFactory,
@@ -44,11 +47,13 @@ public class ResourcesAcquiredRetryDeadLetterHandler : DeadLetterExceptionHandle
         ServiceInformation serviceInformation,
         IExceptionLogger<RetryListener> exceptionHandler,
         IResourceCachePurger resourceCachePurger,
-        ILogger<ResourcesAcquiredRetryDeadLetterHandler> logger)
+        ILogger<ResourcesAcquiredRetryDeadLetterHandler> logger,
+        INormalizationStatusPublisher statusPublisher)
         : base(producerFactory, nullConsumeResultProducerFactory, serviceInformation, exceptionHandler)
     {
         _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _statusPublisher = statusPublisher ?? throw new ArgumentNullException(nameof(statusPublisher));
     }
 
     /// <remarks>
@@ -82,6 +87,34 @@ public class ResourcesAcquiredRetryDeadLetterHandler : DeadLetterExceptionHandle
 
         // RetryListener runs its consume callback on a background thread with no synchronization
         // context, so blocking here cannot deadlock. PurgeAsync does not throw.
+        ResourceKey? key = null;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(consumeResult.Message.Key))
+                key = JsonSerializer.Deserialize<ResourceKey>(consumeResult.Message.Key, DeserializerOptions);
+        }
+        catch (JsonException)
+        {
+            // Invalid keys cannot identify a patient, but must still release their resource cache.
+        }
+
+        var error = consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryExceptionMessage, out var bytes)
+            && bytes is not null
+            ? System.Text.Encoding.UTF8.GetString(bytes).Split('\n')[0].TrimEnd('\r')
+            : exceptionMessage;
+        try
+        {
+            _statusPublisher.PublishAsync(key, value, consumeResult.Message.Headers,
+                    false, null, error, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to publish normalization failure for a retry-exhausted message from {Topic}. Continuing with resource cache cleanup.",
+                consumeResult.Topic.SanitizeForLog());
+        }
+
         _resourceCachePurger
             .PurgeAsync(value, $"retry count exhausted: {exceptionMessage}")
             .GetAwaiter()

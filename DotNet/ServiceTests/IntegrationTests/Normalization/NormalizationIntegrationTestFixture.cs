@@ -57,6 +57,7 @@ namespace IntegrationTests.Normalization
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> ConsumeExceptionHandlerMock { get; } = new();
         public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; } = new();
         public Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> MappingOutcomeProducerMock { get; } = new();
+        public Mock<IProducer<ReportStatusUpdatedKey, ReportStatusUpdatedValue>> StatusProducerMock { get; } = new();
         public Mock<IVendorVersionResolver> VendorVersionResolverMock { get; } = new();
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
@@ -113,6 +114,11 @@ namespace IntegrationTests.Normalization
             };
 
             builder.Services.AddSingleton(serviceInformation);
+            builder.Services.AddSingleton<INormalizationStatusPublisher, NormalizationStatusPublisher>();
+            StatusProducerMock.Setup(p => p.ProduceAsync(It.IsAny<string>(),
+                    It.IsAny<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<ReportStatusUpdatedKey, ReportStatusUpdatedValue>());
+            builder.Services.AddSingleton(StatusProducerMock.Object);
             builder.Services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
             builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
             builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
