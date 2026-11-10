@@ -4,6 +4,10 @@
       <div class="rubric-banner-kicker">Configuration</div>
       <h2 class="rubric-banner-heading">Validation Rubrics</h2>
     </div>
+    <div class="rubric-banner-actions">
+      <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', '-', 'import']">Import</a>
+      <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', '-', 'new']">New rubric</a>
+    </div>
   </div>
 
   <div class="rubric-list-body">
@@ -54,7 +58,10 @@
           <button type="button" class="rubric-button" (click)="clearFilters()">Clear filters</button>
         } @else {
           <p><strong>There are no rubrics yet.</strong></p>
-          <p>A rubric appears here once a version of it has been registered with the Validation service.</p>
+          <p>
+            <a class="rubric-link" [routerLink]="['/rubrics', '-', 'new']">Create a rubric</a>, or
+            <a class="rubric-link" [routerLink]="['/rubrics', '-', 'import']">import one</a> from a file.
+          </p>
         }
       </div>
     } @else {

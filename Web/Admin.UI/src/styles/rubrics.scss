@@ -1,0 +1,140 @@
+// The classes the rubric screens share: status pills, links, buttons, monospace text.
+//
+// They are here, loaded once for the whole application, and not in the partial each rubric component
+// uses, because a rule in that partial is copied into every component's stylesheet, and the build limits
+// how large a component's stylesheet may be.
+//
+// The colours and type are the validation theme's (styles/validation-theme.scss), written out as values:
+// that file also holds rules for plain elements, such as every link, which must not be loaded for the
+// whole application. If the theme's palette changes, change these to match.
+
+// A version's status, and labels like "Active", as a small pill.
+.rubric-chip {
+  display: inline-block;
+  padding: .125rem .625rem;
+  border-radius: 999px;
+  font-family: Arial, sans-serif;
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  background-color: #DCDCDC;
+  color: #333333;
+
+  &--draft {
+    background-color: #FCEFD4;
+    color: #7A4E00;
+  }
+
+  &--published {
+    background-color: #E2F1D2;
+    color: #35600A;
+  }
+
+  &--retired {
+    background-color: #DCDCDC;
+    color: #555555;
+  }
+
+  &--active {
+    background-color: #005EAA;
+    color: #ffffff;
+  }
+
+  // On the page banner, where the other colours would not stand out from the background.
+  &--on-banner {
+    background-color: #ffffff;
+    color: #030E44;
+    margin-left: .5rem;
+  }
+
+  &--error {
+    background-color: #F8DADB;
+    color: #7F2A2E;
+  }
+
+  &--warning {
+    background-color: #FCEFD4;
+    color: #7A4E00;
+  }
+
+  &--information {
+    background-color: #C0E9FF;
+    color: #030E44;
+  }
+}
+
+.rubric-muted {
+  color: #555555;
+}
+
+.rubric-mono {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: .875rem;
+  overflow-wrap: anywhere;
+}
+
+.rubric-link {
+  color: #005EAA;
+  text-decoration: none;
+  font-weight: 600;
+
+  &:hover,
+  &:focus-visible {
+    color: #030E44;
+    text-decoration: underline;
+  }
+}
+
+// A plain button for the page's own actions (filters, export, copy). Also worn by a link that leads to a
+// page where something is done, so the two sit alike in a row of actions.
+.rubric-button {
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.5em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: .5rem 1rem;
+  border: solid 2px #005EAA;
+  background-color: #ffffff;
+  color: #005EAA;
+
+  &:hover,
+  &:focus-visible {
+    background-color: #EDF9FF;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: .6;
+  }
+
+  // Named twice over so it outranks a component's own rule for links: the validation theme colours every
+  // link, and a component's copy of that rule would otherwise win over this stylesheet.
+  &--on-banner,
+  &.rubric-button--on-banner {
+    border-color: #ffffff;
+    background-color: transparent;
+    color: #ffffff;
+
+    &:hover,
+    &:focus-visible {
+      background-color: rgba(#ffffff, .15);
+    }
+  }
+}
+
+.rubric-button--primary {
+  background-color: #005EAA;
+  color: #ffffff;
+
+  &:hover,
+  &:focus-visible {
+    background-color: #26418F;
+  }
+}

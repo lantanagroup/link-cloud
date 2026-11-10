@@ -1,0 +1,163 @@
+<div class="rubric-import">
+  <div class="rubric-import-banner">
+    <div>
+      <div class="rubric-banner-kicker">
+        Configuration &gt; <a routerLink="/rubrics">Validation Rubrics</a>
+      </div>
+      <h2 class="rubric-banner-heading">Import a rubric</h2>
+    </div>
+  </div>
+
+  <div class="rubric-import-body">
+    <section class="rubric-import-panel" aria-labelledby="importProvideHeading">
+      <h4 id="importProvideHeading">1. Provide the definition</h4>
+      <p class="rubric-import-help">
+        Upload a .yaml, .yml or .json file, or paste the definition. A file exported from this page or another
+        environment can be used as it is.
+      </p>
+
+      <div class="rubric-import-file">
+        <label for="importFile" class="rubric-button">Choose a file</label>
+        <input id="importFile" type="file" accept=".yaml,.yml,.json" (change)="onFileChosen($event)">
+        @if (fileName) {
+          <span class="rubric-mono">{{ fileName }}</span>
+        }
+      </div>
+      <span class="rubric-import-error" role="alert">{{ fileError }}</span>
+
+      <div class="rubric-import-field">
+        <label for="importText">Definition, as YAML or JSON</label>
+        <textarea id="importText" rows="14" class="rubric-mono" spellcheck="false" [(ngModel)]="text"
+          (ngModelChange)="onTextChanged()"></textarea>
+      </div>
+
+      <div class="rubric-import-actions">
+        <button type="button" class="rubric-button rubric-button--primary" [disabled]="busy !== null || !text.trim()"
+          (click)="reviewText()">
+          {{ busy === 'reviewing' ? 'Reviewing…' : 'Review' }}
+        </button>
+        <span class="rubric-import-help">Reviewing saves nothing.</span>
+      </div>
+    </section>
+
+    @if (failure) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>That did not work.</strong></p>
+        <p>{{ failure }}</p>
+      </div>
+    }
+
+    @if (review) {
+      <section class="rubric-import-panel" aria-labelledby="importReviewHeading">
+        <h4 id="importReviewHeading">2. Review</h4>
+
+        @if (definition; as reviewed) {
+          <dl class="rubric-import-facts">
+            <div>
+              <dt>Rubric</dt>
+              <dd>{{ reviewed.title || reviewed.id }} <span class="rubric-mono rubric-muted">{{ reviewed.id }}</span></dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd>{{ reviewed.semver }}</dd>
+            </div>
+            <div>
+              <dt>Owner</dt>
+              <dd>{{ reviewed.owner || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Checks</dt>
+              <dd>{{ checkCount }} ({{ enabledCheckCount }} enabled)</dd>
+            </div>
+            <div>
+              <dt>Scoring</dt>
+              <dd>{{ scoringLabel(reviewed.scoringPolicy) || '—' }}</dd>
+            </div>
+          </dl>
+        }
+
+        @if (!review.valid) {
+          <div class="rubric-message rubric-message--error" role="alert">
+            <p>
+              <strong>
+                @if (definition) {
+                  This definition has {{ review.errors.length === 1 ? 'a problem' : review.errors.length + ' problems' }} and
+                  cannot be imported as it is.
+                } @else {
+                  This could not be read as a rubric definition.
+                }
+              </strong>
+            </p>
+            <ul>
+              @for (error of review.errors; track $index) {
+                <li>{{ error }}</li>
+              }
+            </ul>
+            @if (definition) {
+              <p>Correct the text above and review it again, or open it in the editor to fix it there.</p>
+              <button type="button" class="rubric-button" (click)="openInEditor()">Open in the editor</button>
+            }
+          </div>
+        } @else {
+          @switch (effect) {
+            @case ('new-rubric') {
+              <p class="rubric-import-effect">
+                Importing creates the rubric <strong>{{ definition!.id }}</strong>, with version {{ definition!.semver }} as
+                a draft.
+              </p>
+            }
+            @case ('new-version') {
+              <p class="rubric-import-effect">
+                The rubric <strong>{{ definition!.id }}</strong> exists. Importing adds version {{ definition!.semver }} to
+                it as a draft.
+              </p>
+            }
+            @case ('replace-draft') {
+              <p class="rubric-import-effect">
+                Version {{ definition!.semver }} of <strong>{{ definition!.id }}</strong> is already a draft, with a
+                different definition. Importing <strong>replaces that draft</strong> with this one.
+              </p>
+            }
+            @case ('unchanged-draft') {
+              <p class="rubric-import-effect">
+                Version {{ definition!.semver }} of <strong>{{ definition!.id }}</strong> is already a draft with exactly this
+                definition. There is nothing to import.
+                <a class="rubric-link" [routerLink]="['/rubrics', definition!.id, 'versions', definition!.semver]">Open it</a>
+              </p>
+            }
+            @case ('immutable') {
+              <div class="rubric-message rubric-message--error" role="alert">
+                <p>
+                  <strong>
+                    Version {{ definition!.semver }} of {{ definition!.id }} is {{ review.existingStatus?.toLowerCase() }} and
+                    cannot be changed.
+                  </strong>
+                </p>
+                @if (review.checksum === review.existingChecksum) {
+                  <p>It already has exactly this definition, so there is nothing to import.</p>
+                } @else {
+                  <p>Its definition differs from this one. To bring this one in, import it under the next version number.</p>
+                  <button type="button" class="rubric-button" [disabled]="busy !== null" (click)="reviewAsNextVersion()">
+                    Review it as the next version
+                  </button>
+                }
+              </div>
+            }
+          }
+
+          @if (canImport) {
+            <p class="rubric-import-help">
+              It is imported as a draft. Nothing is published, and it does not affect validation until it is.
+            </p>
+            <div class="rubric-import-actions">
+              <button type="button" class="rubric-button rubric-button--primary" [disabled]="busy !== null"
+                (click)="importDefinition()">
+                {{ busy === 'importing' ? 'Importing…' : 'Import as a draft' }}
+              </button>
+            </div>
+          }
+        }
+      </section>
+    }
+  </div>
+</div>

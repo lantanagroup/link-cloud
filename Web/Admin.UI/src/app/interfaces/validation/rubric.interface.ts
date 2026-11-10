@@ -187,6 +187,33 @@ export interface IRubricSettings {
 
 export type RubricDefinitionFormat = 'json' | 'yaml';
 
+/** What checking a definition found, without saving it. */
+export interface IRubricValidationResult {
+  /** Whether saving this definition would be accepted. */
+  valid: boolean;
+  /** Every problem, each as `<where>: <what>`. Empty when valid. */
+  errors: string[];
+  /** The definition as JSON. Present whenever the text could be read, valid or not. */
+  definition?: IRubricDefinition;
+  /** The checksum it would be stored with. Only when valid. */
+  checksum?: string;
+  rubricExists?: boolean;
+  /** The status of the version already saved under this id and version number, when there is one. */
+  existingStatus?: RubricVersionStatus;
+  existingChecksum?: string;
+}
+
+/**
+ * What the caller says a version's state is when saving it, so a save made on stale knowledge is refused
+ * instead of replacing someone else's work. With neither, a draft is replaced whatever it holds.
+ */
+export interface IRubricSavePrecondition {
+  /** The checksum of the draft that was opened. Refused when the draft has since changed or been deleted. */
+  expectedChecksum?: string;
+  /** The version is being created. Refused when it already exists. */
+  mustNotExist?: boolean;
+}
+
 /** What the rubric list can be asked for. */
 export interface IRubricListQuery {
   /** Only rubrics with a version in this status. */

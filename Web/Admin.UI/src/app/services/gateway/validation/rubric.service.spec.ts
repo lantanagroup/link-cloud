@@ -197,6 +197,101 @@ describe('RubricService', () => {
     });
   });
 
+  describe('validateText and validate', () => {
+    it('sends YAML as YAML and JSON as JSON, as the text it was given', () => {
+      service.validateText('id: piqi.core\n', 'yaml').subscribe();
+      const yaml = http.expectOne(`${BASE}/$validate`);
+      expect(yaml.request.method).toBe('POST');
+      expect(yaml.request.headers.get('Content-Type')).toBe('application/yaml');
+      expect(yaml.request.body).toBe('id: piqi.core\n');
+      yaml.flush(envelope({ valid: true, errors: [] }));
+
+      service.validate({ id: 'piqi.core' } as never).subscribe();
+      const json = http.expectOne(`${BASE}/$validate`);
+      expect(json.request.headers.get('Content-Type')).toBe('application/json');
+      expect(json.request.body).toBe('{"id":"piqi.core"}');
+      json.flush(envelope({ valid: true, errors: [] }));
+    });
+
+    it('returns a result for a definition that is not valid, rather than failing', () => {
+      let received: { valid: boolean; errors: string[] } | undefined;
+
+      service.validateText('id: x', 'yaml').subscribe(result => received = result);
+      http.expectOne(`${BASE}/$validate`).flush(envelope({ valid: false, errors: ['id: too short'] }));
+
+      expect(received).toEqual({ valid: false, errors: ['id: too short'] });
+    });
+
+    it('gives a result an empty list of errors when the service left it out', () => {
+      let received: { valid: boolean; errors: string[] } | undefined;
+
+      service.validateText('id: x', 'yaml').subscribe(result => received = result);
+      http.expectOne(`${BASE}/$validate`).flush(envelope({ valid: true }));
+
+      expect(received?.errors).toEqual([]);
+    });
+  });
+
+  describe('saveDraft', () => {
+    const definition = { id: 'piqi.core', semver: '1.1.0' } as never;
+
+    it('posts the definition to its rubric, with no precondition unless one is given', () => {
+      let received: unknown;
+
+      service.saveDraft(definition).subscribe(result => received = result);
+      const request = http.expectOne(`${BASE}/piqi.core/versions`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toBe('{"id":"piqi.core","semver":"1.1.0"}');
+      expect(request.request.headers.has('If-Match')).toBeFalse();
+      expect(request.request.headers.has('If-None-Match')).toBeFalse();
+      request.flush(envelope({ semver: '1.1.0', checksum: 'abc' }));
+
+      expect(received).toEqual({ semver: '1.1.0', checksum: 'abc' });
+    });
+
+    it('sends the checksum it expects as an entity tag', () => {
+      service.saveDraft(definition, { expectedChecksum: 'abc123' }).subscribe();
+
+      const request = http.expectOne(`${BASE}/piqi.core/versions`);
+      expect(request.request.headers.get('If-Match')).toBe('"abc123"');
+      request.flush(envelope({}));
+    });
+
+    it('says the version must not exist yet', () => {
+      service.saveDraft(definition, { mustNotExist: true }).subscribe();
+
+      const request = http.expectOne(`${BASE}/piqi.core/versions`);
+      expect(request.request.headers.get('If-None-Match')).toBe('*');
+      request.flush(envelope({}));
+    });
+
+    it('fails with the kind of refusal: a precondition, a conflict, or problems with the definition', () => {
+      const failures: RubricApiError[] = [];
+      const refuse = (status: number, body: object) => {
+        service.saveDraft(definition).subscribe({ error: error => failures.push(error) });
+        http.expectOne(`${BASE}/piqi.core/versions`).flush(body, { status, statusText: 'Refused' });
+      };
+
+      refuse(412, { status: 412, message: 'changed' });
+      refuse(409, { status: 409, message: 'immutable' });
+      refuse(400, { status: 400, message: 'Invalid rubric definition', errors: ['owner: too long'] });
+
+      expect(failures.map(f => [f.preconditionFailed, f.conflict, f.errors])).toEqual([
+        [true, false, []], [false, true, []], [false, false, ['owner: too long']]]);
+    });
+  });
+
+  it('deleteDraft deletes the version and completes with nothing', () => {
+    let completed = false;
+
+    service.deleteDraft('piqi.core', '1.1.0').subscribe({ complete: () => completed = true });
+    const request = http.expectOne(`${BASE}/piqi.core/versions/1.1.0`);
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+
+    expect(completed).toBeTrue();
+  });
+
   describe('a failed call', () => {
     function failure(run: () => void): RubricApiError {
       let caught: RubricApiError | undefined;

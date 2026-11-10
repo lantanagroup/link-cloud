@@ -22,6 +22,13 @@
         </div>
       }
     </div>
+    @if (rubric) {
+      <div class="rubric-banner-actions">
+        <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubric.rubricId, 'versions', 'new']">
+          New version
+        </a>
+      </div>
+    }
   </div>
 
   <div class="rubric-detail-body">
@@ -60,6 +67,11 @@
                   <span [class]="chipClass(version)">{{ statusLabel(version.status) }}</span>
                   @if (isActive(version)) {
                     <span class="rubric-chip rubric-chip--active">Active</span>
+                  }
+                  @if (version.status === 'DRAFT') {
+                    <a class="rubric-link rubric-detail-row-action"
+                      [routerLink]="['/rubrics', rubric.rubricId, 'versions', version.semver, 'edit']"
+                      [attr.aria-label]="'Edit draft ' + version.semver">Edit</a>
                   }
                 </td>
               </ng-container>

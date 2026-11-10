@@ -3,6 +3,7 @@ import {RouterModule, Routes} from '@angular/router';
 import {NgModule} from '@angular/core';
 import {AuthGuard} from './services/security/auth.guard'; // adjust the path
 import {DmrpGuard} from './services/security/dmrp.guard';
+import {confirmLeavingRubricEditor} from './components/rubrics/rubric-editor/rubric-editor-leave.guard';
 
 
 const routes: Routes = [
@@ -37,7 +38,11 @@ const routes: Routes = [
   { path: 'validation-config/validation-categories-management', loadComponent: () => import('./components/validation-config/validation-categories/validation-categories-management/validation-categories-management.component').then(mod => mod.ValidationCategoriesManagementComponent), canActivate: [AuthGuard] },
   { path: 'validation-config/validation-categories/:id/edit', loadComponent: () => import('./components/validation-config/validation-categories/edit-validation-category/edit-validation-category.component').then(mod => mod.EditValidationCategoryComponent), canActivate: [AuthGuard]  },
   { path: 'rubrics', loadComponent: () => import('./components/rubrics/rubric-list/rubric-list.component').then(mod => mod.RubricListComponent), canActivate: [AuthGuard] },
+  { path: 'rubrics/-/import', loadComponent: () => import('./components/rubrics/rubric-import/rubric-import.component').then(mod => mod.RubricImportComponent), canActivate: [AuthGuard] },
+  { path: 'rubrics/-/new', loadComponent: () => import('./components/rubrics/rubric-editor/rubric-editor.component').then(mod => mod.RubricEditorComponent), canActivate: [AuthGuard], canDeactivate: [confirmLeavingRubricEditor] },
   { path: 'rubrics/:rubricId', loadComponent: () => import('./components/rubrics/rubric-detail/rubric-detail.component').then(mod => mod.RubricDetailComponent), canActivate: [AuthGuard] },
+  { path: 'rubrics/:rubricId/versions/new', loadComponent: () => import('./components/rubrics/rubric-editor/rubric-editor.component').then(mod => mod.RubricEditorComponent), canActivate: [AuthGuard], canDeactivate: [confirmLeavingRubricEditor] },
+  { path: 'rubrics/:rubricId/versions/:semver/edit', loadComponent: () => import('./components/rubrics/rubric-editor/rubric-editor.component').then(mod => mod.RubricEditorComponent), canActivate: [AuthGuard], canDeactivate: [confirmLeavingRubricEditor] },
   { path: 'rubrics/:rubricId/versions/:semver', loadComponent: () => import('./components/rubrics/rubric-version-view/rubric-version-view.component').then(mod => mod.RubricVersionViewComponent), canActivate: [AuthGuard] },
   { path: 'query-plans', loadComponent: () => import('./components/query-plans/query-plans-dashboard/query-plans-dashboard.component').then(mod => mod.QueryPlansDashboardComponent), canActivate: [AuthGuard]  },
   { path: 'terminology-config', loadComponent: () => import('./components/terminology/terminology-config.component').then(mod => mod.TerminologyConfigComponent), canActivate: [AuthGuard]  },

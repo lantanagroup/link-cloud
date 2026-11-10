@@ -239,7 +239,9 @@ internal static partial class FacilitySetupExtensions
     {
         try
         {
-            using var http = LinkServiceClient.Create(Ports.MeasureEval);
+            // A short wait: when MeasureEval is not running, Aspire's proxy still accepts the connection and
+            // never answers, and the form would not open until the client gave up.
+            using var http = LinkServiceClient.Create(Ports.MeasureEval, TimeSpan.FromSeconds(5));
             using var document = JsonDocument.Parse(await http.GetStringAsync("api/measureeval/measure-definition", cancellationToken));
             return document.RootElement.ValueKind is JsonValueKind.Array
                 ? document.RootElement.EnumerateArray()

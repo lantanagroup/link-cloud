@@ -5,13 +5,17 @@ import { catchError, map, Observable, of, shareReplay, throwError } from 'rxjs';
 import { AppConfigService } from '../../app-config.service';
 import {
   IRubricApiResponse,
+  IRubricDefinition,
   IRubricDetail,
   IRubricLifecycleEvent,
   IRubricListQuery,
   IRubricPage,
+  IRubricSavePrecondition,
   IRubricSettings,
   IRubricSummary,
+  IRubricValidationResult,
   IRubricVersionDetail,
+  IRubricVersionSummary,
   RubricDefinitionFormat
 } from '../../../interfaces/validation/rubric.interface';
 
@@ -28,6 +32,16 @@ export class RubricApiError extends Error {
   /** True when the rubric or version asked for does not exist. */
   get notFound(): boolean {
     return this.status === 404;
+  }
+
+  /** True when a save was refused because the version is not in the state the caller said it was. */
+  get preconditionFailed(): boolean {
+    return this.status === 412;
+  }
+
+  /** True when the version's status does not allow what was asked: it is published or retired. */
+  get conflict(): boolean {
+    return this.status === 409;
   }
 }
 
@@ -138,6 +152,59 @@ export class RubricService {
       }).pipe(
       catchError(RubricService.toApiError)
     );
+  }
+
+  /**
+   * Checks a definition without saving it. The text is YAML or JSON as given; `format` says which. The
+   * answer is a result even when the definition is not valid: only a request the service could not take
+   * at all (too large, say) fails.
+   */
+  validateText(text: string, format: RubricDefinitionFormat): Observable<IRubricValidationResult> {
+    return this.http.post<IRubricApiResponse<IRubricValidationResult>>(`${this.baseUrl}/$validate`, text, {
+      headers: { 'Content-Type': format === 'yaml' ? 'application/yaml' : 'application/json' }
+    }).pipe(
+      map(response => RubricService.validationResult(RubricService.required(response))),
+      catchError(RubricService.toApiError)
+    );
+  }
+
+  /** Checks a definition without saving it. */
+  validate(definition: IRubricDefinition): Observable<IRubricValidationResult> {
+    return this.validateText(JSON.stringify(definition), 'json');
+  }
+
+  /**
+   * Saves a definition as a draft of its rubric: a new version, or a replacement for the draft already
+   * saved under that version number. Fails with a {@link RubricApiError}: `errors` when the definition is
+   * not valid, `preconditionFailed` when the precondition did not hold, `conflict` when that version is
+   * published or retired.
+   */
+  saveDraft(definition: IRubricDefinition, precondition: IRubricSavePrecondition = {}): Observable<IRubricVersionSummary> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (precondition.expectedChecksum) {
+      headers['If-Match'] = `"${precondition.expectedChecksum}"`;
+    }
+    if (precondition.mustNotExist) {
+      headers['If-None-Match'] = '*';
+    }
+    return this.http.post<IRubricApiResponse<IRubricVersionSummary>>(
+      `${this.baseUrl}/${encodeURIComponent(definition.id)}/versions`, JSON.stringify(definition), { headers }).pipe(
+      map(response => RubricService.required(response)),
+      catchError(RubricService.toApiError)
+    );
+  }
+
+  /** Deletes a draft. A published or retired version cannot be deleted; that fails with `conflict`. */
+  deleteDraft(rubricId: string, semver: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.baseUrl}/${encodeURIComponent(rubricId)}/versions/${encodeURIComponent(semver)}`).pipe(
+      map(() => undefined),
+      catchError(RubricService.toApiError)
+    );
+  }
+
+  private static validationResult(result: IRubricValidationResult): IRubricValidationResult {
+    return { ...result, valid: result.valid === true, errors: result.errors ?? [] };
   }
 
   private static toApiError(error: unknown): Observable<never> {

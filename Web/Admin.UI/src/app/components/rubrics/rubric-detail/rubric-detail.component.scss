@@ -25,6 +25,10 @@
     margin-left: .375rem;
   }
 
+  &-row-action {
+    margin-left: .75rem;
+  }
+
   // "Published" and "Active" stay side by side.
   .mat-column-status,
   .mat-column-semver {

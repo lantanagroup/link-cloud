@@ -15,6 +15,16 @@
     </div>
     @if (version?.definition) {
       <div class="rubric-banner-actions">
+        @if (version?.status === 'DRAFT') {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'versions', version!.semver, 'edit']">
+            Edit
+          </a>
+        } @else {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'versions', 'new']"
+            [queryParams]="{ from: version!.semver }">
+            New version from this
+          </a>
+        }
         <button type="button" class="rubric-button rubric-button--on-banner" [disabled]="exporting !== null"
           (click)="export('yaml')">
           {{ exporting === 'yaml' ? 'Exporting…' : 'Export YAML' }}

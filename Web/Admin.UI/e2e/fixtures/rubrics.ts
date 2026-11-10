@@ -6,6 +6,7 @@ import {
   IRubricPage,
   IRubricSettings,
   IRubricSummary,
+  IRubricValidationResult,
   IRubricVersionDetail,
   IRubricVersionSummary,
 } from '../../src/app/interfaces/validation/rubric.interface';
@@ -241,3 +242,53 @@ export const bareMinimumEvents: IRubricLifecycleEvent[] = [
   { eventId: 'e-2', semver: '1.1.0', action: 'PUBLISHED', actor: 'reviewer@example.org', checksum: CHECKSUM_PUBLISHED, occurredAt: '2026-09-03T16:30:00Z' },
   { eventId: 'e-1', semver: '1.1.0', action: 'REGISTERED', actor: 'author@example.org', checksum: CHECKSUM_PUBLISHED, occurredAt: '2026-09-01T09:00:00Z' },
 ];
+
+/** The draft version's definition: the published one with a fifth check, under the next version number. */
+export const draftDefinition: IRubricDefinition = {
+  ...publishedDefinition,
+  semver: '1.2.0',
+  checks: [
+    ...publishedDefinition.checks,
+    {
+      id: 'patient-name-present',
+      type: 'FHIRPATH',
+      dimension: 'CONFORMANCE',
+      severityOverride: 'WARNING',
+      ordinal: 5,
+      enabled: true,
+      parameters: { expression: 'Patient.name.exists()', failureMessage: 'Patient has no name' },
+    },
+  ],
+};
+
+/** GET /api/validation/rubrics/bare-minimum-requirements/versions/1.2.0 */
+export const draftVersion: IRubricVersionDetail = {
+  rubricVersionId: 12,
+  rubricId: 'bare-minimum-requirements',
+  semver: '1.2.0',
+  status: 'DRAFT',
+  checksum: CHECKSUM_DRAFT,
+  definition: draftDefinition,
+  createdAt: '2026-09-06T14:02:11Z',
+  createdBy: 'author@example.org',
+};
+
+/** What saving a draft answers with: the version as saved, with the checksum the next save has to name. */
+export function savedDraft(rubricId: string, semver: string, checksum = 'c0ffee'.repeat(10) + 'c0ff'):
+  { status: number; json: IRubricApiResponse<IRubricVersionSummary> } {
+  return {
+    status: 201,
+    json: {
+      status: 201,
+      message: 'Rubric version registered',
+      timestamp: '2026-09-08T10:15:30.184Z',
+      data: { rubricVersionId: 30, rubricId, semver, status: 'DRAFT', checksum },
+    },
+  };
+}
+
+/** POST /api/validation/rubrics/$validate */
+export function validationResult(result: Partial<IRubricValidationResult>):
+  { status: number; json: IRubricApiResponse<IRubricValidationResult> } {
+  return rubricOk<IRubricValidationResult>({ valid: true, errors: [], ...result });
+}
