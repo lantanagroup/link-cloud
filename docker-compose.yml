@@ -795,7 +795,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5257/"]
-
+      
   measureeval:
     image: link-measureeval
     container_name: link-measureeval
