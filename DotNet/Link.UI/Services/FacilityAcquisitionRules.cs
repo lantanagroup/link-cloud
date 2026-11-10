@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Link.UI.Models;
@@ -29,7 +30,15 @@ public static class FacilityAcquisitionRules
     public static readonly string[] Variables = ["PatientId", "LookbackStart", "PeriodStart", "PeriodEnd"];
     public static readonly string[] SetupMethods = ["manual", "identifier", "managingOrg", "locationType"];
     public static readonly string[] AcquisitionTypes = ["Census", "Resources"];
-    public static readonly string[] AcquisitionSubTypes = ["None", "CernerCCLExtract"];
+    public static readonly string[] AcquisitionSubTypes = ["None", "CernerCCLExtract", "HL7ADT"];
+
+    public const string AdtPatientOnEvent = "adtEvent";
+    public const string AdtPatientByMrn = "mrnSearch";
+
+    // Same location syntax Hl7Path accepts: SEG[selector]-Field[selector].Component.Subcomponent.
+    private static readonly Regex Hl7Location = new(
+        @"^[A-Za-z][A-Za-z0-9]{2}(\[([1-9]\d{0,2}|[1-9]\d{0,2}(\.[1-9]\d{0,2})?=[^\]]+)\])?[-.][1-9]\d{0,2}(\[([1-9]\d{0,2}|[1-9]\d{0,2}=[^\]]+)\])?(\.[1-9]\d{0,2}(\.[1-9]\d{0,2})?)?$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static readonly (string Status, string TimeFrame, string Label)[] PatientListSlots =
     [
@@ -497,7 +506,7 @@ public static class FacilityAcquisitionRules
             return false;
         }
 
-        if (!TryAcquisitions(input.Acquisitions, out var acquisitions, out error))
+        if (!TryAcquisitions(input.Acquisitions, input.RemoveAfterProcessing, out var acquisitions, out error))
             return false;
 
         var username = input.Username?.Trim() ?? string.Empty;
@@ -863,6 +872,7 @@ public static class FacilityAcquisitionRules
 
     private static bool TryAcquisitions(
         List<SftpAcquisitionInput>? rows,
+        bool removeAfterProcessing,
         out List<Dictionary<string, object?>> acquisitions,
         out string? error)
     {
@@ -872,7 +882,9 @@ public static class FacilityAcquisitionRules
             var blank = string.IsNullOrWhiteSpace(row.AcquisitionType)
                 && string.IsNullOrWhiteSpace(row.RemoteDirectory)
                 && string.IsNullOrWhiteSpace(row.ProcessedDirectory)
-                && string.IsNullOrWhiteSpace(row.FileNamePattern);
+                && string.IsNullOrWhiteSpace(row.FileNamePattern)
+                && !AdtFieldsPresent(row)
+                && !string.Equals(row.SubType?.Trim(), "HL7ADT", StringComparison.OrdinalIgnoreCase);
             if (row.Remove || blank)
                 continue;
 
@@ -882,7 +894,7 @@ public static class FacilityAcquisitionRules
                 string.Equals(item, string.IsNullOrWhiteSpace(row.SubType) ? "None" : row.SubType.Trim(), StringComparison.OrdinalIgnoreCase));
             if (type is null || subType is null)
             {
-                error = "Acquisition type must be Census or Resources, and sub type None or CernerCCLExtract.";
+                error = "Acquisition type must be Census or Resources, and sub type None, CernerCCLExtract, or HL7ADT.";
                 return false;
             }
 
@@ -902,7 +914,109 @@ public static class FacilityAcquisitionRules
             if (!string.IsNullOrWhiteSpace(row.FileNamePattern))
                 item["FileNamePattern"] = row.FileNamePattern.Trim();
 
+            if (subType == "HL7ADT")
+            {
+                if (!string.Equals(type, "Census", StringComparison.Ordinal))
+                {
+                    error = "The HL7ADT sub type is only supported for Census acquisition.";
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(processed) && !removeAfterProcessing)
+                {
+                    error = "HL7ADT acquisition requires a processed directory or Remove after processing, so that a file of ADT events is not read again on every run.";
+                    return false;
+                }
+
+                if (!TryAdtConfiguration(row, out var adt, out error))
+                    return false;
+                item["AdtConfiguration"] = adt;
+            }
+            else if (AdtFieldsPresent(row))
+            {
+                error = "An ADT configuration is only allowed for the HL7ADT sub type.";
+                return false;
+            }
+
             acquisitions.Add(item);
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static bool AdtFieldsPresent(SftpAcquisitionInput row) =>
+        !string.IsNullOrWhiteSpace(row.PatientIdLocation)
+        || !string.IsNullOrWhiteSpace(row.MrnIdentifierSystem)
+        || !string.IsNullOrWhiteSpace(row.MrnLocation)
+        || !string.IsNullOrWhiteSpace(row.EncounterIdLocation);
+
+    private static bool TryAdtConfiguration(
+        SftpAcquisitionInput row,
+        out Dictionary<string, object?> adt,
+        out string? error)
+    {
+        adt = new Dictionary<string, object?>();
+        var source = string.IsNullOrWhiteSpace(row.PatientIdSource) ? AdtPatientOnEvent : row.PatientIdSource.Trim();
+        var onEvent = string.Equals(source, AdtPatientOnEvent, StringComparison.OrdinalIgnoreCase);
+        var byMrn = string.Equals(source, AdtPatientByMrn, StringComparison.OrdinalIgnoreCase);
+        if (!onEvent && !byMrn)
+        {
+            error = "Choose whether the FHIR Patient.Id is on the ADT event or found by MRN search.";
+            return false;
+        }
+
+        if (onEvent)
+        {
+            if (!TryHl7Location(row.PatientIdLocation, required: true, "Patient.Id location", out var location, out error))
+                return false;
+            adt["PatientIdLocation"] = location;
+        }
+        else
+        {
+            var system = row.MrnIdentifierSystem?.Trim() ?? string.Empty;
+            if (system.Length == 0)
+            {
+                error = "MRN identifier system is required when the Patient.Id is found by MRN search.";
+                return false;
+            }
+
+            if (system.Length > 512 || system.Any(character => char.IsWhiteSpace(character) || character == '|'))
+            {
+                error = "MRN identifier system cannot contain whitespace or '|', or exceed 512 characters.";
+                return false;
+            }
+
+            adt["MrnIdentifierSystem"] = system;
+        }
+
+        if (!TryHl7Location(row.MrnLocation, required: false, "MRN location", out var mrnLocation, out error))
+            return false;
+        if (mrnLocation is not null)
+            adt["MrnLocation"] = mrnLocation;
+
+        if (!TryHl7Location(row.EncounterIdLocation, required: false, "Encounter id location", out var encounterLocation, out error))
+            return false;
+        if (encounterLocation is not null)
+            adt["EncounterIdLocation"] = encounterLocation;
+
+        error = null;
+        return true;
+    }
+
+    private static bool TryHl7Location(string? value, bool required, string label, out string? location, out string? error)
+    {
+        location = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        if (location is null)
+        {
+            error = required ? $"{label} is required." : null;
+            return !required;
+        }
+
+        if (location.Length > 128 || !Hl7Location.IsMatch(location))
+        {
+            error = $"{label} must be an HL7 location such as PID-2, PID-3[5=FHIR].1 or OBX[3.1=FHIRID]-5.";
+            return false;
         }
 
         error = null;
@@ -1206,13 +1320,23 @@ public static class FacilityAcquisitionRules
 
         foreach (var item in items.EnumerateArray())
         {
+            var hasAdt = TryProp(item, "adtConfiguration", out var adt) && adt.ValueKind == JsonValueKind.Object;
+            var patientIdLocation = hasAdt ? StringOf(adt, "patientIdLocation") : null;
+            var mrnIdentifierSystem = hasAdt ? StringOf(adt, "mrnIdentifierSystem") : null;
             rows.Add(new SftpAcquisitionInput
             {
                 AcquisitionType = StringOf(item, "acquisitionType"),
                 SubType = StringOf(item, "subType") ?? "None",
                 RemoteDirectory = StringOf(item, "remoteDirectory"),
                 ProcessedDirectory = StringOf(item, "processedDirectory"),
-                FileNamePattern = StringOf(item, "fileNamePattern")
+                FileNamePattern = StringOf(item, "fileNamePattern"),
+                PatientIdSource = !string.IsNullOrWhiteSpace(mrnIdentifierSystem) && string.IsNullOrWhiteSpace(patientIdLocation)
+                    ? AdtPatientByMrn
+                    : AdtPatientOnEvent,
+                PatientIdLocation = patientIdLocation,
+                MrnIdentifierSystem = mrnIdentifierSystem,
+                MrnLocation = hasAdt ? StringOf(adt, "mrnLocation") : null,
+                EncounterIdLocation = hasAdt ? StringOf(adt, "encounterIdLocation") : null
             });
         }
 

@@ -641,47 +641,86 @@ else
                         @for (var i = 0; i < sftp.Acquisitions.Count; i++)
                         {
                             var row = sftp.Acquisitions[i];
-                            <div class="row g-2 align-items-end mb-2">
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label" for="sftp-type-@i">Type</label>
-                                    <select id="sftp-type-@i" name="Acquisitions[@i].AcquisitionType" class="form-select">
-                                        <option value=""></option>
-                                        @foreach (var acquisitionType in FacilityAcquisitionRules.AcquisitionTypes)
-                                        {
-                                            <option value="@acquisitionType" selected="@(string.Equals(acquisitionType, row.AcquisitionType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@acquisitionType</option>
-                                        }
-                                    </select>
+                            var adtOnEvent = !string.Equals(row.PatientIdSource, FacilityAcquisitionRules.AdtPatientByMrn, StringComparison.OrdinalIgnoreCase);
+                            <div class="mb-3" data-sftp-acquisition>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label" for="sftp-type-@i">Type</label>
+                                        <select id="sftp-type-@i" name="Acquisitions[@i].AcquisitionType" class="form-select">
+                                            <option value=""></option>
+                                            @foreach (var acquisitionType in FacilityAcquisitionRules.AcquisitionTypes)
+                                            {
+                                                <option value="@acquisitionType" selected="@(string.Equals(acquisitionType, row.AcquisitionType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@acquisitionType</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label" for="sftp-sub-@i">Sub type</label>
+                                        <select id="sftp-sub-@i" name="Acquisitions[@i].SubType" class="form-select">
+                                            @foreach (var subType in FacilityAcquisitionRules.AcquisitionSubTypes)
+                                            {
+                                                <option value="@subType" selected="@(string.Equals(subType, row.SubType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@subType</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label" for="sftp-remote-@i">Remote directory</label>
+                                        <input id="sftp-remote-@i" name="Acquisitions[@i].RemoteDirectory" value="@row.RemoteDirectory" class="form-control" placeholder="Inherit" />
+                                    </div>
+                                    <div class="col-12 col-md-2">
+                                        <label class="form-label" for="sftp-processed-@i">Processed directory</label>
+                                        <input id="sftp-processed-@i" name="Acquisitions[@i].ProcessedDirectory" value="@row.ProcessedDirectory" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-2">
+                                        <label class="form-label" for="sftp-pattern-@i">File name pattern</label>
+                                        <input id="sftp-pattern-@i" name="Acquisitions[@i].FileNamePattern" value="@row.FileNamePattern" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-1">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="sftp-remove-@i" name="Acquisitions[@i].Remove" value="true" />
+                                            <label class="form-check-label" for="sftp-remove-@i">Remove</label>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label" for="sftp-sub-@i">Sub type</label>
-                                    <select id="sftp-sub-@i" name="Acquisitions[@i].SubType" class="form-select">
-                                        @foreach (var subType in FacilityAcquisitionRules.AcquisitionSubTypes)
-                                        {
-                                            <option value="@subType" selected="@(string.Equals(subType, row.SubType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@subType</option>
-                                        }
-                                    </select>
-                                </div>
-                                <div class="col-12 col-md-3">
-                                    <label class="form-label" for="sftp-remote-@i">Remote directory</label>
-                                    <input id="sftp-remote-@i" name="Acquisitions[@i].RemoteDirectory" value="@row.RemoteDirectory" class="form-control" placeholder="Inherit" />
-                                </div>
-                                <div class="col-12 col-md-2">
-                                    <label class="form-label" for="sftp-processed-@i">Processed directory</label>
-                                    <input id="sftp-processed-@i" name="Acquisitions[@i].ProcessedDirectory" value="@row.ProcessedDirectory" class="form-control" />
-                                </div>
-                                <div class="col-12 col-md-2">
-                                    <label class="form-label" for="sftp-pattern-@i">File name pattern</label>
-                                    <input id="sftp-pattern-@i" name="Acquisitions[@i].FileNamePattern" value="@row.FileNamePattern" class="form-control" />
-                                </div>
-                                <div class="col-12 col-md-1">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="sftp-remove-@i" name="Acquisitions[@i].Remove" value="true" />
-                                        <label class="form-check-label" for="sftp-remove-@i">Remove</label>
+                                <div class="border rounded p-3 mt-2" data-sftp-adt hidden>
+                                    <h4 class="h6">ADT patient identification</h4>
+                                    <p class="form-text">HL7ADT reads files of HL7 v2 ADT messages. The file must leave the directory: set a processed directory, or enable Remove after processing.</p>
+                                    <div class="mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="Acquisitions[@i].PatientIdSource" id="sftp-adt-event-@i" value="@FacilityAcquisitionRules.AdtPatientOnEvent" checked="@(adtOnEvent ? "checked" : null)" />
+                                            <label class="form-check-label" for="sftp-adt-event-@i">Patient.Id on the ADT event</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="Acquisitions[@i].PatientIdSource" id="sftp-adt-mrn-@i" value="@FacilityAcquisitionRules.AdtPatientByMrn" checked="@(!adtOnEvent ? "checked" : null)" />
+                                            <label class="form-check-label" for="sftp-adt-mrn-@i">Patient MRN search</label>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2" data-adt-field>
+                                        <label class="form-label" for="sftp-adt-location-@i">Patient.Id location</label>
+                                        <input id="sftp-adt-location-@i" name="Acquisitions[@i].PatientIdLocation" value="@row.PatientIdLocation" class="form-control" placeholder="PID-3[5=FHIR].1" maxlength="128" data-adt-source="@FacilityAcquisitionRules.AdtPatientOnEvent" />
+                                        <div class="form-text">PID-2, PID-3[5=FHIR].1, or OBX[3.1=FHIRID]-5.</div>
+                                    </div>
+                                    <div class="mb-2" data-adt-field>
+                                        <label class="form-label" for="sftp-adt-system-@i">MRN identifier system</label>
+                                        <input id="sftp-adt-system-@i" name="Acquisitions[@i].MrnIdentifierSystem" value="@row.MrnIdentifierSystem" class="form-control" placeholder="urn:oid:1.2.3.4" maxlength="512" data-adt-source="@FacilityAcquisitionRules.AdtPatientByMrn" />
+                                        <div class="form-text">Patients are found with GET /Patient?identifier=&lt;system&gt;|&lt;MRN&gt;, using the facility's FHIR query configuration.</div>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label" for="sftp-adt-mrn-location-@i">MRN location</label>
+                                            <input id="sftp-adt-mrn-location-@i" name="Acquisitions[@i].MrnLocation" value="@row.MrnLocation" class="form-control" placeholder="PID-3[5=MR].1" maxlength="128" />
+                                            <div class="form-text">Optional. Defaults to the PID-3 identifier with type MR.</div>
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label" for="sftp-adt-encounter-@i">Encounter id location</label>
+                                            <input id="sftp-adt-encounter-@i" name="Acquisitions[@i].EncounterIdLocation" value="@row.EncounterIdLocation" class="form-control" placeholder="PV1-19.1" maxlength="128" />
+                                            <div class="form-text">Optional. Defaults to PV1-19, the visit number.</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         }
-                        <p class="form-text">Leave the last acquisition row blank. A blank directory inherits the connection directory.</p>
+                        <p class="form-text">Leave the last acquisition row blank. A blank directory inherits the connection directory. HL7ADT is a census feed of HL7 v2 ADT messages.</p>
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="sftpUsername">Username</label>

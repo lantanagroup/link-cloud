@@ -436,6 +436,7 @@
                 fresh.querySelectorAll("form[data-au-save]").forEach(classify);
                 decorateAll();
                 wirePlanSelect(fresh);
+                syncSftpAdt(fresh);
                 refreshFlag();
                 return true;
             })
@@ -823,6 +824,30 @@
         });
     }
 
+    function syncSftpAdt(root) {
+        if (!root || !root.querySelectorAll) return;
+        root.querySelectorAll("[data-sftp-acquisition]").forEach(syncSftpAdtRow);
+    }
+
+    function syncSftpAdtRow(row) {
+        var select = row.querySelector("select[name$='.SubType']");
+        var panel = row.querySelector("[data-sftp-adt]");
+        if (!select || !panel) return;
+        var adt = select.value === "HL7ADT";
+        panel.hidden = !adt;
+        var source = "adtEvent";
+        panel.querySelectorAll("input[type='radio']").forEach(function (radio) {
+            if (radio.checked) source = radio.value;
+        });
+        panel.querySelectorAll("input, select, textarea").forEach(function (field) {
+            var forSource = field.getAttribute("data-adt-source");
+            var active = adt && (!forSource || forSource === source);
+            field.disabled = !active;
+            var wrap = field.closest("[data-adt-field]");
+            if (wrap) wrap.hidden = !active;
+        });
+    }
+
     function classify(form) {
         var action = form.getAttribute("data-facility-action") || actionName(form);
         form.setAttribute("data-facility-action", action);
@@ -855,6 +880,15 @@
         editor.querySelectorAll("form[data-au-save]").forEach(classify);
         decorateAll();
         wirePlanSelect(editor);
+        syncSftpAdt(editor);
+        editor.addEventListener("change", function (event) {
+            var target = event.target;
+            if (!target || !target.closest) return;
+            var row = target.closest("[data-sftp-acquisition]");
+            if (!row) return;
+            if (target.matches("select[name$='.SubType'], input[name$='.PatientIdSource']"))
+                syncSftpAdtRow(row);
+        });
         var save = document.getElementById("facilitySaveButton");
         var cancel = document.getElementById("facilityCancelButton");
         if (save) save.addEventListener("click", saveAll);

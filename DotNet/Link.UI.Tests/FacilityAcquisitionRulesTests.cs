@@ -485,6 +485,122 @@ public class FacilityAcquisitionRulesTests
         FacilityAcquisitionRules.ParseCredentialStatus("""{"hasCredentials":false}""").Should().BeFalse();
     }
 
+    [Fact]
+    public void Sftp_hl7_adt_sends_the_patient_id_location_and_not_an_mrn_system()
+    {
+        var built = FacilityAcquisitionRules.TryBuildSftp(AdtPanel(new SftpAcquisitionInput
+        {
+            AcquisitionType = "Census",
+            SubType = "HL7ADT",
+            ProcessedDirectory = "/processed",
+            PatientIdSource = FacilityAcquisitionRules.AdtPatientOnEvent,
+            PatientIdLocation = "PID-3[5=FHIR].1",
+            MrnIdentifierSystem = "should-not-be-sent",
+            EncounterIdLocation = "PV1-19.1"
+        }), "facility", out var body, out _, out var error);
+
+        built.Should().BeTrue(error);
+        var adt = AdtOf(body);
+        adt["PatientIdLocation"].Should().Be("PID-3[5=FHIR].1");
+        adt["EncounterIdLocation"].Should().Be("PV1-19.1");
+        adt.Should().NotContainKey("MrnIdentifierSystem");
+    }
+
+    [Fact]
+    public void Sftp_hl7_adt_mrn_search_sends_the_identifier_system()
+    {
+        var built = FacilityAcquisitionRules.TryBuildSftp(AdtPanel(new SftpAcquisitionInput
+        {
+            AcquisitionType = "Census",
+            SubType = "HL7ADT",
+            ProcessedDirectory = "/processed",
+            PatientIdSource = FacilityAcquisitionRules.AdtPatientByMrn,
+            PatientIdLocation = "PID-2",
+            MrnIdentifierSystem = "urn:oid:1.2.3.4",
+            MrnLocation = "PID-3[5=MR].1"
+        }, removeAfterProcessing: true), "facility", out var body, out _, out var error);
+
+        built.Should().BeTrue(error);
+        var adt = AdtOf(body);
+        adt["MrnIdentifierSystem"].Should().Be("urn:oid:1.2.3.4");
+        adt["MrnLocation"].Should().Be("PID-3[5=MR].1");
+        adt.Should().NotContainKey("PatientIdLocation");
+    }
+
+    [Fact]
+    public void Sftp_hl7_adt_requires_the_file_to_leave_the_directory()
+    {
+        var built = FacilityAcquisitionRules.TryBuildSftp(AdtPanel(new SftpAcquisitionInput
+        {
+            AcquisitionType = "Census",
+            SubType = "HL7ADT",
+            PatientIdLocation = "PID-2"
+        }), "facility", out _, out _, out var error);
+
+        built.Should().BeFalse();
+        error.Should().Contain("processed directory");
+    }
+
+    [Fact]
+    public void Sftp_hl7_adt_is_only_a_census_acquisition()
+    {
+        var built = FacilityAcquisitionRules.TryBuildSftp(AdtPanel(new SftpAcquisitionInput
+        {
+            AcquisitionType = "Resources",
+            SubType = "HL7ADT",
+            ProcessedDirectory = "/processed",
+            PatientIdLocation = "OBX[3.1=FHIRID]-5"
+        }), "facility", out _, out _, out var error);
+
+        built.Should().BeFalse();
+        error.Should().Contain("Census");
+    }
+
+    [Fact]
+    public void Sftp_parse_reads_an_adt_mrn_search()
+    {
+        var panel = FacilityAcquisitionRules.ParseSftp(
+            """
+            {
+              "host": "sftp.example.org",
+              "acquisitionConfigurations": [
+                {
+                  "acquisitionType": "Census",
+                  "subType": "HL7ADT",
+                  "processedDirectory": "/processed",
+                  "adtConfiguration": {
+                    "mrnIdentifierSystem": "urn:oid:1.2.3.4",
+                    "mrnLocation": "PID-18"
+                  }
+                }
+              ]
+            }
+            """);
+
+        var row = panel.Acquisitions[0];
+        row.SubType.Should().Be("HL7ADT");
+        row.PatientIdSource.Should().Be(FacilityAcquisitionRules.AdtPatientByMrn);
+        row.MrnIdentifierSystem.Should().Be("urn:oid:1.2.3.4");
+        row.MrnLocation.Should().Be("PID-18");
+        row.PatientIdLocation.Should().BeNull();
+    }
+
+    private static SftpPanel AdtPanel(SftpAcquisitionInput row, bool removeAfterProcessing = false) => new()
+    {
+        Host = "sftp.example.org",
+        Port = 22,
+        RemoteDirectory = "/",
+        Timeout = "00:01:00",
+        RemoveAfterProcessing = removeAfterProcessing,
+        Acquisitions = [row, new SftpAcquisitionInput()]
+    };
+
+    private static Dictionary<string, object?> AdtOf(Dictionary<string, object?>? body)
+    {
+        var acquisitions = body!["AcquisitionConfigurations"].Should().BeAssignableTo<List<Dictionary<string, object?>>>().Subject;
+        return acquisitions[0]["AdtConfiguration"].Should().BeAssignableTo<Dictionary<string, object?>>().Subject;
+    }
+
     private static QueryRowInput Query(string resource) => new()
     {
         ResourceType = resource,

@@ -302,6 +302,14 @@ public sealed class SftpAcquisitionInput
     public string? ProcessedDirectory { get; set; }
     public string? FileNamePattern { get; set; }
     public bool Remove { get; set; }
+
+    /// <summary><c>adtEvent</c> or <c>mrnSearch</c>. Used only when <see cref="SubType"/> is HL7ADT.</summary>
+    public string? PatientIdSource { get; set; } = "adtEvent";
+
+    public string? PatientIdLocation { get; set; }
+    public string? MrnIdentifierSystem { get; set; }
+    public string? MrnLocation { get; set; }
+    public string? EncounterIdLocation { get; set; }
 }
 
 public sealed class SftpPanel
