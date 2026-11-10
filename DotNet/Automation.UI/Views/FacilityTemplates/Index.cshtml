@@ -50,7 +50,7 @@
              aria-live="polite"
              style="display:none;white-space:pre-line;"></div>
 
-        <div class="card-body p-0" data-au-table>
+        <div class="card-body p-0">
             <table class="table au-table mb-0">
 
                 <thead>
@@ -601,56 +601,6 @@
                 });
 
                 showBulkResult(message, true);
-
-                // Remove successfully deleted rows from the current page.
-                selectionBoxes.forEach(box => {
-                    if (deletedIds.has(box.value.toLowerCase())) {
-                        box.closest('tr')?.remove();
-                        box.checked = false;
-                    }
-                });
-
-                if (deletedIds.size > 0) {
-                    const updatedTotal = Math.max(0, initialTotalCount - deletedIds.size);
-                    const first = updatedTotal === 0
-                        ? 0
-                        : (currentPage - 1) * pageSize + 1;
-                    const last = Math.min(currentPage * pageSize, updatedTotal);
-
-                    recordCount.textContent =
-                        `Showing ${first}–${last} of ${updatedTotal} facility templates`;
-                }
-
-                if (failures.length === 0) {
-                    // Refresh the record count and pagination after success.
-                    window.location.reload();
-                    return;
-                }
-
-                // Keep failed selections checked so they can be retried.
-                const failedIds = new Set(
-                    failures.map(f => String(f.id).toLowerCase())
-                );
-
-                selectionBoxes.forEach(box => {
-                    box.checked = failedIds.has(box.value.toLowerCase());
-                });
-
-                const failureDetails = failures.map(f => {
-                    const matchingBox = selectionBoxes.find(
-                        box => box.value.toLowerCase() ===
-                            String(f.id).toLowerCase()
-                    );
-
-                    const name = matchingBox?.dataset.name || f.id;
-                    return `${name}: ${f.reason}`;
-                });
-
-                showBulkResult(
-                    `${deletedIds.size} deleted; ${failures.length} failed.\n` +
-                    failureDetails.join('\n'),
-                    true
-                );
 
             } catch (err) {
                 showBulkResult(
