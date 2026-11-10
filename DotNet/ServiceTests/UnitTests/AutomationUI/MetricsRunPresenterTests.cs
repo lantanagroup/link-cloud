@@ -25,6 +25,7 @@ public class MetricsRunPresenterTests
         item.StagesUnavailable.Should().BeTrue();
         item.E2eDurationSeconds.Should().Be(90);
         item.BenchmarkPass.Should().BeTrue();
+        item.PatientCount.Should().Be(15);
     }
 
     [Fact]
