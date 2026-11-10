@@ -148,8 +148,18 @@ else
                                 <tbody>
                                 @foreach (var category in table.Rows)
                                 {
+                                    var title = string.IsNullOrWhiteSpace(category.Title) ? category.Id : category.Title;
                                     <tr>
-                                        <td><a href="@Href(1, query.Sort, query.Descending, query.PageSize, category.Id)">@(string.IsNullOrWhiteSpace(category.Title) ? category.Id : category.Title)</a></td>
+                                        <td>
+                                            @if (ReportsRules.CategoryDrilldown(category.Id))
+                                            {
+                                                <a href="@Href(1, query.Sort, query.Descending, query.PageSize, category.Id)">@title</a>
+                                            }
+                                            else
+                                            {
+                                                @title
+                                            }
+                                        </td>
                                         <td>@category.Issues</td>
                                         <td style="white-space:normal;overflow-wrap:anywhere">@category.Guidance</td>
                                     </tr>
@@ -168,11 +178,20 @@ else
                         <h2 class="h6 mb-0">@(selected?.Title ?? query.Category)</h2>
                         <a href="@Href(1, query.Sort, query.Descending, query.PageSize, null)">All categories</a>
                     </div>
+                    @if (!Model.CountsUnavailable)
+                    {
+                        <p class="mb-1">Reported issues: @(selected?.Issues ?? 0)</p>
+                    }
+                    <p class="mb-2">Available saved issues: @bar.TotalCount</p>
                     @if (!string.IsNullOrWhiteSpace(Model.IssuesError) && (Model.Unacceptable.Count > 0 || Model.AcceptableCategories.Count > 0 || Model.CountsUnavailable))
                     {
                         <div class="alert alert-warning">@Model.IssuesError</div>
                     }
-                    else if (Model.Issues.Count == 0 && string.IsNullOrWhiteSpace(Model.IssuesError))
+                    else if (bar.TotalCount == 0 && Model.Issues.Count == 0)
+                    {
+                        <p class="au-empty mb-0">No saved issues are available for this category. Reported counts can include findings that were not saved or have been deleted.</p>
+                    }
+                    else if (Model.Issues.Count == 0)
                     {
                         <p class="au-empty mb-0">No findings on this page.</p>
                     }
@@ -202,7 +221,10 @@ else
                             </table>
                         </div>
                     }
-                    <partial name="_BottomPager" model="@(new BottomPager { Label = "Issue pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = query.PageSize, Sizes = ReportsRules.IssuePageSizes, Path = "/Reports/Validation", Route = IssueRoute })" />
+                    @if (bar.TotalCount > 0)
+                    {
+                        <partial name="_BottomPager" model="@(new BottomPager { Label = "Issue pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = query.PageSize, Sizes = ReportsRules.IssuePageSizes, Path = "/Reports/Validation", Route = IssueRoute })" />
+                    }
                 </div>
             }
         </div>

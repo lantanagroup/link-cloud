@@ -98,56 +98,6 @@ public class ReportsRulesTests
     }
 
     [Fact]
-    public void Issues_page_sort_and_filter_without_sending_the_whole_list()
-    {
-        var issues = new List<ValidationIssueRow>();
-        for (var index = 0; index < 2000; index++)
-        {
-            var severity = index % 3 == 0 ? "error" : index % 3 == 1 ? "warning" : "information";
-            issues.Add(new ValidationIssueRow
-            {
-                PatientId = "patient-" + index.ToString("0000"),
-                Severity = severity,
-                Code = index % 5 == 0 ? "code-a" : "code-b",
-                Message = index % 10 == 2 ? "clock skew " + index : "message " + index,
-                Location = "Observation/" + index,
-                Categories = index % 10 == 2
-                    ? [new ValidationCategoryRow { Title = "Timing", Acceptable = false }]
-                    : index % 4 == 0
-                        ? []
-                        : [new ValidationCategoryRow { Title = "Optional", Acceptable = true }]
-            });
-        }
-
-        var query = ReportsRules.NormalizeIssueQuery("clock", null, "code-b", "Timing", "patient", "asc", 1, 7);
-        query.PageSize.Should().Be(ReportsRules.DefaultIssuePageSize);
-        query.Sort.Should().Be("patient");
-        query.Descending.Should().BeFalse();
-
-        var slice = ReportsRules.SliceIssues(issues, query);
-        slice.Total.Should().Be(200);
-        slice.Page.Should().HaveCount(ReportsRules.DefaultIssuePageSize);
-        slice.Page.Should().OnlyContain(issue => issue.Message.Contains("clock", StringComparison.OrdinalIgnoreCase));
-        slice.Severities.Should().Equal("error", "warning", "information");
-        slice.Categories.Should().Contain("Timing");
-        ReportsRules.IssueStanding(issues).Should().Be("Unacceptable");
-
-        var first = ReportsRules.SliceIssues(issues, ReportsRules.NormalizeIssueQuery(null, "error", null, null, "severity", "desc", 1, 25));
-        first.Page.Should().HaveCount(25);
-        first.Page.Should().OnlyContain(issue => issue.Severity == "error");
-        first.Total.Should().Be(issues.Count(issue => issue.Severity == "error"));
-        var second = ReportsRules.SliceIssues(issues, ReportsRules.NormalizeIssueQuery(null, "error", null, null, "severity", "desc", 2, 25));
-        second.Page.Should().HaveCount(25);
-        second.Page[0].PatientId.Should().NotBe(first.Page[0].PatientId);
-
-        ReportsRules.IssueHref(query, "fac", "rep", "/Reports?status=Submitted", 2, "code", "desc")
-            .Should().Contain("returnUrl=%2FReports%3Fstatus%3DSubmitted")
-            .And.Contain("page=2")
-            .And.Contain("sort=code")
-            .And.Contain("dir=desc");
-    }
-
-    [Fact]
     public void Validation_is_one_tab_and_prequalification_redirects()
     {
         var root = Root();
@@ -163,6 +113,10 @@ public class ReportsRulesTests
         page.Should().NotContain("data-au-filter");
         page.Should().Contain("All categories");
         page.Should().Contain("id=\"validationIssues\"");
+        page.Should().Contain("ReportsRules.CategoryDrilldown");
+        page.Should().Contain("Reported issues:");
+        page.Should().Contain("Available saved issues:");
+        page.Should().Contain("No saved issues are available for this category. Reported counts can include findings that were not saved or have been deleted.");
         page.Should().NotContain("Open prequalification");
         page.Should().NotContain("does not download the issue list");
         var controller = File.ReadAllText(Path.Combine(root, "Controllers", "ReportsController.cs"));

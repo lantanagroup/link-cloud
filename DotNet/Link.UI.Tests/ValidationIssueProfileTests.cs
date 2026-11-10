@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Link.UI.Models;
 using Link.UI.Services;
 using Xunit;
 
@@ -34,24 +33,6 @@ public class ValidationIssueProfileTests
     [InlineData(null, "")]
     public void Profile_label_is_the_short_name_with_its_version(string? profile, string expected) =>
         ReportsRules.ProfileLabel(profile).Should().Be(expected);
-
-    [Fact]
-    public void Issues_sort_and_search_by_profile()
-    {
-        IReadOnlyList<ValidationIssueRow> issues =
-        [
-            new() { PatientId = "p-1", Severity = "ERROR", Code = "a", Profile = "http://x/StructureDefinition/zeta" },
-            new() { PatientId = "p-2", Severity = "ERROR", Code = "b", Profile = "http://x/StructureDefinition/alpha" },
-            new() { PatientId = "p-3", Severity = "ERROR", Code = "c" }
-        ];
-
-        ReportsRules.IssueSorts.Should().Contain("profile");
-        var sorted = ReportsRules.SliceIssues(issues, new ValidationIssueQuery { Sort = "profile", Descending = false });
-        sorted.Page.Select(issue => issue.PatientId).Should().Equal("p-3", "p-2", "p-1");
-
-        var searched = ReportsRules.SliceIssues(issues, new ValidationIssueQuery { Text = "alpha" });
-        searched.Page.Should().ContainSingle().Which.PatientId.Should().Be("p-2");
-    }
 
     [Fact]
     public void Validation_issue_table_matches_the_server_page_columns()

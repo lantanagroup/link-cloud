@@ -114,4 +114,12 @@ public class PrequalPageRulesTests
         sorted.Should().Contain("dir=desc");
         sorted.Should().NotContain("category=");
     }
+
+    [Theory]
+    [InlineData("uncategorized", false)]
+    [InlineData("Uncategorized", false)]
+    [InlineData("timing", true)]
+    [InlineData(" ", false)]
+    public void Uncategorized_has_no_drilldown(string categoryId, bool drilldown) =>
+        ReportsRules.CategoryDrilldown(categoryId).Should().Be(drilldown);
 }

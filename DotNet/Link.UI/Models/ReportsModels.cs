@@ -152,8 +152,6 @@ public sealed class ValidationPage : ReportSectionPage
     public bool CountsUnavailable { get; set; }
     public bool CountsInProgress { get; set; }
     public IReadOnlyList<ValidationSeverityCount> SeverityCounts { get; set; } = [];
-    public IReadOnlyList<string> SeverityOptions { get; set; } = [];
-    public IReadOnlyList<string> CategoryOptions { get; set; } = [];
     public IReadOnlyList<StoredCategoryCount> Unacceptable { get; set; } = [];
     public IReadOnlyList<StoredCategoryCount> AcceptableCategories { get; set; } = [];
     public ValidationIssueQuery Query { get; set; } = new();
