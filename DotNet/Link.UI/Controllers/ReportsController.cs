@@ -150,9 +150,6 @@ public sealed class ReportsController : Controller
     public async Task<IActionResult> Validation(
         string? facilityId,
         string? reportId,
-        string? q,
-        string? severity,
-        string? code,
         string? category,
         string? sort,
         string? dir,
@@ -160,10 +157,30 @@ public sealed class ReportsController : Controller
         int pageSize,
         CancellationToken cancellationToken)
     {
-        var query = ReportsRules.NormalizeIssueQuery(q, severity, code, category, sort, dir, page, pageSize);
+        var query = ReportsRules.NormalizePrequalQuery(category, sort, dir, page, pageSize);
         var model = await _reports.LoadValidationPageAsync(facilityId, reportId, query, cancellationToken);
         ViewData["Title"] = "Validation";
         return View(model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ValidationCsv(string? facilityId, string? reportId, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(reportId, out var id))
+        {
+            TempData["Error"] = "Report id is not valid.";
+            return RedirectToAction(nameof(Validation), new { facilityId, reportId });
+        }
+
+        Response.ContentType = "text/csv; charset=utf-8";
+        Response.Headers.ContentDisposition = $"attachment; filename=\"validation-results-{id:D}.csv\"";
+        Response.Headers.CacheControl = "no-store";
+        var result = await _reports.CopyValidationCsvAsync(facilityId, reportId, Response.Body, cancellationToken);
+        if (result.Succeeded || Response.HasStarted)
+            return new EmptyResult();
+
+        TempData["Error"] = result.Message;
+        return RedirectToAction(nameof(Validation), new { facilityId, reportId });
     }
 
     [HttpGet]

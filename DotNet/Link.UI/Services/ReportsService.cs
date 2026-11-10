@@ -41,12 +41,15 @@ public sealed class ReportsService
         "Validation service URL is not configured (ServiceRegistry:ValidationServiceUrl).";
     public const string MeasureNotConfigured =
         "MeasureEval service URL is not configured (ServiceRegistry:MeasureServiceUrl).";
+    public const string AdminBffNotConfigured =
+        "Admin BFF URL is not configured (ServiceRegistry:AdminBffServiceUrl).";
 
     private readonly IFacilityServiceClient _facilities;
     private readonly IReportServiceClient? _reports;
     private readonly ISubmissionServiceClient? _submission;
     private readonly IValidationServiceClient? _validation;
     private readonly IMeasureEvalServiceClient? _measure;
+    private readonly IAdminBffIntegrationClient? _admin;
     private readonly LinkUiFeatureOptions _options;
     private readonly IMemoryCache _counts;
     private readonly ILogger<ReportsService> _logger;
@@ -61,7 +64,8 @@ public sealed class ReportsService
         IOptions<LinkUiFeatureOptions> options,
         IMemoryCache counts,
         ILogger<ReportsService> logger,
-        ReportManifestArchive? archive = null)
+        ReportManifestArchive? archive = null,
+        IAdminBffIntegrationClient? admin = null)
     {
         _archive = archive;
         _facilities = facilities;
@@ -69,6 +73,7 @@ public sealed class ReportsService
         _submission = submission;
         _validation = validation;
         _measure = measure;
+        _admin = admin;
         _options = options.Value;
         _counts = counts;
         _logger = logger;
@@ -86,7 +91,8 @@ public sealed class ReportsService
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<IMemoryCache>(),
             services.GetRequiredService<ILogger<ReportsService>>(),
-            ReportManifestArchive.From(services));
+            ReportManifestArchive.From(services),
+            Blank(registry.AdminBffServiceUrl) ? null : services.GetRequiredService<IAdminBffIntegrationClient>());
     }
 
     public async Task<ReportActivityLoad> LoadActivityCountsAsync(int days, CancellationToken cancellationToken)
@@ -435,15 +441,48 @@ public sealed class ReportsService
             return page;
 
         if (_validation is null)
-        {
             page.SummaryError = ValidationNotConfigured;
-            page.IssuesError = ValidationNotConfigured;
-            return page;
-        }
+        else
+            await ReadSummaryAsync(page, cancellationToken);
 
-        await ReadSummaryAsync(page, cancellationToken);
-        await ReadIssuesAsync(page, cancellationToken);
+        await ReadPrequalAsync(page, cancellationToken);
         return page;
+    }
+
+    public async Task<ReportsAction> CopyValidationCsvAsync(
+        string? facilityId,
+        string? reportId,
+        Stream destination,
+        CancellationToken cancellationToken)
+    {
+        var opened = await OpenReportAsync(facilityId, reportId, cancellationToken);
+        if (opened.Page.NotFound || opened.Page.LoadError is not null)
+            return Fail(opened.Page.LoadError ?? "That report was not found.");
+        if (_validation is null)
+            return Fail(ValidationNotConfigured);
+        if (!Guid.TryParse(opened.Page.ReportId, out var id))
+            return Fail("Report ID is required.");
+
+        try
+        {
+            var copy = await _validation.CopyValidationResultsCsvAsync(
+                opened.Page.FacilityId!,
+                id,
+                destination,
+                cancellationToken);
+            return copy.StatusCode is >= 200 and < 300
+                ? new ReportsAction(true, string.Empty)
+                : Fail(FacilityFormRules.ServiceMessage("Validation", copy.StatusCode, copy.RawBody));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Validation CSV failed. ReportId={ReportId}", opened.Page.ReportId.Sanitize());
+            return Fail("Validation service call failed: " + ex.Message);
+        }
     }
 
     public async Task<MeasureReportPage> LoadMeasureAsync(
@@ -610,36 +649,69 @@ public sealed class ReportsService
         }
     }
 
-    private async Task ReadIssuesAsync(ValidationPage page, CancellationToken cancellationToken)
+    private async Task ReadPrequalAsync(ValidationPage page, CancellationToken cancellationToken)
     {
+        if (_admin is null)
+        {
+            page.IssuesError = AdminBffNotConfigured;
+            return;
+        }
+
         try
         {
-            var results = await _validation!.GetValidationResultsAsync(
+            var counts = await _admin.GetReportValidationCategoryCountsAsync(
+                page.ReportId,
+                cancellationToken: cancellationToken);
+            if (counts.StatusCode == StatusCodes.Status404NotFound)
+            {
+                page.CountsUnavailable = true;
+            }
+            else if (!counts.IsSuccessStatusCode)
+            {
+                page.IssuesError = FacilityFormRules.ServiceMessage("Admin BFF", counts.StatusCode, counts.RawBody);
+            }
+            else
+            {
+                var stored = ReportsRules.ReadStoredCategories(counts.Body, out var inProgress);
+                page.CountsInProgress = inProgress;
+                var sorted = ReportsRules.SortCategories(stored, page.Query.Sort, page.Query.Descending);
+                page.Unacceptable = sorted.Where(category => !category.Acceptable).ToList();
+                page.AcceptableCategories = sorted.Where(category => category.Acceptable).ToList();
+                page.PrequalStatus = page.Unacceptable.Count > 0 ? "Unacceptable" : "Acceptable";
+            }
+
+            if (string.IsNullOrWhiteSpace(page.Query.Category))
+                return;
+
+            if (_validation is null)
+            {
+                page.IssuesError ??= ValidationNotConfigured;
+                return;
+            }
+
+            var issues = await _validation.GetCategoryIssuesAsync(
                 page.FacilityId!,
                 page.ReportId,
-                ReportsRules.InformationSeverity,
+                page.Query.Category,
+                page.Query.Page,
+                page.Query.PageSize,
                 cancellationToken);
-            if (results.StatusCode == StatusCodes.Status404NotFound)
+            if (issues.StatusCode == StatusCodes.Status404NotFound)
             {
-                ApplyIssueSlice(page, ReportsRules.SliceIssues([], page.Query), "—");
+                page.Issues = [];
+                page.Paging = new PageBar { Page = page.Query.Page, PageSize = page.Query.PageSize };
                 return;
             }
 
-            if (!results.IsSuccessStatusCode)
+            if (!issues.IsSuccessStatusCode)
             {
-                page.IssuesError = FacilityFormRules.ServiceMessage("Validation", results.StatusCode, results.RawBody);
+                page.IssuesError = FacilityFormRules.ServiceMessage("Validation", issues.StatusCode, issues.RawBody);
                 return;
             }
 
-            if (results.Body is { Length: > ReportsRules.MaxResultChars })
-            {
-                page.TooLarge = true;
-                page.IssuesError = "Validation results for this report are too large to list here.";
-                return;
-            }
-
-            var issues = ReportsRules.ParseIssues(results.Body);
-            ApplyIssueSlice(page, ReportsRules.SliceIssues(issues, page.Query), ReportsRules.IssueStanding(issues));
+            var parsed = ReportsRules.ReadCategoryIssuePage(issues.Body);
+            page.Issues = parsed.Records;
+            page.Paging = parsed.Paging;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -647,25 +719,9 @@ public sealed class ReportsService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Validation issues failed. ReportId={ReportId}", page.ReportId.Sanitize());
+            _logger.LogError(ex, "Validation categories failed. ReportId={ReportId}", page.ReportId.Sanitize());
             page.IssuesError = "Validation service call failed: " + ex.Message;
         }
-    }
-
-    private static void ApplyIssueSlice(ValidationPage page, IssueSlice slice, string standing)
-    {
-        page.PrequalStatus = standing;
-        page.SeverityCounts = slice.SeverityCounts;
-        page.SeverityOptions = slice.Severities;
-        page.CategoryOptions = slice.Categories;
-        page.Issues = slice.Page;
-        page.Paging = new PageBar
-        {
-            Page = slice.PageNumber,
-            PageSize = page.Query.PageSize,
-            TotalCount = slice.Total,
-            TotalPages = slice.TotalPages
-        };
     }
 
     public async Task<ReportManifestPage> LoadManifestAsync(

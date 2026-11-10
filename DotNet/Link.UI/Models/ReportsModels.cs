@@ -149,13 +149,31 @@ public sealed class ValidationPage : ReportSectionPage
     public string? IssuesError { get; set; }
     public bool TooLarge { get; set; }
     public string? PrequalStatus { get; set; }
+    public bool CountsUnavailable { get; set; }
+    public bool CountsInProgress { get; set; }
     public IReadOnlyList<ValidationSeverityCount> SeverityCounts { get; set; } = [];
     public IReadOnlyList<string> SeverityOptions { get; set; } = [];
     public IReadOnlyList<string> CategoryOptions { get; set; } = [];
+    public IReadOnlyList<StoredCategoryCount> Unacceptable { get; set; } = [];
+    public IReadOnlyList<StoredCategoryCount> AcceptableCategories { get; set; } = [];
     public ValidationIssueQuery Query { get; set; } = new();
     public IReadOnlyList<ValidationIssueRow> Issues { get; set; } = [];
     public PageBar Paging { get; set; } = new();
 }
+
+/// <summary>One stored category count. Findings for the category are loaded one page at a time.</summary>
+public sealed class StoredCategoryCount
+{
+    public string Id { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public bool Acceptable { get; init; }
+    public string Guidance { get; init; } = string.Empty;
+    public string Severity { get; init; } = string.Empty;
+    public long Issues { get; init; }
+}
+
+/// <summary>One server page of findings for a category. TotalCount can be larger than Records.</summary>
+public readonly record struct CategoryIssuePage(IReadOnlyList<ValidationIssueRow> Records, PageBar Paging);
 
 public sealed class ValidationSeverityCount
 {

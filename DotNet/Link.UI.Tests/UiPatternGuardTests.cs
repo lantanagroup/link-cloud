@@ -100,10 +100,9 @@ public class UiPatternGuardTests
             .Should().Contain("lu-reports-table");
         File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Index.cshtml"))
             .Should().Contain("Census / IP");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Validation.cshtml"))
-            .Should().Contain("lu-issue-filters");
-        File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Validation.cshtml"))
-            .Should().Contain("col-category");
+        var validation = File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Validation.cshtml"));
+        validation.Should().Contain("lu-clamp-3");
+        validation.Should().Contain("Number of issues");
     }
 
     [Fact]

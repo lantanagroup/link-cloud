@@ -54,7 +54,7 @@ public class ValidationIssueProfileTests
     }
 
     [Fact]
-    public void Validation_issue_table_has_a_profile_column()
+    public void Validation_issue_table_matches_the_server_page_columns()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Link.UI", "Link.UI.csproj")))
@@ -62,9 +62,10 @@ public class ValidationIssueProfileTests
         dir.Should().NotBeNull();
         var view = File.ReadAllText(Path.Combine(dir!.FullName, "Link.UI", "Views", "Reports", "Validation.cshtml"));
 
-        view.Should().Contain("Profile@(Mark(\"profile\"))");
-        view.Should().Contain("<td data-issue-profile");
-        view.Should().Contain("@ReportsRules.ProfileLabel(issue.Profile)");
-        view.Should().Contain("title=\"@issue.Profile\"");
+        view.Should().Contain(">Message<");
+        view.Should().Contain(">Patient<");
+        view.Should().Contain(">Expression<");
+        view.Should().Contain(">Location<");
+        view.Should().NotContain("Profile@(Mark(\"profile\"))");
     }
 }

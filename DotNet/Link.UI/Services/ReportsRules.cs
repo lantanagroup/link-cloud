@@ -17,6 +17,8 @@ public static class ReportsRules
     public const int MaxJsonChars = 750_000;
     public const int DefaultLogPageSize = 10;
     public const int DefaultIssuePageSize = 25;
+    public const string UncategorizedGuidance = "These issues are not categorized and must be reviewed individually.";
+    public static readonly string[] CategorySorts = ["name", "quantity", "guidance"];
 
     public static readonly string[] Cadences = ["Daily", "Monthly", "Custom"];
     public static readonly int[] LogPageSizes = [10, 20, 50];
@@ -172,6 +174,194 @@ public static class ReportsRules
         var slash = url.TrimEnd('/').LastIndexOf('/');
         var name = slash >= 0 ? url.TrimEnd('/')[(slash + 1)..] : url;
         return name.Length == 0 ? value : name + version;
+    }
+
+    /// <summary>
+    /// Reads the aggregate category-count payload. Categories with no findings are left out,
+    /// matching the prequalification tables. The uncategorized row keeps the fixed guidance.
+    /// </summary>
+    public static IReadOnlyList<StoredCategoryCount> ReadStoredCategories(string? json, out bool inProgress)
+    {
+        inProgress = false;
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return [];
+            if (root.TryGetProperty("inProgress", out var flag) && flag.ValueKind == JsonValueKind.True)
+                inProgress = true;
+            if (!root.TryGetProperty("categories", out var categories) || categories.ValueKind != JsonValueKind.Array)
+                return [];
+
+            var list = new List<StoredCategoryCount>();
+            foreach (var item in categories.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                    continue;
+                var id = Text(item, "categoryId");
+                if (id.Length == 0)
+                    continue;
+                var uncategorized = id.Equals("uncategorized", StringComparison.OrdinalIgnoreCase);
+                long issues = 0;
+                if (item.TryGetProperty("issues", out var count))
+                    count.TryGetInt64(out issues);
+                if (issues <= 0)
+                    continue;
+                list.Add(new StoredCategoryCount
+                {
+                    Id = uncategorized ? "uncategorized" : id,
+                    Title = Text(item, "title"),
+                    Acceptable = item.TryGetProperty("acceptable", out var ok) && ok.ValueKind == JsonValueKind.True,
+                    Guidance = uncategorized ? UncategorizedGuidance : Text(item, "guidance"),
+                    Severity = Text(item, "severity"),
+                    Issues = issues
+                });
+            }
+
+            return list;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    public static IReadOnlyList<StoredCategoryCount> SortCategories(
+        IReadOnlyList<StoredCategoryCount> categories,
+        string? sort,
+        bool descending)
+    {
+        if (sort is not ("name" or "quantity" or "guidance"))
+            return categories;
+
+        IEnumerable<StoredCategoryCount> ordered = sort switch
+        {
+            "quantity" => descending
+                ? categories.OrderByDescending(category => category.Issues)
+                : categories.OrderBy(category => category.Issues),
+            "guidance" => descending
+                ? categories.OrderByDescending(category => category.Guidance, StringComparer.OrdinalIgnoreCase)
+                : categories.OrderBy(category => category.Guidance, StringComparer.OrdinalIgnoreCase),
+            _ => descending
+                ? categories.OrderByDescending(category => category.Title, StringComparer.OrdinalIgnoreCase)
+                : categories.OrderBy(category => category.Title, StringComparer.OrdinalIgnoreCase)
+        };
+        return ordered.ToList();
+    }
+
+    /// <summary>
+    /// One page of saved findings. The payload is that page only; totalCount can be larger than records.
+    /// </summary>
+    public static CategoryIssuePage ReadCategoryIssuePage(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new CategoryIssuePage([], new PageBar());
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            var records = new List<ValidationIssueRow>();
+            if (root.TryGetProperty("records", out var items) && items.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in items.EnumerateArray())
+                {
+                    if (item.ValueKind != JsonValueKind.Object)
+                        continue;
+                    records.Add(new ValidationIssueRow
+                    {
+                        Message = Text(item, "message"),
+                        PatientId = Text(item, "patientId"),
+                        Expression = Text(item, "expression"),
+                        Location = Text(item, "location"),
+                        Code = Text(item, "code"),
+                        Profile = Text(item, "profile")
+                    });
+                }
+            }
+
+            var meta = root.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object
+                ? metadata
+                : default;
+            int Number(string name)
+            {
+                if (meta.ValueKind != JsonValueKind.Object || !meta.TryGetProperty(name, out var value))
+                    return 0;
+                return value.TryGetInt32(out var number) ? number : 0;
+            }
+
+            long total = 0;
+            if (meta.ValueKind == JsonValueKind.Object
+                && meta.TryGetProperty("totalCount", out var totalValue))
+                totalValue.TryGetInt64(out total);
+
+            return new CategoryIssuePage(records, new PageBar
+            {
+                Page = Number("pageNumber") < 1 ? 1 : Number("pageNumber"),
+                PageSize = Number("pageSize"),
+                TotalCount = total,
+                TotalPages = Number("totalPages")
+            });
+        }
+        catch (JsonException)
+        {
+            return new CategoryIssuePage([], new PageBar());
+        }
+    }
+
+    public static ValidationIssueQuery NormalizePrequalQuery(
+        string? category,
+        string? sort,
+        string? dir,
+        int page,
+        int pageSize)
+    {
+        var cleanSort = FacilityViewRules.Clean(sort)?.ToLowerInvariant();
+        if (cleanSort is null || !CategorySorts.Contains(cleanSort))
+            cleanSort = string.Empty;
+
+        return new ValidationIssueQuery
+        {
+            Category = FacilityViewRules.Clean(category),
+            Sort = cleanSort,
+            Descending = !string.IsNullOrEmpty(cleanSort)
+                && string.Equals(dir?.Trim(), "desc", StringComparison.OrdinalIgnoreCase),
+            Page = page < 1 ? 1 : page,
+            PageSize = IssuePageSizes.Contains(pageSize) ? pageSize : DefaultIssuePageSize
+        };
+    }
+
+    public static string PrequalHref(
+        string? facilityId,
+        string? reportId,
+        string? returnUrl,
+        string? category,
+        string? sort,
+        bool descending,
+        int page,
+        int pageSize)
+    {
+        var pairs = new List<string>();
+        void Add(string key, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                pairs.Add(Uri.EscapeDataString(key) + "=" + Uri.EscapeDataString(value));
+        }
+
+        Add("facilityId", facilityId);
+        Add("reportId", reportId);
+        Add("returnUrl", returnUrl);
+        Add("category", category);
+        Add("sort", sort);
+        if (!string.IsNullOrWhiteSpace(sort))
+            Add("dir", descending ? "desc" : "asc");
+        Add("page", page.ToString());
+        Add("pageSize", pageSize.ToString());
+        return "/Reports/Validation?" + string.Join("&", pairs);
     }
 
     public static IReadOnlyList<ValidationIssueRow> ParseIssues(string? json)

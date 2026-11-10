@@ -157,7 +157,10 @@ public class ReportsRulesTests
         nav.Should().NotContain("Prequalification");
         nav.Should().Contain(">Acquisition log</a>");
         var page = File.ReadAllText(Path.Combine(root, "Views", "Reports", "Validation.cshtml"));
-        page.Should().Contain("data-au-filter");
+        page.Should().Contain("id=\"validation-live\"");
+        page.Should().Contain("Download CSV");
+        page.Should().Contain("/Reports/ValidationCsv");
+        page.Should().NotContain("data-au-filter");
         page.Should().Contain("All categories");
         page.Should().Contain("id=\"validationIssues\"");
         page.Should().NotContain("Open prequalification");
