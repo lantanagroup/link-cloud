@@ -38,7 +38,7 @@ Per-resource work runs in tight in-process loops that execute **hundreds of thou
 
 It is deliberately *not* exhaustive. `docs/config-key-inventory.md` is the complete list of every key the code reads, generated from source — add a key to the catalog only if it is provisioned per environment, has no safe default, or is a documented operational knob.
 
-`required: true` means a row must exist in **all three** environment stores. An entry with a working shipped default should be `required: false` with that value recorded in `defaultValue`; requiring it would mean provisioning one identical value three times.
+`required: true` means a row must exist in **every** environment store declared in the catalog's `environments` block. An entry with a working shipped default should be `required: false` with that value recorded in `defaultValue`; requiring it would mean provisioning one identical value in every store.
 
 **The per-environment values are not in this repo.** The catalog is here; the exports it is checked against (`app-config.<env>.json`, one per store) live in the private **`lantanagroup/link-cac`** repository — this one is public and those files are the deployed environments' real configuration. Everything under `Scripts/AzureAppConfig/` still runs from this repo root and defaults to a sibling clone at `../link-cac/Config`; override with `LINK_CAC_CONFIG_DIR` or `--config-dir`. Adding a `required: true` key here means adding its rows there, in the same pair of PRs.
 
@@ -83,6 +83,10 @@ Per-patient work doesn't begin here. It begins when `Census` later emits `Patien
 Neither half makes sense alone — Report builds the rows that the downstream pipeline updates; QueryDispatch fires the work that does the updating. Both flows converge at `DataAcquisitionRequested`; from there on the pipeline doesn't know which path triggered it.
 
 Quartz storage is SQL-backed and clustered for every service that uses it (`UsePersistentStore` / `UseSqlServer` / `UseClustering` in shared `RegisterQuartzDatabase`), so triggers survive container restarts via the `quartz.QRTZ_*` tables. Each process gets its own scheduler instance id (`SchedulerId = "AUTO"`, host name + start ticks) under the shared scheduler name, so replicas show up as separate rows in `QRTZ_SCHEDULER_STATE` and a restarting pod only recovers its own in-flight firings, not a live peer's. `QueryDispatch.ScheduleService.StartAsync` *also* walks the `patientDispatches` SQL table on boot and reconciles Quartz state to it (adds missing triggers, removes orphans) — belt-and-braces, not the only thing preventing dispatch loss.
+
+#### Census sources
+
+`Census` learns who is admitted from one of three sources per facility: FHIR Lists (`PatientListsAcquired`), a Cerner SFTP extract (`CernerPatientsAcquired`), or an HL7 v2 ADT feed over SFTP (`ADTAcquired`). The first two are snapshots, so `Census` infers admits and discharges by comparing them to the open encounters. An ADT feed is a stream of changes applied in order, so the Admit or Discharge comes from the message itself. See **[dev-docs/adt-census.md](dev-docs/adt-census.md)**.
 
 #### Two-phase MeasureEval — the only backward arrow
 

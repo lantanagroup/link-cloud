@@ -18,12 +18,14 @@ public class AutomationRunSummary
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public string? Error { get; set; }
+    /// <summary>Formatted operation-failure blocks, capped when recorded. Empty when the run had none.</summary>
+    public IReadOnlyList<string> FailureDetails { get; set; } = [];
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
     public string? Duration { get; set; }
     public string? FacilityId { get; set; }
     /// <summary>
-    /// True when this run created <see cref="FacilityId"/>. A differing id that already
-    /// existed, such as a DMRP NHSN organization, is not an Automation leftover.
+    /// True when this run created <see cref="FacilityId"/>. Leftover cleanup deletes a
+    /// facility id other than the run id only when this is set.
     /// </summary>
     public bool AutomationCreatedFacility { get; set; }
     public string? ReportId { get; set; }
@@ -32,5 +34,17 @@ public class AutomationRunSummary
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
+    /// <summary>TestRail runs that accepted this automation run's results. Empty when nothing was published.</summary>
+    public List<TestRailRunReference> TestRailRuns { get; set; } = [];
     public IReadOnlyList<string> Logs { get; set; } = [];
+}
+
+/// <summary>One TestRail run that received results for an automation run.</summary>
+public sealed class TestRailRunReference
+{
+    public int RunId { get; set; }
+    public string Url { get; set; } = string.Empty;
+    /// <summary>Set when the publish response included exactly one test id.</summary>
+    public int? TestId { get; set; }
+    public string? TestUrl { get; set; }
 }

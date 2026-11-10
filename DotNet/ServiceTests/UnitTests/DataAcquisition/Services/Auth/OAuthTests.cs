@@ -38,7 +38,12 @@ public class OAuthTests
     }
 
     private OAuth BuildSut(HttpMessageHandler handler) =>
-        new(new HttpClient(handler), _mockLogger.Object, _mockCacheService.Object, _mockSecretManager.Object);
+        new(new HttpClient(handler),
+            _mockLogger.Object,
+            new FacilityAccessTokenCache(_mockCacheService.Object,
+                                         TokenLockProviders.Granting(),
+                                         Mock.Of<ILogger<FacilityAccessTokenCache>>()),
+            _mockSecretManager.Object);
 
     private static AuthenticationConfigurationModel BuildAuthSettings(string? scope = null) => new()
     {
@@ -192,5 +197,19 @@ public class OAuthTests
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task InvalidateAuthentication_TokenMintedBeforeTheRequest_RemovesTheFacilityToken()
+    {
+        var requestStartedUtc = DateTimeOffset.UtcNow;
+        _mockCacheService
+            .Setup(x => x.GetAsync<DateTimeOffset>($"{FacilityId}:access-token-minted-at", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(requestStartedUtc.AddMinutes(-2));
+        var sut = BuildSut(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        await sut.InvalidateAuthentication(FacilityId, requestStartedUtc);
+
+        _mockCacheService.Verify(x => x.RemoveAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

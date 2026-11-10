@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
-using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
@@ -27,9 +26,6 @@ namespace UnitTests.Tenant
         private readonly HttpClient _httpClient;
         private readonly Mock<IEntityRepository<Facility>> _mockRepository;
         private readonly Mock<IFacilityQueries> _mockQueries;
-        private readonly Mock<CreateAuditEventCommand> _mockCreateAuditEventCommand;
-        private readonly Mock<ILogger<CreateAuditEventCommand>> _mockAuditCommandLogger;
-        private readonly Mock<IProducer<string, AuditEventMessage>> _mockProducer;
         private readonly Mock<IOptions<ServiceRegistry>> _mockServiceRegistry;
         private readonly Mock<IOptions<MeasureConfig>> _mockMeasureConfig;
         private readonly Mock<IOptions<LinkTokenServiceSettings>> _mockLinkTokenServiceConfig;
@@ -45,9 +41,6 @@ namespace UnitTests.Tenant
             _httpClient = new HttpClient(_mockHttpMessageHandler.Object);
             _mockRepository = new Mock<IEntityRepository<Facility>>();
             _mockQueries = new Mock<IFacilityQueries>();
-            _mockAuditCommandLogger = new Mock<ILogger<CreateAuditEventCommand>>();
-            _mockProducer = new Mock<IProducer<string, AuditEventMessage>>();
-            _mockCreateAuditEventCommand = new Mock<CreateAuditEventCommand>(_mockAuditCommandLogger.Object, _mockProducer.Object);
             _mockServiceRegistry = new Mock<IOptions<ServiceRegistry>>();
             _mockMeasureConfig = new Mock<IOptions<MeasureConfig>>();
             _mockLinkTokenServiceConfig = new Mock<IOptions<LinkTokenServiceSettings>>();
@@ -59,15 +52,12 @@ namespace UnitTests.Tenant
                 NumericOnlyFacilityId = false
             };
 
-            _mockProducer.Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, AuditEventMessage>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new DeliveryResult<string, AuditEventMessage>());
 
             _facilityManager = new FacilityManager(
                 _mockLogger.Object,
                 _httpClient,
                 _mockRepository.Object,
                 _mockQueries.Object,
-                _mockCreateAuditEventCommand.Object,
                 _mockServiceRegistry.Object,
                 _mockMeasureConfig.Object,
                 _mockLinkTokenServiceConfig.Object,

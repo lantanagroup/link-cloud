@@ -30,7 +30,6 @@ public enum KafkaTopic
     ReportFailed,
     ReportRequestRejected,
     ReportScheduled,
-    RetentionCheckScheduled,
     MeasureChanged,
     MeasureEvalFailed,
     FHIRValidationFailed,
@@ -84,4 +83,7 @@ public enum KafkaTopic
     ReportStatusUpdatedRetry,
     [StringValue("ReportStatusUpdated-Error")]
     ReportStatusUpdatedError,
+    ADTAcquired,
+    [StringValue("ADTAcquired-Retry")]
+    ADTAcquiredRetry,
 }

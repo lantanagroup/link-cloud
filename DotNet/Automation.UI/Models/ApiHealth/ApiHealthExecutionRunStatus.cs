@@ -15,6 +15,8 @@ public sealed class ApiHealthExecutionRunStatus
     public bool Failed { get; init; }
     public string? Error { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
+    /// <summary>TestRail runs that accepted this execution's results. Empty when nothing was published.</summary>
+    public List<TestRailRunReference> TestRailRuns { get; init; } = [];
 
     public string RunMode => string.Equals(Scope, "All", StringComparison.OrdinalIgnoreCase) ? "All" : "Single";
 }

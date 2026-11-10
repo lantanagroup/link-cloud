@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
         private readonly IReportEntryManager _reportEntryManager;
         private readonly IReportScheduledManager _reportScheduleManager;
-
+        private readonly ServiceInformation _serviceInformation;
 
         public ReportManifestProducer(
             ILogger<ReportManifestProducer> logger,
@@ -39,7 +39,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             SubmitPayloadProducer payloadSubmittedProducer,
             AuditableEventOccurredProducer auditableEventOccurredProducer,
             IReportEntryManager reportEntryManager,
-            IReportScheduledManager reportScheduleManager)
+            IReportScheduledManager reportScheduleManager,
+            ServiceInformation serviceInformation)
         {
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
@@ -50,6 +51,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
             _reportEntryManager = reportEntryManager;
             _reportScheduleManager = reportScheduleManager;
+            _serviceInformation = serviceInformation;
         }
 
         public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
@@ -177,22 +179,46 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             {
                 Meta = new Meta { Profile = [ReportConstants.BundleSettings.SubmittingDeviceProfile] }
             };
-            device.DeviceName.Add(new Device.DeviceNameComponent()
+            device.DeviceName.Add(new Device.DeviceNameComponent
             {
-                Name = "NHSNLink"
+                Name = ReportConstants.BundleSettings.DeviceName,
+                Type = DeviceNameType.UserFriendlyName
             });
 
-            string? version = ServiceActivitySource.ProductVersion;
+            var version = string.IsNullOrWhiteSpace(_serviceInformation.ProductVersion)
+                ? _serviceInformation.Version
+                : _serviceInformation.ProductVersion;
 
-            if (string.IsNullOrEmpty(version))
-                version = ServiceActivitySource.Instance.Version ?? "unknown";
+            AddDeviceVersion(device, ReportConstants.BundleSettings.DeviceVersionCode, version, system: null);
+            AddDeviceVersion(device,
+                             ReportConstants.BundleSettings.DeviceVersionBuildCode,
+                             _serviceInformation.Build,
+                             ReportConstants.BundleSettings.LinkDeviceVersionCodeSystem);
+            AddDeviceVersion(device,
+                             ReportConstants.BundleSettings.DeviceVersionCommitCode,
+                             _serviceInformation.Commit,
+                             ReportConstants.BundleSettings.LinkDeviceVersionCodeSystem);
+
+            return device;
+        }
+
+        /// <summary>
+        /// Adds one typed version entry in the shape MVP Link submitted. An empty value is skipped rather
+        /// than written as "", which is not valid FHIR (LEGLINK-1420).
+        /// </summary>
+        private static void AddDeviceVersion(Device device, string code, string? value, string? system)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
 
             device.Version.Add(new Device.VersionComponent
             {
-                Value = version
+                Type = new CodeableConcept { Coding = [new Coding { System = system, Code = code }] },
+                Component = new Identifier { Value = ReportConstants.BundleSettings.DeviceVersionComponent },
+                Value = value
             });
-
-            return device;
         }
 
         private List CreatePatientList(List<string> patientIds, DateTime startDate, DateTime endDate)
