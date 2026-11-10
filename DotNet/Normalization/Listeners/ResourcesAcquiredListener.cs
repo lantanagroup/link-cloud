@@ -23,6 +23,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Task = System.Threading.Tasks.Task;
@@ -54,6 +55,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly IResourceCachePurger _resourceCachePurger;
     private readonly IOptionsMonitor<TelemetrySettings> _telemetrySettings;
     private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
+    private readonly INormalizationStatusPublisher _statusPublisher;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -75,7 +77,8 @@ public class ResourcesAcquiredListener : BackgroundService
         IResourceCache resourceCache,
         IResourceCachePurger resourceCachePurger,
         IOptionsMonitor<TelemetrySettings> telemetrySettings,
-        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer)
+        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer,
+        INormalizationStatusPublisher statusPublisher)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -106,6 +109,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _resourceCachePurger = resourceCachePurger ?? throw new ArgumentNullException(nameof(resourceCachePurger));
         _telemetrySettings = telemetrySettings ?? throw new ArgumentNullException(nameof(telemetrySettings));
         _mappingOutcomeProducer = mappingOutcomeProducer ?? throw new ArgumentNullException(nameof(mappingOutcomeProducer));
+        _statusPublisher = statusPublisher ?? throw new ArgumentNullException(nameof(statusPublisher));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -191,12 +195,15 @@ public class ResourcesAcquiredListener : BackgroundService
     /// </remarks>
     public async Task ConsumeMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             await ProcessMessageAsync(result, consumeCancellationToken);
         }
         catch (DeadLetterException ex)
         {
+            await _statusPublisher.PublishAsync(result.Message.Key, result.Message.Value, result.Message.Headers,
+                false, stopwatch.ElapsedMilliseconds, ex.Message, consumeCancellationToken);
             _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
 
             // Terminal failure: the message is on ResourcesAcquired-Error and will never be normalized,
@@ -226,6 +233,7 @@ public class ResourcesAcquiredListener : BackgroundService
     public async Task ProcessMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken cancellationToken)
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
+        var stopwatch = Stopwatch.StartNew();
 
         using var duration = _metrics.MeasureNormalizationDuration(
         [
@@ -279,6 +287,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
         foreach (var cacheKey in cacheKeys)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
@@ -310,6 +319,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
                     foreach (var resource in resources)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         // IMPORTANT: step summary token format is consumed by Automation.UI
                         // normalization validation evidence parsing. Keep each token as:
                         //   "{Sequence}:{OperationType}:{OperationName}:{Outcome}"
@@ -426,6 +436,11 @@ public class ResourcesAcquiredListener : BackgroundService
                 correlationId.SanitizeForLog());
         }
 
+        stopwatch.Stop();
+        // Await the status before downstream work or source-cache deletion. A failed success send
+        // retries ResourcesAcquired with its original completion timestamp and source data intact.
+        await _statusPublisher.PublishAsync(result.Message.Key, result.Message.Value, result.Message.Headers,
+            true, stopwatch.ElapsedMilliseconds, null, cancellationToken);
         await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
         // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
@@ -446,7 +461,17 @@ public class ResourcesAcquiredListener : BackgroundService
             mappingOutcomes,
             cancellationToken);
 
-        await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+        try
+        {
+            await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The bundle and success status are already downstream. Retrying cleanup as normalization
+            // could ultimately report a false stage failure; expiration will release these source keys.
+            _logger.LogError(ex, "Failed to release acquisition cache after normalization for correlation {CorrelationId}.",
+                correlationId.SanitizeForLog());
+        }
     }
 
     private static List<HSLOCMappingResult> BuildHSLOCMappingResults(string facilityId, DomainResource resource, OperationResult? operationResult)
@@ -501,12 +526,12 @@ public class ResourcesAcquiredListener : BackgroundService
             throw new DeadLetterException("Malformed key in the event. Facility Id and Patient Id are required.");
         }
 
-        if (string.IsNullOrWhiteSpace(message.Message.Value.QueryType))
+        if (string.IsNullOrWhiteSpace(message.Message.Value?.QueryType))
         {
             throw new DeadLetterException("Malformed value in the event. QueryType is required.");
         }
 
-        if (message.Message.Value.ScheduledReports.Count() == 0)
+        if (message.Message.Value.ScheduledReports == null || message.Message.Value.ScheduledReports.Count == 0)
         {
             throw new DeadLetterException("Malformed value in the event. At least one ScheduledReport must be included.");
         }

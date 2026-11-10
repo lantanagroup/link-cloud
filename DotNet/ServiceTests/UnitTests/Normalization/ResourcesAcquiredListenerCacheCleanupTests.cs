@@ -174,7 +174,8 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             resourceCache.Object,
             purger.Object,
             telemetrySettings.Object,
-            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
+            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>(),
+            Mock.Of<INormalizationStatusPublisher>());
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(string patientId = PatientId)

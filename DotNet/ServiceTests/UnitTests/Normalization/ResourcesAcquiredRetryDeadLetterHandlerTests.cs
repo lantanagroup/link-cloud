@@ -7,6 +7,9 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Text.Json;
@@ -77,9 +80,43 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
             Times.Once);
     }
 
+    [Theory]
+    [InlineData("Initial")]
+    [InlineData("Supplemental")]
+    public void RetryExhaustionReportsOriginalFailureBeforePurging(string phase)
+    {
+        var status = new Mock<INormalizationStatusPublisher>();
+        var purger = new Mock<IResourceCachePurger>();
+        var order = new List<string>();
+        status.Setup(p => p.PublishAsync(It.IsAny<ResourceKey>(), It.IsAny<ResourcesAcquiredValue>(),
+                It.IsAny<Headers>(), false, null, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("status"))
+            .Returns(Task.CompletedTask);
+        purger.Setup(p => p.PurgeAsync(It.IsAny<ResourcesAcquiredValue>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("purge"))
+            .Returns(Task.CompletedTask);
+        var handler = BuildHandler(purger, out _, status.Object);
+        var result = BuildRetryConsumeResult(JsonSerializer.Serialize(new ResourcesAcquiredValue
+        {
+            QueryType = phase,
+            ScheduledReports = [new() { ReportTrackingId = "report-1" }],
+            CacheKeys = []
+        }));
+        result.Message.Key = JsonSerializer.Serialize(new ResourceKey { PatientId = "patient-1", FacilityId = "facility-1" });
+        result.Message.Headers.Add(KafkaConstants.HeaderConstants.CorrelationId, Encoding.UTF8.GetBytes(CorrelationId));
+        result.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage,
+            Encoding.UTF8.GetBytes("Original normalization error\r\nstack trace"));
+        handler.ProduceDeadLetter(result, "Retry count exceeded");
+        Assert.Equal(new[] { "status", "purge" }, order);
+        status.Verify(p => p.PublishAsync(It.Is<ResourceKey>(k => k.PatientId == "patient-1"),
+            It.Is<ResourcesAcquiredValue>(v => v.QueryType == phase), result.Message.Headers,
+            false, null, "Original normalization error", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static ResourcesAcquiredRetryDeadLetterHandler BuildHandler(
         Mock<IResourceCachePurger> purger,
-        out Mock<IProducer<string, string>> producer)
+        out Mock<IProducer<string, string>> producer,
+        INormalizationStatusPublisher? statusPublisher = null)
     {
         producer = new Mock<IProducer<string, string>>();
 
@@ -98,7 +135,8 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
             new ServiceInformation { ServiceConfigName = "Normalization" },
             Mock.Of<IExceptionLogger<RetryListener>>(),
             purger.Object,
-            Mock.Of<ILogger<ResourcesAcquiredRetryDeadLetterHandler>>())
+            Mock.Of<ILogger<ResourcesAcquiredRetryDeadLetterHandler>>(),
+            statusPublisher ?? Mock.Of<INormalizationStatusPublisher>())
         {
             Topic = "ResourcesAcquired-Error"
         };

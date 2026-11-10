@@ -79,6 +79,29 @@ The patient lifecycle values are `PatientIdentified`, `InitialAcquisition`, `Ini
 `Validation`, `Submission`, `Submitted`, `Failed`, `NotReportable`, and `NotSubmitted`.
 Report lifecycle values are `Pending`, `Completed`, `CompletedNotSubmitted`, `Failure`, and `Canceled`.
 
+## Normalization producer
+
+Normalization emits `InitialNormalization` or `SupplementalNormalization` on `ReportStatusUpdated`
+for each distinct `ScheduledReports.ReportTrackingId` and the `ResourcesAcquired` patient. Phase
+names are case-insensitive. Success means the entire cached bundle was processed, including an
+empty bundle or resources with no configured operations. Nonfatal operation/mapping outcomes retain
+their existing behavior and do not fail the processing stage.
+
+The success event is acknowledged before `ResourcesNormalized` is published or acquisition cache
+keys are deleted. Its duration measures normalization work, excluding consumer lag and event sends.
+`X-Normalization-Completed-At` and `X-Normalization-Processing-Time` on the source message retain the
+original occurrence time and duration across retries of that publication.
+After the downstream handoff succeeds, source-cache cleanup failures are logged and left to cache
+expiration rather than retried as a failed normalization stage.
+
+Direct dead letters and exhausted acquisition-message retries emit a failure for the failed phase;
+temporary failures and pipeline aborts/shutdown cancellation do not. Exhausted retries preserve the
+original error message when available. Failure status sends are best effort after Kafka's producer
+retries, so a diagnostic-send failure is logged and terminal dead-letter/cache cleanup continues.
+Messages lacking a patient id, correlation id, report id, or recognized phase cannot emit a valid
+status event. The status producer uses the canonical report/patient key and Murmur2 partitioning,
+and propagates the correlation and metrics-mode headers.
+
 ## Contract checks
 
 The fixtures in `Java/shared/src/test/resources/report-status/` are shared with .NET ServiceTests.

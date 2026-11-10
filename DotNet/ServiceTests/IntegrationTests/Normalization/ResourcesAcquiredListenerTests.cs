@@ -13,6 +13,7 @@ using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Enums.Reporting;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,10 +37,13 @@ namespace IntegrationTests.Normalization
             _fixture = fixture;
         }
 
-        [Fact]
-        public async Task ConsumeRedisEvent() 
+        [Theory]
+        [InlineData(QueryType.Initial, PatientReportingStatus.InitialNormalization)]
+        [InlineData(QueryType.Supplemental, PatientReportingStatus.SupplementalNormalization)]
+        public async Task ConsumeRedisEvent(QueryType phase, PatientReportingStatus status)
         {
             _fixture.ResourcesNormalizedProducerMock.Reset();
+            _fixture.StatusProducerMock.Invocations.Clear();
 
             using var scope = _fixture.ScopeFactory.CreateScope();
             var listener = scope.ServiceProvider.GetRequiredService<ResourcesAcquiredListener>();
@@ -56,7 +60,7 @@ namespace IntegrationTests.Normalization
             var key = new ResourceKey() { FacilityId = facilityId, PatientId = patientId };
             var value = new ResourcesAcquiredValue()
             {
-                QueryType = QueryType.Initial.ToString(),
+                QueryType = phase.ToString(),
                 CacheType = ResourceCacheType.Redis,
                 CacheKeys = new List<string>() { correlationId + ":Location" },
                 ReportableEvent = ReportableEvent.Discharge.ToString(),
@@ -80,6 +84,8 @@ namespace IntegrationTests.Normalization
 
             await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
 
+            VerifyStatus(status, correlationId);
+
             _fixture.ResourcesNormalizedProducerMock.Verify(
                 p => p.ProduceAsync(
                     It.IsAny<string>(),
@@ -88,10 +94,13 @@ namespace IntegrationTests.Normalization
                 Times.Once);
         }
 
-        [Fact]
-        public async Task ConsumeABSEvent()
+        [Theory]
+        [InlineData(QueryType.Initial, PatientReportingStatus.InitialNormalization)]
+        [InlineData(QueryType.Supplemental, PatientReportingStatus.SupplementalNormalization)]
+        public async Task ConsumeABSEvent(QueryType phase, PatientReportingStatus status)
         {
             _fixture.ResourcesNormalizedProducerMock.Reset();
+            _fixture.StatusProducerMock.Invocations.Clear();
 
             using var scope = _fixture.ScopeFactory.CreateScope();
 
@@ -109,7 +118,7 @@ namespace IntegrationTests.Normalization
             var key = new ResourceKey() { FacilityId = facilityId, PatientId = patientId };
             var value = new ResourcesAcquiredValue()
             {
-                QueryType = QueryType.Initial.ToString(),
+                QueryType = phase.ToString(),
                 CacheType = ResourceCacheType.ABS,
                 CacheKeys = new List<string>() { correlationId + ":Location" },
                 ReportableEvent = ReportableEvent.Discharge.ToString(),
@@ -133,12 +142,25 @@ namespace IntegrationTests.Normalization
 
             await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
 
+            VerifyStatus(status, correlationId);
+
             _fixture.ResourcesNormalizedProducerMock.Verify(
                 p => p.ProduceAsync(
                     It.IsAny<string>(),
                     It.Is<Message<ResourceKey, ResourcesNormalizedValue>>(m => m.Key.PatientId == patientId),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
+        }
+
+        private void VerifyStatus(PatientReportingStatus status, string correlationId)
+        {
+            _fixture.StatusProducerMock.Verify(p => p.ProduceAsync("ReportStatusUpdated",
+                It.Is<Message<ReportStatusUpdatedKey, ReportStatusUpdatedValue>>(m =>
+                    m.Key.ReportId == "Report1" && m.Key.PatientId == "Patient1" &&
+                    m.Value.ReportScheduleId == "Report1" && m.Value.PatientId == "Patient1" &&
+                    m.Value.CorrelationId == correlationId && m.Value.Status == status &&
+                    m.Value.IsSuccess && m.Value.ProcessingTime >= 0),
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]

@@ -241,12 +241,121 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             Times.Never);
     }
 
+    [Fact]
+    public async Task SuccessStatusIsAwaitedBeforeDownstreamPublicationAndCacheCleanup()
+    {
+        var order = new List<string>();
+        var status = new Mock<INormalizationStatusPublisher>();
+        status.Setup(p => p.PublishAsync(It.IsAny<ResourceKey>(), It.IsAny<ResourcesAcquiredValue>(),
+                It.IsAny<Headers>(), true, It.IsAny<long?>(), null, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("status"))
+            .Returns(Task.CompletedTask);
+        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        producer.Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("downstream"))
+            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
+        var cache = new Mock<IResourceCache>();
+        cache.Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>())).Returns(cache.Object);
+        cache.Setup(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("delete"))
+            .Returns(Task.CompletedTask);
+        using var cts = new CancellationTokenSource();
+        var result = BuildConsumeResult([]);
+        await BuildListener(cache, producer, statusPublisher: status.Object).ProcessMessageAsync(result, cts.Token);
+        Assert.Equal(new[] { "status", "downstream", "delete" }, order);
+        status.Verify(p => p.PublishAsync(result.Message.Key, result.Message.Value, result.Message.Headers,
+            true, It.Is<long?>(ms => ms >= 0), null, cts.Token), Times.Once);
+    }
+
+    [Fact]
+    public async Task FailedSuccessSend_RetainsCacheAndDoesNotPublishDownstream()
+    {
+        var status = new Mock<INormalizationStatusPublisher>();
+        status.Setup(p => p.PublishAsync(It.IsAny<ResourceKey>(), It.IsAny<ResourcesAcquiredValue>(),
+                It.IsAny<Headers>(), true, It.IsAny<long?>(), null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("status broker unavailable"));
+        var cache = new Mock<IResourceCache>();
+        cache.Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>())).Returns(cache.Object);
+        cache.Setup(c => c.GetResourceTypeByCacheKey(PatientCacheKey)).Returns(FhirResourceType.Patient);
+        cache.Setup(c => c.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new Patient { Id = PatientId }]);
+        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            BuildListener(cache, producer, statusPublisher: status.Object)
+                .ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None));
+        producer.VerifyNoOtherCalls();
+        cache.Verify(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OnlyTerminalFailurePublishesFailureStatus(bool terminal)
+    {
+        var status = new Mock<INormalizationStatusPublisher>();
+        var cache = new Mock<IResourceCache>();
+        cache.Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>())).Returns(cache.Object);
+        cache.Setup(c => c.GetResourceTypeByCacheKey(PatientCacheKey)).Returns(FhirResourceType.Patient);
+        if (terminal)
+            cache.Setup(c => c.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        else
+            cache.Setup(c => c.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new TransientException("cache unavailable"));
+        var result = BuildConsumeResult([PatientCacheKey]);
+        await BuildListener(cache, new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>(), statusPublisher: status.Object)
+            .ConsumeMessageAsync(result, CancellationToken.None);
+        status.Verify(p => p.PublishAsync(result.Message.Key, result.Message.Value, result.Message.Headers,
+            false, It.Is<long?>(ms => ms >= 0), It.Is<string>(s => s.Contains("contained no resources")),
+            It.IsAny<CancellationToken>()), terminal ? Times.Once() : Times.Never());
+        if (!terminal)
+            status.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task AbortedReportOrHostCancellationDoesNotPublishStatus()
+    {
+        var status = new Mock<INormalizationStatusPublisher>();
+        var abort = new InMemoryPipelineAbortRegistry();
+        await abort.AbortAsync(FacilityId, reportId: null, TimeSpan.FromDays(1));
+        await BuildListener(new Mock<IResourceCache>(), new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>(),
+                abort, statusPublisher: status.Object)
+            .ConsumeMessageAsync(BuildConsumeResult([]), CancellationToken.None);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var cache = new Mock<IResourceCache>();
+        cache.Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>())).Returns(cache.Object);
+        cache.Setup(c => c.GetResourceTypeByCacheKey(PatientCacheKey)).Returns(FhirResourceType.Patient);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            BuildListener(cache, new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>(), statusPublisher: status.Object)
+                .ConsumeMessageAsync(BuildConsumeResult([PatientCacheKey]), cts.Token));
+        status.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task CacheCleanupFailureAfterSuccessfulHandoffDoesNotFailNormalization()
+    {
+        var status = new Mock<INormalizationStatusPublisher>();
+        var cache = new Mock<IResourceCache>();
+        cache.Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>())).Returns(cache.Object);
+        cache.Setup(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache unavailable"));
+        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var result = BuildConsumeResult([]);
+        await BuildListener(cache, producer, statusPublisher: status.Object).ConsumeMessageAsync(result, CancellationToken.None);
+        status.Verify(p => p.PublishAsync(result.Message.Key, result.Message.Value, result.Message.Headers,
+            true, It.IsAny<long?>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        status.VerifyNoOtherCalls();
+    }
+
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCache> resourceCache,
         Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer,
         IPipelineAbortRegistry? abortRegistry = null,
         IResourceCachePurger? purger = null,
-        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null)
+        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null,
+        INormalizationStatusPublisher? statusPublisher = null)
     {
         mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var sequenceQueries = new Mock<IOperationSequenceQueries>();
@@ -300,7 +409,8 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             resourceCache.Object,
             purger ?? Mock.Of<IResourceCachePurger>(),
             telemetrySettings.Object,
-            mappingOutcomeProducer.Object);
+            mappingOutcomeProducer.Object,
+            statusPublisher ?? Mock.Of<INormalizationStatusPublisher>());
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)
