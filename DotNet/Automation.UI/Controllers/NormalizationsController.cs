@@ -43,16 +43,20 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (model.ResourceTypes.Count == 0)
             return BadRequest("At least one resource type is required.");
 
+        var existing = await store.GetOperationByIdAsync(model.Id, ct);
+        if (existing is { IsSystem: true })
+            return StatusCode(StatusCodes.Status403Forbidden, "System operations cannot be modified.");
+
+        // HSLOC Map always stores the NHSN URL. A posted or previously stored target
+        // cannot override it, including when rows are added or reordered.
+        ApplyHslocTargetSystems(model);
+
         var hslocError = GetHslocMapSaveError(model);
         if (hslocError != null)
             return BadRequest(hslocError);
 
         if (string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
             model.CodeMapFhirPath = HslocMappingDefaults.FhirPath;
-
-        var existing = await store.GetOperationByIdAsync(model.Id, ct);
-        if (existing is { IsSystem: true })
-            return StatusCode(StatusCodes.Status403Forbidden, "System operations cannot be modified.");
 
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
@@ -135,14 +139,16 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (model.CodeSystemMaps.Count == 0)
             return "HSLOCMap requires at least one Code System Map.";
 
-        for (var i = 0; i < model.CodeSystemMaps.Count; i++)
-        {
-            var target = model.CodeSystemMaps[i].TargetSystem?.Trim() ?? string.Empty;
-            if (!string.Equals(target, MappingTargetSystems.HslocUrl, StringComparison.Ordinal))
-                return $"Code System Map #{i + 1} target system must be {MappingTargetSystems.HslocUrl}.";
-        }
-
         return null;
+    }
+
+    internal static void ApplyHslocTargetSystems(NormalizationOperationDefinition model)
+    {
+        if (!string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        foreach (var map in model.CodeSystemMaps)
+            map.TargetSystem = MappingTargetSystems.HslocUrl;
     }
 
     // ===== Sequences =====
