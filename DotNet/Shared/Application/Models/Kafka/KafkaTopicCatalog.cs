@@ -72,6 +72,7 @@ public static class KafkaTopicCatalog
 
     public static IReadOnlyList<KafkaTopicCatalogEntry> Topics { get; } =
     [
+        Entry("ADTAcquired", KafkaTopicKeyClass.Facility, true, false, FacilityJsonShape, "", "Census"),
         Entry("AuditableEventOccurred", KafkaTopicKeyClass.Patient, orderSensitive: true, hardBlocked: false, AuditShape, "", "Audit"),
         Entry("CernerPatientsAcquired", KafkaTopicKeyClass.Facility, true, false, FacilityJsonShape, "", "Census"),
         Entry("DataAcquisitionRequested", KafkaTopicKeyClass.Patient, true, false, PatientJsonShape, "", "DataAcquisition"),
@@ -89,9 +90,8 @@ public static class KafkaTopicCatalog
         Entry("ReportScheduled", KafkaTopicKeyClass.Facility, true, false, FacilityJsonShape, "", "QueryDispatch", "Report"),
         Entry("ResourcesAcquired", KafkaTopicKeyClass.Patient, true, false, PatientJsonShape, "", "Normalization"),
         Entry("ResourcesNormalized", KafkaTopicKeyClass.Patient, true, false, PatientJsonShape, "", "measureeval", "measureeval-events"),
-        Entry("RetentionCheckScheduled", KafkaTopicKeyClass.Facility, true, false, FacilityJsonShape, ""),
         Entry("RetentionCheckRequested", KafkaTopicKeyClass.Correlation, false, false, RetentionCleanupShape, ""),
-        Entry("RetentionCheckComplete", KafkaTopicKeyClass.Correlation, false, false, RetentionCleanupShape, ""),
+        Entry("RetentionCheckComplete", KafkaTopicKeyClass.Correlation, false, false, RetentionCleanupShape, "", "Report"),
         Entry("Service-Healthcheck", KafkaTopicKeyClass.Health, false, false, ServiceShape, ""),
         Entry("ShadowCompareEvent", KafkaTopicKeyClass.Facility, false, false, FacilityIdShape, "", "validation-shadow"),
         Entry("SubmitPayload", KafkaTopicKeyClass.Patient, true, false, PatientOrFacilityJsonShape, "", "Submission"),
@@ -200,7 +200,6 @@ public static class KafkaTopicCatalog
             Producers(
                 Site("Account", "DotNet/Account/Application/Commands/AuditEvent/CreateAuditEvent.cs"),
                 Site("Shared", "DotNet/Shared/Application/Auditing/KafkaAuditPublisher.cs"),
-                Site("Tenant", "DotNet/Tenant/Commands/CreateAuditEventCommand.cs"),
                 Site("Notification", "DotNet/Notification/Application/Notification/Commands/CreateAuditEventCommand/CreateAuditEventCommand.cs"),
                 Site("Report", "DotNet/Report/KafkaProducers/AuditableEventOccurredProducer.cs"),
                 Site("Submission", "DotNet/Submission/KafkaProducers/AuditableEventOccurredProducer.cs"),
@@ -211,6 +210,9 @@ public static class KafkaTopicCatalog
                 Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/QueryDispatchConfigurationManager.cs"),
                 Site("QueryDispatch", "DotNet/QueryDispatch/Domain/Managers/PatientDispatchManager.cs")),
             Consumers(Site("Audit", "DotNet/Audit/Listeners/AuditEventListener.cs")));
+        Add(map, "ADTAcquired", true, "", false, "Census", "",
+            Producers(Site("DataAcquisition", "DotNet/DataAcquisition.Domain/Application/Services/Sftp/Processors/Hl7AdtProcessor.cs")),
+            Consumers(Site("Census", "DotNet/Census/Listeners/ADTAcquiredListener.cs")));
         Add(map, "CernerPatientsAcquired", true, "", false, "Census", "",
             Producers(Site("DataAcquisition", "DotNet/DataAcquisition.Domain/Application/Services/Sftp/Processors/CernerCCLExtractProcessor.cs")),
             Consumers(Site("Census", "DotNet/Census/Listeners/CernerPatientsAcquiredListener.cs")));
@@ -304,18 +306,15 @@ public static class KafkaTopicCatalog
                 Site("measureeval", "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/services/ResourcesNormalizedConsumer.java"),
                 Site("measureeval", "Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/KafkaConfig.java"),
                 Site("Admin.BFF", "DotNet/Admin.BFF/Application/Commands/Integration/KafkaConsumerManager.cs", control: true)));
-        Add(map, "RetentionCheckScheduled", false, "This topic has no consumer.", false, "", "",
-            Producers(Site("Tenant", "DotNet/Tenant/Jobs/RetentionCheckScheduledJob.cs")),
-            Consumers());
         Add(map, "Service-Healthcheck", false, "Health checks are not migrated.", false, "", "",
             Producers(Site("shared", "Java/shared/src/main/java/com/lantanagroup/link/shared/health/KafkaHealthCheckIndicator.java")),
             Consumers());
-        Add(map, "RetentionCheckRequested", false, "This topic has no producer or consumer yet.", false, "", "",
-            Producers(),
+        Add(map, "RetentionCheckRequested", false, "", false, "", "",
+            Producers(Site("Report", "DotNet/Report/KafkaProducers/RetentionCheckRequestedProducer.cs")),
             Consumers());
-        Add(map, "RetentionCheckComplete", false, "This topic has no producer or consumer yet.", false, "", "",
+        Add(map, "RetentionCheckComplete", false, "", false, "Report", "",
             Producers(),
-            Consumers());
+            Consumers(Site("Report", "DotNet/Report/Listeners/RetentionCheckCompleteListener.cs")));
         Add(map, "ShadowCompareEvent", false, "Validation produces and consumes this topic. Slice 2.", false, "", "",
             Producers(Site("validation", "Java/validation/src/main/java/com/lantanagroup/link/validation/services/ReadyForValidationConsumer.java")),
             Consumers(
