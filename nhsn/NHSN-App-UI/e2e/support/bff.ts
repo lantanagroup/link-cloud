@@ -4,17 +4,22 @@ import {expect, type Page, type APIRequestContext} from '@playwright/test';
  * Preflight for the `bff` tier. Fails fast and says what is missing, rather than letting a
  * spec spend its 60s timing out against a closed port.
  *
- * The tier is deliberately thin. Two things have to be true before it can be more than a
- * smoke test, and neither is yet:
+ * The tier is thin, but **not** because the endpoints are missing. An earlier version of this
+ * comment said they were, repeating `NHSN-App-UI/README.md`, which is stale: phase 1 landed in
+ * LEGPROG-515 (`9771759e9`, 2026-10-23) and `OnboardingEndpoints` maps the draft read and
+ * write, import, export and completion under `/api/nhsn-app-bff/onboarding`. Treat that README
+ * line as out of date rather than as a reason not to write specs here.
  *
- * 1. **The BFF's onboarding endpoints do not exist.** `NHSN-App-UI/README.md` is explicit
- *    that mock mode is the only way any step runs until the BFF's phase 1 lands. A draft
- *    spec against them would be a spec against a fiction.
- * 2. **BFF mode needs a signed-JWT profile** — issuer, `kid` and PKCS#8 private key matching
- *    the BFF's `NhsnJwt` configuration. `docker-compose.yml` supplies those as
- *    `NHSN_APP_UI_DEFAULT_JWT_*` to the shell's runtime server, which serves them at
- *    `/shell-config.js`; the webpack dev server does not serve that file at all. So a BFF
- *    run wants the composed shell (:8090), not `npm start`.
+ * What is actually in the way is the credential, and it is a one-off cost rather than a
+ * blocker: **BFF mode needs a signed-JWT profile** — issuer, `kid` and PKCS#8 private key
+ * matching the BFF's `NhsnJwt` configuration. `docker-compose.yml` supplies those as
+ * `NHSN_APP_UI_DEFAULT_JWT_*` to the shell's runtime server, which serves them at
+ * `/shell-config.js`; the webpack dev server does not serve that file at all. So a BFF run
+ * wants the composed shell (:8090), not `npm start`. `seedTestProfile()` below is the other
+ * half, for a spec that drives the UI rather than the API directly.
+ *
+ * A BFF run may also point at a shared lower environment, so specs here stay read-only and
+ * shape-based until that profile is wired up.
  */
 export const BFF_BASE_URL = process.env.NHSN_BFF_BASE_URL ?? 'http://localhost:8079';
 

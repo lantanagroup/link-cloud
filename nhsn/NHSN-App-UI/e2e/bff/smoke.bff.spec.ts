@@ -22,9 +22,17 @@ test.describe('NHSN-App-BFF smoke', () => {
     // The component never sets an Authorization header itself — the NHSN gateway injects the
     // JWT in transit — so an unauthenticated call is the one contract the UI never exercises
     // and the one most worth pinning: it must not be treated as an anonymous read.
-    const response = await request.get(`${BFF_BASE_URL}/api/nhsn-app-bff/onboarding/draft`, {
+    //
+    // It has to be the real route, and 404 must not be accepted. An unmatched path is rejected
+    // by routing before authorization ever runs, so a request to a route that does not exist
+    // returns 404 whether or not the endpoints are protected at all. This is the draft read
+    // itself: `OnboardingEndpoints` maps GET "/" on a group carrying
+    // `.RequireAuthorization("AuthenticatedUser")`. `Authentication:AllowAnonymous`, true in
+    // the Development and Docker settings, does not loosen this — it governs the BFF's own
+    // outbound calls to Link services, not its endpoints.
+    const response = await request.get(`${BFF_BASE_URL}/api/nhsn-app-bff/onboarding`, {
       failOnStatusCode: false
     });
-    expect([401, 403, 404]).toContain(response.status());
+    expect([401, 403]).toContain(response.status());
   });
 });

@@ -213,14 +213,25 @@ this suite, and `npm run typecheck` is clean.
 
 ## The BFF tier
 
-Thin on purpose. The BFF's onboarding endpoints do not exist yet — the project README is
-explicit that mock mode is the only way any step runs until its phase 1 lands — so specs
-against them would encode a fiction. BFF mode also needs a signed-JWT profile whose issuer,
+Thin, but **not** because the endpoints are missing. This section and `support/bff.ts` both
+used to say they were, following `NHSN-App-UI/README.md`, which is stale: phase 1 landed in
+LEGPROG-515 (`9771759e9`, 2026-10-23), and `OnboardingEndpoints` maps the draft read and write,
+import, export and completion under `/api/nhsn-app-bff/onboarding`.
+
+What keeps the tier thin is the credential. BFF mode needs a signed-JWT profile whose issuer,
 `kid` and PKCS#8 key match the BFF's `NhsnJwt` config; `docker-compose.yml` supplies those
 to the shell's runtime server as `NHSN_APP_UI_DEFAULT_JWT_*`, served at `/shell-config.js`,
 which the dev server does not serve. A real BFF run therefore wants the composed shell
 (:8090), not `npm start`. `support/bff.ts` holds the preflight and `seedTestProfile()` for
 when that lands.
+
+One trap in the smoke test, and it is general: **an authorization assertion must name a route
+that exists, and must not accept 404.** Routing rejects an unmatched path before authorization
+runs, so `GET /api/nhsn-app-bff/onboarding/draft` — a path the BFF does not map — returns 404
+whether the endpoints are protected or wide open, and a spec that accepts 404 passes either
+way. The real draft read is `GET /api/nhsn-app-bff/onboarding`, which answers 401 unauthenticated.
+`Authentication:AllowAnonymous`, true in the Development and Docker settings, does not change
+that: it governs the BFF's own outbound calls to Link services, not its endpoints.
 
 ## CI
 
