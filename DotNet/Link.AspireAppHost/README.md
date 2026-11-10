@@ -22,7 +22,10 @@ takes a few minutes; later starts are much quicker.
 - The .NET 8 SDK, and authentication to the Azure Artifacts feed (as for `link-cloud.sln`; see
   `DEVELOPMENT.md`)
 - Maven on `PATH`, and a JDK 21
-- Node and npm on `PATH`, for the Admin UI
+- Node and npm on `PATH`, for the Admin UI and the NHSN App UI
+- Only if you turn the NHSN App on (it is off by default): the NHSN design system's package file, `nhsn-react-core-2.4.1.tgz`, which
+  cannot be in the repository. Put your copy in `nhsn/NHSN-App-UI/packages/`, a folder you create; see
+  [The NHSN App](#the-nhsn-app)
 
 ### One-time settings
 
@@ -34,6 +37,9 @@ cd DotNet/Link.AspireAppHost
 dotnet user-secrets set "Terminology:Path" "C:\path\to\terminology-data"
 # Only if JAVA_HOME is not a JDK 21. The Java services target 17 and are built and run on 21.
 dotnet user-secrets set "Java:Home" "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot"
+# Only for the NHSN App UI, and only if you keep the design system's package file outside the
+# repository folder instead of in nhsn/NHSN-App-UI/packages/: the file, or the folder that holds it.
+dotnet user-secrets set "NhsnApp:ReactCorePackage" "C:\path\to\nhsn-react-core-2.4.1.tgz"
 ```
 
 | Setting | Default | Purpose |
@@ -42,6 +48,8 @@ dotnet user-secrets set "Java:Home" "C:\Program Files\Eclipse Adoptium\jdk-21.0.
 | `Java:Home` | `JAVA_HOME`, else `java` on `PATH` | The JDK that builds and runs MeasureEval and Validation |
 | `Java:Maven` | `mvn` | The Maven command |
 | `AdminUi:Enabled` | `true` | `false` leaves the Admin UI out |
+| `NhsnApp:Enabled` | `false` | `true` adds the NHSN App BFF and the NHSN App UI. Off by default because the UI needs a one-time manual setup; see [The NHSN App](#the-nhsn-app) |
+| `NhsnApp:ReactCorePackage` | empty | Where the NHSN design system's package file is, when it is not already in `nhsn/NHSN-App-UI/packages/`: the file, or the folder that holds it. See [The NHSN App](#the-nhsn-app) |
 | `Auth:Mode` | `Anonymous` (`Keycloak` in the https profile) | How people sign in; see below |
 | `AdminUi:AuthRequired` | `false` | The UI's `authRequired`. Keycloak mode turns it on. Under anonymous access the Admin BFF maps no login endpoint, so `true` on its own sends people to a page that 404s |
 | `Validation:Engine` | `Legacy` | Which engine decides whether a patient passes validation: `Legacy` (HAPI's validator) or `Rubric` (the rubric engine, with the rubric Seed data publishes). Sets Validation's `vaas.bridge.enabled` |
@@ -113,6 +121,7 @@ connections and not recover.
 | Normalization / QueryDispatch / Report / Submission / Tenant | 18068 / 18071 / 18072 / 18073 / 18074 |
 | Validation (Java) / Terminology / Acquisition worker | 18075 / 18076 / 18078 |
 | Automation UI | http://localhost:15256 |
+| NHSN App UI (`webpack serve`) / NHSN App BFF | http://localhost:18090 / 18079 |
 | Mock FHIR server / Mock DMRP API | 16158 / 16159 |
 | HAPI FHIR server | http://localhost:16157/fhir |
 | SQL Server | `tcp:127.0.0.1,14333`, user `sa`, trust the server certificate (see below) |
@@ -123,6 +132,77 @@ connections and not recover.
 | Loki | http://localhost:13100 |
 | SFTP server | `127.0.0.1:12222`, user `admin`, generated password (see above), uploads in `data/` (kept between runs) |
 | Keycloak (https profile only) | https://localhost:18443, realm `link` |
+
+### The NHSN App
+
+`nhsn-app-bff` and `nhsn-app-ui` are the NHSN App (`nhsn/`): its BFF, and the standalone shell of its UI
+that stands in for the CDC NHSN App. Both are off by default, because the UI needs the one-time setup
+below. Turn them on with `NhsnApp:Enabled`, in user secrets so the choice stays on your machine:
+
+```powershell
+cd DotNet/Link.AspireAppHost
+dotnet user-secrets set "NhsnApp:Enabled" "true"
+```
+
+#### One-time setup: the design system's package file
+
+The UI installs the NHSN design system (`@nhsn/nhsn-react-core`) from a package file,
+`nhsn-react-core-2.4.1.tgz`. The file cannot be in the repository, so each developer gets a copy and
+puts it where the UI's `package.json` looks for it:
+
+1. Create the folder `nhsn/NHSN-App-UI/packages/`. Nothing creates it for you: not git, npm or React.
+2. Put `nhsn-react-core-2.4.1.tgz` in it, with that exact name.
+3. Set `NhsnApp:Enabled` to `true`, as above.
+4. Start the AppHost. `nhsn-app-ui-install` runs `npm ci` once, then `nhsn-app-ui` starts.
+
+```
+nhsn/NHSN-App-UI/
+  packages/
+    nhsn-react-core-2.4.1.tgz
+```
+
+`packages/` is listed in `nhsn/NHSN-App-UI/.gitignore`, so the file never shows in `git status` and
+cannot be committed by accident. Only that folder is ignored: the same file anywhere else in the
+repository folder shows up as untracked.
+
+To keep the file outside the repository folder instead, set `NhsnApp:ReactCorePackage` to the file, or
+to the folder that holds it (see [One-time settings](#one-time-settings)). The AppHost then creates
+`packages/` and copies the file into it before the install. It is copied, not installed from where it
+is, because `package.json` and the lock file name it by that path.
+
+Things to know:
+
+- **Without the file, the UI is left out.** `nhsn-app-ui` does not appear in the dashboard, and a warning
+  in the AppHost's console log says what is missing. The same happens when `NhsnApp:ReactCorePackage`
+  points at a file that is not there or has a different name. The BFF and everything else run as usual.
+- **The file is needed for the install only.** Once `nhsn/NHSN-App-UI/node_modules` exists, later starts
+  skip the install and do not look for the file. Delete `node_modules` to have the next start install
+  again; the file must be in place then.
+- **A new version of the design system** changes the file name in the UI's `package.json`. Put the new
+  file in `packages/` and delete `node_modules`. The AppHost reads the name from `package.json`, so it
+  needs no change.
+
+#### Using it
+
+Open http://localhost:18090. The shell opens in BFF mode, with `/api` proxied to `nhsn-app-bff`. Create a
+test profile in its sidebar: email, name, groups (such as `FACADMIN`) and facility id. The issuer, key
+id and private key are already filled in.
+
+Those three come from a key pair the AppHost makes on the first run and keeps under the temp directory
+(`link-aspire/nhsn-app-jwt`). The shell signs a token with the private key in the browser, and the BFF
+validates it against the pair's certificate, as it validates the NHSN gateway's tokens when deployed. No
+key is committed.
+
+- **A saved profile holds the key**, so it keeps working across restarts. If that temp folder is deleted,
+  the next start makes a new pair, and the BFF answers a saved profile with 401. Edit the profile, or
+  create a new one, to pick up the new values.
+- **The BFF's own endpoints always require one of those tokens**, in both `Auth:Mode`s. `Auth:Mode` only
+  decides whether the BFF sends Link bearer tokens to the Link services it calls.
+- **The UI's own files are not changed.** It runs under `webpack serve`, as `npm start` runs it, with
+  `NhsnAppUi/webpack.config.js` wrapped around the UI's config for the port, the proxy and the profile
+  defaults. Running `npm start` in `nhsn/NHSN-App-UI` yourself still uses port 4300 and a BFF on 8079.
+- **The BFF runs in the `Docker` environment**, like the other services, so it reads its
+  `appsettings.Docker.json`. Its database is `link-nhsn-app-bff` on the AppHost's SQL Server.
 
 ### Scaling a service out
 
@@ -195,11 +275,13 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | `Extensions/DotNetServiceExtensions.cs` | How a .NET service is run and configured |
 | `Extensions/JavaServiceExtensions.cs` | The Maven build, MeasureEval, Validation, and the Validation migrations command |
 | `Extensions/AdminUiExtensions.cs` | The Admin UI under `ng serve` |
+| `Extensions/NhsnAppExtensions.cs` | The NHSN App BFF, the NHSN App UI under `webpack serve`, and the key pair they share |
 | `Extensions/KeycloakExtensions.cs` | Reads `Auth:Mode`, and adds Keycloak with the development certificate |
 | `Extensions/SeedDataExtensions.cs` | Seed data and the **Seed data** command |
 | `Extensions/AccountUserExtensions.cs` | The **Create user** command |
 | `Extensions/FacilitySetupExtensions.cs` | The **Create test facility** command, which runs `FacilitySetup/steps.json` |
 | `AdminUi/proxy.mjs` | The Admin UI's `ng serve` proxy |
+| `NhsnAppUi/webpack.config.js` | The NHSN App UI's webpack config: the UI's own, with `/api` proxied to this host's BFF |
 | `Keycloak/link-realm.json` | The `link` realm Keycloak imports |
 | `FacilitySetup/` | `steps.json` and the request payloads, by service, that **Create test facility** sends |
 | `SeedData/Validation/bare-minimum-requirements.yaml` | The validation rubric **Seed data** publishes, and Validation's shadow comparison uses |
@@ -285,4 +367,4 @@ replaced by a green notice on success or a red one on failure, which stays until
   API key: Aspire's usual way of passing the key sets variables the OpenTelemetry Spring starter
   cannot read, and they stop the services from starting. Their traces may not show on the dashboard.
   Their logs still reach the console view and Loki.
-- **Not included:** the NHSN app (`nhsn/`), Grafana, Tempo and Prometheus.
+- **Not included:** Grafana, Tempo and Prometheus.

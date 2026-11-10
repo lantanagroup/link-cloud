@@ -40,6 +40,7 @@ internal static class Ports
     public const int MockFhirServer = 16158;
     public const int MockDmrpApi = 16159;
     public const int AutomationUi = 15256;
+    public const int NhsnAppBff = 18079;
 
     // Java services
     public const int MeasureEval = 18067;
@@ -47,4 +48,7 @@ internal static class Ports
 
     // Admin UI under ng serve
     public const int AdminUi = 14200;
+
+    // NHSN App UI's shell under webpack serve
+    public const int NhsnAppUi = 18090;
 }

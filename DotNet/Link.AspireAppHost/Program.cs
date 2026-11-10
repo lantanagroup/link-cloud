@@ -148,6 +148,19 @@ validation.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(i
 
 
 // ---------------------------------------------------------------------------------------------------
+// NHSN App: its BFF and the standalone shell of its UI (NhsnApp:Enabled)
+// ---------------------------------------------------------------------------------------------------
+
+if (builder.NhsnAppEnabled())
+{
+    var nhsnJwt = NhsnAppJwt.LoadOrCreate();
+    var nhsnAppBff = builder.AddNhsnAppBff(infrastructure, nhsnJwt, requireToken, keycloak)
+        .WaitFor(tenant)
+        .WaitFor(terminology);
+    builder.AddNhsnAppUi(nhsnAppBff, nhsnJwt);
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Admin BFF, Admin UI and Automation UI
 // ---------------------------------------------------------------------------------------------------
 
