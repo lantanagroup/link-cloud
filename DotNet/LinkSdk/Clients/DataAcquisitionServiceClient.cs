@@ -509,4 +509,158 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request("data-acquisition/sftp-logs")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteAllQueryPlansAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/{facilityId}/QueryPlan/All")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<OrganizationLocationConfigurationApiModel>> GetOrganizationLocationConfigurationByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<OrganizationLocationConfigurationApiModel>(() => Request($"data-acquisition/location-config/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> SearchOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/location-config/facility/{facilityId}/search")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateOrganizationLocationConfigurationByIdAsync(
+        int id,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/location-config/{id}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteOrganizationLocationConfigurationByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/location-config/{id}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> SearchOrganizationLocationMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/location-mappings/facility/{facilityId}/search")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteOrganizationLocationMappingsByFacilityAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/location-mappings/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetEncounterMappingByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/encounter-mappings/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetEncounterMappingByEncounterAsync(
+        string facilityId,
+        string encounterId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetEncounterMappingsByPatientAsync(
+        string facilityId,
+        string patientId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/encounter-mappings/facilities/{facilityId}/patients/{patientId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> SearchEncounterMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/encounter-mappings/facilities/{facilityId}/search")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateEncounterMappingAsync(
+        int id,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/encounter-mappings/{id}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateEncounterMappingByEncounterAsync(
+        string facilityId,
+        string encounterId,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> CreateEncounterMappingAsync(
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("data-acquisition/encounter-mappings")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> SearchAcquisitionLogsByFacilityAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/acquisition-logs/facility/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> SearchAcquisitionLogsByPatientAsync(
+        string facilityId,
+        string patientId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/acquisition-logs/facility/{facilityId}/patient/{patientId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateAcquisitionLogAsync(
+        long id,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/acquisition-logs/{id}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetFhirQueriesAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/{facilityId}/FhirQueries")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetAuthenticationConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration/authentication")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> CreateAuthenticationConfigurationAsync(
+        string facilityId,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration/authentication")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateAuthenticationConfigurationAsync(
+        string facilityId,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration/authentication")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteAuthenticationConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration/authentication")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetSftpLogAsync(
+        string logId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/sftp-logs/{logId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> ResetSftpLogAsync(
+        string logId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/sftp-logs/{logId}/reset")
+            .PostAsync(cancellationToken: cancellationToken));
 }

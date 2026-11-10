@@ -172,11 +172,68 @@ public static class ApiEndPointLibrary
         [CensusSteps.PatientEventDelete202] = new EndpointMeta(CensusSteps.PatientEventDelete202, "/api/census/patient-events/{id}", "Patient events are written exclusively by the Kafka PatientListsAcquiredListener. No HTTP endpoint exists to create them, so the 202 path cannot be exercised in a self-contained health test.")
     };
 
-    private static IReadOnlyDictionary<string, EndpointMeta> BuildDataAcquisitionMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildDataAcquisitionMetadata()
     {
-        [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", "GET /api/data-acquisition/info"),
-        [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health")
-    };
+        const string api = "/api/data-acquisition";
+        return new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+        {
+            [DataAcquisitionSteps.InfoGet200] = new EndpointMeta("Returns Data Acquisition service information.", $"GET {api}/info"),
+            [DataAcquisitionSteps.RootHealthGet200] = new EndpointMeta("Returns Data Acquisition service health status.", "GET /health"),
+            [DataAcquisitionSteps.FhirConfigPut202] = new EndpointMeta("Updates the throwaway FHIR query configuration.", $"PUT {api}/fhirQueryConfiguration"),
+            [DataAcquisitionSteps.FhirListConfigPut200] = new EndpointMeta("Updates the throwaway FHIR list configuration.", $"PUT {api}/fhirQueryList"),
+            [DataAcquisitionSteps.QueryPlanPut202] = new EndpointMeta("Updates the throwaway Discharge query plan.", $"PUT {api}/{{facilityId}}/QueryPlan"),
+            [DataAcquisitionSteps.QueryPlanDeleteAll202] = new EndpointMeta("Deletes every query plan on the throwaway facility.", $"DELETE {api}/{{facilityId}}/QueryPlan/All"),
+            [DataAcquisitionSteps.AuthGet404] = new EndpointMeta("Reads query authentication that was never saved.", $"GET {api}/{{facilityId}}/fhirQueryConfiguration/authentication"),
+            [DataAcquisitionSteps.AuthPost400] = new EndpointMeta("Rejects an empty query-authentication body.", $"POST {api}/{{facilityId}}/fhirQueryConfiguration/authentication"),
+            [DataAcquisitionSteps.AuthPut400] = new EndpointMeta("Rejects an empty query-authentication replacement.", $"PUT {api}/{{facilityId}}/fhirQueryConfiguration/authentication"),
+            [DataAcquisitionSteps.AuthDelete202] = new EndpointMeta("Clears query authentication on the throwaway configuration.", $"DELETE {api}/{{facilityId}}/fhirQueryConfiguration/authentication"),
+            [DataAcquisitionSteps.FhirAuthGet404] = new EndpointMeta("Reads a generic OAuth configuration that was never saved.", $"GET {api}/facilities/{{facilityId}}/fhir-authentication-configuration"),
+            [DataAcquisitionSteps.FhirAuthPut400] = new EndpointMeta("Rejects an empty generic OAuth body before any secret is stored.", $"PUT {api}/facilities/{{facilityId}}/fhir-authentication-configuration"),
+            [DataAcquisitionSteps.FacilityValidateGet400] = new EndpointMeta("Rejects a facility connection probe that has no patient, measure, or dates.", $"GET {api}/connectionValidation/{{facilityId}}/$validate"),
+            [DataAcquisitionSteps.FhirServerValidateGet400] = new EndpointMeta("Rejects a FHIR server probe whose URL is not a URL.", $"GET {api}/connectionValidation/$validate"),
+            [DataAcquisitionSteps.LogsByFacilityGet200] = new EndpointMeta("Lists acquisition logs for the throwaway facility.", $"GET {api}/acquisition-logs/facility/{{facilityId}}"),
+            [DataAcquisitionSteps.LogsByPatientGet200] = new EndpointMeta("Lists acquisition logs for a synthetic patient.", $"GET {api}/acquisition-logs/facility/{{facilityId}}/patient/{{patientId}}"),
+            [DataAcquisitionSteps.StatisticsGet200] = new EndpointMeta("Reads report statistics for a report that has no logs.", $"GET {api}/acquisition-logs/report/{{reportId}}/statistics"),
+            [DataAcquisitionSteps.ResourceCountsGet200] = new EndpointMeta("Reads acquired-resource counts for a report that has no logs.", $"GET {api}/acquisition-logs/report/{{reportId}}/acquired-resource-counts-by-patient"),
+            [DataAcquisitionSteps.ResourceCountsGet400] = new EndpointMeta("Rejects acquired-resource counts when the report id is not a guid.", $"GET {api}/acquisition-logs/report/{{reportId}}/acquired-resource-counts-by-patient"),
+            [DataAcquisitionSteps.UpdateLog400] = new EndpointMeta("Rejects an acquisition-log update that has no id.", $"PUT {api}/acquisition-logs/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationConfigGet200ById] = new EndpointMeta("Reads the organization/location configuration created in this run.", $"GET {api}/location-config/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationConfigGet404] = new EndpointMeta("Answers not-found for an unknown organization/location configuration id.", $"GET {api}/location-config/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationConfigSearch200] = new EndpointMeta("Searches organization/location configurations for the throwaway facility.", $"GET {api}/location-config/facility/{{facilityId}}/search"),
+            [DataAcquisitionSteps.OrgLocationConfigPut404] = new EndpointMeta("Answers not-found when updating an unknown organization/location configuration.", $"PUT {api}/location-config/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationConfigPut202ById] = new EndpointMeta("Updates the throwaway organization/location configuration by id without activating it.", $"PUT {api}/location-config/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationConfigPut202] = new EndpointMeta("Updates the throwaway organization/location configuration by facility without activating it.", $"PUT {api}/location-config/facility/{{facilityId}}"),
+            [DataAcquisitionSteps.OrgLocationConfigDelete202ById] = new EndpointMeta("Deletes the organization/location configuration created in this run.", $"DELETE {api}/location-config/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationConfigDelete202] = new EndpointMeta("Deletes organization/location configurations for the throwaway facility.", $"DELETE {api}/location-config/facility/{{facilityId}}"),
+            [DataAcquisitionSteps.OrgLocationMappingGet404] = new EndpointMeta("Answers not-found for an unknown organization/location mapping.", $"GET {api}/location-mappings/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationMappingSearch200] = new EndpointMeta("Searches organization/location mappings for the throwaway facility.", $"GET {api}/location-mappings/facility/{{facilityId}}/search"),
+            [DataAcquisitionSteps.OrgLocationMappingPut404] = new EndpointMeta("Answers not-found when updating an unknown organization/location mapping.", $"PUT {api}/location-mappings/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationMappingDelete202] = new EndpointMeta("Accepts a delete of an organization/location mapping that is not there.", $"DELETE {api}/location-mappings/{{id}}"),
+            [DataAcquisitionSteps.OrgLocationMappingsDelete202] = new EndpointMeta("Deletes organization/location mappings for the throwaway facility.", $"DELETE {api}/location-mappings/facility/{{facilityId}}"),
+            [DataAcquisitionSteps.EncounterMappingGet404] = new EndpointMeta("Answers not-found for an unknown encounter mapping.", $"GET {api}/encounter-mappings/{{id}}"),
+            [DataAcquisitionSteps.EncounterMappingByEncounterGet404] = new EndpointMeta("Answers not-found for an encounter that was never mapped.", $"GET {api}/encounter-mappings/facilities/{{facilityId}}/encounters/{{encounterId}}"),
+            [DataAcquisitionSteps.EncounterMappingsByPatientGet200] = new EndpointMeta("Lists encounter mappings for a synthetic patient.", $"GET {api}/encounter-mappings/facilities/{{facilityId}}/patients/{{patientId}}"),
+            [DataAcquisitionSteps.EncounterMappingSearch200] = new EndpointMeta("Searches encounter mappings for the throwaway facility.", $"GET {api}/encounter-mappings/facilities/{{facilityId}}/search"),
+            [DataAcquisitionSteps.EncounterMappingPut404] = new EndpointMeta("Answers not-found when updating an unknown encounter mapping.", $"PUT {api}/encounter-mappings/{{id}}"),
+            [DataAcquisitionSteps.EncounterMappingPutByEncounter404] = new EndpointMeta("Answers not-found when updating an encounter that was never mapped.", $"PUT {api}/encounter-mappings/facilities/{{facilityId}}/encounters/{{encounterId}}"),
+            [DataAcquisitionSteps.EncounterMappingPost400] = new EndpointMeta("Rejects an empty encounter-mapping body.", $"POST {api}/encounter-mappings"),
+            [DataAcquisitionSteps.FhirQueriesGet404] = new EndpointMeta("Answers not-found when the throwaway facility has no stored FHIR queries.", $"GET {api}/{{facilityId}}/FhirQueries"),
+            [DataAcquisitionSteps.SftpConfigGet400] = new EndpointMeta("Rejects an empty sFTP configuration id.", $"GET {api}/sftp-configurations/{{id}}"),
+            [DataAcquisitionSteps.SftpConfigByOrgGet404] = new EndpointMeta("Answers not-found when the throwaway facility has no sFTP configuration.", $"GET {api}/{{organizationId}}/sftp-configurations"),
+            [DataAcquisitionSteps.SftpConfigPost400] = new EndpointMeta("Rejects an empty sFTP configuration body before a row or secret is stored.", $"POST {api}/{{organizationId}}/sftp-configurations"),
+            [DataAcquisitionSteps.SftpConfigPut400] = new EndpointMeta("Rejects an sFTP configuration update whose body id is empty.", $"PUT {api}/{{organizationId}}/sftp-configurations/{{configurationId}}"),
+            [DataAcquisitionSteps.SftpConfigDelete400] = new EndpointMeta("Rejects an sFTP configuration delete whose id is not a guid.", $"DELETE {api}/{{organizationId}}/sftp-configurations/{{configurationId}}"),
+            [DataAcquisitionSteps.SftpCredentialsPut400] = new EndpointMeta("Rejects an empty sFTP credential body before the secret store.", $"PUT {api}/{{organizationId}}/sftp-configurations/credentials"),
+            [DataAcquisitionSteps.SftpCredentialStatusGet404] = new EndpointMeta("Answers not-found for sFTP credential status when no configuration exists.", $"GET {api}/{{organizationId}}/sftp-configurations/credentials/status"),
+            [DataAcquisitionSteps.SftpCredentialsDelete404] = new EndpointMeta("Answers not-found for an sFTP credential delete when no configuration exists.", $"DELETE {api}/{{organizationId}}/sftp-configurations/credentials"),
+            [DataAcquisitionSteps.SftpSavedTestPost404] = new EndpointMeta("Answers not-found for a saved sFTP connection test before any network call.", $"POST {api}/{{organizationId}}/sftp-configurations/test-connection"),
+            [DataAcquisitionSteps.SftpAdHocTestPost400] = new EndpointMeta("Rejects an sFTP connection test that has no host.", $"POST {api}/sftp-configurations/test-connection"),
+            [DataAcquisitionSteps.SftpLogsGet200] = new EndpointMeta("Lists sFTP acquisition logs.", $"GET {api}/sftp-logs"),
+            [DataAcquisitionSteps.SftpLogGet400] = new EndpointMeta("Rejects an sFTP log id that is not a guid.", $"GET {api}/sftp-logs/{{logId}}"),
+            [DataAcquisitionSteps.SftpLogPost400] = new EndpointMeta("Rejects an empty sFTP log body before a row is inserted.", $"POST {api}/sftp-logs"),
+            [DataAcquisitionSteps.SftpLogReset400] = new EndpointMeta("Rejects an sFTP log reset whose id is not a guid.", $"POST {api}/sftp-logs/{{logId}}/reset")
+        };
+    }
 
     private static IReadOnlyDictionary<string, EndpointMeta> BuildDmrpMetadata()
     {
@@ -483,6 +540,59 @@ public static class ApiEndPointLibrary
         public const string ResourceIdsGet200 = "ResourceIds GET → 200";
         public const string ResourceIds400NoFacility = "ResourceIds → 400 (no facility)";
         public const string Search400BadSortBy = "Search → 400 (bad sortBy)";
+        public const string FhirConfigPut202 = "FhirConfig PUT → 202";
+        public const string FhirListConfigPut200 = "FhirListConfig PUT → 200";
+        public const string QueryPlanPut202 = "QueryPlan PUT → 202";
+        public const string QueryPlanDeleteAll202 = "QueryPlan DELETE All → 202";
+        public const string AuthGet404 = "Auth GET → 404";
+        public const string AuthPost400 = "Auth POST → 400";
+        public const string AuthPut400 = "Auth PUT → 400";
+        public const string AuthDelete202 = "Auth DELETE → 202";
+        public const string FhirAuthGet404 = "FhirAuth GET → 404";
+        public const string FhirAuthPut400 = "FhirAuth PUT → 400";
+        public const string FacilityValidateGet400 = "FacilityValidate GET → 400";
+        public const string FhirServerValidateGet400 = "FhirServerValidate GET → 400";
+        public const string LogsByFacilityGet200 = "LogsByFacility GET → 200";
+        public const string LogsByPatientGet200 = "LogsByPatient GET → 200";
+        public const string StatisticsGet200 = "Statistics GET → 200";
+        public const string ResourceCountsGet200 = "ResourceCounts GET → 200";
+        public const string ResourceCountsGet400 = "ResourceCounts GET → 400";
+        public const string UpdateLog400 = "UpdateLog → 400";
+        public const string OrgLocationConfigGet200ById = "OrgLocationConfig GET → 200 (by id)";
+        public const string OrgLocationConfigGet404 = "OrgLocationConfig GET → 404";
+        public const string OrgLocationConfigSearch200 = "OrgLocationConfig SEARCH → 200";
+        public const string OrgLocationConfigPut404 = "OrgLocationConfig PUT → 404";
+        public const string OrgLocationConfigPut202ById = "OrgLocationConfig PUT → 202 (by id)";
+        public const string OrgLocationConfigPut202 = "OrgLocationConfig PUT → 202";
+        public const string OrgLocationConfigDelete202ById = "OrgLocationConfig DELETE → 202 (by id)";
+        public const string OrgLocationConfigDelete202 = "OrgLocationConfig DELETE → 202";
+        public const string OrgLocationMappingGet404 = "OrgLocationMapping GET → 404";
+        public const string OrgLocationMappingSearch200 = "OrgLocationMapping SEARCH → 200";
+        public const string OrgLocationMappingPut404 = "OrgLocationMapping PUT → 404";
+        public const string OrgLocationMappingDelete202 = "OrgLocationMapping DELETE → 202";
+        public const string OrgLocationMappingsDelete202 = "OrgLocationMappings DELETE → 202";
+        public const string EncounterMappingGet404 = "EncounterMapping GET → 404";
+        public const string EncounterMappingByEncounterGet404 = "EncounterMappingByEncounter GET → 404";
+        public const string EncounterMappingsByPatientGet200 = "EncounterMappingsByPatient GET → 200";
+        public const string EncounterMappingSearch200 = "EncounterMapping SEARCH → 200";
+        public const string EncounterMappingPut404 = "EncounterMapping PUT → 404";
+        public const string EncounterMappingPutByEncounter404 = "EncounterMappingByEncounter PUT → 404";
+        public const string EncounterMappingPost400 = "EncounterMapping POST → 400";
+        public const string FhirQueriesGet404 = "FhirQueries GET → 404";
+        public const string SftpConfigGet400 = "SftpConfig GET → 400";
+        public const string SftpConfigByOrgGet404 = "SftpConfigByOrg GET → 404";
+        public const string SftpConfigPost400 = "SftpConfig POST → 400";
+        public const string SftpConfigPut400 = "SftpConfig PUT → 400";
+        public const string SftpConfigDelete400 = "SftpConfig DELETE → 400";
+        public const string SftpCredentialsPut400 = "SftpCredentials PUT → 400";
+        public const string SftpCredentialStatusGet404 = "SftpCredentialStatus GET → 404";
+        public const string SftpCredentialsDelete404 = "SftpCredentials DELETE → 404";
+        public const string SftpSavedTestPost404 = "SftpSavedTest POST → 404";
+        public const string SftpAdHocTestPost400 = "SftpAdHocTest POST → 400";
+        public const string SftpLogsGet200 = "SftpLogs GET → 200";
+        public const string SftpLogGet400 = "SftpLog GET → 400";
+        public const string SftpLogPost400 = "SftpLog POST → 400";
+        public const string SftpLogReset400 = "SftpLogReset POST → 400";
     }
 
     public static class NormalizationSteps

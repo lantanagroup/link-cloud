@@ -19,7 +19,7 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 /// Each step is self-contained: prerequisite data (facility, config) is created
 /// within the step that needs it and cleaned up after.
 /// </summary>
-public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
+public sealed partial class DataAcquisitionTestSuite : ServiceTestSuiteBase
 {
     private readonly IDataAcquisitionServiceClient _client;
     private readonly IFacilityServiceClient _facilityClient;
@@ -135,6 +135,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         var queryConfigCreated = false;
         var dischargePlanCreated = false;
         var fhirListCreated = false;
+        var coverage = new CoverageState(facilityId, results, ct);
 
         try
         {
@@ -243,7 +244,8 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
                 throw new InvalidOperationException("Default Organization Resource Map template is missing or has no conditions.");
 
             results.Add(await RunStepAsync(StepNames.OrgLocationConfigPost201, 201, async () =>
-                await _client.CreateOrganizationLocationConfigurationAsync(
+            {
+                var resp = await _client.CreateOrganizationLocationConfigurationAsync(
                     facilityId,
                     new CreateOrganizationLocationConfigurationApiModel
                     {
@@ -251,7 +253,15 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
                         IsActive = true,
                         Conditions = mapConditions
                     },
-                    ct), ct: ct));
+                    ct);
+                if (resp.IsSuccessStatusCode)
+                {
+                    coverage.OrgLocationConfigCreated = true;
+                    coverage.OrgLocationConfigId = resp.Body?.ConfigId ?? 0;
+                }
+
+                return resp;
+            }, ct: ct));
 
             results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200AfterPost, 200, async () =>
                 await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
@@ -261,6 +271,9 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
 
             results.Add(await RunStepAsync(StepNames.EncounterMappingsGet200, 200, async () =>
                 await _client.GetEncounterMappingsAsync(facilityId, ct), ct: ct));
+
+            await AppendOrganizationLocationCoverageAsync(coverage);
+            await AppendEncounterCoverageAsync(coverage);
 
             // CREATE FHIR Query Config
             results.Add(await RunStepAsync(StepNames.FhirConfigPost201, 201, async () =>
@@ -274,6 +287,8 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             // GET FHIR Query Config (depends on create above)
             results.Add(await RunStepAsync(StepNames.FhirConfigGet200, 200, async () =>
                 await _client.GetFhirQueryConfigurationAsync(facilityId, ct), ct: ct));
+
+            await AppendFhirConfigurationCoverageAsync(coverage);
 
             // POST again → 409 (already exists)
             results.Add(await RunStepAsync(StepNames.FhirConfigPost409, 409, async () =>
@@ -292,6 +307,8 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.QueryPlanGet200, 200, async () =>
                 await _client.GetQueryPlanAsync(facilityId, "Discharge", ct), ct: ct));
 
+            await AppendQueryPlanUpdateAsync(coverage);
+
             // POST Query Plan again → 409 (already exists)
             results.Add(await RunStepAsync(StepNames.QueryPlanPost409, 409, async () =>
                 await _client.CreateQueryPlanAsync(facilityId, BuildDischargePlanRequest(facilityId, "ApiHealth-Discharge-Dup"), ct), ct: ct));
@@ -307,6 +324,8 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             // GET Query Plan → 404 (after delete)
             results.Add(await RunStepAsync(StepNames.QueryPlanGet404, 404, async () =>
                 await _client.GetQueryPlanAsync(facilityId, "Discharge", ct), ct: ct));
+
+            await AppendQueryPlanDeleteAllAsync(coverage);
 
             // DELETE FHIR Query Config
             results.Add(await RunStepAsync(StepNames.FhirConfigDelete202, 202, async () =>
@@ -333,6 +352,8 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             // GET FHIR List Config → 200
             results.Add(await RunStepAsync(StepNames.FhirListConfigGet200, 200, async () =>
                 await _client.GetFhirListConfigurationAsync(facilityId, cancellationToken: ct), ct: ct));
+
+            await AppendFhirListUpdateAsync(coverage);
 
             // POST FHIR List Config → 409 (duplicate)
             results.Add(await RunStepAsync(StepNames.FhirListConfigPost409, 409, async () =>
@@ -457,12 +478,19 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             // Search → 400 (invalid sortBy)
             results.Add(await RunStepAsync(StepNames.Search400BadSortBy, 400, async () =>
                 await _client.SearchAcquisitionLogsAsync(facilityId, fakeReportId, sortBy: "InvalidColumn", cancellationToken: ct), ct: ct));
+
+            await AppendLogAndConnectionCoverageAsync(coverage, fakeReportId);
+            await AppendSftpCoverageAsync(coverage);
         }
         finally
         {
             if (dischargePlanCreated) await TryCleanupAsync(() => _client.DeleteQueryPlanAsync(facilityId, "Discharge", ct));
             if (queryConfigCreated) await TryCleanupAsync(() => _client.DeleteFhirQueryConfigurationAsync(facilityId, ct));
             if (fhirListCreated) await TryCleanupAsync(() => _client.DeleteFhirListConfigurationAsync(facilityId, ct));
+            if (coverage.OrgLocationConfigCreated && !coverage.OrgLocationConfigDeleted)
+                await TryCleanupAsync(() => _client.DeleteOrganizationLocationConfigurationsAsync(facilityId, ct));
+            if (facilityCreated && !coverage.OrgLocationMappingsDeleted)
+                await TryCleanupAsync(() => _client.DeleteOrganizationLocationMappingsByFacilityAsync(facilityId, ct));
             if (facilityCreated) await TryCleanupAsync(() => _facilityClient.DeleteAsync(facilityId, ct));
         }
 
