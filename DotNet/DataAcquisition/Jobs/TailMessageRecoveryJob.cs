@@ -7,6 +7,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
 using Quartz;
@@ -84,20 +86,40 @@ public class TailMessageRecoveryJob : IJob
                         continue;
                     }
 
-                    var tailFinalizer = scope.ServiceProvider.GetRequiredService<IResourcesAcquiredTailFinalizer>();
-                    await tailFinalizer.FinalizeAsync(tailResult, context.CancellationToken);
-
                     var headers = new Headers
                     {
                         new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
                             Encoding.UTF8.GetBytes(tailResult.CorrelationId))
                     };
 
+                    // Use the same completion/failure gate as the inline worker. Status publication
+                    // must be acknowledged before either the downstream handoff or marking the tail sent.
+                    foreach (var report in tailResult.ResourcesAcquired.ScheduledReports)
+                    {
+                        var mode = await ReportMetricsModeCache.TryGetAsync(
+                            scope.ServiceProvider.GetService<ICacheService>(), tailResult.FacilityId,
+                            report.ReportTrackingId, context.CancellationToken);
+                        KafkaHeaderHelper.ApplyIfPerformance(headers, mode);
+                    }
+                    var statusPublisher = scope.ServiceProvider.GetRequiredService<IAcquisitionStatusPublisher>();
+                    if (!tailResult.IsSuccess)
+                    {
+                        await statusPublisher.PublishCompletionAsync(tailResult, headers, context.CancellationToken);
+                        await dataAcquisitionLogManager.MarkTailSentAsync(tailResult.FacilityId,
+                            tailResult.CorrelationId, tailResult.QueryPhase, context.CancellationToken);
+                        processed++;
+                        continue;
+                    }
+
+                    var tailFinalizer = scope.ServiceProvider.GetRequiredService<IResourcesAcquiredTailFinalizer>();
+                    await tailFinalizer.FinalizeAsync(tailResult, context.CancellationToken);
+
                     if (!string.IsNullOrEmpty(tailResult.TraceParentId))
                     {
                         headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
                     }
 
+                    await statusPublisher.PublishCompletionAsync(tailResult, headers, context.CancellationToken);
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourcesAcquired.ToString(),
                         new Message<ResourceKey, ResourcesAcquired>
@@ -139,7 +161,7 @@ public class TailMessageRecoveryJob : IJob
                                 tailResult.FacilityId,
                                 tailResult.CorrelationId,
                                 tailResult.QueryPhase,
-                                CancellationToken.None);
+                                context.CancellationToken);
                         }
                         catch (Exception revertEx)
                         {

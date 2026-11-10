@@ -32,6 +32,7 @@ public class AcquisitionProcessorBackgroundServiceTests
     private readonly Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>> _mockMappingOutcomeProducer = new();
     private readonly Mock<IResourcesAcquiredTailFinalizer> _mockTailFinalizer = new();
     private readonly Mock<IDataAcquisitionLogManager> _mockLogManager = new();
+    private readonly Mock<IAcquisitionStatusPublisher> _mockStatusPublisher = new();
     private readonly AcquisitionProcessorBackgroundService _service;
     private readonly IServiceProvider _scopeProvider;
 
@@ -39,6 +40,7 @@ public class AcquisitionProcessorBackgroundServiceTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(_mockTailFinalizer.Object);
+        services.AddSingleton(_mockStatusPublisher.Object);
         _scopeProvider = services.BuildServiceProvider();
 
         _service = new AcquisitionProcessorBackgroundService(
@@ -46,6 +48,45 @@ public class AcquisitionProcessorBackgroundServiceTests
             Mock.Of<IServiceProvider>(),
             _mockResourceAcquiredProducer.Object,
             _mockMappingOutcomeProducer.Object);
+    }
+
+    [Fact]
+    public async Task FailedTailReportsFailureWithoutFinalizingOrHandingOffResources()
+    {
+        var result = new TailCompletionResult
+        {
+            FacilityId = FacilityId, CorrelationId = CorrelationId, PatientId = "patient-1",
+            QueryPhase = QueryPhase.Initial, FailedLogIds = [LogId],
+            ResourcesAcquired = new ResourcesAcquired { QueryType = "Initial" }
+        };
+        _mockLogManager.Setup(m => m.TryCompleteTailAsync(LogId, It.IsAny<CancellationToken>())).ReturnsAsync(result);
+
+        await InvokeTryProduceTailMessageAsync();
+
+        _mockStatusPublisher.Verify(p => p.PublishCompletionAsync(result, It.IsAny<Headers>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockLogManager.Verify(m => m.MarkTailSentAsync(FacilityId, CorrelationId, QueryPhase.Initial, It.IsAny<CancellationToken>()), Times.Once);
+        _mockTailFinalizer.Verify(p => p.FinalizeAsync(It.IsAny<TailCompletionResult>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockResourceAcquiredProducer.Verify(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesAcquired>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task StatusSendFailureLeavesTailRecoverableWithoutDownstreamHandoff(bool success)
+    {
+        SetupTail();
+        SetupStrip(NotApplicable());
+        if (!success)
+            _mockLogManager.Setup(m => m.TryCompleteTailAsync(LogId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new TailCompletionResult { FacilityId = FacilityId, CorrelationId = CorrelationId, FailedLogIds = [LogId] });
+        _mockStatusPublisher.Setup(p => p.PublishCompletionAsync(It.IsAny<TailCompletionResult>(), It.IsAny<Headers>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("broker unavailable"));
+
+        await InvokeTryProduceTailMessageAsync();
+
+        _mockResourceAcquiredProducer.Verify(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesAcquired>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockLogManager.Verify(m => m.MarkTailSentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryPhase?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockLogManager.Verify(m => m.RevertTailSentAsync(FacilityId, CorrelationId, It.IsAny<QueryPhase?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

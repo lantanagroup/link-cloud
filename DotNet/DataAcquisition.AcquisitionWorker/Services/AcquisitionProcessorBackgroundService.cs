@@ -283,6 +283,18 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return; // Group not yet complete.
             }
 
+            var statusHeaders = new Headers();
+            KafkaHeaderHelper.ApplyIfPerformance(statusHeaders, isPerformanceMode ? "performance" : null);
+            var statusPublisher = scopeProvider.GetRequiredService<IAcquisitionStatusPublisher>();
+            if (!tailResult.IsSuccess)
+            {
+                // A terminal failure completes tracking, but must not start normalization.
+                await statusPublisher.PublishCompletionAsync(tailResult, statusHeaders, ct);
+                await logManager.MarkTailSentAsync(tailResult.FacilityId, tailResult.CorrelationId,
+                    tailResult.QueryPhase, ct);
+                return;
+            }
+
             // Strips non-org encounters from the cache and then drops any cache key left empty, so
             // ResourcesAcquired never points Normalization at an empty location. Runs before ProduceAsync
             // so the cache the tail announces is already filtered.
@@ -355,6 +367,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 }
             }
 
+            await statusPublisher.PublishCompletionAsync(tailResult, headers, ct);
             await _resourceAcquiredProducer.ProduceAsync(
                     KafkaTopic.ResourcesAcquired.ToString(),
                     new Message<ResourceKey, ResourcesAcquired>
@@ -393,7 +406,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                         tailResult.FacilityId,
                         tailResult.CorrelationId,
                         tailResult.QueryPhase,
-                        CancellationToken.None);
+                        ct);
                 }
                 catch (Exception revertEx)
                 {

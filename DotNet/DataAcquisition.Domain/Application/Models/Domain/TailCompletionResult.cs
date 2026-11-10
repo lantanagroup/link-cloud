@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 
 /// <summary>
 /// Returned by TryCompleteTailAsync when the inline tail check succeeds,
-/// containing everything needed to produce the AcquisitionComplete Kafka message.
+/// containing the phase outcome and the data for the successful ResourcesAcquired handoff.
 /// </summary>
 public class TailCompletionResult
 {
@@ -14,5 +14,9 @@ public class TailCompletionResult
     public QueryPhase? QueryPhase { get; set; }
     public string? TraceParentId { get; set; }
     public string PatientId { get; set; } = string.Empty;
+    public List<long> FailedLogIds { get; set; } = [];
+    public bool IsSuccess => FailedLogIds.Count == 0;
+    public long? ProcessingTime { get; set; }
+    public DateTimeOffset Timestamp { get; set; }
     public ResourcesAcquired ResourcesAcquired { get; set; } = new ResourcesAcquired();
 }

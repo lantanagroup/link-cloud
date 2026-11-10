@@ -421,8 +421,10 @@ public class PatientDataService : IPatientDataService
             ? dataAcqRequested.ScheduledReports.ToList()
             : new List<ScheduledReport> { null };
 
+        var createdCount = 0;
         foreach (var schedReport in scheduledReports)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var priority = schedReport != null && schedReport.Frequency == Frequency.Daily
                 ? AcquisitionPriority.High
                 : AcquisitionPriority.Normal;
@@ -452,14 +454,21 @@ public class PatientDataService : IPatientDataService
                         Notes = new List<string> { note },
                         FhirQuery = new List<CreateFhirQueryModel>(),
                     }, cancellationToken);
+                createdCount++;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
                     "Error creating ConfigurationMissing log entry for facility {FacilityId} and patient {PatientId}",
-                    request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
+                    request.FacilityId.SanitizeForLog(), dataAcqRequested.PatientId.SanitizeForLog());
+                throw;
             }
         }
+
+        // No worker will execute these terminal logs. Make them visible to tail recovery so it
+        // can publish the failed phase and close the group without sending ResourcesAcquired.
+        await _dataAcquisitionLogManager.StampSiblingCountAsync(request.FacilityId, request.CorrelationId,
+            queryPhase, createdCount, cancellationToken);
     }
 
     /// <summary>
