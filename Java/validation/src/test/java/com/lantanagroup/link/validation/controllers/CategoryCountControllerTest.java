@@ -12,6 +12,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.http.MediaType;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -77,14 +79,29 @@ class CategoryCountControllerTest {
 
         mockMvc.perform(get(URL))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.detail").value("Validation counts are unavailable for this report"));
+                .andExpect(jsonPath("$.detail").value("Validation counts are unavailable for this report"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404));
     }
 
     @Test
     void getReportCategoryCounts_invalidSubmitValue_returnsBadRequest() throws Exception {
         mockMvc.perform(get(URL).param("submit", "sometimes"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400));
 
         verify(categoryCountService, never()).getReportCounts(anyString(), anyString(), any());
+    }
+
+    @Test
+    void unexpectedFailureReturnsSafeProblem() throws Exception {
+        when(categoryCountService.getReportCounts("facility-1", "report-1", null))
+                .thenThrow(new RuntimeException("private database details"));
+        mockMvc.perform(get(URL)).andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.title").value("Internal Server Error"))
+                .andExpect(jsonPath("$.detail").value("An unexpected error occurred"));
     }
 }
