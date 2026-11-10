@@ -5,15 +5,16 @@ import {CommonModule} from '@angular/common';
 import {FacilityViewService} from '../../tenant/facility-view/facility-view.service';
 import {
   IReportListSummary,
-  IValidationIssue,
-  IValidationIssueCategory,
-  IValidationIssueCategorySummary
+  ICategoryIssue,
+  IValidationIssueCategoryMetadata
 } from '../../tenant/facility-view/report-view.interface';
 import {
   SubPreQualReportIssuesTableComponent
 } from '../sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
 import {SubPreQualReportMetaComponent} from '../sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
-import {Subscription} from 'rxjs';
+import {catchError, combineLatestWith, forkJoin, map, of, Subject, Subscription, switchMap, startWith, tap, throwError} from 'rxjs';
+import {PageEvent} from '@angular/material/paginator';
+import {UNCATEGORIZED_GUIDANCE} from '../validation-category.constants';
 import {MatTabsModule} from '@angular/material/tabs';
 import {MatIconModule} from '@angular/material/icon';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
@@ -39,11 +40,17 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
   facilityId: string = '';
   submissionId: string = '';
   categoryId: string = '';
-  issueCount: number = 0;
+  issueCount: number | undefined;
+  countsUnavailable = false;
+  inProgress = false;
 
-  category: IValidationIssueCategory | undefined;
-  reportIssues: IValidationIssue[] | undefined;
-  reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
+  category: IValidationIssueCategoryMetadata | undefined;
+  reportIssues: ICategoryIssue[] = [];
+  availableCount = 0;
+  pageIndex = 0;
+  pageSize = 25;
+  loadError: string | undefined;
+  private readonly pageChanges = new Subject<PageEvent>();
   reportSummary: IReportListSummary | undefined;
   isLoading: boolean = true;
 
@@ -53,86 +60,80 @@ export class SubPreQualReportIssuesComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    this.subscription = this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];
-      this.submissionId = params['submissionId'];
-      this.categoryId = params['categoryId'];
-      this.loadReportData();
-    });
-  }
-
-  updateIsLoading() {
-    if (this.reportIssues && this.reportIssuesSummary && this.reportSummary) {
-      this.isLoading = false;
-    }
-    else {
-      this.isLoading = true;
-    }
-  }
-
-  private loadReportData(): void {
-    this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
-      next: (response) => {
-        this.reportSummary = response;
-        this.updateIsLoading();
-      },
-      error: (error) => {
-        console.error('Error getting report summary:', error);
-      }
-    });
-
-    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (response) => {
-        this.reportIssues = response;
-        this.updateIsLoading();
-
-        if (this.reportIssues && this.reportIssues.length > 0) {
-          // Find all issues that belong to this category
-          const categoryIssues = this.reportIssues.filter(issue =>
-            (issue.categories ?? []).some(cat =>
-              cat.id === this.categoryId
-            ) || (!issue.categories && this.categoryId === 'Uncategorized')
-          );
-
-          // Get the first category that matches to get guidance
-          if (this.categoryId === 'Uncategorized') {
-            this.issueCount = this.reportIssues.filter(issue => !issue.categories || issue.categories.length === 0).length;
-            this.category = {
-              acceptable: false,
-              guidance: 'These issues are not categorized and must be reviewed individually.',
-              id: 'Uncategorized',
-              severity: '',
-              title: 'Uncategorized',
-              requireMatch: false
-            };
-          } else {
-            this.issueCount = categoryIssues.length;
-            const matchingCategory = categoryIssues
-              .flatMap(issue => issue.categories ?? [])
-              .find(cat => cat.id === this.categoryId);
-
-            this.category = matchingCategory;
-          }
-
-          this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
-            next: (response) => {
-              this.reportIssuesSummary = response;
-              this.updateIsLoading();
-            },
-            error: (error) => {
-              console.error('Error getting report issues summary:', error);
-            }
-          });
-        } else {
-          // No issues found
-          this.reportIssuesSummary = [];
-          this.updateIsLoading();
+    this.subscription = this.route.params.pipe(
+      tap({
+        next: params => {
+          this.facilityId = params['facilityId'];
+          this.submissionId = params['submissionId'];
+          this.categoryId = params['categoryId'];
+          this.category = undefined;
+          this.issueCount = undefined;
+          this.countsUnavailable = false;
+          this.inProgress = false;
+          this.reportSummary = undefined;
+          this.reportIssues = [];
+          this.availableCount = 0;
         }
-      },
-      error: (error) => {
-        console.error('Error getting report issues:', error);
+      }),
+      switchMap(() => {
+        const metadata = forkJoin({
+          report: this.facilityViewService.getReportSummary(this.facilityId, this.submissionId, true),
+          counts: this.facilityViewService.getReportCategoryCounts(this.submissionId).pipe(
+            catchError(error => error.status === 404 ? of(null) : throwError(() => error))
+          )
+        }).pipe(catchError(() => of(null)));
+        const issues = this.pageChanges.pipe(
+          startWith({pageIndex: 0, pageSize: 25} as PageEvent),
+          tap({
+            next: page => {
+              this.pageIndex = page.pageIndex;
+              this.pageSize = page.pageSize;
+              this.isLoading = true;
+              this.loadError = undefined;
+            }
+          }),
+          switchMap(page => this.facilityViewService.getCategoryIssuesPage(
+            this.facilityId, this.submissionId, this.categoryId, page.pageIndex + 1, page.pageSize
+          ).pipe(catchError(() => of(null))))
+        );
+        // Metadata stays subscribed once per route while only findings change with each page.
+        return metadata.pipe(
+          combineLatestWith(issues),
+          map(([metadata, issues]) => ({metadata, issues}))
+        );
+      })
+    ).subscribe({
+      next: response => {
+        this.isLoading = false;
+        if (!response.metadata) {
+          this.loadError = 'Unable to load validation issues for this category.';
+          return;
+        }
+        this.reportSummary = response.metadata.report;
+        this.countsUnavailable = response.metadata.counts === null;
+        this.inProgress = response.metadata.counts?.inProgress ?? false;
+        const stored = response.metadata.counts?.categories.find(category =>
+          category.categoryId.toLowerCase() === this.categoryId.toLowerCase());
+        this.issueCount = this.countsUnavailable ? undefined : stored?.issues ?? 0;
+        this.category = {
+          id: this.categoryId,
+          title: stored?.title ?? this.categoryId,
+          acceptable: stored?.acceptable ?? null,
+          guidance: this.categoryId.toLowerCase() === 'uncategorized' ? UNCATEGORIZED_GUIDANCE : stored?.guidance ?? '',
+          severity: stored?.severity ?? ''
+        };
+        if (!response.issues) {
+          this.loadError = 'Unable to load validation issues for this category.';
+          return;
+        }
+        this.reportIssues = response.issues.records;
+        this.availableCount = response.issues.metadata.totalCount;
       }
     });
+  }
+
+  changePage(page: PageEvent): void {
+    this.pageChanges.next(page);
   }
 
   ngOnDestroy(): void {

@@ -5,7 +5,19 @@ export enum SftpAcquisitionType {
 
 export enum SftpAcquisitionSubType {
   None = 'None',
-  CernerCCLExtract = 'CernerCCLExtract'
+  CernerCCLExtract = 'CernerCCLExtract',
+  HL7ADT = 'HL7ADT'
+}
+
+/**
+ * How a facility's HL7 v2 ADT feed identifies patients. Exactly one of patientIdLocation and
+ * mrnIdentifierSystem is set.
+ */
+export interface IAdtConfiguration {
+  patientIdLocation?: string;
+  mrnIdentifierSystem?: string;
+  mrnLocation?: string;
+  encounterIdLocation?: string;
 }
 
 export interface IFileParsingConfiguration {
@@ -26,6 +38,7 @@ export interface ISftpAcquisitionTypeConfiguration {
   processedDirectory?: string;
   fileNamePattern?: string;
   parsingConfiguration?: IFileParsingConfiguration;
+  adtConfiguration?: IAdtConfiguration;
 }
 
 export interface ISftpConfigurationModel {

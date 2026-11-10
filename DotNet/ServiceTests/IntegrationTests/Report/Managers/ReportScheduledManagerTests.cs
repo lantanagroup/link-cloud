@@ -1,11 +1,13 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -952,6 +954,73 @@ public class ReportScheduledManagerTests
     /// <summary>
     /// A minimal schedule row for one facility, never modified and not yet completed.
     /// </summary>
+    [Fact]
+    public async Task UpdateReportsDeletedStatusForFacility_ScheduledReportClaimedByRetention_KeepsRetentionStatus()
+    {
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Scheduled);
+
+        var status = await RunWithConcurrentRetentionClaimAsync(
+            report,
+            manager => manager.UpdateReportsDeletedStatusForFacility(report.FacilityId, deleted: true));
+
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, status);
+    }
+
+    [Fact]
+    public async Task SoftDeleteByReportTrackingIdAsync_ReportClaimedByRetention_KeepsRetentionStatus()
+    {
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Submitted);
+
+        var status = await RunWithConcurrentRetentionClaimAsync(
+            report,
+            manager => manager.SoftDeleteByReportTrackingIdAsync(report.Id));
+
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, status);
+    }
+
+    [Fact]
+    public async Task RestoreByReportTrackingIdAsync_ReportClaimedByRetention_KeepsRetentionStatus()
+    {
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Submitted, isDeleted: true);
+
+        var status = await RunWithConcurrentRetentionClaimAsync(
+            report,
+            manager => manager.RestoreByReportTrackingIdAsync(report.Id));
+
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, status);
+    }
+
+    // Loads the report into the manager's context, has a retention cleanup claim it from another context, then
+    // runs the operation, which finds the stale tracked copy. Returns the stored retention status afterward.
+    private async Task<ReportRetentionStatus> RunWithConcurrentRetentionClaimAsync(
+        ReportSchedule report,
+        Func<IReportScheduledManager, Task> operation)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var manager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        await SeedAsync(context, report);
+        await context.ReportSchedule.FindAsync(report.Id);
+
+        using (var claimScope = _scopeFactory.CreateScope())
+        {
+            var claimContext = claimScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            await claimContext.ReportSchedule
+                .Where(r => r.Id == report.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.RetentionStatus,
+                                                       ReportRetentionStatus.PendingDeletion));
+        }
+
+        await operation(manager);
+
+        using var verificationScope = _scopeFactory.CreateScope();
+        var verificationContext = verificationScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        return await verificationContext.ReportSchedule
+            .Where(r => r.Id == report.Id)
+            .Select(r => r.RetentionStatus)
+            .SingleAsync();
+    }
+
     private static ReportSchedule CreateReport(string facilityId,
                                                ScheduleStatus status,
                                                bool isDeleted = false,
