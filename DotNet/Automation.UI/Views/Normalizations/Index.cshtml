@@ -693,7 +693,7 @@
         return cards.map((card, index) => {
             const sourceSystem = (card.querySelector('.csm-source-system').value || '').trim();
             const targetInput = card.querySelector('.csm-target-system');
-            const targetSystem = (targetSystemDraft(targetInput) || '').trim();
+            const targetSystem = targetSystemForBuild(document.getElementById('OpType').value, targetInput);
             if (!sourceSystem) throw new Error(`Code System Map #${index + 1} requires Source System.`);
             if (!targetSystem) throw new Error(`Code System Map #${index + 1} requires Target System.`);
 

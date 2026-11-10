@@ -6,6 +6,7 @@ const {
     applyTargetSystemField,
     lockTargetSystemInput,
     targetSystemDraft,
+    targetSystemForBuild,
     normalizeCodeSystemMapsForSave,
     targetSystemForSave
 } = require(path.join(
@@ -101,4 +102,37 @@ test('switching a CodeMap to HSLOC and back keeps the draft target', () => {
         { sourceSystem: 'urn:local', targetSystem: 'http://example.org/codes' }
     ]);
     assert.equal(savedWhileHsloc[0].targetSystem, hslocTargetSystemUrl);
+});
+
+test('an empty Code Map target switched to HSLOC Map and back restores empty', () => {
+    const input = fakeInput('');
+
+    lockTargetSystemInput(input, 'HSLOCMap');
+    assert.equal(input.value, hslocTargetSystemUrl);
+    assert.equal(targetSystemDraft(input), '');
+
+    lockTargetSystemInput(input, 'CodeMap');
+    assert.equal(input.value, '');
+    assert.equal(input.readOnly, false);
+    assert.equal(input.disabled, false);
+    assert.equal(input.dataset.codeMapTarget, undefined);
+});
+
+test('an HSLOC Map card with an empty prior target builds and saves the HSLOC URL', () => {
+    const input = fakeInput('');
+    lockTargetSystemInput(input, 'HSLOCMap');
+
+    assert.equal(targetSystemDraft(input), '');
+    assert.equal(targetSystemForBuild('HSLOCMap', input), hslocTargetSystemUrl);
+
+    const saved = normalizeCodeSystemMapsForSave('HSLOCMap', [
+        {
+            sourceSystem: 'urn:local',
+            targetSystem: targetSystemForBuild('HSLOCMap', input)
+        }
+    ]);
+    assert.equal(saved[0].targetSystem, hslocTargetSystemUrl);
+
+    const codeMap = fakeInput('');
+    assert.equal(targetSystemForBuild('CodeMap', codeMap), '');
 });

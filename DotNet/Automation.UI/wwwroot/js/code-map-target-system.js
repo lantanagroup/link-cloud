@@ -12,6 +12,7 @@
     root.applyTargetSystemField = api.applyTargetSystemField;
     root.lockTargetSystemInput = api.lockTargetSystemInput;
     root.targetSystemDraft = api.targetSystemDraft;
+    root.targetSystemForBuild = api.targetSystemForBuild;
     root.targetSystemForSave = api.targetSystemForSave;
     root.normalizeCodeSystemMapsForSave = api.normalizeCodeSystemMapsForSave;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
@@ -61,9 +62,18 @@
 
     function targetSystemDraft(input) {
         var dataset = input.dataset;
-        if (dataset && dataset.codeMapTarget != null && dataset.codeMapTarget !== '')
+        if (dataset && dataset.codeMapTarget != null)
             return String(dataset.codeMapTarget);
         return input.value == null ? '' : String(input.value);
+    }
+
+    // The preview and the save both use this. An HSLOC Map is the NHSN URL.
+    // A Code Map is the input value, including an empty one.
+    function targetSystemForBuild(operationType, input) {
+        if (isHslocMapOperation(operationType))
+            return hslocTargetSystemUrl;
+        var value = input && input.value != null ? String(input.value) : '';
+        return value.trim();
     }
 
     function targetSystemForSave(operationType, submittedValue) {
@@ -95,6 +105,7 @@
         applyTargetSystemField: applyTargetSystemField,
         lockTargetSystemInput: lockTargetSystemInput,
         targetSystemDraft: targetSystemDraft,
+        targetSystemForBuild: targetSystemForBuild,
         targetSystemForSave: targetSystemForSave,
         normalizeCodeSystemMapsForSave: normalizeCodeSystemMapsForSave
     };

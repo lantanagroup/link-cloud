@@ -17,7 +17,7 @@ public class CodeMapTargetSystemUiTests
 
         editor.Should().Contain("code-map-target-system.js");
         editor.Should().Contain("lockTargetSystemInput(");
-        editor.Should().Contain("targetSystemDraft(");
+        editor.Should().Contain("targetSystemForBuild(");
         editor.Should().Contain("normalizeCodeSystemMapsForSave(");
         editor.Should().Contain("hslocUrl: hslocTargetSystemUrl");
         editor.Should().Contain("Target system is the NHSN HSLOC URL and cannot be changed.");
