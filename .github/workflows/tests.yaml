@@ -38,7 +38,9 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+          # Here-string, not a pipe. With pipefail, grep -q exits on the first match and echo
+          # dies with SIGPIPE, so the if is false and a job that should run is skipped.
+          if grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|docker-compose\.yml|\.github/workflows/tests\.yaml)' <<< "$CHANGED_FILES"; then
             echo "run_job=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_job=false" >> "$GITHUB_OUTPUT"
@@ -47,7 +49,7 @@ jobs:
           # The mocked Admin UI tier stubs every /api call, so no backend change can affect
           # it — gate it on its own sources rather than the shared filter above. The workflow
           # itself counts, so a change to this file still exercises the job that runs it.
-          if echo "$CHANGED_FILES" | grep -Eq '^(Web/Admin\.UI/|\.github/workflows/tests\.yaml)'; then
+          if grep -Eq '^(Web/Admin\.UI/|\.github/workflows/tests\.yaml)' <<< "$CHANGED_FILES"; then
             echo "run_admin_ui=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_admin_ui=false" >> "$GITHUB_OUTPUT"
