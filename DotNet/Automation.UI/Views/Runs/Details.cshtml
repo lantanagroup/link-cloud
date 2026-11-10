@@ -1111,6 +1111,8 @@
                     display = v ? '<i class="bi bi-check-circle-fill text-success"></i> Yes' : '<i class="bi bi-x-circle text-muted"></i> No';
                 } else if (typeof v === 'object') {
                     return;
+                } else if (k === 'facilityConfigurationMode' && v === 'AlaCarte') {
+                    display = 'A La Carte';
                 } else {
                     display = escapeHtml(String(v));
                 }
