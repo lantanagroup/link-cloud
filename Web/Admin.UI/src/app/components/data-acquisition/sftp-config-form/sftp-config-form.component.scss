@@ -1,5 +1,26 @@
 @use '../../../../styles/core.scss';
 
+.adt-configuration {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  h5 {
+    margin: 0;
+  }
+
+  mat-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+}
+
+.adt-error {
+  margin: 0;
+  color: var(--mat-sys-error, #b3261e);
+}
+
 .host-port-row {
   display: grid;
   grid-template-columns: 4fr 1fr;

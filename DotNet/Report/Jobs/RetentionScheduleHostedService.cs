@@ -4,8 +4,9 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 namespace LantanaGroup.Link.Report.Jobs;
 
 /// <summary>
-/// At startup, before the shared scheduler starts: reports which participants retention cleanups will expect,
-/// then reconciles the retention job with Retention:Schedule.
+/// At startup, before the shared scheduler starts: reports which participants retention cleanups will expect
+/// and which window and cap the retention check will use, then reconciles the retention job with
+/// Retention:Schedule.
 /// </summary>
 /// <remarks>
 /// Registered ahead of RetryScheduleService, which owns the scheduler's start and shutdown, so this service
@@ -15,6 +16,7 @@ public class RetentionScheduleHostedService : IHostedService
 {
     private readonly IRetentionScheduleReconciler _reconciler;
     private readonly RetentionParticipants _participants;
+    private readonly RetentionCheckSettings _checkSettings;
     private readonly ILogger<RetentionScheduleHostedService> _logger;
 
     /// <summary>
@@ -22,20 +24,24 @@ public class RetentionScheduleHostedService : IHostedService
     /// </summary>
     public RetentionScheduleHostedService(IRetentionScheduleReconciler reconciler,
                                           RetentionParticipants participants,
+                                          RetentionCheckSettings checkSettings,
                                           ILogger<RetentionScheduleHostedService> logger)
     {
         _reconciler = reconciler ?? throw new ArgumentNullException(nameof(reconciler));
         _participants = participants ?? throw new ArgumentNullException(nameof(participants));
+        _checkSettings = checkSettings ?? throw new ArgumentNullException(nameof(checkSettings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Logs the retention participants, then reconciles the retention job in the Quartz store.
+    /// Logs the retention participants and check settings, then reconciles the retention job in the Quartz
+    /// store.
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        // First, so a reconcile failure cannot hide an invalid participant list.
+        // First, so a reconcile failure cannot hide invalid retention configuration.
         LogParticipants();
+        LogCheckSettings();
 
         try
         {
@@ -78,5 +84,27 @@ public class RetentionScheduleHostedService : IHostedService
             "Retention cleanups will expect {Participants}{Source}.",
             list.SanitizeForLog(),
             _participants.IsDefault ? $", the default, because {RetentionParticipants.Key} is not set" : "");
+    }
+
+    // Report still starts with invalid settings; each retention check then logs an error and does nothing.
+    private void LogCheckSettings()
+    {
+        if (!_checkSettings.IsValid)
+        {
+            _logger.LogError(
+                "The retention check settings are invalid, so no retention check will run until they are fixed: " +
+                "{Errors}",
+                string.Join(" ", _checkSettings.Errors).SanitizeForLog());
+
+            return;
+        }
+
+        _logger.LogInformation(
+            "Retention checks will use a window of {WindowText} ({WindowCount} {WindowUnit}) and at most " +
+            "{MaxReportsPerCleanup} reports per cleanup.",
+            _checkSettings.WindowText.SanitizeForLog(),
+            _checkSettings.Window!.Count,
+            _checkSettings.Window.Unit,
+            _checkSettings.MaxReportsPerCleanup);
     }
 }

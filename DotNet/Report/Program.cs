@@ -180,6 +180,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
     builder.Services.TryAddSingleton(TimeProvider.System);
     builder.Services.AddTransient<IRetentionCleanupManager, RetentionCleanupManager>();
+    builder.Services.AddTransient<IRetentionEligibilityQuery, RetentionEligibilityQuery>();
 
     builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 

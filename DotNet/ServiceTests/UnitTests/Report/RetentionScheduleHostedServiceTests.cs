@@ -9,8 +9,8 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Report;
 
 /// <summary>
-/// Covers the startup hook that logs the retention participants, reconciles the retention job and leaves the
-/// scheduler's lifecycle to RetryScheduleService.
+/// Covers the startup hook that logs the retention participants and check settings, reconciles the retention
+/// job and leaves the scheduler's lifecycle to RetryScheduleService.
 /// </summary>
 [Trait("Category", "UnitTests")]
 public class RetentionScheduleHostedServiceTests
@@ -84,8 +84,36 @@ public class RetentionScheduleHostedServiceTests
     {
         await CreateService().StartAsync(CancellationToken.None);
 
-        var entry = Assert.Single(_logger.Entries, e => e.Level == LogLevel.Information);
+        var entry = Assert.Single(_logger.Entries,
+                                  e => e.Level == LogLevel.Information && e.Message.Contains("will expect"));
         Assert.Contains("DataAcquisition (Report), the default", entry.Message);
+    }
+
+    [Fact]
+    public async Task StartAsync_DefaultCheckSettings_LogsWindowAndCapAsInformation()
+    {
+        await CreateService().StartAsync(CancellationToken.None);
+
+        var entry = Assert.Single(_logger.Entries,
+                                  e => e.Level == LogLevel.Information && e.Message.Contains("window of"));
+        Assert.Contains("P3M (3 Months)", entry.Message);
+        Assert.Contains("at most 25 reports per cleanup", entry.Message);
+    }
+
+    [Fact]
+    public async Task StartAsync_InvalidCheckSettings_LogsAnErrorAndStillReconciles()
+    {
+        var checkSettings = ReadCheckSettings(new Dictionary<string, string?>
+        {
+            ["Retention:Window"] = "P4Y"
+        });
+
+        await CreateService(checkSettings: checkSettings).StartAsync(CancellationToken.None);
+
+        var entry = Assert.Single(_logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains("Retention:Window 'P4Y' is 48 months", entry.Message);
+        Assert.DoesNotContain(_logger.Entries, e => e.Message.Contains("window of"));
+        _reconciler.Verify(r => r.ReconcileAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -122,15 +150,27 @@ public class RetentionScheduleHostedServiceTests
         Assert.Contains("Failed to reconcile", errors[1].Message);
     }
 
-    private RetentionScheduleHostedService CreateService(RetentionParticipants? participants = null) =>
-        new(_reconciler.Object, participants ?? ReadParticipants(new Dictionary<string, string?>()), _logger);
+    private RetentionScheduleHostedService CreateService(RetentionParticipants? participants = null,
+                                                         RetentionCheckSettings? checkSettings = null) =>
+        new(_reconciler.Object,
+            participants ?? ReadParticipants(new Dictionary<string, string?>()),
+            checkSettings ?? ReadCheckSettings(new Dictionary<string, string?>()),
+            _logger);
 
     private static RetentionParticipants ReadParticipants(Dictionary<string, string?> values)
     {
-        var configuration = new ConfigurationBuilder()
+        return RetentionParticipants.FromConfiguration(BuildConfiguration(values));
+    }
+
+    private static RetentionCheckSettings ReadCheckSettings(Dictionary<string, string?> values)
+    {
+        return RetentionCheckSettings.FromConfiguration(BuildConfiguration(values));
+    }
+
+    private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
+    {
+        return new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();
-
-        return RetentionParticipants.FromConfiguration(configuration);
     }
 }
