@@ -54,8 +54,6 @@ describe('onboarding walking skeleton', () => {
     expect(currentStepLabel(container)).toBe('Welcome');
   });
 
-  // Welcome has no editable fields, and OnboardingProvider only saves a draft with edits, so
-  // this transition writes nothing.
   it('advances to the next step and mirrors it to the URL', async () => {
     const user = userEvent.setup();
     const {container} = renderApp();
@@ -72,6 +70,24 @@ describe('onboarding walking skeleton', () => {
     // ...and the URL follows the machine.
     await waitFor(() => {
       expect(window.location.pathname).toBe('/onboarding/reporting-plan');
+    });
+  });
+
+  // Known gap: OnboardingProvider only saves a draft that has edits, so leaving a step with no
+  // editable fields is not persisted and a reload returns to the last saved step. it.fails keeps
+  // the gap visible; once transitions are saved this starts failing and should become a plain it().
+  it.fails('persists the transition so a reload agrees with where we are', async () => {
+    const user = userEvent.setup();
+    const {container} = renderApp();
+
+    await waitFor(() => expect(stepLabels(container)).toHaveLength(13));
+    await user.click(await screen.findByRole('button', {name: 'Continue'}));
+    await waitFor(() => expect(currentStepLabel(container)).toBe('Facility Reporting Plan'));
+
+    await waitFor(() => {
+      const saved = window.localStorage.getItem('nhsn-app-ui.mockDraft.MOCK-FACILITY-001');
+      expect(saved).toBeTruthy();
+      expect(JSON.parse(saved as string).currentStepId).toBe('reporting-plan');
     });
   });
 

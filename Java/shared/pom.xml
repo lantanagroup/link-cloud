@@ -100,8 +100,7 @@
 
         <!--
           RestClient picks Apache HttpComponents when it is on the classpath. HAPI FHIR 8.12 stopped
-          bringing it in, which would silently switch ReportClient to Reactor Netty. Version is managed
-          by Spring Boot.
+          bringing it in, which would silently switch ReportClient to Reactor Netty.
         -->
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
