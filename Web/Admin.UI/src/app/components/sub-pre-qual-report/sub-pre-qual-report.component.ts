@@ -5,7 +5,7 @@ import {ActivatedRoute, RouterLink, RouterLinkActive} from '@angular/router';
 import {FacilityViewService} from '../tenant/facility-view/facility-view.service';
 import {
   IReportListSummary,
-  IValidationIssue,
+  IReportCategoryCount,
   IValidationIssueCategorySummary
 } from '../tenant/facility-view/report-view.interface';
 import {
@@ -13,7 +13,7 @@ import {
 } from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
 import {SubPreQualReportMetaComponent} from './sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
 import {SubPreQualReportSummaryComponent} from './sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
-import {Subscription} from 'rxjs';
+import {catchError, forkJoin, of, Subscription, switchMap, tap, throwError} from 'rxjs';
 import {MatTabsModule} from '@angular/material/tabs';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 
@@ -40,7 +40,10 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
   private subscription: Subscription | undefined;
   facilityId: string = '';
   submissionId: string = '';
-  reportIssues: IValidationIssue[] | undefined;
+  categoryCounts: IReportCategoryCount[] = [];
+  loadError: string | undefined;
+  countsUnavailable = false;
+  inProgress = false;
   reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
   reportSummary: IReportListSummary | undefined;
   isLoading: boolean = true;
@@ -51,57 +54,47 @@ export class SubPreQualReportComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    this.subscription = this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];
-      this.submissionId = params['submissionId'];
-      this.loadReportData();
-    });
-  }
-
-  updateIsLoading() {
-    if (this.reportIssues != undefined && this.reportIssuesSummary != undefined && this.reportSummary != undefined) {
-      this.isLoading = false;
-    }
-    else {
-      this.isLoading = true;
-    }
-  }
-
-  private loadReportData(): void {
-    this.facilityViewService.getReportSummary(this.facilityId, this.submissionId).subscribe({
-      next: (response) => {
-        this.reportSummary = response;
-        this.updateIsLoading();
-      },
-      error: (error) => {
-        console.error('Error getting report summary:', error);
-      }
-    });
-
-    this.facilityViewService.getReportIssues(this.facilityId, this.submissionId).subscribe({
-      next: (response) => {
-        this.reportIssues = response;
-        this.updateIsLoading();
-        if (this.reportIssues && this.reportIssues.length > 0) {
-          this.facilityViewService.getReportIssuesSummary(this.reportIssues).subscribe({
-            next: (response) => {
-              this.reportIssuesSummary = response;
-              this.updateIsLoading();
-            },
-            error: (error) => {
-              console.error('Error getting report issues summary:', error);
-            }
-          });
-        } else {
-          // No issues found
-          this.reportIssuesSummary = [];
-          this.updateIsLoading();
+    this.subscription = this.route.params.pipe(
+      tap({
+        next: params => {
+          this.facilityId = params['facilityId'];
+          this.submissionId = params['submissionId'];
+          this.isLoading = true;
+          this.loadError = undefined;
+          this.categoryCounts = [];
+          this.reportIssuesSummary = undefined;
+          this.countsUnavailable = false;
+          this.inProgress = false;
+          this.reportSummary = undefined;
         }
-      },
-      error: (error) => {
-        console.error('Error getting report issues:', error);
+      }),
+      switchMap(() => forkJoin({
+        report: this.facilityViewService.getReportSummary(this.facilityId, this.submissionId, true),
+        counts: this.facilityViewService.getReportCategoryCounts(this.submissionId).pipe(
+          catchError(error => error.status === 404 ? of(null) : throwError(() => error))
+        )
+      }).pipe(
+        catchError(() => {
+          this.loadError = 'Unable to load prequalification category counts for this report.';
+          return of(null);
+        })
+      ))
+    ).subscribe(response => {
+      this.isLoading = false;
+      if (!response) {
+        return;
       }
+      this.reportSummary = response.report;
+      this.countsUnavailable = response.counts === null;
+      this.inProgress = response.counts?.inProgress ?? false;
+      if (!response.counts) return;
+      this.categoryCounts = response.counts.categories;
+      this.reportIssuesSummary = this.categoryCounts.map(category => ({value: category.title, count: category.issues}));
     });
+  }
+
+  downloadReport(): void {
+    this.facilityViewService.downloadValidationResults(this.facilityId, this.submissionId);
   }
 
   ngOnDestroy(): void {
