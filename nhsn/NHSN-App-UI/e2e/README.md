@@ -20,8 +20,8 @@ npx playwright test --project=mocked -g "connection test"
 
 Playwright starts `npm start` itself (`webServer`, `reuseExistingServer: true`) — don't start
 one first. A cold webpack compile is ~30-60s. Count tests with
-`npx playwright test --project=mocked --list`; it needs no dev server. **27 tests in 7 files**
-as of 2026-10-30; a warm run is ~28s, and `--repeat-each=3` is clean.
+`npx playwright test --project=mocked --list`; it needs no dev server. **80 tests in 15 files**
+as of 2026-11-09, all passing against a warm dev server, and `--repeat-each=3` is clean.
 
 The dev server answers on `http://localhost:4300` but **not** on `http://127.0.0.1:4300`.
 Preflight with the hostname.
@@ -36,7 +36,7 @@ e2e/
     drafts.ts                typed FacilityDraft builders (import src/, never `any`)
   support/
     test.ts                  extended `test`: harness + onboarding fixtures, console tripwire
-    fields.ts                selector contract for core/fields (Kendo) + the a11y-name traps
+    fields.ts                selector contract for core/fields (Kendo), a11y names, typeDate
     bff.ts                   BFF preflight and test-profile seeding
     pages/
       harness.page.ts        the standalone shell (mode switch, draft seeding)
@@ -71,11 +71,24 @@ absorb them.
   on reload behaviour**: in this harness a reload cannot preserve the wizard at all. The
   draft survives (it is in `localStorage`); the mode does not.
 
-`open()` waits for `.nhsn-link__step-panel`, not just the rail. `OnboardingStepsNav` renders
-throughout the draft load, against `createEmptyDraft()`, whose current step is `welcome` —
-and `goTo()` returns early when the target is already current, so a rail click in that window
-is **silently swallowed**. The panel is the machine's own ready signal. This cost a debug
-cycle; a "flake" here is almost always a wait on the wrong element.
+`open()` waits for three things, each for its own reason. A "flake" on arrival is almost
+always one of them having been skipped.
+
+1. **`.nhsn-link__step-panel`**, not just the rail. `OnboardingStepsNav` renders throughout
+   the draft load, against `createEmptyDraft()`, whose current step is `welcome` — and
+   `goTo()` returns early when the target is already current, so a rail click in that window
+   is **silently swallowed**. The panel is the machine's own ready signal.
+2. **`.nhsn-link__step-actions`**, the footer each step installs through `useStepChrome`
+   *after* its own first render — so its arrival means the step, not just the host, is up.
+3. **A 250ms settle.** A navigation requested in the first moments after landing on a step by
+   URL is **silently dropped**: no navigation, no unsaved-changes dialog, nothing written to
+   the draft or announced, and an identical second click works. Measured on Report Results'
+   "+ Generate New Report", the window closes within 200ms of the footer appearing, which
+   fits `completeGoTo`'s `startTransition` losing to the deep link's own resolution as it
+   finishes. **This is an app-side race, not a test artefact** — a real user meets it in the
+   embedded app, which mounts the wizard at a URL. Nothing observable in the DOM separates
+   the two moments, so no assertion can replace the wait; it lives in one place rather than
+   as a sleep in every spec.
 
 ## Seeding a draft
 
@@ -124,9 +137,29 @@ Everything visual is `@nhsn/nhsn-react-core` (Kendo). The traps, each one a real
 - **Steps render empty `role="alert"` live regions up front.** A bare
   `expect(alerts).toContainText(...)` is then a strict-mode violation — and those are *not*
   retried, so it fails instantly rather than waiting. Poll `alertTexts()` instead.
+- **A step-level message announced on a `setTimeout` needs a retried expectation.** The HSLOC
+  duplicate summary is one; `alertTexts()` is a one-shot read and misses it. Wait on the panel
+  first (`expect(stepPanel).toContainText(...)`), then snapshot the alerts for counting.
+- **`getByRole`'s `name` matches a substring, case-insensitively.** On the encounter step
+  `{name: 'Encounter.type code'}` also matches that group's **Encounter.type Code System**
+  input, which comes first in the DOM — so an inexact locator types the local code into the
+  code system and the step rejects a form that looks filled in. Pass `exact: true` wherever
+  one field's name is a prefix of another's.
+- **A masked Kendo date field cannot be `fill()`ed.** The mask consumes the string from
+  wherever the caret happens to be and leaves `mm-dd-0006`, which validation reads as empty.
+  Use `typeDate(page, fieldId, 'MM-dd-yyyy')`: it presses `Home`, types digits as trusted key
+  presses (Kendo ignores synthetic `KeyboardEvent`s) and **blurs afterwards** — a date's error
+  renders on blur, and leaving that blur to the next click moves the page out from under it,
+  so the click is lost.
 - **Validation runs on Continue, not as a disabled button.** Continue is enabled on an
   incomplete step; asserting `toBeDisabled` fails and misdescribes the gate.
-- **Success is `role="status"`, errors are `role="alert"`.**
+- **A control can look disabled without being disabled.** At `maxItems` the report step's add
+  button gets `nhsn-link__button--disabled` and nothing else — no `disabled` attribute, no
+  `aria-disabled` — so `toBeDisabled()` fails while the button is genuinely inert. Assert the
+  class, and that clicking changes nothing.
+- **Success is `role="status"`, errors are `role="alert"`, and toasts are neither** — they
+  render into `.notification-stack`, which carries one `aria-live` for all of them, so there
+  is no per-toast role to match.
 - Time zone options are labelled `America/New_York — (UTC-04:00) Eastern Time`, and **the
   offset is computed from the current date** — it reads `-05:00` outside daylight saving.
   Match the IANA id, which is also what the draft stores.
@@ -150,11 +183,23 @@ can never have a clean console. Deployed builds serve the file properly.
 
 ## Characterisation tests
 
-`mocked/draft-persistence.spec.ts` and the Days-spinner test in `mocked/fhir-step.spec.ts`
-pin down behaviour that is **wrong or surprising**, not behaviour to preserve. Each says so
-in a comment. If one starts failing, read the comment before changing the test — a failure
-probably means the defect was fixed, and the assertion should be inverted rather than
-relaxed.
+Several specs pin down behaviour that is **wrong or surprising**, not behaviour to preserve.
+Each says so in a comment. If one starts failing, read the comment before changing the test —
+a failure probably means the defect was fixed, and the assertion should be inverted rather
+than relaxed. The current set:
+
+| Spec | What it pins |
+|---|---|
+| `draft-persistence.spec.ts` | a step transition does not persist the draft (see below) |
+| `fhir-step.spec.ts` | the Days spinner's accessible name is doubled |
+| `census-step.spec.ts` | the 24-hour frequency ceiling is unreachable from the inputs: 0-23h and 0-59m cap the total at 1,439, one minute under the 1,440 that `frequencyTooLong` exists to catch |
+| `location-org-step.spec.ts` | `locationOrg.noneAdded` and `errors.invalidFhirPath` are copy that no component renders, and switching resolution method silently discards the rows of the method left behind |
+| `hsloc-step.spec.ts` | rows hydrate from `getHslocMappings`, so a facility whose mappings are saved still arrives at one empty row in mock mode; and the reference pane's "select a code" prompt is unreachable except with zero search matches, because an effect auto-selects the first row |
+| `encounter-step.spec.ts` | `flow.ts` declares the step optional (`isComplete: () => true`) while the step itself requires a code system, so the rail's next entry stays disabled either way; and a blank second code system is reported as a *mapping-row* problem, leaving `messages.missingCodeSystem` unused |
+| `report-step.spec.ts` | `patientIdsIncomplete` is computed but suppressed, and at the ten-id ceiling the add button looks disabled without being disabled |
+| `report-results-step.spec.ts` | zero reports render no table **and** no empty state, because "No reports have been generated yet." is a `<tr>` inside the table that only renders when there are rows |
+| `mrn-intake-step.spec.ts` | a rule is required even from a facility that has just declared it has a single MRN, while every sibling section is gated on its own answer |
+| `complete-step.spec.ts` | "Reports Generated: 0" sits beside the id of the report the enrollment completed from — the two rows read from different sources; and the recap reports an unqualified "Passed" for a connection test the mock only simulated, because `connectionTested` is a bare boolean and the result's `simulated` flag reaches nothing |
 
 The no-dirty-transition case is not merely surprising: `walking-skeleton.test.tsx` asserts
 that a transition **does** persist the draft, and that unit test is already failing on this
@@ -197,8 +242,18 @@ The `bff` project is **not** run in CI.
 
 - **No demo tier.** Admin.UI has a paced, headed walkthrough for presenting. Nothing here
   needs one yet; add it the way Admin.UI did if a demo is wanted.
-- **Steps 6-13** (Patients of Interest onward) have no specs. They are the richest — census
-  vendor branching, HSLOC and encounter mapping, report generation and the results tables
-  with their modals and xlsx export — and each wants the same treatment: walk it in a browser
-  first, then encode what was observed. The fixtures and page objects here are the starting
-  point; extend `fixtures/drafts.ts` with the slice data each step's `isComplete` requires.
+- **The Report Results detail view.** `ReportDetailView` and its modals — query plan,
+  acquisition log, patient detail and timeline, the mapping-evidence panels — plus the xlsx
+  export are untouched, because mock mode cannot get a report into the list at all
+  (`MockApiClient.listReports` returns a hard-coded empty page and never records what
+  `requestReport` built). Giving the mock a reports store would unblock both those specs and
+  a single-session walk from step 1 through to 13; until then the detail view is only
+  reachable against a real BFF.
+- **Cerner's branches.** Every fixture seeds Epic, so the sFTP census branch with its
+  credential fields and connection test, and Location Org's Managing Organization and
+  Location Type methods, are covered only by the assertions saying they are *absent* for
+  Epic. Setting `facilityInfo.vendor` is all a Cerner spec needs to start.
+- **The capability-on paths.** Every flag in the mock's `capabilities` is false, so the live
+  halves of the census step (per-list validation, the results preview and its accuracy
+  acknowledgement), HSLOC's third column and the report step's two census-pull tabs are also
+  pinned only as absences. They want a mock whose capabilities a spec can turn on.

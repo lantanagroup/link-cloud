@@ -59,3 +59,29 @@ export function selectedOptionText(page: Page, fieldId: string): Locator {
 export const ACRONYM_SPELLED = {
   ehrVendor: 'E H R Vendor'
 } as const;
+
+/**
+ * Types a date into a `DateField`, which is a Kendo `FormDatePicker` over a masked `DateInput`.
+ *
+ * `fill()` does not work on it. The mask consumes the string a character at a time from wherever
+ * the caret happens to be, so `fill('10-01-2026')` leaves `mm-dd-0006` — which the step reads as
+ * no date at all, and the spec then fails on a message about a missing date rather than on the
+ * typing. Pressing `Home` puts the caret in the first segment, and the digits then fill the
+ * segments in order. Kendo also ignores synthetic `KeyboardEvent`s, so this has to go through
+ * the keyboard rather than `evaluate`.
+ *
+ * It also blurs the field afterwards, which matters more than it looks. A step marks a date field
+ * touched on blur, and only then renders its error — so if the blur is left to happen when the
+ * spec clicks the next control, that control moves down the page as the message appears, between
+ * Playwright's hit test and the click. The click is then simply lost (clicking again works),
+ * which reads as a dead button rather than as the layout shift it is.
+ *
+ * `date` is written as the field displays it, `MM-dd-yyyy`; separators are optional.
+ */
+export async function typeDate(page: Page, fieldId: string, date: string): Promise<void> {
+  const input = page.locator(`#${fieldId}`);
+  await input.click();
+  await page.keyboard.press('Home');
+  await page.keyboard.type(date.replace(/\D/g, ''));
+  await input.blur();
+}

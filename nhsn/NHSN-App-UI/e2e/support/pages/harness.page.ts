@@ -23,6 +23,7 @@ export class HarnessPage {
   readonly profileGate: Locator;
   readonly stepRail: Locator;
   readonly stepPanel: Locator;
+  readonly stepActions: Locator;
   readonly facilityName: Locator;
   readonly facilityId: Locator;
 
@@ -30,6 +31,7 @@ export class HarnessPage {
     this.profileGate = page.locator('.shell__empty');
     this.stepRail = page.locator('.nhsn-link__steps');
     this.stepPanel = page.locator('.nhsn-link__step-panel');
+    this.stepActions = page.locator('.nhsn-link__step-actions');
     this.facilityName = page.locator('.shell__content .nhsn-link__step-nav-facility-name');
     this.facilityId = page.locator('.shell__content .nhsn-link__step-nav-facility-id');
   }
@@ -87,5 +89,22 @@ export class HarnessPage {
     // already the current step, so a click on "Welcome" is swallowed and the seeded draft
     // then moves the machine elsewhere. The panel is the machine's own ready signal.
     await expect(this.stepPanel).toBeVisible();
+
+    // And wait for the footer, which each step installs through `useStepChrome` after its own
+    // first render — so its arrival means the step, not just the host, has rendered.
+    await expect(this.stepActions).toBeVisible();
+
+    // Then let the arrival settle. A navigation requested in the first moments after landing on a
+    // step by URL is **silently dropped**: no navigation, no unsaved-changes dialog, nothing in
+    // the draft or the save announcer, and a second, identical click works. It reads as a dead
+    // control. Measured against Report Results' "+ Generate New Report", the window closes within
+    // 200ms of the footer appearing, which is consistent with `completeGoTo`'s `startTransition`
+    // being overridden by the deep link's own resolution as it finishes.
+    //
+    // This is an app-side race worth fixing (it is reachable by a real user in the embedded app,
+    // which mounts the wizard at a URL), not a test artefact. Until then it lives here as one
+    // wait rather than in every spec that clicks something on arrival. No assertion can replace
+    // it: nothing observable in the DOM distinguishes the two states.
+    await this.page.waitForTimeout(250);
   }
 }
