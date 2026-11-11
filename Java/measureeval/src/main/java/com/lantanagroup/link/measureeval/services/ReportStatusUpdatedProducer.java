@@ -15,6 +15,8 @@ import com.lantanagroup.link.shared.utils.LogUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -25,9 +27,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** Patient stage outcomes; terminal failures are called only by the dead-letter recoverer. */
+/**
+ * Patient stage outcomes; terminal failures are called only by the dead-letter recoverer.
+ * Status publication is best effort after Kafka producer retries and must not repeat evaluation.
+ */
 @Service
 public class ReportStatusUpdatedProducer {
+    private static final Logger logger = LoggerFactory.getLogger(ReportStatusUpdatedProducer.class);
     private static final String COMPLETED_AT = "X-Evaluation-Completed-At-";
     private static final String PROCESSING_TIME = "X-Evaluation-Processing-Time";
     private final KafkaTemplate<ReportStatusUpdatedKey, ReportStatusUpdated> template;
@@ -140,17 +146,24 @@ public class ReportStatusUpdatedProducer {
     }
 
     private void send(ReportStatusUpdated event, org.apache.kafka.common.header.Headers inboundHeaders) {
-        var headers = new RecordHeaders();
-        headers.add(Headers.CORRELATION_ID, Headers.getBytes(event.getCorrelationId()));
-        Headers.copyMetricsMode(inboundHeaders, headers);
-        var key = new ReportStatusUpdatedKey(event.getReportScheduleId(), event.getPatientId());
         try {
+            var headers = new RecordHeaders();
+            headers.add(Headers.CORRELATION_ID, Headers.getBytes(event.getCorrelationId()));
+            Headers.copyMetricsMode(inboundHeaders, headers);
+            var key = new ReportStatusUpdatedKey(event.getReportScheduleId(), event.getPatientId());
             template.send(new ProducerRecord<>(Topics.REPORT_STATUS_UPDATED, null, key, event, headers)).get();
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Failed to produce ReportStatusUpdated message", ex);
+            logPublicationFailure(event, ex);
         } catch (Exception ex) {
-            throw new RuntimeException("Failed to produce ReportStatusUpdated message", ex);
+            logPublicationFailure(event, ex);
         }
+    }
+
+    private void logPublicationFailure(ReportStatusUpdated event, Exception failure) {
+        logger.error("Failed to publish ReportStatusUpdated for report={}, patient={}, stage={}, correlationId={}; "
+                        + "evaluation will not be reprocessed for this status publication failure",
+                LogUtils.sanitize(event.getReportScheduleId()), LogUtils.sanitize(event.getPatientId()),
+                LogUtils.sanitize(event.getStatus()), LogUtils.sanitize(event.getCorrelationId()), failure);
     }
 }

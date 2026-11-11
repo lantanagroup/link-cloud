@@ -84,6 +84,8 @@ class AbstractResourceConsumerTest {
 
     @AfterEach
     void tearDown() throws Exception {
+        consumer.close();
+        consumerWithAbs.close();
         mocks.close();
     }
 
@@ -620,14 +622,34 @@ class AbstractResourceConsumerTest {
         verify(redisResourceService, never()).cleanup(anyString());
     }
 
-    @Test
-    void process_statusPublicationFailureLeavesCacheForRetry() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(QueryType.class)
+    @SuppressWarnings("unchecked")
+    void consume_statusPublicationFailureAcknowledgesWithoutRetryingEvaluation(QueryType phase) {
         var record = prepareInitialRecord();
-        doThrow(new RuntimeException("status unavailable")).when(reportStatusUpdatedProducer)
-                .publishSuccess(any(), any(), anyLong(), any());
-        assertThrows(RuntimeException.class, () -> consumer.process(record));
-        verify(dataAcquisitionRequestedTemplate).send(any(ProducerRecord.class));
-        verify(redisResourceService, never()).cleanup(anyString());
+        record.value().setQueryType(phase);
+        KafkaTemplate<com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdatedKey,
+                com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdated> statusTemplate =
+                mock(KafkaTemplate.class);
+        when(statusTemplate.send(any(ProducerRecord.class)))
+                .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("status unavailable")));
+        ReflectionTestUtils.setField(consumer, "reportStatusUpdatedProducer",
+                new ReportStatusUpdatedProducer(statusTemplate, patientStatusRepository));
+        var acknowledgment = mock(org.springframework.kafka.support.Acknowledgment.class);
+
+        consumer.consume(record, acknowledgment);
+
+        verify(acknowledgment, timeout(2000)).acknowledge();
+        verify(evaluateMeasureService).evaluateMeasure(anyString(), any(), any(), any());
+        verify(statusTemplate).send(any(ProducerRecord.class));
+        verifyNoInteractions(recoverer);
+        if (phase == QueryType.INITIAL) {
+            verify(dataAcquisitionRequestedTemplate).send(any(ProducerRecord.class));
+            verify(redisResourceService, never()).cleanup(anyString());
+        } else {
+            verify(blobStorageService).storePatientInBlobStorage(any(), any(), any(), any());
+            verify(redisResourceService).cleanup("correlation-1");
+        }
     }
 
     @Test

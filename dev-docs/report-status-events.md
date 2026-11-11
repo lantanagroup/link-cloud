@@ -147,9 +147,12 @@ acquisition. After its downstream handoffs it reports initial completion and, fo
 supplemental completion against the new report id and workflow correlation id.
 
 Durations exclude consumer lag. `X-Evaluation-Completed-At-<phase>` and
-`X-Evaluation-Processing-Time-<phase>` preserve the original successful occurrence and duration when
-status publication is retried. Success is published before cache cleanup so failed status sends
-retain the resources required for retry.
+`X-Evaluation-Processing-Time-<phase>` preserve the original successful occurrence and duration on
+source-record redelivery. Status sends wait for Kafka acknowledgement and use Kafka's producer
+retries. A failed status send is logged with report, patient, stage, and correlation identifiers;
+it does not retry evaluation, republish downstream events, or prevent normal cache cleanup and source
+acknowledgement. Publication continues for other reports and regeneration stages. Status delivery is
+best effort after producer retries; an exhausted send can leave a missing status event.
 
 Direct dead letters, disabled retries, and exhausted retries report `isSuccess=false` for the failed
 evaluation phase. Temporary failures emit no failure status. The terminal hook runs after durable

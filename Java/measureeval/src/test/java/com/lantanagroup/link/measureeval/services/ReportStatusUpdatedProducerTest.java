@@ -82,15 +82,43 @@ class ReportStatusUpdatedProducerTest {
     }
 
     @Test
-    void failedStatusPublicationPropagatesAndRetryPreservesOccurrenceAndDuration() {
+    void failedStatusPublicationDoesNotPropagateAndRedeliveryPreservesOccurrenceAndDuration() {
         when(template.send(any(ProducerRecord.class)))
                 .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker unavailable")))
                 .thenReturn(CompletableFuture.completedFuture(null));
         var headers = new RecordHeaders();
-        assertThrows(RuntimeException.class, () -> producer.publishSuccess(patient(), QueryType.INITIAL, 12, headers));
+        assertDoesNotThrow(() -> producer.publishSuccess(patient(), QueryType.INITIAL, 12, headers));
         producer.publishSuccess(patient(), QueryType.INITIAL, 900, headers);
         var sent = records(2);
         assertEquals(sent.get(0).value(), sent.get(1).value());
+    }
+
+    @Test
+    void synchronousStatusSendFailureDoesNotPreventOtherReportsFromBeingPublished() {
+        when(template.send(any(ProducerRecord.class)))
+                .thenThrow(new IllegalStateException("producer unavailable"))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        var patient = patient();
+        patient.setReports(List.of(report("report-1", true), report("report-2", true)));
+
+        assertDoesNotThrow(() -> producer.publishSuccess(patient, QueryType.INITIAL, 12, new RecordHeaders()));
+
+        assertEquals(List.of("report-1", "report-2"),
+                records(2).stream().map(record -> record.value().getReportScheduleId()).toList());
+    }
+
+    @Test
+    void interruptedStatusSendPreservesInterruptWithoutPropagating() throws Exception {
+        CompletableFuture<org.springframework.kafka.support.SendResult<ReportStatusUpdatedKey, ReportStatusUpdated>> send =
+                mock(CompletableFuture.class);
+        when(send.get()).thenThrow(new InterruptedException("shutdown"));
+        when(template.send(any(ProducerRecord.class))).thenReturn(send);
+        try {
+            assertDoesNotThrow(() -> producer.publishSuccess(patient(), QueryType.INITIAL, 12, new RecordHeaders()));
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test

@@ -85,6 +85,7 @@ class EvaluationRequestedConsumerTest {
 
     @AfterEach
     void tearDown() throws Exception {
+        consumer.close();
         mocks.close();
     }
 
@@ -172,6 +173,42 @@ class EvaluationRequestedConsumerTest {
                 ArgumentCaptor.forClass(PatientReportingEvaluationStatus.Report.class);
         verify(evaluateMeasureService).evaluateMeasure(any(), reportCaptor.capture(), eq(bundle));
         assertEquals("tracking-1", reportCaptor.getValue().getReportTrackingId());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void consume_statusPublicationFailureAcknowledgesRegenerationWithoutRetryingEvaluation() {
+        var value = new EvaluationRequested();
+        value.setPatientId("patient-1");
+        value.setPreviousReportId("report-1");
+        value.setReportTrackingId("tracking-1");
+        var patientStatus = buildPatientStatus("facility-1", "patient-1", "report-1");
+        when(patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(
+                "facility-1", "patient-1", "report-1")).thenReturn(Optional.of(patientStatus));
+        var bundle = new Bundle();
+        bundle.addEntry().setResource(new Patient().setId("patient-1"));
+        when(patientStatusBundler.createBundle("facility-1", "correlation-1")).thenReturn(bundle);
+        when(evaluateMeasureService.evaluateMeasure(any(), any(), any())).thenReturn(new MeasureReport());
+        when(reportabilityPredicate.test(any())).thenReturn(true);
+        KafkaTemplate<com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdatedKey,
+                com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdated> statusTemplate =
+                mock(KafkaTemplate.class);
+        when(statusTemplate.send(any(org.apache.kafka.clients.producer.ProducerRecord.class)))
+                .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("status unavailable")));
+        org.springframework.test.util.ReflectionTestUtils.setField(consumer, "reportStatusUpdatedProducer",
+                new ReportStatusUpdatedProducer(statusTemplate, patientStatusRepository));
+        var record = buildRecord("facility-1", value);
+        record.headers().add(com.lantanagroup.link.shared.kafka.Headers.CORRELATION_ID,
+                com.lantanagroup.link.shared.kafka.Headers.getBytes("new-correlation"));
+        var acknowledgment = mock(org.springframework.kafka.support.Acknowledgment.class);
+
+        consumer.consume(record, acknowledgment);
+
+        verify(acknowledgment, timeout(2000)).acknowledge();
+        verify(evaluateMeasureService).evaluateMeasure(any(), any(), any());
+        verify(blobStorageService).storePatientInBlobStorage(any(), any(), any(), any());
+        verify(statusTemplate, times(2)).send(any(org.apache.kafka.clients.producer.ProducerRecord.class));
+        verifyNoInteractions(recoverer);
     }
 
     @Test
