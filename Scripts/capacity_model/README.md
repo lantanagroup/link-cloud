@@ -23,7 +23,57 @@ python Scripts/capacity_model/model.py --exclude-tag shadow --exclude-tag rubric
 python -m unittest discover Scripts/capacity_model/tests
 ```
 
-Nothing here connects to an environment or needs credentials.
+The model itself connects to nothing and needs no credentials.
+
+## Quick start: measuring a run
+
+The steps are the same in every environment:
+1. A full snapshot before the run.
+2. A light series during it.
+3. A full snapshot after it, once every report is terminal.
+4. A diff.
+
+[Capture](#capture) has the details.
+
+**Setup, once:**
+
+```powershell
+python -m venv $env:USERPROFILE/.venvs/link-capacity
+& $env:USERPROFILE/.venvs/link-capacity/Scripts/python -m pip install -r Scripts/capacity_model/requirements-capture.txt
+$py = "$env:USERPROFILE/.venvs/link-capacity/Scripts/python"
+```
+
+**Local Compose stack.** The default targets file reads `LINK_DB_PASS` and the Kafka SASL user from
+the repository's `.env`, so no flags are needed.
+
+```powershell
+& $py Scripts/capacity_model/snapshot.py --label before --out before.json
+& $py Scripts/capacity_model/snapshot.py --interval 15 --previous before.json --out run.jsonl   # second terminal; Ctrl+C to stop
+./Scripts/run-adhoc-reporting-smoke-test.ps1                                                    # or any other run
+& $py Scripts/capacity_model/snapshot.py --label after --previous before.json --out after.json
+python Scripts/capacity_model/diff_snapshots.py --before before.json --after after.json --series run.jsonl --out-dir diff --tooling-check
+```
+
+A local run proves the tooling. It doesn't produce numbers for the model.
+
+**Deployed environment** (LCG, CDC, …):
+1. **Write a targets file for the environment, outside this repository.** The repository is public,
+   so its hostnames don't belong here. Copy `targets/docker-compose.json` and set the SQL server or
+   per-service connection strings, the Cosmos Mongo connection string and `cosmos.resource_id`, the
+   Kafka brokers and security, the Loki URL, and `replicas` (`kubectl` with namespace and context, or
+   `none`). Make every credential a `${VAR}`, supplied from your shell or a private `--env-file`.
+2. **Run from somewhere that can reach every endpoint,** using `kubectl port-forward` for in-cluster
+   services. Use a read-only SQL login with VIEW DATABASE STATE, plus VIEW SERVER STATE where the
+   server allows it. For Cosmos RU and 429s, `az login` with Reader on the Cosmos account.
+3. **Check connectivity** with a full snapshot and a recent `--since`, so every source is exercised:
+   `snapshot.py --targets <file> --env-file <file> --since <five minutes ago, ISO> --out check.json`.
+   Then clear any `unavailable` items you didn't expect.
+4. **Run the same four commands as above,** adding `--targets <file> --env-file <file> --code-version
+   <release>` to each `snapshot.py`. Use a 30–60 s `--interval` for long runs. Drop `--tooling-check`.
+   - In a shared environment, pass `--report-ids <file>` to the after snapshot, so only your run's
+     reports count.
+5. **Read `diff/summary.md`.** For a representative run only, record it with `diff_snapshots.py --apply`
+   (see [Recording a measurement](#recording-a-measurement-leglink-1369)).
 
 ## Inputs
 
