@@ -70,6 +70,18 @@ jobs:
           echo "run_admin_ui=${{ steps.should.outputs.run_admin_ui }}"
           echo "run_nhsn_app_ui=${{ steps.should.outputs.run_nhsn_app_ui }}"
 
+      # The pattern has to live in this file, so the search skips it. A hit anywhere else fails the job.
+      - name: Reject private NuGet feed references
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits=$(git grep -n -i -E 'Shared_BOTW|pkgs\.dev\.azure|pkgs\.visualstudio\.com|_packaging/|AZURE_ARTIFACTS_PAT|NuGetAuthenticate|CredentialProvider|credprovider|VSS_NUGET|restore-feed|feed-token|FEED_ACCESSTOKEN|packageSourceCredentials' -- . ':!.github/workflows/tests.yaml' || true)
+          if [ -n "$hits" ]; then
+            printf '%s\n' "$hits"
+            echo "Private NuGet feed reference found."
+            exit 1
+          fi
+
   backend-e2e-tests:
     # PR-safe Backend E2E against a SINGLE shared docker compose stack
     # (one build, one up). API Stability runs first; the remaining
@@ -88,7 +100,6 @@ jobs:
       CHECK_INTERVAL: 10
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
       LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE: false
-      AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
       LEFTOVER_CLEANUP_ENABLED: "false"
 
       # Live UI tier switch. Set to "false" to leave the Playwright live tests, and the
@@ -295,14 +306,6 @@ jobs:
       # with "The process cannot access the file ... being used by another
       # process" (MSB4018). Building once and passing --no-build/--no-restore
       # to each parallel run avoids the contention.
-      - name: Authenticate Shared_BOTW_Feed
-        run: |
-          dotnet nuget update source Shared_BOTW_Feed \
-            --username az \
-            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
-            --store-password-in-clear-text \
-            --configfile nuget.config
-
       - name: Restore & build BackendE2ETests
         run: |
           dotnet restore ./Tests/BackendE2ETests/BackendE2ETests.csproj
@@ -695,27 +698,13 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Authenticate Shared_BOTW_Feed
-        run: |
-          dotnet nuget update source Shared_BOTW_Feed \
-            --username az \
-            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
-            --store-password-in-clear-text \
-            --configfile nuget.config
-
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/packages.lock.json') }}
+          key: ${{ runner.os }}-nuget-v3-${{ hashFiles('**/packages.lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-v2-
-
-      # Drop any Thetis 1.0.0 that a previous run packed locally (NU1403 vs lock file).
-      - name: Drop cached Thetis packages
-        run: |
-          rm -rf "${HOME}/.nuget/packages/lantanagroup.thetis.generation.abstractions" \
-                 "${HOME}/.nuget/packages/lantanagroup.thetis.generation.engine"
+            ${{ runner.os }}-nuget-v3-
 
       # Pulled up-front so the integration fixtures (Testcontainers) don't
       # spend their per-test pull budget on the cold pull. Retry up to 3 times
