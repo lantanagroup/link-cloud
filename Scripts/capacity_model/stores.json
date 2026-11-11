@@ -134,9 +134,9 @@
       "kind": "sql",
       "store": "ReportResource",
       "grain": "patient_report",
-      "multiplier": 300,
-      "multiplier_source": "prior: ~300 resource references per patient (LEGPROG-516 first-pass estimate); upper prior 708 resources per patient (Performance Model)",
-      "multiplier_status": "prior",
+      "multiplier": 0,
+      "multiplier_source": "schema: not written since LNK-5134 (37e2cf095, 2026-04-22), which removed MeasureReportGeneratedListener's call to IReportResourceManager",
+      "multiplier_status": "schema",
       "bytes_per_row": 300,
       "anchor": "report",
       "adr_action": "retain",
@@ -151,7 +151,8 @@
         "attribution": {
           "key": "ReportScheduleId"
         }
-      }
+      },
+      "notes": "Kept in the model at 0 so capture can confirm the table stays empty in a deployed environment. Before LNK-5134 this was the largest store (one row per resource reference per patient-report)."
     },
     {
       "id": "report.ReportPopulation",
@@ -495,15 +496,15 @@
       "kind": "sql",
       "store": "DataAcquisitionLogReferenceResource (junction)",
       "grain": "patient_report",
-      "multiplier": 20,
-      "multiplier_source": "placeholder: reference resources linked per patient-report",
-      "multiplier_status": "placeholder",
+      "multiplier": 0,
+      "multiplier_source": "schema: not written since LNK-5140 (32bcf3f9e) removed the only caller of ReferenceResourcesManager.LinkToLogAsync",
+      "multiplier_status": "schema",
       "bytes_per_row": 40,
       "anchor": "report",
       "adr_action": "delete (child of log)",
       "analysis_action": "delete",
       "pi": "PI 3",
-      "notes": "Junction only. ReferenceResources itself holds FHIR bodies and is excluded.",
+      "notes": "Junction only; ReferenceResources itself holds FHIR bodies and is excluded. Kept at 0 so capture can confirm.",
       "location": {
         "service": "dataacquisition",
         "table": "dbo.DataAcquisitionLogReferenceResource",
@@ -520,18 +521,14 @@
       "store": "PendingReferenceIds",
       "grain": "patient_report",
       "multiplier": 20,
-      "multiplier_source": "placeholder: pending references per patient-report",
+      "multiplier_source": "placeholder: reference IDs recorded per patient-report",
       "multiplier_status": "placeholder",
       "bytes_per_row": 200,
-      "anchor": "fixed_residency",
-      "residency_days": 1,
-      "adr_action": "not covered",
-      "analysis_action": "transient (work queue)",
-      "pi": "n/a",
-      "divergences": [
-        "D5"
-      ],
-      "notes": "Assumed cleared once the reference batch is acquired; residency placeholder 1 day.",
+      "anchor": "report",
+      "adr_action": "delete (child of log)",
+      "analysis_action": "delete",
+      "pi": "PI 3",
+      "notes": "Not a work queue: rows are a reference log's permanent query of record (ReferenceResourceService), removed only by the cascade from their DataAcquisitionLog.",
       "location": {
         "service": "dataacquisition",
         "table": "dbo.PendingReferenceIds",
@@ -568,9 +565,9 @@
       "service": "DataAcquisition",
       "kind": "sql",
       "store": "EncounterMappings",
-      "grain": "census_patient",
+      "grain": "patient_report",
       "multiplier": 1,
-      "multiplier_source": "placeholder: one encounter per census patient per month",
+      "multiplier_source": "placeholder: encounter mappings per patient-report (written by DataAcquisition during acquisition)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 250,
       "anchor": "record_age",
@@ -583,16 +580,17 @@
       "location": {
         "service": "dataacquisition",
         "table": "dbo.EncounterMapping"
-      }
+      },
+      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5)."
     },
     {
       "id": "da.EncounterLocation",
       "service": "DataAcquisition",
       "kind": "sql",
       "store": "EncounterLocations",
-      "grain": "census_patient",
+      "grain": "patient_report",
       "multiplier": 2,
-      "multiplier_source": "placeholder: locations per encounter",
+      "multiplier_source": "placeholder: encounter locations per patient-report (written by DataAcquisition during acquisition)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 60,
       "anchor": "record_age",
@@ -605,7 +603,8 @@
       "location": {
         "service": "dataacquisition",
         "table": "dbo.EncounterLocation"
-      }
+      },
+      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5)."
     },
     {
       "id": "da.SftpAcquisitionLog",
@@ -1146,6 +1145,28 @@
       "location": {
         "topics": [
           "DataAcquisitionRequested"
+        ]
+      }
+    },
+    {
+      "id": "kafka.ReadyToAcquire",
+      "service": "Kafka",
+      "kind": "kafka",
+      "store": "ReadyToAcquire",
+      "grain": "patient_report",
+      "multiplier": 8.4,
+      "multiplier_source": "placeholder: about one message per DataAcquisitionLog (the DA log prior)",
+      "multiplier_status": "placeholder",
+      "bytes_per_row": 1000,
+      "anchor": "own_retention",
+      "residency_days_param": "kafka_retention_days",
+      "copies_param": "kafka_replication_factor",
+      "adr_action": "topic retention",
+      "analysis_action": "topic retention",
+      "pi": "n/a",
+      "location": {
+        "topics": [
+          "ReadyToAcquire"
         ]
       }
     },

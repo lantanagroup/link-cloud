@@ -393,7 +393,7 @@ def summary(pair: dict | None, series_result: dict | None, tooling_check: bool) 
                                              f"{_n((run.get('census') or {}).get('patients'))}"],
             ["Facilities", _n(run.get("facilities"))],
             ["Reportable share", _n(run.get("reportable_share"))],
-            ["Reports terminal / completion lag median, max (days)",
+            ["Scheduled reports terminal / completion lag median, max (days)",
              f"{run['terminal_reports']} / {_n(run.get('completion_lag_days_median'))}, "
              f"{_n(run.get('completion_lag_days_max'))}"],
             ["Resources acquired per patient-report", _n(run.get("resources_acquired_per_patient_report"))],

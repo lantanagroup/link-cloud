@@ -202,6 +202,7 @@ class PairTests(unittest.TestCase):
         text = diff.summary(self.pair, None, tooling_check=True)
         self.assertIn("Tooling check, not a measurement", text)
         self.assertIn("## Store multipliers", text)
+        self.assertIn("Scheduled reports terminal", text)  # ad hoc reports don't count toward the lag
         self.assertIn("**300**", text)
         self.assertIn("GenerateReportRequested", text)
         self.assertIn("## Unavailable", text)
@@ -253,8 +254,9 @@ class SeriesTests(unittest.TestCase):
     def test_required_rates_come_from_the_model(self):
         req = self.s["required"]
         self.assertEqual(req["windows_hours"], [2, 6, 24])
-        rr = req["stores"]["report.ReportResource"]
-        self.assertGreater(rr[0], rr[2])  # a 2 h window needs more than 24 h
+        ids = req["stores"]["da.DataAcquisitionLogResourceId"]
+        self.assertGreater(ids[0], ids[2])  # a 2 h window needs more than 24 h
+        self.assertEqual(req["stores"]["report.ReportResource"], [0, 0, 0])  # not written since LNK-5134
         text = diff.summary(None, self.s, tooling_check=False)
         self.assertIn("## Transient queues", text)
         self.assertIn("Required, 24 h", text)

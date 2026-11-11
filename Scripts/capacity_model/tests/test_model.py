@@ -186,6 +186,21 @@ class InputTests(unittest.TestCase):
                 self.assertNotIn(key, seen, f"{s['id']} and {seen.get(key)} both measure {key}")
                 seen[key] = s["id"]
 
+    def test_corrections_from_the_live_runs(self):
+        """Code facts found by the 2026-11-11 runs; none of these is a measured prior."""
+        stores, _ = model.load_stores(model.DEFAULT_STORES)
+        by_id = {s["id"]: s for s in stores}
+        for sid, ticket in (("report.ReportResource", "LNK-5134"), ("da.DataAcquisitionLogReferenceResource", "LNK-5140")):
+            self.assertEqual(by_id[sid]["multiplier"], 0, sid)
+            self.assertEqual(by_id[sid]["multiplier_status"], "schema", sid)
+            self.assertIn(ticket, by_id[sid]["multiplier_source"], sid)
+        pending = by_id["da.PendingReferenceId"]
+        self.assertEqual(pending["anchor"], "report")  # a child of the log, not a work queue
+        self.assertIn("attribution", pending["location"])
+        self.assertEqual({by_id[s]["grain"] for s in ("da.EncounterMapping", "da.EncounterLocation")},
+                         {"patient_report"})
+        self.assertEqual(by_id["kafka.ReadyToAcquire"]["location"]["topics"], ["ReadyToAcquire"])
+
     def test_location_validation_rejects_bad_identifiers(self):
         from capture.common import location_errors
         bad = store(id="x", location={"service": "report", "table": "ReportResource; drop table x"})

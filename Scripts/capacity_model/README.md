@@ -28,7 +28,8 @@ The model itself connects to nothing and needs no credentials.
 ## Quick start: measuring a run
 
 The steps are the same in every environment:
-1. A full snapshot before the run.
+1. A full snapshot just before the run. Store deltas don't depend on when you take it, but the Loki
+   window and the facility-days run from it, so idle time before the run dilutes them.
 2. A light series during it.
 3. A full snapshot after it, once every report is terminal.
 4. A diff.
@@ -215,9 +216,11 @@ source.
   Bytes per message come from reading up to 50 of the newest messages per partition with an
   assign-only consumer, which joins no group and commits nothing. `SubmitPayload` and
   `PayloadSubmitted` carry per-patient and per-report messages that offsets can't separate.
-- **Work queues** (`fixed_residency`: `PendingReferenceIds`, `patientDispatches`, the QueryDispatch
-  Quartz rows, `EventRetries`). Rows drain as the queue works, so a before/after pair can't show
-  rows written. The series reports their maximum depth and whether they drained.
+- **Work queues** (`fixed_residency`: `patientDispatches`, the QueryDispatch Quartz rows,
+  `EventRetries`). Rows drain as the queue works, so a before/after pair can't show rows written.
+  The series reports their maximum depth and whether they drained. `PendingReferenceIds` looks like a
+  queue but isn't: its rows stay until their `DataAcquisitionLog` is deleted, so it is measured like
+  the other log child tables.
 - **Loki.** Bytes come from `bytes_over_time` grouped by `component`, over the window from the before
   snapshot to the after snapshot. Logs from anything else running in that window are included.
 
