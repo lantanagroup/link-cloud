@@ -414,6 +414,52 @@ public class RunCleanupHelperTests
         RunCleanupHelper.IsAutomationFacilityId("census-b3310bbb-d0ab-4d49-8351-aabbee62662d-admit-24to48").Should().BeFalse();
         RunCleanupHelper.IsAutomationFacilityId(null).Should().BeFalse();
         RunCleanupHelper.IsAutomationFacilityId("").Should().BeFalse();
+        RunCleanupHelper.IsAutomationFacilityId("10765").Should().BeFalse();
+        RunCleanupHelper.IsAutomationFacilityId("48291").Should().BeFalse();
+        RunCleanupHelper.IsFiveDigitFacilityId("48291").Should().BeTrue();
+        RunCleanupHelper.IsFiveDigitFacilityId("10765").Should().BeTrue();
+        RunCleanupHelper.IsFiveDigitFacilityId("1076").Should().BeFalse();
+        RunCleanupHelper.IsFiveDigitFacilityId("107650").Should().BeFalse();
+        RunCleanupHelper.IsFiveDigitFacilityId("echs").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Five_digit_facility_with_no_run_is_not_selected()
+    {
+        SelectQuiesce(Facilities("10765"), []).Should().BeEmpty();
+        SelectTeardown(Facilities("10765"), []).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Finished_five_digit_facility_is_torn_down_and_the_run_id_is_not()
+    {
+        var runId = Guid.NewGuid();
+        var facilityId = "48291";
+        var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
+        var run = Run(runId, facilityId, AutomationRunStatus.Succeeded, finishedAt: now.AddDays(-15));
+        run.AutomationCreatedFacility = true;
+
+        SelectTeardown(Facilities(facilityId, runId.ToString(), "10765"), [run], now)
+            .Should().Equal(facilityId);
+    }
+
+    [Fact]
+    public void Five_digit_facility_without_the_created_marker_is_not_selected()
+    {
+        var runId = Guid.NewGuid();
+        var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
+        var run = Run(runId, "48291", AutomationRunStatus.Succeeded, finishedAt: now.AddDays(-15));
+
+        SelectTeardown(Facilities("48291", runId.ToString()), [run], now).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Active_five_digit_facility_is_protected()
+    {
+        var run = Run(Guid.NewGuid(), "48291", AutomationRunStatus.Running, finishedAt: null);
+        run.AutomationCreatedFacility = true;
+
+        SelectQuiesce(Facilities("48291"), [run]).Should().BeEmpty();
     }
 
     private static IReadOnlyList<string> SelectQuiesce(

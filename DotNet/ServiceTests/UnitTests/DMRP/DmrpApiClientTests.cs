@@ -259,6 +259,31 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
+        public async Task GetReportingPlanAsync_AGuidFacilityId_IsSentAsNhsnOrgIdAndStillRead()
+        {
+            var facilityId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+            var (client, handler, _) = CreateClient(request =>
+                request.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal)
+                    ? TokenResponse()
+                    : Json($$"""
+                        {"orgid":null,"year":2026,"month":5,"plans":[
+                          {"name":"HOB","nhsnorgid":"{{facilityId}}","month":5,"year":2026,"reporting":"Y"}]}
+                        """));
+
+            var entries = await client.GetReportingPlanAsync(facilityId, 5, 2026);
+
+            var plans = handler.Requests
+                .Where(r => !r.RequestUri!.AbsolutePath.EndsWith("token", StringComparison.Ordinal))
+                .Select(r => r.RequestUri!.PathAndQuery)
+                .ToList();
+
+            Assert.Equal(2, plans.Count);
+            Assert.All(plans, p => Assert.Contains($"nhsnorgid={facilityId}", p, StringComparison.Ordinal));
+            Assert.Equal(2, entries.Count);
+            Assert.All(entries, e => Assert.Equal("HOB", e.Measure));
+        }
+
+        [Fact]
         public async Task GetReportingPlanAsync_AsksBothOperationsForTheRequestedPeriod()
         {
             var (client, handler, _) = CreateClient(RouteByPath);

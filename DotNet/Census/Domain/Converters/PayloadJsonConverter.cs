@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
 using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
@@ -20,7 +21,12 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public PayloadJsonConverter(ILogger<PayloadJsonConverter> logger = null)
+    // A [JsonConverter] attribute can only create a converter through a parameterless constructor
+    public PayloadJsonConverter() : this(null)
+    {
+    }
+
+    public PayloadJsonConverter(ILogger<PayloadJsonConverter> logger)
     {
         _logger = logger;
     }
@@ -93,7 +99,10 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
                 case "CernerListUpdate":
                     return JsonSerializer.Deserialize<CernerListUpdatePayload>(document);
                 default:
-                    return null;
+                    // Each ADT message type has its own payload class
+                    return AdtPayloadFactory.GetPayloadType(payloadType) is { } adtPayloadType
+                        ? (IPayload)JsonSerializer.Deserialize(document, adtPayloadType)
+                        : null;
             }
         }
 
@@ -137,6 +146,10 @@ public class PayloadJsonConverter : JsonConverter<IPayload>
         else if (value is CernerListDischargePayload cernerDischargePayload)
         {
             writer.WriteRawValue(JsonSerializer.Serialize(cernerDischargePayload));
+        }
+        else if (value is AdtPayload adtPayload)
+        {
+            writer.WriteRawValue(JsonSerializer.Serialize(adtPayload, adtPayload.GetType()));
         }
     }
 }

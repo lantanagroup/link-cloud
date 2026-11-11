@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Models;
@@ -366,33 +367,57 @@ public static class RunCleanupHelper
     }
 
     /// <summary>
-    /// Automation.UI creates one facility per scenario run and uses the run GUID as the
-    /// facility id. Named production facilities and other GUID tenants (QA test facilities
-    /// that were never an Automation run) are not leftovers.
+    /// True for a GUID-shaped facility id. Shape alone never selects a five-digit
+    /// NHSN organization id, so a production facility is not treated as a leftover.
     /// </summary>
     public static bool IsAutomationFacilityId(string? facilityId) =>
         Guid.TryParse(facilityId, out _);
 
     /// <summary>
-    /// The run id is the facility Automation creates for a normal scenario.
-    /// A different <see cref="AutomationRunSummary.FacilityId"/> is torn down only when
-    /// this run created it. DMRP can point that id at a tenant that already existed.
+    /// Five digits and nothing else. Automation allocates these as facility ids.
+    /// A value of this shape is owned only when a run record says it created it.
+    /// </summary>
+    public static bool IsFiveDigitFacilityId(string? facilityId) =>
+        facilityId is not null && FiveDigitFacilityIdPattern.IsMatch(facilityId);
+
+    private static readonly Regex FiveDigitFacilityIdPattern = new(
+        "^\\d{5}$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>
+    /// The run id is a facility when this run used that id as its facility.
+    /// A five-digit <see cref="AutomationRunSummary.FacilityId"/> is torn down only
+    /// when this run created it, and in that case the run id itself was never a facility.
     /// </summary>
     public static bool IsOwnedAutomationFacilityId(AutomationRunSummary run, string? facilityId)
     {
-        if (!IsAutomationFacilityId(facilityId))
+        if (string.IsNullOrWhiteSpace(facilityId))
             return false;
 
-        if (string.Equals(facilityId, run.RunId.ToString(), StringComparison.OrdinalIgnoreCase))
-            return true;
+        if (IsAutomationFacilityId(facilityId)
+            && string.Equals(facilityId, run.RunId.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            // A five-digit facility replaced the run id. Do not tombstone a GUID tenant
+            // that this run never created.
+            if (IsFiveDigitFacilityId(run.FacilityId))
+                return false;
 
-        return run.AutomationCreatedFacility
-            && string.Equals(facilityId, run.FacilityId, StringComparison.OrdinalIgnoreCase);
+            return true;
+        }
+
+        if (!run.AutomationCreatedFacility)
+            return false;
+
+        if (!string.Equals(facilityId, run.FacilityId, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return IsAutomationFacilityId(facilityId) || IsFiveDigitFacilityId(facilityId);
     }
 
     /// <summary>
-    /// Automation.UI GUID facilities whose matching run is terminal past <paramref name="grace"/>.
-    /// GUID tenants with no Automation run record are not selected.
+    /// Automation facilities whose matching run is terminal past <paramref name="grace"/>.
+    /// A GUID with no Automation run record is not selected. A five-digit id is selected
+    /// only when a run record owns it.
     /// </summary>
     public static IReadOnlyList<string> SelectQuiesceAutomationFacilities(
         IReadOnlyDictionary<string, string> facilities,
@@ -402,8 +427,9 @@ public static class RunCleanupHelper
         => SelectAutomationFacilities(facilities, runs, now, grace);
 
     /// <summary>
-    /// Automation.UI GUID facilities whose matching run has been terminal longer than
-    /// <paramref name="retention"/>. GUID tenants with no Automation run record are not selected.
+    /// Automation facilities whose matching run has been terminal longer than
+    /// <paramref name="retention"/>. A GUID with no Automation run record is not selected.
+    /// A five-digit id is selected only when a run record owns it.
     /// </summary>
     public static IReadOnlyList<string> SelectTeardownAutomationFacilities(
         IReadOnlyDictionary<string, string> facilities,
@@ -420,7 +446,7 @@ public static class RunCleanupHelper
         => SelectTeardownAutomationFacilities(facilities, runs, now, retention);
 
     /// <summary>
-    /// GUID facilities whose Automation run is still non-terminal but older than
+    /// Owned facilities whose Automation run is still non-terminal but older than
     /// <paramref name="retention"/>. Daily teardown aborts these as leftover ongoing jobs.
     /// </summary>
     public static IReadOnlyList<string> SelectStaleActiveAutomationFacilities(

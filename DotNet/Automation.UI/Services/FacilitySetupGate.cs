@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 namespace Automation.UI.Services;
 
 /// <summary>
-/// DMRP runs share one NHSN organization id as the facility id. Facility setup deletes and
-/// recreates that facility's normalization and location configuration, so two runs must not
-/// do that at the same time.
+/// Facility setup deletes and recreates that facility's normalization and location
+/// configuration, so a second caller for the same facility id waits. Each run uses its
+/// own facility id, so two copies of one scenario do not wait on each other.
 /// </summary>
 internal static class FacilitySetupGate
 {
