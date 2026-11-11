@@ -7,6 +7,9 @@ import com.lantanagroup.link.measureeval.records.*;
 import com.lantanagroup.link.measureeval.services.AbsResourceService;
 import com.lantanagroup.link.measureeval.services.RedisResourceService;
 import com.lantanagroup.link.measureeval.services.ResourceCacheCleanup;
+import com.lantanagroup.link.measureeval.services.ReportStatusUpdatedProducer;
+import com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdated;
+import com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdatedKey;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecoverer;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
@@ -155,6 +158,7 @@ public class KafkaConfig {
 
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
+                ReportStatusUpdatedKey.class, new JsonSerializer<>(objectMapper.constructType(ReportStatusUpdatedKey.class), objectMapper).noTypeInfo(),
                 ResourceKey.class, new JsonSerializer<>(objectMapper.constructType(ResourceKey.class), objectMapper).noTypeInfo(),
                 Object.class, new JsonSerializer<>(),
                 byte[].class, new ByteArraySerializer()
@@ -165,6 +169,7 @@ public class KafkaConfig {
     @Bean
     public Serializer<?> valueSerializer(ObjectMapper objectMapper) {
         Map<Class<?>, Serializer<?>> serializers = Map.of(
+                ReportStatusUpdated.class, new JsonSerializer<>(objectMapper.constructType(ReportStatusUpdated.class), objectMapper).noTypeInfo(),
                 ResourcesAcquired.class, new JsonSerializer<>(objectMapper.constructType(ResourcesAcquired.class), objectMapper).noTypeInfo(),
                 ResourcesNormalized.class, new JsonSerializer<>(objectMapper.constructType(ResourcesNormalized.class), objectMapper).noTypeInfo(),
                 DataAcquisitionRequested.class, new JsonSerializer<>(objectMapper.constructType(DataAcquisitionRequested.class), objectMapper).noTypeInfo(),
@@ -289,7 +294,7 @@ public class KafkaConfig {
             String retryTopic,
             String errorTopic,
             KafkaRetryConfig retryConfig,
-            ResourceCacheCleanup cacheCleanup) {
+            ResourceCacheCleanup cacheCleanup, ReportStatusUpdatedProducer statusProducer) {
         // The consumer no longer cleans up the resource cache on failure — a record routed to -Retry
         // is redelivered and still needs its cached resources. This hook is the failure-path cleanup:
         // it runs only on terminal decisions (poison / exhausted / retries disabled), after the dead
@@ -297,8 +302,12 @@ public class KafkaConfig {
         // expiration policy reclaims whatever it left behind.
         return RetryTopicRecovererFactory.create(kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE,
                 (record, exception) -> {
-                    if (record.value() instanceof AbstractResourceRecord resourceRecord) {
-                        cacheCleanup.cleanup(resourceRecord.getCacheKey(), resourceRecord.getCacheType());
+                    try {
+                        statusProducer.publishFinalFailure(record, exception);
+                    } finally {
+                        if (record.value() instanceof AbstractResourceRecord resourceRecord) {
+                            cacheCleanup.cleanup(resourceRecord.getCacheKey(), resourceRecord.getCacheType());
+                        }
                     }
                 });
     }
@@ -315,14 +324,14 @@ public class KafkaConfig {
             @Qualifier("compressedKafkaTemplate")
             KafkaTemplate<String, ResourcesNormalized> kafkaTemplate,
             KafkaRetryConfig retryConfig,
-            ResourceCacheCleanup resourceCacheCleanup) {
+            ResourceCacheCleanup resourceCacheCleanup, ReportStatusUpdatedProducer statusProducer) {
 
         return createRetryTopicRecoverer(
                 kafkaTemplate,
                 "ResourcesNormalized-Retry",
                 "ResourcesNormalized-Error",
                 retryConfig,
-                resourceCacheCleanup
+                resourceCacheCleanup, statusProducer
         );
     }
 
@@ -331,14 +340,14 @@ public class KafkaConfig {
             @Qualifier("compressedKafkaTemplate")
             KafkaTemplate<String, EvaluationRequested> kafkaTemplate,
             KafkaRetryConfig retryConfig,
-            ResourceCacheCleanup resourceCacheCleanup) {
+            ResourceCacheCleanup resourceCacheCleanup, ReportStatusUpdatedProducer statusProducer) {
 
         return createRetryTopicRecoverer(
                 kafkaTemplate,
                 "EvaluationRequested-Retry",
                 "EvaluationRequested-Error",
                 retryConfig,
-                resourceCacheCleanup
+                resourceCacheCleanup, statusProducer
         );
     }
 

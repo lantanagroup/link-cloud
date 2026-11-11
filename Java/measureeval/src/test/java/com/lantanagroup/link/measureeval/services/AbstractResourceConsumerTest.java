@@ -43,6 +43,8 @@ class AbstractResourceConsumerTest {
     @Mock private AbsResourceService absResourceService;
     @Mock private MongoOperations mongoOperations;
 
+    @Mock private ReportStatusUpdatedProducer reportStatusUpdatedProducer;
+
     private AutoCloseable mocks;
     private ResourcesNormalizedConsumer consumer;
     private ResourcesNormalizedConsumer consumerWithAbs;
@@ -50,6 +52,8 @@ class AbstractResourceConsumerTest {
     @BeforeEach
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
+        when(dataAcquisitionRequestedTemplate.send(any(ProducerRecord.class)))
+                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
         consumer = new ResourcesNormalizedConsumer(
                 patientStatusRepository,
                 reportabilityPredicate,
@@ -62,7 +66,7 @@ class AbstractResourceConsumerTest {
                 measureReportGeneratedProducer,
                 redisResourceService,
                 null,
-                mongoOperations);
+                mongoOperations, reportStatusUpdatedProducer);
         consumerWithAbs = new ResourcesNormalizedConsumer(
                 patientStatusRepository,
                 reportabilityPredicate,
@@ -75,7 +79,7 @@ class AbstractResourceConsumerTest {
                 measureReportGeneratedProducer,
                 redisResourceService,
                 absResourceService,
-                mongoOperations);
+                mongoOperations, reportStatusUpdatedProducer);
     }
 
     @AfterEach
@@ -586,6 +590,87 @@ class AbstractResourceConsumerTest {
 
         verify(redisResourceService, never()).cleanup(anyString());
         verifyNoInteractions(mongoOperations);
+    }
+
+    @Test
+    void process_waitsForInitialHandoffBeforeReportingSuccess() throws Exception {
+        var record = prepareInitialRecord();
+        var handoff = new java.util.concurrent.CompletableFuture<org.springframework.kafka.support.SendResult<String, DataAcquisitionRequested>>();
+        when(dataAcquisitionRequestedTemplate.send(any(ProducerRecord.class))).thenReturn(handoff);
+        var processing = java.util.concurrent.CompletableFuture.runAsync(() -> consumer.process(record));
+        try {
+            verify(dataAcquisitionRequestedTemplate, timeout(2000)).send(any(ProducerRecord.class));
+            verifyNoInteractions(reportStatusUpdatedProducer);
+            handoff.complete(null);
+            processing.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            verify(reportStatusUpdatedProducer).publishSuccess(any(), eq(QueryType.INITIAL), anyLong(), eq(record.headers()));
+        } finally {
+            handoff.complete(null);
+        }
+    }
+
+    @Test
+    void process_failedInitialHandoffDoesNotReportSuccessOrDeleteCache() {
+        var record = prepareInitialRecord();
+        when(dataAcquisitionRequestedTemplate.send(any(ProducerRecord.class)))
+                .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("broker unavailable")));
+        assertThrows(RuntimeException.class, () -> consumer.process(record));
+        verify(reportStatusUpdatedProducer, never()).publishSuccess(any(), any(), anyLong(), any());
+        verify(reportStatusUpdatedProducer).noteFailedAttempt(eq(record), anyLong());
+        verify(redisResourceService, never()).cleanup(anyString());
+    }
+
+    @Test
+    void process_statusPublicationFailureLeavesCacheForRetry() {
+        var record = prepareInitialRecord();
+        doThrow(new RuntimeException("status unavailable")).when(reportStatusUpdatedProducer)
+                .publishSuccess(any(), any(), anyLong(), any());
+        assertThrows(RuntimeException.class, () -> consumer.process(record));
+        verify(dataAcquisitionRequestedTemplate).send(any(ProducerRecord.class));
+        verify(redisResourceService, never()).cleanup(anyString());
+    }
+
+    @Test
+    void process_supplementalReportsSuccessAfterBlobHandoff() {
+        var record = prepareInitialRecord();
+        record.value().setQueryType(QueryType.SUPPLEMENTAL);
+        consumer.process(record);
+        var order = inOrder(blobStorageService, reportStatusUpdatedProducer);
+        order.verify(blobStorageService).storePatientInBlobStorage(any(), any(), any(), any());
+        order.verify(reportStatusUpdatedProducer).publishSuccess(any(), eq(QueryType.SUPPLEMENTAL), anyLong(), eq(record.headers()));
+        verify(redisResourceService).cleanup("correlation-1");
+    }
+
+    @Test
+    void process_supplementalBlobFailureDoesNotReportSuccess() {
+        var record = prepareInitialRecord();
+        record.value().setQueryType(QueryType.SUPPLEMENTAL);
+        doThrow(new RuntimeException("blob unavailable")).when(blobStorageService)
+                .storePatientInBlobStorage(any(), any(), any(), any());
+        assertThrows(RuntimeException.class, () -> consumer.process(record));
+        verify(reportStatusUpdatedProducer, never()).publishSuccess(any(), any(), anyLong(), any());
+        verify(reportStatusUpdatedProducer).noteFailedAttempt(eq(record), anyLong());
+    }
+
+    private ConsumerRecord<ResourceKey, ResourcesNormalized> prepareInitialRecord() {
+        var value = buildRedisValue("correlation-1");
+        var patient = new PatientReportingEvaluationStatus();
+        patient.setFacilityId("facility-1");
+        patient.setPatientId("patient-1");
+        patient.setCorrelationId("correlation-1");
+        var report = new PatientReportingEvaluationStatus.Report();
+        report.setReportTrackingId("tracking-1");
+        report.setReportable(true);
+        patient.setReports(List.of(report));
+        when(patientStatusRepository.findByFacilityIdAndCorrelationId("facility-1", "correlation-1"))
+                .thenReturn(Optional.of(patient));
+        when(redisResourceService.readResources(anyString(), anyString(), anyString())).thenReturn(List.of());
+        var bundle = new Bundle();
+        bundle.addEntry().setResource(nonEmptyPatient());
+        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
+        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(new MeasureReport());
+        when(reportabilityPredicate.test(any())).thenReturn(true);
+        return buildConsumerRecord("facility-1", "patient-1", value);
     }
 
     private static org.hl7.fhir.r4.model.Patient nonEmptyPatient() {

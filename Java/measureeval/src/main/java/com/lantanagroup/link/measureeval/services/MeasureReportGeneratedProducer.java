@@ -4,6 +4,7 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.measureeval.records.MeasureReportGenerated;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.slf4j.Logger;
@@ -77,10 +78,13 @@ public class MeasureReportGeneratedProducer {
                     null,
                     null,
                     value,
-                    headers));
+                    headers)).get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Failed to produce MeasureReportGenerated message", ex);
         } catch (Exception ex) {
-            logger.error("Failed to produce measure report generated record: {}", ex.getMessage());
-            throw ex;
+            logger.error("Failed to produce measure report generated record: {}", LogUtils.sanitize(ex.getMessage()));
+            throw new RuntimeException("Failed to produce MeasureReportGenerated message", ex);
         }
     }
 }

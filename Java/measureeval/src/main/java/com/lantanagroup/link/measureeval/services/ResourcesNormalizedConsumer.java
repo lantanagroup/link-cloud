@@ -31,7 +31,7 @@ public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<Resour
           MeasureReportGeneratedProducer measureReportGeneratedProducer,
           RedisResourceService redisResourceService,
           AbsResourceService absResourceService,
-          MongoOperations mongoOperations){
+          MongoOperations mongoOperations, ReportStatusUpdatedProducer reportStatusUpdatedProducer){
     super(
             patientStatusRepository,
             reportabilityPredicate,
@@ -44,7 +44,7 @@ public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<Resour
             measureReportGeneratedProducer,
             redisResourceService,
             absResourceService,
-            mongoOperations);
+            mongoOperations, reportStatusUpdatedProducer);
   }
 
     @KafkaListener(topics = Topics.RESOURCES_NORMALIZED, containerFactory = "manualAckListenerContainerFactory")

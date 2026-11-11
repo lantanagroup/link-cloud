@@ -61,6 +61,8 @@ class EvaluationRequestedConsumerTest {
     @Mock
     private FhirContext fhirContext;
 
+    @Mock private ReportStatusUpdatedProducer reportStatusUpdatedProducer;
+
     private AutoCloseable mocks;
     private EvaluationRequestedConsumer consumer;
 
@@ -78,7 +80,7 @@ class EvaluationRequestedConsumerTest {
                 blobStorageService,
                 evaluateMeasureService,
                 recoverer,
-                fhirContext);
+                fhirContext, reportStatusUpdatedProducer);
     }
 
     @AfterEach
@@ -199,5 +201,11 @@ class EvaluationRequestedConsumerTest {
 
         verify(blobStorageService).storePatientInBlobStorage(any(), any(), eq(measureReport), any());
         verifyNoInteractions(measureReportGeneratedProducer);
+        var order = inOrder(blobStorageService, reportStatusUpdatedProducer);
+        order.verify(blobStorageService).storePatientInBlobStorage(any(), any(), eq(measureReport), any());
+        order.verify(reportStatusUpdatedProducer).publishSuccess(any(),
+                eq(com.lantanagroup.link.measureeval.entities.QueryType.INITIAL), anyLong(), any());
+        order.verify(reportStatusUpdatedProducer).publishSuccess(any(),
+                eq(com.lantanagroup.link.measureeval.entities.QueryType.SUPPLEMENTAL), anyLong(), any());
     }
 }

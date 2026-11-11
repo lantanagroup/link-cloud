@@ -312,7 +312,8 @@ class RetryTopicRecovererDecisionTest {
 
         var recoverer = new KafkaConfig().resourceNormalizedRecoverer(
                 template, retryConfig(3, false),
-                new com.lantanagroup.link.measureeval.services.ResourceCacheCleanup(redis, null));
+                new com.lantanagroup.link.measureeval.services.ResourceCacheCleanup(redis, null),
+                mock(com.lantanagroup.link.measureeval.services.ReportStatusUpdatedProducer.class));
         recoverer.accept(record, exception);
     }
 

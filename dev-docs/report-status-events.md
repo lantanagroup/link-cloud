@@ -132,6 +132,34 @@ Messages lacking a patient id, correlation id, report id, or recognized phase ca
 status event. The status producer uses the canonical report/patient key and Murmur2 partitioning,
 and propagates the correlation and metrics-mode headers.
 
+## MeasureEval producer
+
+MeasureEval emits `InitialEvaluation` or `SupplementalEvaluation` once per distinct report/patient
+after evaluation, persistence, and the downstream handoff have succeeded. Both
+`DataAcquisitionRequested` (initial reportable patients) and `MeasureReportGenerated` sends wait for
+Kafka acknowledgement; an asynchronous send failure therefore follows the inbound retry path.
+Initial events include `reportable`, true if any measure in that report is reportable. Supplemental
+events omit it and exclude reports already completed as not reportable during initial evaluation.
+An empty initial bundle retains the existing successful, not-reportable outcome.
+
+Regeneration (`EvaluationRequested`) performs reportability and final evaluation together without
+acquisition. After its downstream handoffs it reports initial completion and, for reportable reports,
+supplemental completion against the new report id and workflow correlation id.
+
+Durations exclude consumer lag. `X-Evaluation-Completed-At-<phase>` and
+`X-Evaluation-Processing-Time-<phase>` preserve the original successful occurrence and duration when
+status publication is retried. Success is published before cache cleanup so failed status sends
+retain the resources required for retry.
+
+Direct dead letters, disabled retries, and exhausted retries report `isSuccess=false` for the failed
+evaluation phase. Temporary failures emit no failure status. The terminal hook runs after durable
+dead-letter publication and still releases the cache if status publication fails. As with the shared
+recoverer, terminal diagnostic publication is best effort after Kafka producer retries. Failures
+include the exception type and its message, sanitized with the shared `LogUtils` helper. When the
+message is absent or blank, only the exception type is included.
+Malformed messages without report/patient/correlation identity cannot emit a valid status event.
+Status records use the canonical key, default Java key hashing, and correlation/metrics-mode headers.
+
 ## Contract checks
 
 The fixtures in `Java/shared/src/test/resources/report-status/` are shared with .NET ServiceTests.

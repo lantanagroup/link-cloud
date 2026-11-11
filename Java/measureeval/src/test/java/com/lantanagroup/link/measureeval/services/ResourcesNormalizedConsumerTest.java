@@ -61,6 +61,8 @@ class ResourcesNormalizedConsumerTest {
     @Mock
     private MongoOperations mongoOperations;
 
+    @Mock private ReportStatusUpdatedProducer reportStatusUpdatedProducer;
+
     private AutoCloseable mocks;
     private ResourcesNormalizedConsumer consumer;
 
@@ -79,7 +81,7 @@ class ResourcesNormalizedConsumerTest {
                 measureReportGeneratedProducer,
                 redisResourceService,
                 absResourceService,
-                mongoOperations);
+                mongoOperations, reportStatusUpdatedProducer);
     }
 
     @AfterEach
