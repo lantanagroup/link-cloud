@@ -1,0 +1,4 @@
+{"items": [
+  {"metadata": {"name": "report"}, "spec": {"replicas": 2}, "status": {"readyReplicas": 2}},
+  {"metadata": {"name": "measureeval"}, "spec": {"replicas": 10}, "status": {"readyReplicas": 9}}
+]}

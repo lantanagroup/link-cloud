@@ -1,0 +1,39 @@
+{
+  "_comment": "Local docker-compose stack. Secrets come from .env (LINK_DB_PASS, KAFKA_SASL_CLIENT_USER, KAFKA_SASL_CLIENT_PASSWORD); copy this file for another environment and override anything with the CLI flags.",
+  "environment": "local-compose",
+  "sql": {
+    "connection_string": "Server=localhost,1433;UID=sa;PWD=${LINK_DB_PASS};TrustServerCertificate=yes",
+    "databases": {
+      "report": "link-report",
+      "census": "link-census",
+      "dataacquisition": "link-dataacquisition",
+      "audit": "link-audit",
+      "querydispatch": "link-querydispatch",
+      "validation": "link-validation",
+      "tenant": "link-tenant"
+    },
+    "connection_strings": {}
+  },
+  "mongo": {
+    "connection_string": "mongodb://localhost:17017/?directConnection=true",
+    "databases": {
+      "measureeval": "link-measureeval"
+    }
+  },
+  "kafka": {
+    "bootstrap_servers": "localhost:9094",
+    "security_protocol": "SASL_PLAINTEXT",
+    "sasl_mechanism": "PLAIN",
+    "username": "${KAFKA_SASL_CLIENT_USER}",
+    "password": "${KAFKA_SASL_CLIENT_PASSWORD}"
+  },
+  "loki": {
+    "url": "http://localhost:3100"
+  },
+  "cosmos": {
+    "resource_id": null
+  },
+  "replicas": {
+    "provider": "docker"
+  }
+}

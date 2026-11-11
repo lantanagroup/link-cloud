@@ -1,0 +1,11 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {"metric": {"component": "Report"}, "value": [1762880400, "1048576"]},
+      {"metric": {"component": "DataAcquisition"}, "value": [1762880400, "4194304"]},
+      {"metric": {}, "value": [1762880400, "512"]}
+    ]
+  }
+}

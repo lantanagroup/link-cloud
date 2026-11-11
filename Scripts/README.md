@@ -52,6 +52,8 @@ subfolder and is summarised at the end.
 | Script | Purpose |
 |---|---|
 | `capacity_model/model.py [--format md\|csv] [--out <file>]` | LEGPROG-516 metadata volume model: arrival rates, held volume by retention window, and peak write throughput for every in-scope store. The inputs are `assumptions.json` and `stores.json`; see `capacity_model/README.md`. Stdlib only. Tests: `python -m unittest discover Scripts/capacity_model/tests`. |
+| `capacity_model/snapshot.py --out <file> [--previous <snapshot>] [--interval <s>]` | Read-only snapshot of every model store (SQL Server, MongoDB/Cosmos, Kafka, Loki), with the run's grain counts, contention counters and environment context. Connections come from a targets file (`capacity_model/targets/`) plus `clean.py`-style flags, with secrets as `${VAR}`. Needs `capacity_model/requirements-capture.txt`. |
+| `capacity_model/diff_snapshots.py --before <a> --after <b> [--series <s>] --out-dir <dir>` | Turns snapshots into multipliers, write rates and contention, and proposes a `stores.json` update. `--apply` writes the update, and requires `--source` and explicit paths. Stdlib only. |
 
 ### LINQPad utilities
 

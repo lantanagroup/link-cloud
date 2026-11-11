@@ -157,6 +157,43 @@ class InputTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             model.load_assumptions(model.DEFAULT_ASSUMPTIONS, ["no_such_key=1"])
 
+    def test_every_store_has_a_usable_location(self):
+        from capture.common import location_errors
+        stores, _ = model.load_stores(model.DEFAULT_STORES)
+        errors = [e for s in stores for e in location_errors(s)]
+        self.assertEqual(errors, [])
+
+    def test_measured_with_points_at_a_store_of_the_same_kind(self):
+        stores, _ = model.load_stores(model.DEFAULT_STORES)
+        by_id = {s["id"]: s for s in stores}
+        for s in stores:
+            target = s["location"].get("measured_with")
+            if target:
+                self.assertIn(target, by_id, s["id"])
+                self.assertEqual(by_id[target]["kind"], s["kind"], s["id"])
+
+    def test_no_two_measured_stores_share_a_physical_location(self):
+        stores, _ = model.load_stores(model.DEFAULT_STORES)
+        seen = {}
+        for s in stores:
+            loc = s["location"]
+            if "measured_with" in loc:
+                continue
+            keys = [(loc.get("service"), t) for t in loc.get("tables") or [loc.get("table")] if t]
+            keys += [("kafka", t) for t in loc.get("topics", [])]
+            keys += [(loc.get("service"), loc["collection"])] if "collection" in loc else []
+            for key in keys:
+                self.assertNotIn(key, seen, f"{s['id']} and {seen.get(key)} both measure {key}")
+                seen[key] = s["id"]
+
+    def test_location_validation_rejects_bad_identifiers(self):
+        from capture.common import location_errors
+        bad = store(id="x", location={"service": "report", "table": "ReportResource; drop table x"})
+        self.assertTrue(location_errors(bad))
+        bad_join = store(id="y", location={"service": "report", "table": "dbo.A",
+                                           "attribution": {"key": "p.Id", "from": "dbo.B t JOIN dbo.C p ON 1=1"}})
+        self.assertTrue(location_errors(bad_join))
+
     def test_exclude_tag(self):
         all_stores, _ = model.load_stores(model.DEFAULT_STORES)
         trimmed, _ = model.load_stores(model.DEFAULT_STORES, ["shadow"])

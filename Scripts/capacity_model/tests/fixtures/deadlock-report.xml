@@ -1,0 +1,17 @@
+<event name="xml_deadlock_report" package="sqlserver" timestamp="2026-11-11T17:05:00.000Z">
+  <data name="xml_report">
+    <value>
+      <deadlock>
+        <victim-list><victimProcess id="process1" /></victim-list>
+        <process-list>
+          <process id="process1" currentdbname="link-report"><inputbuf>UPDATE dbo.ReportEntry SET ReportingStatus = 'X' WHERE PatientId = 'Patient/123'</inputbuf></process>
+          <process id="process2" currentdbname="link-report"><inputbuf>SELECT 1</inputbuf></process>
+        </process-list>
+        <resource-list>
+          <keylock objectname="link-report.dbo.ReportEntry" mode="X" />
+          <pagelock objectname="link-report.dbo.ReportSchedule" mode="S" />
+        </resource-list>
+      </deadlock>
+    </value>
+  </data>
+</event>

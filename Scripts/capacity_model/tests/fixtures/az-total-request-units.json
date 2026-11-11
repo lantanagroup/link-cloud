@@ -1,0 +1,14 @@
+{
+  "value": [
+    {
+      "name": {"value": "TotalRequestUnits"},
+      "timeseries": [
+        {"data": [
+          {"timeStamp": "2026-11-11T17:00:00Z", "total": 1200.0},
+          {"timeStamp": "2026-11-11T17:01:00Z", "total": 3400.5},
+          {"timeStamp": "2026-11-11T17:02:00Z"}
+        ]}
+      ]
+    }
+  ]
+}

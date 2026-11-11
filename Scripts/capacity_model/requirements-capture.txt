@@ -1,0 +1,8 @@
+# Client libraries for snapshot.py. model.py and diff_snapshots.py need none of these.
+#   python -m venv <a directory outside the repository>
+#   <venv>/Scripts/python -m pip install -r Scripts/capacity_model/requirements-capture.txt
+# pyodbc also needs a SQL Server ODBC driver (ODBC Driver 17 or 18 for SQL Server).
+pyodbc==5.2.0
+pymongo==4.10.1
+confluent-kafka==2.6.1
+requests==2.32.3
