@@ -5,6 +5,7 @@ import com.lantanagroup.link.measureeval.entities.*;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.records.ResourcesNormalized;
+import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
@@ -24,6 +25,7 @@ import org.springframework.kafka.retrytopic.RetryTopicHeaders;
 import java.nio.ByteBuffer;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,12 +35,14 @@ import static org.mockito.Mockito.*;
 class ReportStatusUpdatedProducerTest {
     private KafkaTemplate<ReportStatusUpdatedKey, ReportStatusUpdated> template;
     private ReportStatusUpdatedProducer producer;
+    private PatientReportingEvaluationStatusRepository patientStatusRepository;
 
     @BeforeEach
     void setUp() {
         template = mock(KafkaTemplate.class);
+        patientStatusRepository = mock(PatientReportingEvaluationStatusRepository.class);
         when(template.send(any(ProducerRecord.class))).thenReturn(CompletableFuture.completedFuture(null));
-        producer = new ReportStatusUpdatedProducer(template);
+        producer = new ReportStatusUpdatedProducer(template, patientStatusRepository);
     }
 
     @Test
@@ -92,6 +96,8 @@ class ReportStatusUpdatedProducerTest {
     @Test
     void finalFailureUsesPhaseAndDistinctSchedulesAndIncludesExceptionMessage() {
         var record = resourceRecord(QueryType.SUPPLEMENTAL);
+        when(patientStatusRepository.findByFacilityIdAndCorrelationId("facility", "correlation-1"))
+                .thenReturn(Optional.of(patient()));
         producer.noteFailedAttempt(record, 73);
         producer.publishFinalFailure(record, new UnsupportedOperationException("test exception"));
         var event = records(1).get(0).value();
@@ -103,6 +109,38 @@ class ReportStatusUpdatedProducerTest {
         assertEquals(73L, event.getProcessingTime());
         assertEquals("Measure evaluation failed: UnsupportedOperationException: test exception", event.getErrorMessage());
         assertNull(event.getReportable());
+    }
+
+    @Test
+    void supplementalFinalFailureAggregatesOnlyReportableReports() {
+        var patient = patient();
+        var unknown = new PatientReportingEvaluationStatus.Report();
+        unknown.setReportTrackingId("report-3");
+        patient.setReports(List.of(report("report-1", false), report("report-1", true),
+                report("report-1", true), report("report-2", false), unknown));
+        when(patientStatusRepository.findByFacilityIdAndCorrelationId("facility", "correlation-1"))
+                .thenReturn(Optional.of(patient));
+        var record = resourceRecord(QueryType.SUPPLEMENTAL);
+        var nonreportable = new AbstractResourceRecord.ScheduledReport();
+        nonreportable.setReportTrackingId("report-2");
+        var unevaluated = new AbstractResourceRecord.ScheduledReport();
+        unevaluated.setReportTrackingId("report-3");
+        record.value().setScheduledReports(List.of(record.value().getScheduledReports().get(0),
+                nonreportable, unevaluated));
+
+        producer.publishFinalFailure(record, new IllegalStateException());
+
+        var event = records(1).get(0).value();
+        assertEquals("report-1", event.getReportScheduleId());
+        assertEquals(PatientReportingStatus.SUPPLEMENTAL_EVALUATION, event.getStatus());
+        assertFalse(event.isSuccess());
+        assertNull(event.getReportable());
+    }
+
+    @Test
+    void supplementalFinalFailureWithoutPatientStatusDoesNotAssumeReportability() {
+        producer.publishFinalFailure(resourceRecord(QueryType.SUPPLEMENTAL), new IllegalStateException());
+        verifyNoInteractions(template);
     }
 
     @Test

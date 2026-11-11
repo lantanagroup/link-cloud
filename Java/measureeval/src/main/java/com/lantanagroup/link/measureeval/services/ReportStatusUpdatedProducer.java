@@ -4,6 +4,7 @@ import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStat
 import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
+import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
@@ -30,10 +31,13 @@ public class ReportStatusUpdatedProducer {
     private static final String COMPLETED_AT = "X-Evaluation-Completed-At-";
     private static final String PROCESSING_TIME = "X-Evaluation-Processing-Time";
     private final KafkaTemplate<ReportStatusUpdatedKey, ReportStatusUpdated> template;
+    private final PatientReportingEvaluationStatusRepository patientStatusRepository;
 
     public ReportStatusUpdatedProducer(
-            @Qualifier("compressedKafkaTemplate") KafkaTemplate<ReportStatusUpdatedKey, ReportStatusUpdated> template) {
+            @Qualifier("compressedKafkaTemplate") KafkaTemplate<ReportStatusUpdatedKey, ReportStatusUpdated> template,
+            PatientReportingEvaluationStatusRepository patientStatusRepository) {
         this.template = template;
+        this.patientStatusRepository = patientStatusRepository;
     }
 
     public void publishSuccess(PatientReportingEvaluationStatus patient, QueryType phase, long processingTime,
@@ -98,6 +102,15 @@ public class ReportStatusUpdatedProducer {
             return; // Deserialization failures cannot identify a patient/report.
         }
         if (blank(patientId) || blank(correlationId)) return;
+        if (record.value() instanceof AbstractResourceRecord resource
+                && resource.getQueryType() == QueryType.SUPPLEMENTAL && record.key() instanceof ResourceKey key) {
+            // As in publishSuccess, a schedule is eligible if any of its measures was reportable.
+            reportIds = patientStatusRepository.findByFacilityIdAndCorrelationId(key.getFacilityId(), correlationId)
+                    .map(patient -> patient.getReports().stream()
+                            .filter(report -> Boolean.TRUE.equals(report.getReportable()))
+                            .map(PatientReportingEvaluationStatus.Report::getReportTrackingId).toList())
+                    .orElseGet(List::of);
+        }
         var duration = record.headers().lastHeader(PROCESSING_TIME);
         Long processingTime = duration == null ? null : Long.valueOf(Headers.getString(duration.value()));
         OffsetDateTime timestamp = OffsetDateTime.now(ZoneOffset.UTC);
