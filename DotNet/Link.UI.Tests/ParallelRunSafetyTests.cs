@@ -193,6 +193,55 @@ public class ParallelRunSafetyTests
         registry.Claim(second, ["Patient/pat-1"]);
 
         registry.PathsHeldByOthers(first).Should().BeEmpty();
+        registry.FacilitiesHeldByOthers(first).Should().BeEmpty();
+        ParallelRunSafety.FacilityIsHeldByAnotherRun("10001", registry.FacilitiesHeldByOthers(first))
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void Two_named_ehr_systems_keep_separate_runs_and_the_same_endpoint_stays_protected()
+    {
+        var host = new AutomationConfig
+        {
+            FhirServerBase = "http://host.example/fhir",
+            FhirServerOAuth = new OAuthConfig { ClientId = "host-client" },
+            FhirServerBasicAuth = new BasicAuthConfig()
+        };
+        var local = System("local", "https://ehr-a.example/fhir", isDefault: true);
+        var sandbox = System("sandbox", "https://ehr-b.example/fhir", isDefault: false);
+        var sameServer = System("alias", "https://ehr-a.example/fhir", isDefault: false);
+        var localKey = EhrEndpointIdentity.From(EhrSystemCatalog.WithEndpoints(host, local));
+        var sandboxKey = EhrEndpointIdentity.From(EhrSystemCatalog.WithEndpoints(host, sandbox));
+        var aliasKey = EhrEndpointIdentity.From(EhrSystemCatalog.WithEndpoints(host, sameServer));
+
+        localKey.Should().NotBe(sandboxKey);
+        localKey.Should().Be(aliasKey);
+        localKey.Should().NotContain("host-client");
+
+        var registry = new SharedEhrWorkRegistry();
+        var onLocal = Guid.NewGuid();
+        var onSandbox = Guid.NewGuid();
+        registry.Begin(onLocal, localKey, "10001");
+        registry.Begin(onSandbox, sandboxKey, "10002");
+        registry.Claim(onLocal, ["Patient/pat-1"]);
+        registry.Claim(onSandbox, ["Patient/pat-1"]);
+
+        ParallelRunSafety.PathsSafeToExpunge(["Patient/pat-1"], registry.PathsHeldByOthers(onLocal))
+            .Should().Equal("Patient/pat-1");
+        registry.FacilitiesHeldByOthers(onLocal).Should().BeEmpty();
+        ParallelRunSafety.FacilityIsHeldByAnotherRun("10001", registry.FacilitiesHeldByOthers(onLocal))
+            .Should().BeFalse();
+
+        var alsoOnLocal = Guid.NewGuid();
+        registry.Begin(alsoOnLocal, aliasKey, "10003");
+        registry.Claim(alsoOnLocal, ["Patient/pat-1"]);
+
+        registry.PathsHeldByOthers(onLocal).Should().Equal("Patient/pat-1");
+        registry.FacilitiesHeldByOthers(onLocal).Should().Equal("10003");
+        ParallelRunSafety.FacilityIsHeldByAnotherRun("10003", registry.FacilitiesHeldByOthers(onLocal))
+            .Should().BeTrue();
+        ParallelRunSafety.PathsSafeToExpunge(["Patient/pat-1"], registry.PathsHeldByOthers(onSandbox))
+            .Should().Equal("Patient/pat-1");
     }
 
     [Fact]
@@ -297,6 +346,7 @@ public class ParallelRunSafetyTests
         executor.Should().Contain("ParallelRunSafety.FacilityIsHeldByAnotherRun");
         executor.Should().Contain("_sharedEhrWork.Release");
         executor.Should().Contain("ParallelRunSafety.PatientIdsAfterIsolate(importedPatients)");
+        executor.Should().Contain("EhrEndpointIdentity.From(ConfigFor(state.Options.EhrSystemName))");
 
         var manager = File.ReadAllText(RepoFile("DotNet/Link.UI/Engine/Services/AutomationRunManager.cs"));
         manager.Should().Contain("ParallelRunSafety.BlocksMetricsStart");
@@ -351,6 +401,9 @@ public class ParallelRunSafetyTests
         var paths = ImportedResourceRunScope.Isolate(imported, runTag);
         return (imported.PatientId, imported.BundleJson!, paths);
     }
+
+    private static NamedEhrSystem System(string name, string url, bool isDefault) =>
+        new(name, url, url, null, isDefault, new OAuthConfig(), new BasicAuthConfig());
 
     private static string RepoFile(string relative)
     {

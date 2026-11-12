@@ -451,14 +451,23 @@ internal sealed class SharedEhrWorkRegistry
         }
     }
 
+    /// <summary>
+    /// Facilities another ongoing run on this same endpoint still holds.
+    /// A run on a different endpoint does not block cleanup here.
+    /// </summary>
     public IReadOnlyCollection<string> FacilitiesHeldByOthers(Guid runId)
     {
         lock (_gate)
         {
             var facilities = new HashSet<string>(StringComparer.Ordinal);
+            if (!_runs.TryGetValue(runId, out var self))
+                return facilities;
+
             foreach (var (id, work) in _runs)
             {
                 if (id == runId || string.IsNullOrWhiteSpace(work.FacilityId))
+                    continue;
+                if (!string.Equals(work.EhrKey, self.EhrKey, StringComparison.Ordinal))
                     continue;
                 facilities.Add(work.FacilityId);
             }

@@ -271,7 +271,7 @@ internal sealed class RunExecutor
         {
             _sharedEhrWork.Begin(
                 state.RunId,
-                EhrEndpointIdentity.From(_automationConfig),
+                EhrEndpointIdentity.From(ConfigFor(state.Options.EhrSystemName)),
                 AllocatedOrganizationId(state));
 
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
