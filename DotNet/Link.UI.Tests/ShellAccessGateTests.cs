@@ -155,6 +155,8 @@ public class ShellAccessGateTests
     [InlineData("/api/api-health-runs/start-all-for-pipeline")]
     [InlineData("/api/api-health-runs/22222222-2222-2222-2222-222222222222/status")]
     [InlineData("/api/api-health-runs/22222222-2222-2222-2222-222222222222/results")]
+    [InlineData("/api/ehr-systems/readiness")]
+    [InlineData("/api/ehr-systems/local/readiness")]
     public void Anonymous_off_closes_native_automation_apis_when_bearer_is_disabled(string path)
     {
         ShellAccessGate.IsClosedNativeApi(false, false, path).Should().BeTrue();
@@ -163,6 +165,8 @@ public class ShellAccessGateTests
     [Theory]
     [InlineData("/api/runs/metrics")]
     [InlineData("/api/api-health-runs/start-all-for-pipeline")]
+    [InlineData("/api/ehr-systems/readiness")]
+    [InlineData("/api/ehr-systems/local/readiness")]
     public void Bearer_enabled_leaves_bearer_routes_to_the_auth_middleware(string path)
     {
         ShellAccessGate.IsClosedNativeApi(false, true, path).Should().BeFalse();

@@ -2097,6 +2097,21 @@ with the extractor does not replace this section.
 | `Authentication:ApiBearer:Enabled` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Auth/ApiBearerAuthentication.cs` |
 | `Authentication:EnableAnonymousAccess` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Program.cs` |
 | `Authentication:UseBearerForServiceCalls` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Program.cs` |
+| `Automation:EhrSystems:0:BasicAuth:Password` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:BasicAuth:ShouldAuthenticate` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:BasicAuth:Username` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:DefaultFacilityTemplate` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:FacilityFhirServerBase` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:FhirServerBase` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:IsDefault` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:Name` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:OAuth:ClientId` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:OAuth:ClientSecret` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:OAuth:Password` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:OAuth:Scope` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:OAuth:ShouldAuthenticate` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:OAuth:TokenEndpoint` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
+| `Automation:EhrSystems:0:OAuth:Username` | dotnet | yes | - | `DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs` |
 | `Automation:FacilityFhirServerBase` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
 | `Automation:FhirServerBase` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
 | `InternalBlobStorage:BlobContainerName` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |

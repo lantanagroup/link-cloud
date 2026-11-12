@@ -39,6 +39,8 @@ public sealed class AutomationRunsApiController(
             return NotFound(new { error = $"Scenario {request.ScenarioId} not found." });
 
         var startRequest = StartScenarioRequest.FromScenario(scenario);
+        if (!string.IsNullOrWhiteSpace(request.EhrSystem))
+            startRequest.EhrSystem = request.EhrSystem.Trim();
 
         Guid runId;
         try
@@ -176,6 +178,7 @@ public sealed class AutomationRunsApiController(
             FinishedAt = summary.FinishedAt,
             Duration = summary.Duration,
             Error = summary.Error,
+            EhrSystem = summary.EhrSystem,
         });
     }
 
@@ -342,6 +345,9 @@ public sealed class AutomationRunsApiController(
         /// Optional.
         /// </summary>
         public string? Source { get; set; }
+
+        /// <summary>Named EHR system for this run. Empty uses the configured default.</summary>
+        public string? EhrSystem { get; set; }
     }
 
     public sealed class RunStatusResponse
@@ -355,5 +361,8 @@ public sealed class AutomationRunsApiController(
         public DateTimeOffset? FinishedAt { get; set; }
         public string? Duration { get; set; }
         public string? Error { get; set; }
+
+        /// <summary>Named FHIR endpoint for this run.</summary>
+        public string? EhrSystem { get; set; }
     }
 }

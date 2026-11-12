@@ -45,6 +45,8 @@ public sealed class NativeApiClosedTests : IClassFixture<BearerOffHost>
     [InlineData("POST", "/api/api-health-runs/start-all-for-pipeline")]
     [InlineData("GET", "/api/api-health-runs/22222222-2222-2222-2222-222222222222/status")]
     [InlineData("GET", "/api/api-health-runs/22222222-2222-2222-2222-222222222222/results")]
+    [InlineData("GET", "/api/ehr-systems/readiness")]
+    [InlineData("GET", "/api/ehr-systems/local/readiness")]
     public async Task Native_routes_are_closed_with_no_token_a_bad_token_or_a_test_token(string method, string path)
     {
         using var bare = await NativeApiHttp.Send(_host.Client, method, path);
@@ -85,6 +87,7 @@ public sealed class NativeApiClosedWithSessionTests : IClassFixture<BearerOffSig
 
     [Theory]
     [InlineData("GET", "/api/runs/metrics")]
+    [InlineData("GET", "/api/ehr-systems/readiness")]
     [InlineData("POST", "/api/api-health-runs/start-all")]
     [InlineData("GET", "/api/api-health-runs/22222222-2222-2222-2222-222222222222/status")]
     public async Task A_shell_session_does_not_open_the_native_api(string method, string path)

@@ -85,6 +85,9 @@ public record ResolvedRunOptions(
     /// <summary>Vendor posted on facility create. Null with <see cref="HonorExplicitFacilityPieces"/> false keeps Epic.</summary>
     public string? VendorName { get; init; }
 
+    /// <summary>Named FHIR endpoint this run uses. Not a vendor.</summary>
+    public string? EhrSystemName { get; init; }
+
     public bool AllowPatientConfigurationsOutsideSet { get; init; } = true;
 
     public List<Guid> AllowedPatientConfigurationIds { get; init; } = [];

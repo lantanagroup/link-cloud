@@ -105,6 +105,12 @@ public class StartScenarioRequest : IValidatableObject
 
     public Guid? FacilityTemplateId { get; set; }
 
+    /// <summary>
+    /// Named EHR system for this run. Empty uses the configured default.
+    /// This is the FHIR endpoint, not a vendor.
+    /// </summary>
+    public string? EhrSystem { get; set; }
+
     /// <summary>Ala carte vendor. Empty means the run does not send a vendor.</summary>
     public string? VendorName { get; set; }
 

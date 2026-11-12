@@ -649,11 +649,63 @@ services:
       defaultValue: "120"
   LinkUI:
     - key: "Automation:FhirServerBase"
-      description: "The base URL of the FHIR server the generator writes test data to."
+      description: "Fallback FHIR base URL Link.UI itself calls when Automation:EhrSystems has no entries. When that list is present, the default EHR system's FhirServerBase is used instead. The generator, readiness probe, and bundle upload call this URL."
       required: true
     - key: "Automation:FacilityFhirServerBase"
-      description: "The base URL of the FHIR server as the facility reaches it. Differs from Automation:FhirServerBase only when the consumer's network vantage point differs."
+      description: "Fallback FHIR base URL written onto a test facility when Automation:EhrSystems has no entries. Same server as Automation:FhirServerBase, from the facility's network vantage. When the list is present, the default EHR system's FacilityFhirServerBase is used, or its FhirServerBase when that facility URL is omitted."
       required: true
+    - key: "Automation:EhrSystems:0:Name"
+      description: "Name of the first configured EHR system. An EHR system is a named FHIR endpoint, not a vendor. Further systems use the next index (1, 2, ...) with the same child keys. Do not reorder an index once its secret rows exist."
+      required: false
+    - key: "Automation:EhrSystems:0:FhirServerBase"
+      description: "Absolute http or https FHIR base URL Link.UI calls for this EHR system. The readiness probe uses this URL."
+      required: false
+    - key: "Automation:EhrSystems:0:FacilityFhirServerBase"
+      description: "Absolute http or https FHIR base URL written onto a facility that uses this EHR system. Same server as FhirServerBase, from the facility's network vantage. Omitted means the facility uses FhirServerBase."
+      required: false
+    - key: "Automation:EhrSystems:0:DefaultFacilityTemplate"
+      description: "Optional facility template for runs on this EHR system. A GUID or a template name. Applied when the run has no template or is still on the system-default template. A run that names another template keeps that template."
+      required: false
+    - key: "Automation:EhrSystems:0:IsDefault"
+      description: "Whether this EHR system is the one a run uses when the start request does not name one. Exactly one system is the default. A list of one system is the default even when this is false."
+      required: false
+      defaultValue: "false"
+    - key: "Automation:EhrSystems:0:OAuth:ShouldAuthenticate"
+      description: "Whether this EHR system uses the OAuth password grant. Cannot be true together with BasicAuth:ShouldAuthenticate."
+      required: false
+      defaultValue: "false"
+    - key: "Automation:EhrSystems:0:OAuth:TokenEndpoint"
+      description: "OAuth token endpoint for this EHR system. Required when OAuth:ShouldAuthenticate is true."
+      required: false
+    - key: "Automation:EhrSystems:0:OAuth:ClientId"
+      description: "OAuth client id for this EHR system. Required when OAuth:ShouldAuthenticate is true."
+      required: false
+    - key: "Automation:EhrSystems:0:OAuth:ClientSecret"
+      description: "OAuth client secret for this EHR system. Stored as a Key Vault reference for that environment, never as a plain value in this repository. Leave unset when the token endpoint does not require a client secret."
+      required: false
+      sensitive: true
+    - key: "Automation:EhrSystems:0:OAuth:Scope"
+      description: "OAuth scope sent when this EHR system authenticates. The code uses openid profile email when this is empty."
+      required: false
+      defaultValue: "openid profile email"
+    - key: "Automation:EhrSystems:0:OAuth:Username"
+      description: "OAuth resource-owner username for this EHR system. Required when OAuth:ShouldAuthenticate is true."
+      required: false
+    - key: "Automation:EhrSystems:0:OAuth:Password"
+      description: "OAuth resource-owner password for this EHR system. Stored as a Key Vault reference for that environment, never as a plain value in this repository."
+      required: false
+      sensitive: true
+    - key: "Automation:EhrSystems:0:BasicAuth:ShouldAuthenticate"
+      description: "Whether this EHR system uses HTTP basic auth. Cannot be true together with OAuth:ShouldAuthenticate."
+      required: false
+      defaultValue: "false"
+    - key: "Automation:EhrSystems:0:BasicAuth:Username"
+      description: "Basic auth username for this EHR system. Required when BasicAuth:ShouldAuthenticate is true."
+      required: false
+    - key: "Automation:EhrSystems:0:BasicAuth:Password"
+      description: "Basic auth password for this EHR system. Stored as a Key Vault reference for that environment, never as a plain value in this repository."
+      required: false
+      sensitive: true
     - key: "MongoDB:ConnectionString"
       description: "The MongoDB connection string for automation data."
       required: true
