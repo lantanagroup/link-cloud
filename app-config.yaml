@@ -781,7 +781,7 @@ services:
       required: false
       defaultValue: "10"
     - key: "spring.kafka.retry.consumer-retry-duration"
-      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
+      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts). Each entry must be between PT0S and PT24H, or the service fails to start: spring-kafka processes a retry due more than a day ahead immediately."
       required: false
       defaultValue: "PT3S,PT3S"
     - key: "spring.kafka.retry.disable-retry-consumer"
@@ -1000,7 +1000,7 @@ services:
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false
     - key: "spring.kafka.retry.consumer-retry-duration"
-      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
+      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts). Each entry must be between PT0S and PT24H, or the service fails to start: spring-kafka processes a retry due more than a day ahead immediately."
       required: false
       defaultValue: "PT3S,PT3S"
     - key: "spring.kafka.retry.disable-retry-consumer"

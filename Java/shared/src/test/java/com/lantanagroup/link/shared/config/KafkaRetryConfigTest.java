@@ -63,4 +63,42 @@ class KafkaRetryConfigTest {
         config.setDisableRetryConsumer(true);
         assertTrue(config.isDisableRetryConsumer());
     }
+
+    @Test
+    void setConsumerRetryDuration_DelayOfExactlyOneDay_IsAccepted() {
+        KafkaRetryConfig config = new KafkaRetryConfig();
+
+        config.setConsumerRetryDuration(List.of(Duration.ZERO, Duration.ofHours(24)));
+
+        assertEquals(86_400_000L, config.backoffMsForAttempt(2));
+    }
+
+    @Test
+    void setConsumerRetryDuration_DelayOverOneDay_IsRejected() {
+        KafkaRetryConfig config = new KafkaRetryConfig();
+        List<Duration> schedule = List.of(Duration.ofSeconds(20), Duration.ofHours(24).plusMillis(1));
+
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                () -> config.setConsumerRetryDuration(schedule));
+
+        assertTrue(thrown.getMessage().contains("PT24H0.001S"));
+        assertEquals(3, config.effectiveMaxAttempts());
+    }
+
+    @Test
+    void setConsumerRetryDuration_NegativeDelay_IsRejected() {
+        KafkaRetryConfig config = new KafkaRetryConfig();
+        List<Duration> schedule = List.of(Duration.ofSeconds(-1));
+
+        assertThrows(IllegalArgumentException.class, () -> config.setConsumerRetryDuration(schedule));
+    }
+
+    @Test
+    void setConsumerRetryDuration_Null_DisablesRetries() {
+        KafkaRetryConfig config = new KafkaRetryConfig();
+
+        config.setConsumerRetryDuration(null);
+
+        assertEquals(1, config.effectiveMaxAttempts());
+    }
 }

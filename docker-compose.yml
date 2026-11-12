@@ -779,9 +779,6 @@ services:
       dockerfile: DotNet/Automation.UI/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
-        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
-      secrets:
-        - feed_accesstoken
     networks:
       - link-nw
     depends_on:
@@ -1081,9 +1078,6 @@ services:
       dockerfile: DotNet/MockFhirServer/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
-        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
-      secrets:
-        - feed_accesstoken
     networks:
       - link-nw
     healthcheck:
@@ -1155,10 +1149,6 @@ services:
 
 networks:
   link-nw:
-     
-secrets:
-  feed_accesstoken:
-    environment: AZURE_ARTIFACTS_PAT
 
 volumes:
   kafka_data:

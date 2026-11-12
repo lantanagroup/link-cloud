@@ -80,7 +80,6 @@
     <Content Include="Azure_Pipelines\_build_and_push_all_services.yaml" />
     <Content Include="Azure_Pipelines\_deploy_all_services.yml" />
     <Content Include="Azure_Pipelines\_summarize_delta.yaml" />
-    <Content Include="Dockerfile.aspnet8-run" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Tests\AutomationUI.Pipeline\" />
