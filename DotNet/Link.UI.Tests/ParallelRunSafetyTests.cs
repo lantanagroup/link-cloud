@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Automation.UI.Models;
 using Automation.UI.Services;
 using FluentAssertions;
 using LantanaGroup.Automation;
@@ -256,6 +257,37 @@ public class ParallelRunSafetyTests
     }
 
     [Fact]
+    public void The_live_pool_uses_the_scoped_bundle_id_and_not_the_original()
+    {
+        var isolated = new[]
+        {
+            new ImportedPatientInput
+            {
+                Source = ImportedPatientSource.Bundle,
+                PatientId = "aaaa1111-pat-1"
+            },
+            new ImportedPatientInput
+            {
+                Source = ImportedPatientSource.ExistingId,
+                PatientId = "already-there"
+            }
+        };
+
+        var importedIds = ParallelRunSafety.PatientIdsAfterIsolate(isolated);
+        var pool = LivePatientPoolBuilder.Build(
+            ["aaaa1111-pat-1", "already-there"],
+            profilesAlignedToPatientIds: null,
+            importedIds);
+
+        pool.Should().ContainSingle(seed => seed.PatientId == "aaaa1111-pat-1")
+            .Which.Origin.Should().Be(LivePatientOrigin.Import);
+        pool.Should().ContainSingle(seed => seed.PatientId == "already-there")
+            .Which.Origin.Should().Be(LivePatientOrigin.Import);
+        pool.Should().NotContain(seed => seed.PatientId == "pat-1");
+        pool.Should().HaveCount(2);
+    }
+
+    [Fact]
     public void The_run_engine_uses_the_parallel_run_guards()
     {
         var executor = File.ReadAllText(RepoFile("DotNet/Link.UI/Engine/Services/RunExecutor.cs"));
@@ -264,6 +296,7 @@ public class ParallelRunSafetyTests
         executor.Should().Contain("ForgetCreatedResources");
         executor.Should().Contain("ParallelRunSafety.FacilityIsHeldByAnotherRun");
         executor.Should().Contain("_sharedEhrWork.Release");
+        executor.Should().Contain("ParallelRunSafety.PatientIdsAfterIsolate(importedPatients)");
 
         var manager = File.ReadAllText(RepoFile("DotNet/Link.UI/Engine/Services/AutomationRunManager.cs"));
         manager.Should().Contain("ParallelRunSafety.BlocksMetricsStart");

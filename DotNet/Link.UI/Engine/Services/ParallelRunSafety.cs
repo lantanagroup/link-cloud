@@ -58,6 +58,22 @@ internal static class ParallelRunSafety
         return facilitiesHeldByOtherRuns.Any(id =>
             !string.IsNullOrWhiteSpace(id) && string.Equals(id, facilityId, StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// Patient ids for the live census pool. Bundle imports have already been
+    /// rewritten onto this run's tag, so the pool must use those ids. The saved
+    /// scenario still carries the original id, and admitting that id would publish
+    /// a patient this run did not upload.
+    /// </summary>
+    public static IReadOnlyList<string> PatientIdsAfterIsolate(IEnumerable<ImportedPatientInput> isolatedImports)
+    {
+        ArgumentNullException.ThrowIfNull(isolatedImports);
+        return isolatedImports
+            .Where(imported => !string.IsNullOrWhiteSpace(imported.PatientId))
+            .Select(imported => imported.PatientId.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
 }
 
 /// <summary>

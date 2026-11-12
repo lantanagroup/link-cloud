@@ -964,6 +964,7 @@ internal sealed class RunExecutor
                         measureIds,
                         scenarioConfig,
                         patientIds,
+                        ParallelRunSafety.PatientIdsAfterIsolate(importedPatients),
                         profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
                         generationManifest,
                         fhirDataLoader,
@@ -2425,6 +2426,7 @@ internal sealed class RunExecutor
         IReadOnlyList<string> measureIds,
         TestScenarioConfig scenarioConfig,
         IReadOnlyList<string> patientIds,
+        IReadOnlyList<string> isolatedImportedPatientIds,
         IReadOnlyList<PatientProfile>? profiles,
         GenerationManifest? generationManifest,
         FhirDataLoader fhirDataLoader,
@@ -2456,17 +2458,10 @@ internal sealed class RunExecutor
             state.LiveWindowEndUtc = windowEnd;
         }
 
-        var importedIds = state.Options.ImportedPatientIds
-            .Concat(state.Options.ImportedPatientBundles)
-            .Select(p => p.PatientId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id!.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
         var expectedFromManifest = generationManifest?.ExpectedSubmittedPatientIds()
             .ToHashSet(StringComparer.Ordinal);
-        var seeds = LivePatientPoolBuilder.Build(patientIds, profiles, importedIds, expectedFromManifest);
+        var seeds = LivePatientPoolBuilder.Build(
+            patientIds, profiles, isolatedImportedPatientIds, expectedFromManifest);
         var censusPublisher = new LiveCensusPublisher(reportHelper, facilityId, reportTrackingId, output);
         var liveShape = (profiles ?? []).FirstOrDefault(p => p.IsExpectedToBeSubmitted(state.Options.SelectedMeasures))
             ?? (profiles ?? []).FirstOrDefault();
