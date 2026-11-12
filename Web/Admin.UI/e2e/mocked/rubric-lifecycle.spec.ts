@@ -181,7 +181,7 @@ test.describe('publishing', () => {
     await expect(confirmation).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Retire' })).toBeVisible();
     expect(published).toHaveLength(1);
-    await expect(page).toHaveURL(new RegExp(`${DRAFT_URL.replace(/\./g, '\\.')}$`));
+    await expect(page).toHaveURL(new RegExp(`${DRAFT_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
   });
 
   test('cancelling leaves the draft a draft', async ({ page, api }) => {
