@@ -36,6 +36,7 @@ else
                                 <th scope="col">Reports</th>
                                 <th scope="col">At once</th>
                                 <th scope="col">Batch</th>
+                                <th scope="col">Launch</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -47,6 +48,16 @@ else
                                     <td>@batch.ItemCount</td>
                                     <td>@batch.MaxConcurrency</td>
                                     <td><a href="@batch.Href">@batch.BatchId</a></td>
+                                    <td>
+                                        @if (batch.LaunchHref is not null && batch.LaunchId is Guid launchId)
+                                        {
+                                            <a href="@batch.LaunchHref">@launchId</a>
+                                        }
+                                        else
+                                        {
+                                            <span>—</span>
+                                        }
+                                    </td>
                                 </tr>
                             }
                         </tbody>

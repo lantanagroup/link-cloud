@@ -51,6 +51,10 @@ public static class ReportBatchDisplay
 
     public static string BatchHref(Guid batchId) => "/Automation/ReportBatches/" + batchId.ToString("D");
 
+    public static string LaunchPath(Guid launchId) => "/Automation/ReportBatches/Launches/" + launchId.ToString("D");
+
+    public static string MissingLaunchMessage(Guid launchId) => $"Launch {launchId} was not found.";
+
     public static ReportBatchTrackingModel From(ReportBatchDocument batch)
     {
         var ehr = EhrName(batch.EhrSystem);
@@ -64,6 +68,8 @@ public static class ReportBatchDisplay
         return new ReportBatchTrackingModel
         {
             BatchId = batch.BatchId,
+            LaunchId = batch.LaunchId,
+            LaunchHref = batch.LaunchId is Guid launchId ? LaunchPath(launchId) : null,
             EhrSystem = ehr,
             Status = label,
             PillClass = PillClass(label),
@@ -101,6 +107,61 @@ public static class ReportBatchDisplay
             })
             .ToList();
 
+    public static ReportBatchLaunchSummary? FromLaunch(Guid launchId, IReadOnlyList<ReportBatchDocument> batches)
+    {
+        if (batches.Count == 0)
+            return null;
+
+        var groups = batches
+            .OrderBy(batch => EhrName(batch.EhrSystem), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(batch => batch.CreatedAt)
+            .Select(EhrSummary)
+            .ToList();
+
+        return new ReportBatchLaunchSummary
+        {
+            LaunchId = launchId,
+            Open = groups.Any(group => group.Open),
+            CanCancel = groups.Any(group => group.CanCancel),
+            Total = groups.Sum(group => group.Total),
+            Pending = groups.Sum(group => group.Pending),
+            InProgress = groups.Sum(group => group.InProgress),
+            Completed = groups.Sum(group => group.Completed),
+            Failed = groups.Sum(group => group.Failed),
+            Cancelled = groups.Sum(group => group.Cancelled),
+            Groups = groups
+        };
+    }
+
+    private static ReportBatchLaunchEhrSummary EhrSummary(ReportBatchDocument batch)
+    {
+        var ehr = EhrName(batch.EhrSystem);
+        var rows = batch.Items
+            .OrderBy(item => item.Ordinal)
+            .Select(item => Row(item, ehr))
+            .ToList();
+        var label = BatchLabel(batch.Status);
+        var open = ReportBatchStatus.IsOpen(batch.Status);
+        return new ReportBatchLaunchEhrSummary
+        {
+            BatchId = batch.BatchId,
+            EhrSystem = ehr,
+            Status = label,
+            PillClass = PillClass(label),
+            Open = open,
+            CanCancel = open,
+            MaxConcurrency = batch.MaxConcurrency,
+            BatchHref = BatchHref(batch.BatchId),
+            Total = rows.Count,
+            Pending = rows.Count(row => row.Status == Pending),
+            InProgress = rows.Count(row => row.Status == InProgress),
+            Completed = rows.Count(row => row.Status == Completed),
+            Failed = rows.Count(row => row.Status == Failed),
+            Cancelled = rows.Count(row => row.Status == Cancelled),
+            Items = rows
+        };
+    }
+
     private static ReportBatchTrackingRow Row(ReportBatchItemDocument item, string ehr)
     {
         var label = ItemLabel(item.Status);
@@ -131,7 +192,9 @@ public static class ReportBatchDisplay
             MaxConcurrency = batch.MaxConcurrency,
             CreatedAt = Instant(batch.CreatedAt),
             FinishedAt = Instant(batch.FinishedAt),
-            Href = BatchHref(batch.BatchId)
+            Href = BatchHref(batch.BatchId),
+            LaunchId = batch.LaunchId,
+            LaunchHref = batch.LaunchId is Guid launchId ? LaunchPath(launchId) : null
         };
     }
 

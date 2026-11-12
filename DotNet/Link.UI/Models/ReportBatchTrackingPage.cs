@@ -15,6 +15,10 @@ public sealed class ReportBatchTrackingModel
 {
     public Guid BatchId { get; init; }
 
+    public Guid? LaunchId { get; init; }
+
+    public string? LaunchHref { get; init; }
+
     public string EhrSystem { get; init; } = string.Empty;
 
     public string Status { get; init; } = string.Empty;
@@ -111,4 +115,75 @@ public sealed class ReportBatchHistoryRow
     public string? FinishedAt { get; init; }
 
     public string Href { get; init; } = string.Empty;
+
+    public Guid? LaunchId { get; init; }
+
+    public string? LaunchHref { get; init; }
+}
+
+public sealed class ReportBatchLaunchSummaryPage
+{
+    public bool Ready { get; init; }
+
+    public bool Found { get; init; }
+
+    public string? Message { get; init; }
+
+    public ReportBatchLaunchSummary? Launch { get; init; }
+}
+
+public sealed class ReportBatchLaunchSummary
+{
+    public Guid LaunchId { get; init; }
+
+    public bool Open { get; init; }
+
+    public bool CanCancel { get; init; }
+
+    public int Total { get; init; }
+
+    public int Pending { get; init; }
+
+    public int InProgress { get; init; }
+
+    public int Completed { get; init; }
+
+    public int Failed { get; init; }
+
+    public int Cancelled { get; init; }
+
+    public IReadOnlyList<ReportBatchLaunchEhrSummary> Groups { get; init; } = [];
+}
+
+public sealed class ReportBatchLaunchEhrSummary
+{
+    public Guid BatchId { get; init; }
+
+    public string EhrSystem { get; init; } = string.Empty;
+
+    public string Status { get; init; } = string.Empty;
+
+    public string PillClass { get; init; } = string.Empty;
+
+    public bool Open { get; init; }
+
+    public bool CanCancel { get; init; }
+
+    public int MaxConcurrency { get; init; }
+
+    public string BatchHref { get; init; } = string.Empty;
+
+    public int Total { get; init; }
+
+    public int Pending { get; init; }
+
+    public int InProgress { get; init; }
+
+    public int Completed { get; init; }
+
+    public int Failed { get; init; }
+
+    public int Cancelled { get; init; }
+
+    public IReadOnlyList<ReportBatchTrackingRow> Items { get; init; } = [];
 }

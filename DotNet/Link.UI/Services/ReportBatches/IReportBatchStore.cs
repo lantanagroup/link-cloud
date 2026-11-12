@@ -14,6 +14,9 @@ public interface IReportBatchStore
 
     /// <summary>Newest batches first. The caller chooses how many.</summary>
     Task<IReadOnlyList<ReportBatchDocument>> ListRecentAsync(int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>Every batch that belongs to one launch. The caller sorts them.</summary>
+    Task<IReadOnlyList<ReportBatchDocument>> ListByLaunchAsync(Guid launchId, CancellationToken cancellationToken = default);
 }
 
 public interface IReportBatchSettingsStore
