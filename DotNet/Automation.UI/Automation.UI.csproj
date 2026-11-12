@@ -34,5 +34,8 @@
     <Compile Include="..\Link.UI\Models\AutomationModels.cs" Link="LinkModels\AutomationModels.cs" />
     <Compile Include="..\Link.UI\Models\AdminBffUser.cs" Link="LinkModels\AdminBffUser.cs" />
     <Compile Include="..\Link.UI\Services\AdminBffUserService.cs" Link="LinkServices\AdminBffUserService.cs" />
+    <!-- Run start now resolves a named EHR system. Those types live beside the engine. -->
+    <Compile Include="..\Link.UI\Services\EhrSystems\EhrSystemCatalog.cs" Link="LinkServices\EhrSystemCatalog.cs" />
+    <Compile Include="..\Link.UI\Services\EhrSystems\EhrSystemRunSelector.cs" Link="LinkServices\EhrSystemRunSelector.cs" />
   </ItemGroup>
 </Project>

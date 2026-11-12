@@ -36,6 +36,8 @@ COPY ["DotNet/Link.UI/Services/AutomationRules.cs", "DotNet/Link.UI/Services/Aut
 COPY ["DotNet/Link.UI/Models/AutomationModels.cs", "DotNet/Link.UI/Models/AutomationModels.cs"]
 COPY ["DotNet/Link.UI/Models/AdminBffUser.cs", "DotNet/Link.UI/Models/AdminBffUser.cs"]
 COPY ["DotNet/Link.UI/Services/AdminBffUserService.cs", "DotNet/Link.UI/Services/AdminBffUserService.cs"]
+COPY ["DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs", "DotNet/Link.UI/Services/EhrSystems/EhrSystemCatalog.cs"]
+COPY ["DotNet/Link.UI/Services/EhrSystems/EhrSystemRunSelector.cs", "DotNet/Link.UI/Services/EhrSystems/EhrSystemRunSelector.cs"]
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
