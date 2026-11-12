@@ -19,7 +19,10 @@ public sealed class DocumentsEndpoints : IApi
                 return result.Status switch
                 {
                     DocumentStatus.Ok => Results.File(result.Content!, result.ContentType!, result.FileName),
-                    DocumentStatus.NotFound => Results.NotFound(new {message = "The requested document was not found."}),
+                    DocumentStatus.NotFound => Results.Problem(
+                        title: "Document not found",
+                        detail: "The requested document was not found.",
+                        statusCode: StatusCodes.Status404NotFound),
                     DocumentStatus.DirectoryUnavailable => Results.Problem(
                         title: "Document resources unavailable",
                         statusCode: StatusCodes.Status503ServiceUnavailable),
