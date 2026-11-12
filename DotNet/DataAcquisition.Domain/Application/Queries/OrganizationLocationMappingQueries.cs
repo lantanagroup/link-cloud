@@ -13,6 +13,15 @@ public interface IOrganizationLocationMappingQueries
     Task<OrganizationLocationMappingModel> GetByIdAsync(int locationMappingId);
     Task<OrganizationLocationMappingModel?> GetByFacilityIdAndLocationIdAsync(string facilityId, string locationId);
     Task<List<OrganizationLocationMappingModel>> GetByFacilityIdAsync(string facilityId);
+
+    /// <summary>
+    /// Returns the facility's mappings for the given location ids. An id with no mapping is absent from the result.
+    /// </summary>
+    Task<List<OrganizationLocationMappingModel>> GetByFacilityIdAndLocationIdsAsync(
+        string facilityId,
+        IReadOnlyCollection<string> locationIds,
+        CancellationToken cancellationToken = default);
+
     Task<PagedConfigModel<OrganizationLocationMappingModel>> SearchAsync(
         OrganizationLocationMappingSearchModel search,
         int pageNumber = 1,
@@ -95,6 +104,35 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
             })
             .OrderBy(m => m.LocationName)
             .ToListAsync();
+    }
+
+    public async Task<List<OrganizationLocationMappingModel>> GetByFacilityIdAndLocationIdsAsync(
+        string facilityId,
+        IReadOnlyCollection<string> locationIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (locationIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.OrganizationLocationMappings
+            .Where(m => m.FacilityId == facilityId && m.LocationId != null && locationIds.Contains(m.LocationId))
+            .Select(m => new OrganizationLocationMappingModel
+            {
+                LocationMappingId = m.LocationMappingId,
+                FacilityId = m.FacilityId,
+                LocationId = m.LocationId,
+                LocationName = m.LocationName,
+                LocationAlias = m.LocationAlias,
+                PartOfValue = m.PartOfValue,
+                PartOfId = m.PartOfId,
+                IsOrgLocation = m.IsOrgLocation,
+                CreateDate = m.CreateDate,
+                ModifiedDate = m.ModifiedDate,
+                IsActive = m.IsActive
+            })
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<PagedConfigModel<OrganizationLocationMappingModel>> SearchAsync(

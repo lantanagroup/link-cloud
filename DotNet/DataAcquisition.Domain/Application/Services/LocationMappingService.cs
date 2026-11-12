@@ -661,7 +661,8 @@ public class LocationMappingService(
         else
         {
             //use the locationIds to get any existing location mappings and see if they are mapped to the org
-            var existingMappings = await organizationLocationMappingQueries.GetByFacilityIdAsync(facilityId);
+            var existingMappings = await _organizationLocationMappingQueries
+                .GetByFacilityIdAndLocationIdsAsync(facilityId, locationIds, cancellationToken);
             foreach(var locationId in locationIds)
             {
                 var existingMapping = existingMappings.FirstOrDefault(m => m.LocationId == locationId);
@@ -710,7 +711,7 @@ public class LocationMappingService(
             }
         }
         
-        return await _encounterMappingManager.CreateAsync(new CreateEncounterMappingModel
+        return await _encounterMappingManager.CreateFromAcquisitionAsync(new CreateEncounterMappingModel
             {
                 FacilityId = facilityId,
                 PatientId = patientId,

@@ -192,6 +192,35 @@ public class EncounterMappingManagerUnitTests
     }
 
     [Fact]
+    public async Task CreateFromAcquisitionAsync_ValidModel_SkipsFacilityAndPatientChecks()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = "Pat1" };
+
+        _mockMappingRepo
+            .Setup(r => r.AddAsync(It.IsAny<EncounterMapping>()))
+            .ReturnsAsync((EncounterMapping e) => e);
+
+        await _manager.CreateFromAcquisitionAsync(model);
+
+        _mockFhirQueryConfigRepo.Verify(
+            r => r.AnyAsync(It.IsAny<Expression<Func<FhirQueryConfiguration, bool>>>()),
+            Times.Never);
+        _mockDataAcqLogRepo.Verify(
+            r => r.AnyAsync(It.IsAny<Expression<Func<DataAcquisitionLog, bool>>>()),
+            Times.Never);
+        _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>()), Times.Once);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateFromAcquisitionAsync_EmptyPatientId_ThrowsArgumentException()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = string.Empty };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _manager.CreateFromAcquisitionAsync(model));
+    }
+
+    [Fact]
     public async Task CreateAsync_NonExistentOrganizationLocationMappingId_ThrowsBadRequestException()
     {
         // Arrange: not a duplicate, but the insert trips the EncounterLocation -> OrganizationLocationMapping

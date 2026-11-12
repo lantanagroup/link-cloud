@@ -870,7 +870,10 @@ public class LocationMappingServiceTests
         const string nonOrgLocationId = "loc-nonorg";
 
         _mockQueries
-            .Setup(q => q.GetByFacilityIdAsync(FacilityId))
+            .Setup(q => q.GetByFacilityIdAndLocationIdsAsync(
+                FacilityId,
+                It.IsAny<IReadOnlyCollection<string>>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OrganizationLocationMappingModel>
             {
                 new() { LocationMappingId = 1, FacilityId = FacilityId, LocationId = orgLocationId, IsOrgLocation = true },
@@ -879,7 +882,7 @@ public class LocationMappingServiceTests
 
         CreateEncounterMappingModel? captured = null;
         _mockEncounterMappingManager
-            .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
+            .Setup(m => m.CreateFromAcquisitionAsync(It.IsAny<CreateEncounterMappingModel>()))
             .Callback<CreateEncounterMappingModel>(m => captured = m)
             .ReturnsAsync((CreateEncounterMappingModel m) => new EncounterMappingModel
             {
@@ -907,6 +910,45 @@ public class LocationMappingServiceTests
         // Assert — at least one referenced location is an org location → mapped to org.
         Assert.NotNull(captured);
         Assert.True(captured!.MappedToOrg);
+    }
+
+    [Fact]
+    public async Task UpdateEncounterLocationMappingAsync_ReferencedLocations_LoadsOnlyThoseMappings()
+    {
+        _mockQueries
+            .Setup(q => q.GetByFacilityIdAndLocationIdsAsync(
+                FacilityId,
+                It.IsAny<IReadOnlyCollection<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrganizationLocationMappingModel>
+            {
+                new() { LocationMappingId = 1, FacilityId = FacilityId, LocationId = "loc-a", IsOrgLocation = true }
+            });
+
+        _mockEncounterMappingManager
+            .Setup(m => m.CreateFromAcquisitionAsync(It.IsAny<CreateEncounterMappingModel>()))
+            .ReturnsAsync(new EncounterMappingModel());
+
+        var encounter = new Encounter
+        {
+            Id = "enc-1",
+            Subject = new ResourceReference("Patient/patient-1"),
+            Location = new List<Encounter.LocationComponent>
+            {
+                new() { Location = new ResourceReference("Location/loc-a") },
+                new() { Location = new ResourceReference("Location/loc-a") }
+            }
+        };
+
+        await _service.UpdateEncounterLocationMappingAsync(FacilityId, encounter, CancellationToken.None);
+
+        _mockQueries.Verify(q => q.GetByFacilityIdAndLocationIdsAsync(
+                FacilityId,
+                It.Is<IReadOnlyCollection<string>>(ids => ids.Count == 1 && ids.Contains("loc-a")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        _mockQueries.Verify(q => q.GetByFacilityIdAsync(It.IsAny<string>()), Times.Never);
+        _mockEncounterMappingManager.Verify(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()), Times.Never);
     }
 
     [Fact]
