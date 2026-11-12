@@ -108,7 +108,7 @@ else if (batch is not null)
                                             </td>
                                             <td>@item.EhrSystem</td>
                                             <td data-nocopy><span class="badge @item.PillClass" data-item-status>@item.Status</span></td>
-                                            <td class="text-break" data-item-error>@(item.Error ?? "—")</td>
+                                            <td class="text-break"><span data-item-error>@(item.Error ?? "—")</span></td>
                                             <td data-item-run-cell>
                                                 @if (item.RunHref is not null && item.RunId is Guid runId)
                                                 {

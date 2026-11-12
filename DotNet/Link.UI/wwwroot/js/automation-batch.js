@@ -57,10 +57,7 @@
     }
 
     function apply(page) {
-        if (!page || !page.found || !page.batch) {
-            stop();
-            return;
-        }
+        if (!page || !page.found || !page.batch) return;
 
         var batch = page.batch;
         var status = document.getElementById("batchStatus");
@@ -91,7 +88,10 @@
                     itemStatus.className = "badge " + (item.pillClass || "au-badge-muted");
                 }
                 var error = row.querySelector("[data-item-error]");
-                if (error) error.textContent = item.error || "—";
+                if (error) {
+                    var next = item.error || "—";
+                    if (error.textContent !== next) error.textContent = next;
+                }
                 paintRun(row.querySelector("[data-item-run-cell]"), item);
             });
         });
@@ -104,10 +104,12 @@
         var current = ++ticket;
         fetch(url, { headers: { "Accept": "application/json" }, cache: "no-store" })
             .then(function (response) {
-                if (!response.ok) {
+                if (current !== ticket) return null;
+                if (response.status === 404) {
                     stop();
                     return null;
                 }
+                if (!response.ok) return null;
                 return response.json();
             })
             .then(function (page) {

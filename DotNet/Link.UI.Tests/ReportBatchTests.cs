@@ -617,10 +617,15 @@ public class ReportBatchTests
         var history = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/ReportBatchTracking/History.cshtml"));
         history.Should().Contain("No batches yet.");
 
+        detail.Should().Contain("<span data-item-error>");
+
         var script = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/automation-batch.js"));
         script.Should().Contain("2000");
         script.Should().NotContain("signalR");
         script.Should().NotContain("/api/report-batches");
+        script.Should().Contain("if (response.status === 404)");
+        script.Should().Contain("if (!response.ok) return null;");
+        script.Should().Contain("if (error.textContent !== next) error.textContent = next;");
     }
 
     private const string ParallelRunSafetyMessage =
