@@ -38,6 +38,7 @@ public class ReportBatchLaunchTests
         model.EhrSystems[0].Ready.Should().BeTrue();
         model.Scenarios.Select(scenario => scenario.Id).Should().Equal(adhoc.Id, scheduled.Id, regenerate.Id);
         model.Scenarios.Select(scenario => scenario.Group).Should().Equal("Ad-hoc", "Scheduled", "Scheduled");
+        model.Scenarios.Single(scenario => scenario.Id == adhoc.Id).ReportMethodLabel.Should().Be("Ad-hoc");
         model.Scenarios.Single(scenario => scenario.Id == scheduled.Id).ReportMethodLabel.Should().Be("Scheduled report");
         model.Scenarios.Single(scenario => scenario.Id == regenerate.Id).Group.Should().Be("Scheduled");
 
@@ -128,11 +129,15 @@ public class ReportBatchLaunchTests
     {
         var harness = new LaunchHarness();
         var scenario = harness.AddScenario("alpha");
-        scenario.ReportPeriodStart = null;
         scenario.ReportPeriodEnd = null;
 
-        var missingPeriod = await Rejected(harness, "local", [scenario.Id], 1, 1);
-        missingPeriod.Errors.Should().Contain("alpha needs a report period.");
+        var startOnly = await Rejected(harness, "local", [scenario.Id], 1, 1);
+        startOnly.Errors.Should().Contain("alpha needs both ends of the report period.");
+
+        scenario.ReportPeriodStart = null;
+        scenario.ReportPeriodEnd = new DateTimeOffset(2024, 1, 31, 0, 0, 0, TimeSpan.Zero);
+        var endOnly = await Rejected(harness, "local", [scenario.Id], 1, 1);
+        endOnly.Errors.Should().Contain("alpha needs both ends of the report period.");
 
         scenario.ReportPeriodStart = new DateTimeOffset(2024, 2, 1, 0, 0, 0, TimeSpan.Zero);
         scenario.ReportPeriodEnd = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -143,6 +148,22 @@ public class ReportBatchLaunchTests
         scenario.PatientCount = 0;
         var missingPatients = await Rejected(harness, "local", [scenario.Id], 1, 1);
         missingPatients.Errors.Should().Contain("alpha needs a patient source.");
+    }
+
+    [Fact]
+    public async Task A_scenario_with_no_period_and_patients_is_accepted()
+    {
+        var harness = new LaunchHarness();
+        var scenario = harness.AddScenario("seeded");
+        scenario.ReportPeriodStart = null;
+        scenario.ReportPeriodEnd = null;
+
+        var result = await harness.Controller().Index("local", [scenario.Id], 1, 1, CancellationToken.None);
+
+        var batch = harness.Batches.Only();
+        result.Should().BeOfType<RedirectResult>().Which.Url
+            .Should().Be("/Automation/ReportBatches/" + batch.BatchId.ToString("D"));
+        batch.Items.Should().ContainSingle().Which.ScenarioId.Should().Be(scenario.Id);
     }
 
     [Fact]

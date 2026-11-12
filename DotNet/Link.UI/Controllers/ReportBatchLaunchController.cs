@@ -285,9 +285,12 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
     private static void AddScenarioErrors(TestScenarioDefinition scenario, List<string> errors)
     {
         var name = string.IsNullOrWhiteSpace(scenario.Name) ? scenario.Id.ToString() : scenario.Name.Trim();
-        if (scenario.ReportPeriodStart is null || scenario.ReportPeriodEnd is null)
-            errors.Add($"{name} needs a report period.");
-        else if (scenario.ReportPeriodStart.Value > scenario.ReportPeriodEnd.Value)
+        var start = scenario.ReportPeriodStart;
+        var end = scenario.ReportPeriodEnd;
+        // Both ends null is valid. The run uses the system default window.
+        if ((start is null) != (end is null))
+            errors.Add($"{name} needs both ends of the report period.");
+        else if (start is not null && end is not null && start.Value > end.Value)
             errors.Add($"{name} has a report period that starts after it ends.");
 
         if (!HasPatientSource(scenario))
@@ -326,7 +329,7 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
 
     private static string MethodLabel(ReportMethod method) => method switch
     {
-        ReportMethod.Adhoc => "Adhoc",
+        ReportMethod.Adhoc => "Ad-hoc",
         ReportMethod.ScheduledReport => "Scheduled report",
         ReportMethod.RegenerateReport => "Regenerate report",
         _ => method.ToString()
