@@ -56,6 +56,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final AbsResourceService absResourceService;
     private final ResourceCacheCleanup cacheCleanup;
     private final MongoOperations mongoOperations;
+    private final ReportStatusUpdatedProducer reportStatusUpdatedProducer;
 
     public AbstractResourceConsumer (
             PatientReportingEvaluationStatusRepository patientStatusRepository,
@@ -68,7 +69,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             ConsumerRecordRecoverer recoverer, MeasureReportGeneratedProducer measureReportGeneratedProducer,
             RedisResourceService redisResourceService,
             AbsResourceService absResourceService,
-            MongoOperations mongoOperations) {
+            MongoOperations mongoOperations, ReportStatusUpdatedProducer reportStatusUpdatedProducer) {
         super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
         this.measureReportGeneratedProducer = measureReportGeneratedProducer;
@@ -83,10 +84,12 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.absResourceService = absResourceService;
         this.cacheCleanup = new ResourceCacheCleanup(redisResourceService, absResourceService);
         this.mongoOperations = mongoOperations;
+        this.reportStatusUpdatedProducer = reportStatusUpdatedProducer;
     }
 
     @Override
     protected void process(ConsumerRecord<ResourceKey, T> record) {
+        long processingStarted = System.nanoTime();
         boolean perf = performanceLogger.isInfoEnabled();
         StopWatch totalStopWatch = perf ? new StopWatch() : null;
         StopWatch taskStopWatch = perf ? new StopWatch() : null;
@@ -230,6 +233,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                         resources.size(), correlationId);
             }
 
+            reportStatusUpdatedProducer.publishSuccess(patientStatus, value.getQueryType(),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - processingStarted), record.headers());
+
             // Cleanup runs ONLY when processing succeeded. A thrown exception must leave the cache
             // intact: the recoverer may route the record to -Retry, and the redelivered record needs
             // its cached resources. Terminal (dead-letter) cleanup is the recoverer's job — it is the
@@ -245,6 +251,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 }
             }
 
+        } catch (RuntimeException ex) {
+            reportStatusUpdatedProducer.noteFailedAttempt(record,
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - processingStarted));
+            throw ex;
         } finally {
             // A task may still be running if we got here by way of an exception; stop it so that its
             // elapsed time is reported.
@@ -502,11 +512,14 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         });
         org.apache.kafka.common.header.Headers headers = new RecordHeaders().add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
         Headers.copyMetricsMode(inboundHeaders, headers);
-        dataAcquisitionRequestedTemplate.send(new ProducerRecord<>(
-                Topics.DATA_ACQUISITION_REQUESTED,
-                null,
-                patientStatus.getFacilityId(),
-                valueDa,
-                headers));
+        try {
+            dataAcquisitionRequestedTemplate.send(new ProducerRecord<>(
+                    Topics.DATA_ACQUISITION_REQUESTED, null, patientStatus.getFacilityId(), valueDa, headers)).get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Failed to produce DataAcquisitionRequested message", ex);
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to produce DataAcquisitionRequested message", ex);
+        }
     }
 }

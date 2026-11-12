@@ -39,6 +39,29 @@ import static org.mockito.Mockito.*;
 class KafkaConfigTest {
 
     @Test
+    @SuppressWarnings("unchecked")
+    void statusSerializersUseCanonicalWireContract() throws Exception {
+        var config = new KafkaConfig();
+        var mapper = new LinkConfig().objectMapper(new org.springframework.http.converter.json.Jackson2ObjectMapperBuilder());
+        var keySerializer = (Serializer<Object>) config.keySerializer(mapper);
+        var valueSerializer = (Serializer<Object>) config.valueSerializer(mapper);
+        var key = new com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdatedKey("report-1", "patient-1");
+        assertEquals("{\"reportId\":\"report-1\",\"patientId\":\"patient-1\"}",
+                new String(keySerializer.serialize("ReportStatusUpdated", key), java.nio.charset.StandardCharsets.UTF_8));
+        var timestamp = java.time.OffsetDateTime.parse("2026-11-10T20:00:00Z");
+        var event = com.lantanagroup.link.shared.kafka.records.reportstatus.ReportStatusUpdated.builder()
+                .reportScheduleId("report-1").patientId("patient-1").correlationId("correlation-1")
+                .status(com.lantanagroup.link.shared.kafka.records.reportstatus.PatientReportingStatus.INITIAL_EVALUATION)
+                .success(true).reportable(false).timestamp(timestamp).build();
+        var json = mapper.readTree(valueSerializer.serialize("ReportStatusUpdated", event));
+        assertEquals("InitialEvaluation", json.get("status").asText());
+        assertTrue(json.get("isSuccess").asBoolean());
+        assertFalse(json.get("reportable").asBoolean());
+        assertEquals(timestamp, java.time.OffsetDateTime.parse(json.get("timestamp").asText()));
+        assertFalse(json.has("validationResult"));
+    }
+
+    @Test
     void keySerializer_ShouldHandleResourceKey() {
         KafkaConfig kafkaConfig = new KafkaConfig();
         ObjectMapper objectMapper = new ObjectMapper();

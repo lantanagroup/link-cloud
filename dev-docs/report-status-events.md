@@ -132,6 +132,37 @@ Messages lacking a patient id, correlation id, report id, or recognized phase ca
 status event. The status producer uses the canonical report/patient key and Murmur2 partitioning,
 and propagates the correlation and metrics-mode headers.
 
+## MeasureEval producer
+
+MeasureEval emits `InitialEvaluation` or `SupplementalEvaluation` once per distinct report/patient
+after evaluation, persistence, and the downstream handoff have succeeded. Both
+`DataAcquisitionRequested` (initial reportable patients) and `MeasureReportGenerated` sends wait for
+Kafka acknowledgement; an asynchronous send failure therefore follows the inbound retry path.
+Initial events include `reportable`, true if any measure in that report is reportable. Supplemental
+events omit it and exclude reports already completed as not reportable during initial evaluation.
+An empty initial bundle retains the existing successful, not-reportable outcome.
+
+Regeneration (`EvaluationRequested`) performs reportability and final evaluation together without
+acquisition. After its downstream handoffs it reports initial completion and, for reportable reports,
+supplemental completion against the new report id and workflow correlation id.
+
+Durations exclude consumer lag. `X-Evaluation-Completed-At-<phase>` and
+`X-Evaluation-Processing-Time-<phase>` preserve the original successful occurrence and duration on
+source-record redelivery. Status sends wait for Kafka acknowledgement and use Kafka's producer
+retries. A failed status send is logged with report, patient, stage, and correlation identifiers;
+it does not retry evaluation, republish downstream events, or prevent normal cache cleanup and source
+acknowledgement. Publication continues for other reports and regeneration stages. Status delivery is
+best effort after producer retries; an exhausted send can leave a missing status event.
+
+Direct dead letters, disabled retries, and exhausted retries report `isSuccess=false` for the failed
+evaluation phase. Temporary failures emit no failure status. The terminal hook runs after durable
+dead-letter publication and still releases the cache if status publication fails. As with the shared
+recoverer, terminal diagnostic publication is best effort after Kafka producer retries. Failures
+include the exception type and its message, sanitized with the shared `LogUtils` helper. When the
+message is absent or blank, only the exception type is included.
+Malformed messages without report/patient/correlation identity cannot emit a valid status event.
+Status records use the canonical key, default Java key hashing, and correlation/metrics-mode headers.
+
 ## Contract checks
 
 The fixtures in `Java/shared/src/test/resources/report-status/` are shared with .NET ServiceTests.
