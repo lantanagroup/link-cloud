@@ -57,8 +57,7 @@
       "kind": "sql",
       "store": "ReportEntry",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "schema: one row per (report, patient)",
+      "multiplier_source": "schema: one row per (report, patient); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "schema",
       "bytes_per_row": 450,
       "anchor": "report",
@@ -74,7 +73,13 @@
         "attribution": {
           "key": "ReportScheduleId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "report.EntryMeasureReport",
@@ -82,8 +87,7 @@
       "kind": "sql",
       "store": "EntryMeasureReport",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "schema: one per entry per measure (one measure per ACH report)",
+      "multiplier_source": "schema: one per entry per measure (one measure per ACH report); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "schema",
       "bytes_per_row": 350,
       "anchor": "report",
@@ -100,7 +104,13 @@
           "key": "p.ReportScheduleId",
           "from": "dbo.EntryMeasureReport t JOIN dbo.ReportEntry p ON p.Id = t.ReportEntryId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "report.ResourceCount",
@@ -108,8 +118,7 @@
       "kind": "sql",
       "store": "ResourceCount",
       "grain": "patient_report",
-      "multiplier": 10,
-      "multiplier_source": "prior: ~10 resource types acquired (Performance Model query table)",
+      "multiplier_source": "prior: ~10 resource types acquired (Performance Model query table); as drivers: 11.1111 per reportable (10 per entry at the decided drivers; was 10)",
       "multiplier_status": "prior",
       "bytes_per_row": 60,
       "anchor": "report",
@@ -126,7 +135,14 @@
           "key": "p.ReportScheduleId",
           "from": "dbo.ResourceCount t JOIN dbo.EntryMeasureReport m ON m.Id = t.MeasureReportId JOIN dbo.ReportEntry p ON p.Id = m.ReportEntryId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 11.1111111111
+        }
+      ],
+      "notes": "One row per resource type per measure report, written for reportable entries only, so it scales with the reportable share but not with record size."
     },
     {
       "id": "report.ReportResource",
@@ -211,8 +227,7 @@
       "kind": "sql",
       "store": "MeasureReportPopulation",
       "grain": "patient_report",
-      "multiplier": 2,
-      "multiplier_source": "placeholder: populations each patient is counted in",
+      "multiplier_source": "placeholder: populations each patient is counted in; as drivers: 2.22222 per reportable (2 per entry at the decided drivers; was 2)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 80,
       "anchor": "report",
@@ -229,7 +244,13 @@
           "key": "p.ReportScheduleId",
           "from": "dbo.MeasureReportPopulation t JOIN dbo.GroupPopulation g ON g.Id = t.GroupPopulationId JOIN dbo.ReportPopulation p ON p.Id = g.ReportPopulationId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 2.22222222222
+        }
+      ]
     },
     {
       "id": "report.ReportEntryMappingOutcome",
@@ -237,8 +258,7 @@
       "kind": "sql",
       "store": "ReportEntryMappingOutcome",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "schema: one per (report, patient)",
+      "multiplier_source": "schema: one per (report, patient); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "report",
@@ -256,7 +276,13 @@
         "attribution": {
           "key": "ReportScheduleId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "report.RetentionCleanup",
@@ -359,8 +385,7 @@
       "kind": "sql",
       "store": "DataAcquisitionLogs",
       "grain": "patient_report",
-      "multiplier": 8.4,
-      "multiplier_source": "prior: ~8.4 logs per patient (Performance Model, one week, 2,991 patients)",
+      "multiplier_source": "prior: ~8.4 logs per patient (Performance Model, one week, 2,991 patients); as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
       "multiplier_status": "prior",
       "bytes_per_row": 600,
       "anchor": "report",
@@ -371,9 +396,21 @@
         "service": "dataacquisition",
         "table": "dbo.DataAcquisitionLog",
         "attribution": {
-          "key": "ReportTrackingId"
+          "key": "ReportTrackingId",
+          "phase": "QueryPhase"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 4.42105263158
+        },
+        {
+          "driver": "reportable",
+          "per": 4.42105263158
+        }
+      ],
+      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
     },
     {
       "id": "da.FhirQuery",
@@ -381,8 +418,7 @@
       "kind": "sql",
       "store": "FhirQueries",
       "grain": "patient_report",
-      "multiplier": 8.4,
-      "multiplier_source": "placeholder: one query per log",
+      "multiplier_source": "placeholder: one query per log; as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 500,
       "anchor": "report",
@@ -394,9 +430,21 @@
         "table": "dbo.FhirQuery",
         "attribution": {
           "key": "l.ReportTrackingId",
-          "from": "dbo.FhirQuery t JOIN dbo.DataAcquisitionLog l ON l.Id = t.DataAcquisitionLogId"
+          "from": "dbo.FhirQuery t JOIN dbo.DataAcquisitionLog l ON l.Id = t.DataAcquisitionLogId",
+          "phase": "l.QueryPhase"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 4.42105263158
+        },
+        {
+          "driver": "reportable",
+          "per": 4.42105263158
+        }
+      ],
+      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
     },
     {
       "id": "da.FhirQueryResourceType",
@@ -404,8 +452,7 @@
       "kind": "sql",
       "store": "FhirQueryResourceTypes",
       "grain": "patient_report",
-      "multiplier": 8.4,
-      "multiplier_source": "placeholder: one resource type per query",
+      "multiplier_source": "placeholder: one resource type per query; as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 50,
       "anchor": "report",
@@ -417,9 +464,21 @@
         "table": "dbo.FhirQueryResourceType",
         "attribution": {
           "key": "l.ReportTrackingId",
-          "from": "dbo.FhirQueryResourceType t JOIN dbo.FhirQuery q ON q.Id = t.FhirQueryId JOIN dbo.DataAcquisitionLog l ON l.Id = q.DataAcquisitionLogId"
+          "from": "dbo.FhirQueryResourceType t JOIN dbo.FhirQuery q ON q.Id = t.FhirQueryId JOIN dbo.DataAcquisitionLog l ON l.Id = q.DataAcquisitionLogId",
+          "phase": "l.QueryPhase"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 4.42105263158
+        },
+        {
+          "driver": "reportable",
+          "per": 4.42105263158
+        }
+      ],
+      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
     },
     {
       "id": "da.ResourceReferenceType",
@@ -427,8 +486,7 @@
       "kind": "sql",
       "store": "ResourceReferenceType",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder: reference resource types per patient-report",
+      "multiplier_source": "placeholder: reference resource types per patient-report; as drivers: 0.001 per resources (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 150,
       "anchor": "report",
@@ -442,7 +500,13 @@
           "key": "l.ReportTrackingId",
           "from": "dbo.ResourceReferenceType t JOIN dbo.FhirQuery q ON q.Id = t.FhirQueryId JOIN dbo.DataAcquisitionLog l ON l.Id = q.DataAcquisitionLogId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "resources",
+          "per": 0.001
+        }
+      ]
     },
     {
       "id": "da.DataAcquisitionLogNote",
@@ -450,8 +514,7 @@
       "kind": "sql",
       "store": "DataAcquisitionLogNotes",
       "grain": "patient_report",
-      "multiplier": 8.4,
-      "multiplier_source": "placeholder: one note per log",
+      "multiplier_source": "placeholder: one note per log; as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 300,
       "anchor": "report",
@@ -463,9 +526,21 @@
         "table": "dbo.DataAcquisitionLogNotes",
         "attribution": {
           "key": "l.ReportTrackingId",
-          "from": "dbo.DataAcquisitionLogNotes t JOIN dbo.DataAcquisitionLog l ON l.Id = t.DataAcquisitionLogId"
+          "from": "dbo.DataAcquisitionLogNotes t JOIN dbo.DataAcquisitionLog l ON l.Id = t.DataAcquisitionLogId",
+          "phase": "l.QueryPhase"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 4.42105263158
+        },
+        {
+          "driver": "reportable",
+          "per": 4.42105263158
+        }
+      ],
+      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
     },
     {
       "id": "da.DataAcquisitionLogResourceId",
@@ -473,9 +548,8 @@
       "kind": "sql",
       "store": "DataAcquisitionLogResourceIds",
       "grain": "patient_report",
-      "multiplier": 708,
-      "multiplier_source": "prior: ~708 resources acquired per patient (Performance Model)",
-      "multiplier_status": "prior",
+      "multiplier_source": "schema: one ID row per acquired resource; as drivers: 1 per resources (1000 per entry at the decided drivers; was 708)",
+      "multiplier_status": "schema",
       "bytes_per_row": 120,
       "anchor": "report",
       "adr_action": "delete (child of log)",
@@ -488,7 +562,13 @@
           "key": "l.ReportTrackingId",
           "from": "dbo.DataAcquisitionLogResourceIds t JOIN dbo.DataAcquisitionLog l ON l.Id = t.DataAcquisitionLogId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "resources",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "da.DataAcquisitionLogReferenceResource",
@@ -520,8 +600,7 @@
       "kind": "sql",
       "store": "PendingReferenceIds",
       "grain": "patient_report",
-      "multiplier": 20,
-      "multiplier_source": "placeholder: reference IDs recorded per patient-report",
+      "multiplier_source": "placeholder: reference IDs recorded per patient-report; as drivers: 0.02 per resources (20 per entry at the decided drivers; was 20)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 200,
       "anchor": "report",
@@ -536,7 +615,13 @@
           "key": "l.ReportTrackingId",
           "from": "dbo.PendingReferenceIds t JOIN dbo.DataAcquisitionLog l ON l.Id = t.DataAcquisitionLogId"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "resources",
+          "per": 0.02
+        }
+      ]
     },
     {
       "id": "da.ScheduledReports",
@@ -566,8 +651,7 @@
       "kind": "sql",
       "store": "EncounterMappings",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder: encounter mappings per patient-report (written by DataAcquisition during acquisition)",
+      "multiplier_source": "placeholder: encounter mappings per patient-report (written by DataAcquisition during acquisition); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 250,
       "anchor": "record_age",
@@ -581,7 +665,13 @@
         "service": "dataacquisition",
         "table": "dbo.EncounterMapping"
       },
-      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5)."
+      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5).",
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "da.EncounterLocation",
@@ -589,8 +679,7 @@
       "kind": "sql",
       "store": "EncounterLocations",
       "grain": "patient_report",
-      "multiplier": 2,
-      "multiplier_source": "placeholder: encounter locations per patient-report (written by DataAcquisition during acquisition)",
+      "multiplier_source": "placeholder: encounter locations per patient-report (written by DataAcquisition during acquisition); as drivers: 2 per entry (2 per entry at the decided drivers; was 2)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 60,
       "anchor": "record_age",
@@ -604,7 +693,13 @@
         "service": "dataacquisition",
         "table": "dbo.EncounterLocation"
       },
-      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5)."
+      "notes": "Written during acquisition, not by Census, so the grain is patient-report. No report key, so capture can't attribute rows to a report; retention doesn't cover the table (D5).",
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 2.0
+        }
+      ]
     },
     {
       "id": "da.SftpAcquisitionLog",
@@ -825,8 +920,7 @@
       "kind": "sql",
       "store": "result",
       "grain": "patient_report",
-      "multiplier": 10,
-      "multiplier_source": "placeholder: validation issues per patient-report",
+      "multiplier_source": "LEGPROG-516 decision, 2026-11-11: 100 validation results per patient-report entry; as drivers: 0.111111 per reportable x resources (100 per entry at the decided drivers; was 100)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 800,
       "anchor": "report",
@@ -839,7 +933,13 @@
         "attribution": {
           "key": "report_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable_resources",
+          "per": 0.111111111111
+        }
+      ]
     },
     {
       "id": "validation.result_category",
@@ -847,8 +947,7 @@
       "kind": "sql",
       "store": "result_category",
       "grain": "patient_report",
-      "multiplier": 10,
-      "multiplier_source": "placeholder: one category per result",
+      "multiplier_source": "LEGPROG-516 decision, 2026-11-11: 100 validation results per patient-report entry; one category row per result; as drivers: 0.111111 per reportable x resources (100 per entry at the decided drivers; was 100)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 30,
       "anchor": "report",
@@ -862,7 +961,13 @@
           "key": "r.report_id",
           "from": "dbo.result_category t JOIN dbo.result r ON r.id = t.result_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable_resources",
+          "per": 0.111111111111
+        }
+      ]
     },
     {
       "id": "validation.patient_category_count",
@@ -870,8 +975,7 @@
       "kind": "sql",
       "store": "patient_category_count",
       "grain": "patient_report",
-      "multiplier": 5,
-      "multiplier_source": "placeholder: categories with issues per patient-report",
+      "multiplier_source": "placeholder: categories with issues per patient-report; as drivers: 5.55556 per reportable (5 per entry at the decided drivers; was 5)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 150,
       "anchor": "report",
@@ -887,7 +991,13 @@
         "attribution": {
           "key": "report_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 5.55555555556
+        }
+      ]
     },
     {
       "id": "validation.report_category_count",
@@ -945,8 +1055,7 @@
       "kind": "sql",
       "store": "rubric_result",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder: one rubric run per patient-report when the rubric engine is enabled",
+      "multiplier_source": "placeholder: one rubric run per patient-report when the rubric engine is enabled; as drivers: 1.11111 per reportable (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 1500,
       "anchor": "report",
@@ -965,7 +1074,13 @@
         "attribution": {
           "key": "report_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.11111111111
+        }
+      ]
     },
     {
       "id": "validation.rubric_finding",
@@ -973,8 +1088,7 @@
       "kind": "sql",
       "store": "rubric_finding",
       "grain": "patient_report",
-      "multiplier": 10,
-      "multiplier_source": "placeholder: findings per rubric result",
+      "multiplier_source": "placeholder: findings per rubric result; as drivers: 0.0111111 per reportable x resources (10 per entry at the decided drivers; was 10)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 600,
       "anchor": "report",
@@ -994,7 +1108,14 @@
           "key": "r.report_id",
           "from": "dbo.rubric_finding t JOIN dbo.rubric_result r ON r.result_id = t.result_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable_resources",
+          "per": 0.0111111111111
+        }
+      ],
+      "notes": "Left at 10 per entry when validation.result went to 100 (2026-11-11): the rubric engine produces its own findings, independent of the legacy result count."
     },
     {
       "id": "validation.legacy_shadow_result",
@@ -1002,8 +1123,7 @@
       "kind": "sql",
       "store": "legacy_shadow_result",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder: one per patient-report while shadow validation runs",
+      "multiplier_source": "placeholder: one per patient-report while shadow validation runs; as drivers: 1.11111 per reportable (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 300,
       "anchor": "report",
@@ -1022,7 +1142,13 @@
         "attribution": {
           "key": "report_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.11111111111
+        }
+      ]
     },
     {
       "id": "validation.legacy_shadow_finding",
@@ -1030,8 +1156,7 @@
       "kind": "sql",
       "store": "legacy_shadow_finding",
       "grain": "patient_report",
-      "multiplier": 10,
-      "multiplier_source": "placeholder: findings per shadow result",
+      "multiplier_source": "LEGPROG-516 decision, 2026-11-11: 100 validation results per patient-report entry; shadow validation re-runs the legacy engine, so its findings mirror the legacy results; as drivers: 0.111111 per reportable x resources (100 per entry at the decided drivers; was 100)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 700,
       "anchor": "report",
@@ -1051,7 +1176,13 @@
           "key": "r.report_id",
           "from": "dbo.legacy_shadow_finding t JOIN dbo.legacy_shadow_result r ON r.result_id = t.result_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable_resources",
+          "per": 0.111111111111
+        }
+      ]
     },
     {
       "id": "validation.shadow_comparison_result",
@@ -1059,8 +1190,7 @@
       "kind": "sql",
       "store": "shadow_comparison_result",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder: one comparison per patient-report while shadow validation runs",
+      "multiplier_source": "placeholder: one comparison per patient-report while shadow validation runs; as drivers: 1.11111 per reportable (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 1500,
       "anchor": "report",
@@ -1079,7 +1209,13 @@
         "attribution": {
           "key": "report_id"
         }
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.11111111111
+        }
+      ]
     },
     {
       "id": "measureeval.PatientReportingEvaluationStatus",
@@ -1087,8 +1223,7 @@
       "kind": "mongo",
       "store": "PatientReportingEvaluationStatus",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "architecture: one document per (facility, correlationId)",
+      "multiplier_source": "architecture: one document per (facility, correlationId); as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "schema",
       "bytes_per_row": 600,
       "anchor": "report",
@@ -1102,7 +1237,13 @@
         "service": "measureeval",
         "collection": "patientReportingEvaluationStatus",
         "report_key": "reports.reportTrackingId"
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.PatientEvent",
@@ -1132,9 +1273,8 @@
       "kind": "kafka",
       "store": "DataAcquisitionRequested",
       "grain": "patient_report",
-      "multiplier": 2,
-      "multiplier_source": "placeholder upper bound: initial + supplemental (1 + reportable share)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries); as drivers: 1 per entry + 1 per reportable (1.9 per entry at the decided drivers; was 2)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1146,7 +1286,17 @@
         "topics": [
           "DataAcquisitionRequested"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        },
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.ReadyToAcquire",
@@ -1154,8 +1304,7 @@
       "kind": "kafka",
       "store": "ReadyToAcquire",
       "grain": "patient_report",
-      "multiplier": 8.4,
-      "multiplier_source": "placeholder: about one message per DataAcquisitionLog (the DA log prior)",
+      "multiplier_source": "placeholder: about one message per DataAcquisitionLog (the DA log prior); as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
       "multiplier_status": "placeholder",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1168,7 +1317,18 @@
         "topics": [
           "ReadyToAcquire"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 4.42105263158
+        },
+        {
+          "driver": "reportable",
+          "per": 4.42105263158
+        }
+      ],
+      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
     },
     {
       "id": "kafka.ResourcesAcquired",
@@ -1176,9 +1336,8 @@
       "kind": "kafka",
       "store": "ResourcesAcquired",
       "grain": "patient_report",
-      "multiplier": 2,
-      "multiplier_source": "placeholder upper bound: one per phase",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries); as drivers: 1 per entry + 1 per reportable (1.9 per entry at the decided drivers; was 2)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1190,7 +1349,17 @@
         "topics": [
           "ResourcesAcquired"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        },
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.ResourcesNormalized",
@@ -1198,9 +1367,8 @@
       "kind": "kafka",
       "store": "ResourcesNormalized",
       "grain": "patient_report",
-      "multiplier": 2,
-      "multiplier_source": "placeholder upper bound: one per phase",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per acquisition pass (INITIAL for every entry, SUPPLEMENTAL for reportable entries); as drivers: 1 per entry + 1 per reportable (1.9 per entry at the decided drivers; was 2)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1212,7 +1380,17 @@
         "topics": [
           "ResourcesNormalized"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        },
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.MeasureReportGenerated",
@@ -1220,8 +1398,7 @@
       "kind": "kafka",
       "store": "MeasureReportGenerated",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "architecture: one terminal per patient-report per measure",
+      "multiplier_source": "architecture: one terminal per patient-report per measure; as drivers: 1 per entry (1 per entry at the decided drivers; was 1)",
       "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
@@ -1234,7 +1411,13 @@
         "topics": [
           "MeasureReportGenerated"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "entry",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.MappingOutcomeEvaluated",
@@ -1264,9 +1447,8 @@
       "kind": "kafka",
       "store": "ReadyForValidation",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder upper bound (reportable patients only)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1278,7 +1460,13 @@
         "topics": [
           "ReadyForValidation"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.ValidationComplete",
@@ -1286,9 +1474,8 @@
       "kind": "kafka",
       "store": "ValidationComplete",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder upper bound",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1300,7 +1487,13 @@
         "topics": [
           "ValidationComplete"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.ShadowCompareEvent",
@@ -1308,9 +1501,8 @@
       "kind": "kafka",
       "store": "ShadowCompareEvent",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder: while shadow validation runs",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1325,7 +1517,13 @@
         "topics": [
           "ShadowCompareEvent"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.SubmitPayload.patient",
@@ -1333,9 +1531,8 @@
       "kind": "kafka",
       "store": "SubmitPayload (per patient)",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "placeholder upper bound",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1347,7 +1544,13 @@
         "topics": [
           "SubmitPayload"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.PayloadSubmitted.patient",
@@ -1355,9 +1558,8 @@
       "kind": "kafka",
       "store": "PayloadSubmitted (per patient)",
       "grain": "patient_report",
-      "multiplier": 1,
-      "multiplier_source": "architecture: one per file in external/",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "schema: one message per reportable patient-report entry; as drivers: 1 per reportable (0.9 per entry at the decided drivers; was 1)",
+      "multiplier_status": "schema",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1369,7 +1571,13 @@
         "topics": [
           "PayloadSubmitted"
         ]
-      }
+      },
+      "drivers": [
+        {
+          "driver": "reportable",
+          "per": 1.0
+        }
+      ]
     },
     {
       "id": "kafka.AuditableEventOccurred",

@@ -110,6 +110,21 @@ def attribution_counts(conn, location: dict, report_ids: list[str]) -> dict[str,
     return counts
 
 
+def phase_counts(conn, location: dict, report_ids: list[str]) -> dict[str, int]:
+    """The run reports' rows split by acquisition phase (`Initial` / `Supplemental`), for stores whose
+    attribution names a `phase` column. It separates a two-pass store's per-entry and per-reportable terms."""
+    attr = location["attribution"]
+    key, phase = attr["key"], attr["phase"]
+    source = attr.get("from") or f"{location['table']} t"
+    counts: dict[str, int] = {}
+    for part in chunks(sorted(set(report_ids)), CHUNK):
+        sql = (f"SELECT CAST({phase} AS nvarchar(64)), COUNT_BIG(*) FROM {source} "
+               f"WHERE {key} IN ({_in_list(part)}) GROUP BY {phase}")
+        for name, n in _rows(conn, sql):
+            counts[name or "unknown"] = counts.get(name or "unknown", 0) + int(n)
+    return counts
+
+
 # --------------------------------------------------------------------------------------------
 # Run facts
 # --------------------------------------------------------------------------------------------

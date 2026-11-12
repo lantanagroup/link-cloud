@@ -89,7 +89,7 @@ other store is left out.
 |---|---|
 | `id`, `service`, `kind`, `store` | Identity. `kind` is `sql`, `mongo`, `kafka` or `loki`. |
 | `grain` | What one arrival unit is: `patient_report` (one patient in one report), `report`, `census_patient` (one unique patient per facility per month), `facility_day`. |
-| `multiplier` / `multiplier_param` | Rows (documents, messages; bytes for Loki) per grain unit, either literal or taken from an assumption. |
+| `multiplier` / `multiplier_param` / `drivers` | Rows (documents, messages; bytes for Loki) per grain unit. A store has exactly one of three forms: a literal; an assumption's value; or, for `patient_report` stores only, a list of **driver terms**, `[{"driver": ..., "per": ...}]`. With driver terms the multiplier is the sum of each `per` times its driver: `entry` (1), `reportable` (`share_reportable`), `resources` (`resources_per_patient`) or `reportable_resources` (their product). Terms keep a measurement independent of the run's own reportable share and record size, which synthetic data rarely gets right. |
 | `multiplier_status` | `measured`, `prior` (from earlier analysis), `placeholder`, `schema` (fixed by the data model), or `design` (fixed by an unbuilt design). |
 | `multiplier_source` | Where the value came from. For a measured value, give the environment, date and ticket. |
 | `bytes_per_row` | Average bytes per row, including indexes. These start as schema-based estimates. |
@@ -102,7 +102,7 @@ other store is left out.
 
 | `location` kind | Fields |
 |---|---|
-| sql | `service` (a key in the targets file's `sql.databases`), `table` (`schema.table`) or `tables` (summed), and optionally `attribution`: `{"key": column}`, or `{"key": "p.Column", "from": "<table> t JOIN ... p ON ..."}` when the report ID sits on a parent row |
+| sql | `service` (a key in the targets file's `sql.databases`), `table` (`schema.table`) or `tables` (summed), and optionally `attribution`: `{"key": column}`, or `{"key": "p.Column", "from": "<table> t JOIN ... p ON ..."}` when the report ID sits on a parent row. An attribution can also name a `phase` column (`QueryPhase` on the DA log); capture then splits the run's rows into `Initial` and `Supplemental`, which separates a two-pass store's `entry` and `reportable` terms. |
 | mongo | `service`, `collection` (matched case-insensitively), `report_key` (dotted path to the report ID inside an array of report entries) |
 | kafka | `topics`: summed |
 | loki | `selector` (LogQL stream selector) and `group_by` (label) |
@@ -248,12 +248,31 @@ python Scripts/capacity_model/diff_snapshots.py --apply capture-out/proposed-upd
 It refuses to run without `--source` and without explicit `--stores` and `--assumptions` paths.
 
 For each store the run supports, it:
-- sets `multiplier` and replaces any `multiplier_param`
+- sets `multiplier` and replaces any `multiplier_param`. For a store with driver terms it writes new
+  terms instead, normalized as described below, and never the run's blended multiplier.
 - sets `multiplier_status: measured`
 - sets a `multiplier_source` that combines your `--source` with the run's size, its reportable
-  share, and the rows and units behind the value
+  share, its resources per entry, the rows and units behind the value and, for driver terms, how
+  they were normalized
 - sets `bytes_per_row`
 - records `measured_by_cadence`
+
+**How driver terms are normalized.** The run's driver figures come from the run itself:
+- **entries:** patient-report entries
+- **reportable entries:** entries × the reportable share, read from MeasureEval
+- **resources:** entries × resources acquired per entry, read from `DataAcquisitionLogResourceIds`
+
+Each term's `per` is then worked out from those figures:
+- **One-term stores:** rows ÷ the run's units for that driver.
+- **Two-pass stores** (`entry` + `reportable`): the `Initial` rows ÷ entries and the `Supplemental`
+  rows ÷ reportable entries, when capture split them by phase. Otherwise, the model's own ratio
+  between the terms, scaled to the run.
+
+The summary shows each normalized store's value *at the decided drivers* beside the raw run figure.
+
+One known approximation: `reportable_resources` assumes reportable entries acquire the run's average
+resources per entry. They actually acquire more, because they also get the supplemental pass, so
+the term comes out somewhat high.
 
 It also writes the median completion lag of the run's scheduled reports to `assumptions.json`. An
 ad hoc report can cover any period, so its lag is ignored.
@@ -270,15 +289,19 @@ Rerun the model, and commit the inputs together with the regenerated tables.
 
 `tests/test_model.py` checks:
 - the baseline arrival rates (28.8 k reports and 22.5 M patient-report entries a month)
-- the aligned boundary batch (9.45 M)
-- the held-volume formulas for each anchor
+- the derived in-house census (10,000 ÷ 29 ≈ 345 per facility) and the end-of-period batch it
+  makes: about 931 k entries at the month boundary and about 310 k at an ordinary midnight
+- the held-volume formulas for each anchor, including the split between rows written through the
+  period and rows written in the end-of-period batch
+- driver terms: the effective multiplier, validation, and the shipped stores' values at the
+  decided drivers
 - the slope-and-offset scaling rule
 - throughput
 - input validation
 - that every store has a usable `location`, with no two stores measuring the same table or topic
 
 `tests/test_capture.py` runs each collector against fakes and recorded responses, covering:
-- SQL sizes, attribution, run facts, waits, blocking and deadlocks
+- SQL sizes, attribution, the phase split, run facts, waits, blocking and deadlocks
 - Mongo without aggregation
 - Kafka watermarks, sampling and lag
 - the Loki and `az` parsers
@@ -292,6 +315,8 @@ Rerun the model, and commit the inputs together with the regenerated tables.
 - wait deltas
 - series rates, queue depth, blocking and lag
 - the comparison with required rates
+- driver normalization: one-term stores, the phase split, the model-ratio fallback, a run with no
+  reportable share, and `--apply` writing driver terms
 - the proposal and `--apply`
 
 None of the tests need a live system or the capture libraries. Rerun them after any change to the

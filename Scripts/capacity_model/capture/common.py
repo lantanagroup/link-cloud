@@ -100,6 +100,8 @@ def location_errors(store: dict) -> list[str]:
         if attr is not None:
             if not _COLUMN.match(attr.get("key", "")):
                 errors.append(f"{sid}: bad attribution key {attr.get('key')!r}")
+            if "phase" in attr and not _COLUMN.match(attr["phase"]):
+                errors.append(f"{sid}: bad attribution phase column {attr['phase']!r}")
             if "from" in attr and not _FROM.match(attr["from"]):
                 errors.append(f"{sid}: attribution 'from' has unexpected characters")
             if "from" in attr and "." in attr["key"] and not attr["from"].startswith(f"{loc.get('table')} t "):

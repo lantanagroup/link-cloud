@@ -153,6 +153,11 @@ def capture_sql(session: Session, stores: list[dict], full: bool, report_ids: li
                     size["by_report"] = sql.attribution_counts(conn, s["location"], report_ids)
                 except Exception as e:  # noqa: BLE001
                     session.unavailable.add("sql", f"{s['id']} attribution", e)
+                if "phase" in s["location"]["attribution"]:
+                    try:
+                        size["by_phase"] = sql.phase_counts(conn, s["location"], report_ids)
+                    except Exception as e:  # noqa: BLE001
+                        session.unavailable.add("sql", f"{s['id']} phase split", e)
             out[s["id"]] = size
     return out
 

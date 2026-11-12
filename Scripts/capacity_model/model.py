@@ -28,6 +28,7 @@ DEFAULT_STORES = HERE / "stores.json"
 GRAINS = ("patient_report", "report", "census_patient", "facility_day")
 ANCHORS = ("report", "record_age", "own_retention", "fixed_residency", "unbounded")
 CADENCES = ("daily", "monthly")
+DRIVERS = ("entry", "reportable", "resources", "reportable_resources")
 SECONDS_PER_DAY = 86_400
 
 
@@ -71,13 +72,35 @@ def validate(a: dict, stores: list[dict]) -> None:
         if s["anchor"] in ("own_retention", "fixed_residency") and not (
                 "residency_days" in s or "residency_days_param" in s):
             raise ValueError(f"{s['id']}: anchor {s['anchor']} needs residency_days or residency_days_param")
-        if "multiplier" not in s and "multiplier_param" not in s:
-            raise ValueError(f"{s['id']}: needs multiplier or multiplier_param")
+        given = [k for k in ("multiplier", "multiplier_param", "drivers") if k in s]
+        if len(given) != 1:
+            raise ValueError(f"{s['id']}: needs exactly one of multiplier, multiplier_param or drivers, got {given}")
+        if "drivers" in s:
+            if s["grain"] != "patient_report":
+                raise ValueError(f"{s['id']}: drivers apply only to the patient_report grain")
+            for term in s["drivers"]:
+                if term.get("driver") not in DRIVERS or not isinstance(term.get("per"), (int, float)):
+                    raise ValueError(f"{s['id']}: bad driver term {term}")
+    n = inhouse_patients(a)
+    if not 0 <= n <= min(a["patients_per_daily_report"], a["patients_per_monthly_report"]):
+        raise ValueError(f"inhouse_patients_per_facility must be between 0 and the patients per report, got {n:.1f}")
 
 
 # --------------------------------------------------------------------------------------------
 # Derived arrival rates
 # --------------------------------------------------------------------------------------------
+
+def inhouse_patients(a: dict) -> float:
+    """Patients still admitted at a period boundary, per facility.
+
+    Derived unless set: with N in house at midnight and L admissions a day, a daily report sees N + L unique
+    patients and a monthly report N + days x L, so N = (days x daily - monthly) / (days - 1), about 345.
+    """
+    if a.get("inhouse_patients_per_facility") is not None:
+        return float(a["inhouse_patients_per_facility"])
+    days, daily, monthly = a["days_per_month"], a["patients_per_daily_report"], a["patients_per_monthly_report"]
+    return (days * daily - monthly) / (days - 1)
+
 
 @dataclass(frozen=True)
 class Cadence:
@@ -86,10 +109,15 @@ class Cadence:
     period_days: float
     patients_per_report: float
     reports_per_month: float
+    inhouse_per_report: float  # still admitted at period end: acquired in the end-of-period batch
 
     @property
     def entries_per_month(self) -> float:
         return self.reports_per_month * self.patients_per_report
+
+    @property
+    def inhouse_fraction(self) -> float:
+        return self.inhouse_per_report / self.patients_per_report
 
     @property
     def boundary_reports(self) -> float:
@@ -98,7 +126,8 @@ class Cadence:
 
     @property
     def boundary_entries(self) -> float:
-        return self.facilities * self.patients_per_report
+        """Entries in one aligned end-of-period batch: each facility's in-house patients."""
+        return self.facilities * self.inhouse_per_report
 
 
 @dataclass(frozen=True)
@@ -119,8 +148,13 @@ class Arrivals:
 
     @property
     def boundary_entries(self) -> float:
-        """Aligned worst case: every facility's monthly and daily batch at the month boundary."""
+        """Aligned worst case: every facility's monthly and daily in-house batch at the month boundary."""
         return sum(c.boundary_entries for c in self.cadences.values())
+
+    @property
+    def midnight_entries(self) -> float:
+        """An ordinary midnight: only the daily reports' in-house batch."""
+        return self.cadences["daily"].boundary_entries
 
     @property
     def boundary_reports(self) -> float:
@@ -133,9 +167,10 @@ def derive_arrivals(a: dict) -> Arrivals:
     daily = a["facilities"] * a["share_daily"]
     both = a["facilities"] * a["share_both"]
     distinct = monthly + daily - both
+    n = inhouse_patients(a)
     cadences = {
-        "daily": Cadence("daily", daily, 1, a["patients_per_daily_report"], daily * days),
-        "monthly": Cadence("monthly", monthly, days, a["patients_per_monthly_report"], monthly),
+        "daily": Cadence("daily", daily, 1, a["patients_per_daily_report"], daily * days, n),
+        "monthly": Cadence("monthly", monthly, days, a["patients_per_monthly_report"], monthly, n),
     }
     return Arrivals(days, distinct, both, cadences, distinct * a["census_patients_per_facility_month"])
 
@@ -146,14 +181,31 @@ def derive_arrivals(a: dict) -> Arrivals:
 
 @dataclass(frozen=True)
 class Component:
-    """One arrival stream into a store. Report-keyed grains get one per cadence."""
+    """One arrival stream into a store.
+
+    Patient-report stores get two per cadence: rows for patients discharged during the period (written
+    throughout it) and rows for in-house patients (written in the end-of-period batch). Report stores get one
+    per cadence; census and facility-day stores one in all.
+    """
     cadence: str | None
     rows_per_month: float
     period_days: float
-    boundary_rows: float | None  # rows written at an aligned period boundary; None = never batched
+    boundary_rows: float | None  # rows written in one aligned period-end batch; None = written through the period
+    at_boundary: bool = False    # the rows are written at period end, so they don't wait for it
+
+
+def driver_value(name: str, a: dict) -> float:
+    """Per patient-report entry: 1 entry, share_reportable reportable entries, resources_per_patient resources."""
+    return {"entry": 1.0,
+            "reportable": a["share_reportable"],
+            "resources": a["resources_per_patient"],
+            "reportable_resources": a["share_reportable"] * a["resources_per_patient"]}[name]
 
 
 def multiplier(store: dict, a: dict) -> float:
+    """Rows per grain unit. For a store with driver terms, the sum of each term's `per` times its driver."""
+    if "drivers" in store:
+        return sum(float(t["per"]) * driver_value(t["driver"], a) for t in store["drivers"])
     if "multiplier_param" in store:
         return float(a[store["multiplier_param"]])
     return float(store["multiplier"])
@@ -174,8 +226,12 @@ def components(store: dict, arr: Arrivals, a: dict) -> list[Component]:
     m = multiplier(store, a)
     grain = store["grain"]
     if grain == "patient_report":
-        return [Component(c.name, c.entries_per_month * m, c.period_days, c.boundary_entries * m)
-                for c in arr.cadences.values()]
+        out = []
+        for c in arr.cadences.values():
+            f = c.inhouse_fraction
+            out.append(Component(c.name, c.entries_per_month * (1 - f) * m, c.period_days, None))
+            out.append(Component(c.name, c.entries_per_month * f * m, c.period_days, c.boundary_entries * m, True))
+        return out
     if grain == "report":
         return [Component(c.name, c.reports_per_month * m, c.period_days, c.boundary_reports * m)
                 for c in arr.cadences.values()]
@@ -193,7 +249,9 @@ def residency_days(store: dict, comp: Component, a: dict, window_months: float, 
     cleanup = a["cleanup_interval_days"]
     anchor = store["anchor"]
     if anchor == "report":
-        before_period_end = comp.period_days if peak else comp.period_days / 2
+        # Peak keeps the full period for every stream: conservative, and the high-water mark doesn't depend
+        # on when within the period a row was written.
+        before_period_end = comp.period_days if peak else 0.0 if comp.at_boundary else comp.period_days / 2
         return before_period_end + a["completion_lag_days"] + window + (cleanup if peak else cleanup / 2)
     if anchor == "record_age":
         return window + (cleanup if peak else cleanup / 2)
@@ -225,15 +283,20 @@ def slope_offset(store: dict, arr: Arrivals, a: dict) -> tuple[float, float] | N
     return r, held_rows(store, arr, a, 0) / r
 
 
-def write_rates(store: dict, arr: Arrivals, a: dict, window_hours: float) -> tuple[float, float]:
-    """(steady rows/s, peak rows/s) where peak processes each batched stream's boundary rows in `window_hours`."""
-    steady = rows_per_month(store, arr, a) / (a["days_per_month"] * SECONDS_PER_DAY)
+def write_rates(store: dict, arr: Arrivals, a: dict, window_hours: float,
+                boundary: str = "month") -> tuple[float, float]:
+    """(steady rows/s, peak rows/s).
+
+    The peak processes the end-of-period batch in `window_hours` on top of every other stream's steady rate.
+    `boundary="month"` is the aligned month boundary (daily and monthly batches together); `"midnight"` is an
+    ordinary midnight, when only the daily batch lands.
+    """
+    month_seconds = a["days_per_month"] * SECONDS_PER_DAY
+    steady = rows_per_month(store, arr, a) / month_seconds
     peak = 0.0
     for c in components(store, arr, a):
-        if c.boundary_rows is None:
-            peak += c.rows_per_month / (a["days_per_month"] * SECONDS_PER_DAY)
-        else:
-            peak += c.boundary_rows / (window_hours * 3600)
+        batched = c.boundary_rows is not None and (boundary == "month" or c.cadence == "daily")
+        peak += c.boundary_rows / (window_hours * 3600) if batched else c.rows_per_month / month_seconds
     return steady, peak
 
 
@@ -299,11 +362,14 @@ def services_in_order(stores: list[dict]) -> list[str]:
 
 def section_inputs(a: dict, arr: Arrivals) -> str:
     rows = [[k, json.dumps(v)] for k, v in a.items()]
+    n = inhouse_patients(a)
     derived = [
         ["distinct enrolled facilities", fmt_count(arr.distinct_facilities)],
         ["facilities on both cadences", fmt_count(arr.both_facilities)],
         ["implied daily reports per unique patient per month",
          f"{a['patients_per_daily_report'] * a['days_per_month'] / a['patients_per_monthly_report']:.1f}"],
+        ["in-house patients per facility at a period boundary", f"{n:.1f}"],
+        ["admissions (and discharges) per facility per day", f"{a['patients_per_daily_report'] - n:.1f}"],
     ]
     return ("## Inputs\n\n" + md_table(["Parameter", "Value"], rows, "ll") + "\n\n"
             + md_table(["Derived", "Value"], derived, "lr"))
@@ -327,15 +393,25 @@ def section_arrivals(a: dict, arr: Arrivals) -> str:
         ["Acquisitions / month (one per patient-report)", fmt_count(d.entries_per_month),
          fmt_count(m.entries_per_month), fmt_count(arr.entries_per_month)],
         ["Census patients / month", "", "", fmt_count(arr.census_patients_per_month)],
-        ["Aligned boundary batch (entries)", fmt_count(d.boundary_entries), fmt_count(m.boundary_entries),
+        ["Per report: discharged during the period", fmt_count(d.patients_per_report - d.inhouse_per_report),
+         fmt_count(m.patients_per_report - m.inhouse_per_report), ""],
+        ["Per report: in house at period end (batch)", fmt_count(d.inhouse_per_report),
+         fmt_count(m.inhouse_per_report), ""],
+        ["Month-boundary batch (entries)", fmt_count(d.boundary_entries), fmt_count(m.boundary_entries),
          fmt_count(arr.boundary_entries)],
-        ["Aligned boundary batch (reports)", fmt_count(d.boundary_reports), fmt_count(m.boundary_reports),
+        ["Month-boundary batch (reports)", fmt_count(d.boundary_reports), fmt_count(m.boundary_reports),
          fmt_count(arr.boundary_reports)],
+        ["Ordinary-midnight batch (entries)", fmt_count(d.boundary_entries), "", fmt_count(arr.midnight_entries)],
     ]
     for hours in a["peak_processing_windows_hours"]:
-        rows.append([f"Boundary entries per minute in a {hours:g} h window", "", "",
-                     fmt_count(arr.boundary_entries / (hours * 60))])
-    return "## Arrival rates\n\n" + md_table(["Quantity", "Daily", "Monthly", "Total"], rows)
+        rows.append([f"Batch entries per minute in a {hours:g} h window (month boundary / ordinary midnight)",
+                     "", "", f"{fmt_count(arr.boundary_entries / (hours * 60))} / "
+                             f"{fmt_count(arr.midnight_entries / (hours * 60))}"])
+    return ("## Arrival rates\n\n"
+            "Patients discharged during a period are acquired through it, after the dispatch delay; patients "
+            "still in house at period end are acquired in the end-of-period batch (`EndOfReportPeriodJob`). "
+            "At the month boundary the daily and monthly batches land together.\n\n"
+            + md_table(["Quantity", "Daily", "Monthly", "Total"], rows))
 
 
 def section_stores(a: dict, arr: Arrivals, stores: list[dict], window: float) -> str:
@@ -345,7 +421,7 @@ def section_stores(a: dict, arr: Arrivals, stores: list[dict], window: float) ->
         steady = held_rows(s, arr, a, window)
         rows.append([
             store_label(s), s["grain"], s["anchor"],
-            f"{multiplier(s, a):g} ({s['multiplier_status']})",
+            f"{multiplier(s, a):.4g} ({s['multiplier_status']}{'; drivers' if 'drivers' in s else ''})",
             fmt_count(rows_per_month(s, arr, a)),
             fmt_count(steady), fmt_count(held_rows(s, arr, a, window, peak=True)),
             fmt_bytes(bytes_held(s, steady, a)),
@@ -392,21 +468,32 @@ def section_throughput(a: dict, arr: Arrivals, stores: list[dict]) -> str:
         steady = sum(write_rates(s, arr, a, hours[0])[0] for s in members)
         peaks = [sum(write_rates(s, arr, a, h)[1] for s in members) for h in hours]
         rows.append([service, fmt_rate(steady)] + [fmt_rate(p) for p in peaks])
+    midnight_rows = []
+    for service in services_in_order(stores):
+        members = [s for s in stores if s["service"] == service and s["kind"] != "loki"]
+        if members:
+            midnight_rows.append([service] + [fmt_rate(sum(write_rates(s, arr, a, h, "midnight")[1]
+                                                           for s in members)) for h in hours])
     top = sorted((s for s in stores if s["kind"] != "loki"),
                  key=lambda s: write_rates(s, arr, a, hours[-1])[1], reverse=True)[:10]
     top_rows = [[store_label(s), fmt_rate(write_rates(s, arr, a, hours[0])[0])]
                 + [fmt_rate(write_rates(s, arr, a, h)[1]) for h in hours] for s in top]
     headers = ["Service", "Steady"] + [f"Peak, {h:g} h window" for h in hours]
     return ("## Write throughput (rows or messages per second)\n\n"
-            "Peak = the aligned boundary batch written within the window; streams that aren't batched "
-            "(census, per-facility) contribute their steady rate.\n\n"
-            + md_table(headers, rows) + "\n\n**Ten busiest stores at peak**\n\n"
+            "Peak = the end-of-period batch of in-house patients written within the window, on top of every "
+            "other stream at its steady rate (discharges through the period, census, per-facility). The month "
+            "boundary is the worst case: every facility's daily and monthly batches land together.\n\n"
+            "**At the month boundary**\n\n"
+            + md_table(headers, rows)
+            + "\n\n**At an ordinary midnight** (daily batch only)\n\n"
+            + md_table(["Service"] + headers[2:], midnight_rows)
+            + "\n\n**Ten busiest stores at the month-boundary peak**\n\n"
             + md_table(["Store"] + headers[1:], top_rows))
 
 
 def section_d1(a: dict, arr: Arrivals, stores: list[dict], window: float) -> str:
     members = [s for s in stores if "D1" in s.get("divergences", [])]
-    horizons = [12, 36, 84]
+    horizons = [w for w in a["projection_windows_months"] if w > window]
     rows = []
     for s in members:
         bounded = bytes_held(s, held_rows(s, arr, a, window), a)
@@ -449,7 +536,8 @@ def csv_report(a: dict, stores: list[dict], window: float) -> str:
                      "slope_rows_per_retention_month", "offset_months"]
                     + [f"held_steady_{w:g}mo" for w in windows] + [f"bytes_steady_{w:g}mo" for w in windows]
                     + ["steady_rows_per_s"] + [f"peak_rows_per_s_{h:g}h" for h in hours]
-                    + ["adr_action", "analysis_action", "pi", "divergences"])
+                    + [f"midnight_peak_rows_per_s_{h:g}h" for h in hours]
+                    + ["drivers", "adr_action", "analysis_action", "pi", "divergences"])
     for s in stores:
         so = slope_offset(s, arr, a)
         steady = held_rows(s, arr, a, window)
@@ -462,7 +550,9 @@ def csv_report(a: dict, stores: list[dict], window: float) -> str:
                         + [round(h) for h in held] + [round(bytes_held(s, h, a)) for h in held]
                         + [round(write_rates(s, arr, a, hours[0])[0], 3)]
                         + [round(write_rates(s, arr, a, h)[1], 3) for h in hours]
-                        + [s.get("adr_action", ""), s.get("analysis_action", ""), s.get("pi", ""),
+                        + [round(write_rates(s, arr, a, h, "midnight")[1], 3) for h in hours]
+                        + [";".join(f"{t['driver']}={t['per']:g}" for t in s.get("drivers", [])),
+                           s.get("adr_action", ""), s.get("analysis_action", ""), s.get("pi", ""),
                            ";".join(s.get("divergences", []))])
     return buf.getvalue()
 

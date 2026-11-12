@@ -109,26 +109,72 @@ def per_cadence(after_size: dict, before_size: dict, run: dict, units: dict) -> 
             for c, n in sorted(rows.items())}
 
 
-def diff_store(store: dict, before: dict, after: dict, run: dict, elapsed_days: float) -> dict:
+def run_driver_units(entries: float, run_share: float | None, run_resources: float | None) -> dict[str, float | None]:
+    """How many of each driver the run contained. reportable x resources assumes reportable entries acquire the
+    run's average resources per entry; capture doesn't split resources by reportability."""
+    reportable = entries * run_share if run_share is not None else None
+    return {"entry": entries,
+            "reportable": reportable,
+            "resources": entries * run_resources if run_resources is not None else None,
+            "reportable_resources": reportable * run_resources
+            if reportable is not None and run_resources is not None else None}
+
+
+def normalize_drivers(store: dict, result: dict, units: dict[str, float | None], by_phase: dict | None,
+                      a: dict) -> None:
+    """Works out each driver term's `per` from the run, and what they give at the decided drivers.
+
+    One term: rows / that driver's units in the run. Entry + reportable (the two acquisition passes): the
+    Initial and Supplemental rows when capture split them by phase, otherwise the model's own ratio between the
+    terms, scaled to the run.
+    """
+    terms = store["drivers"]
+    missing = [t["driver"] for t in terms if not units.get(t["driver"])]
+    if missing:
+        result["note"] = f"can't normalize: the run has no {', '.join(missing)} figure"
+        return
+    delta = result["delta_rows"]
+    names = [t["driver"] for t in terms]
+    if len(terms) == 1:
+        measured = [{"driver": names[0], "per": delta / units[names[0]]}]
+        method = f"rows / run {names[0].replace('_', ' x ')}"
+    elif sorted(names) == ["entry", "reportable"] and by_phase and by_phase.get("Initial") is not None:
+        measured = [{"driver": "entry", "per": by_phase.get("Initial", 0) / units["entry"]},
+                    {"driver": "reportable", "per": by_phase.get("Supplemental", 0) / units["reportable"]}]
+        method = "QueryPhase split"
+    else:
+        expected = sum(t["per"] * units[t["driver"]] for t in terms)
+        k = delta / expected if expected else 0.0
+        measured = [{"driver": t["driver"], "per": t["per"] * k} for t in terms]
+        method = "model's term ratio, scaled to the run"
+    result["drivers_measured"] = measured
+    result["normalization"] = method
+    result["at_decided"] = sum(t["per"] * model.driver_value(t["driver"], a) for t in measured)
+
+
+def diff_store(store: dict, before: dict, after: dict, run: dict, elapsed_days: float,
+               a: dict | None = None, run_resources: float | None = None) -> dict:
     sid = store["id"]
     loc = store.get("location", {})
+    a = a or model.load_assumptions(DEFAULT_ASSUMPTIONS)
     result = {"id": sid, "kind": store["kind"], "grain": store["grain"], "anchor": store["anchor"],
-              "model_multiplier": store.get("multiplier", store.get("multiplier_param")),
+              "model_multiplier": model.multiplier(store, a) if "drivers" in store
+              else store.get("multiplier", store.get("multiplier_param")),
               "model_bytes_per_row": store.get("bytes_per_row")}
     if "measured_with" in loc:
         return {**result, "reason": f"measured with {loc['measured_with']}"}
     units = grain_units(run, store["grain"], elapsed_days)
     if store["kind"] in ("sql", "mongo"):
-        b, a = before.get("stores", {}).get(sid), after.get("stores", {}).get(sid)
-        if a is None or b is None:
-            return {**result, "reason": "missing from " + ("both snapshots" if a is None and b is None
-                                                            else "before" if b is None else "after")}
-        delta = a["rows"] - b["rows"]
-        result.update(delta_rows=delta, units=units["all"], bytes_per_row=store_bytes_per_row(a))
+        b_size, a_size = before.get("stores", {}).get(sid), after.get("stores", {}).get(sid)
+        if a_size is None or b_size is None:
+            return {**result, "reason": "missing from " + ("both snapshots" if a_size is None and b_size is None
+                                                            else "before" if b_size is None else "after")}
+        delta = a_size["rows"] - b_size["rows"]
+        result.update(delta_rows=delta, units=units["all"], bytes_per_row=store_bytes_per_row(a_size))
         if store["anchor"] == "fixed_residency":
             return {**result, "reason": "work queue: rows drain, so counts don't give rows written (see series depth)"}
         if store["grain"] in ("patient_report", "report"):
-            result["per_cadence"] = per_cadence(a, b, run, units)
+            result["per_cadence"] = per_cadence(a_size, b_size, run, units)
             attributed = sum(v["rows"] for v in result["per_cadence"].values())
             result["coverage"] = attributed / delta if result["per_cadence"] and delta > 0 else None
     elif store["kind"] == "kafka":
@@ -161,6 +207,10 @@ def diff_store(store: dict, before: dict, after: dict, run: dict, elapsed_days: 
     elif result["delta_rows"] == 0:
         # Usually the process that writes the store didn't run (retention, rubric, census), not a true zero.
         result["note"] = "no rows written in the run; not proposed"
+    elif "drivers" in store:
+        share = (run.get("reportable") or {}).get("share")
+        by_phase = (after.get("stores", {}).get(sid) or {}).get("by_phase")
+        normalize_drivers(store, result, run_driver_units(units["all"], share, run_resources), by_phase, a)
     return result
 
 
@@ -194,11 +244,23 @@ def contention(before: dict, after: dict) -> dict:
     return {"sql": out, "cosmos": after.get("contention", {}).get("cosmos") or {}}
 
 
-def diff_pair(stores: list[dict], before: dict, after: dict) -> dict:
+RESOURCES_STORE = "da.DataAcquisitionLogResourceId"  # one ID row per acquired resource
+
+
+def diff_pair(stores: list[dict], before: dict, after: dict, a: dict | None = None) -> dict:
+    a = a or model.load_assumptions(DEFAULT_ASSUMPTIONS)
     t0, t1 = parse_iso(before["taken_at"]), parse_iso(after["taken_at"])
     elapsed_days = (t1 - t0).total_seconds() / 86_400
     run = after.get("run") or {}
-    results = [diff_store(s, before, after, run, elapsed_days) for s in stores]
+    # The run's own resources per entry come from the resource-ID store, measured first; every resource driver
+    # term is normalized by it.
+    resource_store = next((s for s in stores if s["id"] == RESOURCES_STORE), None)
+    run_resources = None
+    if resource_store is not None:
+        r = diff_store({k: v for k, v in resource_store.items() if k != "drivers"} | {"multiplier": 1},
+                       before, after, run, elapsed_days, a)
+        run_resources = r.get("multiplier") if not r.get("note") else None
+    results = [diff_store(s, before, after, run, elapsed_days, a, run_resources) for s in stores]
     by_id = {r["id"]: r for r in results}
     enabled = {tag: any(by_id[s["id"]].get("delta_rows", 0) > 0 for s in stores if tag in s.get("tags", []))
                for tag in ("shadow", "rubric")}
@@ -206,7 +268,9 @@ def diff_pair(stores: list[dict], before: dict, after: dict) -> dict:
     return {"before": before["taken_at"], "after": after["taken_at"], "environment": after.get("environment"),
             "code_version": after.get("code_version"), "elapsed_days": elapsed_days,
             "run": {**run_summary(run), "enabled": enabled,
-                    "resources_acquired_per_patient_report": resource_ids.get("multiplier")},
+                    "resources_acquired_per_patient_report": resource_ids.get("multiplier"),
+                    "decided_share_reportable": a["share_reportable"],
+                    "decided_resources_per_patient": a["resources_per_patient"]},
             "stores": results, "unmodeled_topics": unmodeled_topics(stores, before, after),
             "contention": contention(before, after),
             "context": after.get("context", {}),
@@ -314,6 +378,11 @@ def proposal(pair: dict) -> dict:
                if c in ("daily", "monthly") and v["multiplier"] is not None}
         if cad:
             entry["by_cadence"] = cad
+        if r.get("drivers_measured"):
+            # A driver store is recorded as its per-driver terms, never as the run's blended multiplier.
+            entry["drivers"] = [{"driver": t["driver"], "per": sig(t["per"], 6)} for t in r["drivers_measured"]]
+            entry["normalization"] = r["normalization"]
+            entry["at_decided"] = sig(r["at_decided"])
         stores[r["id"]] = entry
     run = pair["run"]
     assumptions = {}
@@ -328,7 +397,9 @@ def apply(proposal_doc: dict, source: str, stores_path: Path, assumptions_path: 
     run = proposal_doc["run"]
     run_text = (f"{run['reports']} reports, {run['entries']} patient-report entries"
                 + (f", reportable share {run['reportable_share']:.2f}" if run.get("reportable_share") is not None
-                   else ""))
+                   else "")
+                + (f", {run['resources_acquired_per_patient_report']:.0f} resources per entry"
+                   if run.get("resources_acquired_per_patient_report") is not None else ""))
     doc = read_json(stores_path)
     changed = []
     for s in doc["stores"]:
@@ -336,10 +407,17 @@ def apply(proposal_doc: dict, source: str, stores_path: Path, assumptions_path: 
         if p is None:
             continue
         s.pop("multiplier_param", None)
-        s["multiplier"] = p["multiplier"]
+        rows_text = f"{p['delta_rows']} rows over {p['units']:g} {GRAIN_LABEL[p['grain']]}"
+        if "drivers" in p:
+            s.pop("multiplier", None)
+            s["drivers"] = p["drivers"]
+            rows_text += f"; normalized to drivers by {p['normalization']}"
+        elif "drivers" in s:
+            continue  # a driver store with no normalized terms is left alone rather than blended
+        else:
+            s["multiplier"] = p["multiplier"]
         s["multiplier_status"] = "measured"
-        s["multiplier_source"] = (f"measured: {source} ({run_text}; {p['delta_rows']} rows over {p['units']:g} "
-                                  f"{GRAIN_LABEL[p['grain']]})")
+        s["multiplier_source"] = f"measured: {source} ({run_text}; {rows_text})"
         if "bytes_per_row" in p:
             s["bytes_per_row"] = p["bytes_per_row"]
         if "by_cadence" in p:
@@ -392,11 +470,14 @@ def summary(pair: dict | None, series_result: dict | None, tooling_check: bool) 
             ["Census encounters / patients", f"{_n((run.get('census') or {}).get('encounters'))} / "
                                              f"{_n((run.get('census') or {}).get('patients'))}"],
             ["Facilities", _n(run.get("facilities"))],
-            ["Reportable share", _n(run.get("reportable_share"))],
+            ["Reportable share (run / decided)", f"{_n(run.get('reportable_share'))} / "
+                                                 f"{_n(run.get('decided_share_reportable'))}"],
             ["Scheduled reports terminal / completion lag median, max (days)",
              f"{run['terminal_reports']} / {_n(run.get('completion_lag_days_median'))}, "
              f"{_n(run.get('completion_lag_days_max'))}"],
-            ["Resources acquired per patient-report", _n(run.get("resources_acquired_per_patient_report"))],
+            ["Resources acquired per patient-report (run / decided)",
+             f"{_n(run.get('resources_acquired_per_patient_report'))} / "
+             f"{_n(run.get('decided_resources_per_patient'))}"],
             ["Shadow / rubric validation active", f"{run['enabled']['shadow']} / {run['enabled']['rubric']}"],
         ], "ll"))
         rows, skipped = [], []
@@ -406,17 +487,22 @@ def summary(pair: dict | None, series_result: dict | None, tooling_check: bool) 
                 continue
             cad = ", ".join(f"{c} {_n(v['multiplier'])}" for c, v in (r.get("per_cadence") or {}).items()
                             if v["multiplier"] is not None)
+            decided = (f"**{_n(r['at_decided'])}** ({r['normalization']})" if r.get("at_decided") is not None
+                       else "–")
             rows.append([r["id"], r["grain"], _n(r["delta_rows"]), _n(r["units"]),
-                         f"{_n(r['model_multiplier'])} → **{_n(r['multiplier'])}**", cad or "–",
+                         f"{_n(r['model_multiplier'])} → **{_n(r['multiplier'])}**", decided, cad or "–",
                          f"{_n(r['model_bytes_per_row'])} → {_n(r.get('bytes_per_row'))}",
                          _n(r.get("coverage")), r.get("note", "")])
-        parts.append("## Store multipliers\n\nModel value → measured. Coverage is the share of the store's new rows "
-                     "attributed to the run's reports; below 1 means other activity wrote to the store too. Bytes "
-                     "per row is the table-wide average (data + indexes) in the after snapshot, given only for "
-                     f"tables of at least {MIN_ROWS_FOR_BYTES:,} rows; smaller tables are dominated by whole "
+        parts.append("## Store multipliers\n\nModel value (at the decided drivers) → measured in this run, per "
+                     "grain unit. For stores with driver terms, *At decided drivers* re-expresses the measurement "
+                     "at the decided reportable share and resources per patient, removing the run's own; that is "
+                     "the figure `--apply` records, as per-driver terms. Coverage is the share of the store's new "
+                     "rows attributed to the run's reports; below 1 means other activity wrote to the store too. "
+                     "Bytes per row is the table-wide average (data + indexes) in the after snapshot, given only "
+                     f"for tables of at least {MIN_ROWS_FOR_BYTES:,} rows; smaller tables are dominated by whole "
                      "8 KB pages. Completion lag counts scheduled (daily and monthly) reports only.\n\n"
-                     + _table(["Store", "Grain", "Δ rows", "Units", "Multiplier", "By cadence", "Bytes/row",
-                               "Coverage", "Note"], rows, "llrrlllrl"))
+                     + _table(["Store", "Grain", "Δ rows", "Units", "Multiplier", "At decided drivers",
+                               "By cadence", "Bytes/row", "Coverage", "Note"], rows, "llrrllllrl"))
         if skipped:
             parts.append("**Not derived**\n\n" + _table(["Store", "Reason"], skipped, "ll"))
         loki = [r for r in pair["stores"] if r.get("by_component")]
@@ -520,7 +606,8 @@ def main(argv=None) -> int:
     assumptions_path = args.assumptions or DEFAULT_ASSUMPTIONS
     stores = read_json(stores_path)["stores"]
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    pair = diff_pair(stores, read_json(args.before), read_json(args.after)) if args.before and args.after else None
+    pair = diff_pair(stores, read_json(args.before), read_json(args.after), model.load_assumptions(assumptions_path)) \
+        if args.before and args.after else None
     series_result = diff_series(stores, read_series(args.series), required_rates(stores_path, assumptions_path)) \
         if args.series else None
     (args.out_dir / "summary.md").write_text(summary(pair, series_result, args.tooling_check), encoding="utf-8",

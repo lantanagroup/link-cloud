@@ -253,13 +253,99 @@ class SeriesTests(unittest.TestCase):
 
     def test_required_rates_come_from_the_model(self):
         req = self.s["required"]
-        self.assertEqual(req["windows_hours"], [2, 6, 24])
+        self.assertEqual(req["windows_hours"], [1, 4, 8, 12, 24])
         ids = req["stores"]["da.DataAcquisitionLogResourceId"]
         self.assertGreater(ids[0], ids[2])  # a 2 h window needs more than 24 h
-        self.assertEqual(req["stores"]["report.ReportResource"], [0, 0, 0])  # not written since LNK-5134
+        self.assertEqual(set(req["stores"]["report.ReportResource"]), {0})  # not written since LNK-5134
         text = diff.summary(None, self.s, tooling_check=False)
         self.assertIn("## Transient queues", text)
         self.assertIn("Required, 24 h", text)
+
+
+def driver_store(sid, terms):
+    s = store(sid, drivers=terms)
+    del s["multiplier"]
+    return s
+
+
+# A run at reportable share 0.4 (20 of 50 entries) acquiring 200 resources per entry, normalized to the shipped
+# decided drivers (share 0.9, 1,000 resources).
+DRIVER_STORES = [
+    driver_store("da.DataAcquisitionLogResourceId", [{"driver": "resources", "per": 1}]),
+    driver_store("x.reportable", [{"driver": "reportable", "per": 1}]),
+    driver_store("x.validation", [{"driver": "reportable_resources", "per": 0.1}]),
+    driver_store("x.dalog", [{"driver": "entry", "per": 1}, {"driver": "reportable", "per": 1}]),
+    driver_store("x.pass", [{"driver": "entry", "per": 1}, {"driver": "reportable", "per": 1}]),
+]
+
+
+def driver_snapshots():
+    b, a = before(), after()
+    zero = {s["id"]: size(0) for s in DRIVER_STORES}
+    b["stores"].update(zero)
+    a["stores"].update({"da.DataAcquisitionLogResourceId": size(10_000), "x.reportable": size(20),
+                        "x.validation": size(2_000), "x.pass": size(70)})
+    a["stores"]["x.dalog"] = {**size(160), "by_phase": {"Initial": 100, "Supplemental": 60}}
+    return b, a
+
+
+class NormalizationTests(unittest.TestCase):
+    def setUp(self):
+        b, a = driver_snapshots()
+        self.pair = diff.diff_pair(DRIVER_STORES, b, a)
+        self.r = by_id(self.pair["stores"])
+
+    def test_single_driver_terms_divide_by_the_runs_units(self):
+        self.assertEqual(self.r["da.DataAcquisitionLogResourceId"]["drivers_measured"], [{"driver": "resources", "per": 1}])
+        self.assertAlmostEqual(self.r["da.DataAcquisitionLogResourceId"]["at_decided"], 1000)
+        self.assertAlmostEqual(self.r["x.reportable"]["drivers_measured"][0]["per"], 1)   # 20 rows / 20 reportable
+        self.assertAlmostEqual(self.r["x.reportable"]["at_decided"], 0.9)
+        # 2,000 rows / (20 reportable x 200 resources) = 0.5 per reportable resource; x 0.9 x 1,000 at decided
+        self.assertAlmostEqual(self.r["x.validation"]["drivers_measured"][0]["per"], 0.5)
+        self.assertAlmostEqual(self.r["x.validation"]["at_decided"], 450)
+        self.assertAlmostEqual(self.r["x.validation"]["multiplier"], 40)  # the raw run figure, not proposed
+
+    def test_two_pass_stores_use_the_phase_split_when_captured(self):
+        dalog = self.r["x.dalog"]
+        self.assertEqual(dalog["normalization"], "QueryPhase split")
+        per = {t["driver"]: t["per"] for t in dalog["drivers_measured"]}
+        self.assertAlmostEqual(per["entry"], 100 / 50)
+        self.assertAlmostEqual(per["reportable"], 60 / 20)
+        self.assertAlmostEqual(dalog["at_decided"], 2 + 3 * 0.9)
+
+    def test_two_pass_stores_without_a_split_keep_the_models_ratio(self):
+        p = self.r["x.pass"]
+        self.assertEqual(p["normalization"], "model's term ratio, scaled to the run")
+        self.assertEqual([t["per"] for t in p["drivers_measured"]], [1, 1])  # 70 = 50 + 20
+        self.assertAlmostEqual(p["at_decided"], 1.9)
+
+    def test_no_share_means_no_normalization(self):
+        b, a = driver_snapshots()
+        a["run"]["reportable"] = None
+        r = by_id(diff.diff_pair(DRIVER_STORES, b, a)["stores"])
+        self.assertIn("can't normalize", r["x.reportable"]["note"])
+        self.assertNotIn("x.reportable", diff.proposal(diff.diff_pair(DRIVER_STORES, b, a))["stores"])
+        self.assertIn("at_decided", r["da.DataAcquisitionLogResourceId"])  # resources alone still normalize
+
+    def test_apply_writes_driver_terms_not_a_blend(self):
+        with tempfile.TemporaryDirectory() as d:
+            stores_path, assumptions_path = Path(d) / "stores.json", Path(d) / "assumptions.json"
+            stores_path.write_text(json.dumps({"stores": DRIVER_STORES}), encoding="utf-8")
+            shutil.copy(diff.DEFAULT_ASSUMPTIONS, assumptions_path)
+            diff.apply(diff.proposal(self.pair), "test run", stores_path, assumptions_path)
+            written = {s["id"]: s for s in json.loads(stores_path.read_text(encoding="utf-8"))["stores"]}
+        v = written["x.validation"]
+        self.assertNotIn("multiplier", v)
+        self.assertEqual(v["drivers"], [{"driver": "reportable_resources", "per": 0.5}])
+        self.assertIn("reportable share 0.40", v["multiplier_source"])
+        self.assertIn("200 resources per entry", v["multiplier_source"])
+        self.assertIn("normalized to drivers", v["multiplier_source"])
+
+    def test_summary_shows_the_decided_figure(self):
+        text = diff.summary(self.pair, None, tooling_check=False)
+        self.assertIn("At decided drivers", text)
+        self.assertIn("**450** (rows / run reportable x resources)", text)
+        self.assertIn("0.4 / 0.9", text)
 
 
 class ApplyTests(unittest.TestCase):

@@ -226,6 +226,14 @@ class SqlTests(unittest.TestCase):
         self.assertIn("JOIN dbo.DataAcquisitionLog l", conn.executed[0][0])
         self.assertIn("GROUP BY l.ReportTrackingId", conn.executed[0][0])
 
+    def test_phase_counts_group_by_the_phase_column(self):
+        conn = FakeConn([("COUNT_BIG", [("Initial", 100), ("Supplemental", 60)])])
+        loc = {"table": "dbo.FhirQuery", "attribution": {
+            "key": "l.ReportTrackingId", "phase": "l.QueryPhase",
+            "from": "dbo.FhirQuery t JOIN dbo.DataAcquisitionLog l ON l.Id = t.DataAcquisitionLogId"}}
+        self.assertEqual(sql.phase_counts(conn, loc, [R1]), {"Initial": 100, "Supplemental": 60})
+        self.assertIn("GROUP BY l.QueryPhase", conn.executed[0][0])
+
     def test_attribution_rejects_non_guid_ids(self):
         conn = FakeConn([("COUNT_BIG", [])])
         with self.assertRaises(ValueError):

@@ -36,10 +36,19 @@ class ArrivalTests(unittest.TestCase):
         self.assertAlmostEqual(arr.cadences["monthly"].entries_per_month, 9_000_000)
         self.assertAlmostEqual(arr.entries_per_month, 22_500_000)
 
-    def test_aligned_boundary_batch(self):
+    def test_inhouse_census_is_derived(self):
+        # N + L = 500 a day and N + 30 L = 5,000 a month give N = 10,000 / 29
+        self.assertAlmostEqual(model.inhouse_patients(baseline()), 10_000 / 29)
+        self.assertEqual(model.inhouse_patients(baseline(inhouse_patients_per_facility=250)), 250)
+        with self.assertRaises(ValueError):
+            model.validate(baseline(inhouse_patients_per_facility=600), [])
+
+    def test_aligned_boundary_batch_is_the_inhouse_census(self):
         arr = model.derive_arrivals(baseline())
-        self.assertAlmostEqual(arr.boundary_entries, 9_450_000)
+        self.assertAlmostEqual(arr.boundary_entries, 2_700 * 10_000 / 29)  # about 931 k
+        self.assertAlmostEqual(arr.midnight_entries, 900 * 10_000 / 29)    # about 310 k
         self.assertAlmostEqual(arr.boundary_reports, 2_700)
+        self.assertAlmostEqual(arr.entries_per_month, 22_500_000)          # the batch is part of the cohort
 
     def test_overlap_changes_only_distinct_facilities(self):
         low = model.derive_arrivals(baseline(share_both=0.35))
@@ -52,16 +61,33 @@ class ArrivalTests(unittest.TestCase):
 
 class HeldVolumeTests(unittest.TestCase):
     def test_report_anchor_at_one_month_without_lag_or_cleanup(self):
-        # daily: 450k/day x (0.5 + 30) days; monthly: 300k/day x (15 + 30) days
+        # Discharged rows wait half the period on average; in-house rows are written at period end and don't.
+        # daily: 450k/day x (30 + 0.5 x (1 - N/500)); monthly: 300k/day x (30 + 15 x (1 - N/5,000))
         a = baseline(completion_lag_days=0, cleanup_interval_days=0)
         arr = model.derive_arrivals(a)
-        self.assertAlmostEqual(model.held_rows(store(), arr, a, 1), 13_725_000 + 13_500_000)
+        n = 10_000 / 29
+        expected = 450_000 * (30 + 0.5 * (1 - n / 500)) + 300_000 * (30 + 15 * (1 - n / 5_000))
+        self.assertAlmostEqual(model.held_rows(store(), arr, a, 1), expected)
+        self.assertAlmostEqual(expected, 26_759_482.76, places=1)
 
     def test_report_anchor_includes_lag_and_cleanup(self):
         a = baseline(completion_lag_days=1, cleanup_interval_days=1)
         arr = model.derive_arrivals(a)
-        # daily 450k x 32 days; monthly 300k x 46.5 days
+        n = 10_000 / 29
+        expected = 450_000 * (0.5 * (1 - n / 500) + 31.5) + 300_000 * (15 * (1 - n / 5_000) + 31.5)
+        self.assertAlmostEqual(model.held_rows(store(), arr, a, 1), expected)
+
+    def test_with_no_inhouse_patients_every_row_waits_half_the_period(self):
+        # The pre-2026-11-11 model: daily 450k x 32 days; monthly 300k x 46.5 days
+        a = baseline(completion_lag_days=1, cleanup_interval_days=1, inhouse_patients_per_facility=0)
+        arr = model.derive_arrivals(a)
         self.assertAlmostEqual(model.held_rows(store(), arr, a, 1), 14_400_000 + 13_950_000)
+
+    def test_peak_held_keeps_the_full_period(self):
+        a = baseline()
+        arr = model.derive_arrivals(a)
+        # daily 450k x (1 + 1 + 30 + 1); monthly 300k x (30 + 1 + 30 + 1)
+        self.assertAlmostEqual(model.held_rows(store(), arr, a, 1, peak=True), 450_000 * 33 + 300_000 * 62)
 
     def test_slope_and_offset_reproduce_held_at_any_window(self):
         a = baseline()
@@ -119,12 +145,26 @@ class HeldVolumeTests(unittest.TestCase):
 
 
 class ThroughputTests(unittest.TestCase):
-    def test_peak_rate_processes_boundary_batch_in_window(self):
+    def test_peak_rate_processes_the_inhouse_batch_on_top_of_discharges(self):
         a = baseline()
         arr = model.derive_arrivals(a)
+        n = 10_000 / 29
+        month = 30 * 86_400
+        discharged = 13_500_000 * (1 - n / 500) + 9_000_000 * (1 - n / 5_000)  # rows a month through the period
         steady, peak = model.write_rates(store(), arr, a, 24)
-        self.assertAlmostEqual(steady, 22_500_000 / (30 * 86_400))
-        self.assertAlmostEqual(peak, 9_450_000 / 86_400)
+        self.assertAlmostEqual(steady, 22_500_000 / month)
+        self.assertAlmostEqual(peak, 2_700 * n / 86_400 + discharged / month)
+
+    def test_ordinary_midnight_has_only_the_daily_batch(self):
+        a = baseline()
+        arr = model.derive_arrivals(a)
+        n = 10_000 / 29
+        month = 30 * 86_400
+        discharged = 13_500_000 * (1 - n / 500) + 9_000_000 * (1 - n / 5_000)
+        monthly_inhouse = 9_000_000 * n / 5_000  # averaged over the month on an ordinary night
+        _, peak = model.write_rates(store(), arr, a, 4, "midnight")
+        self.assertAlmostEqual(peak, 900 * n / (4 * 3600) + (discharged + monthly_inhouse) / month)
+        self.assertLess(peak, model.write_rates(store(), arr, a, 4)[1])
 
     def test_unbatched_grain_peaks_at_steady_rate(self):
         a = baseline()
@@ -140,7 +180,8 @@ class InputTests(unittest.TestCase):
         model.validate(a, stores)
         text = model.markdown_report(a, stores, excluded, a["reference_window_months"])
         self.assertIn("## Arrival rates", text)
-        self.assertIn("9.45 M", text)
+        self.assertIn("931 k", text)          # the month-boundary in-house batch
+        self.assertIn("ordinary midnight", text)
         rows = model.csv_report(a, stores, 1).strip().splitlines()
         self.assertEqual(len(rows), len(stores) + 1)
 
@@ -185,6 +226,47 @@ class InputTests(unittest.TestCase):
             for key in keys:
                 self.assertNotIn(key, seen, f"{s['id']} and {seen.get(key)} both measure {key}")
                 seen[key] = s["id"]
+
+    def test_driver_terms_give_the_effective_multiplier(self):
+        a = baseline()
+        s = store(drivers=[{"driver": "entry", "per": 1}, {"driver": "reportable", "per": 2},
+                           {"driver": "resources", "per": 0.01}, {"driver": "reportable_resources", "per": 0.001}])
+        del s["multiplier"]
+        self.assertAlmostEqual(model.multiplier(s, a), 1 + 2 * 0.9 + 0.01 * 1000 + 0.001 * 900)
+        sens = baseline(share_reportable=0.5, resources_per_patient=400)
+        self.assertAlmostEqual(model.multiplier(s, sens), 1 + 2 * 0.5 + 0.01 * 400 + 0.001 * 200)
+
+    def test_driver_validation(self):
+        good = store(drivers=[{"driver": "entry", "per": 1}])
+        del good["multiplier"]
+        model.validate(baseline(), [good])
+        with self.assertRaises(ValueError):
+            model.validate(baseline(), [store(drivers=[{"driver": "entry", "per": 1}])])  # both multiplier and drivers
+        bad = store(drivers=[{"driver": "patients", "per": 1}])
+        del bad["multiplier"]
+        with self.assertRaises(ValueError):
+            model.validate(baseline(), [bad])
+        wrong_grain = store(grain="report", drivers=[{"driver": "entry", "per": 1}])
+        del wrong_grain["multiplier"]
+        with self.assertRaises(ValueError):
+            model.validate(baseline(), [wrong_grain])
+
+    def test_shipped_driver_stores_at_the_decided_values(self):
+        """2026-11-11: code facts move with the decided drivers; everything else keeps its value per entry."""
+        a = model.load_assumptions(model.DEFAULT_ASSUMPTIONS)
+        stores, _ = model.load_stores(model.DEFAULT_STORES)
+        m = {s["id"]: model.multiplier(s, a) for s in stores}
+        expected = {"da.DataAcquisitionLogResourceId": 1000, "kafka.DataAcquisitionRequested": 1.9,
+                    "kafka.ResourcesAcquired": 1.9, "kafka.ReadyForValidation": 0.9, "kafka.SubmitPayload.patient": 0.9,
+                    "validation.result": 100, "validation.result_category": 100,
+                    "validation.legacy_shadow_finding": 100, "validation.rubric_finding": 10,
+                    "da.DataAcquisitionLog": 8.4, "kafka.ReadyToAcquire": 8.4, "report.ResourceCount": 10,
+                    "report.MeasureReportPopulation": 2, "da.PendingReferenceId": 20, "report.ReportEntry": 1}
+        for sid, value in expected.items():
+            self.assertAlmostEqual(m[sid], value, places=9, msg=sid)
+        by_id = {s["id"]: s for s in stores}
+        self.assertEqual([t["driver"] for t in by_id["da.DataAcquisitionLog"]["drivers"]], ["entry", "reportable"])
+        self.assertEqual(by_id["validation.result"]["drivers"][0]["driver"], "reportable_resources")
 
     def test_corrections_from_the_live_runs(self):
         """Code facts found by the 2026-11-11 runs; none of these is a measured prior."""
