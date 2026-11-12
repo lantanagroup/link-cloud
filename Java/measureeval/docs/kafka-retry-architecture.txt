@@ -124,6 +124,10 @@ separate container-thread handler is required.
     ConsumerRetryDuration[retryCount-1] + count > Count() termination.
   - An empty list disables retries (the first failure is dead-lettered); the
     default is two 3-second delays (3 attempts).
+  - Each entry must be between PT0S and PT24H; KafkaRetryConfig rejects
+    anything else at startup. spring-kafka 3.3.16's backoff listener ignores a
+    due-time more than one day ahead and processes the record at once, so a
+    longer delay would retry early and use up its attempts (see section 7).
   - Disable routes everything to -Error AND (via @ConditionalOnProperty) skips
     provisioning the -Retry listener.
 
@@ -170,6 +174,8 @@ Guarded by:
     reader.
   - RetryTopicBackoffDelayTest - embedded-Kafka test asserting a -Retry record is
     actually delayed (runs in CI).
+  - KafkaRetryConfig.MAX_RETRY_DELAY - one day, spring-kafka's own cap on
+    how far ahead it will honor retry_topic-backoff-timestamp (3.1.4 had none).
 
 
 --------------------------------------------------------------------------------

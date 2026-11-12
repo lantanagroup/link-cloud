@@ -10,7 +10,7 @@
         </encoder>
     </appender>
 
-    <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+    <condition class="com.lantanagroup.link.shared.logging.PropertyEqualsIgnoreCaseCondition">
         <key>loki.enabled</key>
         <value>true</value>
     </condition>
