@@ -92,6 +92,7 @@ internal sealed class RunExecutor
     private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
     private readonly ILivePatientEventInjector _liveInjector;
+    private readonly SharedEhrWorkRegistry _sharedEhrWork = new();
     private readonly IReadOnlyList<(string Name, string Url)> _monitoredServiceHealthUrls;
     private readonly TimeSpan _serviceHealthInterval;
     private readonly TimeSpan _serviceOutageThreshold;
@@ -268,6 +269,11 @@ internal sealed class RunExecutor
 
         try
         {
+            _sharedEhrWork.Begin(
+                state.RunId,
+                EhrEndpointIdentity.From(_automationConfig),
+                AllocatedOrganizationId(state));
+
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
             // Fail early when a required dependency is already unavailable.
@@ -441,6 +447,23 @@ internal sealed class RunExecutor
             importedPatients.AddRange(await _importedBundleResolver.ResolveAsync(
                 state.Options.ImportedPatientBundles,
                 state.RunCancellation.Token));
+            if (importedPatients.Count > 0)
+            {
+                var runTag = ImportedResourceRunScope.RunTag(state.RunId);
+                var scopedBundle = false;
+                foreach (var imported in importedPatients)
+                {
+                    if (imported.Source == ImportedPatientSource.Bundle && !string.IsNullOrWhiteSpace(imported.BundleJson))
+                        scopedBundle = true;
+                    _sharedEhrWork.Claim(state.RunId, ImportedResourceRunScope.Isolate(imported, runTag));
+                }
+
+                if (scopedBundle)
+                {
+                    output.WriteLine(
+                        $"Imported FHIR ids for this run use tag '{runTag}' so they stay separate from another run on the same EHR.");
+                }
+            }
 
             if (profiles.Count == 0 && importedPatients.Count == 0)
             {
@@ -470,6 +493,9 @@ internal sealed class RunExecutor
             {
                 output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
                 await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
+                _sharedEhrWork.Claim(
+                    state.RunId,
+                    importedPatients.SelectMany(ImportedResourceRunScope.ResourcePaths));
 
                 var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
                 if (impStart.HasValue || impEnd.HasValue)
@@ -1543,6 +1569,30 @@ internal sealed class RunExecutor
             removedService = RunCleanupGate.ShouldDeleteServiceData(
                 scenarioConfig.CleanupServiceData, succeeded: true, ownsFacility);
             serviceKeptUnowned = scenarioConfig.CleanupServiceData && !ownsFacility;
+            var mappingsKeptForOtherRun = false;
+            if (removedFhir)
+            {
+                var heldByOthers = _sharedEhrWork.PathsHeldByOthers(state.RunId);
+                var created = fhirDataLoader.CreatedResourcePaths.ToArray();
+                var safe = new HashSet<string>(
+                    ParallelRunSafety.PathsSafeToExpunge(created, heldByOthers),
+                    StringComparer.Ordinal);
+                var forgotten = fhirDataLoader.ForgetCreatedResources(created.Where(path => !safe.Contains(path)));
+                if (forgotten > 0)
+                {
+                    output.WriteLine(
+                        $"Kept {forgotten} FHIR resource(s) that another run on this EHR is still using.");
+                }
+            }
+
+            if (removedService && ParallelRunSafety.FacilityIsHeldByAnotherRun(
+                    facilityId, _sharedEhrWork.FacilitiesHeldByOthers(state.RunId)))
+            {
+                removedService = false;
+                mappingsKeptForOtherRun = true;
+                output.WriteLine("Kept service data and mappings because another run is still using this facility.");
+            }
+
             cleanupAttempted = true;
             if (removedFhir || removedService)
             {
@@ -1567,6 +1617,11 @@ internal sealed class RunExecutor
             }
 
             var retentionNotice = RunCleanupGate.SuccessNotice(removedFhir, removedService, serviceKeptUnowned);
+            if (mappingsKeptForOtherRun)
+            {
+                const string kept = "Service data and mappings were kept because another run is still using this facility.";
+                retentionNotice = string.IsNullOrWhiteSpace(retentionNotice) ? kept : retentionNotice + " " + kept;
+            }
             lock (state.Sync)
             {
                 if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
@@ -1647,6 +1702,8 @@ internal sealed class RunExecutor
         }
         finally
         {
+            _sharedEhrWork.Release(state.RunId);
+
             var organizationId = AllocatedOrganizationId(state);
             if (cleanupMockDmrpEntries &&
                 mockDmrpClientForCleanup != null &&
@@ -2430,7 +2487,13 @@ internal sealed class RunExecutor
                 _generatedTemplateCache,
                 liveShape,
                 state.Options.MeasureBundleJsons,
-                _orchestrator);
+                _orchestrator,
+                imported =>
+                {
+                    var paths = ImportedResourceRunScope.Isolate(
+                        imported, ImportedResourceRunScope.RunTag(state.RunId));
+                    _sharedEhrWork.Claim(state.RunId, paths);
+                });
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,
