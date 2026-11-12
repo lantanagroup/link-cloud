@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Audit.Application.Models
                 Resource = log.Resource,
                 ResourceId = log.ResourceId,
                 PatientId = log.PatientId,
-                PropertyChanges = log.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+                PropertyChanges = log.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue, Entity = p.Entity, RowKey = p.RowKey }).ToList(),
                 Notes = log.Notes
             };
         }
@@ -84,7 +84,7 @@ namespace LantanaGroup.Link.Audit.Application.Models
                 Resource = model.Resource,
                 ResourceId = model.ResourceId,
                 PatientId = model.PatientId,
-                PropertyChanges = model.PropertyChanges?.Select(p => new EntityPropertyChange { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+                PropertyChanges = model.PropertyChanges?.Select(p => new EntityPropertyChange { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue, Entity = p.Entity, RowKey = p.RowKey }).ToList(),
                 Notes = model.Notes
             };
         }

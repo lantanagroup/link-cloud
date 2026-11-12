@@ -50,6 +50,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 resourceName = resourceType.ToString();
             }
 
+            Entities.ResourceType? added = null;
             await CreateResourceLock.WaitAsync(cancellationToken);
             try
             {
@@ -60,14 +61,19 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     return existing;
                 }
 
-                var entity = new Entities.ResourceType() { Name = resourceName };
-                await _database.ResourceTypes.AddAsync(entity, cancellationToken);
+                added = new Entities.ResourceType() { Name = resourceName };
+                await _database.ResourceTypes.AddAsync(added, cancellationToken);
                 await _database.SaveChangesAsync(cancellationToken);
 
                 return await _resourceQueries.Get(resourceName, cancellationToken);
             }
             catch (DbUpdateException ex)
             {
+                if (added != null)
+                {
+                    DetachFailedInsert(ex, added);
+                }
+
                 var sanitizedResourceName = resourceName.Replace("\r", string.Empty).Replace("\n", string.Empty);
                 _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", sanitizedResourceName);
 
@@ -83,6 +89,20 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 CreateResourceLock.Release();
             }
+        }
+
+        private void DetachFailedInsert(DbUpdateException exception, Entities.ResourceType added)
+        {
+            foreach (var entry in exception.Entries)
+            {
+                if (ReferenceEquals(entry.Entity, added) && entry.State == EntityState.Added)
+                {
+                    entry.State = EntityState.Detached;
+                    return;
+                }
+            }
+
+            _database.Detach(added);
         }
 
         public async Task DeleteResource(string resource, CancellationToken cancellationToken = default)

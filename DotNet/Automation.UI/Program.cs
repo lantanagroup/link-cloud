@@ -412,6 +412,8 @@ builder.Services.AddSingleton<MetricsRunPresenter>();
 builder.Services.AddSingleton<PatientReplacementManager>();
 builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
+AutomationSerilog.Use(builder);
+
 var app = builder.Build();
 
 TestRailStartupReport.Log(app.Logger, app.Services.GetRequiredService<IOptions<TestRailOptions>>().Value);

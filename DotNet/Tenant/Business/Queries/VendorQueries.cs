@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
     {
         Task<VendorModel?> GetVendor(Guid Id);
         Task<List<VendorModel>> GetAll();
-        Task<VendorVersionModel?> GetVendorVersion(Guid Id);
+        Task<VendorVersionModel?> GetVendorVersion(Guid Id, CancellationToken cancellationToken = default);
         Task<List<VendorVersionModel>> GetAllVendorVersions();
         Task<List<VendorVersionModel>> GetVendorVersionsByVendorId(Guid vendorId);
     }
@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 .ToListAsync();
         }
 
-        public async Task<VendorVersionModel?> GetVendorVersion(Guid Id)
+        public async Task<VendorVersionModel?> GetVendorVersion(Guid Id, CancellationToken cancellationToken = default)
         {
             return await _dbContext.VendorVersions
                 .Where(vv => vv.Id == Id)
@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     Version = vv.Version,
                     Authentication = vv.Vendor!.Authentication,
                 })
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         public async Task<List<VendorVersionModel>> GetAllVendorVersions()
