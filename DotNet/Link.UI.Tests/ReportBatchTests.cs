@@ -610,6 +610,19 @@ public class ReportBatchTests
     }
 
     [Fact]
+    public async Task A_launch_keeps_an_ampersand_in_the_EHR_name()
+    {
+        var harness = Harness();
+        var scenario = harness.AddScenario("alpha");
+
+        var launch = await harness.Dispatcher.StartLaunchAsync(
+            [new ReportBatchLaunchSlice("R&D", [scenario.Id], 1)],
+            CancellationToken.None);
+
+        launch.Batches.Should().ContainSingle().Which.EhrSystem.Should().Be("R&D");
+    }
+
+    [Fact]
     public async Task A_launch_starts_one_batch_per_EHR_without_waiting()
     {
         var harness = Harness();
@@ -850,6 +863,8 @@ public class ReportBatchTests
                 return "local";
             if (string.Equals(trimmed, "clinic", StringComparison.OrdinalIgnoreCase))
                 return "clinic";
+            if (string.Equals(trimmed, "R&D", StringComparison.Ordinal))
+                return "R&D";
             return null;
         }
     }

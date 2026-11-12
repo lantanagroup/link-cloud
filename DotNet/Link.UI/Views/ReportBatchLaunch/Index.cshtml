@@ -110,7 +110,7 @@ else
                                 {
                                     var inputId = cardId + "-scenario-" + scenario.Id.ToString("N");
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="ehrs[@index].ScenarioIds" value="@scenario.Id" id="@inputId" @(ehr.SelectedScenarioIds.Contains(scenario.Id) ? "checked" : null) />
+                                        <input class="form-check-input" type="checkbox" name="ehrs[@index].ScenarioIds" value="@scenario.Id" id="@inputId" @(ehr.SelectedScenarioIds.Contains(scenario.Id) ? "checked" : null) @(ehr.Selected ? null : "disabled") />
                                         <label class="form-check-label" for="@inputId">
                                             @scenario.Name
                                             <span class="text-muted">@scenario.ReportMethodLabel</span>
@@ -127,12 +127,12 @@ else
                     <div class="row g-3">
                         <div class="col-12 col-md-4">
                             <label class="form-label" for="@(cardId + "-copies")">Copies</label>
-                            <input class="form-control w-auto" type="number" id="@(cardId + "-copies")" name="ehrs[@index].Copies" min="1" max="@ReportBatchConcurrencyPolicy.MaxScenariosPerBatch" step="1" required value="@ehr.Copies" />
+                            <input class="form-control w-auto" type="number" id="@(cardId + "-copies")" name="ehrs[@index].Copies" min="1" max="@ReportBatchConcurrencyPolicy.MaxScenariosPerBatch" step="1" required value="@ehr.Copies" @(ehr.Selected ? null : "disabled") />
                             <div class="form-text">How many times to run each selected scenario. This EHR's batch can hold at most @ReportBatchConcurrencyPolicy.MaxScenariosPerBatch runs.</div>
                         </div>
                         <div class="col-12 col-md-8">
                             <label class="form-label" for="@(cardId + "-cap")">Max concurrent runs</label>
-                            <input class="form-control w-auto" type="number" id="@(cardId + "-cap")" name="ehrs[@index].MaxConcurrency" min="1" max="@Model.SavedCap" step="1" required value="@ehr.MaxConcurrency" />
+                            <input class="form-control w-auto" type="number" id="@(cardId + "-cap")" name="ehrs[@index].MaxConcurrency" min="1" max="@Model.SavedCap" step="1" required value="@ehr.MaxConcurrency" @(ehr.Selected ? null : "disabled") />
                             <div class="form-text">Defaults to the saved cap of @Model.SavedCap. This EHR can use that or a lower number. <a asp-controller="ReportBatchSettings" asp-action="Index">Change the saved cap</a>.</div>
                         </div>
                     </div>
@@ -155,7 +155,12 @@ else
                     var box = card.querySelector("[data-ehr-selected]");
                     var body = card.querySelector("[data-ehr-body]");
                     var selected = !!(box && box.checked);
-                    if (body) body.hidden = !selected;
+                    if (body) {
+                        body.hidden = !selected;
+                        body.querySelectorAll("input").forEach(function (field) {
+                            field.disabled = !selected;
+                        });
+                    }
                     if (!selected) return;
                     any = true;
                     if (card.getAttribute("data-ready") !== "yes") blocked = true;
@@ -163,6 +168,7 @@ else
                 button.disabled = !any || blocked;
             }
             form.addEventListener("change", sync);
+            sync();
         })();
     </script>
 }

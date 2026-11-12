@@ -196,6 +196,7 @@ public class ReportBatchLaunchTests
         launch.Should().Contain("name=\"ehrs[@index].Copies\"");
         launch.Should().Contain("name=\"ehrs[@index].MaxConcurrency\"");
         launch.Should().Contain("Start launch");
+        launch.Should().Contain("field.disabled = !selected");
         launch.Should().Contain("Facility template");
         launch.Should().Contain("Edit scenarios");
 
@@ -225,6 +226,26 @@ public class ReportBatchLaunchTests
 
         var automationEditor = File.ReadAllText(RepoFile("DotNet/Automation.UI/Views/Shared/_ScenarioEditorModal.cshtml"));
         automationEditor.Should().Contain("FHIR query parallelism");
+    }
+
+    [Fact]
+    public async Task An_EHR_named_with_an_ampersand_launches_under_that_name()
+    {
+        var harness = new LaunchHarness(primaryName: "R&D");
+        var scenario = harness.AddScenario("alpha");
+
+        var rejected = Page(await harness.Controller().Index(
+            [Row("R&D", [scenario.Id], maxConcurrency: 4)],
+            CancellationToken.None));
+        harness.Batches.Count.Should().Be(0);
+        rejected.EhrSystems.Should().ContainSingle().Which.Selected.Should().BeTrue();
+        rejected.Errors.Should().Contain("R&D: maxConcurrency cannot be above the saved cap of 2.");
+
+        var result = await harness.Controller().Index(
+            [Row("R&D", [scenario.Id])],
+            CancellationToken.None);
+        result.Should().BeOfType<RedirectResult>();
+        harness.Batches.Only().EhrSystem.Should().Be("R&D");
     }
 
     [Fact]
@@ -440,7 +461,8 @@ public class ReportBatchLaunchTests
             bool engineReady = true,
             bool secondEhr = false,
             HttpStatusCode clinicStatus = HttpStatusCode.OK,
-            string? template = null)
+            string? template = null,
+            string primaryName = "local")
         {
             Settings = new MemorySettings();
             Scenarios = new MemoryScenarios();
@@ -448,7 +470,7 @@ public class ReportBatchLaunchTests
             Runs = new FakeRuns();
             var values = new Dictionary<string, string?>
             {
-                ["Automation:EhrSystems:0:Name"] = "local",
+                ["Automation:EhrSystems:0:Name"] = primaryName,
                 ["Automation:EhrSystems:0:FhirServerBase"] = "http://127.0.0.1:9/fhir",
                 ["Automation:EhrSystems:0:IsDefault"] = "true"
             };
@@ -550,6 +572,8 @@ public class ReportBatchLaunchTests
                 return "local";
             if (string.Equals(trimmed, "clinic", StringComparison.OrdinalIgnoreCase))
                 return "clinic";
+            if (string.Equals(trimmed, "R&D", StringComparison.Ordinal))
+                return "R&D";
             return null;
         }
     }

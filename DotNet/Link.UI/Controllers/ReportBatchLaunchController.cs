@@ -1,7 +1,6 @@
 using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
 using Link.UI.Services.ReportBatches;
@@ -117,7 +116,7 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
             var system = systems[index];
             var probe = probes[index];
             var match = posted?.FirstOrDefault(row =>
-                string.Equals(Clean(row.Name), system.Name, StringComparison.OrdinalIgnoreCase));
+                string.Equals(Trimmed(row.Name), system.Name, StringComparison.OrdinalIgnoreCase));
             rows.Add(new ReportBatchLaunchEhr
             {
                 Name = system.Name,
@@ -192,7 +191,7 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
 
         foreach (var row in selected)
         {
-            var requested = Clean(row.Name);
+            var requested = Trimmed(row.Name);
             var system = string.IsNullOrEmpty(requested) ? null : catalog?.Find(requested);
             if (system is null)
             {
@@ -332,7 +331,7 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
         return false;
     }
 
-    private static string Clean(string? value) => (value ?? string.Empty).Sanitize().Trim();
+    private static string Trimmed(string? value) => (value ?? string.Empty).Trim();
 
     private static bool IsScheduled(ReportMethod method)
         => ReportExecution.UsesCensusScheduleKickoff(method);

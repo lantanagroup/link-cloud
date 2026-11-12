@@ -127,7 +127,7 @@ public sealed class ReportBatchDispatcher : IHostedService
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var slice in slices)
         {
-            var name = _ehr.CanonicalName(slice.EhrSystem.Sanitize());
+            var name = _ehr.CanonicalName((slice.EhrSystem ?? string.Empty).Trim());
             if (name is null)
                 throw new InvalidOperationException("ehrSystem is required and must be a configured EHR system.");
             if (!seen.Add(name))
@@ -341,7 +341,7 @@ public sealed class ReportBatchDispatcher : IHostedService
         Guid? launchId,
         CancellationToken cancellationToken)
     {
-        var ehr = _ehr.CanonicalName(ehrSystem.Sanitize());
+        var ehr = _ehr.CanonicalName((ehrSystem ?? string.Empty).Trim());
         if (ehr is null)
             throw new InvalidOperationException("ehrSystem is required and must be a configured EHR system.");
 
