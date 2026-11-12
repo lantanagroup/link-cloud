@@ -282,13 +282,13 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="Concurrency">
-                                        FHIR query parallelism (1–8)
-                                        <button type="button" class="au-info-toggle" data-help="concurrencyHelp" aria-label="About FHIR query parallelism" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
+                                        FHIR query concurrency (1–8)
+                                        <button type="button" class="au-info-toggle" data-help="concurrencyHelp" aria-label="About FHIR query concurrency" aria-expanded="false"><i class="bi bi-info-circle"></i></button>
                                     </label>
                                     <input class="form-control" type="number" id="Concurrency" min="1" max="8" step="1" placeholder="default 8" />
                                     <div class="form-text">How many Data Acquisition FHIR queries may run at once. Hard cap is 8.</div>
                                     <div id="concurrencyHelp" class="au-help-text mt-1" hidden>
-                                        This sets Data Acquisition’s max concurrent FHIR requests for this run’s facility. Higher values finish querying faster but put more load on the FHIR server and downstream services. 8 is also the acquisition worker cap, so 16 is silently treated as 8. Leave blank to keep the default of 8. This does not change how many patients Thetis generates.
+                                        This sets Data Acquisition’s max concurrent FHIR requests for this run’s facility. This is FHIR query concurrency inside one run. It is separate from how many report runs a batch may keep in flight. Higher values finish querying faster but put more load on the FHIR server and downstream services. 8 is also the acquisition worker cap, so 16 is silently treated as 8. Leave blank to keep the default of 8. This does not change how many patients Thetis generates.
                                     </div>
                                 </div>
                                 <div class="col-12">
@@ -2408,7 +2408,7 @@
                 valid = false;
             }
             if (model.concurrency != null && (model.concurrency < 1 || model.concurrency > 8)) {
-                markFieldError('Concurrency', 'FHIR query parallelism must be between 1 and 8.');
+                markFieldError('Concurrency', 'FHIR query concurrency must be between 1 and 8.');
                 valid = false;
             }
             if (model.targetDurationSeconds != null && model.targetDurationSeconds < 1) {
