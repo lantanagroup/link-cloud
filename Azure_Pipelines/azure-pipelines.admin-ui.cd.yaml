@@ -35,11 +35,11 @@ variables:
 steps:
   - task: NodeTool@0
     inputs:
-      versionSpec: '20.x'
+      versionSpec: '26.x'
     displayName: 'Install Node.js'
 
   - task: Npm@1  
-    displayName: 'Angular CLI 20.3.7'  
+    displayName: 'Install latest Angular CLI globally'  
     inputs:  
       command: custom  
       verbose: false  

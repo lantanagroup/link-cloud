@@ -73,7 +73,10 @@ describe('bundled en-US fallback', () => {
     expect(lookup(bundledOnboarding, `steps.${key}`)).toBeTypeOf('string');
   });
 
-  it.each(STEP_KEYS)('onboarding.json defines a title for %s', key => {
-    expect(lookup(bundledOnboarding, `${key}.title`)).toBeTypeOf('string');
+  // The FHIR step's rail label is steps.fhir, but FhirStep reads its copy from fhirServerInfo.
+  const titleSections = STEP_KEYS.map(key => (key === 'fhir' ? 'fhirServerInfo' : key));
+
+  it.each(titleSections)('onboarding.json defines a title for %s', section => {
+    expect(lookup(bundledOnboarding, `${section}.title`)).toBeTypeOf('string');
   });
 });

@@ -1,7 +1,15 @@
 # syntax=docker/dockerfile:1
 # See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM lantanagroup/aspnet8-run AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
+# curl is for the compose health checks.
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+USER 1654
+WORKDIR /app
+ENV \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    LC_ALL=en_US.UTF-8 \
+    LANG=en_US.UTF-8
 
 EXPOSE 80
 EXPOSE 443
