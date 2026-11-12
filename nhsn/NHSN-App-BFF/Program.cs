@@ -277,6 +277,12 @@ static async Task SetupMiddleware(WebApplication app)
 
     app.UseExceptionHandler();
 
+    // Gives every bodiless 4xx/5xx - a bare Results.NotFound(), an authentication challenge or
+    // authorization failure, an unmatched route - a ProblemDetails body with a traceId, so a client
+    // never has to special-case an empty error response. Only fills an empty body: responses that
+    // already wrote one are left untouched.
+    app.UseStatusCodePages();
+
     app.ConfigureSwagger();
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
