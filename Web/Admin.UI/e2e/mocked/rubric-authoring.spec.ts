@@ -188,7 +188,7 @@ test.describe('editing a draft', () => {
   test('is reached from the rubric page and from the draft\'s own page', async ({ page }) => {
     await page.goto('/rubrics/bare-minimum-requirements');
     await page.getByRole('link', { name: 'Edit draft 1.2.0' }).click();
-    await expect(page).toHaveURL(new RegExp(`${EDIT_URL.replace(/\./g, '\\.')}$`));
+    await expect(page).toHaveURL(new RegExp(`${EDIT_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
 
     await page.goto('/rubrics/bare-minimum-requirements/versions/1.2.0');
     await page.getByRole('link', { name: 'Edit', exact: true }).click();
