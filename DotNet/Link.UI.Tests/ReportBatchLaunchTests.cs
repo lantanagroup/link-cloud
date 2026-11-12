@@ -398,6 +398,19 @@ public class ReportBatchLaunchTests
 
         public Task<IReadOnlyList<ReportBatchDocument>> ListActiveAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ReportBatchDocument>>(_batches.Values.ToList());
+
+        public Task<IReadOnlyList<ReportBatchDocument>> ListRecentAsync(int limit, CancellationToken cancellationToken = default)
+        {
+            if (limit < 1)
+                return Task.FromResult<IReadOnlyList<ReportBatchDocument>>([]);
+
+            IReadOnlyList<ReportBatchDocument> rows = _batches.Values
+                .OrderByDescending(batch => batch.CreatedAt)
+                .ThenBy(batch => batch.BatchId)
+                .Take(limit)
+                .ToList();
+            return Task.FromResult(rows);
+        }
     }
 
     private sealed class FakeRuns : IReportBatchRunGateway
