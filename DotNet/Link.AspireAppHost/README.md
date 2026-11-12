@@ -6,6 +6,75 @@ every service as a process, and one dashboard for their logs, traces, health and
 It is an alternative to `docker compose`, not a replacement. Nothing else references this project.
 Compose, the Dockerfiles and CI are unaffected, and if you never run it, nothing changes for you.
 
+## From nothing to your first ad-hoc report
+
+A new machine, or a stack you have just reset, has no facilities, measures or users. These steps take it
+to a generated report. The sections after this one explain each part in more depth.
+
+1. **Install the prerequisites** listed under [Prerequisites](#prerequisites), and start Docker
+   Desktop.
+2. **Point Terminology at its data.** Get a copy of the terminology data folder from a teammate (one
+   sub-folder per code group, each holding a FHIR `.json` and a `.csv`), then:
+
+   ```powershell
+   cd DotNet/Link.AspireAppHost
+   dotnet user-secrets set "Terminology:Path" "C:\path\to\terminology-data"
+   ```
+
+   You can skip this and still get a report, but the measures' value sets are not expanded and
+   Validation's terminology checks find nothing. If `JAVA_HOME` is not a JDK 21, set `Java:Home` too
+   (see [One-time settings](#one-time-settings)).
+3. **Start the AppHost** from the repository root:
+
+   ```powershell
+   dotnet run --project DotNet/Link.AspireAppHost --launch-profile http
+   ```
+
+   The dashboard opens at http://localhost:15190. The first start pulls container images, runs a Maven
+   build and installs the Admin UI's packages, so it takes several minutes. Wait until the services
+   show as running and healthy. A dashboard command stays greyed out until its service is healthy.
+   Begin with the `http` profile, where nobody has to sign in. The `https` profile signs people in
+   through Keycloak (see [Signing in](#signing-in-the-http-and-https-profiles)).
+4. **Seed data** (the command on `admin-bff`). This loads the role, Validation's artifacts, categories
+   and rubric, and the three measures. Each part also runs by itself when its service turns healthy,
+   so the command mostly confirms that it worked: a green notice means it did. Run it again if
+   Terminology was not ready the first time, so the measures get their value sets expanded.
+5. **Apply Validation migrations** (the command on `validation`). Hibernate creates Validation's
+   tables but never changes an existing constraint or index; the migrations bring the database up to
+   what a deployed one has. Run it once on a new database, and again after pulling changes that add a
+   migration.
+6. **Only with the `https` profile: Create user** (the command on `account`). Enter a name, an email,
+   a password and the `LinkUser` role, then sign in to the Admin UI as that user.
+7. **Create test facility** (the command on `admin-bff`). Choose an id, a measure and the EHR vendor,
+   and the **FHIR server** the facility's data comes from:
+
+   | FHIR server | Enter | Patients |
+   |---|---|---|
+   | The mock that runs in the AppHost | `http://localhost:16158/fhir` | Ten synthetic patients, `mock-patient-0001` to `mock-patient-0010`, with data in January 2026. http://localhost:16158/api/mock-fhir/patients lists them |
+   | A deployed FHIR server, or your own | Its base URL. The form's default is QA's `https://ehr-test.nhsnlink.org/fhir` | Whichever patients that server holds |
+
+   The query plans the vendor picks assume that vendor's data (see [Dashboard
+   commands](#dashboard-commands)). If the measure list is empty, Seed data has not finished: run it,
+   then open the form again.
+8. **Generate the report.** Open the Admin UI at http://localhost:14200 and go to **Reports >
+   Generate Ad-Hoc Report**:
+   - **Facility**: the one you created. **Report Types**: its measure.
+   - **Bypass submission**: tick it to stop after validation. Left unticked, the report is submitted
+     locally, to Azurite and `%TEMP%\link-aspire\submission`, never to NHSN.
+   - **Reporting Cadence** and dates: a period that covers the patients' encounters (January 2026 for
+     the mock).
+   - **Enter Patient IDs** or **Upload CSV**: patient ids on the facility's FHIR server.
+   - Don't use **Use Census** for a first report. It asks Census which patients were admitted in the
+     period, and Census has recorded none: the test facility's Census schedule is created disabled.
+
+   Select **Generate Report**, then **View Report** to follow it.
+9. **Watch it run.** The dashboard's console view shows each service's output, and Grafana at
+   http://localhost:13000 searches all of them (see [Searching the logs](#searching-the-logs)). Search
+   for the report id to follow it from acquisition to submission.
+
+The data is kept between runs (see [Things to know](#things-to-know)), so next time only steps 3 and 8
+are needed.
+
 ## Running it
 
 ```powershell
@@ -13,14 +82,15 @@ dotnet run --project DotNet/Link.AspireAppHost --launch-profile http
 ```
 
 Or choose **Link.AspireAppHost** as the startup project in Visual Studio or Rider. The dashboard opens
-at http://localhost:15190. The first start pulls the container images and runs a Maven build, so it
-takes a few minutes; later starts are much quicker.
+at http://localhost:15190 (under the `https` profile, also at https://localhost:17190). The first start
+pulls the container images and runs a Maven build, so it takes a few minutes; later starts are much
+quicker. The Maven build (`java-build` in the dashboard) runs on every start, and MeasureEval and
+Validation wait for it.
 
 ### Prerequisites
 
 - Docker Desktop, running
-- The .NET 8 SDK, and authentication to the Azure Artifacts feed (as for `link-cloud.sln`; see
-  `DEVELOPMENT.md`)
+- The .NET 8 SDK. Every package comes from nuget.org, so no feed sign-in or token is needed
 - Maven on `PATH`, and a JDK 21
 - Node and npm on `PATH`, for the Admin UI and the NHSN App UI
 - Only if you turn the NHSN App on (it is off by default): the NHSN design system's package file, `nhsn-react-core-2.4.1.tgz`, which
@@ -48,7 +118,7 @@ dotnet user-secrets set "NhsnApp:ReactCorePackage" "C:\path\to\nhsn-react-core-2
 | `Java:Home` | `JAVA_HOME`, else `java` on `PATH` | The JDK that builds and runs MeasureEval and Validation |
 | `Java:Maven` | `mvn` | The Maven command |
 | `AdminUi:Enabled` | `true` | `false` leaves the Admin UI out |
-| `AutomationUi:AutoStart` | `true` | `false` leaves `automation-ui` in the dashboard, configured but stopped, until you start it there. Automation UI runs work of its own once it is up; nothing else depends on it |
+| `AutomationUi:AutoStart` | `false` | `automation-ui` is in the dashboard, configured but stopped, until you start it there. `true` starts it with everything else. Automation UI runs work of its own once it is up; nothing else depends on it |
 | `NhsnApp:Enabled` | `false` | `true` adds the NHSN App BFF and the NHSN App UI. Off by default because the UI needs a one-time manual setup; see [The NHSN App](#the-nhsn-app) |
 | `NhsnApp:ReactCorePackage` | empty | Where the NHSN design system's package file is, when it is not already in `nhsn/NHSN-App-UI/packages/`: the file, or the folder that holds it. See [The NHSN App](#the-nhsn-app) |
 | `Auth:Mode` | `Anonymous` (`Keycloak` in the https profile) | How people sign in; see below |
@@ -123,7 +193,7 @@ connections and not recover.
 | Validation (Java) / Terminology / Acquisition worker | 18075 / 18076 / 18078 |
 | Automation UI | http://localhost:15256 |
 | NHSN App UI (`webpack serve`) / NHSN App BFF | http://localhost:18090 / 18079 |
-| Mock FHIR server / Mock DMRP API | 16158 / 16159 |
+| Mock FHIR server / Mock DMRP API | http://localhost:16158/fhir (ten patients, January 2026; ids at `/api/mock-fhir/patients`) / 16159 |
 | HAPI FHIR server | http://localhost:16157/fhir |
 | SQL Server | `tcp:127.0.0.1,14333`, user `sa`, trust the server certificate (see below) |
 | Kafka / Kafka UI / REST proxy | `localhost:19092` / http://localhost:19080 / http://localhost:18082 |
@@ -177,9 +247,9 @@ Things to know:
 - **Without the file, the UI is left out.** `nhsn-app-ui` does not appear in the dashboard, and a warning
   in the AppHost's console log says what is missing. The same happens when `NhsnApp:ReactCorePackage`
   points at a file that is not there or has a different name. The BFF and everything else run as usual.
-- **The file is needed for the install only.** Once `nhsn/NHSN-App-UI/node_modules` exists, later starts
-  skip the install and do not look for the file. Delete `node_modules` to have the next start install
-  again; the file must be in place then.
+- **The file is needed for the install only.** Once `nhsn/NHSN-App-UI/node_modules/webpack-cli` exists,
+  later starts skip the install and do not look for the file. Delete `node_modules` to have the next
+  start install again; the file must be in place then.
 - **A new version of the design system** changes the file name in the UI's `package.json`. Put the new
   file in `packages/` and delete `node_modules`. The AppHost reads the name from `package.json`, so it
   needs no change.
@@ -278,10 +348,12 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
   `mssql`, `redis_cache`, `loki`, another service's container name), and for the values compose
   itself passes. Environment variables outrank appsettings files. User secrets are not loaded
   outside Development, so nothing on a developer's machine changes what runs here.
-- Kafka is plain (no SASL), and its topics come from `topics.txt`, created on each start.
-- Each service gets its own database, created on start and migrated by the service (`AutoMigrate`),
-  as under compose. Validation's schema is updated by Hibernate. The dashboard command **Apply
-  Validation migrations** also runs `database/migrations/V*.sql`, as the deployment pipeline does.
+- Kafka is plain (no SASL), and its topics come from `topics.txt`: `kafka-init` creates any that are
+  missing on each start, and Kafka counts as healthy only once it has.
+- Each service gets its own database (`db-<name>` in the dashboard), created on start and migrated by
+  the service (`AutoMigrate`), as under compose. Validation's schema is updated by Hibernate. The
+  dashboard command **Apply Validation migrations** also runs
+  `Java/validation/src/main/resources/database/migrations/V*.sql`, as the deployment pipeline does.
 - Telemetry goes to the Aspire dashboard, and logs go to its console view and to Loki. Grafana
   (http://localhost:13000, also the Admin UI's Logs > Grafana) searches Loki; see
   [Searching the logs](#searching-the-logs).
@@ -291,13 +363,14 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | Path | What it holds |
 |---|---|
 | `Program.cs` | Wires every resource together: infrastructure, services, and how sign-in works |
+| `Properties/launchSettings.json` | The `http` and `https` profiles |
 | `Ports.cs` | Every fixed host port |
 | `Extensions/ReplicaExtensions.cs` | `Replicas:<service>`: how many copies of each service run |
 | `Security/LinkSystemToken.cs` | The Link bearer token the AppHost's own commands send |
 | `Security/AuthMode.cs` | `Auth:Mode`: Anonymous (http profile) or Keycloak (https profile) |
 | `Security/LinkServiceClient.cs` | HTTP clients for the AppHost's own calls to services, carrying the Link system token |
 | `Security/LinkKeycloak.cs` | Keycloak's URLs and parameters, its admin token, and creating users |
-| `Extensions/InfrastructureExtensions.cs` | The containers: SQL Server, Kafka and its topics, Mongo, Redis, Azurite, Loki, Grafana, HAPI FHIR, SFTP |
+| `Extensions/InfrastructureExtensions.cs` | The containers: SQL Server, Kafka (with `kafka-init`, Kafka UI and the REST proxy), Mongo, Redis, Azurite, Loki, Grafana, HAPI FHIR, SFTP |
 | `Extensions/DotNetServiceExtensions.cs` | How a .NET service is run and configured |
 | `Extensions/JavaServiceExtensions.cs` | The Maven build, MeasureEval, Validation, and the Validation migrations command |
 | `Extensions/AdminUiExtensions.cs` | The Admin UI under `ng serve` |
@@ -306,6 +379,7 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | `Extensions/SeedDataExtensions.cs` | Seed data and the **Seed data** command |
 | `Extensions/AccountUserExtensions.cs` | The **Create user** command |
 | `Extensions/FacilitySetupExtensions.cs` | The **Create test facility** command, which runs `FacilitySetup/steps.json` |
+| `Extensions/CommandNotifications.cs` | The running, success and failure notices the dashboard commands show |
 | `AdminUi/proxy.mjs` | The Admin UI's `ng serve` proxy |
 | `NhsnAppUi/webpack.config.js` | The NHSN App UI's webpack config: the UI's own, with `/api` proxied to this host's BFF |
 | `Keycloak/link-realm.json` | The `link` realm Keycloak imports |
@@ -315,8 +389,9 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 ## Dashboard commands
 
 Commands that span several services are on `admin-bff`, the platform's front door. A command that
-belongs to one service is on that service. While a command runs, a notice at the top of the dashboard says so. It's
-replaced by a green notice on success or a red one on failure, which stays until dismissed.
+belongs to one service is on that service. A command is greyed out until its service is healthy. While
+a command runs, a notice at the top of the dashboard says so. It's replaced by a green notice on success
+or a red one on failure, which stays until dismissed.
 
 - **Seed data** (on `admin-bff`): creates the local seed data that's missing. Link doesn't seed reference
   data through migrations, so a new environment has none of it. There are three parts, and each one
@@ -337,10 +412,15 @@ replaced by a green notice on success or a red one on failure, which stays until
   existing data is reloading a measure to add expansions. Add more parts in
   `Extensions/SeedDataExtensions.cs`.
 - **Create test facility** (on `admin-bff`): a form for facility id and name, time zone, measure (from
-  the ones MeasureEval has), EHR vendor and FHIR server. It then runs `FacilitySetup/steps.json`, which:
+  the ones MeasureEval has), EHR vendor and FHIR server. The defaults are `dev-facility`, `Dev Facility`,
+  `America/Chicago`, `NHSNAcuteCareHospitalMonthlyInitialPopulation`, Epic and QA's FHIR server. The id
+  takes letters, digits and hyphens; an empty name becomes the id. If MeasureEval has no measures yet,
+  the measure is a text box with a warning to run Seed data first. It then runs
+  `FacilitySetup/steps.json`, which:
   - creates the DMRP measure mapping and the facility in Tenant;
-  - configures Census (disabled), QueryDispatch, DataAcquisition (Discharge and Monthly query plans,
-    the FHIR query configuration and the patient lists) and Normalization.
+  - configures Census (disabled), QueryDispatch, DataAcquisition (Monthly and Discharge query plans,
+    the FHIR query configuration and the patient lists) and Normalization. Normalization is skipped as
+    a whole if the facility already has operations.
 
   The EHR vendor picks the query plans: `query-plan-*-epic.json` or `query-plan-*-cerner.json`, each a
   copy of the ACH Monthly plan production uses for that vendor. Epic fetches Encounter first and
@@ -350,17 +430,22 @@ replaced by a green notice on success or a red one on failure, which stays until
 
   The steps and payloads come from the QA Postman collections. They're read when the command runs,
   so editing them needs no rebuild. Running it again for the same facility only creates what's
-  missing. The default FHIR server is QA's `https://ehr-test.nhsnlink.org/fhir`, where the query
-  list's patient lists exist. See `FacilitySetup/steps.json` for the format: placeholders,
-  existence checks, captured ids and groups.
+  missing. The FHIR server can be the AppHost's mock (`http://localhost:16158/fhir`), a deployed
+  server, or your own. The default is QA's `https://ehr-test.nhsnlink.org/fhir`, the only one where
+  the query list's patient lists exist; they matter only to Census, which the facility has disabled.
+  See `FacilitySetup/steps.json` for the format: placeholders, existence checks, captured ids and
+  groups.
 - **Create user** (on `account`, Keycloak mode only): a form for first name, last name, email,
-  username, role and password. The roles are read from Account. It creates the user in Keycloak, to
+  username (optional; the email is used if it is empty), role and password. The roles are read from
+  Account, which is seeded with them first if it has none. It creates the user in Keycloak, to
   sign in with, and in Account, through Account's own `POST /api/account/user`. Each side is tried
   even if the other already has the user, so after a Keycloak or SQL Server reset, running it again
   fills in whichever is missing. It reads the Account user back to check the role was really
   assigned, because Account skips a role it can't find and still answers 201. It isn't offered in the
   http profile: no one signs in there, so there's no user to create.
-- **Apply Validation migrations** (on `validation`): runs `database/migrations/V*.sql` in order.
+- **Apply Validation migrations** (on `validation`): runs
+  `Java/validation/src/main/resources/database/migrations/V*.sql` in order. The `U*.sql` undo scripts
+  beside them are not run.
 
 ## Things to know
 
@@ -375,20 +460,23 @@ replaced by a green notice on success or a red one on failure, which stays until
   in memory, and saving a facility's credentials fails. That happens when the file was written under
   another key ring, for example by a service run from your IDE with different settings. **Delete the
   file**, even with the services running: the next one to save a secret writes a new one.
-- **Data.** SQL Server, MongoDB, Azurite, Kafka and Keycloak keep their data in Docker volumes
-  (`link-aspire-*`) between runs. Redis and the HAPI FHIR server start empty each time.
+- **Data.** SQL Server, MongoDB, Azurite, Kafka, Keycloak and the SFTP server keep their data in Docker
+  volumes (`link-aspire-*`) between runs. Redis and the HAPI FHIR server start empty each time. Submitted
+  reports are also written to `%TEMP%\link-aspire\submission`.
   - **Kafka keeps its consumer groups' committed offsets, as compose does.** Most Link consumers start
     a new group at the latest message, so with nothing kept, every run's groups were new. A message
     sent before its consumer joined was then lost; Report replaying a stored report at startup lost
     its acquisition requests that way. Now only the very first run is exposed.
   - **To reset everything,** stop the AppHost and run
-    `docker volume rm link-aspire-sql link-aspire-mongo link-aspire-azurite link-aspire-kafka link-aspire-keycloak`.
+    `docker volume rm link-aspire-sql link-aspire-mongo link-aspire-azurite link-aspire-kafka link-aspire-keycloak link-aspire-sftp`.
+    Then follow [From nothing to your first ad-hoc report](#from-nothing-to-your-first-ad-hoc-report)
+    from step 3.
 - **The Admin UI** runs `ng serve` with `AdminUi/proxy.mjs`, which proxies `/api` to the Admin BFF.
   It also answers `/assets/app.config.local.json`, which the UI merges over `app.config.json`, with
-  the AppHost's overrides (`authRequired`). Nothing is written into `Web/Admin.UI`, and
-  `proxy.conf.json` is left alone. If you have your own `src/assets/app.config.local.json`, it is
-  served first and wins. Packages are installed (`npm ci`) only when
-  `node_modules` is missing.
+  the AppHost's overrides (`authRequired`, and `grafanaUrl` for **Logs > Grafana**). Nothing is
+  written into `Web/Admin.UI`, and `proxy.conf.json` is left alone. If you have your own
+  `src/assets/app.config.local.json`, it is served first and wins. Packages are installed (`npm ci`,
+  shown as `admin-ui-install`) only when `node_modules/@angular/cli` is missing.
 - **Java telemetry.** Under the http profile MeasureEval and Validation are given the dashboard's OTLP
   address but not its API key: Aspire's usual way of passing the key sets variables the OpenTelemetry
   Spring starter cannot read, and they stop the services from starting. Their traces may not show on the
