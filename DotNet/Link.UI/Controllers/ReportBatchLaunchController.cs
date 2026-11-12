@@ -1,7 +1,6 @@
 using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
 using Link.UI.Services.ReportBatches;
@@ -10,7 +9,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Link.UI.Controllers;
 
 /// <summary>
-/// Starts one batch against one EHR system. The saved cap stays on the settings page.
+/// Starts one batch per selected EHR system and opens the combined launch page.
+/// The saved cap stays on the settings page. Each batch may only lower it.
 /// </summary>
 [Route("Automation/ReportBatches/Launch")]
 public sealed class ReportBatchLaunchController(IServiceProvider services) : Controller
@@ -18,85 +18,55 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
     public const string Unavailable =
         "Report batches are unavailable until the automation engine is ready.";
 
+    public const string FacilityTemplateFallback = "System default";
+
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         SetView();
-        return View(await BuildPageAsync(null, [], null, null, [], cancellationToken));
+        return View(await BuildPageAsync(null, [], cancellationToken));
     }
 
     [HttpPost("")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Index(
-        string? ehrSystem,
-        List<Guid>? scenarioIds,
-        int copies,
-        int maxConcurrency,
+        List<ReportBatchLaunchEhrForm>? ehrs,
         CancellationToken cancellationToken)
     {
         SetView();
         var dispatcher = services.GetService<ReportBatchDispatcher>();
-        var decision = await DecideAsync(
-            dispatcher,
-            ehrSystem,
-            scenarioIds ?? [],
-            copies,
-            maxConcurrency,
-            cancellationToken);
+        var decision = await DecideAsync(dispatcher, ehrs, cancellationToken);
         if (decision.Errors.Count > 0 || dispatcher is null)
         {
-            return View(await BuildPageAsync(
-                ehrSystem,
-                scenarioIds ?? [],
-                copies,
-                maxConcurrency,
-                decision.Errors,
-                cancellationToken));
+            return View(await BuildPageAsync(ehrs, decision.Errors, cancellationToken));
         }
 
         try
         {
-            var batch = await dispatcher.StartBatchAsync(
-                decision.EhrSystem,
-                decision.ExpandedScenarioIds,
-                maxConcurrency,
-                cancellationToken);
-            return Redirect($"/Automation/ReportBatches/{batch.BatchId:D}");
+            var launch = await dispatcher.StartLaunchAsync(decision.Slices, cancellationToken);
+            return Redirect(ReportBatchDisplay.LaunchPath(launch.LaunchId));
         }
         catch (InvalidOperationException ex)
         {
             var errors = new List<string>(decision.Errors) { ex.Message };
-            return View(await BuildPageAsync(
-                ehrSystem,
-                scenarioIds ?? [],
-                copies,
-                maxConcurrency,
-                errors,
-                cancellationToken));
+            return View(await BuildPageAsync(ehrs, errors, cancellationToken));
         }
     }
 
     private void SetView()
     {
-        ViewData["Title"] = "Launch a batch";
+        ViewData["Title"] = "Launch";
         ViewData["AutomationSection"] = "batch-launch";
     }
 
     private async Task<ReportBatchLaunchPage> BuildPageAsync(
-        string? selectedEhr,
-        IReadOnlyList<Guid> selectedScenarioIds,
-        int? copies,
-        int? maxConcurrency,
+        IReadOnlyList<ReportBatchLaunchEhrForm>? posted,
         IReadOnlyList<string> errors,
         CancellationToken cancellationToken)
     {
         var dispatcher = services.GetService<ReportBatchDispatcher>();
         var ready = dispatcher is not null;
         var savedCap = await SavedCapAsync(cancellationToken);
-        var ehrSystems = await ProbeAsync(cancellationToken);
-        var selected = string.IsNullOrWhiteSpace(selectedEhr)
-            ? ehrSystems.FirstOrDefault(system => system.IsDefault)?.Name ?? ehrSystems.FirstOrDefault()?.Name
-            : selectedEhr.Sanitize().Trim();
         var pageErrors = errors.Count > 0
             ? errors
             : ready ? [] : new[] { Unavailable };
@@ -105,12 +75,8 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
         {
             Ready = ready,
             SavedCap = savedCap,
-            Copies = copies ?? 1,
-            MaxConcurrency = maxConcurrency ?? savedCap,
-            SelectedEhr = selected,
-            SelectedScenarioIds = selectedScenarioIds,
             Errors = pageErrors,
-            EhrSystems = ehrSystems,
+            EhrSystems = await ProbeAsync(posted, savedCap, cancellationToken),
             Scenarios = await LoadScenariosAsync(cancellationToken)
         };
     }
@@ -123,7 +89,10 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
             : await settings.GetMaxConcurrencyAsync(cancellationToken);
     }
 
-    private async Task<IReadOnlyList<ReportBatchLaunchEhr>> ProbeAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ReportBatchLaunchEhr>> ProbeAsync(
+        IReadOnlyList<ReportBatchLaunchEhrForm>? posted,
+        int savedCap,
+        CancellationToken cancellationToken)
     {
         var catalog = services.GetService<EhrSystemCatalog>();
         if (catalog is null)
@@ -140,20 +109,32 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
             }));
         }
 
+        var defaultName = catalog.Default.Name;
         var rows = new List<ReportBatchLaunchEhr>(systems.Count);
         for (var index = 0; index < systems.Count; index++)
         {
             var system = systems[index];
             var probe = probes[index];
+            var match = posted?.FirstOrDefault(row =>
+                string.Equals(Trimmed(row.Name), system.Name, StringComparison.OrdinalIgnoreCase));
             rows.Add(new ReportBatchLaunchEhr
             {
                 Name = system.Name,
                 FhirServerBase = system.FhirServerBase,
-                IsDefault = string.Equals(system.Name, catalog.Default.Name, StringComparison.Ordinal),
+                IsDefault = string.Equals(system.Name, defaultName, StringComparison.Ordinal),
                 Ready = probe?.Ready == true,
                 ReadinessError = probe is null
                     ? "Readiness could not be checked."
-                    : probe.Ready ? null : probe.Error
+                    : probe.Ready ? null : probe.Error,
+                FacilityTemplate = string.IsNullOrWhiteSpace(system.DefaultFacilityTemplate)
+                    ? FacilityTemplateFallback
+                    : system.DefaultFacilityTemplate,
+                Selected = posted is null
+                    ? string.Equals(system.Name, defaultName, StringComparison.Ordinal)
+                    : match?.Selected == true,
+                Copies = match?.Copies ?? 1,
+                MaxConcurrency = match?.MaxConcurrency is int postedCap && postedCap > 0 ? postedCap : savedCap,
+                SelectedScenarioIds = match?.ScenarioIds ?? []
             });
         }
 
@@ -184,29 +165,48 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
 
     private async Task<LaunchDecision> DecideAsync(
         ReportBatchDispatcher? dispatcher,
-        string? ehrSystem,
-        IReadOnlyList<Guid> scenarioIds,
-        int copies,
-        int maxConcurrency,
+        IReadOnlyList<ReportBatchLaunchEhrForm>? posted,
         CancellationToken cancellationToken)
     {
         var errors = new List<string>();
         if (dispatcher is null)
         {
             errors.Add(Unavailable);
-            return new LaunchDecision(errors, [], null);
+            return new LaunchDecision(errors, []);
         }
 
-        var requested = (ehrSystem ?? string.Empty).Sanitize().Trim();
-        var catalog = services.GetService<EhrSystemCatalog>();
-        var system = string.IsNullOrEmpty(requested) ? null : catalog?.Find(requested);
-        if (system is null)
+        var selected = (posted ?? []).Where(row => row.Selected).ToList();
+        if (selected.Count == 0)
         {
-            errors.Add("ehrSystem is required and must be a configured EHR system.");
+            errors.Add("At least one EHR system is required.");
+            return new LaunchDecision(errors, []);
         }
-        else
+
+        var catalog = services.GetService<EhrSystemCatalog>();
+        var readiness = services.GetService<EhrSystemReadinessChecker>();
+        var store = services.GetService<IScenarioStore>();
+        var savedCap = await SavedCapAsync(cancellationToken);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var slices = new List<ReportBatchLaunchSlice>();
+
+        foreach (var row in selected)
         {
-            var readiness = services.GetService<EhrSystemReadinessChecker>();
+            var requested = Trimmed(row.Name);
+            var system = string.IsNullOrEmpty(requested) ? null : catalog?.Find(requested);
+            if (system is null)
+            {
+                errors.Add(string.IsNullOrEmpty(requested)
+                    ? "ehrSystem is required and must be a configured EHR system."
+                    : $"{requested} is not a configured EHR system.");
+                continue;
+            }
+
+            if (!seen.Add(system.Name))
+            {
+                errors.Add($"{system.Name} is selected more than once.");
+                continue;
+            }
+
             if (readiness is null)
             {
                 errors.Add($"{system.Name} is not ready.");
@@ -221,80 +221,87 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
                         : $"{system.Name} is not ready. {probe.Error}");
                 }
             }
-        }
 
-        var selected = new List<Guid>();
-        var seen = new HashSet<Guid>();
-        var store = services.GetService<IScenarioStore>();
-        if (scenarioIds.Count == 0)
-            errors.Add("At least one scenario is required.");
-
-        foreach (var id in scenarioIds)
-        {
-            if (!seen.Add(id))
-                continue;
-            if (id == Guid.Empty)
+            var chosen = new List<Guid>();
+            var ids = new HashSet<Guid>();
+            if (row.ScenarioIds is null || row.ScenarioIds.Count == 0)
             {
-                errors.Add("scenarioId must be a UUID.");
-                continue;
+                errors.Add($"{system.Name} needs at least one scenario.");
+            }
+            else
+            {
+                foreach (var id in row.ScenarioIds)
+                {
+                    if (!ids.Add(id))
+                        continue;
+                    if (id == Guid.Empty)
+                    {
+                        errors.Add($"{system.Name}: scenarioId must be a UUID.");
+                        continue;
+                    }
+
+                    chosen.Add(id);
+                    var scenario = store is null ? null : await store.GetByIdAsync(id, cancellationToken);
+                    if (scenario is null)
+                    {
+                        errors.Add($"{system.Name}: Scenario {id} was not found.");
+                        continue;
+                    }
+
+                    AddScenarioErrors(system.Name, scenario, errors);
+                }
             }
 
-            selected.Add(id);
-            var scenario = store is null ? null : await store.GetByIdAsync(id, cancellationToken);
-            if (scenario is null)
+            if (row.Copies < 1)
+                errors.Add($"{system.Name}: Copies must be a whole number of at least 1.");
+            else if (chosen.Count > 0
+                     && (long)chosen.Count * row.Copies > ReportBatchConcurrencyPolicy.MaxScenariosPerBatch)
             {
-                errors.Add($"Scenario {id} was not found.");
-                continue;
+                errors.Add(
+                    $"{system.Name}: A batch can include at most {ReportBatchConcurrencyPolicy.MaxScenariosPerBatch} scenarios.");
             }
 
-            AddScenarioErrors(scenario, errors);
+            try
+            {
+                ReportBatchConcurrencyPolicy.ResolveBatchCap(row.MaxConcurrency, savedCap);
+            }
+            catch (InvalidOperationException ex)
+            {
+                errors.Add($"{system.Name}: {ex.Message}");
+            }
+
+            if (errors.Count > 0 || chosen.Count == 0 || row.Copies < 1)
+                continue;
+
+            var expanded = new List<Guid>(checked(chosen.Count * row.Copies));
+            foreach (var id in chosen)
+            {
+                for (var copy = 0; copy < row.Copies; copy++)
+                    expanded.Add(id);
+            }
+
+            slices.Add(new ReportBatchLaunchSlice(system.Name, expanded, row.MaxConcurrency));
         }
 
-        if (copies < 1)
-            errors.Add("Copies must be a whole number of at least 1.");
-        else if (selected.Count > 0
-                 && (long)selected.Count * copies > ReportBatchConcurrencyPolicy.MaxScenariosPerBatch)
-        {
-            errors.Add(
-                $"A batch can include at most {ReportBatchConcurrencyPolicy.MaxScenariosPerBatch} scenarios.");
-        }
+        if (errors.Count > 0)
+            return new LaunchDecision(errors, []);
 
-        var savedCap = await SavedCapAsync(cancellationToken);
-        try
-        {
-            ReportBatchConcurrencyPolicy.ResolveBatchCap(maxConcurrency, savedCap);
-        }
-        catch (InvalidOperationException ex)
-        {
-            errors.Add(ex.Message);
-        }
-
-        if (errors.Count > 0 || system is null)
-            return new LaunchDecision(errors, [], system?.Name);
-
-        var expanded = new List<Guid>(checked(selected.Count * copies));
-        foreach (var id in selected)
-        {
-            for (var copy = 0; copy < copies; copy++)
-                expanded.Add(id);
-        }
-
-        return new LaunchDecision(errors, expanded, system.Name);
+        return new LaunchDecision(errors, slices);
     }
 
-    private static void AddScenarioErrors(TestScenarioDefinition scenario, List<string> errors)
+    private static void AddScenarioErrors(string ehr, TestScenarioDefinition scenario, List<string> errors)
     {
         var name = string.IsNullOrWhiteSpace(scenario.Name) ? scenario.Id.ToString() : scenario.Name.Trim();
         var start = scenario.ReportPeriodStart;
         var end = scenario.ReportPeriodEnd;
         // Both ends null is valid. The run uses the system default window.
         if ((start is null) != (end is null))
-            errors.Add($"{name} needs both ends of the report period.");
+            errors.Add($"{ehr}: {name} needs both ends of the report period.");
         else if (start is not null && end is not null && start.Value > end.Value)
-            errors.Add($"{name} has a report period that starts after it ends.");
+            errors.Add($"{ehr}: {name} has a report period that starts after it ends.");
 
         if (!HasPatientSource(scenario))
-            errors.Add($"{name} needs a patient source.");
+            errors.Add($"{ehr}: {name} needs a patient source.");
     }
 
     private static bool HasPatientSource(TestScenarioDefinition scenario)
@@ -324,6 +331,8 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
         return false;
     }
 
+    private static string Trimmed(string? value) => (value ?? string.Empty).Trim();
+
     private static bool IsScheduled(ReportMethod method)
         => ReportExecution.UsesCensusScheduleKickoff(method);
 
@@ -337,6 +346,5 @@ public sealed class ReportBatchLaunchController(IServiceProvider services) : Con
 
     private sealed record LaunchDecision(
         IReadOnlyList<string> Errors,
-        IReadOnlyList<Guid> ExpandedScenarioIds,
-        string? EhrSystem);
+        IReadOnlyList<ReportBatchLaunchSlice> Slices);
 }

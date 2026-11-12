@@ -573,10 +573,12 @@ public class ReportBatchTests
             CreatedAt = DateTimeOffset.Parse("2026-11-10T00:00:00Z"),
             Items = [new ReportBatchItemDocument(), new ReportBatchItemDocument()]
         };
+        var launchId = Guid.NewGuid();
         var other = new ReportBatchDocument
         {
             BatchId = Guid.NewGuid(),
             EhrSystem = "clinic",
+            LaunchId = launchId,
             Status = ReportBatchStatus.Queued,
             CreatedAt = DateTimeOffset.Parse("2026-11-11T00:00:00Z"),
             Items = [new ReportBatchItemDocument()]
@@ -595,7 +597,9 @@ public class ReportBatchTests
         model.Groups.Select(group => group.EhrSystem).Should().Equal("clinic", "Local");
         model.Groups[0].Batches.Should().ContainSingle().Which.Status.Should().Be("Pending");
         model.Groups[0].Batches[0].Href.Should().Be("/Automation/ReportBatches/" + other.BatchId.ToString("D"));
+        model.Groups[0].Batches[0].LaunchHref.Should().Be("/Automation/ReportBatches/Launches/" + launchId.ToString("D"));
         model.Groups[1].Batches.Select(batch => batch.BatchId).Should().Equal(newer.BatchId, older.BatchId);
+        model.Groups[1].Batches[0].LaunchHref.Should().BeNull();
         model.Groups[1].Batches[0].Status.Should().Be("In Progress");
         model.Groups[1].Batches[0].ItemCount.Should().Be(2);
 
@@ -603,6 +607,143 @@ public class ReportBatchTests
         unavailable.Should().BeOfType<ViewResult>()
             .Which.Model.Should().BeOfType<ReportBatchHistoryPage>()
             .Which.Ready.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_launch_keeps_an_ampersand_in_the_EHR_name()
+    {
+        var harness = Harness();
+        var scenario = harness.AddScenario("alpha");
+
+        var launch = await harness.Dispatcher.StartLaunchAsync(
+            [new ReportBatchLaunchSlice("R&D", [scenario.Id], 1)],
+            CancellationToken.None);
+
+        launch.Batches.Should().ContainSingle().Which.EhrSystem.Should().Be("R&D");
+    }
+
+    [Fact]
+    public async Task A_launch_starts_one_batch_per_EHR_without_waiting()
+    {
+        var harness = Harness();
+        var local = harness.AddScenario("local-scenario");
+        var clinic = harness.AddScenario("clinic-scenario");
+
+        var launch = await harness.Dispatcher.StartLaunchAsync(
+            [
+                new ReportBatchLaunchSlice("local", [local.Id, local.Id], 1),
+                new ReportBatchLaunchSlice("clinic", [clinic.Id], 1)
+            ],
+            CancellationToken.None);
+
+        launch.Batches.Should().HaveCount(2);
+        launch.Batches.Should().OnlyContain(batch => batch.LaunchId == launch.LaunchId);
+        launch.Batches.Single(batch => batch.EhrSystem == "local").Items.Select(item => item.ScenarioId)
+            .Should().Equal(local.Id, local.Id);
+        launch.Batches.Single(batch => batch.EhrSystem == "clinic").Items.Should().ContainSingle()
+            .Which.ScenarioId.Should().Be(clinic.Id);
+        harness.Runs.Started.Select(request => request.EhrSystem).Should().Equal("local", "clinic");
+        launch.Batches.Should().OnlyContain(batch =>
+            batch.Items.Any(item => item.Status == ReportBatchItemStatus.Running));
+    }
+
+    [Fact]
+    public async Task A_second_batch_that_fails_to_create_cancels_the_first()
+    {
+        var harness = Harness();
+        var scenario = harness.AddScenario("alpha");
+
+        var act = () => harness.Dispatcher.StartLaunchAsync(
+            [
+                new ReportBatchLaunchSlice("local", [scenario.Id], 1),
+                new ReportBatchLaunchSlice("clinic", [Guid.NewGuid()], 1)
+            ],
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*was not found*");
+        (await harness.Batches.ListActiveAsync()).Should().BeEmpty();
+        var stored = await harness.Batches.ListRecentAsync(10, CancellationToken.None);
+        stored.Should().ContainSingle();
+        stored[0].EhrSystem.Should().Be("local");
+        stored[0].CancelRequested.Should().BeTrue();
+        stored[0].Status.Should().Be(ReportBatchStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task A_failed_insert_cancels_batches_already_created()
+    {
+        var harness = Harness();
+        harness.Batches.FailInsertNumber = 2;
+        var first = harness.AddScenario("alpha");
+        var second = harness.AddScenario("beta");
+
+        var act = () => harness.Dispatcher.StartLaunchAsync(
+            [
+                new ReportBatchLaunchSlice("local", [first.Id], 1),
+                new ReportBatchLaunchSlice("clinic", [second.Id], 1)
+            ],
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<IOException>();
+        (await harness.Batches.ListActiveAsync()).Should().BeEmpty();
+        var stored = await harness.Batches.ListRecentAsync(10, CancellationToken.None);
+        stored.Should().ContainSingle().Which.Status.Should().Be(ReportBatchStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task A_batch_saved_before_dispatch_fails_is_cancelled_with_the_launch()
+    {
+        var harness = Harness();
+        harness.Batches.FailNextReplace = true;
+        var scenario = harness.AddScenario("alpha");
+
+        var act = () => harness.Dispatcher.StartLaunchAsync(
+            [new ReportBatchLaunchSlice("local", [scenario.Id], 1)],
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<IOException>();
+        (await harness.Batches.ListActiveAsync()).Should().BeEmpty();
+        var stored = await harness.Batches.ListRecentAsync(10, CancellationToken.None);
+        stored.Should().ContainSingle();
+        stored[0].CancelRequested.Should().BeTrue();
+        stored[0].Status.Should().Be(ReportBatchStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task The_same_EHR_cannot_be_launched_twice()
+    {
+        var harness = Harness();
+        var scenario = harness.AddScenario("alpha");
+
+        var act = () => harness.Dispatcher.StartLaunchAsync(
+            [
+                new ReportBatchLaunchSlice("local", [scenario.Id], 1),
+                new ReportBatchLaunchSlice("local", [scenario.Id], 1)
+            ],
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*more than once*");
+        (await harness.Batches.ListRecentAsync(10, CancellationToken.None)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Cancelling_a_launch_cancels_every_open_batch()
+    {
+        var harness = Harness();
+        var local = harness.AddScenario("local-scenario");
+        var clinic = harness.AddScenario("clinic-scenario");
+        var launch = await harness.Dispatcher.StartLaunchAsync(
+            [
+                new ReportBatchLaunchSlice("local", [local.Id], 1),
+                new ReportBatchLaunchSlice("clinic", [clinic.Id], 1)
+            ],
+            CancellationToken.None);
+
+        await harness.Dispatcher.CancelLaunchAsync(launch.LaunchId, CancellationToken.None);
+
+        var stored = await harness.Batches.ListByLaunchAsync(launch.LaunchId, CancellationToken.None);
+        stored.Should().HaveCount(2);
+        stored.Should().OnlyContain(batch => batch.Status == ReportBatchStatus.Cancelled);
     }
 
     [Fact]
@@ -616,8 +757,10 @@ public class ReportBatchTests
 
         var history = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/ReportBatchTracking/History.cshtml"));
         history.Should().Contain("No batches yet.");
+        history.Should().Contain("batch.LaunchHref");
 
         detail.Should().Contain("<span data-item-error>");
+        detail.Should().Contain("batch.LaunchHref");
 
         var script = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/automation-batch.js"));
         script.Should().Contain("2000");
@@ -716,7 +859,13 @@ public class ReportBatchTests
         public string? CanonicalName(string? requestedName)
         {
             var trimmed = requestedName?.Trim();
-            return string.Equals(trimmed, "local", StringComparison.OrdinalIgnoreCase) ? "local" : null;
+            if (string.Equals(trimmed, "local", StringComparison.OrdinalIgnoreCase))
+                return "local";
+            if (string.Equals(trimmed, "clinic", StringComparison.OrdinalIgnoreCase))
+                return "clinic";
+            if (string.Equals(trimmed, "R&D", StringComparison.Ordinal))
+                return "R&D";
+            return null;
         }
     }
 
@@ -746,11 +895,19 @@ public class ReportBatchTests
 
         public bool FailNextReplace { get; set; }
 
+        public int FailInsertNumber { get; set; }
+
+        private int _inserts;
+
         public Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
         public Task InsertAsync(ReportBatchDocument batch, CancellationToken cancellationToken = default)
         {
+            _inserts++;
+            if (FailInsertNumber > 0 && _inserts == FailInsertNumber)
+                throw new IOException("insert failed");
+
             _batches[batch.BatchId] = Clone(batch);
             return Task.CompletedTask;
         }
@@ -793,11 +950,20 @@ public class ReportBatchTests
             return Task.FromResult(rows);
         }
 
+        public Task<IReadOnlyList<ReportBatchDocument>> ListByLaunchAsync(
+            Guid launchId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ReportBatchDocument>>(_batches.Values
+                .Where(batch => batch.LaunchId == launchId)
+                .Select(Clone)
+                .ToList());
+
         private static ReportBatchDocument Clone(ReportBatchDocument batch)
             => new()
             {
                 BatchId = batch.BatchId,
                 EhrSystem = batch.EhrSystem,
+                LaunchId = batch.LaunchId,
                 MaxConcurrency = batch.MaxConcurrency,
                 Status = batch.Status,
                 CancelRequested = batch.CancelRequested,

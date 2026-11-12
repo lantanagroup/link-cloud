@@ -18,8 +18,13 @@ public sealed class MongoReportBatchStore(IMongoDatabase database) : IReportBatc
         var created = new CreateIndexModel<ReportBatchDocument>(
             Builders<ReportBatchDocument>.IndexKeys.Descending(batch => batch.CreatedAt),
             new CreateIndexOptions { Name = "createdAt" });
+        // Equality only. A launch is a handful of batches, sorted in memory.
+        var launch = new CreateIndexModel<ReportBatchDocument>(
+            Builders<ReportBatchDocument>.IndexKeys.Ascending(batch => batch.LaunchId),
+            new CreateIndexOptions { Name = "launchId" });
         await _collection.Indexes.CreateOneAsync(status, cancellationToken: cancellationToken);
         await _collection.Indexes.CreateOneAsync(created, cancellationToken: cancellationToken);
+        await _collection.Indexes.CreateOneAsync(launch, cancellationToken: cancellationToken);
     }
 
     public Task InsertAsync(ReportBatchDocument batch, CancellationToken cancellationToken = default)
@@ -54,4 +59,9 @@ public sealed class MongoReportBatchStore(IMongoDatabase database) : IReportBatc
             .Limit(limit)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<ReportBatchDocument>> ListByLaunchAsync(
+        Guid launchId,
+        CancellationToken cancellationToken = default)
+        => await _collection.Find(batch => batch.LaunchId == launchId).ToListAsync(cancellationToken);
 }

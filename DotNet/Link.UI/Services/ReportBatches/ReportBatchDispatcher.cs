@@ -89,12 +89,13 @@ public sealed class ReportBatchDispatcher : IHostedService
         string? ehrSystem,
         IReadOnlyList<Guid>? scenarioIds,
         int? maxConcurrency,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? launchId = null)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var batch = await CreateBatchAsync(ehrSystem, scenarioIds, maxConcurrency, cancellationToken);
+            var batch = await CreateBatchAsync(ehrSystem, scenarioIds, maxConcurrency, launchId, cancellationToken);
             await _batches.InsertAsync(batch, cancellationToken);
             await DispatchOneAsync(batch, cancellationToken);
             _logger.LogInformation(
@@ -110,6 +111,62 @@ public sealed class ReportBatchDispatcher : IHostedService
             _gate.Release();
             Wake();
         }
+    }
+
+    /// <summary>
+    /// Starts one batch per slice under one launch id. A later slice that fails
+    /// cancels the batches already created for this launch.
+    /// </summary>
+    public async Task<ReportBatchLaunchStarted> StartLaunchAsync(
+        IReadOnlyList<ReportBatchLaunchSlice>? slices,
+        CancellationToken cancellationToken)
+    {
+        if (slices is null || slices.Count == 0)
+            throw new InvalidOperationException("At least one EHR system is required.");
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var slice in slices)
+        {
+            var name = _ehr.CanonicalName((slice.EhrSystem ?? string.Empty).Trim());
+            if (name is null)
+                throw new InvalidOperationException("ehrSystem is required and must be a configured EHR system.");
+            if (!seen.Add(name))
+                throw new InvalidOperationException($"{name} is selected more than once.");
+        }
+
+        var launchId = Guid.NewGuid();
+        var created = new List<ReportBatchDocument>();
+        foreach (var slice in slices)
+        {
+            try
+            {
+                created.Add(await StartBatchAsync(
+                    slice.EhrSystem,
+                    slice.ScenarioIds,
+                    slice.MaxConcurrency,
+                    cancellationToken,
+                    launchId));
+            }
+            catch (Exception ex)
+            {
+                var cancelError = await CancelCreatedAsync(await BatchesToCancelAsync(launchId, created));
+                if (cancelError is not null)
+                {
+                    throw new InvalidOperationException(
+                        "The launch was not started. " + ex.Message
+                        + " Cancelling the batches already created failed. " + cancelError,
+                        ex);
+                }
+
+                throw;
+            }
+        }
+
+        _logger.LogInformation(
+            "Started report launch {LaunchId} across {EhrCount} EHR systems.",
+            launchId,
+            created.Count);
+        return new ReportBatchLaunchStarted(launchId, created);
     }
 
     public async Task<ReportBatchDocument?> GetBatchAsync(Guid batchId, CancellationToken cancellationToken)
@@ -163,6 +220,44 @@ public sealed class ReportBatchDispatcher : IHostedService
         }
     }
 
+    /// <summary>
+    /// Cancels every still-open batch in the launch. One failure does not skip the others.
+    /// </summary>
+    public async Task<IReadOnlyList<ReportBatchDocument>> CancelLaunchAsync(
+        Guid launchId,
+        CancellationToken cancellationToken)
+    {
+        var batches = await _batches.ListByLaunchAsync(launchId, cancellationToken);
+        var errors = new List<string>();
+        foreach (var batch in batches)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!ReportBatchStatus.IsOpen(batch.Status))
+                continue;
+
+            try
+            {
+                await CancelBatchAsync(batch.BatchId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                errors.Add(ex.Message);
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "One or more EHR batches could not be cancelled. " + string.Join(" ", errors));
+        }
+
+        return await _batches.ListByLaunchAsync(launchId, cancellationToken);
+    }
+
     public async Task RecoverAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -200,13 +295,53 @@ public sealed class ReportBatchDispatcher : IHostedService
         }
     }
 
+    private async Task<IReadOnlyList<ReportBatchDocument>> BatchesToCancelAsync(
+        Guid launchId,
+        IReadOnlyList<ReportBatchDocument> created)
+    {
+        try
+        {
+            var stored = await _batches.ListByLaunchAsync(launchId, CancellationToken.None);
+            if (stored.Count > 0)
+                return stored;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not list launch {LaunchId} while undoing a failed start.", launchId);
+        }
+
+        return created;
+    }
+
+    private async Task<string?> CancelCreatedAsync(IReadOnlyList<ReportBatchDocument> created)
+    {
+        if (created.Count == 0)
+            return null;
+
+        var failures = new List<string>();
+        foreach (var batch in created)
+        {
+            try
+            {
+                await CancelBatchAsync(batch.BatchId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                failures.Add(ex.Message);
+            }
+        }
+
+        return failures.Count == 0 ? null : string.Join(" ", failures);
+    }
+
     private async Task<ReportBatchDocument> CreateBatchAsync(
         string? ehrSystem,
         IReadOnlyList<Guid>? scenarioIds,
         int? maxConcurrency,
+        Guid? launchId,
         CancellationToken cancellationToken)
     {
-        var ehr = _ehr.CanonicalName(ehrSystem.Sanitize());
+        var ehr = _ehr.CanonicalName((ehrSystem ?? string.Empty).Trim());
         if (ehr is null)
             throw new InvalidOperationException("ehrSystem is required and must be a configured EHR system.");
 
@@ -247,6 +382,7 @@ public sealed class ReportBatchDispatcher : IHostedService
         {
             BatchId = Guid.NewGuid(),
             EhrSystem = ehr,
+            LaunchId = launchId,
             MaxConcurrency = cap,
             Status = ReportBatchStatus.Queued,
             Items = items,

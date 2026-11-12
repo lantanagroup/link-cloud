@@ -44,6 +44,11 @@ else if (batch is not null)
                 <dl class="row mb-0">
                     <dt class="col-sm-3">Batch</dt>
                     <dd class="col-sm-9" id="batchId">@batch.BatchId</dd>
+                    @if (batch.LaunchHref is not null && batch.LaunchId is Guid launchId)
+                    {
+                        <dt class="col-sm-3">Launch</dt>
+                        <dd class="col-sm-9"><a id="batchLaunch" href="@batch.LaunchHref">@launchId</a></dd>
+                    }
                     <dt class="col-sm-3">EHR</dt>
                     <dd class="col-sm-9" id="batchEhr">@batch.EhrSystem</dd>
                     <dt class="col-sm-3">At once</dt>

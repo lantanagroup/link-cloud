@@ -36,6 +36,14 @@ public sealed class ReportBatchDocument
 
     public string EhrSystem { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Set when this batch was started with other EHR batches from one launch.
+    /// Absent on a batch started on its own.
+    /// </summary>
+    [BsonIgnoreIfNull]
+    [BsonRepresentation(BsonType.String)]
+    public Guid? LaunchId { get; set; }
+
     /// <summary>Cap copied when the batch was dispatched. A later settings change does not resize it.</summary>
     public int MaxConcurrency { get; set; }
 
@@ -76,3 +84,14 @@ public sealed class ReportBatchItemDocument
     [BsonIgnoreIfNull]
     public string? Error { get; set; }
 }
+
+/// <summary>One EHR's scenarios and cap inside a multi-EHR launch.</summary>
+public sealed record ReportBatchLaunchSlice(
+    string? EhrSystem,
+    IReadOnlyList<Guid>? ScenarioIds,
+    int? MaxConcurrency);
+
+/// <summary>The batches created for one launch. Each batch keeps its own EHR.</summary>
+public sealed record ReportBatchLaunchStarted(
+    Guid LaunchId,
+    IReadOnlyList<ReportBatchDocument> Batches);
