@@ -1,4 +1,5 @@
 using Automation.UI.Services;
+using Link.UI.Services.ReportBatches;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.TestRail;
 using Automation.UI.Services.ApiHealth.Seeding;
@@ -237,6 +238,15 @@ public static class LinkAutomationEngine
         services.AddSingleton<ITestRailApiClient, TestRailApiClient>();
         services.AddSingleton<ITestRailPublisher, TestRailPublisher>();
         services.AddHostedService<TestRailStartupCheckService>();
+
+        // After scenario and API-health startup recovery, so in-flight runs are already
+        // cancelled or deleted before a batch decides it will not resume them.
+        services.AddSingleton<IReportBatchStore, MongoReportBatchStore>();
+        services.AddSingleton<IReportBatchSettingsStore, MongoReportBatchSettingsStore>();
+        services.AddSingleton<IReportBatchRunGateway, AutomationRunManagerBatchGateway>();
+        services.AddSingleton<IReportBatchEhrLookup, CatalogReportBatchEhrLookup>();
+        services.AddSingleton<ReportBatchDispatcher>();
+        services.AddHostedService(sp => sp.GetRequiredService<ReportBatchDispatcher>());
 
         return new LinkAutomationEngineStatus { Ready = true };
     }

@@ -1,0 +1,50 @@
+@using Link.UI.Services.ReportBatches
+@model ReportBatchSettingsPage
+@{
+    ViewData["Title"] = "Report batches";
+}
+
+@await Html.PartialAsync("~/Views/Automation/_Nav.cshtml")
+
+<div class="mb-3">
+    <h1 class="h3 mb-1">Report batches</h1>
+    <p class="text-muted mb-0">How many report runs a batch may keep in flight. The rest stay queued. This value is stored for this app. It is not an environment setting, and a change applies to batches started after the save.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Message))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.Message
+        <button type="button" class="btn-close lu-dismiss" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.Error
+        <button type="button" class="btn-close lu-dismiss" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+    </div>
+}
+
+<div class="au-card card">
+    <div class="card-header">Concurrency cap</div>
+    <div class="card-body">
+        @if (!Model.Ready)
+        {
+            <p class="mb-0">The cap cannot be changed until the automation engine is ready. Until a value is saved, batches use @ReportBatchConcurrencyPolicy.DefaultMaxConcurrency.</p>
+        }
+        else
+        {
+            <form method="post" asp-action="Save">
+                @Html.AntiForgeryToken()
+                <div class="mb-3">
+                    <label class="form-label" for="maxConcurrency">Max concurrent runs</label>
+                    <input class="form-control w-auto" type="number" id="maxConcurrency" name="maxConcurrency"
+                           min="1" max="@Model.UpperBound" step="1" required value="@Model.MaxConcurrency" />
+                    <div class="form-text">A whole number from 1 to @Model.UpperBound. The default before anything is saved is @ReportBatchConcurrencyPolicy.DefaultMaxConcurrency. A batch request may use a lower cap. It cannot use a higher one.</div>
+                </div>
+                <button type="submit" class="btn btn-success">Save settings</button>
+            </form>
+        }
+    </div>
+</div>
