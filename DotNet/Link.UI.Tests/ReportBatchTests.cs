@@ -258,6 +258,58 @@ public class ReportBatchTests
     }
 
     [Fact]
+    public async Task Restart_keeps_interrupted_when_startup_recovery_already_cancelled_the_run()
+    {
+        // Startup recovery cancels a run with no in-memory execution before batch
+        // recovery reads it. The batch item must not keep that cancel text.
+        var harness = Harness();
+        var queued = harness.AddScenario("queued");
+        var runId = Guid.NewGuid();
+        harness.Runs.Status[runId] = AutomationRunStatus.Cancelled;
+        harness.Runs.Errors[runId] = "Cancelled by user (no active execution in this process).";
+        await harness.Batches.InsertAsync(new ReportBatchDocument
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = "local",
+            MaxConcurrency = 1,
+            Status = ReportBatchStatus.Running,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Items =
+            [
+                new ReportBatchItemDocument
+                {
+                    Ordinal = 0,
+                    ScenarioId = Guid.NewGuid(),
+                    ScenarioName = "in flight",
+                    Status = ReportBatchItemStatus.Running,
+                    RunId = runId
+                },
+                new ReportBatchItemDocument
+                {
+                    Ordinal = 1,
+                    ScenarioId = queued.Id,
+                    ScenarioName = queued.Name,
+                    Status = ReportBatchItemStatus.Queued
+                }
+            ]
+        });
+
+        await harness.Dispatcher.RecoverAsync(CancellationToken.None);
+        var afterRecovery = (await harness.Batches.ListActiveAsync()).Single();
+        afterRecovery.Items[0].Status.Should().Be(ReportBatchItemStatus.Cancelled);
+        afterRecovery.Items[0].Error.Should().Be(ReportBatchDispatcher.InterruptedByRestart);
+        afterRecovery.Items[1].Status.Should().Be(ReportBatchItemStatus.Queued);
+        harness.Runs.Cancelled.Should().BeEmpty();
+
+        await harness.Dispatcher.PumpAsync(CancellationToken.None);
+
+        var stored = (await harness.Batches.ListActiveAsync()).Single();
+        stored.Items[1].Status.Should().Be(ReportBatchItemStatus.Running);
+        harness.Runs.Started.Should().ContainSingle();
+        harness.Runs.Started[0].ScenarioId.Should().Be(queued.Id);
+    }
+
+    [Fact]
     public async Task Restart_keeps_a_run_that_already_finished()
     {
         var harness = Harness();
@@ -1011,6 +1063,7 @@ public class ReportBatchTests
         public List<StartScenarioRequest> Started { get; } = [];
         public List<Guid> Cancelled { get; } = [];
         public Dictionary<Guid, AutomationRunStatus> Status { get; } = [];
+        public Dictionary<Guid, string?> Errors { get; } = [];
         public HashSet<Guid> FailScenarioIds { get; } = [];
         public bool ThrowMetricsRefusal { get; set; }
 
@@ -1047,12 +1100,14 @@ public class ReportBatchTests
             {
                 RunId = runId,
                 Status = status,
-                Error = status switch
-                {
-                    AutomationRunStatus.Failed => "run failed",
-                    AutomationRunStatus.Cancelled => "Cancelled by user.",
-                    _ => null
-                }
+                Error = Errors.TryGetValue(runId, out var error)
+                    ? error
+                    : status switch
+                    {
+                        AutomationRunStatus.Failed => "run failed",
+                        AutomationRunStatus.Cancelled => "Cancelled by user.",
+                        _ => null
+                    }
             });
         }
     }
