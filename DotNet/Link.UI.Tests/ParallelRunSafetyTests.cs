@@ -5,6 +5,7 @@ using FluentAssertions;
 using LantanaGroup.Automation;
 using LantanaGroup.Automation.Configuration;
 using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Automation.Helpers;
 using Link.UI.Services;
 using Xunit;
