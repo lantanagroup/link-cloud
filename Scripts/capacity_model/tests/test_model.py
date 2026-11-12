@@ -260,12 +260,15 @@ class InputTests(unittest.TestCase):
                     "kafka.ResourcesAcquired": 1.9, "kafka.ReadyForValidation": 0.9, "kafka.SubmitPayload.patient": 0.9,
                     "validation.result": 100, "validation.result_category": 100,
                     "validation.legacy_shadow_finding": 100, "validation.rubric_finding": 10,
-                    "da.DataAcquisitionLog": 8.4, "kafka.ReadyToAcquire": 8.4, "report.ResourceCount": 10,
+                    "da.DataAcquisitionLog": 9.3, "da.FhirQuery": 9.3, "da.DataAcquisitionLogNote": 9.3,
+                    "kafka.ReadyToAcquire": 9.3, "report.ResourceCount": 10,
                     "report.MeasureReportPopulation": 2, "da.PendingReferenceId": 20, "report.ReportEntry": 1}
         for sid, value in expected.items():
             self.assertAlmostEqual(m[sid], value, places=9, msg=sid)
         by_id = {s["id"]: s for s in stores}
-        self.assertEqual([t["driver"] for t in by_id["da.DataAcquisitionLog"]["drivers"]], ["entry", "reportable"])
+        # 2026-11-12: 3 INITIAL logs per entry + 7 SUPPLEMENTAL per reportable entry (10 per reportable patient)
+        self.assertEqual(by_id["da.DataAcquisitionLog"]["drivers"],
+                         [{"driver": "entry", "per": 3}, {"driver": "reportable", "per": 7}])
         self.assertEqual(by_id["validation.result"]["drivers"][0]["driver"], "reportable_resources")
 
     def test_corrections_from_the_live_runs(self):

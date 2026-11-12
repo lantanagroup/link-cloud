@@ -385,7 +385,7 @@
       "kind": "sql",
       "store": "DataAcquisitionLogs",
       "grain": "patient_report",
-      "multiplier_source": "prior: ~8.4 logs per patient (Performance Model, one week, 2,991 patients); as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
       "multiplier_status": "prior",
       "bytes_per_row": 600,
       "anchor": "report",
@@ -403,14 +403,13 @@
       "drivers": [
         {
           "driver": "entry",
-          "per": 4.42105263158
+          "per": 3
         },
         {
           "driver": "reportable",
-          "per": 4.42105263158
+          "per": 7
         }
-      ],
-      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
+      ]
     },
     {
       "id": "da.FhirQuery",
@@ -418,8 +417,8 @@
       "kind": "sql",
       "store": "FhirQueries",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: one query per log; as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one query per log; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_status": "prior",
       "bytes_per_row": 500,
       "anchor": "report",
       "adr_action": "delete (child of log)",
@@ -437,14 +436,13 @@
       "drivers": [
         {
           "driver": "entry",
-          "per": 4.42105263158
+          "per": 3
         },
         {
           "driver": "reportable",
-          "per": 4.42105263158
+          "per": 7
         }
-      ],
-      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
+      ]
     },
     {
       "id": "da.FhirQueryResourceType",
@@ -452,8 +450,8 @@
       "kind": "sql",
       "store": "FhirQueryResourceTypes",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: one resource type per query; as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one resource type per query; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_status": "prior",
       "bytes_per_row": 50,
       "anchor": "report",
       "adr_action": "delete (child of log)",
@@ -471,14 +469,13 @@
       "drivers": [
         {
           "driver": "entry",
-          "per": 4.42105263158
+          "per": 3
         },
         {
           "driver": "reportable",
-          "per": 4.42105263158
+          "per": 7
         }
-      ],
-      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
+      ]
     },
     {
       "id": "da.ResourceReferenceType",
@@ -514,8 +511,8 @@
       "kind": "sql",
       "store": "DataAcquisitionLogNotes",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: one note per log; as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); one note per log; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_status": "prior",
       "bytes_per_row": 300,
       "anchor": "report",
       "adr_action": "delete (child of log)",
@@ -533,14 +530,13 @@
       "drivers": [
         {
           "driver": "entry",
-          "per": 4.42105263158
+          "per": 3
         },
         {
           "driver": "reportable",
-          "per": 4.42105263158
+          "per": 7
         }
-      ],
-      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
+      ]
     },
     {
       "id": "da.DataAcquisitionLogResourceId",
@@ -1304,8 +1300,8 @@
       "kind": "kafka",
       "store": "ReadyToAcquire",
       "grain": "patient_report",
-      "multiplier_source": "placeholder: about one message per DataAcquisitionLog (the DA log prior); as drivers: 4.42105 per entry + 4.42105 per reportable, the same count on each acquisition pass (8.4 per entry at the decided drivers; was 8.4)",
-      "multiplier_status": "placeholder",
+      "multiplier_source": "LEGPROG-516 estimate, 2026-11-12: about 10 DA logs per reportable patient in production (3 INITIAL + 7 SUPPLEMENTAL); about one message per DataAcquisitionLog; as drivers: 3 per entry + 7 per reportable (9.3 per entry at the decided drivers; was 8.4)",
+      "multiplier_status": "prior",
       "bytes_per_row": 1000,
       "anchor": "own_retention",
       "residency_days_param": "kafka_retention_days",
@@ -1321,14 +1317,13 @@
       "drivers": [
         {
           "driver": "entry",
-          "per": 4.42105263158
+          "per": 3
         },
         {
           "driver": "reportable",
-          "per": 4.42105263158
+          "per": 7
         }
-      ],
-      "notes": "Split equally across the INITIAL and SUPPLEMENTAL passes until capture measures the QueryPhase split."
+      ]
     },
     {
       "id": "kafka.ResourcesAcquired",
