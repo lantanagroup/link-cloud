@@ -6,12 +6,12 @@
 
     function forRun(status) {
         var s = norm(status);
-        if (s === "succeeded") return "au-badge-success";
+        if (s === "succeeded" || s === "completed") return "au-badge-success";
         if (s === "failed") return "au-badge-danger";
         if (s === "cancelled" || s === "canceled" || s === "2") return "au-badge-warning";
         if (s === "3") return "au-badge-success";
         if (s === "4") return "au-badge-danger";
-        if (s === "running" || s === "queued" || s === "livewindow" || s === "livewindowopen"
+        if (s === "running" || s === "queued" || s === "pending" || s === "inprogress" || s === "livewindow" || s === "livewindowopen"
             || s === "finalizing" || s === "reportfinalization" || s === "collecting" || s === "collectingmetrics"
             || s === "0" || s === "1" || s === "5" || s === "6" || s === "7")
             return "au-badge-active";

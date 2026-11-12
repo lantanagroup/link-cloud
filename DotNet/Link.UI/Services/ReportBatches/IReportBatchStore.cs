@@ -11,6 +11,9 @@ public interface IReportBatchStore
     Task ReplaceAsync(ReportBatchDocument batch, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ReportBatchDocument>> ListActiveAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Newest batches first. The caller chooses how many.</summary>
+    Task<IReadOnlyList<ReportBatchDocument>> ListRecentAsync(int limit, CancellationToken cancellationToken = default);
 }
 
 public interface IReportBatchSettingsStore

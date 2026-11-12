@@ -27,13 +27,13 @@ public static class StatusPills
     public static string ForRun(string? status)
     {
         var name = Compact(status);
-        if (name == "succeeded")
+        if (name is "succeeded" or "completed")
             return "au-badge-success";
         if (name == "failed")
             return "au-badge-danger";
         if (name is "cancelled" or "canceled")
             return "au-badge-warning";
-        if (name is "queued" or "running" or "livewindow" or "livewindowopen" or "finalizing" or "reportfinalization" or "collecting" or "collectingmetrics"
+        if (name is "queued" or "pending" or "running" or "inprogress" or "livewindow" or "livewindowopen" or "finalizing" or "reportfinalization" or "collecting" or "collectingmetrics"
             || AutomationRules.IsInProgress(status))
             return "au-badge-active";
         return "au-badge-muted";
