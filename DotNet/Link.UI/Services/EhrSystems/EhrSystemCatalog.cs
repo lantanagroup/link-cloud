@@ -129,6 +129,11 @@ public sealed class EhrSystemCatalog
                     $"EHR system '{name}' cannot enable OAuth and basic auth together.");
             }
 
+            if (oauth.ShouldAuthenticate)
+                RequireOAuth(oauth, name);
+            if (basic.ShouldAuthenticate)
+                RequireBasic(basic, name);
+
             systems.Add(new NamedEhrSystem(name, consumerBase, facilityBase, template, entry.IsDefault, oauth, basic));
         }
 
@@ -228,6 +233,29 @@ public sealed class EhrSystemCatalog
         }
 
         return trimmed;
+    }
+
+    private static void RequireOAuth(OAuthConfig oauth, string systemName)
+    {
+        RequireAuthField(oauth.TokenEndpoint, systemName, "OAuth token endpoint");
+        RequireAuthField(oauth.ClientId, systemName, "OAuth client id");
+        RequireAuthField(oauth.Username, systemName, "OAuth username");
+        RequireAuthField(oauth.Password, systemName, "OAuth password");
+    }
+
+    private static void RequireBasic(BasicAuthConfig basic, string systemName)
+    {
+        RequireAuthField(basic.Username, systemName, "basic auth username");
+        RequireAuthField(basic.Password, systemName, "basic auth password");
+    }
+
+    private static void RequireAuthField(string? value, string systemName, string field)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                $"EHR system '{systemName}' needs a {field} when that auth mode is on.");
+        }
     }
 
     private static OAuthConfig CopyOAuth(OAuthConfig? source) => new()

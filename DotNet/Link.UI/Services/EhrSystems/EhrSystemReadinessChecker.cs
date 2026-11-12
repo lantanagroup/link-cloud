@@ -32,7 +32,8 @@ public sealed class EhrSystemReadinessChecker(IHttpClientFactory httpClientFacto
         NamedEhrSystem ehr,
         HttpClient client,
         CancellationToken cancellationToken,
-        Func<OAuthConfig, string>? bearerToken = null)
+        Func<OAuthConfig, string>? bearerToken = null,
+        TimeSpan? tokenTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(ehr);
         ArgumentNullException.ThrowIfNull(client);
@@ -42,7 +43,7 @@ public sealed class EhrSystemReadinessChecker(IHttpClientFactory httpClientFacto
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, metadata);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/fhir+json"));
-            ApplyAuthorization(request, ehr, bearerToken);
+            await ApplyAuthorization(request, ehr, bearerToken, tokenTimeout ?? Timeout, cancellationToken);
 
             using var response = await client.SendAsync(request, cancellationToken);
             var status = (int)response.StatusCode;
@@ -63,15 +64,17 @@ public sealed class EhrSystemReadinessChecker(IHttpClientFactory httpClientFacto
         }
     }
 
-    private static void ApplyAuthorization(
+    private static async Task ApplyAuthorization(
         HttpRequestMessage request,
         NamedEhrSystem ehr,
-        Func<OAuthConfig, string>? bearerToken)
+        Func<OAuthConfig, string>? bearerToken,
+        TimeSpan tokenTimeout,
+        CancellationToken cancellationToken)
     {
         if (ehr.OAuth.ShouldAuthenticate)
         {
             var token = bearerToken is null
-                ? AuthHelper.GetBearerToken(ehr.OAuth)
+                ? await AuthHelper.GetBearerTokenAsync(ehr.OAuth, tokenTimeout, cancellationToken).ConfigureAwait(false)
                 : bearerToken(ehr.OAuth);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             return;

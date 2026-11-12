@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using Automation.UI.Models;
 using Automation.UI.Services;
@@ -108,6 +110,50 @@ public class EhrSystemTests
             }
         ]);
         bothAuth.Should().Throw<InvalidOperationException>().WithMessage("*together*");
+    }
+
+    [Fact]
+    public void Auth_that_is_on_requires_the_fields_the_token_call_uses()
+    {
+        var missingToken = () => EhrSystemCatalog.Validate([OauthEntry(tokenEndpoint: "  ")]);
+        missingToken.Should().Throw<InvalidOperationException>().WithMessage("*OAuth token endpoint*");
+
+        var missingClient = () => EhrSystemCatalog.Validate([OauthEntry(clientId: "")]);
+        missingClient.Should().Throw<InvalidOperationException>().WithMessage("*OAuth client id*");
+
+        var missingUser = () => EhrSystemCatalog.Validate([OauthEntry(username: null)]);
+        missingUser.Should().Throw<InvalidOperationException>().WithMessage("*OAuth username*");
+
+        var missingPassword = () => EhrSystemCatalog.Validate([OauthEntry(password: null)]);
+        missingPassword.Should().Throw<InvalidOperationException>().WithMessage("*OAuth password*");
+
+        var missingBasicUser = () => EhrSystemCatalog.Validate(
+        [
+            new EhrSystemEntry
+            {
+                Name = "local",
+                FhirServerBase = "https://ehr.example/fhir",
+                IsDefault = true,
+                BasicAuth = new BasicAuthConfig { ShouldAuthenticate = true, Password = "not-a-real-password" } // trufflehog:ignore
+            }
+        ]);
+        missingBasicUser.Should().Throw<InvalidOperationException>().WithMessage("*basic auth username*");
+
+        var missingBasicPassword = () => EhrSystemCatalog.Validate(
+        [
+            new EhrSystemEntry
+            {
+                Name = "local",
+                FhirServerBase = "https://ehr.example/fhir",
+                IsDefault = true,
+                BasicAuth = new BasicAuthConfig { ShouldAuthenticate = true, Username = "reader" }
+            }
+        ]);
+        missingBasicPassword.Should().Throw<InvalidOperationException>().WithMessage("*basic auth password*");
+
+        var configured = EhrSystemCatalog.Validate([OauthEntry()])[0];
+        configured.OAuth.ClientSecret.Should().BeNull();
+        configured.OAuth.TokenEndpoint.Should().Be("https://auth.example/token");
     }
 
     [Fact]
@@ -279,6 +325,43 @@ public class EhrSystemTests
     }
 
     [Fact]
+    public async Task A_silent_token_endpoint_fails_the_probe_within_the_timeout()
+    {
+        using var listener = Hang();
+        var system = OauthSystem(listener);
+        var started = Stopwatch.StartNew();
+
+        var result = await EhrSystemReadinessChecker.CheckAsync(
+            system,
+            new HttpClient(new StubHandler(_ => throw new InvalidOperationException("metadata was called"))),
+            CancellationToken.None,
+            tokenTimeout: TimeSpan.FromSeconds(1));
+
+        started.Stop();
+        result.Ready.Should().BeFalse();
+        result.Error.Should().NotContain("not-a-real-password");
+        started.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(8));
+    }
+
+    [Fact]
+    public async Task Cancelling_the_probe_stops_the_token_call()
+    {
+        using var listener = Hang();
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+        var started = Stopwatch.StartNew();
+
+        var act = async () => await EhrSystemReadinessChecker.CheckAsync(
+            OauthSystem(listener),
+            new HttpClient(new StubHandler(_ => throw new InvalidOperationException("metadata was called"))),
+            cts.Token,
+            tokenTimeout: TimeSpan.FromSeconds(30));
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        started.Stop();
+        started.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void Committed_link_ui_settings_name_the_local_endpoint_and_hold_no_secrets()
     {
         var root = RepoRoot();
@@ -309,6 +392,52 @@ public class EhrSystemTests
         var page = File.ReadAllText(Path.Combine(RepoRoot(), "DotNet", "Link.UI", "Views", "Automation", "_RunDetail.cshtml"));
         page.Should().Contain("Model.EhrSystem");
         page.Should().Contain("runEhrSystem");
+    }
+
+    private static EhrSystemEntry OauthEntry(
+        string? tokenEndpoint = "https://auth.example/token",
+        string? clientId = "client",
+        string? username = "reader",
+        string? password = "not-a-real-password") => new() // trufflehog:ignore
+    {
+        Name = "local",
+        FhirServerBase = "https://ehr.example/fhir",
+        IsDefault = true,
+        OAuth = new OAuthConfig
+        {
+            ShouldAuthenticate = true,
+            TokenEndpoint = tokenEndpoint,
+            ClientId = clientId,
+            Username = username,
+            Password = password
+        }
+    };
+
+    private static NamedEhrSystem OauthSystem(TcpListener listener)
+    {
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        return new NamedEhrSystem(
+            "local",
+            "https://ehr.example/fhir",
+            "https://ehr.example/fhir",
+            null,
+            true,
+            new OAuthConfig
+            {
+                ShouldAuthenticate = true,
+                TokenEndpoint = $"http://127.0.0.1:{port}/token",
+                ClientId = "client",
+                Username = "reader",
+                Password = "not-a-real-password" // trufflehog:ignore
+            },
+            new BasicAuthConfig());
+    }
+
+    private static TcpListener Hang()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return listener;
     }
 
     private static EhrSystemEntry Entry(string name, string url, string? facilityBase, bool isDefault, string? template = null) => new()
