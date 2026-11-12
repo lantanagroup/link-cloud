@@ -17,6 +17,8 @@ public static class AutomationSurface
         "/api/runs",
         "/api/api-health-runs",
         "/api/ehr-systems",
+        "/api/report-batches",
+        "/api/report-batch-settings",
         "/hubs/runs",
         "/hubs/cleanup"
     ];

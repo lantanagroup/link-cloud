@@ -72,7 +72,9 @@ public static class ShellAccessGate
     public static bool IsNativeAutomationApi(PathString path) =>
         path.StartsWithSegments("/api/runs")
         || path.StartsWithSegments("/api/api-health-runs")
-        || path.StartsWithSegments("/api/ehr-systems");
+        || path.StartsWithSegments("/api/ehr-systems")
+        || path.StartsWithSegments("/api/report-batches")
+        || path.StartsWithSegments("/api/report-batch-settings");
 
     /// <summary>
     /// Routes whose controller or action requires ApiBearerPolicy.
@@ -81,7 +83,9 @@ public static class ShellAccessGate
     public static bool IsBearerProtectedApi(PathString path) =>
         path.StartsWithSegments("/api/runs")
         || path.StartsWithSegments("/api/api-health-runs/start-all-for-pipeline")
-        || path.StartsWithSegments("/api/ehr-systems");
+        || path.StartsWithSegments("/api/ehr-systems")
+        || path.StartsWithSegments("/api/report-batches")
+        || path.StartsWithSegments("/api/report-batch-settings");
 
     /// <summary>
     /// When anonymous access is off, native automation API routes are closed unless bearer
