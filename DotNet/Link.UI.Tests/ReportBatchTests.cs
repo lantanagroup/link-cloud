@@ -292,6 +292,44 @@ public class ReportBatchTests
     }
 
     [Fact]
+    public async Task A_failed_save_after_start_cancels_that_run_and_the_next_pump_starts_one()
+    {
+        var harness = Harness();
+        harness.Batches.FailNextReplace = true;
+        var scenario = harness.AddScenario("one");
+
+        var act = () => harness.Dispatcher.StartBatchAsync("local", [scenario.Id], null, CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        harness.Runs.Started.Should().ContainSingle();
+        harness.Runs.Cancelled.Should().ContainSingle();
+        var orphan = harness.Runs.Cancelled[0];
+        harness.Runs.Status[orphan].Should().Be(AutomationRunStatus.Cancelled);
+
+        var stored = (await harness.Batches.ListActiveAsync()).Should().ContainSingle().Subject;
+        stored.Items.Should().ContainSingle();
+        stored.Items[0].Status.Should().Be(ReportBatchItemStatus.Queued);
+        stored.Items[0].RunId.Should().BeNull();
+
+        await harness.Dispatcher.PumpAsync(CancellationToken.None);
+
+        harness.Runs.Started.Should().HaveCount(2);
+        var after = await harness.Batches.GetAsync(stored.BatchId);
+        after!.Items.Should().ContainSingle();
+        after.Items[0].Status.Should().Be(ReportBatchItemStatus.Running);
+        after.Items[0].RunId.Should().NotBe(orphan);
+        harness.Runs.Status.Count(pair => pair.Value == AutomationRunStatus.Running).Should().Be(1);
+    }
+
+    [Fact]
+    public void The_batch_gateway_reads_run_status_without_the_run_logs()
+    {
+        var gateway = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/ReportBatches/AutomationRunManagerBatchGateway.cs"));
+        gateway.Should().Contain("runs.GetRunForDisplayAsync(runId, cancellationToken)");
+        gateway.Should().NotContain("runs.GetRunAsync(");
+    }
+
+    [Fact]
     public async Task An_unknown_ehr_or_a_missing_scenario_does_not_create_a_batch()
     {
         var harness = Harness();
@@ -495,6 +533,8 @@ public class ReportBatchTests
     {
         private readonly Dictionary<Guid, ReportBatchDocument> _batches = [];
 
+        public bool FailNextReplace { get; set; }
+
         public Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
@@ -509,6 +549,12 @@ public class ReportBatchTests
 
         public Task ReplaceAsync(ReportBatchDocument batch, CancellationToken cancellationToken = default)
         {
+            if (FailNextReplace)
+            {
+                FailNextReplace = false;
+                throw new IOException("replace failed");
+            }
+
             if (!_batches.ContainsKey(batch.BatchId))
                 throw new InvalidOperationException($"Batch {batch.BatchId} was not inserted.");
 

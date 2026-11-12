@@ -13,7 +13,7 @@ internal sealed class AutomationRunManagerBatchGateway(IAutomationRunManager run
         => runs.CancelRunAsync(runId, cancellationToken);
 
     public Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)
-        => runs.GetRunAsync(runId, cancellationToken);
+        => runs.GetRunForDisplayAsync(runId, cancellationToken);
 }
 
 internal sealed class CatalogReportBatchEhrLookup(EhrSystemCatalog catalog) : IReportBatchEhrLookup

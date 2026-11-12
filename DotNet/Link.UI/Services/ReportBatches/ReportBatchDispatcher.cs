@@ -282,7 +282,18 @@ public sealed class ReportBatchDispatcher : IHostedService
             if (!await TryStartAsync(batch, next, cancellationToken))
                 continue;
 
-            await SaveAsync(batch, cancellationToken);
+            try
+            {
+                await SaveAsync(batch, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // The run is already going, but the store still has this item queued
+                // with no run id. Cancel it on a token the request cannot cancel,
+                // and let the next pump start one run.
+                await AbandonUnsavedStartAsync(next, ex);
+                throw;
+            }
         }
     }
 
@@ -323,6 +334,32 @@ public sealed class ReportBatchDispatcher : IHostedService
                 batch.BatchId,
                 item.ScenarioId);
             return false;
+        }
+    }
+
+    private async Task AbandonUnsavedStartAsync(ReportBatchItemDocument item, Exception saveError)
+    {
+        var runId = item.RunId;
+        item.Status = ReportBatchItemStatus.Queued;
+        item.RunId = null;
+        item.Error = null;
+        if (runId is not Guid id)
+            return;
+
+        try
+        {
+            await _runs.CancelRunAsync(id, CancellationToken.None);
+            _logger.LogWarning(
+                saveError,
+                "Batch save failed after starting run {RunId}. The run was cancelled and the item stays queued.",
+                id);
+        }
+        catch (Exception cancelEx)
+        {
+            _logger.LogError(
+                cancelEx,
+                "Batch save failed after starting run {RunId}, and cancelling that run also failed.",
+                id);
         }
     }
 
