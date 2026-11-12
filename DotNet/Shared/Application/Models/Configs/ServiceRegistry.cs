@@ -35,6 +35,22 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public string TerminologyServiceUrl { get; set; } = null!;
         public string? PublicTerminologyServiceUrl { get; set; }
 
+        // Optional: the NHSN App BFF is not deployed in every environment, so a missing URL means
+        // "not monitored here", not a startup failure.
+        public string? NhsnAppBffServiceUrl { get; set; }
+        public string? PublicNhsnAppBffServiceUrl { get; set; }
+
+        public string? NhsnAppBffServiceApiUrl
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(this.NhsnAppBffServiceUrl))
+                    return this.NhsnAppBffServiceUrl.TrimEnd('/') + "/api";
+
+                return null;
+            }
+        }
+
         public string? TerminologyServiceApiUrl
         {
             get

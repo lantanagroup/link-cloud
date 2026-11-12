@@ -204,7 +204,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, ReportsEndpoints>();
     builder.Services.AddTransient<IApi, ReportingPlanEndpoints>();
     builder.Services.AddTransient<IApi, DocumentsEndpoints>();
-    builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
+    // Same check and row name as the other services' databases, so the Admin UI health page shows
+    // this one the way it shows theirs.
+    builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck<NhsnAppDbContext>>(HealthCheckNames.SqlServerDatabase);
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
