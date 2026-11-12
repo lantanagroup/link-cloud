@@ -9,13 +9,17 @@ public sealed class MongoReportBatchStore(IMongoDatabase database) : IReportBatc
     private readonly IMongoCollection<ReportBatchDocument> _collection =
         database.GetCollection<ReportBatchDocument>(CollectionName);
 
-    public Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
+    public async Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
     {
-        var keys = Builders<ReportBatchDocument>.IndexKeys.Ascending(batch => batch.Status);
-        var model = new CreateIndexModel<ReportBatchDocument>(
-            keys,
+        var status = new CreateIndexModel<ReportBatchDocument>(
+            Builders<ReportBatchDocument>.IndexKeys.Ascending(batch => batch.Status),
             new CreateIndexOptions { Name = "status" });
-        return _collection.Indexes.CreateOneAsync(model, cancellationToken: cancellationToken);
+        // Cosmos rejects a sort on a field that has no index. History lists the newest batches.
+        var created = new CreateIndexModel<ReportBatchDocument>(
+            Builders<ReportBatchDocument>.IndexKeys.Descending(batch => batch.CreatedAt),
+            new CreateIndexOptions { Name = "createdAt" });
+        await _collection.Indexes.CreateOneAsync(status, cancellationToken: cancellationToken);
+        await _collection.Indexes.CreateOneAsync(created, cancellationToken: cancellationToken);
     }
 
     public Task InsertAsync(ReportBatchDocument batch, CancellationToken cancellationToken = default)
@@ -37,5 +41,17 @@ public sealed class MongoReportBatchStore(IMongoDatabase database) : IReportBatc
             batch => batch.Status,
             [ReportBatchStatus.Queued, ReportBatchStatus.Running]);
         return await _collection.Find(filter).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ReportBatchDocument>> ListRecentAsync(int limit, CancellationToken cancellationToken = default)
+    {
+        if (limit < 1)
+            return [];
+
+        return await _collection
+            .Find(FilterDefinition<ReportBatchDocument>.Empty)
+            .SortByDescending(batch => batch.CreatedAt)
+            .Limit(limit)
+            .ToListAsync(cancellationToken);
     }
 }

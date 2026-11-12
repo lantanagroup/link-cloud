@@ -1,0 +1,136 @@
+@model ReportBatchTrackingPage
+@{
+    var batch = Model.Batch;
+}
+
+@await Html.PartialAsync("~/Views/Automation/_Nav.cshtml")
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Report batch</h1>
+        <p class="text-muted mb-0">Each report runs on its own. A failure in one does not stop the others.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-au-link" asp-action="History">Recent batches</a>
+        <a class="btn btn-sm btn-au-link" asp-controller="ReportBatchSettings" asp-action="Index">Settings</a>
+    </div>
+</div>
+
+@if (TempData["BatchTrackingError"] is string error && !string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (!Model.Ready || !Model.Found)
+{
+    <div class="alert @(Model.Ready ? "alert-warning" : "alert-danger")" role="alert">@Model.Message</div>
+}
+else if (batch is not null)
+{
+    <div id="batchLive"
+         data-open="@(batch.Open ? "yes" : "no")"
+         data-status-url="@Url.Action("Status", new { batchId = batch.BatchId })">
+        <div class="au-card card mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span>Summary</span>
+                <span class="d-flex align-items-center gap-2">
+                    @if (batch.Open)
+                    {
+                        <span id="batchLiveBadge" class="badge au-badge-active">Live</span>
+                    }
+                    <span id="batchStatus" class="badge @batch.PillClass">@batch.Status</span>
+                </span>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Batch</dt>
+                    <dd class="col-sm-9" id="batchId">@batch.BatchId</dd>
+                    <dt class="col-sm-3">EHR</dt>
+                    <dd class="col-sm-9" id="batchEhr">@batch.EhrSystem</dd>
+                    <dt class="col-sm-3">At once</dt>
+                    <dd class="col-sm-9" id="batchCap">@batch.MaxConcurrency</dd>
+                    <dt class="col-sm-3">Created</dt>
+                    <dd class="col-sm-9" id="batchCreated" data-lu-time-compact>@(batch.CreatedAt ?? "—")</dd>
+                    <dt class="col-sm-3">Started</dt>
+                    <dd class="col-sm-9" id="batchStarted" data-lu-time-compact>@(batch.StartedAt ?? "—")</dd>
+                    <dt class="col-sm-3">Finished</dt>
+                    <dd class="col-sm-9" id="batchFinished" data-lu-time-compact>@(batch.FinishedAt ?? "—")</dd>
+                </dl>
+                <ul class="list-inline mb-0 mt-3" aria-live="polite">
+                    <li class="list-inline-item me-3">Total <span id="countTotal">@batch.Total</span></li>
+                    <li class="list-inline-item me-3">Pending <span id="countPending">@batch.Pending</span></li>
+                    <li class="list-inline-item me-3">In progress <span id="countInProgress">@batch.InProgress</span></li>
+                    <li class="list-inline-item me-3">Completed <span id="countCompleted">@batch.Completed</span></li>
+                    <li class="list-inline-item me-3">Failed <span id="countFailed">@batch.Failed</span></li>
+                    <li class="list-inline-item">Cancelled <span id="countCancelled">@batch.Cancelled</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <form id="batchCancel" method="post" asp-action="Cancel" asp-route-batchId="@batch.BatchId" class="mb-3 @(batch.CanCancel ? "" : "d-none")">
+            @Html.AntiForgeryToken()
+            <button type="button" class="btn btn-warning" id="batchCancelButton">Cancel batch</button>
+        </form>
+
+        @foreach (var group in batch.Groups)
+        {
+            <section class="au-card card mb-3" aria-label="@group.EhrSystem">
+                <div class="card-header">@group.EhrSystem</div>
+                <div class="card-body p-0">
+                    @if (group.Items.Count == 0)
+                    {
+                        <p class="p-3 mb-0 text-muted">No reports in this batch.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table au-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Scenario</th>
+                                        <th scope="col">EHR</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Error</th>
+                                        <th scope="col">Run</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in group.Items)
+                                    {
+                                        <tr data-ordinal="@item.Ordinal">
+                                            <td>@item.Ordinal</td>
+                                            <td>
+                                                @item.ScenarioName
+                                                @if (item.IsMetricsRun)
+                                                {
+                                                    <span class="badge au-badge-muted ms-1" data-nocopy>Metrics</span>
+                                                }
+                                            </td>
+                                            <td>@item.EhrSystem</td>
+                                            <td data-nocopy><span class="badge @item.PillClass" data-item-status>@item.Status</span></td>
+                                            <td class="text-break"><span data-item-error>@(item.Error ?? "—")</span></td>
+                                            <td data-item-run-cell>
+                                                @if (item.RunHref is not null && item.RunId is Guid runId)
+                                                {
+                                                    <a data-item-run href="@item.RunHref">@runId</a>
+                                                }
+                                                else
+                                                {
+                                                    <span data-item-run>—</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@section Scripts {
+    <script src="~/js/automation-batch.js" asp-append-version="true"></script>
+}

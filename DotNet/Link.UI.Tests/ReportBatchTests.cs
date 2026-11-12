@@ -421,6 +421,7 @@ public class ReportBatchTests
         var view = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/ReportBatchSettings/Index.cshtml"));
         view.Should().Contain("name=\"maxConcurrency\"");
         view.Should().Contain("Save settings");
+        view.Should().Contain("asp-action=\"History\"");
 
         var engine = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/LinkAutomationEngine.cs"));
         var runRecovery = engine.IndexOf("AddHostedService<ScenarioRunStartupRecoveryService>", StringComparison.Ordinal);
@@ -429,6 +430,202 @@ public class ReportBatchTests
         runRecovery.Should().BeGreaterThanOrEqualTo(0);
         batches.Should().BeGreaterThan(apiHealthRecovery);
         apiHealthRecovery.Should().BeGreaterThan(runRecovery);
+    }
+
+    [Fact]
+    public void Stored_batch_statuses_use_the_tracking_words()
+    {
+        ReportBatchDisplay.ItemLabel(ReportBatchItemStatus.Queued).Should().Be("Pending");
+        ReportBatchDisplay.ItemLabel(ReportBatchItemStatus.Running).Should().Be("In Progress");
+        ReportBatchDisplay.ItemLabel(ReportBatchItemStatus.Succeeded).Should().Be("Completed");
+        ReportBatchDisplay.ItemLabel(ReportBatchItemStatus.Failed).Should().Be("Failed");
+        ReportBatchDisplay.ItemLabel(ReportBatchItemStatus.Cancelled).Should().Be("Cancelled");
+        ReportBatchDisplay.ItemLabel(" ").Should().Be("Unknown");
+        ReportBatchDisplay.ItemLabel("Collecting").Should().Be("Collecting");
+        ReportBatchDisplay.BatchLabel(ReportBatchStatus.Queued).Should().Be("Pending");
+        ReportBatchDisplay.BatchLabel(ReportBatchStatus.Running).Should().Be("In Progress");
+        ReportBatchDisplay.BatchLabel(ReportBatchStatus.Completed).Should().Be("Completed");
+        ReportBatchDisplay.BatchLabel(ReportBatchStatus.Cancelled).Should().Be("Cancelled");
+    }
+
+    [Fact]
+    public async Task The_tracking_page_shows_each_run_under_its_ehr()
+    {
+        var batches = new MemoryBatches();
+        var failedRun = Guid.NewGuid();
+        var completedRun = Guid.NewGuid();
+        var batch = new ReportBatchDocument
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = "local",
+            Status = ReportBatchStatus.Running,
+            MaxConcurrency = 2,
+            CreatedAt = DateTimeOffset.Parse("2026-11-12T15:00:00Z"),
+            Items =
+            [
+                new ReportBatchItemDocument
+                {
+                    Ordinal = 2,
+                    ScenarioId = Guid.NewGuid(),
+                    ScenarioName = "waiting",
+                    Status = ReportBatchItemStatus.Queued
+                },
+                new ReportBatchItemDocument
+                {
+                    Ordinal = 0,
+                    ScenarioId = Guid.NewGuid(),
+                    ScenarioName = "alpha",
+                    Status = ReportBatchItemStatus.Failed,
+                    Error = "boom",
+                    RunId = failedRun
+                },
+                new ReportBatchItemDocument
+                {
+                    Ordinal = 1,
+                    ScenarioId = Guid.NewGuid(),
+                    ScenarioName = "metrics",
+                    IsMetricsRun = true,
+                    Status = ReportBatchItemStatus.Succeeded,
+                    RunId = completedRun
+                }
+            ]
+        };
+        await batches.InsertAsync(batch);
+        var controller = Tracking(batches);
+
+        var page = await controller.Detail(batch.BatchId, CancellationToken.None);
+        var shown = page.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchTrackingPage>().Subject;
+        shown.Found.Should().BeTrue();
+        shown.Batch!.Status.Should().Be("In Progress");
+        shown.Batch.CanCancel.Should().BeTrue();
+        shown.Batch.Groups.Should().ContainSingle().Which.EhrSystem.Should().Be("local");
+        var rows = shown.Batch.Groups[0].Items;
+        rows.Select(row => row.ScenarioName).Should().Equal("alpha", "metrics", "waiting");
+        rows[0].Status.Should().Be("Failed");
+        rows[0].Error.Should().Be("boom");
+        rows[0].EhrSystem.Should().Be("local");
+        rows[0].RunHref.Should().Be("/Automation/Runs/" + failedRun.ToString("D"));
+        rows[1].Status.Should().Be("Completed");
+        rows[1].IsMetricsRun.Should().BeTrue();
+        rows[1].RunHref.Should().Be("/Automation/Runs/" + completedRun.ToString("D"));
+        rows[2].Status.Should().Be("Pending");
+        rows[2].RunHref.Should().BeNull();
+        shown.Batch.Pending.Should().Be(1);
+        shown.Batch.Completed.Should().Be(1);
+        shown.Batch.Failed.Should().Be(1);
+
+        var status = await controller.Status(batch.BatchId, CancellationToken.None);
+        status.Should().BeOfType<JsonResult>()
+            .Which.Value.Should().BeOfType<ReportBatchTrackingPage>()
+            .Which.Batch!.Failed.Should().Be(1);
+
+        var missing = await controller.Detail(Guid.NewGuid(), CancellationToken.None);
+        missing.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchTrackingPage>()
+            .Which.Found.Should().BeFalse();
+        controller.Response.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+
+        var missingStatus = await controller.Status(Guid.NewGuid(), CancellationToken.None);
+        missingStatus.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task Cancel_on_the_tracking_page_stops_an_open_batch()
+    {
+        var harness = Harness();
+        var started = await harness.Dispatcher.StartBatchAsync("local", Ids(harness, 2), 1, CancellationToken.None);
+        var controller = Tracking(harness.Batches, harness.Dispatcher);
+
+        var cancelled = await controller.Cancel(started.BatchId, CancellationToken.None);
+        cancelled.Should().BeOfType<RedirectToActionResult>().Which.ActionName.Should().Be("Detail");
+
+        var after = await controller.Status(started.BatchId, CancellationToken.None);
+        var body = after.Should().BeOfType<JsonResult>()
+            .Which.Value.Should().BeOfType<ReportBatchTrackingPage>().Subject;
+        body.Batch!.Status.Should().Be("Cancelled");
+        body.Batch.CanCancel.Should().BeFalse();
+        body.Batch.Groups.Should().ContainSingle().Which.EhrSystem.Should().Be("local");
+        body.Batch.Groups[0].Items.Should().OnlyContain(row => row.Status == "Cancelled");
+        body.Batch.Cancelled.Should().Be(2);
+
+        var missing = await controller.Cancel(Guid.NewGuid(), CancellationToken.None);
+        missing.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task History_groups_batches_by_ehr_newest_first()
+    {
+        var batches = new MemoryBatches();
+        var older = new ReportBatchDocument
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = "local",
+            Status = ReportBatchStatus.Completed,
+            CreatedAt = DateTimeOffset.Parse("2026-11-01T00:00:00Z"),
+            Items = [new ReportBatchItemDocument()]
+        };
+        var newer = new ReportBatchDocument
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = "Local",
+            Status = ReportBatchStatus.Running,
+            CreatedAt = DateTimeOffset.Parse("2026-11-10T00:00:00Z"),
+            Items = [new ReportBatchItemDocument(), new ReportBatchItemDocument()]
+        };
+        var other = new ReportBatchDocument
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = "clinic",
+            Status = ReportBatchStatus.Queued,
+            CreatedAt = DateTimeOffset.Parse("2026-11-11T00:00:00Z"),
+            Items = [new ReportBatchItemDocument()]
+        };
+        await batches.InsertAsync(older);
+        await batches.InsertAsync(newer);
+        await batches.InsertAsync(other);
+
+        var limited = await batches.ListRecentAsync(2, CancellationToken.None);
+        limited.Select(batch => batch.BatchId).Should().Equal(other.BatchId, newer.BatchId);
+
+        var page = await Tracking(batches).History(CancellationToken.None);
+        var model = page.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchHistoryPage>().Subject;
+        model.Ready.Should().BeTrue();
+        model.Groups.Select(group => group.EhrSystem).Should().Equal("clinic", "Local");
+        model.Groups[0].Batches.Should().ContainSingle().Which.Status.Should().Be("Pending");
+        model.Groups[0].Batches[0].Href.Should().Be("/Automation/ReportBatches/" + other.BatchId.ToString("D"));
+        model.Groups[1].Batches.Select(batch => batch.BatchId).Should().Equal(newer.BatchId, older.BatchId);
+        model.Groups[1].Batches[0].Status.Should().Be("In Progress");
+        model.Groups[1].Batches[0].ItemCount.Should().Be(2);
+
+        var unavailable = await Tracking(null).History(CancellationToken.None);
+        unavailable.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchHistoryPage>()
+            .Which.Ready.Should().BeFalse();
+    }
+
+    [Fact]
+    public void The_tracking_page_polls_the_shell_status_action()
+    {
+        var detail = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/ReportBatchTracking/Detail.cshtml"));
+        detail.Should().Contain("Scenario");
+        detail.Should().Contain(">EHR<");
+        detail.Should().Contain("Cancel batch");
+        detail.Should().Contain("data-ordinal");
+
+        var history = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/ReportBatchTracking/History.cshtml"));
+        history.Should().Contain("No batches yet.");
+
+        detail.Should().Contain("<span data-item-error>");
+
+        var script = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/automation-batch.js"));
+        script.Should().Contain("2000");
+        script.Should().NotContain("signalR");
+        script.Should().NotContain("/api/report-batches");
+        script.Should().Contain("if (response.status === 404)");
+        script.Should().Contain("if (!response.ok) return null;");
+        script.Should().Contain("if (error.textContent !== next) error.textContent = next;");
     }
 
     private const string ParallelRunSafetyMessage =
@@ -448,6 +645,20 @@ public class ReportBatchTests
         if (service is ReportBatchDispatcher dispatcher)
             services.AddSingleton(dispatcher);
         return services.BuildServiceProvider();
+    }
+
+    private static ReportBatchTrackingController Tracking(MemoryBatches? batches, ReportBatchDispatcher? dispatcher = null)
+    {
+        var services = new ServiceCollection();
+        if (batches is not null)
+            services.AddSingleton<IReportBatchStore>(batches);
+        if (dispatcher is not null)
+            services.AddSingleton(dispatcher);
+        return new ReportBatchTrackingController(services.BuildServiceProvider())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), new UnusedTempData())
+        };
     }
 
     private static ReportBatchSettingsController Page(MemorySettings settings)
@@ -567,6 +778,20 @@ public class ReportBatchTests
                 .Where(batch => ReportBatchStatus.IsOpen(batch.Status))
                 .Select(Clone)
                 .ToList());
+
+        public Task<IReadOnlyList<ReportBatchDocument>> ListRecentAsync(int limit, CancellationToken cancellationToken = default)
+        {
+            if (limit < 1)
+                return Task.FromResult<IReadOnlyList<ReportBatchDocument>>([]);
+
+            IReadOnlyList<ReportBatchDocument> rows = _batches.Values
+                .OrderByDescending(batch => batch.CreatedAt)
+                .ThenBy(batch => batch.BatchId)
+                .Take(limit)
+                .Select(Clone)
+                .ToList();
+            return Task.FromResult(rows);
+        }
 
         private static ReportBatchDocument Clone(ReportBatchDocument batch)
             => new()
