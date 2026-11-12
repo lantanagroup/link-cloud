@@ -16,8 +16,8 @@ public sealed class LocalizationEndpoints : IApi
                 return result.Status switch
                 {
                     LocalizationResourceStatus.Ok => HandleOkResult(context, result),
-                    LocalizationResourceStatus.InvalidLocale or LocalizationResourceStatus.InvalidNamespace => Results.BadRequest(new { message = result.Message }),
-                    LocalizationResourceStatus.NotFound => Results.NotFound(new { message = result.Message }),
+                    LocalizationResourceStatus.InvalidLocale or LocalizationResourceStatus.InvalidNamespace => Results.Problem(title: "Invalid localization request", detail: result.Message, statusCode: StatusCodes.Status400BadRequest),
+                    LocalizationResourceStatus.NotFound => Results.Problem(title: "Localization resources not found", detail: result.Message, statusCode: StatusCodes.Status404NotFound),
                     LocalizationResourceStatus.MalformedJson => Results.Problem(title: "Invalid localization data", detail: result.Message, statusCode: StatusCodes.Status500InternalServerError),
                     LocalizationResourceStatus.DirectoryUnavailable => Results.Problem(title: "Localization resources unavailable", detail: result.Message, statusCode: StatusCodes.Status503ServiceUnavailable),
                     _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
@@ -25,8 +25,8 @@ public sealed class LocalizationEndpoints : IApi
             })
             .WithName("GetLocalizationNamespace")
             .Produces(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status500InternalServerError)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .WithOpenApi(operation =>
