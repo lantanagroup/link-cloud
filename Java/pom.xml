@@ -35,7 +35,8 @@
         <spring-kafka.version>3.1.4</spring-kafka.version>
         <!--
           Overrides Boot 3.2.5's 5.2.3 / 5.2.4, whose httpcore5-h2 has known DoS issues fixed in 5.4.3.
-          Drop these when the Spring Boot upgrade manages a fixed version.
+          Boot 3.5.x still manages 5.3.6 and Boot 4.1.0 manages 5.4.2, both below that fix: drop these
+          only on Boot 4.1.2+, which manages exactly these versions.
         -->
         <httpclient5.version>5.6.5</httpclient5.version>
         <httpcore5.version>5.4.4</httpcore5.version>
