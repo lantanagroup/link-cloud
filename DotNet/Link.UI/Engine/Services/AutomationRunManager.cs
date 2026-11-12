@@ -41,6 +41,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly bool _numericOnlyFacilityId;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
     private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
+    private readonly SemaphoreSlim _parallelRunGate = new(1, 1);
 
     public AutomationRunManager(
         IHubContext<RunHub> hub,
@@ -111,36 +112,51 @@ public class AutomationRunManager : IAutomationRunManager
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var initiator = await ResolveInitiatorAsync(cancellationToken);
         MutableRunState state;
-        if (_numericOnlyFacilityId)
-            await _organizationIdGate.WaitAsync(cancellationToken);
+        await _parallelRunGate.WaitAsync(cancellationToken);
         try
         {
-            var taken = _numericOnlyFacilityId
-                ? await TakenOrganizationIdsAsync(cancellationToken)
-                : new HashSet<string>(StringComparer.Ordinal);
-            var organizationId = RunOrganizationIdAllocator.Choose(
-                _numericOnlyFacilityId,
-                runId,
-                taken);
-            options = options with { NhsnOrganizationId = organizationId };
-            StampRunOrganizationId(request, organizationId);
-
-            state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson)
+            if (ParallelRunSafety.BlocksMetricsStart(
+                    options.IsMetricsRun,
+                    await AnotherMetricsRunIsOngoingAsync(cancellationToken)))
             {
-                FacilityId = organizationId,
-                Initiator = initiator
-            };
-            _runs[runId] = state;
+                throw new InvalidOperationException(ParallelRunSafety.MetricsRunBlockedMessage);
+            }
 
-            // Persist before releasing the gate so the next numeric-only start,
-            // including one in another process, sees this id as ongoing.
-            await PersistRunInputAsync(runId, request);
-            await PersistRunSummaryAsync(state);
+            if (_numericOnlyFacilityId)
+                await _organizationIdGate.WaitAsync(cancellationToken);
+            try
+            {
+                var taken = _numericOnlyFacilityId
+                    ? await TakenOrganizationIdsAsync(cancellationToken)
+                    : new HashSet<string>(StringComparer.Ordinal);
+                var organizationId = RunOrganizationIdAllocator.Choose(
+                    _numericOnlyFacilityId,
+                    runId,
+                    taken);
+                options = options with { NhsnOrganizationId = organizationId };
+                StampRunOrganizationId(request, organizationId);
+
+                state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson)
+                {
+                    FacilityId = organizationId,
+                    Initiator = initiator
+                };
+                _runs[runId] = state;
+
+                // Persist before releasing the gate so the next numeric-only start,
+                // including one in another process, sees this id as ongoing.
+                await PersistRunInputAsync(runId, request);
+                await PersistRunSummaryAsync(state);
+            }
+            finally
+            {
+                if (_numericOnlyFacilityId)
+                    _organizationIdGate.Release();
+            }
         }
         finally
         {
-            if (_numericOnlyFacilityId)
-                _organizationIdGate.Release();
+            _parallelRunGate.Release();
         }
 
         state.ExecutionTask = Task.Run(async () =>
@@ -188,6 +204,26 @@ public class AutomationRunManager : IAutomationRunManager
         }, CancellationToken.None);
 
         return runId;
+    }
+
+    /// <summary>
+    /// True when a Metrics run is still in this process, or still marked active in
+    /// the store. The check runs under <see cref="_parallelRunGate"/> so two starts
+    /// cannot both pass it.
+    /// </summary>
+    private async Task<bool> AnotherMetricsRunIsOngoingAsync(CancellationToken cancellationToken)
+    {
+        foreach (var state in _runs.Values)
+        {
+            lock (state.Sync)
+            {
+                if (state.Options.IsMetricsRun && !state.Status.IsTerminal())
+                    return true;
+            }
+        }
+
+        var active = await _snapshotStore.GetActiveRunsAsync(cancellationToken);
+        return active.Any(run => run.IsActive && run.IsMetricsRun);
     }
 
     private async Task<AutomationRunInitiator> ResolveInitiatorAsync(CancellationToken cancellationToken)

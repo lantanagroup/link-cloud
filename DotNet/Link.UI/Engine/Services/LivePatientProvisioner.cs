@@ -26,7 +26,8 @@ internal sealed class LivePatientProvisioner(
     IGeneratedPatientTemplateCache? generatedTemplateCache = null,
     PatientProfile? shapeTemplate = null,
     IReadOnlyList<string>? measureBundleJsons = null,
-    RunSnapshotOrchestrator? snapshotWrites = null) : ILivePatientProvisioner
+    RunSnapshotOrchestrator? snapshotWrites = null,
+    Action<ImportedPatientInput>? scopeImportedPatient = null) : ILivePatientProvisioner
 {
     public async Task<LiveProvisionedPatient> GenerateQualifyingPatientAsync(CancellationToken cancellationToken)
     {
@@ -71,6 +72,7 @@ internal sealed class LivePatientProvisioner(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var imported = BuildBundleImport(content, fileName);
+        scopeImportedPatient?.Invoke(imported);
         var (patientId, effectiveProfile) = await FhirGenerationPipeline.ImportAndAppendPatientAsync(
             output,
             fhirDataLoader,
@@ -96,6 +98,9 @@ internal sealed class LivePatientProvisioner(
             PatientId = patientId.Trim(),
             AutoDetect = true
         };
+
+        await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, [imported], output, cancellationToken);
+        scopeImportedPatient?.Invoke(imported);
 
         var (id, effectiveProfile) = await FhirGenerationPipeline.ImportAndAppendPatientAsync(
             output,
