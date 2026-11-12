@@ -64,7 +64,10 @@ public class OnboardingEndpoints : IApi
             {
                 if (file is null || file.Length == 0)
                 {
-                    return Results.BadRequest(new {message = "No file was uploaded."});
+                    return Results.Problem(
+                        title: "No file was uploaded",
+                        detail: "No file was uploaded.",
+                        statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 await using var stream = file.OpenReadStream();
@@ -99,10 +102,10 @@ public class OnboardingEndpoints : IApi
                 return result.Status switch
                 {
                     PackageZipDownloadStatus.Ok => Results.File(result.Content!, "application/zip", result.FileName),
-                    PackageZipDownloadStatus.VendorNotSelected => Results.BadRequest(new
-                    {
-                        message = "Select an EHR vendor before downloading the import package."
-                    }),
+                    PackageZipDownloadStatus.VendorNotSelected => Results.Problem(
+                        title: "EHR vendor not selected",
+                        detail: "Select an EHR vendor before downloading the import package.",
+                        statusCode: StatusCodes.Status400BadRequest),
                     PackageZipDownloadStatus.AssetsUnavailable => Results.Problem(
                         title: "Import package assets unavailable",
                         statusCode: StatusCodes.Status503ServiceUnavailable),
