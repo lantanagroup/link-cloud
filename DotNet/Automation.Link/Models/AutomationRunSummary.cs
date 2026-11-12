@@ -41,6 +41,11 @@ public class AutomationRunSummary
     public string? GeneratedTemplateSetHash { get; set; }
     /// <summary>TestRail runs that accepted this automation run's results. Empty when nothing was published.</summary>
     public List<TestRailRunReference> TestRailRuns { get; set; } = [];
+    /// <summary>
+    /// Named FHIR endpoint this run used. Empty on rows written before named EHR systems.
+    /// This is not a vendor.
+    /// </summary>
+    public string? EhrSystem { get; set; }
     public IReadOnlyList<string> Logs { get; set; } = [];
 }
 

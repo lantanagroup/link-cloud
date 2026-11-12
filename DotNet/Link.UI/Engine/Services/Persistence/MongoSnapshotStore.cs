@@ -166,6 +166,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (!string.IsNullOrWhiteSpace(summary.GeneratedTemplateSetHash))
             updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateSetHash, summary.GeneratedTemplateSetHash));
 
+        // A later summary that has not resolved an EHR must not clear the name stored at start.
+        if (!string.IsNullOrWhiteSpace(summary.EhrSystem))
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.EhrSystem, summary.EhrSystem));
+
         return Builders<AutomationRunDocument>.Update.Combine(updates);
     }
 
@@ -653,6 +657,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             GeneratedTemplateCacheScenarioKey = doc.GeneratedTemplateCacheScenarioKey,
             GeneratedTemplateSetHash = doc.GeneratedTemplateSetHash,
             TestRailRuns = TestRailRunLinks.Copy(doc.TestRailRuns),
+            EhrSystem = doc.EhrSystem,
             Logs = []
         };
     }

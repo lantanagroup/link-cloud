@@ -38,6 +38,7 @@ public class AutomationFeatureGateTests
             "/Runs",
             "/api/runs",
             "/api/api-health-runs",
+            "/api/ehr-systems",
             "/hubs/runs",
             "/hubs/cleanup"
         })

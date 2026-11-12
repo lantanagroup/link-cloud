@@ -302,11 +302,13 @@ internal sealed class RunExecutor
                     scenarioConfig.MaxPollingDurationMinutes = Math.Max(scenarioConfig.MaxPollingDurationMinutes, closeMinutes + 30);
             }
 
-            var services = runServices = BuildRunServiceProvider(output);
+            var services = runServices = BuildRunServiceProvider(output, ConfigFor(state.Options.EhrSystemName));
 
             var lokiScraper = services.GetRequiredService<LokiScraper>();
             var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
             state.FhirDataLoader = fhirDataLoader;
+            if (!string.IsNullOrWhiteSpace(state.Options.EhrSystemName))
+                output.WriteLine($"EHR system: {state.Options.EhrSystemName}");
             fhirDataLoader.UseOperationContext(new FhirOperationContext
             {
                 RunId = state.RunId.ToString("D"),
@@ -2692,11 +2694,17 @@ internal sealed class RunExecutor
         };
     }
 
-    private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)
+    private AutomationConfig ConfigFor(string? ehrSystemName)
+    {
+        var catalog = _hostServices.GetService<EhrSystemCatalog>();
+        return catalog is null ? _automationConfig : catalog.Overlay(_automationConfig, ehrSystemName);
+    }
+
+    private ServiceProvider BuildRunServiceProvider(IAutomationOutput output, AutomationConfig runConfig)
     {
         var services = new ServiceCollection();
 
-        services.AddSingleton(_automationConfig);
+        services.AddSingleton(runConfig);
         services.AddSingleton(output);
 
         // Forward host-level configuration into the per-run container

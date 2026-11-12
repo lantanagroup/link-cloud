@@ -70,7 +70,9 @@ public static class ShellAccessGate
     /// Link.UI routes that Automation.UI served under /api. The Admin.BFF proxy is not one of them.
     /// </summary>
     public static bool IsNativeAutomationApi(PathString path) =>
-        path.StartsWithSegments("/api/runs") || path.StartsWithSegments("/api/api-health-runs");
+        path.StartsWithSegments("/api/runs")
+        || path.StartsWithSegments("/api/api-health-runs")
+        || path.StartsWithSegments("/api/ehr-systems");
 
     /// <summary>
     /// Routes whose controller or action requires ApiBearerPolicy.
@@ -78,7 +80,8 @@ public static class ShellAccessGate
     /// </summary>
     public static bool IsBearerProtectedApi(PathString path) =>
         path.StartsWithSegments("/api/runs")
-        || path.StartsWithSegments("/api/api-health-runs/start-all-for-pipeline");
+        || path.StartsWithSegments("/api/api-health-runs/start-all-for-pipeline")
+        || path.StartsWithSegments("/api/ehr-systems");
 
     /// <summary>
     /// When anonymous access is off, native automation API routes are closed unless bearer

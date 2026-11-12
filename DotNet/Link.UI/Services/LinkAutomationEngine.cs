@@ -46,6 +46,14 @@ public static class LinkAutomationEngine
 {
     public static LinkAutomationEngineStatus Add(IServiceCollection services, IConfiguration configuration)
     {
+        services.Configure<AutomationConfig>(configuration.GetSection("Automation"));
+        services.AddHttpClient(EhrSystemReadinessChecker.HttpClientName, client =>
+        {
+            client.Timeout = EhrSystemReadinessChecker.Timeout;
+        });
+        services.AddSingleton<EhrSystemCatalog>();
+        services.AddSingleton<EhrSystemReadinessChecker>();
+
         var status = Register(services, configuration);
         services.AddSingleton(status);
         return status;
@@ -120,6 +128,7 @@ public static class LinkAutomationEngine
         {
             cfg.LokiBaseUrl = lokiUrl!.TrimEnd('/');
             cfg.LokiAppLabel = lokiApp!;
+            ApplyDefaultEhrSystem(configuration, cfg);
         });
         services.Configure<LeftoverRunCleanupOptions>(configuration.GetSection(LeftoverRunCleanupOptions.SectionName));
         services.Configure<ImportedBundleBlobStorageSettings>(configuration.GetSection(ImportedBundleBlobStorageSettings.Key));
@@ -263,5 +272,24 @@ public static class LinkAutomationEngine
             connectionString += $"{separator}directConnection=true";
 
         return connectionString;
+    }
+
+    /// <summary>
+    /// When named EHR systems are configured, host callers that still read
+    /// <see cref="AutomationConfig"/> use the default system's endpoint.
+    /// A per-run overlay replaces that for a run that names a different system.
+    /// </summary>
+    private static void ApplyDefaultEhrSystem(IConfiguration configuration, AutomationConfig config)
+    {
+        var entries = new List<EhrSystemEntry>();
+        configuration.GetSection(EhrSystemCatalog.SectionPath).Bind(entries);
+        if (entries.Count == 0)
+            return;
+
+        var selected = EhrSystemCatalog.SelectDefault(EhrSystemCatalog.Validate(entries));
+        config.FhirServerBase = selected.FhirServerBase;
+        config.FacilityFhirServerBase = selected.FacilityFhirServerBase;
+        config.FhirServerOAuth = selected.OAuth;
+        config.FhirServerBasicAuth = selected.BasicAuth;
     }
 }

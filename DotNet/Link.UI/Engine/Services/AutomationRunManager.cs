@@ -39,6 +39,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly ITestRailPublisher _testRailPublisher;
     private readonly TestRailRunLinkRecorder _testRailRunLinks;
     private readonly bool _numericOnlyFacilityId;
+    private readonly EhrSystemCatalog _ehrCatalog;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
     private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
 
@@ -61,7 +62,8 @@ public class AutomationRunManager : IAutomationRunManager
         IMeasureTemplateStore measureTemplateStore,
         IFacilityTemplateStore facilityTemplateStore,
         ITestRailPublisher testRailPublisher,
-        IOptions<FacilityIdFormatSettings> facilityIdSettings)
+        IOptions<FacilityIdFormatSettings> facilityIdSettings,
+        EhrSystemCatalog ehrCatalog)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -81,6 +83,7 @@ public class AutomationRunManager : IAutomationRunManager
         // Tenant copies this flag into a singleton at startup. Read it the same way
         // so a run does not disagree with the check Tenant will apply.
         _numericOnlyFacilityId = facilityIdSettings.Value.NumericOnlyFacilityId;
+        _ehrCatalog = ehrCatalog;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -102,6 +105,8 @@ public class AutomationRunManager : IAutomationRunManager
     {
         var runId = Guid.NewGuid();
         var resolved = StartScenarioRequestResolver.Resolve(request);
+        resolved = await EhrSystemRunSelector.ApplyAsync(
+            resolved, request, _ehrCatalog, _facilityTemplateStore, cancellationToken);
         resolved = await FacilityTemplateRunBinder.ApplyAsync(resolved, _facilityTemplateStore, cancellationToken);
         resolved = await MeasureTemplateRunBinder.AttachBundlesAsync(resolved, _measureTemplateStore, cancellationToken);
         var options = await PatientConfigurationHydrator.HydrateAsync(
@@ -124,6 +129,7 @@ public class AutomationRunManager : IAutomationRunManager
                 taken);
             options = options with { NhsnOrganizationId = organizationId };
             StampRunOrganizationId(request, organizationId);
+            StampEhrSystem(request, options.EhrSystemName);
 
             state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson)
             {
@@ -263,6 +269,35 @@ public class AutomationRunManager : IAutomationRunManager
         request.RunConfigurationJson = obj.ToJsonString();
     }
 
+    /// <summary>Records the named EHR on the input snapshot. The run document stores the same name.</summary>
+    private static void StampEhrSystem(StartScenarioRequest request, string? ehrSystem)
+    {
+        if (string.IsNullOrWhiteSpace(ehrSystem))
+            return;
+
+        JsonObject obj;
+        if (string.IsNullOrWhiteSpace(request.RunConfigurationJson))
+        {
+            obj = new JsonObject();
+        }
+        else
+        {
+            try
+            {
+                if (JsonNode.Parse(request.RunConfigurationJson) is not JsonObject parsed)
+                    return;
+                obj = parsed;
+            }
+            catch (JsonException)
+            {
+                return;
+            }
+        }
+
+        obj["ehrSystem"] = ehrSystem;
+        request.RunConfigurationJson = obj.ToJsonString();
+    }
+
     private async Task PersistRunInputAsync(Guid runId, StartScenarioRequest request)
     {
         try
@@ -344,7 +379,8 @@ public class AutomationRunManager : IAutomationRunManager
                 state.ReportId,
                 state.FhirDataLoader,
                 state.ExecutionTask,
-                message => WriteLog(state, message));
+                message => WriteLog(state, message),
+                state.Options.EhrSystemName);
         }
 
         return true;
@@ -431,7 +467,8 @@ public class AutomationRunManager : IAutomationRunManager
             summary.ReportId,
             fhirDataLoader: null,
             executionTask: null,
-            writeLog: null);
+            writeLog: null,
+            ehrSystem: summary.EhrSystem);
 
         await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
@@ -450,15 +487,42 @@ public class AutomationRunManager : IAutomationRunManager
         string? reportId,
         FhirDataLoader? fhirDataLoader,
         Task? executionTask,
-        Action<string>? writeLog)
+        Action<string>? writeLog,
+        string? ehrSystem)
     {
         var initiator = _runs.TryGetValue(runId, out var run) ? run.Initiator : AutomationRunInitiator.System;
         _ = Task.Run(async () =>
         {
             using var callScope = BackgroundServiceCallScope.Begin(initiator);
             await CleanupCancelledRunInBackgroundAsync(
-                runId, facilityId, automationCreatedFacility, reportId, fhirDataLoader, executionTask, writeLog);
+                runId, facilityId, automationCreatedFacility, reportId, fhirDataLoader, executionTask, writeLog, ehrSystem);
         });
+    }
+
+    private FhirDataLoader LoaderFor(string? ehrSystem)
+    {
+        if (string.IsNullOrWhiteSpace(ehrSystem))
+        {
+            return new FhirDataLoader(
+                _automationConfig.FhirServerBase,
+                _automationConfig.FhirServerOAuth,
+                _automationConfig.FhirServerBasicAuth);
+        }
+
+        var system = _ehrCatalog.Find(ehrSystem);
+        if (system is null)
+        {
+            _logger.LogWarning(
+                "EHR system {EhrSystem} is not configured. Cancellation cleanup is using the default EHR endpoint.",
+                ehrSystem.SanitizeForLog());
+            return new FhirDataLoader(
+                _automationConfig.FhirServerBase,
+                _automationConfig.FhirServerOAuth,
+                _automationConfig.FhirServerBasicAuth);
+        }
+
+        var config = EhrSystemCatalog.WithEndpoints(_automationConfig, system);
+        return new FhirDataLoader(config.FhirServerBase, config.FhirServerOAuth, config.FhirServerBasicAuth);
     }
 
     private async Task CleanupCancelledRunInBackgroundAsync(
@@ -468,7 +532,8 @@ public class AutomationRunManager : IAutomationRunManager
         string? reportId,
         FhirDataLoader? fhirDataLoader,
         Task? executionTask,
-        Action<string>? writeLog)
+        Action<string>? writeLog,
+        string? ehrSystem)
     {
         try
         {
@@ -505,8 +570,7 @@ public class AutomationRunManager : IAutomationRunManager
                 ? (await settingsStore.GetEffectiveAsync(CancellationToken.None)).AbortTtl
                 : scope.ServiceProvider.GetService<IOptions<LeftoverRunCleanupOptions>>()?.Value.AbortTtl
                   ?? TimeSpan.FromDays(14);
-            var loader = fhirDataLoader
-                ?? new FhirDataLoader(_automationConfig.FhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
+            var loader = fhirDataLoader ?? LoaderFor(ehrSystem);
 
             await RunCleanupHelper.CleanupCancelledRunAsync(
                 dataAcqClient,
@@ -1234,6 +1298,7 @@ public class AutomationRunManager : IAutomationRunManager
                 GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
                 GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
                 TestRailRuns = TestRailRunLinks.Copy(state.TestRailRuns),
+                EhrSystem = state.Options.EhrSystemName,
                 Logs = includeLogs ? state.Logs.ToList() : []
             };
         }

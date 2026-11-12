@@ -64,6 +64,9 @@ public sealed class AutomationRunDocument
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
     public List<TestRailRunReference> TestRailRuns { get; set; } = [];
+
+    /// <summary>Named FHIR endpoint this run used. Empty on older rows. Not a vendor.</summary>
+    public string? EhrSystem { get; set; }
 }
 
 /// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>
