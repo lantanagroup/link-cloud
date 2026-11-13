@@ -13,10 +13,8 @@ COPY ["Directory.Packages.props", "./"]
 COPY ["nuget.config", "./"]
 COPY ["DotNet/Automation/Automation.csproj", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/MockFhirServer.csproj", "DotNet/MockFhirServer/"]
-COPY ["Scripts/docker-compose.restore-feed.sh", "Scripts/docker-compose.restore-feed.sh"]
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
-    --mount=type=secret,id=feed_accesstoken,required=false \
-    sh Scripts/docker-compose.restore-feed.sh "DotNet/MockFhirServer/MockFhirServer.csproj"
+    dotnet restore "DotNet/MockFhirServer/MockFhirServer.csproj" /p:RestorePackagesWithLockFile=false
 
 COPY ["DotNet/Automation/", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/", "DotNet/MockFhirServer/"]

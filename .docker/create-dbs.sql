@@ -14,3 +14,10 @@ IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-submission') CREAT
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-mock-dmrp') CREATE DATABASE [link-mock-dmrp];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-operations') CREATE DATABASE [link-operations];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-nhsn-app-bff') CREATE DATABASE [link-nhsn-app-bff];
+GO
+-- Local SQL Server defaults to locking reads. This runs before any service connects.
+-- Deployed databases are handled when Normalization starts: that path does not kill
+-- sessions, and it does nothing when snapshot reads are already on.
+IF EXISTS (SELECT 1 FROM sys.databases WHERE name = N'link-normalization' AND is_read_committed_snapshot_on = 0)
+    ALTER DATABASE [link-normalization] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
+GO

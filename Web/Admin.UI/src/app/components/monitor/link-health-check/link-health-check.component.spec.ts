@@ -63,6 +63,27 @@ describe('LinkHealthCheckComponent', () => {
     expect(component.initializeSummaries).toBeFalse();
   });
 
+  it('requests the NHSN App BFF health and labels its row while loading', () => {
+    expect(monitorService.getServiceHealthCheck).toHaveBeenCalledWith('nhsnappbff');
+
+    // A fresh, not-yet-answered summary: the label must not fall back to the raw service key.
+    component.initHealthSummary();
+
+    const nhsn = component.healthSummary.find(s => s.serviceKey === 'nhsnappbff')!;
+    expect(nhsn.service).toBe('NHSN App BFF');
+    expect(nhsn.status).toBe('Loading...');
+  });
+
+  it('lists the services alphabetically by display name', () => {
+    component.initHealthSummary();
+
+    const names = component.healthSummary.map(s => s.service);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'})));
+    expect(names.indexOf('NHSN App BFF')).toBe(names.indexOf('Measure Evaluation') + 1);
+    expect(names.indexOf('Normalization')).toBe(names.indexOf('NHSN App BFF') + 1);
+    expect(names.length).toBe(LinkHealthCheckComponent.services.length);
+  });
+
   it('preserves expansion throughout refresh and requests the stable service key', () => {
     accountResponse.next(accountReport);
     accountResponse.complete();

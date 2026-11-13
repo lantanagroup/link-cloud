@@ -771,6 +771,8 @@ namespace LantanaGroup.Link.Normalization.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FacilityId", "OperationType");
+
                     b.ToTable("Operation");
                 });
 
@@ -902,9 +904,9 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.HasKey("Id")
                         .HasName("PK_VendorOperationPreset");
 
-                    b.HasIndex("OperationResourceTypeId");
-
                     b.HasIndex("VendorVersionId");
+
+                    b.HasIndex("OperationResourceTypeId", "VendorVersionId");
 
                     b.ToTable("VendorVersionOperationPreset");
                 });

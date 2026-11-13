@@ -1,7 +1,15 @@
 # syntax=docker/dockerfile:1
 # See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM lantanagroup/aspnet8-run AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
+# curl is for the compose health checks.
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+USER 1654
+WORKDIR /app
+ENV \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    LC_ALL=en_US.UTF-8 \
+    LANG=en_US.UTF-8
 WORKDIR /app
 EXPOSE 5257
 
@@ -19,10 +27,8 @@ COPY ["DotNet/Automation/Automation.csproj", "DotNet/Automation/"]
 COPY ["DotNet/Automation.Link/Automation.Link.csproj", "DotNet/Automation.Link/"]
 COPY ["DotNet/Normalization.Engine/Normalization.Engine.csproj", "DotNet/Normalization.Engine/"]
 COPY ["DotNet/Automation.UI/Automation.UI.csproj", "DotNet/Automation.UI/"]
-COPY ["Scripts/docker-compose.restore-feed.sh", "Scripts/docker-compose.restore-feed.sh"]
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
-    --mount=type=secret,id=feed_accesstoken,required=false \
-    sh Scripts/docker-compose.restore-feed.sh "DotNet/Automation.UI/Automation.UI.csproj"
+    dotnet restore "DotNet/Automation.UI/Automation.UI.csproj" /p:RestorePackagesWithLockFile=false
 
 COPY ["DotNet/Shared/", "DotNet/Shared/"]
 COPY ["DotNet/Link.Authorization/", "DotNet/Link.Authorization/"]

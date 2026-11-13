@@ -33,6 +33,7 @@ public partial class NormalizationDbContext : DbContext
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.HasIndex(e => new { e.FacilityId, e.OperationType });
         });
 
         modelBuilder.Entity<OperationResourceType>(entity =>
@@ -65,6 +66,7 @@ public partial class NormalizationDbContext : DbContext
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
             entity.HasIndex(e => e.VendorVersionId);
+            entity.HasIndex(e => new { e.OperationResourceTypeId, e.VendorVersionId });
 
             entity.HasOne(d => d.OperationResourceType).WithMany(p => p.VendorVersionOperationPresets)
                 .OnDelete(DeleteBehavior.ClientSetNull)

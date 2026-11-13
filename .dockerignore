@@ -3,7 +3,6 @@
 # and was being copied into each of ~16 images.
 
 # Local / agent output
-.azure-artifacts.env
 artifacts/
 TestResults/
 .tmp*/
@@ -23,10 +22,7 @@ Azure_Pipelines/
 docs/
 Java/
 Web/
-# Local scripts are not part of the image build, except the feed restore
-# helper the feed-gated Dockerfiles run before dotnet restore.
-Scripts/*
-!Scripts/docker-compose.restore-feed.sh
+Scripts/
 Tests/
 **/*Tests/
 Prompt Staging/
@@ -74,7 +70,3 @@ LICENSE
 README.md
 SECURITY.md
 topics.txt
-
-# **/docker-compose* matches the feed restore helper. The last matching
-# pattern wins, so this exception has to stay below that rule.
-!Scripts/docker-compose.restore-feed.sh
