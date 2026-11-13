@@ -29,13 +29,29 @@ public class FacilityTemplatesController : AutomationTemplateController
         && Resolve(out scenarioStore);
 
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken ct)
+    public async Task<IActionResult> Index(
+        int page = 1,
+        int pageSize = FacilityTemplateListRules.DefaultPageSize,
+        CancellationToken ct = default)
     {
+        page = Math.Max(1, page);
+        if (!FacilityTemplateListRules.PageSizes.Contains(pageSize))
+            pageSize = FacilityTemplateListRules.DefaultPageSize;
+
+        var totalCount = await store.CountAsync(ct);
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+        page = Math.Min(page, totalPages);
+        var templates = await store.GetPageAsync((page - 1) * pageSize, pageSize, ct);
+
+        ViewBag.CurrentPage = page;
+        ViewBag.PageSize = pageSize;
+        ViewBag.TotalCount = totalCount;
+        ViewBag.TotalPages = totalPages;
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
         ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(ct);
-        return View(await store.GetAllAsync(ct));
+        return View(templates);
     }
 
     [HttpGet]
@@ -102,23 +118,63 @@ public class FacilityTemplatesController : AutomationTemplateController
         if (!this.TryValidateIdRequest(request, out var badRequest))
             return badRequest;
 
-        var template = await store.GetByIdAsync(request.Id, ct);
-        if (template == null) return NotFound();
-        if (template.IsSystem)
-            return StatusCode(StatusCodes.Status403Forbidden, "System template cannot be deleted.");
-        if (template.IsDefault)
-            return Conflict("The system facility config cannot be deleted.");
+        return await DeleteOneAsync(request.Id, ct);
+    }
 
-        var usedBy = (await scenarioStore.GetAllAsync(ct))
-            .Where(s => s.FacilityConfigurationMode == FacilityConfigurationMode.Facility
-                && s.FacilityTemplateId == request.Id)
-            .Select(s => s.Name)
-            .ToList();
-        if (usedBy.Count > 0)
-            return Conflict($"This facility template is used by {string.Join(", ", usedBy)}. Remove it from those scenarios before deleting it.");
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteBulk([FromBody] BulkDeleteRequest? request, CancellationToken ct)
+    {
+        if (request?.Ids == null || request.Ids.Count == 0)
+            return BadRequest("Select at least one facility template.");
+        if (request.Ids.Count > FacilityTemplateListRules.MaxBulkDelete)
+            return BadRequest($"A maximum of {FacilityTemplateListRules.MaxBulkDelete} templates can be deleted at once.");
+        if (request.Ids.Any(id => id == Guid.Empty))
+            return BadRequest("All template IDs must be non-empty GUIDs.");
 
-        await store.DeleteAsync(request.Id, ct);
-        return Ok();
+        var scenarios = await scenarioStore.GetAllAsync(ct);
+        var deletedIds = new List<Guid>();
+        var failures = new List<object>();
+        foreach (var id in request.Ids.Distinct())
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var result = await TryDeleteAsync(id, scenarios, ct);
+                if (result == DeleteTemplateResult.Deleted)
+                {
+                    deletedIds.Add(id);
+                    continue;
+                }
+
+                failures.Add(new { id, reason = await FailureReasonAsync(id, result, scenarios, ct) });
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                failures.Add(new { id, reason = "An unexpected error occurred while deleting this template." });
+            }
+        }
+
+        return Ok(new { deletedIds, failures });
+    }
+
+    private async Task<IActionResult> DeleteOneAsync(Guid id, CancellationToken ct)
+    {
+        var scenarios = await scenarioStore.GetAllAsync(ct);
+        var result = await TryDeleteAsync(id, scenarios, ct);
+        return result switch
+        {
+            DeleteTemplateResult.Deleted => Ok(),
+            DeleteTemplateResult.NotFound => NotFound(),
+            DeleteTemplateResult.SystemProtected => StatusCode(StatusCodes.Status403Forbidden, "System template cannot be deleted."),
+            DeleteTemplateResult.DefaultProtected => Conflict("The system facility config cannot be deleted."),
+            DeleteTemplateResult.InUse => Conflict(await FailureReasonAsync(id, result, scenarios, ct)),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
     }
 
     [HttpPost]
@@ -158,6 +214,59 @@ public class FacilityTemplatesController : AutomationTemplateController
         };
         await store.UpsertAsync(clone, ct);
         return CreatedAtAction(nameof(GetJson), new { id = clone.Id }, new { id = clone.Id });
+    }
+
+    private enum DeleteTemplateResult
+    {
+        Deleted,
+        NotFound,
+        SystemProtected,
+        DefaultProtected,
+        InUse
+    }
+
+    private async Task<DeleteTemplateResult> TryDeleteAsync(
+        Guid id,
+        IReadOnlyList<TestScenarioDefinition> scenarios,
+        CancellationToken ct)
+    {
+        var template = await store.GetByIdAsync(id, ct);
+        if (template == null)
+            return DeleteTemplateResult.NotFound;
+        if (template.IsSystem)
+            return DeleteTemplateResult.SystemProtected;
+        if (template.IsDefault)
+            return DeleteTemplateResult.DefaultProtected;
+        if (scenarios.Any(s => s.FacilityConfigurationMode == FacilityConfigurationMode.Facility && s.FacilityTemplateId == id))
+            return DeleteTemplateResult.InUse;
+
+        await store.DeleteAsync(id, ct);
+        return DeleteTemplateResult.Deleted;
+    }
+
+    private static Task<string> FailureReasonAsync(
+        Guid id,
+        DeleteTemplateResult result,
+        IReadOnlyList<TestScenarioDefinition> scenarios,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (result == DeleteTemplateResult.InUse)
+        {
+            var names = scenarios
+                .Where(s => s.FacilityConfigurationMode == FacilityConfigurationMode.Facility && s.FacilityTemplateId == id)
+                .Select(s => s.Name);
+            return Task.FromResult($"This facility template is used by {string.Join(", ", names)}. Remove it from those scenarios before deleting it.");
+        }
+
+        var reason = result switch
+        {
+            DeleteTemplateResult.NotFound => "Facility template was not found.",
+            DeleteTemplateResult.SystemProtected => "System template cannot be deleted.",
+            DeleteTemplateResult.DefaultProtected => "The system facility config cannot be deleted.",
+            _ => "Deletion failed."
+        };
+        return Task.FromResult(reason);
     }
 
     private async Task<string?> ValidateReferencesAsync(FacilityTemplate model, CancellationToken ct)

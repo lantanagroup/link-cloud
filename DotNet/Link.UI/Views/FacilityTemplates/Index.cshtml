@@ -5,6 +5,17 @@
     var suites = (List<NormalizationSuiteDefinition>?)ViewBag.NormalizationSuites ?? [];
     var maps = (List<OrganizationResourceMapTemplate>?)ViewBag.OrganizationResourceMaps ?? [];
     var patients = (List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? [];
+    var currentPage = (int)ViewBag.CurrentPage;
+    var pageSize = (int)ViewBag.PageSize;
+    var totalCount = (long)ViewBag.TotalCount;
+    var totalPages = (int)ViewBag.TotalPages;
+    var firstRecord = totalCount == 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    var lastRecord = Math.Min((long)currentPage * pageSize, totalCount);
+    Dictionary<string, string> PageRoute(int page, int size) => new()
+    {
+        ["page"] = page.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["pageSize"] = size.ToString(System.Globalization.CultureInfo.InvariantCulture)
+    };
     string PieceName<T>(IEnumerable<T> items, Guid? id, Func<T, Guid> idOf, Func<T, string> nameOf) where T : class
     {
         if (!id.HasValue) return "Not configured";
@@ -22,12 +33,19 @@
     <div class="au-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>All templates</span>
-            <button type="button" class="btn btn-sm btn-success" id="btnNewFacility">New</button>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-danger" id="btnDeleteSelectedFacilities" disabled>Delete selected (0)</button>
+                <button type="button" class="btn btn-sm btn-success" id="btnNewFacility">New</button>
+            </div>
         </div>
+        <div id="facilityBulkResult" class="alert mx-3 mt-3 mb-0" role="status" aria-live="polite" style="white-space: pre-line" hidden></div>
         <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0">
                 <thead>
                     <tr>
+                        <th data-nocopy style="width:2.5rem">
+                            <input type="checkbox" class="form-check-input" id="facilitySelectAll" aria-label="Select all deletable templates on this page" />
+                        </th>
                         <th data-sort="name">Name</th>
                         <th data-sort="vendor">Vendor</th>
                         <th>Pieces</th>
@@ -39,6 +57,12 @@
                 @foreach (var t in Model)
                 {
                     <tr data-name="@t.Name" data-vendor="@(t.VendorName ?? "")" data-type="@(t.IsSystem ? "System" : "Custom")">
+                        <td data-nocopy>
+                            @if (!t.IsSystem && !t.IsDefault)
+                            {
+                                <input type="checkbox" class="form-check-input facility-select" value="@t.Id" data-name="@t.Name" aria-label="Select @t.Name" />
+                            }
+                        </td>
                         <td>
                             <strong>@t.Name</strong>
                             @if (t.IsDefault)
@@ -71,9 +95,9 @@
                             <div class="lu-row-actions">
                                 <button type="button" class="btn btn-sm btn-au-link lu-icon-btn btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i><span class="ms-1">@(t.IsSystem ? "View" : "Edit")</span></button>
                                 <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-facility-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i><span class="ms-1">Clone</span></button>
-                                @if (!t.IsSystem)
+                                @if (!t.IsSystem && !t.IsDefault)
                                 {
-                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-facility-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                    <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-facility-delete" data-id="@t.Id" data-name="@t.Name" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                 }
                             </div>
                         </td>
@@ -81,6 +105,10 @@
                 }
                 </tbody>
             </table>
+        </div>
+        <div class="card-footer">
+            <p class="small text-muted mb-2">Showing @firstRecord–@lastRecord of @totalCount facility templates</p>
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Facility template pages", Page = currentPage, Pages = totalPages, Total = totalCount, PageSize = pageSize, Sizes = FacilityTemplateListRules.PageSizes, Route = PageRoute })" />
         </div>
     </div>
 </div>
@@ -176,6 +204,7 @@
     const getUrl = '@Url.Action("GetJson", "FacilityTemplates")';
     const cloneUrl = '@Url.Action("CloneInline", "FacilityTemplates")';
     const deleteUrl = '@Url.Action("DeleteInline", "FacilityTemplates")';
+    const bulkDeleteUrl = '@Url.Action("DeleteBulk", "FacilityTemplates")';
     function token() {
         const field = document.querySelector('input[name="__RequestVerificationToken"]');
         return field ? field.value : '';
@@ -315,6 +344,129 @@
             });
         });
     });
+
+    const selectAll = document.getElementById('facilitySelectAll');
+    const deleteSelectedButton = document.getElementById('btnDeleteSelectedFacilities');
+    const bulkResult = document.getElementById('facilityBulkResult');
+    const bulkResultStorageKey = 'facilityTemplatesBulkDeleteResult';
+    const selectionBoxes = Array.prototype.slice.call(document.querySelectorAll('.facility-select'));
+    let bulkDeleting = false;
+
+    function rowVisible(box) {
+        const row = box.closest('tr');
+        return box.isConnected && (!row || !row.classList.contains('au-row-hidden'));
+    }
+    function visibleBoxes() {
+        return selectionBoxes.filter(rowVisible);
+    }
+    function selectedBoxes() {
+        return visibleBoxes().filter(function (box) { return box.checked; });
+    }
+    function updateBulkSelection() {
+        const active = visibleBoxes();
+        const selected = active.filter(function (box) { return box.checked; });
+        deleteSelectedButton.textContent = 'Delete selected (' + selected.length + ')';
+        deleteSelectedButton.disabled = bulkDeleting || selected.length === 0;
+        selectAll.checked = active.length > 0 && selected.length === active.length;
+        selectAll.indeterminate = selected.length > 0 && selected.length < active.length;
+        selectAll.disabled = bulkDeleting || active.length === 0;
+    }
+    function showBulkResult(message, isError) {
+        bulkResult.textContent = message;
+        bulkResult.className = 'alert mx-3 mt-3 mb-0 ' + (isError ? 'alert-warning' : 'alert-success');
+        bulkResult.hidden = false;
+    }
+    function restoreBulkDeleteResult() {
+        const saved = sessionStorage.getItem(bulkResultStorageKey);
+        if (!saved) return;
+        sessionStorage.removeItem(bulkResultStorageKey);
+        try {
+            const result = JSON.parse(saved);
+            showBulkResult(result.message, true);
+            const failedIds = new Set((result.failedIds || []).map(function (id) { return String(id).toLowerCase(); }));
+            selectionBoxes.forEach(function (box) {
+                box.checked = failedIds.has(box.value.toLowerCase());
+            });
+            updateBulkSelection();
+        } catch (err) {
+            // A stale browser value is not a reason to block the page.
+        }
+    }
+    async function runBulkDelete(selected) {
+        bulkDeleting = true;
+        selectionBoxes.forEach(function (box) { box.disabled = true; });
+        updateBulkSelection();
+        bulkResult.hidden = true;
+        try {
+            const result = await post(bulkDeleteUrl, {
+                ids: selected.map(function (box) { return box.value; })
+            }) || {};
+            const deletedIds = new Set((result.deletedIds || []).map(function (id) { return String(id).toLowerCase(); }));
+            const failures = result.failures || [];
+            if (failures.length === 0) {
+                await auRefreshPage('Deleted.');
+                return;
+            }
+            const failureDetails = failures.map(function (failure) {
+                const matching = selectionBoxes.find(function (box) {
+                    return box.value.toLowerCase() === String(failure.id).toLowerCase();
+                });
+                const name = (matching && matching.dataset.name) || failure.id;
+                return name + ': ' + failure.reason;
+            });
+            const message = deletedIds.size + ' deleted; ' + failures.length + ' failed.\n' + failureDetails.join('\n');
+            if (deletedIds.size > 0) {
+                sessionStorage.setItem(bulkResultStorageKey, JSON.stringify({
+                    message: message,
+                    failedIds: failures.map(function (failure) { return String(failure.id); })
+                }));
+                await auRefreshPage('Some templates could not be deleted.');
+                return;
+            }
+            const failedIds = new Set(failures.map(function (failure) { return String(failure.id).toLowerCase(); }));
+            selectionBoxes.forEach(function (box) {
+                box.checked = failedIds.has(box.value.toLowerCase());
+            });
+            showBulkResult(message, true);
+        } catch (err) {
+            showBulkResult(err.message || 'Bulk deletion failed. Please retry.', true);
+        } finally {
+            bulkDeleting = false;
+            selectionBoxes.forEach(function (box) {
+                if (box.isConnected) box.disabled = false;
+            });
+            updateBulkSelection();
+        }
+    }
+
+    selectAll.addEventListener('change', function () {
+        visibleBoxes().forEach(function (box) { box.checked = selectAll.checked; });
+        updateBulkSelection();
+    });
+    selectionBoxes.forEach(function (box) {
+        box.addEventListener('change', updateBulkSelection);
+    });
+    const tableShell = document.querySelector('[data-au-table]');
+    if (tableShell) {
+        tableShell.addEventListener('input', updateBulkSelection);
+        tableShell.addEventListener('change', updateBulkSelection);
+    }
+    deleteSelectedButton.addEventListener('click', function () {
+        const selected = selectedBoxes();
+        if (selected.length === 0 || bulkDeleting || !window.luHoldConfirm) return;
+        const names = selected.map(function (box) { return box.dataset.name; });
+        const noun = selected.length === 1 ? 'facility template' : 'facility templates';
+        window.luHoldConfirm.ask(
+            deleteSelectedButton,
+            'Delete selected facility templates',
+            'Delete ' + selected.length + ' selected ' + noun + '?',
+            ['These facility templates are removed.'].concat(names),
+            function () { runBulkDelete(selected); });
+    });
+    if (document.readyState === 'loading')
+        document.addEventListener('DOMContentLoaded', updateBulkSelection);
+    updateBulkSelection();
+    restoreBulkDeleteResult();
 })();
 </script>
 <script src="~/js/au-data-table.js" asp-append-version="true"></script>
