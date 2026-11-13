@@ -506,6 +506,12 @@ public class EhrSystemTests
         public Task<List<FacilityTemplate>> GetAllAsync(CancellationToken ct = default) =>
             Task.FromResult(templates.ToList());
 
+        public Task<long> CountAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<List<FacilityTemplate>> GetPageAsync(int skip, int take, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
