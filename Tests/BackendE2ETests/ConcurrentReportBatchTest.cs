@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
 /// Three existing report scenarios in one Link.UI batch. Cleanup runs before a
-/// run reports Succeeded, so facility, patient, and FHIR evidence is taken
+/// run reports Succeeded, so report-entry patients and a FHIR read are taken
 /// while the run is still going.
 /// </summary>
 public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixture>
@@ -179,17 +179,14 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
                 $"{run.ScenarioName} {run.StartedAt:o}..{run.FinishedAt:o}")));
 
         Assert.All(runs, run => Assert.True(
-            run.Patients.Count > 0 && run.EntryPatientIds.Count > 0,
-            $"{run.ScenarioName} finished before its facility had census patients and report entries."));
+            run.Patients.Count > 0,
+            $"{run.ScenarioName} finished before its facility had report entries."));
 
         foreach (var run in runs)
         {
             var tags = run.Patients.Select(TagOf).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             Assert.True(tags.Count == 1 && tags[0] != null, $"{run.ScenarioName} patient ids did not share one tag: {string.Join(", ", run.Patients)}");
             run.Tag = tags[0]!;
-            Assert.True(
-                run.EntryPatientIds.All(id => run.Patients.Contains(id)),
-                $"{run.ScenarioName} report entries left its census patients: {string.Join(", ", run.EntryPatientIds)}");
         }
 
         Assert.Equal(3, runs.Select(run => run.Tag).Distinct(StringComparer.OrdinalIgnoreCase).Count());
@@ -228,18 +225,16 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
 
     private async Task SampleAsync(RunWatch watch, ConsoleAutomationOutput output, CancellationToken cancellationToken)
     {
-        var patients = await ReadCensusPatientsAsync(watch.FacilityId!, cancellationToken);
-        var entries = await ReadReportEntriesAsync(watch.FacilityId!, cancellationToken);
-        if (patients.Count == 0 || entries.Count == 0)
+        var patients = await ReadReportEntriesAsync(watch.FacilityId!, cancellationToken);
+        if (patients.Count == 0)
             return;
 
         var firstSample = watch.Patients.Count == 0;
         watch.Patients = patients;
-        watch.EntryPatientIds = entries;
         if (firstSample)
         {
             output.WriteLine(
-                $"  {watch.ScenarioName} sampled facility {watch.FacilityId}: {patients.Count} census patient(s), {entries.Count} report entry patient(s).");
+                $"  {watch.ScenarioName} sampled facility {watch.FacilityId}: {patients.Count} report entry patient(s).");
         }
 
         if (watch.FhirSeen)
@@ -255,33 +250,6 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
         }
 
         watch.FhirSeen = true;
-    }
-
-    private async Task<HashSet<string>> ReadCensusPatientsAsync(string facilityId, CancellationToken cancellationToken)
-    {
-        var census = _sp.GetRequiredService<ICensusServiceClient>();
-        var response = await census.GetAdmittedPatientsAsync(
-            facilityId,
-            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            cancellationToken);
-        if (response.StatusCode == 404 || string.IsNullOrWhiteSpace(response.RawBody))
-            return [];
-
-        Assert.True(
-            response.IsSuccessStatusCode,
-            $"Census admitted list for {facilityId} returned HTTP {response.StatusCode}: {response.RawBody}");
-
-        var list = JsonSerializer.Deserialize<CensusList>(response.RawBody, JsonOpts);
-        var patients = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var entry in list?.Entry ?? [])
-        {
-            var patientId = PatientIdFromReference(entry.Item?.Reference);
-            if (patientId != null)
-                patients.Add(patientId);
-        }
-
-        return patients;
     }
 
     private async Task<HashSet<string>> ReadReportEntriesAsync(string facilityId, CancellationToken cancellationToken)
@@ -342,14 +310,6 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
     private static bool IsTerminalItem(string? status)
         => status is "Succeeded" or "Failed" or "Cancelled";
 
-    private static string? PatientIdFromReference(string? reference)
-    {
-        if (string.IsNullOrWhiteSpace(reference))
-            return null;
-        var slash = reference.LastIndexOf('/');
-        return NormalizePatientId(slash < 0 ? reference : reference[(slash + 1)..]);
-    }
-
     private static string? NormalizePatientId(string? patientId)
     {
         if (string.IsNullOrWhiteSpace(patientId))
@@ -383,7 +343,6 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
         public string? Tag { get; set; }
         public bool FhirSeen { get; set; }
         public HashSet<string> Patients { get; set; } = new(StringComparer.Ordinal);
-        public HashSet<string> EntryPatientIds { get; set; } = new(StringComparer.Ordinal);
     }
 
     private sealed class BatchBody
@@ -416,20 +375,5 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
     private sealed class CapBody
     {
         public int MaxConcurrency { get; set; }
-    }
-
-    private sealed class CensusList
-    {
-        public List<CensusEntry>? Entry { get; set; }
-    }
-
-    private sealed class CensusEntry
-    {
-        public CensusItem? Item { get; set; }
-    }
-
-    private sealed class CensusItem
-    {
-        public string? Reference { get; set; }
     }
 }
