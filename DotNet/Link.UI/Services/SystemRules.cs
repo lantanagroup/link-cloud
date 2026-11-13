@@ -25,7 +25,7 @@ public static class SystemRules
     public static readonly string[] HealthServices =
     [
         "account", "adminbff", "audit", "census", "dataacquisition", "measureeval", "measureevaluation",
-        "normalization", "querydispatch", "report", "submission", "tenant", "terminology", "validation"
+        "nhsnappbff", "normalization", "querydispatch", "report", "submission", "tenant", "terminology", "validation"
     ];
 
     public static readonly string[] Frequencies = ["Discharge", "Daily", "Weekly", "Monthly", "Adhoc"];

@@ -315,6 +315,7 @@
                 }
                 else
                 {
+                    <div class="table-responsive">
                     <table class="au-table table table-sm mb-0">
                         <thead>
                             <tr>
@@ -342,6 +343,7 @@
                         }
                         </tbody>
                     </table>
+                    </div>
                 }
             </div>
             <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
@@ -399,6 +401,7 @@
                     {
                         <p class="small text-muted mb-2" data-origin-note>Patient source was not recorded for this run.</p>
                     }
+                    <div class="table-responsive">
                     <table class="au-table table table-sm mb-0">
                         <thead>
                             <tr>
@@ -555,6 +558,7 @@
                         }
                         </tbody>
                     </table>
+                    </div>
                 }
             </div>
             <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
@@ -615,6 +619,7 @@
                 <h3 class="card-header h6 mb-0">Measures compared</h3>
                 <div class="card-body">
                     <p class="small text-muted">Largest Initial Population first. At most @ReportManifestModel.ChartCap measures.</p>
+                    <div class="table-responsive">
                     <table class="au-table table table-sm mb-0">
                         <thead>
                             <tr>
@@ -638,6 +643,7 @@
                         }
                         </tbody>
                     </table>
+                    </div>
                     @if (Model.PopulationMeasureCount > Model.PopulationComparison.Count)
                     {
                         <p class="small text-muted mb-0 mt-2">@Model.PopulationComparison.Count of @Counts.Of(Model.PopulationMeasureCount, "measure") shown.</p>
@@ -690,6 +696,7 @@
                     }
                     else
                     {
+                        <div class="table-responsive">
                         <table class="au-table table table-sm mb-0">
                             <thead>
                                 <tr>
@@ -710,6 +717,7 @@
                             }
                             </tbody>
                         </table>
+                        </div>
                     }
                 </div>
                 <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
@@ -757,7 +765,8 @@
                             <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
                             <a class="btn btn-sm btn-warning" href="@Model.Href(clearCompare: true)">Clear</a>
                         </form>
-                        <table class="au-table table table-sm mb-3">
+                        <div class="table-responsive mb-3">
+                        <table class="au-table table table-sm mb-0">
                             <thead>
                                 <tr>
                                     <th>Resource type</th>
@@ -792,6 +801,7 @@
                             }
                             </tbody>
                         </table>
+                        </div>
                         <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                             @if (comparison.TypePaging.Page > 1)
                             {
@@ -808,6 +818,7 @@
                                 <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: (int)comparison.TypePaging.TotalPages)">Last types</a>
                             }
                         </div>
+                        <div class="table-responsive">
                         <table class="au-table table table-sm mb-0">
                             <thead>
                                 <tr>
@@ -848,6 +859,7 @@
                             }
                             </tbody>
                         </table>
+                        </div>
                         <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
                             @if (comparison.PatientPaging.Page > 1)
                             {

@@ -164,8 +164,30 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
             return 0;
         }
 
-        var result = await _dbContext.OrganizationLocationMappings
+        // Runs for every acquired Location, so it touches only children that need this parent's id or org
+        // status, and walks further only below children it promotes. See
+        // DataAcquisition.Domain/Docs/OrgLocationMapping-AsBuilt.md.
+        var pendingChildren = await _dbContext.OrganizationLocationMappings
             .Where(m => m.FacilityId == facilityId
+                    && m.PartOfValue == parentLocationId
+                    && (m.PartOfId != parentLocationMappingId || (isOrgLocation && !m.IsOrgLocation)))
+            .Select(m => new { m.LocationMappingId, m.LocationId, m.IsOrgLocation })
+            .ToListAsync(cancellationToken);
+
+        if (pendingChildren.Count == 0)
+        {
+            return 0;
+        }
+
+        var pendingIds = pendingChildren
+            .Select(m => m.LocationMappingId)
+            .ToList();
+
+        // The whole condition is repeated so a child another worker has since updated or moved to a different
+        // parent is left alone.
+        var result = await _dbContext.OrganizationLocationMappings
+            .Where(m => pendingIds.Contains(m.LocationMappingId)
+                    && m.FacilityId == facilityId
                     && m.PartOfValue == parentLocationId
                     && (m.PartOfId != parentLocationMappingId || (isOrgLocation && !m.IsOrgLocation)))
             .ExecuteUpdateAsync(setters => setters
@@ -174,32 +196,53 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
                 .SetProperty(m => m.ModifiedDate, DateTime.UtcNow),
             cancellationToken);
 
-        var updatedMappings = await _dbContext.OrganizationLocationMappings
-            .Where(m => m.PartOfId == parentLocationMappingId)
-            .Select(m => new { m.LocationMappingId, m.LocationId, m.IsOrgLocation })
+        if (!isOrgLocation)
+        {
+            return result;
+        }
+
+        // Only a promoted child changes any encounter's MappedToOrg, and only its children can need promoting
+        // in turn. A child that was already an org location promoted its own children when it was acquired.
+        var promotionCandidateIds = pendingChildren
+            .Where(m => !m.IsOrgLocation)
+            .Select(m => m.LocationMappingId)
+            .ToList();
+
+        if (promotionCandidateIds.Count == 0)
+        {
+            return result;
+        }
+
+        // Confirmed against the rows as they are now: a candidate another worker moved to a different parent
+        // must not have its own children promoted on this parent's behalf.
+        var promotedChildren = await _dbContext.OrganizationLocationMappings
+            .Where(m => promotionCandidateIds.Contains(m.LocationMappingId)
+                    && m.PartOfId == parentLocationMappingId
+                    && m.PartOfValue == parentLocationId
+                    && m.IsOrgLocation)
+            .Select(m => new { m.LocationMappingId, m.LocationId })
             .ToListAsync(cancellationToken);
-            
-        foreach (var mapping in updatedMappings)
+
+        foreach (var child in promotedChildren)
         {
             await _encounterMappingManager.RecomputeMappedToOrgForLocationMappingAsync(
-                mapping.LocationMappingId,
+                child.LocationMappingId,
                 cancellationToken);
         }
 
-        foreach (var mapping in updatedMappings.Where(mapping =>
-                     mapping.IsOrgLocation && !string.IsNullOrWhiteSpace(mapping.LocationId)))
+        foreach (var child in promotedChildren.Where(m => !string.IsNullOrWhiteSpace(m.LocationId)))
         {
             result += await SetParentForChildrenAsync(
                 facilityId,
-                mapping.LocationId!,
-                mapping.LocationMappingId,
-                mapping.IsOrgLocation,
+                child.LocationId!,
+                child.LocationMappingId,
+                isOrgLocation: true,
                 visitedParentMappingIds,
                 cancellationToken);
         }
 
         return result;
-    }    
+    }
 
     private void ApplyUpdate(OrganizationLocationMapping entity, UpdateOrganizationLocationMappingModel model)
     {
