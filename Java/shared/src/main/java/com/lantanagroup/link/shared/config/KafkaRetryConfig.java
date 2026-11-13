@@ -13,6 +13,12 @@ import java.util.List;
 public class KafkaRetryConfig {
 
     /**
+     * The longest retry delay spring-kafka honors. Its backoff listener (3.3.16; 3.1.4 had no cap) ignores
+     * a due-time more than one day ahead and processes the record at once, so a longer delay retries early.
+     */
+    public static final Duration MAX_RETRY_DELAY = Duration.ofDays(1);
+
+    /**
      * Per-attempt retry delays — the single source of truth for retry depth and timing. Entry K-1 is the
      * delay before retry K, and the total attempt count is derived from the list size
      * ({@link #effectiveMaxAttempts()} = size + 1); after the last entry the record is dead-lettered to
@@ -25,6 +31,21 @@ public class KafkaRetryConfig {
 
     private boolean disableRetryConsumer = false;
 
+    /**
+     * Sets the retry schedule, rejecting entries spring-kafka would not wait for, so a bad value fails
+     * at startup rather than retrying early.
+     *
+     * @throws IllegalArgumentException if an entry is null, negative, or longer than {@link #MAX_RETRY_DELAY}
+     */
+    public void setConsumerRetryDuration(List<Duration> consumerRetryDuration) {
+        if (consumerRetryDuration != null) {
+            for (Duration delay : consumerRetryDuration) {
+                validateDelay(delay);
+            }
+        }
+        this.consumerRetryDuration = consumerRetryDuration;
+    }
+
     public int effectiveMaxAttempts() {
         return (consumerRetryDuration == null ? 0 : consumerRetryDuration.size()) + 1;
     }
@@ -35,6 +56,18 @@ public class KafkaRetryConfig {
         }
         int idx = Math.min(Math.max(attempt - 1, 0), consumerRetryDuration.size() - 1);
         return consumerRetryDuration.get(idx).toMillis();
+    }
+
+    private static void validateDelay(Duration delay) {
+        if (delay == null || delay.isNegative()) {
+            throw new IllegalArgumentException(
+                    "spring.kafka.retry.consumer-retry-duration entries must be zero or positive, but got " + delay);
+        }
+        if (delay.compareTo(MAX_RETRY_DELAY) > 0) {
+            throw new IllegalArgumentException(
+                    "spring.kafka.retry.consumer-retry-duration entries must be at most " + MAX_RETRY_DELAY +
+                    ", because spring-kafka retries a longer delay immediately, but got " + delay);
+        }
     }
 
 }

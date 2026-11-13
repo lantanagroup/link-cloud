@@ -42,28 +42,36 @@ export class LinkHealthCheckComponent implements OnInit {
     this.getServiceInfos();
   }
 
+  // Service key (the Admin BFF's /monitor/health/{service} route value) and the display name the
+  // Admin BFF reports for it. Rows are listed alphabetically by display name, so a new service only
+  // needs an entry here, in any position.
+  static readonly services: ReadonlyArray<[serviceKey: string, displayName: string]> = [
+    ['account', 'Account'],
+    ['adminbff', 'Admin BFF'],
+    ['audit', 'Audit'],
+    ['census', 'Census'],
+    ['dataacquisition', 'Data Acquisition'],
+    ['measureeval', 'Measure Evaluation'],
+    ['nhsnappbff', 'NHSN App BFF'],
+    ['normalization', 'Normalization'],
+    ['querydispatch', 'Query Dispatch'],
+    ['report', 'Report'],
+    ['submission', 'Submission'],
+    ['tenant', 'Tenant'],
+    ['terminology', 'Terminology'],
+    ['validation', 'Validation']
+  ];
+
   initHealthSummary(): void {
-    this.healthSummary = [
-      this.createHealthSummary('account'),
-      this.createHealthSummary('adminbff'),
-      this.createHealthSummary('audit'),
-      this.createHealthSummary('census'),
-      this.createHealthSummary('dataacquisition'),
-      this.createHealthSummary('normalization'),
-      this.createHealthSummary('querydispatch'),
-      this.createHealthSummary('report'),
-      this.createHealthSummary('submission'),
-      this.createHealthSummary('tenant'),
-      this.createHealthSummary('measureeval'),
-      this.createHealthSummary('validation'),
-      this.createHealthSummary('terminology')
-    ];
+    this.healthSummary = [...LinkHealthCheckComponent.services]
+      .sort(([, a], [, b]) => a.localeCompare(b, undefined, {sensitivity: 'base'}))
+      .map(([serviceKey, displayName]) => this.createHealthSummary(serviceKey, displayName));
   }
 
-  createHealthSummary(serviceName: string): ILinkServiceHealthSummary & { serviceKey: string } {
+  createHealthSummary(serviceName: string, displayName: string = serviceName): ILinkServiceHealthSummary & { serviceKey: string } {
     return {
       serviceKey: serviceName,
-      service: serviceName,
+      service: displayName,
       status: 'Loading...',
       totalDuration: '',
       entries: {}

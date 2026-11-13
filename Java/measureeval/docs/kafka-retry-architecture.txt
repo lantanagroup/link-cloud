@@ -124,6 +124,10 @@ separate container-thread handler is required.
     ConsumerRetryDuration[retryCount-1] + count > Count() termination.
   - An empty list disables retries (the first failure is dead-lettered); the
     default is two 3-second delays (3 attempts).
+  - Each entry must be between PT0S and PT24H; KafkaRetryConfig rejects
+    anything else at startup. spring-kafka 3.3.16's backoff listener ignores a
+    due-time more than one day ahead and processes the record at once, so a
+    longer delay would retry early and use up its attempts (see section 7).
   - Disable routes everything to -Error AND (via @ConditionalOnProperty) skips
     provisioning the -Retry listener.
 
@@ -152,7 +156,7 @@ poison) is service-specific and passed in as parameters.
 
 
 --------------------------------------------------------------------------------
-7. THE HEADER CONTRACT & ITS GUARD (spring-kafka 3.1.4)
+7. THE HEADER CONTRACT & ITS GUARD (spring-kafka 3.3.16)
 --------------------------------------------------------------------------------
 The recoverer hand-writes headers Spring's backoff listener reads, so the
 encodings must match exactly:
@@ -164,12 +168,14 @@ encodings must match exactly:
 
 These are spring-kafka INTERNALS - an upgrade can silently break the delay.
 Guarded by:
-  - Pinned version - spring-kafka.version = 3.1.4 in the parent pom (with a
+  - Pinned version - spring-kafka.version = 3.3.16 in the parent pom (with a
     comment), so a Boot bump can't move it accidentally.
   - RetryTopicRecovererTest - asserts our header bytes decode exactly as Spring's
     reader.
   - RetryTopicBackoffDelayTest - embedded-Kafka test asserting a -Retry record is
     actually delayed (runs in CI).
+  - KafkaRetryConfig.MAX_RETRY_DELAY - one day, spring-kafka's own cap on
+    how far ahead it will honor retry_topic-backoff-timestamp (3.1.4 had none).
 
 
 --------------------------------------------------------------------------------
