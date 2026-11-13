@@ -265,7 +265,7 @@ public class EncounterMappingManager : IEncounterMappingManager
         try
         {
             await _database.EncounterMappingRepository.AddAsync(entity, cancellationToken);
-            await _database.SaveChangesAsync();
+            await _database.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {

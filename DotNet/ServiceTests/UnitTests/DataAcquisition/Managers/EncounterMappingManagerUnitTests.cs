@@ -94,7 +94,7 @@ public class EncounterMappingManagerUnitTests
         Assert.True(capturedEntity.MappedToOrg);
         Assert.NotEqual(default, capturedEntity.CreateDate);
         Assert.Equal(capturedEntity.CreateDate, capturedEntity.ModifiedDate);
-        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public class EncounterMappingManagerUnitTests
         // Assert
         Assert.Contains("blahblahblah", ex.Message);
         _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>(), It.IsAny<CancellationToken>()), Times.Never);
-        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class EncounterMappingManagerUnitTests
         Assert.Contains("Pat-from-Fac2", ex.Message);
         Assert.Contains("Fac1", ex.Message);
         _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>(), It.IsAny<CancellationToken>()), Times.Never);
-        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -209,11 +209,11 @@ public class EncounterMappingManagerUnitTests
             r => r.AnyAsync(It.IsAny<Expression<Func<DataAcquisitionLog, bool>>>()),
             Times.Never);
         _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>(), It.IsAny<CancellationToken>()), Times.Once);
-        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task CreateFromAcquisitionAsync_WithToken_ForwardsTokenToLookupAndInsert()
+    public async Task CreateFromAcquisitionAsync_WithToken_ForwardsTokenToLookupInsertAndSave()
     {
         var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = "Pat1" };
         using var cancellation = new CancellationTokenSource();
@@ -228,6 +228,8 @@ public class EncounterMappingManagerUnitTests
             r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), cancellation.Token),
             Times.Once);
         _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>(), cancellation.Token), Times.Once);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(cancellation.Token), Times.Once);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
     }
 
     [Fact]
@@ -255,7 +257,7 @@ public class EncounterMappingManagerUnitTests
         _mockMappingRepo.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((EncounterMapping)null!);
 
-        _mockDatabase.Setup(d => d.SaveChangesAsync())
+        _mockDatabase.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("FK violation", new Exception()));
 
         // Re-check: only id 5 exists; 99 is the missing reference.
@@ -308,7 +310,7 @@ public class EncounterMappingManagerUnitTests
         Assert.Equal(2, capturedEntity.EncounterLocations.Count);
         Assert.Contains(capturedEntity.EncounterLocations, l => l.OrganizationLocationMappingId == 5);
         Assert.Contains(capturedEntity.EncounterLocations, l => l.OrganizationLocationMappingId == 6);
-        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -332,7 +334,7 @@ public class EncounterMappingManagerUnitTests
 
         // Assert
         _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>(), It.IsAny<CancellationToken>()), Times.Never);
-        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -352,7 +354,7 @@ public class EncounterMappingManagerUnitTests
             .ReturnsAsync((EncounterMapping)null!)                                          // pre-check
             .ReturnsAsync(new EncounterMapping { FacilityId = "Fac1", EncounterId = "Enc1" }); // post-failure re-check
 
-        _mockDatabase.Setup(d => d.SaveChangesAsync())
+        _mockDatabase.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("unique constraint", new Exception()));
 
         // Act
@@ -375,7 +377,7 @@ public class EncounterMappingManagerUnitTests
         _mockMappingRepo.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((EncounterMapping)null!);
 
-        _mockDatabase.Setup(d => d.SaveChangesAsync())
+        _mockDatabase.Setup(d => d.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("fk violation", new Exception()));
 
         // Act & Assert
