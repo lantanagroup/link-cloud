@@ -81,6 +81,15 @@ public class ConfigurationNullBindingTests
         Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
     }
 
+    [Fact]
+    public void NullKeys_NullsInsideArrays_ReportIndexPaths()
+    {
+        // No shipped file has a null inside an array yet; this keeps the array branch honest for when one does.
+        var actual = FindNullKeysInJson("""{"items":[null,{"value":null}]}""");
+
+        Assert.Equal(["items:0", "items:1:value"], actual);
+    }
+
     [Theory]
     [MemberData(nameof(NullKeysByFile))]
     public void RawValue_NullKeyInShippedAppSettings_ReadsAsEmptyString(string service,
@@ -144,12 +153,17 @@ public class ConfigurationNullBindingTests
 
     private static List<string> FindNullKeys(string service, string file)
     {
+        return FindNullKeysInJson(File.ReadAllText(ResourcePath(service, file)));
+    }
+
+    private static List<string> FindNullKeysInJson(string json)
+    {
         var options = new JsonDocumentOptions
         {
             CommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true
         };
-        using var document = JsonDocument.Parse(File.ReadAllText(ResourcePath(service, file)), options);
+        using var document = JsonDocument.Parse(json, options);
 
         var keys = new List<string>();
         CollectNullKeys(document.RootElement, null, keys);
