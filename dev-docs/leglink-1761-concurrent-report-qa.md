@@ -10,7 +10,7 @@ Command, from the worktree:
 
 `dotnet test DotNet/Link.UI.Tests/Link.UI.Tests.csproj --nologo`
 
-Date: 2026-11-12. First run: Passed 896, Failed 0, Skipped 0, Duration 26 s. After the restart-message fix: Passed 897, Failed 0, Skipped 0, Duration 24 s.
+Date: 2026-11-12. First run: Passed 896, Failed 0, Skipped 0, Duration 26 s. After the restart-message fix: Passed 897, Failed 0, Skipped 0, Duration 24 s. After the closed-batch badge fix: Passed 899, Failed 0, Skipped 0, Duration 17 s.
 
 These tests use an in-memory batch store and a fake run manager. They do not start Docker and they do not call a FHIR server. Every case below passed inside that run. The live pass is the separate section.
 
@@ -80,7 +80,7 @@ Evidence is under `dev-docs/leglink-1761/`. A captured status response is the re
 | L7 | Pass | Checking `down` disabled Start launch and created nothing. |
 | L8 | Pass | Cancel one EHR left the other in progress. Cancel launch then cancelled that one too. |
 | L9 | Pass on re-run | The first restart copied the scenario-recovery cancel text. After the fix, the same steps recorded "Interrupted by process restart." and the item that had never started did start. |
-| M6 | Pending | Two reports at once drop this PC below 1 GB free. Not run again. `Patient/qa-seed` was still HTTP 200 on both servers. |
+| M6 | Stopped | Launch `bb061283-f873-44e0-a604-cc4db316743d` had `local` and `sandbox` in progress together. I cancelled at 0.98 GB free. Success cleanup did not run. `Patient/qa-seed` stayed HTTP 200 on both servers. |
 
 ### L1. Settings cap
 
@@ -148,6 +148,12 @@ The log still shows startup recovery cancelling run `3ed4fbd5-5b16-4b05-8ef3-63a
 
 ### M6. Cleanup across two EHR servers
 
-Pending, retry when this PC has enough free RAM to finish two reports. Adhoc Report Test builds one patient with 1000 resources. The one time both EHR runs were in progress together, free RAM fell from 2.4 GB to 0.7 GB and I cancelled them. Before the later retry the machine had 12.2 GB free with the QA containers stopped. Starting the report stack, with validation capped at 2 GB and the two HAPI servers capped, left 2.3 GB free before any new report. That is not enough to finish two of these runs. I did not start them again.
+Stopped. Two Adhoc Report Test runs, one on `local` and one on `sandbox`, did not both finish. Success cleanup did not run, so this pass does not show that cleanup on one EHR leaves the other EHR's data in place. The unit tests `A_different_ehr_does_not_block_expunge_of_the_same_path` and `Two_named_ehr_systems_keep_separate_runs_and_the_same_endpoint_stays_protected` still cover that rule in memory.
 
-`Patient/qa-seed` was still HTTP 200 on both servers. A patient search returned total 11 on `local` and total 3 on `sandbox`. Those extra patients are from runs I cancelled. Cancel keeps imported data. No success cleanup has expunged them. The QA volumes are still on this machine.
+The live attempt is launch `bb061283-f873-44e0-a604-cc4db316743d`. `local` batch run `0c670fe4-c6ba-4ee2-acbd-01013246c76b` and `sandbox` batch run `11c898dc-7f18-48e1-9e6e-7d2f51b5ccce` were both in progress. Free RAM was 1.64 GB at the start and 0.98 GB on the next read. I cancelled the launch. Both items are Cancelled with "Cancelled by user." Status: `dev-docs/leglink-1761/m6-final.json`. The before patient ids are `dev-docs/leglink-1761/m6-patients-before.json`.
+
+`Patient/qa-seed` was HTTP 200 on both servers before the launch and after the cancel. Before: 13 patients on `local` and 4 on `sandbox` (`dev-docs/leglink-1761/m6-patients-before.json`). After the cancel: 14 on `local` (added `Patient-56734ad9-001`) and 5 on `sandbox` (added `Patient-4d3b2c34-001`), in `dev-docs/leglink-1761/m6-patients-after-cancel.json`. Cancel does not expunge those creates. The same ids, including `qa-seed`, were still on the server they started on.
+
+Two earlier tries on this same stack did not reach cleanup either. One died at facility create with HTTP 502 because `l1761-mock-dmrp` was not running. The next, launch `f540750a-db28-4aa5-bd64-4dc2b83b1252`, had both reports in progress until validation threw `Java heap space` inside its 2 GB cap and both runs aborted after validation was unavailable for 120 seconds. I restarted that container at the same 2 GB cap before this attempt. It was healthy, and this attempt was cancelled for host RAM before validation was the blocker.
+
+A closed batch whose items all failed was showing Completed with the success badge. It now shows Failed. A mix of completed and failed items shows Partial with the warning badge. The tests are `A_closed_batch_badge_follows_its_items` and `A_launch_badge_follows_each_ehr_batch`. This cancelled launch did not exercise that badge.
