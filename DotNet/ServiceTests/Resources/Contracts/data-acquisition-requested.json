@@ -1,0 +1,14 @@
+{
+  "PatientId": "pat-001",
+  "ScheduledReports": [
+    {
+      "ReportTypes": [ "NHSNdQMAcuteCareHospitalInitialPopulation" ],
+      "Frequency": "Monthly",
+      "StartDate": "2026-10-01T05:00:00Z",
+      "EndDate": "2026-11-01T04:59:59Z",
+      "ReportTrackingId": "3f6a1c2e-8b4d-4e7a-9c15-2d0b7e9f4a61"
+    }
+  ],
+  "QueryType": "Initial",
+  "ReportableEvent": "Discharge"
+}

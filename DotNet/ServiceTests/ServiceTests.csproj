@@ -160,6 +160,13 @@
     </None>
   </ItemGroup>
 
+  <!-- The Kafka message fixtures checked by the tests in UnitTests/Shared/Contracts. -->
+  <ItemGroup>
+    <None Update="Resources\Contracts\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- The shipped appsettings files that set keys to null, checked by ConfigurationNullBindingTests. -->
   <ItemGroup>
     <None Include="..\Submission\appsettings.json" Link="Resources\Submission\appsettings.json">

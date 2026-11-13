@@ -1,0 +1,11 @@
+{
+  "PatientId": "pat-001",
+  "QueryType": "Initial",
+  "ScheduledReports": [
+    {
+      "ReportTypes": [ "NHSNdQMAcuteCareHospitalInitialPopulation" ],
+      "StartDate": "2026-10-01T05:00:00Z",
+      "EndDate": "2026-11-01T04:59:59Z"
+    }
+  ]
+}
