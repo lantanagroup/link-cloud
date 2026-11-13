@@ -531,7 +531,10 @@ public sealed class ReportBatchDispatcher : IHostedService
 
     /// <summary>
     /// A run that was still going when the process stopped is not started again.
-    /// The run recovery service has already cancelled or deleted it.
+    /// Startup recovery cancels that run first and records "Cancelled by user
+    /// (no active execution in this process)." The batch item still says it was
+    /// interrupted by the restart. A run that already succeeded or failed keeps
+    /// that result.
     /// </summary>
     private async Task InterruptInFlightAsync(ReportBatchDocument batch, CancellationToken cancellationToken)
     {
@@ -549,6 +552,13 @@ public sealed class ReportBatchDispatcher : IHostedService
 
             if (summary is { } finished && finished.Status.IsTerminal())
             {
+                if (finished.Status == AutomationRunStatus.Cancelled)
+                {
+                    item.Status = ReportBatchItemStatus.Cancelled;
+                    item.Error = InterruptedByRestart;
+                    continue;
+                }
+
                 ApplyTerminal(item, finished);
                 continue;
             }

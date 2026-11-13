@@ -258,6 +258,58 @@ public class ReportBatchTests
     }
 
     [Fact]
+    public async Task Restart_keeps_interrupted_when_startup_recovery_already_cancelled_the_run()
+    {
+        // Startup recovery cancels a run with no in-memory execution before batch
+        // recovery reads it. The batch item must not keep that cancel text.
+        var harness = Harness();
+        var queued = harness.AddScenario("queued");
+        var runId = Guid.NewGuid();
+        harness.Runs.Status[runId] = AutomationRunStatus.Cancelled;
+        harness.Runs.Errors[runId] = "Cancelled by user (no active execution in this process).";
+        await harness.Batches.InsertAsync(new ReportBatchDocument
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = "local",
+            MaxConcurrency = 1,
+            Status = ReportBatchStatus.Running,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Items =
+            [
+                new ReportBatchItemDocument
+                {
+                    Ordinal = 0,
+                    ScenarioId = Guid.NewGuid(),
+                    ScenarioName = "in flight",
+                    Status = ReportBatchItemStatus.Running,
+                    RunId = runId
+                },
+                new ReportBatchItemDocument
+                {
+                    Ordinal = 1,
+                    ScenarioId = queued.Id,
+                    ScenarioName = queued.Name,
+                    Status = ReportBatchItemStatus.Queued
+                }
+            ]
+        });
+
+        await harness.Dispatcher.RecoverAsync(CancellationToken.None);
+        var afterRecovery = (await harness.Batches.ListActiveAsync()).Single();
+        afterRecovery.Items[0].Status.Should().Be(ReportBatchItemStatus.Cancelled);
+        afterRecovery.Items[0].Error.Should().Be(ReportBatchDispatcher.InterruptedByRestart);
+        afterRecovery.Items[1].Status.Should().Be(ReportBatchItemStatus.Queued);
+        harness.Runs.Cancelled.Should().BeEmpty();
+
+        await harness.Dispatcher.PumpAsync(CancellationToken.None);
+
+        var stored = (await harness.Batches.ListActiveAsync()).Single();
+        stored.Items[1].Status.Should().Be(ReportBatchItemStatus.Running);
+        harness.Runs.Started.Should().ContainSingle();
+        harness.Runs.Started[0].ScenarioId.Should().Be(queued.Id);
+    }
+
+    [Fact]
     public async Task Restart_keeps_a_run_that_already_finished()
     {
         var harness = Harness();
@@ -531,6 +583,42 @@ public class ReportBatchTests
     }
 
     [Fact]
+    public async Task A_closed_batch_badge_follows_its_items()
+    {
+        var batches = new MemoryBatches();
+        var succeeded = ClosedBatch("local", ReportBatchItemStatus.Succeeded, ReportBatchItemStatus.Succeeded);
+        var failed = ClosedBatch("sandbox", ReportBatchItemStatus.Failed, ReportBatchItemStatus.Failed);
+        var mixed = ClosedBatch("clinic", ReportBatchItemStatus.Succeeded, ReportBatchItemStatus.Failed);
+        await batches.InsertAsync(succeeded);
+        await batches.InsertAsync(failed);
+        await batches.InsertAsync(mixed);
+        var controller = Tracking(batches);
+
+        var ok = await BatchPage(controller, succeeded.BatchId);
+        ok.Status.Should().Be(ReportBatchDisplay.Completed);
+        ok.PillClass.Should().Be("au-badge-success");
+
+        var bad = await BatchPage(controller, failed.BatchId);
+        bad.Status.Should().Be(ReportBatchDisplay.Failed);
+        bad.PillClass.Should().Be("au-badge-danger");
+
+        var some = await BatchPage(controller, mixed.BatchId);
+        some.Status.Should().Be(ReportBatchDisplay.Partial);
+        some.PillClass.Should().Be("au-badge-warning");
+
+        var history = await controller.History(CancellationToken.None);
+        var rows = history.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchHistoryPage>().Subject
+            .Groups.SelectMany(group => group.Batches).ToList();
+        rows.Single(row => row.BatchId == succeeded.BatchId).Status.Should().Be(ReportBatchDisplay.Completed);
+        rows.Single(row => row.BatchId == succeeded.BatchId).PillClass.Should().Be("au-badge-success");
+        rows.Single(row => row.BatchId == failed.BatchId).Status.Should().Be(ReportBatchDisplay.Failed);
+        rows.Single(row => row.BatchId == failed.BatchId).PillClass.Should().Be("au-badge-danger");
+        rows.Single(row => row.BatchId == mixed.BatchId).Status.Should().Be(ReportBatchDisplay.Partial);
+        rows.Single(row => row.BatchId == mixed.BatchId).PillClass.Should().Be("au-badge-warning");
+    }
+
+    [Fact]
     public async Task Cancel_on_the_tracking_page_stops_an_open_batch()
     {
         var harness = Harness();
@@ -790,6 +878,29 @@ public class ReportBatchTests
         return services.BuildServiceProvider();
     }
 
+    private static ReportBatchDocument ClosedBatch(string ehr, params string[] itemStatuses)
+        => new()
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = ehr,
+            Status = ReportBatchStatus.Completed,
+            CreatedAt = DateTimeOffset.Parse("2026-11-12T16:00:00Z"),
+            Items = itemStatuses.Select((status, index) => new ReportBatchItemDocument
+            {
+                Ordinal = index,
+                ScenarioId = Guid.NewGuid(),
+                ScenarioName = "scenario-" + index,
+                Status = status
+            }).ToList()
+        };
+
+    private static async Task<ReportBatchTrackingModel> BatchPage(ReportBatchTrackingController controller, Guid batchId)
+    {
+        var page = await controller.Detail(batchId, CancellationToken.None);
+        return page.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchTrackingPage>().Subject.Batch!;
+    }
+
     private static ReportBatchTrackingController Tracking(MemoryBatches? batches, ReportBatchDispatcher? dispatcher = null)
     {
         var services = new ServiceCollection();
@@ -1011,6 +1122,7 @@ public class ReportBatchTests
         public List<StartScenarioRequest> Started { get; } = [];
         public List<Guid> Cancelled { get; } = [];
         public Dictionary<Guid, AutomationRunStatus> Status { get; } = [];
+        public Dictionary<Guid, string?> Errors { get; } = [];
         public HashSet<Guid> FailScenarioIds { get; } = [];
         public bool ThrowMetricsRefusal { get; set; }
 
@@ -1047,12 +1159,14 @@ public class ReportBatchTests
             {
                 RunId = runId,
                 Status = status,
-                Error = status switch
-                {
-                    AutomationRunStatus.Failed => "run failed",
-                    AutomationRunStatus.Cancelled => "Cancelled by user.",
-                    _ => null
-                }
+                Error = Errors.TryGetValue(runId, out var error)
+                    ? error
+                    : status switch
+                    {
+                        AutomationRunStatus.Failed => "run failed",
+                        AutomationRunStatus.Cancelled => "Cancelled by user.",
+                        _ => null
+                    }
             });
         }
     }

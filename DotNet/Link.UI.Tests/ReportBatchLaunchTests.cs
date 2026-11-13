@@ -427,6 +427,47 @@ public class ReportBatchLaunchTests
         return model;
     }
 
+    [Fact]
+    public async Task A_launch_badge_follows_each_ehr_batch()
+    {
+        var harness = new LaunchHarness();
+        var launchId = Guid.NewGuid();
+        var succeeded = ClosedBatch(launchId, "local", ReportBatchItemStatus.Succeeded);
+        var failed = ClosedBatch(launchId, "sandbox", ReportBatchItemStatus.Failed, ReportBatchItemStatus.Failed);
+        var mixed = ClosedBatch(launchId, "clinic", ReportBatchItemStatus.Succeeded, ReportBatchItemStatus.Failed);
+        await harness.Batches.InsertAsync(succeeded);
+        await harness.Batches.InsertAsync(failed);
+        await harness.Batches.InsertAsync(mixed);
+
+        var page = Summary(await harness.LaunchPage().Detail(launchId, CancellationToken.None));
+        page.Found.Should().BeTrue();
+        var groups = page.Launch!.Groups;
+
+        groups.Single(group => group.EhrSystem == "local").Status.Should().Be(ReportBatchDisplay.Completed);
+        groups.Single(group => group.EhrSystem == "local").PillClass.Should().Be("au-badge-success");
+        groups.Single(group => group.EhrSystem == "sandbox").Status.Should().Be(ReportBatchDisplay.Failed);
+        groups.Single(group => group.EhrSystem == "sandbox").PillClass.Should().Be("au-badge-danger");
+        groups.Single(group => group.EhrSystem == "clinic").Status.Should().Be(ReportBatchDisplay.Partial);
+        groups.Single(group => group.EhrSystem == "clinic").PillClass.Should().Be("au-badge-warning");
+    }
+
+    private static ReportBatchDocument ClosedBatch(Guid launchId, string ehr, params string[] itemStatuses)
+        => new()
+        {
+            BatchId = Guid.NewGuid(),
+            LaunchId = launchId,
+            EhrSystem = ehr,
+            Status = ReportBatchStatus.Completed,
+            CreatedAt = DateTimeOffset.Parse("2026-11-12T16:00:00Z"),
+            Items = itemStatuses.Select((status, index) => new ReportBatchItemDocument
+            {
+                Ordinal = index,
+                ScenarioId = Guid.NewGuid(),
+                ScenarioName = "scenario-" + index,
+                Status = status
+            }).ToList()
+        };
+
     private static ReportBatchLaunchSummaryPage Summary(IActionResult result)
         => result.Should().BeOfType<ViewResult>().Which.Model.Should().BeOfType<ReportBatchLaunchSummaryPage>().Subject;
 

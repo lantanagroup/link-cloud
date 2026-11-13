@@ -16,6 +16,7 @@ public static class ReportBatchDisplay
     public const string Completed = "Completed";
     public const string Failed = "Failed";
     public const string Cancelled = "Cancelled";
+    public const string Partial = "Partial";
     public const string Unknown = "Unknown";
 
     public const string UnavailableMessage =
@@ -42,7 +43,10 @@ public static class ReportBatchDisplay
         _ => string.IsNullOrWhiteSpace(status) ? Unknown : status.Trim()
     };
 
-    public static string PillClass(string? label) => StatusPills.ForRun(label);
+    public static string PillClass(string? label) =>
+        string.Equals(label, Partial, StringComparison.Ordinal)
+            ? "au-badge-warning"
+            : StatusPills.ForRun(label);
 
     public static string EhrName(string? name)
         => string.IsNullOrWhiteSpace(name) ? "Unnamed EHR" : name.Trim();
@@ -62,7 +66,7 @@ public static class ReportBatchDisplay
             .OrderBy(item => item.Ordinal)
             .Select(item => Row(item, ehr))
             .ToList();
-        var label = BatchLabel(batch.Status);
+        var label = ClosedLabel(batch.Status, rows.Select(row => row.Status));
         var open = ReportBatchStatus.IsOpen(batch.Status);
 
         return new ReportBatchTrackingModel
@@ -140,7 +144,7 @@ public static class ReportBatchDisplay
             .OrderBy(item => item.Ordinal)
             .Select(item => Row(item, ehr))
             .ToList();
-        var label = BatchLabel(batch.Status);
+        var label = ClosedLabel(batch.Status, rows.Select(row => row.Status));
         var open = ReportBatchStatus.IsOpen(batch.Status);
         return new ReportBatchLaunchEhrSummary
         {
@@ -182,7 +186,7 @@ public static class ReportBatchDisplay
 
     private static ReportBatchHistoryRow HistoryRow(ReportBatchDocument batch)
     {
-        var label = BatchLabel(batch.Status);
+        var label = ClosedLabel(batch.Status, batch.Items.Select(item => ItemLabel(item.Status)));
         return new ReportBatchHistoryRow
         {
             BatchId = batch.BatchId,
@@ -196,6 +200,24 @@ public static class ReportBatchDisplay
             LaunchId = batch.LaunchId,
             LaunchHref = batch.LaunchId is Guid launchId ? LaunchPath(launchId) : null
         };
+    }
+
+    /// <summary>
+    /// A closed batch keeps its stored Completed status. The badge follows the items:
+    /// every item failed is Failed, and a mix of failures and successes is Partial.
+    /// </summary>
+    private static string ClosedLabel(string? storedStatus, IEnumerable<string?> itemLabels)
+    {
+        var label = BatchLabel(storedStatus);
+        if (!string.Equals(label, Completed, StringComparison.Ordinal))
+            return label;
+
+        var labels = itemLabels.ToList();
+        if (labels.Count > 0 && labels.TrueForAll(item => item == Failed))
+            return Failed;
+        if (labels.Exists(item => item == Failed))
+            return Partial;
+        return Completed;
     }
 
     private static string? Instant(DateTimeOffset? value)
