@@ -160,7 +160,8 @@ public static class OperationFailureFactory
         if (string.IsNullOrWhiteSpace(body))
             return OperationFailureText.NotProvided;
 
-        var text = RedactSecrets(body);
+        // The formatted block joins its lines with \n, so a CRLF body would mix line endings in it.
+        var text = RedactSecrets(body).ReplaceLineEndings("\n");
         if (text.Length <= MaxTechnicalDetailsChars)
             return text;
 
