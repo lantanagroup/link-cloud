@@ -72,7 +72,7 @@ Evidence is under `dev-docs/leglink-1761/`. A captured status response is the re
 | Case | Result | What I saw |
 | --- | --- | --- |
 | L1 | Pass | Settings page saved a cap of 4. The launch form then defaulted Max concurrent runs to 4. A later batch lowered its own cap to 2, which a batch is allowed to do. |
-| L2 | Pass | Three copies on `local` with max concurrent 2: two in progress, one pending. The pending copy started after one of the first two failed. |
+| L2 | Pass | Three copies on `local` with max concurrent 2. After one facility create failed, the other two were in progress. The queue itself is `The_queued_run_starts_when_a_slot_frees`. |
 | L3 | Pass | The open launch page polled its status URL twice in five seconds. |
 | L4 | Pass | Cancel while one item was running and one had no run: the running run was cancelled, and the queued item was cancelled without a run id. |
 | L5 | Pass | History lists the batch, grouped under `local`. |
@@ -84,13 +84,13 @@ Evidence is under `dev-docs/leglink-1761/`. A captured status response is the re
 
 ### L1. Settings cap
 
-I saved 4 on `/Automation/ReportBatches`. The page said new batches use a cap of 4. Screenshot: `dev-docs/leglink-1761/l1-settings-cap-4.jpg`. The launch form then showed a default of 4 and the help line that it defaults to the saved cap of 4.
+I saved 4 on `/Automation/ReportBatches`. The page said new batches use a cap of 4. The launch form then showed Max concurrent runs of 4 and the help line that it defaults to the saved cap of 4. Screenshot: `dev-docs/leglink-1761/l1-settings-cap-4.jpg`.
 
 ### L2. Cap queues the third copy
 
-Launch `28ebded6-214a-4879-9954-95809060cf24`, batch `56592f5d-6c8c-4d77-b1ad-589f871dfd67`, EHR `local`, Adhoc Report Test, copies 3, max concurrent 2. The page showed At once 2, Pending 1, In progress 2. Screenshot: `dev-docs/leglink-1761/l2-cap-queues-third-run.jpg`.
+Launch `28ebded6-214a-4879-9954-95809060cf24`, batch `56592f5d-6c8c-4d77-b1ad-589f871dfd67`, EHR `local`, Adhoc Report Test, copies 3, max concurrent 2. The screenshot is the read after one copy failed: At once 2, Pending 0, In progress 2, Failed 1. Item 0 was in progress (`194fe6cf-06e9-477c-97c7-5a3d6df2f2f1`). Item 1 failed (`7713c64e-8cf7-4575-8f75-a5997a23daa3`) with "Failed to create facility '7713c64e-8cf7-4575-8f75-a5997a23daa3'. HTTP 500". Item 2 was in progress (`8bb0ed0c-6bac-4189-bb12-2adec904b626`). Screenshot: `dev-docs/leglink-1761/l2-cap-queues-third-run.jpg`. The same counts are in `dev-docs/leglink-1761/l2-status.json`.
 
-A later read of that launch (`dev-docs/leglink-1761/l2-status.json`) had item 0 still in progress (`194fe6cf-06e9-477c-97c7-5a3d6df2f2f1`), item 1 failed (`7713c64e-8cf7-4575-8f75-a5997a23daa3`), and item 2 in progress (`8bb0ed0c-6bac-4189-bb12-2adec904b626`). The copy that had been pending started when the failed copy released its slot. The tenant log for that failure was a SQL deadlock (1205) while two facility creates ran at once. The same two-at-once create did not deadlock on L6: both facilities reached In Progress. I am not treating the single 1205 as a confirmed product defect.
+The tenant container log at 2026-11-12T23:18:36Z recorded SqlException 1205 for that facility create: the transaction was the deadlock victim. The same two-at-once create did not deadlock on L6: both facilities reached In Progress. I am not treating the single 1205 as a confirmed product defect. A third copy staying queued until a slot frees is the unit test `The_queued_run_starts_when_a_slot_frees`.
 
 ### L3. Live tracking interval
 
