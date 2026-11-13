@@ -506,9 +506,9 @@ services:
     # UI health page reports the NHSN App BFF as Unhealthy ("not configured") and leaves it out of
     # Service Meta Data; nothing fails to start.
     - key: "ServiceRegistry:NhsnAppBffServiceUrl"
-      description: "The base URL for the NHSN App BFF, used by the Admin BFF to read its health (including its database check) and service information for the Admin UI monitor page. /api is appended for the info call."
+      description: "The base URL for the NHSN App BFF, used by the Admin BFF to read its health (including its database check) and service information for the Admin UI monitor page, and by Link.UI for the same health row when that check is ported. /api is appended for the info call."
       required: false
-      consumers: ["AdminBFF"]
+      consumers: ["AdminBFF", "LinkUI"]
     # The explicit lists that make Admin.BFF's AllowCredentials safe. They exist only under
     # the LinkAdminBFF label - no unlabeled rows - because it is the one service a browser
     # calls cross-origin: the Admin UI is served from <env>-demo/<env>-dash and calls the BFF
@@ -655,6 +655,14 @@ services:
       required: false
       defaultValue: "120"
   LinkUI:
+    - key: "Authentication:RequireBffSession"
+      description: "When true, Link.UI pages without an Admin.BFF session redirect to sign-in. The shipped default is true. Local Development and Docker profiles set it to false so the shell stays browsable without a BFF session."
+      required: false
+      defaultValue: "true"
+    - key: "LinkUi:AutomationEnabled"
+      description: "When true, Link.UI serves the Automation area (runs, scenarios, cleanup, and related APIs). The shipped default is true. Set to false to hide that area."
+      required: false
+      defaultValue: "true"
     - key: "Automation:FhirServerBase"
       description: "The base URL of the FHIR server the generator writes test data to."
       required: true
