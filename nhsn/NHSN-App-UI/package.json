@@ -17,6 +17,7 @@
     "e2e:ui": "playwright test --project=mocked --ui",
     "e2e:report": "playwright show-report",
     "e2e:bff": "playwright test --project=bff --workers=1",
+    "e2e:demo": "playwright test --project=demo --workers=1",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json"
   },
   "dependencies": {
