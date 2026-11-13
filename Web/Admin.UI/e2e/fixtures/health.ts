@@ -2,10 +2,10 @@ import { ILinkServiceHealthSummary } from '../../src/app/components/monitor/link
 import { IServiceInfoModel } from '../../src/app/components/monitor/service-info.service';
 
 /**
- * The service keys the health screen hardcodes in initHealthSummary(), in its order. The
- * screen builds its own rows and asks each service for its own health, so a key left
- * unmocked renders as Unknown *and* makes the component console.error — which the tripwire
- * fails the test for. Keep this list in step with the component.
+ * The service keys the health screen lists in LinkHealthCheckComponent.services, in the order it
+ * renders them: alphabetical by display name. The screen builds its own rows and asks each service
+ * for its own health, so a key left unmocked renders as Unknown *and* makes the component
+ * console.error — which the tripwire fails the test for. Keep this list in step with the component.
  */
 export const HEALTH_SERVICE_KEYS = [
   'account',
@@ -13,31 +13,33 @@ export const HEALTH_SERVICE_KEYS = [
   'audit',
   'census',
   'dataacquisition',
+  'measureeval',
+  'nhsnappbff',
   'normalization',
   'querydispatch',
   'report',
   'submission',
   'tenant',
-  'measureeval',
-  'validation',
   'terminology',
+  'validation',
 ];
 
-/** How each service names itself in its response; this is what the row shows. */
-const DISPLAY_NAMES: Record<string, string> = {
+/** How the Admin BFF names each service in its response; this is what the row shows. */
+export const DISPLAY_NAMES: Record<string, string> = {
   account: 'Account',
-  adminbff: 'AdminBFF',
+  adminbff: 'Admin BFF',
   audit: 'Audit',
   census: 'Census',
-  dataacquisition: 'DataAcquisition',
+  dataacquisition: 'Data Acquisition',
+  measureeval: 'Measure Evaluation',
+  nhsnappbff: 'NHSN App BFF',
   normalization: 'Normalization',
-  querydispatch: 'QueryDispatch',
+  querydispatch: 'Query Dispatch',
   report: 'Report',
   submission: 'Submission',
   tenant: 'Tenant',
-  measureeval: 'MeasureEval',
-  validation: 'Validation',
   terminology: 'Terminology',
+  validation: 'Validation',
 };
 
 const healthy = (service: string): ILinkServiceHealthSummary => ({
