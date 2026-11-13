@@ -267,6 +267,46 @@ flowchart LR
     Q3 -->|no| RNO["Not reportable:<br/>preempt dependents (NotReportable)<br/>+ strip non-org encounters from cache<br/>→ MeasureEval non-reportable → excluded"]
 ```
 
+## Parent propagation on each acquired Location
+
+`SetParentForChildrenAsync` runs for every acquired Location, so it does only the work that Location can
+cause:
+
+1. It reads the children that name this Location in `PartOf` and still need its mapping id, or its org
+   status when it is an org location. A child that already has both is not touched.
+2. It updates those children by id, repeating the whole condition, including the facility and the `PartOf`
+   value. A child another worker has since updated, or moved to a different parent, is left alone.
+3. It recomputes `MappedToOrg` only for children it promoted to org. An encounter's flag depends only on
+   the `IsOrgLocation` of the locations it references, so setting `PartOfId` alone cannot change it.
+4. It walks further only below children it promoted. A child that was already an org location promoted
+   its own children when it was acquired, and a non-org parent cannot promote anything, so it never walks.
+   Before walking, it re-reads the candidates and keeps only those that are now org locations still under
+   this parent, so a child moved elsewhere in the meantime never has its own children promoted on this
+   parent's behalf.
+
+`RecomputeMappedToOrgForLocationMappingAsync` writes only the encounters whose stored `MappedToOrg`
+differs from the recomputed value.
+
+The read in step 1 uses `IX_LocationMapping_FacilityId_PartOfValue_All`, an unfiltered index on
+`(FacilityId, PartOfValue)` that includes `PartOfId` and `IsOrgLocation`. It replaced
+`IX_LocationMapping_FacilityId_PartOfValue`, which was filtered to `PartOfId IS NULL`. That index could not
+serve a read that also matches children whose `PartOfId` is already set, so every acquired Location scanned
+the whole table, across every facility, and no other query used it.
+
+Re-acquiring an unchanged Location therefore writes nothing. Earlier versions re-read every child,
+recomputed every child's encounters and walked every org subtree on each acquire. Concurrent workers
+acquiring Locations under a shared parent then rewrote the same encounter rows and waited on each
+other's locks, which made Location the slowest resource type to acquire.
+
+Two paths still sweep the whole facility: `ReevaluateLocationMappingsAsync` after a configuration change,
+and `PropagateOrgLocationToDescendantsAsync` within it, which calls `SetParentForChildrenAsync` for every
+org location until a pass changes nothing.
+
+Each acquired Encounter loads only the mappings for the locations it references
+(`GetByFacilityIdAndLocationIdsAsync`), and creates its mapping through
+`EncounterMappingManager.CreateFromAcquisitionAsync`. That method skips the facility and patient checks
+the manual API needs, because acquisition cannot produce either inconsistency.
+
 ## Key code references
 
 - `Application/Services/LocationMappingService.cs` — `IsConfigured`, `UpdateLocationMappingAsync`,
