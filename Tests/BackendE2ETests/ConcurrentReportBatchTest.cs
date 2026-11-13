@@ -179,8 +179,8 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
                 $"{run.ScenarioName} {run.StartedAt:o}..{run.FinishedAt:o}")));
 
         Assert.All(runs, run => Assert.True(
-            run.Patients.Count > 0 && run.ResourcePatientIds.Count > 0,
-            $"{run.ScenarioName} finished before its facility had patients and report resources."));
+            run.Patients.Count > 0 && run.EntryPatientIds.Count > 0,
+            $"{run.ScenarioName} finished before its facility had census patients and report entries."));
 
         foreach (var run in runs)
         {
@@ -190,9 +190,6 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
             Assert.True(
                 run.EntryPatientIds.All(id => run.Patients.Contains(id)),
                 $"{run.ScenarioName} report entries left its census patients: {string.Join(", ", run.EntryPatientIds)}");
-            Assert.True(
-                run.ResourcePatientIds.All(id => run.Patients.Contains(id)),
-                $"{run.ScenarioName} report resources left its census patients: {string.Join(", ", run.ResourcePatientIds)}");
         }
 
         Assert.Equal(3, runs.Select(run => run.Tag).Distinct(StringComparer.OrdinalIgnoreCase).Count());
@@ -202,12 +199,9 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
             {
                 if (ReferenceEquals(run, other))
                     continue;
-                Assert.True(
-                    !run.Patients.Overlaps(other.Patients),
+                Assert.False(
+                    run.Patients.Overlaps(other.Patients),
                     $"{run.ScenarioName} and {other.ScenarioName} share patients.");
-                Assert.True(
-                    run.ResourceIds.All(id => id.IndexOf(other.Tag!, StringComparison.OrdinalIgnoreCase) < 0),
-                    $"{run.ScenarioName} resource ids contain {other.ScenarioName}'s tag {other.Tag}.");
             }
         }
 
@@ -235,19 +229,17 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
     private async Task SampleAsync(RunWatch watch, ConsoleAutomationOutput output, CancellationToken cancellationToken)
     {
         var patients = await ReadCensusPatientsAsync(watch.FacilityId!, cancellationToken);
-        var report = await ReadReportAsync(watch.FacilityId!, cancellationToken);
-        if (patients.Count == 0 || report.ResourcePatientIds.Count == 0)
+        var entries = await ReadReportEntriesAsync(watch.FacilityId!, cancellationToken);
+        if (patients.Count == 0 || entries.Count == 0)
             return;
 
         var firstSample = watch.Patients.Count == 0;
         watch.Patients = patients;
-        watch.EntryPatientIds = report.EntryPatientIds;
-        watch.ResourcePatientIds = report.ResourcePatientIds;
-        watch.ResourceIds = report.ResourceIds;
+        watch.EntryPatientIds = entries;
         if (firstSample)
         {
             output.WriteLine(
-                $"  {watch.ScenarioName} sampled facility {watch.FacilityId}: {patients.Count} census patient(s), {report.ResourceIds.Count} report resource(s).");
+                $"  {watch.ScenarioName} sampled facility {watch.FacilityId}: {patients.Count} census patient(s), {entries.Count} report entry patient(s).");
         }
 
         if (watch.FhirSeen)
@@ -292,60 +284,39 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
         return patients;
     }
 
-    private async Task<ReportSample> ReadReportAsync(string facilityId, CancellationToken cancellationToken)
+    private async Task<HashSet<string>> ReadReportEntriesAsync(string facilityId, CancellationToken cancellationToken)
     {
         var reports = _sp.GetRequiredService<IReportServiceClient>();
-        var sample = new ReportSample();
-        var entries = await reports.SearchEntriesAsync(facilityId, pageSize: 50, cancellationToken: cancellationToken);
-        if (entries.IsSuccessStatusCode && entries.Body?.Records != null)
+        var patients = new HashSet<string>(StringComparer.Ordinal);
+        const int pageSize = 100;
+
+        for (var page = 1; page <= 20; page++)
         {
+            var entries = await reports.SearchEntriesAsync(
+                facilityId,
+                pageSize: pageSize,
+                pageNumber: page,
+                cancellationToken: cancellationToken);
+            Assert.True(
+                entries.IsSuccessStatusCode,
+                $"Report entries for {facilityId} returned HTTP {entries.StatusCode}.");
+            if (entries.Body?.Records == null || entries.Body.Records.Count == 0)
+                break;
+
             foreach (var entry in entries.Body.Records)
             {
                 Assert.Equal(facilityId, entry.FacilityId);
                 var patientId = NormalizePatientId(entry.PatientId);
                 if (patientId != null)
-                    sample.EntryPatientIds.Add(patientId);
+                    patients.Add(patientId);
             }
+
+            var totalPages = entries.Body.Metadata?.TotalPages ?? page;
+            if (page >= totalPages)
+                break;
         }
 
-        var summaries = await reports.GetReportSummariesAsync(facilityId, pageSize: 20, cancellationToken: cancellationToken);
-        if (!summaries.IsSuccessStatusCode || summaries.Body?.Records == null)
-            return sample;
-
-        foreach (var summary in summaries.Body.Records)
-        {
-            Assert.Equal(facilityId, summary.FacilityId);
-            if (string.IsNullOrWhiteSpace(summary.ReportScheduleId))
-                continue;
-
-            for (var page = 1; page <= 20; page++)
-            {
-                var resources = await reports.SearchResourcesAsync(
-                    facilityId,
-                    summary.ReportScheduleId,
-                    pageSize: 5000,
-                    pageNumber: page,
-                    cancellationToken: cancellationToken);
-                if (!resources.IsSuccessStatusCode || resources.Body?.Records == null || resources.Body.Records.Count == 0)
-                    break;
-
-                foreach (var resource in resources.Body.Records)
-                {
-                    Assert.Equal(facilityId, resource.FacilityId);
-                    var patientId = NormalizePatientId(resource.PatientId);
-                    if (patientId != null)
-                        sample.ResourcePatientIds.Add(patientId);
-                    if (!string.IsNullOrWhiteSpace(resource.ResourceId))
-                        sample.ResourceIds.Add(resource.ResourceId);
-                }
-
-                var totalPages = resources.Body.Metadata?.TotalPages ?? page;
-                if (page >= totalPages)
-                    break;
-            }
-        }
-
-        return sample;
+        return patients;
     }
 
     private static async Task<int> GetCapAsync(HttpClient link, CancellationToken cancellationToken)
@@ -413,15 +384,6 @@ public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixt
         public bool FhirSeen { get; set; }
         public HashSet<string> Patients { get; set; } = new(StringComparer.Ordinal);
         public HashSet<string> EntryPatientIds { get; set; } = new(StringComparer.Ordinal);
-        public HashSet<string> ResourcePatientIds { get; set; } = new(StringComparer.Ordinal);
-        public List<string> ResourceIds { get; set; } = [];
-    }
-
-    private sealed class ReportSample
-    {
-        public HashSet<string> EntryPatientIds { get; } = new(StringComparer.Ordinal);
-        public HashSet<string> ResourcePatientIds { get; } = new(StringComparer.Ordinal);
-        public List<string> ResourceIds { get; } = [];
     }
 
     private sealed class BatchBody

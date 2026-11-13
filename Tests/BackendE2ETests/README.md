@@ -101,13 +101,11 @@ Backend E2E categories and excludes long-running mega stress tests.
 
 Current PR list includes:
 
-- `AdhocReportTest`
-- `AdhocReportDailyAchTest`
 - `ApiStabilityTest`
-- `AutomationUiSmokeTest`
+- `ConcurrentReportBatch` (Adhoc `0001`, Daily ACH `0009`, and Regenerate `0005` in one batch)
+- `AutomationUiSmokeTest` (still starts Adhoc `0001` on its own)
 - `ReportScheduledTest`
 - `DmrpScheduledReportTest`
-- `RegenerateReportTest`
 - `MultiMeasureTest`
 
 `MegaPatientTest` and `MegaMultiPatientTest` are marked with `Category=LongRunning` and are not
