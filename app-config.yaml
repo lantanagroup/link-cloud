@@ -498,6 +498,13 @@ services:
     - key: "MonitorBackendHealthChecks"
       description: "Boolean flag to enable monitoring of backend service health."
       required: true
+    # Optional because the NHSN App BFF is not deployed in every environment. Without it the Admin
+    # UI health page reports the NHSN App BFF as Unhealthy ("not configured") and leaves it out of
+    # Service Meta Data; nothing fails to start.
+    - key: "ServiceRegistry:NhsnAppBffServiceUrl"
+      description: "The base URL for the NHSN App BFF, used by the Admin BFF to read its health (including its database check) and service information for the Admin UI monitor page. /api is appended for the info call."
+      required: false
+      consumers: ["AdminBFF"]
     # The explicit lists that make Admin.BFF's AllowCredentials safe. They exist only under
     # the LinkAdminBFF label - no unlabeled rows - because it is the one service a browser
     # calls cross-origin: the Admin UI is served from <env>-demo/<env>-dash and calls the BFF

@@ -19,7 +19,8 @@ public static class GetSystemHealth
         TenantService tenantService,
         MeasureEvalService measureEvalService,
         ValidationService validationService,
-        TerminologyService terminologyService)
+        TerminologyService terminologyService,
+        NhsnAppBffService nhsnAppBffService)
     {
 
         var dotNetHealthCheckTasks = new List<Task<LinkServiceHealthReport>>
@@ -33,7 +34,8 @@ public static class GetSystemHealth
             reportService.LinkServiceHealthCheck(context.RequestAborted),
             submissionService.LinkServiceHealthCheck(context.RequestAborted),
             tenantService.LinkServiceHealthCheck(context.RequestAborted),
-            terminologyService.LinkServiceHealthCheck(context.RequestAborted)
+            terminologyService.LinkServiceHealthCheck(context.RequestAborted),
+            nhsnAppBffService.LinkServiceHealthCheck(context.RequestAborted)
         };
 
         // Get Admin BFF health
