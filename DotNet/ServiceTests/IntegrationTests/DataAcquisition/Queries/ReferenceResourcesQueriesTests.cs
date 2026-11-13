@@ -455,5 +455,67 @@ namespace IntegrationTests.DataAcquisition.Queries
             Assert.Equal(0, result.Metadata.TotalCount);
             Assert.Empty(result.Records);
         }
+
+        [Fact]
+        public async Task SearchAsync_MoreResourceIdsThanSqlServerParameterLimit_ReturnsExactlyTheMatches()
+        {
+            // SQL Server allows 2,100 parameters per command. EF Core 8 sends the id list as one OPENJSON
+            // parameter; EF Core 10 can send one parameter per id. LocationMappingService passes every
+            // location id mapped for a facility here, so the list is not bounded by one patient.
+            const int matchingCount = 2500;
+            const int missingCount = 100;
+
+            // Arrange
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"Facility_{tag}";
+            var matchingIds = Enumerable.Range(0, matchingCount)
+                .Select(i => $"Location{i}_{tag}")
+                .ToList();
+            var resources = matchingIds
+                .Select(id => CreateLocation(facilityId, id))
+                .ToList();
+            resources.AddRange(Enumerable.Range(0, 50)
+                .Select(i => CreateLocation(facilityId, $"NotRequested{i}_{tag}")));
+            resources.AddRange(matchingIds
+                .Take(50)
+                .Select(id => CreateLocation($"OtherFacility_{tag}", id)));
+            await SeedReferenceResources(resources);
+
+            var requestedIds = matchingIds
+                .Concat(Enumerable.Range(0, missingCount).Select(i => $"Missing{i}_{tag}"))
+                .ToList();
+
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var queries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
+
+            // Act
+            var result = await queries.SearchAsync(new SearchReferenceResourcesModel
+            {
+                FacilityId = facilityId,
+                ResourceType = "Location",
+                ResourceIds = requestedIds,
+                PageSize = int.MaxValue
+            });
+
+            // Assert
+            Assert.True(requestedIds.Count > 2100);
+            Assert.Equal(matchingCount, result.Records.Count);
+            Assert.Equal(matchingIds.Order(StringComparer.Ordinal),
+                         result.Records.Select(r => r.ResourceId).Order(StringComparer.Ordinal));
+            Assert.All(result.Records, r => Assert.Equal(facilityId, r.FacilityId));
+        }
+
+        private static ReferenceResources CreateLocation(string facilityId, string resourceId)
+        {
+            return new ReferenceResources
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = facilityId,
+                ResourceId = resourceId,
+                ResourceType = "Location",
+                ReferenceResource = "{}",
+                QueryPhase = QueryPhase.Initial
+            };
+        }
     }
 }
