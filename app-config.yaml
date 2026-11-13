@@ -44,20 +44,16 @@ required:
 # repository, not this one; the tooling defaults to a sibling clone at ../link-cac/Config. A
 # declared environment with no export is an error, not a quietly smaller check.
 #
-# The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2 and test are
+# The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2, qa3 and test are
 # `nhnslink`, with the middle letters transposed. That is in the actual Azure resource names,
 # so anything addressing a store must use it verbatim. The Key Vaults spell it the other way
 # again (`nhsnlink-kv-*`), and dev's vault does not follow the pattern at all.
 environments:
   dev:  { store: "nhsnlink-ac-dev",  keyVault: "link-vault" }
   qa:   { store: "nhnslink-ac-qa",   keyVault: "nhsnlink-kv-qa" }
+  qa2:  { store: "nhnslink-ac-qa2",  keyVault: "nhsnlink-kv-qa2" }
+  qa3:  { store: "nhnslink-ac-qa3",  keyVault: "nhsnlink-kv-qa3" }
   test: { store: "nhnslink-ac-test", keyVault: "nhsnlink-kv-test" }
-  # nhnslink-ac-qa2 exists in Azure but holds no key-values yet, so listing it here would
-  # report all 95 required keys as missing - true, but not actionable until LEGLINK-775
-  # imports into it. Add it with its first export, in that change:
-  #   qa2: { store: "nhnslink-ac-qa2", keyVault: "nhsnlink-kv-qa2" }
-  # The keyVault above is inferred from the qa/test pattern; confirm it from the keyvaultref
-  # values in the export rather than trusting the guess.
 
 serviceMeta:
   Account:               { label: "Account",               runtime: "dotnet" }
@@ -362,6 +358,10 @@ global:
     description: "The base URL for the Notification Service."
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "ServiceRegistry:MockDmrpApiUrl"
+    description: "The base URL for the Mock DMRP API, used by Automation.UI to seed and clean up DMRP enrollments for DMRP-enabled scenarios. /api is appended by the client."
+    required: false
+    consumers: ["AutomationUI"]
   # Java-notation key under global, which has no owning service to infer a runtime from.
   # Without the marker it is looked up as a .NET key and its /link/report/base-url row is
   # never matched.
@@ -395,17 +395,12 @@ global:
   # on it, but the switch decides whether this deployment does NHSN measure-enrollment reporting at
   # all, and further services are expected to read it as the workflow lands (LEGLINK-698/701).
   #
-  # The Angular Admin UI needs the same answer and cannot read App Configuration. It is served by a
-  # container that maps LINK_DMRP_ENABLED into its runtime app.config, so the switch reaches the UI
-  # out of band. The two MUST agree, and the failure modes are not symmetric:
-  #   UI off, services on  -> the facility form asks for a schedule the Tenant API then refuses. Loud.
-  #   UI on, services off  -> the form sends an empty schedule Tenant accepts, quietly creating a
-  #                           facility with no scheduled reports and no jobs. Silent.
-  # So the UI must never be switched on ahead of the services.
+  # The Angular Admin UI cannot read App Configuration, so it asks Tenant instead, at
+  # api/dmrp/dmrp-status. There is no separate UI setting to keep in step.
   #
-  # Expected to end up permanently on, at which point this row and LINK_DMRP_ENABLED both go away.
+  # Expected to end up permanently on, at which point this row goes away.
   - key: "DMRP:Enabled"
-    description: "Boolean flag (default false) that turns on DMRP integration for the deployment. When enabled, facility reporting plans are sourced from the NHSN DMRP API rather than chosen per facility, the DMRP controllers are served under api/dmrp by their host service, and a facility's scheduled reports are derived from its reporting plans. When disabled, Link performs facility dQM reporting on its own and the api/dmrp routes do not exist. Must be set to the same value as the Admin UI container's LINK_DMRP_ENABLED."
+    description: "Boolean flag (default false) that turns on DMRP integration for the deployment. When enabled, facility reporting plans are sourced from the NHSN DMRP API rather than chosen per facility, the DMRP controllers are served under api/dmrp by their host service, and a facility's scheduled reports are derived from its reporting plans. When disabled, Link performs facility dQM reporting on its own and the only api/dmrp route is api/dmrp/dmrp-status, which reports DMRP as off."
     required: false
     defaultValue: "false"
     consumers: ["Tenant"]
@@ -466,6 +461,13 @@ global:
     description: "QA aid. A local date and time with no offset (for example 2026-09-30T23:59:00), read in each facility's timezone the same way NightlyCron is. When set, every fire of the DMRP nightly job anchors its reporting periods on that wall-clock moment instead of the trigger's scheduled time, so the month-end refresh and the Monthly announcement can be rehearsed on any date. A value carrying a Z or a UTC offset is ignored with a warning. Leave unset in production; the job logs a warning on every fire while it is set."
     required: false
     consumers: ["Tenant"]
+  # Read by two services from one row, so the row is unlabeled: a row labeled MockDmrpApi would be
+  # invisible to Tenant, and a second Tenant-labeled copy could disagree with the mock's own switch.
+  - key: "MockDmrpApi:Enabled"
+    description: "Master switch for the mock DMRP surface, provisioned as one UNLABELED row so both of its readers see it. MockDmrpApi: absent or false means every route except /health and /api/mock-dmrp/info answers 503 (schema migration still runs when ConnectionStrings:DatabaseConnection is configured, and is skipped when it is not), so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048). Tenant: with DMRP:Enabled on, true (and DMRP:Api:BaseUrl set) turns on the Admin UI facility write-through, so a facility's selected reports are written to the mock as enrollment entries; read once at startup. Because a production store never carries the row, the write-through cannot turn on there."
+    required: false
+    defaultValue: "false"
+    consumers: ["MockDmrpApi", "Tenant"]
 
 services:
   Account:
@@ -496,6 +498,13 @@ services:
     - key: "MonitorBackendHealthChecks"
       description: "Boolean flag to enable monitoring of backend service health."
       required: true
+    # Optional because the NHSN App BFF is not deployed in every environment. Without it the Admin
+    # UI health page reports the NHSN App BFF as Unhealthy ("not configured") and leaves it out of
+    # Service Meta Data; nothing fails to start.
+    - key: "ServiceRegistry:NhsnAppBffServiceUrl"
+      description: "The base URL for the NHSN App BFF, used by the Admin BFF to read its health (including its database check) and service information for the Admin UI monitor page. /api is appended for the info call."
+      required: false
+      consumers: ["AdminBFF"]
     # The explicit lists that make Admin.BFF's AllowCredentials safe. They exist only under
     # the LinkAdminBFF label - no unlabeled rows - because it is the one service a browser
     # calls cross-origin: the Admin UI is served from <env>-demo/<env>-dash and calls the BFF
@@ -585,6 +594,54 @@ services:
       description: "Whether the weekly scenario-run history purge is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
       required: false
       defaultValue: "false"
+    - key: "Automation:TestRail:Enabled"
+      description: "Master switch for publishing Automation.UI scenario and API Health results to TestRail: true or false. The code default is false. An environment publishes by setting this key to true in its App Configuration store; the service does not check the environment name. A value that is not true or false leaves publishing off and logs a warning at startup."
+      required: false
+      defaultValue: "false"
+    - key: "Automation:TestRail:BaseUrl"
+      description: "TestRail site address, for example https://<organization>.testrail.io. A trailing /index.php?/api/v2 is accepted and removed. Publishing stays off until this is set together with the user, API key, and project."
+      required: false
+    - key: "Automation:TestRail:Username"
+      description: "Email address of the TestRail user that owns the API key. Publishing stays off until this is set."
+      required: false
+    - key: "Automation:TestRail:ApiKey"
+      description: "TestRail API key generated by the user in Username. Stored as a Key Vault reference to that environment's vault, never as a plain value. Startup logs only whether it is set."
+      required: false
+      sensitive: true
+    - key: "Automation:TestRail:ProjectId"
+      description: "TestRail project that receives Automation.UI results: the numeric id (12 or P12) or the exact project name. A name is looked up in TestRail on first use. The shipped default is the project name NHSNLink 2.0. Blank or zero leaves publishing off."
+      required: false
+      defaultValue: "NHSNLink 2.0"
+    - key: "Automation:TestRail:ScenarioSuiteId"
+      description: "TestRail suite for scenario runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134. Blank or zero skips scenario publishing; the startup check then logs the project's suites."
+      required: false
+      defaultValue: "134"
+    - key: "Automation:TestRail:ApiHealthSuiteId"
+      description: "TestRail suite for API Health runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134, the same suite as scenario runs. Blank or zero skips API Health publishing; the startup check then logs the project's suites."
+      required: false
+      defaultValue: "134"
+    - key: "Automation:TestRail:RequestTimeoutSeconds"
+      description: "HTTP timeout in seconds for each TestRail API call. Values below 1 use 15 seconds."
+      required: false
+      defaultValue: "15"
+    - key: "Automation:TestRail:UseSharedRun"
+      description: "When false (the default), each automation run creates its own TestRail run containing only that run's mapped cases. When true, scenario and API Health publishes reuse one TestRail run per suite."
+      required: false
+      defaultValue: "false"
+    - key: "Automation:TestRail:SharedScenarioRunId"
+      description: "Existing TestRail run id reused for scenario results when UseSharedRun is true. Blank creates a run on first publish and keeps it in memory for the process. 123 or R123 selects an existing run."
+      required: false
+      defaultValue: ""
+    - key: "Automation:TestRail:SharedApiHealthRunId"
+      description: "Existing TestRail run id reused for API Health results when UseSharedRun is true. Blank creates a run on first publish and keeps it in memory for the process. 123 or R123 selects an existing run."
+      required: false
+      defaultValue: ""
+    - key: "Automation:TestRail:ScenarioCaseIds"
+      description: "Optional map of scenario id or scenario name to a TestRail case id. The case id saved on the scenario is the source of truth and wins over this map. The automation run name is not a key."
+      required: false
+    - key: "Automation:TestRail:ApiHealthCaseIds"
+      description: "Map of API Health endpoint key or name to a TestRail case id. An endpoint definition's TestRailCaseId wins over this map."
+      required: false
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."
@@ -680,10 +737,6 @@ services:
   # required: true because the service does not run in every environment -- provision these
   # only where the mock is deployed, and never in a production store.
   MockDmrpApi:
-    - key: "MockDmrpApi:Enabled"
-      description: "Master switch for the mock DMRP surface. Absent or false means every route except /health and /api/mock-dmrp/info answers 503 (schema migration still runs when ConnectionStrings:DatabaseConnection is configured, and is skipped when it is not), so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048)."
-      required: false
-      defaultValue: "false"
     - key: "MockDmrpApi:AuthClientId"
       description: "Client id the mock's token endpoint accepts. Provision per environment to move off the shipped non-production value."
       required: false
@@ -735,7 +788,7 @@ services:
       required: false
       defaultValue: "10"
     - key: "spring.kafka.retry.consumer-retry-duration"
-      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
+      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts). Each entry must be between PT0S and PT24H, or the service fails to start: spring-kafka processes a retry due more than a day ahead immediately."
       required: false
       defaultValue: "PT3S,PT3S"
     - key: "spring.kafka.retry.disable-retry-consumer"
@@ -838,6 +891,29 @@ services:
     - key: "PatientAggregator:IncludeOrganizationResource"
       description: "Whether to include the submitting Organization in patient bundles."
       required: false
+    - key: "Retention:Schedule:Cron"
+      description: "Quartz cron expression for the daily retention check job, evaluated in UTC. The job lives in Report's clustered Quartz store, so each firing runs once across all Report instances. Read at startup; a changed value reschedules the job when Report restarts. An invalid expression is logged as an error and falls back to the default."
+      required: false
+      defaultValue: "0 0 2 * * ?"
+    - key: "Retention:Schedule:Enabled"
+      description: "Whether the daily retention check job is scheduled. False removes the job and its trigger when Report next starts."
+      required: false
+      defaultValue: "true"
+    # A list of objects, stored as Retention:Participants:<n>:ServiceName and :Scope rows. Set the
+    # whole list or none of it: .NET merges list entries from different sources by index, which is
+    # why the default lives in code and not in appsettings.json.
+    - key: "Retention:Participants"
+      description: "The services expected to reply to every retention cleanup, each with a ServiceName (the name it puts in RetentionCheckComplete) and a Scope of Report (one result per report) or Cutoff (one result per cleanup). Copied onto each cleanup when it is created, so a change never affects existing cleanups. Read at startup. An empty list, a missing ServiceName or Scope, an unknown Scope, a duplicate name, or no participant with Scope Report makes the whole list invalid: Report logs an error at startup and records every cleanup Failed without sending a request."
+      required: false
+      defaultValue: '[{"ServiceName":"Report","Scope":"Report"},{"ServiceName":"MeasureEval","Scope":"Report"},{"ServiceName":"Validation","Scope":"Report"},{"ServiceName":"DataAcquisition","Scope":"Report"}]'
+    - key: "Retention:Window"
+      description: "How long a report's clinical data is kept after the report finishes (or, for a report that never finished, after it was soft-deleted), as one ISO-8601 years, months, weeks or days value: P3M, P1Y, P2W or P90D. Years count as 12 months and weeks as 7 days; months are calendar months, never a fixed number of days. At most 36 months or 1095 days. Read at startup. An invalid value does not fall back to the default: Report logs an error at startup and every scheduled retention check does nothing until it is fixed."
+      required: false
+      defaultValue: "P3M"
+    - key: "Retention:MaxReportsPerCleanup"
+      description: "The most reports one retention cleanup may hold. A scheduled check with more eligible reports splits them across several cleanups, each its own RetentionCheckRequested message, so no participant gets a request too large to finish within its Kafka poll interval. A whole number from 1 to 1000; the upper limit keeps one request message near 350 KB, under Kafka's default 1 MB message size. Read at startup; an invalid value stops the retention check, as for Retention:Window."
+      required: false
+      defaultValue: "25"
   Submission:
     - key: "SubmissionServiceConfig:SubmissionDirectory"
       description: "The local or network path where submission files are stored."
@@ -931,7 +1007,7 @@ services:
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false
     - key: "spring.kafka.retry.consumer-retry-duration"
-      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
+      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts). Each entry must be between PT0S and PT24H, or the service fails to start: spring-kafka processes a retry due more than a day ahead immediately."
       required: false
       defaultValue: "PT3S,PT3S"
     - key: "spring.kafka.retry.disable-retry-consumer"
@@ -946,6 +1022,79 @@ services:
       description: "Cap in seconds on a single Validation blob network attempt; the SDK default is effectively unbounded. Defaults to 10."
       required: false
       defaultValue: "10"
+    # VaaS defaults below reflect Java property-binding fallbacks, which can differ
+    # from application.yml. Omit defaultValue when the bound property has no default.
+    # These keys do not require an App Configuration row.
+    - key: "cache.rubric.ttl"
+      description: "Resolved-rubric cache TTL in seconds. A backstop against missed invalidation; registering, publishing and retiring rubrics explicitly evict the cache."
+      required: false
+      defaultValue: "3600"
+    - key: "link.rubric.max-payload-bytes"
+      description: "Maximum rubric-definition upload size in bytes (256 KiB). Enforced for both Content-Length and streamed bodies; does not limit the FHIR payload sent for rubric validation."
+      required: false
+      defaultValue: "262144"
+    - key: "link.rubric.dry-run.required-for-publish"
+      description: "Whether publishing a rubric version requires a completed dry run with status ACCEPTABLE or ACCEPTABLE_WITH_WARNINGS."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.checks.parallel"
+      description: "Whether independent rubric checks run concurrently on a dedicated executor, with results merged in rubric order. Shipped as true; the code fallback is false."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.checks.core-pool-size"
+      description: "Core thread count for parallel rubric checks. Shipped as 4; 0 (the code fallback) auto-sizes to the CPU count bounded between 2 and 8. Must be non-negative."
+      required: false
+      defaultValue: "0"
+    - key: "vaas.checks.max-pool-size"
+      description: "Maximum parallel rubric-check thread count, raised to at least the core size. Shipped as 8; 0 (the code fallback) derives twice the core size. Saturation runs excess checks on the caller thread. Must be non-negative."
+      required: false
+      defaultValue: "0"
+    - key: "vaas.checks.queue-capacity"
+      description: "Parallel rubric-check queue capacity. Zero uses direct hand-off so the pool can grow to its maximum; a positive queue must fill before the pool grows beyond its core size. Must be non-negative."
+      required: false
+      defaultValue: "0"
+    - key: "vaas.checks.keep-alive-seconds"
+      description: "Seconds idle non-core rubric-check threads remain alive before being reclaimed. Must be non-negative."
+      required: false
+      defaultValue: "60"
+    # The bridge and shadow comparison both need the configured rubric registered
+    # and PUBLISHED in each environment before either path evaluates it.
+    - key: "vaas.bridge.enabled"
+      description: "Whether ReadyForValidation events use the rubric engine for live validation instead of the legacy validator. Register and publish vaas.bridge.rubric-id in each environment before enabling."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.bridge.rubric-id"
+      description: "Rubric ID evaluated for pipeline validation and shadow comparisons. Must exactly match a rubric registered and published in the environment's registry."
+      required: false
+      defaultValue: "measure-report-submission-v1"
+    - key: "vaas.bridge.shadow-enabled"
+      description: "Whether to publish ShadowCompareEvent messages for asynchronous comparison of the rubric and legacy engines, without changing live results. Independent of vaas.bridge.enabled; requires the configured rubric to be published. Shipped as true; the code fallback is false."
+      required: false
+      defaultValue: "false"
+    - key: "vaas.bridge.shadow-report.daily-blob-path"
+      description: "Blob path template for the daily shadow-comparison CSV report."
+      required: false
+      defaultValue: "shadow-reports/shadow-comparison-daily-report.csv"
+    - key: "vaas.bridge.shadow-report.daily-cron"
+      description: "Six-field Spring cron expression, evaluated in UTC, for generating the previous day's shadow-comparison report. Defaults to 00:15 UTC daily."
+      required: false
+      defaultValue: "0 15 0 * * *"
+    - key: "validation.categoryOverride.enabled"
+      description: "Whether category overrides change findings' effective severity and acceptability before scoring. Shipped as true; the code fallback is false."
+      required: false
+      defaultValue: "false"
+    - key: "validation.scoring.rollup"
+      description: "Fallback roll-up strategy when a rubric version declares none. Values: WORST_OF, BEST_OF, PASS_FAIL, MAJORITY, ALL_MUST_PASS. The bound property defaults to null (no defaultValue); the scoring resolver uses WORST_OF when unset."
+      required: false
+      defaultValue: "WORST_OF"
+    - key: "validation.response.includeOriginalSeverity"
+      description: "Whether responses include originalSeverity and overriddenSeverity for findings whose severity was changed by a category override."
+      required: false
+      defaultValue: "true"
+    - key: "validation.response.includeCategoryIds"
+      description: "Whether responses include categoryIds and governingCategoryId for categorized findings, allowing callers to trace the categories behind the verdict."
+      required: false
+      defaultValue: "true"
 $defs:
   serviceMetaEntry:
     type: "object"

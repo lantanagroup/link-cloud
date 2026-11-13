@@ -9,7 +9,6 @@ import {
 } from '@angular/material/dialog';
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatButton} from "@angular/material/button";
-import {faRotate} from "@fortawesome/free-solid-svg-icons";
 
 export interface ResubmitDialogData {
   facilityId: string;
@@ -40,7 +39,6 @@ export class ResubmitDialogComponent {
   ) {
     this.form = this.fb.group({
       bypassSubmission: [false],
-      comment: [''],
     });
   }
 
@@ -59,6 +57,4 @@ export class ResubmitDialogComponent {
 
     this.dialogRef.close(result);
   }
-
-  protected readonly faRotate = faRotate;
 }

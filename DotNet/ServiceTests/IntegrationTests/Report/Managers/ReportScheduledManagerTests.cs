@@ -1,10 +1,13 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -98,49 +101,113 @@ public class ReportScheduledManagerTests
         Assert.True(updated!.IsDeleted);
     }
 
-    [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WithEndOfPeriodReport_WhenDeleted_LeavesReportUntouched()
+    [Theory]
+    [InlineData(ScheduleStatus.New, false)]
+    [InlineData(ScheduleStatus.New, null)]
+    [InlineData(ScheduleStatus.EndOfPeriod, false)]
+    [InlineData(ScheduleStatus.EndOfPeriod, null)]
+    public async Task UpdateReportsDeletedStatusForFacility_WithInProgressReport_WhenDeleted_SetsDeletionDates(
+        ScheduleStatus status, bool? isDeleted)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
         var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
         var facilityId = Guid.NewGuid().ToString();
-        var report = CreateReport(facilityId, ScheduleStatus.EndOfPeriod, isDeleted: false);
-        var originalModifyDate = report.ModifyDate;
+        var report = CreateReport(facilityId, status);
+        report.IsDeleted = isDeleted;
 
         await SeedAsync(context, report);
 
+        var before = DateTimeOffset.UtcNow;
         await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
+        var after = DateTimeOffset.UtcNow;
 
+        context.ChangeTracker.Clear();
         var updated = await context.ReportSchedule.FindAsync(report.Id);
-        Assert.False(updated!.IsDeleted);
-        Assert.Equal(originalModifyDate, updated.ModifyDate);
+        Assert.True(updated!.IsDeleted);
+        Assert.Equal(status, updated.Status);
+        Assert.Null(updated.CompletedDate);
+        Assert.NotNull(updated.SoftDeletedDate);
+        Assert.InRange(updated.SoftDeletedDate.Value, before, after);
+        Assert.Equal(TimeSpan.Zero, updated.SoftDeletedDate.Value.Offset);
+        Assert.Equal(updated.SoftDeletedDate.Value.UtcDateTime, updated.ModifyDate);
     }
 
-    [Fact]
-    public async Task UpdateReportsDeletedStatusForFacility_WithNewReport_WhenDeleted_LeavesReportUntouched()
+    [Theory]
+    [InlineData(ScheduleStatus.New)]
+    [InlineData(ScheduleStatus.EndOfPeriod)]
+    public async Task UpdateReportsDeletedStatusForFacility_WithInProgressReport_WhenDeletedAgain_PreservesDeletionDates(
+        ScheduleStatus status)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
         var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
         var facilityId = Guid.NewGuid().ToString();
-        var report = CreateReport(facilityId, ScheduleStatus.New, isDeleted: false);
-        var originalModifyDate = report.ModifyDate;
+        var yesterday = DateTimeOffset.UtcNow.AddDays(-1);
+        var report = CreateReport(facilityId, status, isDeleted: true, softDeletedDate: yesterday);
+        report.ModifyDate = yesterday.UtcDateTime;
 
         await SeedAsync(context, report);
 
         await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
 
+        context.ChangeTracker.Clear();
         var updated = await context.ReportSchedule.FindAsync(report.Id);
-        Assert.False(updated!.IsDeleted);
-        Assert.Equal(originalModifyDate, updated.ModifyDate);
+        Assert.True(updated!.IsDeleted);
+        Assert.Equal(yesterday, updated.SoftDeletedDate);
+        Assert.Equal(yesterday.UtcDateTime, updated.ModifyDate);
     }
 
     #endregion
 
     #region Restore (deleted = false) Tests
+
+    [Theory]
+    [InlineData(ScheduleStatus.New, true)]
+    [InlineData(ScheduleStatus.EndOfPeriod, true)]
+    [InlineData(ScheduleStatus.Scheduled, false)]
+    [InlineData(ScheduleStatus.Submitted, false)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted, false)]
+    public async Task UpdateReportsDeletedStatusForFacility_AfterDelete_WhenRestored_OnlyRestoresEligibleStatuses(
+        ScheduleStatus status, bool staysDeleted)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var report = CreateReport(facilityId, status);
+        report.ReportEndDate = DateTime.UtcNow.AddDays(1);
+        var completedDate = status.IsTerminal() ? DateTimeOffset.UtcNow.AddDays(-1) : (DateTimeOffset?)null;
+        report.CompletedDate = completedDate;
+        await SeedAsync(context, report);
+
+        await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
+        context.ChangeTracker.Clear();
+        var deletedReport = await context.ReportSchedule.FindAsync(report.Id);
+        var deletionDate = deletedReport!.SoftDeletedDate;
+        var modifyDate = deletedReport.ModifyDate;
+
+        await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: false);
+
+        context.ChangeTracker.Clear();
+        var updated = await context.ReportSchedule.FindAsync(report.Id);
+        Assert.Equal(staysDeleted, updated!.IsDeleted);
+        Assert.Equal(status, updated.Status);
+        Assert.Equal(completedDate, updated.CompletedDate);
+        if (staysDeleted)
+        {
+            Assert.NotNull(deletionDate);
+            Assert.Equal(deletionDate, updated.SoftDeletedDate);
+            Assert.Equal(modifyDate, updated.ModifyDate);
+        }
+        else
+        {
+            Assert.Null(updated.SoftDeletedDate);
+        }
+    }
 
     [Fact]
     public async Task UpdateReportsDeletedStatusForFacility_WithSubmittedReport_WhenNotDeleted_SetsIsDeletedFalse()
@@ -164,6 +231,65 @@ public class ReportScheduledManagerTests
 
     #region Mixed Status & SaveChanges Tests
 
+    [Theory]
+    [InlineData(ScheduleStatus.Submitted)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted)]
+    public async Task UpdateReportsDeletedStatusForFacility_WithConcurrentCompletion_PreservesCompletion(
+        ScheduleStatus terminalStatus)
+    {
+        using var deleteScope = _scopeFactory.CreateScope();
+        var deleteContext = deleteScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var deletingManager = deleteScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.EndOfPeriod);
+        await SeedAsync(deleteContext, report);
+        await deleteContext.ReportSchedule.FindAsync(report.Id);
+
+        DateTimeOffset? completedDate;
+        using (var workerScope = _scopeFactory.CreateScope())
+        {
+            var worker = workerScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            var model = await worker.SingleAsync(r => r.Id == report.Id);
+            model.Status = terminalStatus;
+            var completed = await worker.UpdateAsync(model, CancellationToken.None);
+            completedDate = completed.CompletedDate;
+        }
+
+        await deletingManager.UpdateReportsDeletedStatusForFacility(report.FacilityId, deleted: true);
+
+        using var verificationScope = _scopeFactory.CreateScope();
+        var verificationContext = verificationScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var updated = await verificationContext.ReportSchedule.FindAsync(report.Id);
+        Assert.True(updated!.IsDeleted);
+        Assert.Equal(terminalStatus, updated.Status);
+        Assert.NotNull(completedDate);
+        Assert.Equal(completedDate, updated.CompletedDate);
+        Assert.Null(updated.SoftDeletedDate);
+    }
+
+    [Theory]
+    [InlineData(ScheduleStatus.New)]
+    [InlineData(ScheduleStatus.EndOfPeriod)]
+    public async Task UpdateReportsDeletedStatusForFacility_WhenDeleted_LeavesOtherFacilitiesUntouched(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var target = CreateReport(facilityId, status);
+        var other = CreateReport(Guid.NewGuid().ToString(), status);
+        await SeedAsync(context, target, other);
+
+        await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
+
+        context.ChangeTracker.Clear();
+        Assert.True((await context.ReportSchedule.FindAsync(target.Id))!.IsDeleted);
+        var unchanged = await context.ReportSchedule.FindAsync(other.Id);
+        Assert.False(unchanged!.IsDeleted);
+        Assert.Null(unchanged.SoftDeletedDate);
+        Assert.Null(unchanged.ModifyDate);
+    }
+
     [Fact]
     public async Task UpdateReportsDeletedStatusForFacility_WithMixedStatuses_WhenDeleted_HandlesEachStatusCorrectly()
     {
@@ -185,8 +311,8 @@ public class ReportScheduledManagerTests
         var updatedNew = await context.ReportSchedule.FindAsync(newReport.Id);
 
         Assert.True(updatedScheduled!.IsDeleted);
-        Assert.False(updatedEndOfPeriod!.IsDeleted);
-        Assert.False(updatedNew!.IsDeleted);
+        Assert.True(updatedEndOfPeriod!.IsDeleted);
+        Assert.True(updatedNew!.IsDeleted);
     }
 
     [Fact]
@@ -472,9 +598,433 @@ public class ReportScheduledManagerTests
         Assert.True((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
     }
 
+    [Theory]
+    [InlineData(ScheduleStatus.Scheduled)]
+    [InlineData(ScheduleStatus.Submitted)]
+    public async Task RestoreByReportTrackingIdAsync_WithRestorableStatus_ClearsIsDeleted(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status, isDeleted: true);
+        await SeedAsync(context, report);
+
+        await sut.RestoreByReportTrackingIdAsync(report.Id);
+
+        context.ChangeTracker.Clear();
+        Assert.False((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
+    }
+
+    [Theory]
+    [InlineData(ScheduleStatus.New)]
+    [InlineData(ScheduleStatus.EndOfPeriod)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted)]
+    public async Task RestoreByReportTrackingIdAsync_WithNonRestorableStatus_ThrowsAndStaysDeleted(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status, isDeleted: true);
+        await SeedAsync(context, report);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.RestoreByReportTrackingIdAsync(report.Id));
+
+        Assert.Contains("cannot be restored", ex.Message);
+        Assert.Contains(status.ToString(), ex.Message);
+        context.ChangeTracker.Clear();
+        Assert.True((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
+    }
+
     #endregion
 
-    private static ReportSchedule CreateReport(string facilityId, ScheduleStatus status, bool isDeleted = false)
+    #region Retention dates (LEGLINK-1245)
+
+    [Theory]
+    [InlineData(ScheduleStatus.Submitted, false)]
+    [InlineData(ScheduleStatus.Submitted, true)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted, false)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted, true)]
+    public async Task UpdateAsync_WithConcurrentFacilityDeletion_PreservesDeletionState(
+        ScheduleStatus terminalStatus, bool trackBeforeDeletion)
+    {
+        using var workerScope = _scopeFactory.CreateScope();
+        var workerContext = workerScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var worker = workerScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.EndOfPeriod);
+        await SeedAsync(workerContext, report);
+
+        var staleModel = await worker.SingleAsync(r => r.Id == report.Id);
+        if (trackBeforeDeletion)
+        {
+            // A long-running worker may already track the row from an earlier update.
+            await workerContext.ReportSchedule.FindAsync(report.Id);
+        }
+
+        DateTimeOffset? deletionDate;
+        using (var deleteScope = _scopeFactory.CreateScope())
+        {
+            var deletingManager = deleteScope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+            await deletingManager.UpdateReportsDeletedStatusForFacility(report.FacilityId, deleted: true);
+            var deleteContext = deleteScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            deleteContext.ChangeTracker.Clear();
+            deletionDate = (await deleteContext.ReportSchedule.FindAsync(report.Id))!.SoftDeletedDate;
+        }
+
+        Assert.False(staleModel.IsDeleted);
+        staleModel.Status = terminalStatus;
+        var result = await worker.UpdateAsync(staleModel, CancellationToken.None);
+
+        using var verificationScope = _scopeFactory.CreateScope();
+        var verificationContext = verificationScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var updated = await verificationContext.ReportSchedule.FindAsync(report.Id);
+        Assert.True(updated!.IsDeleted);
+        Assert.NotNull(deletionDate);
+        Assert.Equal(deletionDate, updated.SoftDeletedDate);
+        Assert.Equal(terminalStatus, updated.Status);
+        Assert.NotNull(updated.CompletedDate);
+        Assert.True(result.IsDeleted);
+        Assert.Equal(updated.SoftDeletedDate, result.SoftDeletedDate);
+        Assert.Equal(updated.CompletedDate, result.CompletedDate);
+    }
+
+    /// <summary>
+    /// The first write of a terminal status stamps CompletedDate. A later write with the same
+    /// terminal status, which is what a regenerate produces, leaves it where it was.
+    /// </summary>
+    [Theory]
+    [InlineData(ScheduleStatus.Submitted)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted)]
+    public async Task UpdateAsync_StatusBecomesTerminal_SetsCompletedDateOnce(ScheduleStatus terminalStatus)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.EndOfPeriod);
+        await SeedAsync(context, report);
+
+        var before = DateTimeOffset.UtcNow;
+        await sut.UpdateAsync(ToModel(report, terminalStatus), CancellationToken.None);
+        var after = DateTimeOffset.UtcNow;
+
+        context.ChangeTracker.Clear();
+        var first = (await context.ReportSchedule.FindAsync(report.Id))!.CompletedDate;
+        Assert.NotNull(first);
+        Assert.InRange(first.Value, before, after);
+        Assert.Equal(TimeSpan.Zero, first.Value.Offset);
+
+        await Task.Delay(20);
+        await sut.UpdateAsync(ToModel(report, terminalStatus), CancellationToken.None);
+
+        context.ChangeTracker.Clear();
+        Assert.Equal(first, (await context.ReportSchedule.FindAsync(report.Id))!.CompletedDate);
+    }
+
+    /// <summary>
+    /// Moving between in-progress statuses is not completion, so no date is recorded.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_StatusStaysInProgress_LeavesCompletedDateNull()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Scheduled);
+        await SeedAsync(context, report);
+
+        await sut.UpdateAsync(ToModel(report, ScheduleStatus.EndOfPeriod), CancellationToken.None);
+
+        context.ChangeTracker.Clear();
+        Assert.Null((await context.ReportSchedule.FindAsync(report.Id))!.CompletedDate);
+    }
+
+    /// <summary>
+    /// A report that has not finished gets its retention clock from the soft delete, in UTC.
+    /// </summary>
+    [Theory]
+    [InlineData(ScheduleStatus.Scheduled, false)]
+    [InlineData(ScheduleStatus.New, true)]
+    [InlineData(ScheduleStatus.EndOfPeriod, true)]
+    public async Task SoftDeleteByReportTrackingIdAsync_UnfinishedReport_SetsSoftDeletedDate(ScheduleStatus status, bool allowInProgress)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status);
+        await SeedAsync(context, report);
+
+        var before = DateTimeOffset.UtcNow;
+        await sut.SoftDeleteByReportTrackingIdAsync(report.Id, allowInProgress: allowInProgress);
+        var after = DateTimeOffset.UtcNow;
+
+        context.ChangeTracker.Clear();
+        var softDeletedDate = (await context.ReportSchedule.FindAsync(report.Id))!.SoftDeletedDate;
+        Assert.NotNull(softDeletedDate);
+        Assert.InRange(softDeletedDate.Value, before, after);
+        Assert.Equal(TimeSpan.Zero, softDeletedDate.Value.Offset);
+    }
+
+    /// <summary>
+    /// A finished report ages from CompletedDate, so its soft delete records no date.
+    /// </summary>
+    [Theory]
+    [InlineData(ScheduleStatus.Submitted)]
+    [InlineData(ScheduleStatus.CompletedNotSubmitted)]
+    public async Task SoftDeleteByReportTrackingIdAsync_FinishedReport_LeavesSoftDeletedDateNull(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status);
+        await SeedAsync(context, report);
+
+        await sut.SoftDeleteByReportTrackingIdAsync(report.Id);
+
+        context.ChangeTracker.Clear();
+        var updated = await context.ReportSchedule.FindAsync(report.Id);
+        Assert.True(updated!.IsDeleted);
+        Assert.Null(updated.SoftDeletedDate);
+    }
+
+    /// <summary>
+    /// Restoring stops the clock that the soft delete started.
+    /// </summary>
+    [Fact]
+    public async Task RestoreByReportTrackingIdAsync_UnfinishedReport_ClearsSoftDeletedDate()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Scheduled, isDeleted: true,
+            softDeletedDate: DateTimeOffset.UtcNow.AddDays(-1));
+        await SeedAsync(context, report);
+
+        await sut.RestoreByReportTrackingIdAsync(report.Id);
+
+        context.ChangeTracker.Clear();
+        Assert.Null((await context.ReportSchedule.FindAsync(report.Id))!.SoftDeletedDate);
+    }
+
+    /// <summary>
+    /// A second soft delete after a restore records the new date, not the original one.
+    /// </summary>
+    [Fact]
+    public async Task SoftDeleteByReportTrackingIdAsync_AfterRestore_RecordsNewSoftDeletedDate()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Scheduled);
+        await SeedAsync(context, report);
+
+        await sut.SoftDeleteByReportTrackingIdAsync(report.Id);
+        context.ChangeTracker.Clear();
+        var firstDelete = (await context.ReportSchedule.FindAsync(report.Id))!.SoftDeletedDate;
+
+        await sut.RestoreByReportTrackingIdAsync(report.Id);
+        await Task.Delay(20);
+        await sut.SoftDeleteByReportTrackingIdAsync(report.Id);
+
+        context.ChangeTracker.Clear();
+        var secondDelete = (await context.ReportSchedule.FindAsync(report.Id))!.SoftDeletedDate;
+        Assert.NotNull(firstDelete);
+        Assert.NotNull(secondDelete);
+        Assert.True(secondDelete > firstDelete);
+    }
+
+    /// <summary>
+    /// Deleting a facility stamps its unfinished reports; its finished reports age from CompletedDate.
+    /// </summary>
+    [Fact]
+    public async Task UpdateReportsDeletedStatusForFacility_WhenDeleted_StampsOnlyUnfinishedReports()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var scheduled = CreateReport(facilityId, ScheduleStatus.Scheduled);
+        var newReport = CreateReport(facilityId, ScheduleStatus.New);
+        var endOfPeriod = CreateReport(facilityId, ScheduleStatus.EndOfPeriod);
+        var submitted = CreateReport(facilityId, ScheduleStatus.Submitted);
+        var bypassed = CreateReport(facilityId, ScheduleStatus.CompletedNotSubmitted);
+        await SeedAsync(context, scheduled, newReport, endOfPeriod, submitted, bypassed);
+
+        var before = DateTimeOffset.UtcNow;
+        await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: true);
+        var after = DateTimeOffset.UtcNow;
+
+        context.ChangeTracker.Clear();
+        var scheduledDate = (await context.ReportSchedule.FindAsync(scheduled.Id))!.SoftDeletedDate;
+        Assert.NotNull(scheduledDate);
+        Assert.InRange(scheduledDate.Value, before, after);
+        Assert.Equal(scheduledDate, (await context.ReportSchedule.FindAsync(newReport.Id))!.SoftDeletedDate);
+        Assert.Equal(scheduledDate, (await context.ReportSchedule.FindAsync(endOfPeriod.Id))!.SoftDeletedDate);
+        Assert.Null((await context.ReportSchedule.FindAsync(submitted.Id))!.SoftDeletedDate);
+        Assert.Null((await context.ReportSchedule.FindAsync(bypassed.Id))!.SoftDeletedDate);
+    }
+
+    /// <summary>
+    /// Restoring a facility clears the date on every report it touches.
+    /// </summary>
+    [Fact]
+    public async Task UpdateReportsDeletedStatusForFacility_WhenRestored_ClearsSoftDeletedDate()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var yesterday = DateTimeOffset.UtcNow.AddDays(-1);
+        var scheduled = CreateReport(facilityId, ScheduleStatus.Scheduled, isDeleted: true, softDeletedDate: yesterday);
+        // Deleted while in flight and finished afterwards: restore still clears the stale date.
+        var submitted = CreateReport(facilityId, ScheduleStatus.Submitted, isDeleted: true, softDeletedDate: yesterday);
+        await SeedAsync(context, scheduled, submitted);
+
+        await sut.UpdateReportsDeletedStatusForFacility(facilityId, deleted: false);
+
+        context.ChangeTracker.Clear();
+        Assert.Null((await context.ReportSchedule.FindAsync(scheduled.Id))!.SoftDeletedDate);
+        Assert.Null((await context.ReportSchedule.FindAsync(submitted.Id))!.SoftDeletedDate);
+    }
+
+    /// <summary>
+    /// Every read path projects the model by hand, so each must carry the dates through to the API.
+    /// </summary>
+    [Fact]
+    public async Task ReadMethods_ReturnRetentionDates()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var finished = CreateReport(facilityId, ScheduleStatus.EndOfPeriod);
+        var deleted = CreateReport(facilityId, ScheduleStatus.Scheduled);
+        await SeedAsync(context, finished, deleted);
+
+        await sut.UpdateAsync(ToModel(finished, ScheduleStatus.Submitted), CancellationToken.None);
+        await sut.SoftDeleteByReportTrackingIdAsync(deleted.Id);
+        context.ChangeTracker.Clear();
+
+        var byId = await sut.GetReportSchedule(facilityId, finished.Id);
+        Assert.NotNull(byId!.CompletedDate);
+
+        var single = await sut.SingleOrDefaultAsync(r => r.Id == deleted.Id);
+        Assert.NotNull(single!.SoftDeletedDate);
+
+        var found = await sut.FindAsync(r => r.FacilityId == facilityId);
+        Assert.NotNull(found.Single(r => r.Id == finished.Id).CompletedDate);
+        Assert.NotNull(found.Single(r => r.Id == deleted.Id).SoftDeletedDate);
+
+        var searched = await sut.SearchAsync(facilityId, null, null, null, null, null, null,
+            includeDeleted: true, sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1);
+        Assert.NotNull(searched.Records.Single(r => r.Id == finished.Id).CompletedDate);
+        Assert.NotNull(searched.Records.Single(r => r.Id == deleted.Id).SoftDeletedDate);
+    }
+
+    /// <summary>
+    /// The update input for a seeded report, carrying only what UpdateAsync copies.
+    /// </summary>
+    private static ReportScheduleModel ToModel(ReportSchedule report, ScheduleStatus status)
+    {
+        return new ReportScheduleModel
+        {
+            Id = report.Id,
+            FacilityId = report.FacilityId,
+            ReportStartDate = report.ReportStartDate,
+            ReportEndDate = report.ReportEndDate,
+            Frequency = report.Frequency,
+            EnableSubmission = report.EnableSubmission,
+            Status = status,
+            IsDeleted = report.IsDeleted
+        };
+    }
+
+    #endregion
+
+    /// <summary>
+    /// A minimal schedule row for one facility, never modified and not yet completed.
+    /// </summary>
+    [Fact]
+    public async Task UpdateReportsDeletedStatusForFacility_ScheduledReportClaimedByRetention_KeepsRetentionStatus()
+    {
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Scheduled);
+
+        var status = await RunWithConcurrentRetentionClaimAsync(
+            report,
+            manager => manager.UpdateReportsDeletedStatusForFacility(report.FacilityId, deleted: true));
+
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, status);
+    }
+
+    [Fact]
+    public async Task SoftDeleteByReportTrackingIdAsync_ReportClaimedByRetention_KeepsRetentionStatus()
+    {
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Submitted);
+
+        var status = await RunWithConcurrentRetentionClaimAsync(
+            report,
+            manager => manager.SoftDeleteByReportTrackingIdAsync(report.Id));
+
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, status);
+    }
+
+    [Fact]
+    public async Task RestoreByReportTrackingIdAsync_ReportClaimedByRetention_KeepsRetentionStatus()
+    {
+        var report = CreateReport(Guid.NewGuid().ToString(), ScheduleStatus.Submitted, isDeleted: true);
+
+        var status = await RunWithConcurrentRetentionClaimAsync(
+            report,
+            manager => manager.RestoreByReportTrackingIdAsync(report.Id));
+
+        Assert.Equal(ReportRetentionStatus.PendingDeletion, status);
+    }
+
+    // Loads the report into the manager's context, has a retention cleanup claim it from another context, then
+    // runs the operation, which finds the stale tracked copy. Returns the stored retention status afterward.
+    private async Task<ReportRetentionStatus> RunWithConcurrentRetentionClaimAsync(
+        ReportSchedule report,
+        Func<IReportScheduledManager, Task> operation)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var manager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        await SeedAsync(context, report);
+        await context.ReportSchedule.FindAsync(report.Id);
+
+        using (var claimScope = _scopeFactory.CreateScope())
+        {
+            var claimContext = claimScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            await claimContext.ReportSchedule
+                .Where(r => r.Id == report.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.RetentionStatus,
+                                                       ReportRetentionStatus.PendingDeletion));
+        }
+
+        await operation(manager);
+
+        using var verificationScope = _scopeFactory.CreateScope();
+        var verificationContext = verificationScope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        return await verificationContext.ReportSchedule
+            .Where(r => r.Id == report.Id)
+            .Select(r => r.RetentionStatus)
+            .SingleAsync();
+    }
+
+    private static ReportSchedule CreateReport(string facilityId,
+                                               ScheduleStatus status,
+                                               bool isDeleted = false,
+                                               DateTimeOffset? softDeletedDate = null)
     {
         return new ReportSchedule
         {
@@ -482,6 +1032,7 @@ public class ReportScheduledManagerTests
             FacilityId = facilityId,
             Status = status,
             IsDeleted = isDeleted,
+            SoftDeletedDate = softDeletedDate,
             CreateDate = DateTime.UtcNow,
             ModifyDate = null
         };

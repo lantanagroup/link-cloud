@@ -1,0 +1,9 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "cpt-test",
+  "url": "http://www.ama-assn.org/go/cpt",
+  "version": "1.0.0",
+  "name": "CPTTest",
+  "status": "active",
+  "content": "fragment"
+}

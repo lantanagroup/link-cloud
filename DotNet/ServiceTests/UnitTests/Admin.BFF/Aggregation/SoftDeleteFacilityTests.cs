@@ -125,7 +125,7 @@ public class SoftDeleteFacilityTests
 
             // DA logs soft-delete
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
                 return NoContentResponse();
 
             // Census jobs delete
@@ -203,7 +203,7 @@ public class SoftDeleteFacilityTests
                 return NoContentResponse();
 
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
                 return NoContentResponse();
 
             // Census jobs delete
@@ -443,7 +443,7 @@ public class SoftDeleteFacilityTests
 
             // DA soft-delete fails
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
                 return StatusResponse(HttpStatusCode.ServiceUnavailable);
 
             // Report rollback (restore)
@@ -505,7 +505,7 @@ public class SoftDeleteFacilityTests
                 return NoContentResponse();
 
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
                 throw new HttpRequestException("DA service unavailable");
 
             if (request.Method == HttpMethod.Patch &&
@@ -568,7 +568,7 @@ public class SoftDeleteFacilityTests
                 return NoContentResponse();
 
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
                 return NoContentResponse();
 
             // Census jobs delete
@@ -670,7 +670,7 @@ public class SoftDeleteFacilityTests
                 return NoContentResponse();
 
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
                 return NoContentResponse();
 
             // Census job delete fails
@@ -681,7 +681,7 @@ public class SoftDeleteFacilityTests
 
             // DA rollback (restore)
             if (request.Method == HttpMethod.Patch &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/") &&
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
             {
                 daRestoreCalled = true;
@@ -749,7 +749,7 @@ public class SoftDeleteFacilityTests
                 return NoContentResponse();
 
             if (request.Method == HttpMethod.Delete &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/"))
                 return NoContentResponse();
 
             // Census job delete throws
@@ -760,7 +760,7 @@ public class SoftDeleteFacilityTests
 
             // DA rollback (restore)
             if (request.Method == HttpMethod.Patch &&
-                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("api/data-acquisition/acquisition-logs/facility/") &&
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
             {
                 daRestoreCalled = true;

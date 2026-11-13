@@ -10,6 +10,8 @@
         pageSize = Model.PageSize,
         sortBy = col,
         sortDir = (Model.SortBy == col && Model.SortDescending) ? "asc" : "desc",
+        createdFrom = Model.CreatedFrom?.ToString("yyyy-MM-dd"),
+        createdTo = Model.CreatedTo?.ToString("yyyy-MM-dd"),
     }) ?? "#";
 
     Func<string, string> sortIndicator = col => Model.SortBy == col
@@ -26,6 +28,8 @@
         pageSize = Model.PageSize,
         sortBy = Model.SortBy,
         sortDir = Model.SortDir,
+        createdFrom = Model.CreatedFrom?.ToString("yyyy-MM-dd"),
+        createdTo = Model.CreatedTo?.ToString("yyyy-MM-dd"),
     }) ?? "#";
 }
 <div class="au-card"
@@ -33,6 +37,8 @@
      data-page-size="@Model.PageSize"
      data-sort-by="@Model.SortBy"
      data-sort-dir="@Model.SortDir"
+     data-created-from="@Model.CreatedFrom?.ToString("yyyy-MM-dd")"
+     data-created-to="@Model.CreatedTo?.ToString("yyyy-MM-dd")"
      id="recentRunsCard">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-clock-history me-2"></i>Recent Runs</span>
@@ -40,6 +46,54 @@
             @Model.TotalCount run@(Model.TotalCount == 1 ? "" : "s") &middot; page @Model.PageNumber of @Model.TotalPages
         </span>
     </div>
+    <form id="recentRunsDateFilter"
+      method="get"
+      asp-controller="Runs"
+      asp-action="Index"
+      class="d-flex flex-wrap align-items-end gap-2 p-3 border-bottom">
+
+        <div>
+            <label for="createdFromInput" class="form-label small mb-1">
+                Created From (UTC)
+            </label>
+            <input type="date"
+                id="createdFromInput"
+                name="createdFrom"
+                class="form-control form-control-sm"
+                value="@Model.CreatedFrom?.ToString("yyyy-MM-dd")" />
+        </div>
+
+        <div>
+            <label for="createdToInput" class="form-label small mb-1">
+                Created To (UTC)
+            </label>
+            <input type="date"
+                id="createdToInput"
+                name="createdTo"
+                class="form-control form-control-sm"
+                value="@Model.CreatedTo?.ToString("yyyy-MM-dd")" />
+        </div>
+
+        <input type="hidden" name="pageNumber" value="1" />
+        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+        <input type="hidden" name="sortDir" value="@Model.SortDir" />
+
+        <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-funnel me-1"></i>Apply
+        </button>
+
+        <a id="clearCreatedDateFilter"
+            class="btn btn-sm btn-outline-secondary"
+            href="@Url.Action("Index", "Runs", new {
+                pageNumber = 1,
+                pageSize = Model.PageSize,
+                sortBy = Model.SortBy,
+                sortDir = Model.SortDir
+            })">
+            Clear
+        </a>
+    </form>
     <div data-au-table>
     <div class="table-responsive">
         <table class="table au-table mb-0">
@@ -59,7 +113,16 @@
             @if (Model.Runs == null || !Model.Runs.Any())
             {
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-4">No runs yet. Pick a scenario in Quick Launch to start one.</td>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        @if (Model.CreatedFrom.HasValue || Model.CreatedTo.HasValue)
+                        {
+                            <text>No runs found for the selected Created Date range.</text>
+                        }
+                        else
+                        {
+                            <text>No runs yet. Pick a scenario in Quick Launch to start one.</text>
+                        }
+                    </td>
                 </tr>
             }
             @foreach (var run in Model.Runs)

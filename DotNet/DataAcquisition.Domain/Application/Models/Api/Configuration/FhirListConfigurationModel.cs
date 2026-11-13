@@ -22,7 +22,6 @@ public class FhirListConfigurationModel
     public string FacilityId { get; set; }
     [Required]
     public string FhirBaseServerUrl { get; set; }
-    public AuthenticationConfigurationModel? Authentication { get; set; }
     [Required]
     public List<EhrPatientListModel> EHRPatientLists { get; set; }
     [DataMember]
@@ -40,7 +39,6 @@ public class FhirListConfigurationModel
             Id = entity.Id.ToString(),
             FacilityId = entity.FacilityId,
             FhirBaseServerUrl = entity.FhirBaseServerUrl,
-            Authentication = entity.Authentication != null ? AuthenticationConfigurationModel.FromDomain(entity.Authentication) : null,
             EHRPatientLists = entity.EHRPatientLists?.Select(e => new EhrPatientListModel
             {
                 FhirId = e.FhirId,
@@ -110,9 +108,9 @@ public class EhrPatientListModel
 
     /// <summary>
     /// The patients present on this EHR List. Response-only: it is populated solely by
-    /// GET /api/data/{facilityId}/fhirQueryList when includePatients=true, and is ignored on POST/PUT.
+    /// GET /api/data-acquisition/{facilityId}/fhirQueryList when includePatients=true, and is ignored on POST/PUT.
     /// </summary>
-    [Description("A list of patients. Only populated in the response of GET /api/data/{facilityId}/fhirQueryList when includePatients=true is passed.")]
+    [Description("A list of patients. Only populated in the response of GET /api/data-acquisition/{facilityId}/fhirQueryList when includePatients=true is passed.")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<EhrPatientListPatientModel>? Patients { get; set; }
 

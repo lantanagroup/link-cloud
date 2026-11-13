@@ -1,11 +1,14 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.AdminBFF;
@@ -13,21 +16,22 @@ namespace UnitTests.AdminBFF;
 [Trait("Category", "UnitTests")]
 public class JavaServiceHealthTests
 {
+    /// <summary>
+    /// A failing component's details are what name the backend and the reason, so every shape Spring
+    /// can put in them has to survive the trip to the dashboard verbatim.
+    /// </summary>
     [Theory]
-    [InlineData(true, "UP", HttpStatusCode.OK, HealthStatus.Healthy)]
-    [InlineData(false, "UP", HttpStatusCode.OK, HealthStatus.Healthy)]
-    [InlineData(true, "DOWN", HttpStatusCode.ServiceUnavailable, HealthStatus.Unhealthy)]
-    [InlineData(false, "DOWN", HttpStatusCode.ServiceUnavailable, HealthStatus.Unhealthy)]
-    public async Task HealthCheck_PreservesAllDetailsInDescription(
-        bool measureEval, string status, HttpStatusCode statusCode, HealthStatus expectedStatus)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_PreservesAllDetailsInDescription(bool measureEval)
     {
-                var componentName = measureEval ? "Resource Cache" : "Redis";
+        var componentName = measureEval ? "Resource Cache" : "Redis";
         var payload = $$"""
             {
-              "status": "{{status}}",
+              "status": "DOWN",
               "components": {
-                                "{{componentName}}": {
-                  "status": "{{status}}",
+                "{{componentName}}": {
+                  "status": "DOWN",
                   "details": {
                     "Redis": "Available",
                     "ABS": "Unavailable",
@@ -41,13 +45,13 @@ public class JavaServiceHealthTests
             }
             """;
 
-        var report = await CheckHealth(measureEval, payload, statusCode);
+        var report = await CheckHealth(measureEval, payload, HttpStatusCode.ServiceUnavailable);
 
         Assert.Equal(measureEval ? "Measure Evaluation" : "Validation", report.Service);
-        Assert.Equal(expectedStatus, report.Status);
+        Assert.Equal(HealthStatus.Unhealthy, report.Status);
         var entry = Assert.Single(report.Entries);
         Assert.Equal(componentName, entry.Key);
-        Assert.Equal(expectedStatus, entry.Value.Status);
+        Assert.Equal(HealthStatus.Unhealthy, entry.Value.Status);
         Assert.Equal(TimeSpan.Zero, entry.Value.Duration);
         using var description = JsonDocument.Parse(entry.Value.Description!);
         var details = description.RootElement;
@@ -58,6 +62,74 @@ public class JavaServiceHealthTests
         Assert.Equal(2, details.GetProperty("attempts").GetInt32());
         Assert.False(details.GetProperty("reachable").GetBoolean());
         Assert.Equal("second", details.GetProperty("nested").GetProperty("hosts")[1].GetString());
+    }
+
+    /// <summary>
+    /// LEGLINK-1545. A healthy indicator's details only restate the status the row already shows --
+    /// the dashboard read <c>{"Cache":"Available"}</c> beside a green Healthy, where every .NET row
+    /// read "-". The details are dropped at Healthy so both runtimes' Description columns say the
+    /// same thing: nothing, while there is nothing wrong.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_DropsAHealthyComponentsRedundantDetails(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "UP",
+              "components": {
+                "Cache (Redis)":          { "status": "UP", "details": { "Cache": "Available" } },
+                "Database (SQL Server)":  { "status": "UP", "details": { "Database": "Available" } },
+                "Kafka":                  { "status": "UP", "details": { "Kafka": "Available" } }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload);
+
+        Assert.Equal(HealthStatus.Healthy, report.Status);
+        Assert.Equal(3, report.Entries.Count);
+        Assert.All(report.Entries, entry =>
+        {
+            Assert.Equal(HealthStatus.Healthy, entry.Value.Status);
+            Assert.Null(entry.Value.Description);
+        });
+    }
+
+    /// <summary>
+    /// The two rules together, on the report an operator actually reads during an outage: the row
+    /// that failed keeps everything its indicator said, and the rows beside it stay quiet rather
+    /// than filling the column with "Available".
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_DescribesOnlyTheFailingComponent(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "DOWN",
+              "components": {
+                "Kafka":                 { "status": "UP",   "details": { "Kafka": "Available" } },
+                "Database (SQL Server)": { "status": "DOWN", "details": { "Database": "Unavailable", "error": "Login failed." } }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload, HttpStatusCode.ServiceUnavailable);
+
+        Assert.Equal(HealthStatus.Unhealthy, report.Status);
+
+        var healthy = report.Entries["Kafka"];
+        Assert.Equal(HealthStatus.Healthy, healthy.Status);
+        Assert.Null(healthy.Description);
+
+        var failed = report.Entries["Database (SQL Server)"];
+        Assert.Equal(HealthStatus.Unhealthy, failed.Status);
+        using var description = JsonDocument.Parse(failed.Description!);
+        Assert.Equal("Unavailable", description.RootElement.GetProperty("Database").GetString());
+        Assert.Equal("Login failed.", description.RootElement.GetProperty("error").GetString());
     }
 
     [Theory]
@@ -79,17 +151,155 @@ public class JavaServiceHealthTests
         Assert.Null(Assert.Single(report.Entries).Value.Description);
     }
 
+    /// <summary>
+    /// A body that is not a health report has to be reported as one entry rather than as none. The
+    /// dashboard renders a row per entry and falls back to "No health check entries available" for
+    /// an empty report, so returning nothing showed the service Unhealthy while explaining nothing.
+    /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task HealthCheck_ReturnsUnhealthyForMalformedResponse(bool measureEval)
+    public async Task HealthCheck_ExplainsAMalformedResponse(bool measureEval)
     {
-        var report = await CheckHealth(measureEval, "not json");
+        var report = await CheckHealth(measureEval, "not json", HttpStatusCode.BadGateway);
 
         Assert.Equal(HealthStatus.Unhealthy, report.Status);
-        Assert.Empty(report.Entries);
+        var entry = Assert.Single(report.Entries);
+        Assert.Equal(SpringServiceHealth.ReadEntry, entry.Key);
+        Assert.Equal(HealthStatus.Unhealthy, entry.Value.Status);
+        // The status code tells a 502 from a gateway apart from a service that answered late.
+        Assert.Contains("502", entry.Value.Description!);
     }
 
+    /// <summary>A parsed report with no components still has to render as something.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_ExplainsAReportWithNoComponents(bool measureEval)
+    {
+        var report = await CheckHealth(measureEval, """{ "status": "UP" }""");
+
+        // The status the service reported is kept; only the missing detail is filled in.
+        Assert.Equal(HealthStatus.Healthy, report.Status);
+        var entry = Assert.Single(report.Entries);
+        Assert.Equal(SpringServiceHealth.ReadEntry, entry.Key);
+        Assert.Contains("no health components", entry.Value.Description!);
+    }
+
+    /// <summary>
+    /// The case that prompted this: MeasureEval answered /health correctly in 6.01s with Kafka down,
+    /// the BFF abandoned it at 5s, and the dashboard lost the MongoDB and Resource Cache rows that
+    /// explained the outage. The deadline now reports itself.
+    /// </summary>
+    [Fact]
+    public async Task HealthCheck_ReportsItsOwnDeadlineRatherThanNothing()
+    {
+        using var client = new HttpClient(new NeverAnswersHandler()) { BaseAddress = new Uri("http://localhost/") };
+
+        var report = await SpringServiceHealth.ReadAsync(client, "Measure Evaluation",
+            TimeSpan.FromMilliseconds(100), NullLogger.Instance, CancellationToken.None);
+
+        Assert.Equal(HealthStatus.Unhealthy, report.Status);
+        var entry = Assert.Single(report.Entries);
+        Assert.Equal(SpringServiceHealth.ReadEntry, entry.Key);
+        Assert.Contains("did not answer", entry.Value.Description!);
+        // Timed, so the dashboard can show where the budget went instead of 00:00:00.
+        Assert.True(report.TotalDuration > TimeSpan.Zero, "the report must carry how long it waited");
+    }
+
+    /// <summary>
+    /// A caller that gave up is not a service that failed. Reporting Unhealthy here would record a
+    /// verdict this check never reached, for a dashboard request that is already gone.
+    /// </summary>
+    [Fact]
+    public async Task HealthCheck_PropagatesCallerCancellation()
+    {
+        using var client = new HttpClient(new NeverAnswersHandler()) { BaseAddress = new Uri("http://localhost/") };
+        using var abandoned = new CancellationTokenSource();
+        await abandoned.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            SpringServiceHealth.ReadAsync(client, "Measure Evaluation", TimeSpan.FromSeconds(5),
+                NullLogger.Instance, abandoned.Token));
+    }
+
+    /// <summary>
+    /// Spring times nothing itself, so each indicator reports its own elapsed time and the BFF
+    /// moves it into the entry. With indicators evaluated sequentially that figure is what says
+    /// which backend spent the budget, and it is not wanted in the description as well -- that
+    /// column is for what the backend said.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_ReportsEachComponentsOwnDuration(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "UP",
+              "components": {
+                "Kafka": {
+                  "status": "UP",
+                  "details": { "Kafka": "Available", "durationMs": 1200 }
+                }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload);
+
+        var entry = Assert.Single(report.Entries);
+        // Taken even though the rest of the details are dropped: the timing is what says which
+        // backend spent the budget, and it is wanted on a healthy row as much as on a failing one.
+        Assert.Equal(TimeSpan.FromMilliseconds(1200), entry.Value.Duration);
+        Assert.Null(entry.Value.Description);
+    }
+
+    /// <summary>
+    /// The duration is lifted out of a failing component's details too, rather than left to appear
+    /// twice -- once in its own column and again inside the description beside the backend detail
+    /// the operator is actually reading.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_KeepsTheDurationOutOfAFailingComponentsDescription(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "DOWN",
+              "components": {
+                "Kafka": {
+                  "status": "DOWN",
+                  "details": { "Kafka": "Unavailable", "durationMs": 1500 }
+                }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload, HttpStatusCode.ServiceUnavailable);
+
+        var entry = Assert.Single(report.Entries);
+        Assert.Equal(TimeSpan.FromMilliseconds(1500), entry.Value.Duration);
+        using var description = JsonDocument.Parse(entry.Value.Description!);
+        Assert.Equal("Unavailable", description.RootElement.GetProperty("Kafka").GetString());
+        Assert.False(description.RootElement.TryGetProperty("durationMs", out _),
+            "the duration belongs in the entry, not repeated in the description");
+    }
+
+    /// <summary>
+    /// An indicator this codebase does not own reports no timing. The row still has to render, and
+    /// a zero duration is the honest answer rather than a fabricated one.
+    /// </summary>
+    [Fact]
+    public async Task HealthCheck_LeavesDurationZeroWhenNoneIsReported()
+    {
+        var report = await CheckHealth(true, """
+            { "status": "UP", "components": { "ping": { "status": "UP" } } }
+            """);
+
+        Assert.Equal(TimeSpan.Zero, Assert.Single(report.Entries).Value.Duration);
+    }
     private static async Task<LinkServiceHealthReport> CheckHealth(
         bool measureEval, string payload, HttpStatusCode statusCode = HttpStatusCode.OK)
     {
@@ -103,7 +313,11 @@ public class JavaServiceHealthTests
         return measureEval
             ? await new MeasureEvalService(NullLogger<MeasureEvalService>.Instance, client, registry)
                 .LinkServiceHealthCheck(CancellationToken.None)
-            : await new ValidationService(NullLogger<ValidationService>.Instance, client, registry)
+            : await new ValidationService(NullLogger<ValidationService>.Instance,
+                                          client,
+                                          registry,
+                                          Options.Create(new AuthenticationSchemaConfig()),
+                                          new Mock<IServiceScopeFactory>().Object)
                 .LinkServiceHealthCheck(CancellationToken.None);
     }
 
@@ -118,6 +332,17 @@ public class JavaServiceHealthTests
             {
                 Content = new StringContent(payload)
             });
+        }
+    }
+
+    /// <summary>Stands in for a service whose indicators outlast the deadline.</summary>
+    private sealed class NeverAnswersHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("unreachable");
         }
     }
 }

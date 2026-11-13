@@ -3,6 +3,8 @@ package com.lantanagroup.link.shared.auth;
 import com.azure.security.keyvault.secrets.SecretClient;
 import com.azure.security.keyvault.secrets.models.KeyVaultSecret;
 import com.lantanagroup.link.shared.config.AuthenticationConfig;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.Optional;
 
 public class JwtAuthenticationFilterTest {
@@ -53,6 +57,43 @@ public class JwtAuthenticationFilterTest {
     Assertions.assertNotNull(SecurityContextHolder.getContext().getAuthentication(),
         "Token signed with the configured signing key should authenticate when no Key Vault is available");
     Assertions.assertNotNull(chain.getRequest(), "Filter chain should proceed");
+  }
+
+  @Test
+  public void noVault_tokenSignedWithOtherKeyIsRejected() throws Exception {
+    AuthenticationConfig config = createConfig(SIGNING_KEY);
+    JwtService jwtService = new JwtService(config);
+    JwtAuthenticationFilter filter = new JwtAuthenticationFilter(config, jwtService, exceptionResolver, Optional.empty());
+
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader("Authorization", "Bearer " + createToken(jwtService, OTHER_KEY));
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+    Assertions.assertNull(SecurityContextHolder.getContext().getAuthentication(),
+        "Token signed with a different key must not authenticate");
+    Assertions.assertNotNull(chain.getRequest(), "Filter chain should proceed unauthenticated");
+  }
+
+  @Test
+  public void noVault_expiredTokenIsRejected() throws Exception {
+    AuthenticationConfig config = createConfig(SIGNING_KEY);
+    JwtService jwtService = new JwtService(config);
+    JwtAuthenticationFilter filter = new JwtAuthenticationFilter(config, jwtService, exceptionResolver, Optional.empty());
+
+    String expired = Jwts.builder()
+        .subject(JwtService.LinkUserClaims_LinkSystemAccount)
+        .expiration(new Date(System.currentTimeMillis() - 60_000))
+        .signWith(Keys.hmacShaKeyFor(SIGNING_KEY.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS512)
+        .compact();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader("Authorization", "Bearer " + expired);
+
+    filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+    Assertions.assertNull(SecurityContextHolder.getContext().getAuthentication(),
+        "An expired token must not authenticate");
   }
 
   @Test

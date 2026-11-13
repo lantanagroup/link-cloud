@@ -18,7 +18,7 @@ using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionCo
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data/{facilityId}")]
+[Route("api/data-acquisition/{facilityId}")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class QueryPlanConfigController : Controller

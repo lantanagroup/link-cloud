@@ -8,6 +8,7 @@ using LantanaGroup.Link.MockDmrpApi.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -84,7 +85,7 @@ var healthChecks = builder.Services.AddHealthChecks();
 
 if (enabled)
 {
-    healthChecks.AddDbContextCheck<ReportingPlanDbContext>("database");
+    healthChecks.AddDbContextCheck<ReportingPlanDbContext>(HealthCheckNames.SqlServerDatabase);
 }
 
 var app = builder.Build();

@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lantanagroup.link</groupId>
         <artifactId>main</artifactId>
-        <version>0.8.0</version>
+        <version>0.8.1</version>
     </parent>
 
     <artifactId>measureeval</artifactId>
@@ -123,11 +123,6 @@
         </dependency>
 
 
-        <!-- for logback to use conditional expressions -->
-        <dependency>
-            <groupId>org.codehaus.janino</groupId>
-            <artifactId>janino</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-core</artifactId>

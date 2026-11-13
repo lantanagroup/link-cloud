@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data")]
+[Route("api/data-acquisition")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 [Tags("SftpConfiguration")]

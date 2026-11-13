@@ -18,8 +18,10 @@ namespace IntegrationTests.Report.Managers;
 [Collection("ReportPopulationLocalDb")]
 public sealed class ReportPopulationMigrationTests
 {
-    private const string PreviousMigration = "20260827211554_AddReportEntryMappingOutcome";
-    private const string ThisMigration = "20261008152257_UniqueReportPopulationKeys";
+    // The pre-unique schema is the retention migration. That schema already has the
+    // schedule columns this entity writes, and the unique-key migration is the one after it.
+    private const string PreviousMigration = "20261105193129_AddRetentionCleanupRecord";
+    private const string ThisMigration = "20261112192221_UniqueReportPopulationKeys";
 
     [LocalDbFact]
     public async Task Migration_CollapsesDuplicates_AndLeavesUntouchedTotals()

@@ -25,6 +25,8 @@ public class MetricsRunPresenterTests
         item.StagesUnavailable.Should().BeTrue();
         item.E2eDurationSeconds.Should().Be(90);
         item.BenchmarkPass.Should().BeTrue();
+        item.PatientCount.Should().Be(15);
+        item.PatientCountText.Should().Be("15");
     }
 
     [Fact]
@@ -90,7 +92,7 @@ public class MetricsRunPresenterTests
             {
                 Service = "Data Acquisition",
                 Method = "GET",
-                Route = "api/data/{facilityId}/QueryPlan",
+                Route = "api/data-acquisition/{facilityId}/QueryPlan",
                 P95Ms = 220,
                 Count = 12
             }

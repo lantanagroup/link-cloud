@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Audit.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.4")
+                .HasAnnotation("ProductVersion", "8.0.27")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -518,6 +518,10 @@ namespace LantanaGroup.Link.Audit.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("MISFIRE_INSTR");
 
+                    b.Property<long?>("MisfireOriginalFireTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("MISFIRE_ORIG_FIRE_TIME");
+
                     b.Property<long?>("NextFireTime")
                         .HasColumnType("bigint")
                         .HasColumnName("NEXT_FIRE_TIME");
@@ -598,8 +602,14 @@ namespace LantanaGroup.Link.Audit.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PatientId")
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Resource")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResourceId")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ServiceName")
                         .HasMaxLength(100)
@@ -622,6 +632,10 @@ namespace LantanaGroup.Link.Audit.Migrations
                     b.HasIndex("EventDate");
 
                     b.HasIndex("FacilityId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("ResourceId");
 
                     b.HasIndex("ServiceName");
 
@@ -696,6 +710,9 @@ namespace LantanaGroup.Link.Audit.Migrations
                                 .ValueGeneratedOnAdd()
                                 .HasColumnType("int");
 
+                            b1.Property<string>("Entity")
+                                .HasColumnType("nvarchar(max)");
+
                             b1.Property<string>("InitialPropertyValue")
                                 .IsRequired()
                                 .HasColumnType("nvarchar(max)");
@@ -706,6 +723,9 @@ namespace LantanaGroup.Link.Audit.Migrations
 
                             b1.Property<string>("PropertyName")
                                 .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<string>("RowKey")
                                 .HasColumnType("nvarchar(max)");
 
                             b1.HasKey("AuditLogId", "Id");

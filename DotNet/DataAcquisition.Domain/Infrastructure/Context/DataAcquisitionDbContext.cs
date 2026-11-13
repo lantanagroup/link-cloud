@@ -101,11 +101,6 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-            entity.Property(b => b.Authentication)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions()));
-
             var ehrPatientListComparer = new ValueComparer<List<EhrPatientList>>(
                 (c1, c2) => c1.SequenceEqual(c2),
                 c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),

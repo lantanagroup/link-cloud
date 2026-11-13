@@ -3,7 +3,6 @@ package com.lantanagroup.link.shared.auth;
 import com.lantanagroup.link.shared.config.AuthenticationConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -85,7 +84,7 @@ public class JwtService {
   //for retrieving any information from token we will need the secret key
   public Claims getAllClaimsFromToken (String token, String secret) {
     SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-    return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+    return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
   }
 
   //check if the token has expired
@@ -136,14 +135,19 @@ public class JwtService {
     }
 
     SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-    return Jwts.builder().setHeaderParam("typ","JWT")
-            .setClaims(claims)
-            .setSubject(subject).
-             setIssuedAt(new Date(System.currentTimeMillis()))
-            .setIssuer(this.authenticationConfig.getAuthority())
-            .setAudience(Audiences)
-            .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
-            .signWith(key, SignatureAlgorithm.HS512)
+    // single() is deprecated, but it keeps aud the plain string 0.11 wrote; add() makes it an array.
+    return Jwts.builder()
+            .header()
+            .add("typ", "JWT")
+            .and()
+            .claims(claims)
+            .subject(subject)
+            .issuedAt(new Date(System.currentTimeMillis()))
+            .issuer(this.authenticationConfig.getAuthority())
+            .audience()
+            .single(Audiences)
+            .expiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
+            .signWith(key, Jwts.SIG.HS512)
             .compact();
   }
 

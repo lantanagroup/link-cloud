@@ -18,7 +18,7 @@ export class SftpAcquisitionLogService {
   ) { }
 
   get baseUrl(): string {
-    return `${this.appConfigService.config?.baseApiUrl}/data/sftp-logs`;
+    return `${this.appConfigService.config?.baseApiUrl}/data-acquisition/sftp-logs`;
   }
 
   getSftpAcquisitionLogs(

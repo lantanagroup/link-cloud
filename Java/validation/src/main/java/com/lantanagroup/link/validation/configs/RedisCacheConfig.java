@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.lantanagroup.link.validation.providers.RubricCacheService;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
 import org.slf4j.Logger;
@@ -58,7 +59,7 @@ public class RedisCacheConfig {
 
         // Bound Redis commands and socket connects so cache ops (and the health indicator that uses
         // this factory) fail fast when Redis is unreachable, instead of blocking on Lettuce's ~60s
-        // default. Keeps the BFF's 5s health-check window from timing out and showing every column N/A.
+        // default. Keeps the BFF's health-check window from timing out and showing every column N/A.
         SocketOptions socketOptions = SocketOptions.builder()
                 .connectTimeout(Duration.ofSeconds(1))
                 .build();
@@ -80,8 +81,15 @@ public class RedisCacheConfig {
     @Bean
     public CacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory, RedisCacheConfiguration redisCacheConfiguration) {
         logger.info("Cache type set to 'redis'");
+        // deliberately not .transactionAware() — its deferred evicts run outside the cache
+        // error handler, so a redis outage would 500 lifecycle calls whose commit already
+        // went through. RubricCacheService defers its own evictions to after-commit instead.
+        RedisCacheConfiguration rubricConfiguration = redisCacheConfiguration
+                .entryTtl(Duration.ofSeconds(this.cacheConfig.getRubric().getTtl()));
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration)
+                .withCacheConfiguration(RubricCacheService.VERSION_CACHE, rubricConfiguration)
+                .withCacheConfiguration(RubricCacheService.LATEST_SEMVER_CACHE, rubricConfiguration)
                 .build();
     }
 

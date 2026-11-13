@@ -1,7 +1,9 @@
 ﻿using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
@@ -19,7 +21,7 @@ using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionCo
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data")]
+[Route("api/data-acquisition")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class SftpConfigurationController : Controller
@@ -27,6 +29,7 @@ public class SftpConfigurationController : Controller
     private readonly ILogger<SftpConfigurationController> _logger;
     private readonly ISftpConfigurationManager _sftpConfigurationManager;
     private readonly ISftpConfigurationQueries _sftpConfigurationQueries;
+    private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
     private readonly ISftpCredentialService _sftpCredentialService;
     private readonly ITenantApiService _tenantApiService;
     private readonly IValidator<CreateSftpConfigurationModel> _createValidator;
@@ -36,6 +39,7 @@ public class SftpConfigurationController : Controller
         ILogger<SftpConfigurationController> logger,
         ISftpConfigurationManager sftpConfigurationManager,
         ISftpConfigurationQueries sftpConfigurationQueries,
+        IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
         ISftpCredentialService sftpCredentialService,
         ITenantApiService tenantApiService,
         IValidator<CreateSftpConfigurationModel> createValidator,
@@ -44,6 +48,7 @@ public class SftpConfigurationController : Controller
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _sftpConfigurationManager = sftpConfigurationManager ?? throw new ArgumentNullException(nameof(sftpConfigurationManager));
         _sftpConfigurationQueries = sftpConfigurationQueries ?? throw new ArgumentNullException(nameof(sftpConfigurationQueries));
+        _fhirQueryConfigurationQueries = fhirQueryConfigurationQueries ?? throw new ArgumentNullException(nameof(fhirQueryConfigurationQueries));
         _sftpCredentialService = sftpCredentialService ?? throw new ArgumentNullException(nameof(sftpCredentialService));
         _tenantApiService = tenantApiService ?? throw new ArgumentNullException(nameof(tenantApiService));
         _createValidator = createValidator ?? throw new ArgumentNullException(nameof(createValidator));
@@ -206,6 +211,11 @@ public class SftpConfigurationController : Controller
                 return NotFound($"No facility found for organizationId: {organizationId}");
             }
 
+            if (await ValidateMrnSearchHasFhirQueryConfiguration(organizationId, sftpConfiguration.AcquisitionConfigurations, cancellationToken) is { } mrnSearchError)
+            {
+                return mrnSearchError;
+            }
+
             // Default AuthType to Basic until other authentication options are supported
             sftpConfiguration.AuthenticationProtocol = AuthType.Basic;
 
@@ -326,6 +336,11 @@ public class SftpConfigurationController : Controller
             }
 
             organizationId = organizationId.SanitizeAndRemove();
+
+            if (await ValidateMrnSearchHasFhirQueryConfiguration(organizationId, sftpConfiguration.AcquisitionConfigurations, cancellationToken) is { } mrnSearchError)
+            {
+                return mrnSearchError;
+            }
 
             var result = await _sftpConfigurationManager.UpdateAsync(organizationId, sftpConfiguration, cancellationToken);
 
@@ -729,4 +744,48 @@ public class SftpConfigurationController : Controller
     }
 
     #endregion
+
+    /// <summary>
+    /// An ADT acquisition that finds the Patient.Id by MRN search queries the facility's FHIR server, which comes from its
+    /// FHIR Query Configuration. Without one, every acquisition run would fail, so the configuration is rejected here.
+    /// </summary>
+    /// <returns>A 400 result naming the acquisition configuration, or null when the configuration is acceptable.</returns>
+    private async Task<ActionResult?> ValidateMrnSearchHasFhirQueryConfiguration(
+        string facilityId,
+        List<SftpAcquisitionTypeConfiguration>? acquisitionConfigurations,
+        CancellationToken cancellationToken)
+    {
+        var mrnSearchIndexes = (acquisitionConfigurations ?? [])
+            .Select((config, index) => (config, index))
+            .Where(x => x.config.SubType == SftpAcquisitionSubType.HL7ADT
+                && !string.IsNullOrWhiteSpace(x.config.AdtConfiguration?.MrnIdentifierSystem))
+            .Select(x => x.index)
+            .ToList();
+
+        if (mrnSearchIndexes.Count == 0
+            || await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken) is not null)
+        {
+            return null;
+        }
+
+        const string message =
+            "ADT Patient MRN search queries the facility's FHIR server. Add a FHIR Query Configuration for the facility before saving, or use the Patient.Id on the ADT event instead.";
+
+        foreach (var index in mrnSearchIndexes)
+        {
+            ModelState.AddModelError(
+                $"{nameof(SftpConfigurationModel.AcquisitionConfigurations)}[{index}].{nameof(SftpAcquisitionTypeConfiguration.AdtConfiguration)}.{nameof(AdtConfiguration.MrnIdentifierSystem)}",
+                message);
+        }
+
+        var problem = new ValidationProblemDetails(ModelState)
+        {
+            Title = "One or more validation errors occurred.",
+            Status = StatusCodes.Status400BadRequest,
+            Detail = message,
+        };
+        problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
+
+        return BadRequest(problem);
+    }
 }

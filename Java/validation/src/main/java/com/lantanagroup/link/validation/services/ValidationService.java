@@ -11,7 +11,6 @@ import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
 import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.*;
-import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -25,8 +24,11 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 /**
  * Holds a single {@link FhirValidator} (and the {@link ValidationSupportChain} whose cache backs it) across
@@ -105,9 +107,12 @@ public class ValidationService {
 
         // The chain caches internally; CachingValidationSupport is deprecated for removal and would only add a
         // second cache layer.
-        IValidatorModule validatorModule = new FhirInstanceValidator(validationSupportChain);
+        IValidatorModule validatorModule = new ProfileCapturingInstanceValidator(validationSupportChain);
         FhirValidator fhirValidator = new FhirValidator(fhirContext);
         fhirValidator.registerValidatorModule(validatorModule);
+        // Required for profile attribution, not just throughput: concurrent validation validates each entry
+        // standalone, which is what keeps each message's validationContext accurate. Validating the bundle in one
+        // pass misattributes findings to whichever profile was evaluated last. See LEGLINK-1172.
         fhirValidator.setConcurrentBundleValidation(true);
         fhirValidator.setExecutorService(bundleValidationExecutor);
         return fhirValidator;
@@ -116,8 +121,9 @@ public class ValidationService {
     private record ValidatorState(ArtifactValidationSupport artifactSupport, FhirValidator validator) {
     }
 
-    // Package-private for unit testing of the terminology support chain composition.
-    static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain, ValidationCacheService validationCacheService) {
+    // Public so FhirConfig can compose the rubric engine's chain from the same terminology
+    // supports (same remote support, same order, same whitelists) as this legacy validator.
+    public static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain, ValidationCacheService validationCacheService) {
         if (linkConfig.getFhirTerminologyServiceUrl() != null && !linkConfig.getFhirTerminologyServiceUrl().isEmpty()) {
             var remoteTerm = new RemoteTermServiceValidation(validationCacheService, fhirContext, linkConfig.getFhirTerminologyServiceUrl(), linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
             validationSupportChain.addValidationSupport(remoteTerm);
@@ -164,7 +170,13 @@ public class ValidationService {
             List<Result> results = validationResult.getMessages().stream()
                     .map(Result::fromMessage)
                     .toList();
-            return validationResultIgnoreService.filterIgnored(deduplicateInactiveResults(results));
+            List<Result> deduplicated = deduplicateInactiveResults(results);
+            Map<String, Long> bySeverity = deduplicated.stream()
+                    .collect(Collectors.groupingBy(
+                            r -> String.valueOf(r.getSeverity()), TreeMap::new, Collectors.counting()));
+            logger.info("HAPI validation (legacy) returned {} findings ({} after inactive-dedup); severities {} are raw HAPI output — the legacy path applies no category/severity overrides",
+                    results.size(), deduplicated.size(), bySeverity);
+            return validationResultIgnoreService.filterIgnored(deduplicated);
         } catch (Exception ex) {
             logger.error("Validation failed", ex);
             throw ex;

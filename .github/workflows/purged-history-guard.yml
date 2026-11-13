@@ -1,0 +1,80 @@
+name: "Purged History Guard"
+
+# LEGLINK-912. Periodically checks every branch and tag for history under the paths below, and
+# fails if it finds any.
+#
+# Runs only when the repository variable PURGED_HISTORY_GUARD is `enforce`; unset or any other
+# value skips it. Failures post to the PURGED_HISTORY_ALERT_WEBHOOK secret, when set.
+# Logs here are public: print commit IDs, subjects and ref names only, never file contents.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+# Reads this repository and nothing else; the alert goes out through a webhook, not the token.
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    name: Purged App Config sweep
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report that the sweep is not enforced yet
+        if: vars.PURGED_HISTORY_GUARD != 'enforce'
+        run: echo "::notice::Skipped. Set the repository variable PURGED_HISTORY_GUARD to enforce to run it."
+
+      # Every branch and tag with full history, but no file contents: commits and trees are enough.
+      - name: Fetch every branch and tag
+        if: vars.PURGED_HISTORY_GUARD == 'enforce'
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: .github
+
+      - name: Check every branch and tag
+        if: vars.PURGED_HISTORY_GUARD == 'enforce'
+        shell: bash
+        run: |
+          paths=(Config/ .env)
+
+          # --full-history follows every parent of a merge, not only one that matches at these paths.
+          offenders=$(git rev-list --full-history --remotes=origin --tags -- "${paths[@]}")
+          if [ -z "$offenders" ]; then
+            echo "No branch or tag has history touching ${paths[*]}."
+            exit 0
+          fi
+
+          echo "::error::Found history touching ${paths[*]}. See LEGLINK-912."
+          printf '%s\n' "$offenders" | head -20 | while read -r commit; do
+            echo "    $(git log -1 --format='%h %ad %s' --date=short "$commit" | cut -c1-100)"
+          done
+
+          echo ""
+          echo "Branches and tags that carry them:"
+          git for-each-ref --format='%(objectname) %(refname:short)' refs/remotes/origin refs/tags |
+            while read -r object ref; do
+              if [ "$ref" = "origin/HEAD" ] || [ "$ref" = "origin" ]; then
+                continue
+              fi
+              if [ -n "$(git rev-list --full-history -1 "$object" -- "${paths[@]}")" ]; then
+                echo "    $ref"
+              fi
+            done
+          exit 1
+
+      - name: Alert the rewrite coordinator
+        if: failure()
+        env:
+          ALERT_WEBHOOK: ${{ secrets.PURGED_HISTORY_ALERT_WEBHOOK }}
+          ALERT_TEXT: >-
+            Purged History Guard failed:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$ALERT_WEBHOOK" ]; then
+            echo "No alert webhook configured."
+            exit 0
+          fi
+          jq -n --arg text "$ALERT_TEXT" '{text: $text}' |
+            curl -fsS -X POST -H 'Content-Type: application/json' --data @- "$ALERT_WEBHOOK" > /dev/null

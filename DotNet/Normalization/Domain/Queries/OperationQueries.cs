@@ -145,12 +145,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             var pageNumber = model.PageNumber ?? 1;
             var pageSize = model.PageSize ?? 10;
 
-            var count = await query.CountAsync(cancellationToken);
-
-            var records = await query
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+            // Outside a caller transaction, retry a deadlock victim. Under locking reads this
+            // search shares pages with uncommitted creates and the API turns the victim into HTTP 500.
+            var (count, records) = await ReadWithoutDeadlockAsync(async () =>
+            {
+                var count = await query.CountAsync(cancellationToken);
+                var records = await query
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync(cancellationToken);
+                return (count, records);
+            }, cancellationToken);
 
             if (hydrateVendors)
             {
@@ -203,6 +208,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             }
 
             return query.Select(operation => operation.Id).ToListAsync(cancellationToken);
+        }
+
+        private Task<T> ReadWithoutDeadlockAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+        {
+            if (_dbContext.Database.CurrentTransaction != null)
+            {
+                return action();
+            }
+
+            return SqlDeadlock.ExecuteReadAsync(action, cancellationToken);
         }
 
         private async Task HydrateVendorVersionsAsync(IEnumerable<OperationModel> operations, CancellationToken cancellationToken)

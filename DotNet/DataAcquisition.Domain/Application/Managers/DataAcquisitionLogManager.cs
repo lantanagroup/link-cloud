@@ -355,7 +355,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (completionTimeMs is not null)
             activity?.SetTag(DiagnosticNames.Duration, completionTimeMs);
 
-        // 1. Atomic scalar update ? single DB round-trip
+        // 1. Scalar fields except Status (Status is published last, step 5)
         var updated = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Id == logId)
             .ExecuteUpdateAsync(setters => setters
@@ -364,7 +364,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .SetProperty(l => l.ExecutionDate, l => executionDate ?? l.ExecutionDate)
                 .SetProperty(l => l.CompletionDate, l => completionDate ?? l.CompletionDate)
                 .SetProperty(l => l.CompletionTimeMilliseconds, l => completionTimeMs ?? l.CompletionTimeMilliseconds)
-                .SetProperty(l => l.Status, l => status ?? l.Status)
                 .SetProperty(l => l.ModifyDate, now),
             cancellationToken);
 
@@ -409,6 +408,20 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (_dbContext.ChangeTracker.HasChanges())
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        // 5. Status last. A terminal status is what TryCompleteTailAsync waits for, and the tail builds
+        // ResourcesAcquired.CacheKeys from this log's resource-id rows. Publishing the status before those
+        // rows were saved let a sibling finishing at the same moment claim the tail without this log's
+        // resource type, silently dropping it from the pipeline (run 24d4820a lost 27 Observations).
+        if (status is not null)
+        {
+            await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Id == logId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, status)
+                    .SetProperty(l => l.ModifyDate, now),
+                    cancellationToken);
         }
 
         // No reload here - hot path under load. Callers that need fresh state

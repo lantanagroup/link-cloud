@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.services;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.CanonicalType;
 import org.hl7.fhir.r4.model.CodeType;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Extension;
@@ -23,8 +24,8 @@ import java.util.UUID;
 
 /**
  * Builds the single pre-qualification {@link OperationOutcome} written to the patient NDJSON: one issue
- * per <em>submitted</em> category (a category with {@code submit=true}) that has at least one
- * finding. See LEGLINK-425.
+ * per <em>submitted</em> category (a category with {@code submit=true}) and source profile that has at
+ * least one finding. See LEGLINK-425 and LEGLINK-1172.
  */
 @Component
 public class PreQualOperationOutcomeBuilder {
@@ -32,6 +33,8 @@ public class PreQualOperationOutcomeBuilder {
 
     /** Extension URL carrying the category id on each issue. */
     static final String PQ_ISSUE_CAT_URL = "http://hl7.org/fhir/us/core/StructureDefinition/pq-issue-cat";
+    /** Extension URL carrying the source profile canonical on each issue; omitted for findings with no profile. */
+    static final String PQ_ISSUE_PROFILE_URL = "http://nhsnlink.org/pq-issue-profile";
     /** Extension URL carrying the total issue count on the OperationOutcome. */
     static final String OO_TOTAL_URL = "http://nhsnlink.org/oo-total";
     /**
@@ -50,6 +53,13 @@ public class PreQualOperationOutcomeBuilder {
     }
 
     /**
+     * Groups findings into issues. {@code profile} is null for findings that belong to no profile; records
+     * compare components with {@code Objects.equals}, so those still group together.
+     */
+    private record IssueKey(String categoryId, String profile) {
+    }
+
+    /**
      * Builds the OperationOutcome for a patient's categorized findings.
      *
      * @param results          the patient's categorized validation results
@@ -58,13 +68,14 @@ public class PreQualOperationOutcomeBuilder {
          * @return the OperationOutcome, or {@link Optional#empty()} when no submitted-category findings exist
      */
     public Optional<OperationOutcome> build(List<Result> results, MeasureReportRef measureReport, boolean writeExpressions) {
-                // Group findings by submitted category (submit == true); a Result may map to several
-        // categories. Keyed by category id, not by the Category entity: Category defines no
+                // Group findings by submitted category (submit == true) and source profile; a Result may map to
+        // several categories. Keyed by category id, not by the Category entity: Category defines no
         // equals/hashCode, so two instances of the same logical category (loaded in different
         // persistence contexts, say) would otherwise land in separate groups and emit a duplicate issue
-        // for that category, inflating oo-total. LinkedHashMap keeps issue order deterministic
-        // (first-seen category order).
-        Map<String, List<Result>> byCategoryId = new LinkedHashMap<>();
+        // for that category, inflating oo-total. The profile is part of the key so that findings from,
+        // say, a lab and a vitals Observation in the same category stay distinguishable. LinkedHashMap
+        // keeps issue order deterministic (first-seen order).
+        Map<IssueKey, List<Result>> byIssueKey = new LinkedHashMap<>();
         for (Result result : results) {
             List<Category> categories = result.getCategories();
             if (categories == null) {
@@ -72,20 +83,21 @@ public class PreQualOperationOutcomeBuilder {
             }
             for (Category category : categories) {
                 if (category.isSubmit()) {
-                    byCategoryId.computeIfAbsent(category.getId(), id -> new ArrayList<>()).add(result);
+                    byIssueKey.computeIfAbsent(new IssueKey(category.getId(), result.getProfile()), key -> new ArrayList<>())
+                            .add(result);
                 }
             }
         }
 
-        if (byCategoryId.isEmpty()) {
+        if (byIssueKey.isEmpty()) {
             return Optional.empty();
         }
 
         OperationOutcome operationOutcome = new OperationOutcome();
         operationOutcome.setId(UUID.randomUUID().toString());
 
-        for (Map.Entry<String, List<Result>> entry : byCategoryId.entrySet()) {
-            String categoryId = entry.getKey();
+        for (Map.Entry<IssueKey, List<Result>> entry : byIssueKey.entrySet()) {
+            IssueKey key = entry.getKey();
             List<Result> categoryResults = entry.getValue();
 
             OperationOutcome.OperationOutcomeIssueComponent issue = operationOutcome.addIssue()
@@ -93,7 +105,10 @@ public class PreQualOperationOutcomeBuilder {
                     .setCode(OperationOutcome.IssueType.PROCESSING)
                     .setDetails(new CodeableConcept().setText(categoryResults.get(0).getMessage()));
 
-            issue.addExtension(new Extension(PQ_ISSUE_CAT_URL, new CodeType(categoryId)));
+            issue.addExtension(new Extension(PQ_ISSUE_CAT_URL, new CodeType(key.categoryId())));
+            if (key.profile() != null) {
+                issue.addExtension(new Extension(PQ_ISSUE_PROFILE_URL, new CanonicalType(key.profile())));
+            }
 
             if (writeExpressions) {
                 // The id is checked as well as the ref: a MeasureReport carrying no id yields a non-null

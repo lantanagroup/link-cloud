@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lantanagroup.link</groupId>
         <artifactId>main</artifactId>
-        <version>0.8.0</version>
+        <version>0.8.1</version>
     </parent>
 
     <artifactId>shared</artifactId>
@@ -69,11 +69,6 @@
         </dependency>
 
         <dependency>
-            <groupId>com.auth0</groupId>
-            <artifactId>java-jwt</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>com.azure.spring</groupId>
             <artifactId>spring-cloud-azure-appconfiguration-config-web</artifactId>
         </dependency>
@@ -101,6 +96,16 @@
         <dependency>
             <groupId>com.github.loki4j</groupId>
             <artifactId>loki-logback-appender</artifactId>
+        </dependency>
+
+        <!--
+          RestClient picks Apache HttpComponents when it is on the classpath. HAPI FHIR 8.12 stopped
+          bringing it in, which would silently switch ReportClient to Reactor Netty.
+        -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>

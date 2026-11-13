@@ -1,0 +1,155 @@
+package com.lantanagroup.link.validation.services.execution.executors;
+
+import ca.uhn.fhir.fhirpath.IFhirPath;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.entities.RubricCheck;
+import com.lantanagroup.link.validation.enums.CheckType;
+import com.lantanagroup.link.validation.enums.Severity;
+import com.lantanagroup.link.validation.models.ExecutionContext;
+import com.lantanagroup.link.validation.models.RawFinding;
+import com.lantanagroup.link.validation.services.execution.CheckExecutor;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.BooleanType;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class FhirPathCheckExecutor implements CheckExecutor {
+
+    private final IFhirPath fhirPath;
+    private final ObjectMapper objectMapper;
+
+    @Override
+    public CheckType supports() {
+        return CheckType.FHIRPATH;
+    }
+
+    @Override
+    public List<RawFinding> execute(RubricCheck check, ExecutionContext context) {
+        if (check.getParametersJson() == null) {
+            log.warn("FHIRPATH check {} missing parameters", check.getCheckLocalId());
+            return Collections.emptyList();
+        }
+        final JsonNode params;
+        try {
+            params = objectMapper.readTree(check.getParametersJson());
+        } catch (Exception e) {
+            log.error("FHIRPATH check {} has invalid parameters JSON", check.getCheckLocalId(), e);
+            return Collections.emptyList();
+        }
+
+        String expression = params.path("expression").asText(null);
+        if (expression == null || expression.isBlank()) {
+            log.warn("FHIRPATH check {} missing expression", check.getCheckLocalId());
+            return Collections.emptyList();
+        }
+
+        List<IBaseResource> targets = resolveTargets(context, expression);
+        if (targets.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String failureMessage = params.path("failureMessage").asText("FHIRPath assertion failed: " + expression);
+        String code = params.path("code").asText("fhirpath-assertion-failed");
+        Severity severity = check.getSeverityOverride() != null ? check.getSeverityOverride() : Severity.ERROR;
+
+        List<RawFinding> findings = new ArrayList<>();
+        for (IBaseResource target : targets) {
+            try {
+                boolean passed = fhirPath.evaluateFirst(target, expression, BooleanType.class)
+                        .map(BooleanType::booleanValue)
+                        .orElse(false);
+                if (!passed) {
+                    findings.add(RawFinding.builder()
+                            .checkLocalId(check.getCheckLocalId())
+                            .dimension(check.getDimension())
+                            .severity(severity)
+                            .code(code)
+                            .message(failureMessage)
+                            .location(resourceLocation(target))
+                            .expression(expression)
+                            .build());
+                }
+            } catch (Exception e) {
+                log.error("FHIRPATH evaluation failed for check {}: {}", check.getCheckLocalId(), e.getMessage());
+                findings.add(RawFinding.builder()
+                        .checkLocalId(check.getCheckLocalId())
+                        .dimension(check.getDimension())
+                        .severity(Severity.ERROR)
+                        .code("fhirpath-evaluation-error")
+                        .message("FHIRPath evaluation error: " + e.getMessage())
+                        .location(resourceLocation(target))
+                        .expression(expression)
+                        .build());
+            }
+        }
+        return findings;
+    }
+
+    private List<IBaseResource> resolveTargets(ExecutionContext context, String expression) {
+        if (context.getBundleEntries().isEmpty()) {
+            IBaseResource root = context.getResource();
+            if (root == null) {
+                return Collections.emptyList();
+            }
+
+            if ("Bundle".equals(root.fhirType())) {
+                return "Bundle".equals(leadingResourceType(expression))
+                        ? List.of(root)
+                        : Collections.emptyList();
+            }
+
+            String singleType = leadingResourceType(expression);
+            if (singleType == null || singleType.equals(root.fhirType())) {
+                return List.of(root);
+            }
+            return Collections.emptyList();
+        }
+
+        String resourceType = leadingResourceType(expression);
+        if (resourceType == null) {
+            return context.getBundleEntries();
+        }
+
+        IBaseResource root = context.getResource();
+        if (root != null && resourceType.equals(root.fhirType())) {
+            return List.of(root);
+        }
+        return context.getBundleEntries().stream()
+                .filter(e -> e.fhirType().equals(resourceType))
+                .collect(Collectors.toList());
+    }
+
+    private String leadingResourceType(String expression) {
+        int i = 0;
+        while (i < expression.length()
+                && (Character.isWhitespace(expression.charAt(i)) || expression.charAt(i) == '(')) {
+            i++;
+        }
+        int start = i;
+        while (i < expression.length()
+                && (Character.isLetterOrDigit(expression.charAt(i)) || expression.charAt(i) == '_')) {
+            i++;
+        }
+
+        if (start == i || i >= expression.length() || expression.charAt(i) != '.') {
+            return null;
+        }
+        String token = expression.substring(start, i);
+        return Character.isUpperCase(token.charAt(0)) ? token : null;
+    }
+
+    private String resourceLocation(IBaseResource resource) {
+        String id = resource.getIdElement() != null ? resource.getIdElement().getIdPart() : null;
+        return (id != null && !id.isBlank()) ? resource.fhirType() + "/" + id : resource.fhirType();
+    }
+}
