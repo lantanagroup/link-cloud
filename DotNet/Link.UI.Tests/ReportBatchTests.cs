@@ -583,6 +583,42 @@ public class ReportBatchTests
     }
 
     [Fact]
+    public async Task A_closed_batch_badge_follows_its_items()
+    {
+        var batches = new MemoryBatches();
+        var succeeded = ClosedBatch("local", ReportBatchItemStatus.Succeeded, ReportBatchItemStatus.Succeeded);
+        var failed = ClosedBatch("sandbox", ReportBatchItemStatus.Failed, ReportBatchItemStatus.Failed);
+        var mixed = ClosedBatch("clinic", ReportBatchItemStatus.Succeeded, ReportBatchItemStatus.Failed);
+        await batches.InsertAsync(succeeded);
+        await batches.InsertAsync(failed);
+        await batches.InsertAsync(mixed);
+        var controller = Tracking(batches);
+
+        var ok = await BatchPage(controller, succeeded.BatchId);
+        ok.Status.Should().Be(ReportBatchDisplay.Completed);
+        ok.PillClass.Should().Be("au-badge-success");
+
+        var bad = await BatchPage(controller, failed.BatchId);
+        bad.Status.Should().Be(ReportBatchDisplay.Failed);
+        bad.PillClass.Should().Be("au-badge-danger");
+
+        var some = await BatchPage(controller, mixed.BatchId);
+        some.Status.Should().Be(ReportBatchDisplay.Partial);
+        some.PillClass.Should().Be("au-badge-warning");
+
+        var history = await controller.History(CancellationToken.None);
+        var rows = history.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchHistoryPage>().Subject
+            .Groups.SelectMany(group => group.Batches).ToList();
+        rows.Single(row => row.BatchId == succeeded.BatchId).Status.Should().Be(ReportBatchDisplay.Completed);
+        rows.Single(row => row.BatchId == succeeded.BatchId).PillClass.Should().Be("au-badge-success");
+        rows.Single(row => row.BatchId == failed.BatchId).Status.Should().Be(ReportBatchDisplay.Failed);
+        rows.Single(row => row.BatchId == failed.BatchId).PillClass.Should().Be("au-badge-danger");
+        rows.Single(row => row.BatchId == mixed.BatchId).Status.Should().Be(ReportBatchDisplay.Partial);
+        rows.Single(row => row.BatchId == mixed.BatchId).PillClass.Should().Be("au-badge-warning");
+    }
+
+    [Fact]
     public async Task Cancel_on_the_tracking_page_stops_an_open_batch()
     {
         var harness = Harness();
@@ -840,6 +876,29 @@ public class ReportBatchTests
         if (service is ReportBatchDispatcher dispatcher)
             services.AddSingleton(dispatcher);
         return services.BuildServiceProvider();
+    }
+
+    private static ReportBatchDocument ClosedBatch(string ehr, params string[] itemStatuses)
+        => new()
+        {
+            BatchId = Guid.NewGuid(),
+            EhrSystem = ehr,
+            Status = ReportBatchStatus.Completed,
+            CreatedAt = DateTimeOffset.Parse("2026-11-12T16:00:00Z"),
+            Items = itemStatuses.Select((status, index) => new ReportBatchItemDocument
+            {
+                Ordinal = index,
+                ScenarioId = Guid.NewGuid(),
+                ScenarioName = "scenario-" + index,
+                Status = status
+            }).ToList()
+        };
+
+    private static async Task<ReportBatchTrackingModel> BatchPage(ReportBatchTrackingController controller, Guid batchId)
+    {
+        var page = await controller.Detail(batchId, CancellationToken.None);
+        return page.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<ReportBatchTrackingPage>().Subject.Batch!;
     }
 
     private static ReportBatchTrackingController Tracking(MemoryBatches? batches, ReportBatchDispatcher? dispatcher = null)
