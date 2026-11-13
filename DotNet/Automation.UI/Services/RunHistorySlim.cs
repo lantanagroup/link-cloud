@@ -147,7 +147,7 @@ public static class RunHistorySlim
     private static bool IsFailureStatus(string status)
         => status.Contains("fail", StringComparison.OrdinalIgnoreCase)
             || status.Contains("error", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("MaxRetriesReached", StringComparison.OrdinalIgnoreCase);
+            || AcquisitionTerminalFailures.IsTerminalFailure(status);
 
     private static AcquisitionLogFailure FailureSample(PipelineDataReader.AcquisitionLogInfo log, string status)
     {
@@ -262,6 +262,12 @@ public static class RunHistorySlim
             StepsCollapsed = false,
             OmittedStepCount = source.ParsedSteps?.Count ?? 0,
             EvidenceChunkCount = 0,
+            GeneratedPatientCount = source.GeneratedPatientCount,
+            UploadedPatientCount = source.UploadedPatientCount,
+            GeneratorAppliedSelectedSuite = source.GeneratorAppliedSelectedSuite,
+            EvidenceCollected = source.EvidenceCollected,
+            EvidenceInventory = source.EvidenceInventory == null ? [] : [.. source.EvidenceInventory],
+            EvidencePatientIds = source.EvidencePatientIds == null ? [] : [.. source.EvidencePatientIds],
             RuntimeSequences = source.RuntimeSequences,
             SuiteSequences = source.SuiteSequences,
             OperationConfigs = (source.OperationConfigs ?? [])

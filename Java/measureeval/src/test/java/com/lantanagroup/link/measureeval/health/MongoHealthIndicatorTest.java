@@ -92,7 +92,7 @@ public class MongoHealthIndicatorTest {
     /**
      * An unreachable mongod leaves the driver blocking for its full serverSelectionTimeoutMS -- 30s on
      * the default -- which pushes /health past the BFF's health-check deadline, so the BFF reports the service
-     * Unhealthy with no entries at all and the Admin dashboard loses both the MongoDB and the Resource
+     * Unhealthy with no entries at all and the Admin dashboard loses both the Database and the Resource
      * Cache rows. The indicator must give up on its own well before that.
      */
     @Test

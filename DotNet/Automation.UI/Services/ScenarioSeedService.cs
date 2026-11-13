@@ -32,17 +32,6 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly List<ProfiledMeasureType> DailyAchMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation];
 
-    private const string AdhocReportTestNhsnOrganizationId = "10756";
-    private const string ApiHealthScenarioNhsnOrganizationId = "10757";
-    private const string MultiPatientTestNhsnOrganizationId = "10758";
-    private const string MegaPatientTestNhsnOrganizationId = "10759";
-    private const string MegaMultiPatientTestNhsnOrganizationId = "10760";
-    private const string ScheduledReportTestNhsnOrganizationId = "10761";
-    private const string RegenerateReportTestNhsnOrganizationId = "10762";
-    private const string MultiMeasureTestNhsnOrganizationId = "10763";
-    private const string AdhocReportDailyAchTestNhsnOrganizationId = "10764";
-    private const string DmrpScheduledReportTestNhsnOrganizationId = "10765";
-
     private static readonly List<string> DefaultEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.Qualifying)];
 
@@ -58,7 +47,9 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DailyAchQualifyingEligibilities =
         DailyAchMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
 
-    public ScenarioSeedService(IScenarioStore store, ILogger<ScenarioSeedService> logger)
+    public ScenarioSeedService(
+        IScenarioStore store,
+        ILogger<ScenarioSeedService> logger)
     {
         _store = store;
         _logger = logger;
@@ -85,6 +76,7 @@ public sealed class ScenarioSeedService : IHostedService
                 _logger.LogDebug("Refreshed system scenario: {Name} ({Id})", scenario.Name, scenario.Id);
             }
         }
+
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -140,7 +132,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = AdhocReportTestNhsnOrganizationId,
             Seed = 20260326,
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
@@ -170,7 +161,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DailyAchMeasures],
-            NhsnOrganizationId = AdhocReportDailyAchTestNhsnOrganizationId,
             Seed = 20260825,
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
@@ -204,7 +194,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = ApiHealthScenarioNhsnOrganizationId,
             Seed = 20260501,
             PatientCount = 1,
             ResourcesPerPatientMin = 15,
@@ -234,7 +223,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = MultiPatientTestNhsnOrganizationId,
             Seed = 20260328,
             PatientCount = 150,
             ResourcesPerPatientMin = 25,
@@ -264,7 +252,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = MegaPatientTestNhsnOrganizationId,
             Seed = 20260327,
             PatientCount = FhirBundleGenerator.DefaultPatientCount,
             ResourcesPerPatientMin = FhirBundleGenerator.DefaultResourcesPerPatient,
@@ -294,7 +281,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = MegaMultiPatientTestNhsnOrganizationId,
             Seed = 20260330,
             PatientCount = 150,
             ResourcesPerPatientMin = 25,
@@ -333,7 +319,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.ScheduledReport,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = ScheduledReportTestNhsnOrganizationId,
             Seed = 20260326,
             PatientCount = 6,
             ResourcesPerPatientMin = 50,
@@ -408,7 +393,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.RegenerateReport,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = RegenerateReportTestNhsnOrganizationId,
             Seed = 20260401,
             PatientCount = 1,
             ResourcesPerPatientMin = 100,
@@ -442,7 +426,6 @@ public sealed class ScenarioSeedService : IHostedService
                 ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
             ],
-            NhsnOrganizationId = MultiMeasureTestNhsnOrganizationId,
             Seed = 20260420,
             PatientCount = 2,
             ResourcesPerPatientMin = 250,
@@ -483,7 +466,6 @@ public sealed class ScenarioSeedService : IHostedService
             IsSystemScenario = true,
             ReportMethod = ReportMethod.ScheduledReport,
             SelectedMeasures = [..DefaultMeasures],
-            NhsnOrganizationId = DmrpScheduledReportTestNhsnOrganizationId,
             EnableDmrp = true,
             Seed = 20260909,
             PatientCount = 1,

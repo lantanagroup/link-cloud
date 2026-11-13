@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * serverSelectionTimeoutMS} -- 30s on the driver default, and the URI is supplied per environment
  * (Azure App Configuration in deployed environments), so the parameter cannot be relied on. Thirty
  * seconds pushes /health past the BFF's health-check deadline, and the BFF then reports the whole
- * service Unhealthy with no entries at all -- so the Admin dashboard loses the MongoDB *and* the
+ * service Unhealthy with no entries at all -- so the Admin dashboard loses the Database *and* the
  * Resource Cache rows precisely when they would say what is wrong. The backstop is kept below that
  * deadline, with room for the resource-cache check to spend its own budget, since Spring runs
  * indicators sequentially on the request thread.
@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * @see ResourceCacheHealthIndicator a bounded probe on the same reasoning, for Redis + ABS
  */
-@Component("MongoDB")
+@Component("Database (MongoDB/Cosmos)")
 public class MongoHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(MongoHealthIndicator.class);

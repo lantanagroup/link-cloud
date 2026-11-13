@@ -36,6 +36,9 @@ public static class SqlServerRegistration
                                 builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
                                     .DatabaseConnection));
                         }
+                        //a service that registered the shared audit mechanism has no AddDbContext of its
+                        //own to attach the interceptor in, so it is attached here.
+                        options.AddLinkAuditInterceptor(sp);
                     }
                     break;
                 default:

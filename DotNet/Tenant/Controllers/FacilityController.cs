@@ -5,6 +5,7 @@ using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -77,6 +78,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
         }
+
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a
+        /// request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
 
         /// <summary>
         /// A problem response carrying an explicit type, so the same status always answers with the
@@ -231,6 +238,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
+        [Auditable(AuditEventType.Create, "Facility")]
         public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
         {
             if (newFacility == null)
@@ -271,6 +279,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
 
             var facilityConfigDto = await _facilityQueries.GetAsync(newFacility.FacilityId, null, cancellationToken);
+
+            //the facility is the record here, and this route carries no id at all.
+            if (Audit is { } audit)
+            {
+                audit.FacilityId = facilityConfigDto.FacilityId;
+                audit.RecordId = facilityConfigDto.FacilityId;
+            }
 
             return Created($"/api/Facility/{facilityConfigDto.FacilityId}", facilityConfigDto);
         }
@@ -327,6 +342,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{facilityId}")]
+        [Auditable(AuditEventType.Update, "Facility", RecordIdRouteKey = "facilityId")]
         public async Task<ActionResult<FacilityModel>> PutFacility(string facilityId, FacilityModel facilityConfig, CancellationToken cancellationToken)
         {
             facilityId = facilityId.Sanitize();
@@ -390,6 +406,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{facilityId}")]
+        [Auditable(AuditEventType.Delete, "Facility", RecordIdRouteKey = "facilityId")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
         {
             facilityId = facilityId?.Sanitize();
@@ -419,6 +436,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpDelete("softDelete/{facilityId}")]
+        [Auditable(AuditEventType.SoftDelete, "Facility", RecordIdRouteKey = "facilityId")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
@@ -455,6 +473,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [HttpPatch("restore/{facilityId}")]
+        [Auditable(AuditEventType.Restore, "Facility", RecordIdRouteKey = "facilityId")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]

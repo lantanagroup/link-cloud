@@ -4,6 +4,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -13,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Net;
 using Task = System.Threading.Tasks.Task;
 
@@ -190,7 +192,9 @@ public class ReportApiHelper
     public async Task<ReportScheduleApiModel> WaitForScheduledReportAsync(
         string reportTrackingId,
         TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? facilityId = null,
+        IPipelineAbortRegistry? abortRegistry = null)
     {
         if (!Guid.TryParse(reportTrackingId, out _))
             throw new ArgumentException("reportTrackingId must be a valid Guid.", nameof(reportTrackingId));
@@ -198,6 +202,8 @@ public class ReportApiHelper
         var effectiveTimeout = timeout ?? TimeSpan.FromMinutes(2);
         var pollingInterval = TimeSpan.FromSeconds(2);
         var start = DateTime.UtcNow;
+        int? lastStatusCode = null;
+        string? lastBody = null;
 
         _output.WriteLine($"Waiting for scheduled report {reportTrackingId} to be persisted before publishing census snapshots...");
 
@@ -213,12 +219,86 @@ public class ReportApiHelper
                 return response.Body;
             }
 
+            lastStatusCode = response.StatusCode;
+            lastBody = response.RawBody;
+
             await Task.Delay(pollingInterval, cancellationToken);
         }
 
+        bool? facilityAborted = null;
+        if (abortRegistry != null && !string.IsNullOrWhiteSpace(facilityId))
+        {
+            try
+            {
+                facilityAborted = await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"Could not read the facility abort flag: {ex.Message}");
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         throw new TimeoutException(
-            $"Scheduled report {reportTrackingId} was not persisted within {effectiveTimeout.TotalSeconds:F0}s. " +
-            "Census snapshots were not published to avoid a 'No Scheduled Reports found' race.");
+            DescribeScheduledReportNotPersisted(
+                reportTrackingId,
+                effectiveTimeout,
+                lastStatusCode,
+                lastBody,
+                facilityId,
+                facilityAborted));
+    }
+
+    /// <summary>
+    /// Explains a schedule lookup that never succeeded. The id is the schedule id
+    /// the Report service stores when it consumes ReportScheduled.
+    /// </summary>
+    internal static string DescribeScheduledReportNotPersisted(
+        string reportTrackingId,
+        TimeSpan timeout,
+        int? lastStatusCode,
+        string? lastBody,
+        string? facilityId = null,
+        bool? facilityAborted = null)
+    {
+        var status = lastStatusCode.HasValue ? $"HTTP {lastStatusCode.Value}" : "no response";
+        var detail = SummarizeLookupBody(lastBody);
+        var bodyClause = string.IsNullOrEmpty(detail) ? string.Empty : $" Response: {detail}.";
+        var safeFacility = string.IsNullOrWhiteSpace(facilityId)
+            ? "the facility"
+            : HtmlInputSanitizer.Sanitize(facilityId.Trim());
+
+        var abortClause = facilityAborted switch
+        {
+            true => $" Facility '{safeFacility}' is still aborted, so ReportScheduledListener skips the ReportScheduled event and does not store the schedule.",
+            false => " The facility abort flag was not set when the wait ended.",
+            _ => string.Empty
+        };
+
+        return
+            $"Scheduled report {reportTrackingId} was not persisted within {timeout.TotalSeconds:F0}s.{abortClause} " +
+            "Census snapshots were not published to avoid a 'No Scheduled Reports found' race. " +
+            $"Checked GET /api/schedules/{reportTrackingId}; last response was {status}.{bodyClause} " +
+            "The Report service creates that row when it consumes the ReportScheduled event. " +
+            "It skips the event when that facility or that report id is aborted, and it does not store an invalid event or an id that already exists (those go to the ReportScheduled error topic). " +
+            "Check Report service logs for ReportScheduledListener and that error topic.";
+    }
+
+    private static string SummarizeLookupBody(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody))
+            return string.Empty;
+
+        var sanitized = HtmlInputSanitizer.Sanitize(rawBody).ReplaceLineEndings(" ").Trim();
+        if (sanitized.Length <= 180)
+            return sanitized;
+
+        return sanitized[..180];
     }
 
     public async Task PublishPatientListAcquiredAsync(
@@ -373,7 +453,16 @@ public class ReportApiHelper
         // -------------------------------------------------------------------
         if (diagnostics?.HasReachedMilestone("SubmissionCompleted") == true)
         {
-            _output.WriteLine("Submission milestone already reached. Skipping schedule polling.");
+            if (diagnostics.HasCriticalFailure)
+            {
+                _output.WriteLine(
+                    "[EARLY EXIT] Background diagnostics detected a critical failure.");
+                return false;
+            }
+
+            _output.WriteLine(
+                "Submission milestone already reached. Skipping schedule polling.");
+
             return true;
         }
 
@@ -429,8 +518,18 @@ public class ReportApiHelper
 
                 if (string.Equals(currentStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (diagnostics?.HasCriticalFailure == true)
+                    {
+                        _output.WriteLine(
+                            "[EARLY EXIT] Background diagnostics detected a critical failure.");
+                        return false;
+                    }
+
                     var elapsed = (DateTime.UtcNow - submissionPhaseStart).TotalSeconds;
-                    _output.WriteLine($"Report submitted (after {elapsed:F0}s of status polling).");
+
+                    _output.WriteLine(
+                        $"Report submitted (after {elapsed:F0}s of status polling).");
+
                     return true;
                 }
             }

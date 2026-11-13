@@ -164,6 +164,29 @@ public class RunHistorySlimTests
     }
 
     [Fact]
+    public void Acquisition_chart_counts_AccessDenied_as_a_failure()
+    {
+        var chart = RunHistorySlim.ToAcquisitionChart(
+        [
+            new PipelineDataReader.AcquisitionLogInfo(
+                5,
+                "patient-9",
+                null,
+                null,
+                "AccessDenied",
+                "Initial",
+                ["HTTP Forbidden from the FHIR server for Coverage. Not retried."],
+                [],
+                [],
+                ResourceTypes: ["Coverage"])
+        ]);
+
+        chart.FailureCount.Should().Be(1);
+        chart.CompletedCount.Should().Be(0);
+        chart.Failures.Should().ContainSingle().Which.Message.Should().Contain("Forbidden");
+    }
+
+    [Fact]
     public void Acquisition_chart_keeps_the_latest_failure_note()
     {
         var chart = RunHistorySlim.ToAcquisitionChart(
@@ -310,6 +333,44 @@ public class RunHistorySlimTests
         slim.OperationConfigs[0].Name.Should().Be("Copy");
         slim.OperationConfigs[0].Conditions.Should().BeEmpty();
         slim.OperationConfigs[0].CodeSystemMaps.Should().BeEmpty();
+        slim.GeneratedPatientCount.Should().Be(0);
+        slim.UploadedPatientCount.Should().Be(0);
+        slim.GeneratorAppliedSelectedSuite.Should().BeFalse();
+        slim.EvidenceCollected.Should().BeFalse();
+        slim.EvidenceInventory.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Normalization_evidence_keeps_inventory_and_patient_source()
+    {
+        var slim = RunHistorySlim.SlimNormalizationEvidence(new NormalizationEvidenceSnapshot
+        {
+            SuiteName = "Epic",
+            CollectedLineCount = 2,
+            SummaryLines = ["raw line"],
+            ParsedSteps = [new NormalizationEvidenceStep { ResourceId = "Patient/1" }],
+            GeneratedPatientCount = 3,
+            UploadedPatientCount = 1,
+            GeneratorAppliedSelectedSuite = true,
+            EvidenceCollected = true,
+            EvidenceInventory = ["Encounter#1 CopyLocation 'Copy': Success=2"],
+            EvidencePatientIds = ["uploaded-1", "generated-1"]
+        });
+
+        slim.SummaryLines.Should().BeEmpty();
+        slim.ParsedSteps.Should().BeEmpty();
+        slim.OmittedStepCount.Should().Be(1);
+        slim.GeneratedPatientCount.Should().Be(3);
+        slim.UploadedPatientCount.Should().Be(1);
+        slim.GeneratorAppliedSelectedSuite.Should().BeTrue();
+        slim.EvidenceCollected.Should().BeTrue();
+        slim.EvidenceInventory.Should().Equal("Encounter#1 CopyLocation 'Copy': Success=2");
+        slim.EvidencePatientIds.Should().Equal("uploaded-1", "generated-1");
+
+        var export = NormalizationDiagnosticsWriter.FormatExportAppendix(slim);
+        export.Should().Contain("Encounter#1 CopyLocation 'Copy': Success=2");
+        export.Should().NotContain("omitted from this snapshot");
+        export.Should().Contain("raw lines omitted from this document");
     }
 }
 

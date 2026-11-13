@@ -29,6 +29,7 @@ public static class NormalizationExecutionSummaryParser
         var trimmed = rawLine.Trim();
         string? resourceType = null;
         string? resourceId = null;
+        string? patientId = null;
         string? steps = null;
         string? markerText = null;
 
@@ -41,6 +42,7 @@ public static class NormalizationExecutionSummaryParser
 
                 resourceType = GetString(root, "ResourceType") ?? GetString(root, "resourceType");
                 resourceId = GetString(root, "ResourceId") ?? GetString(root, "resourceId");
+                patientId = GetString(root, "PatientId") ?? GetString(root, "patientId");
                 steps = GetString(root, "Steps") ?? GetString(root, "steps");
                 markerText = GetString(root, "MessageTemplate")
                     ?? GetString(root, "RenderedMessage")
@@ -75,6 +77,17 @@ public static class NormalizationExecutionSummaryParser
                 steps = stepsMatch.Groups["value"].Value;
         }
 
+        if (string.IsNullOrWhiteSpace(patientId))
+        {
+            var patientIdMatch = Regex.Match(markerText, @"(?:^|,\s*)PatientId=(?<value>[^,]+)");
+            if (patientIdMatch.Success)
+                patientId = CleanLogToken(patientIdMatch.Groups["value"].Value);
+        }
+        else
+        {
+            patientId = CleanLogToken(patientId);
+        }
+
         if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(resourceId) || string.IsNullOrWhiteSpace(steps))
             return [];
 
@@ -88,6 +101,7 @@ public static class NormalizationExecutionSummaryParser
             {
                 ResourceType = resourceType,
                 ResourceId = resourceId,
+                PatientId = patientId ?? string.Empty,
                 Sequence = sequence,
                 OperationType = operationType,
                 OperationName = operationName,
@@ -168,6 +182,15 @@ public static class NormalizationExecutionSummaryParser
         }
 
         return collapsed.ToString().Trim();
+    }
+
+    private static string? CleanLogToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim().Trim('"');
+        return trimmed.Length == 0 ? null : trimmed;
     }
 
     private static string? GetString(JsonElement node, string propertyName)

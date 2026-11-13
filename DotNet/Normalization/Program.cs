@@ -248,8 +248,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<NormalizationDbContext>>(HealthCheckType.Database.ToString())
-        .AddCheck<ResourceCacheHealthCheck>(HealthCheckType.Cache.ToString())
+        .AddCheck<DatabaseHealthCheck<NormalizationDbContext>>(HealthCheckNames.SqlServerDatabase)
+        .AddCheck<ResourceCacheHealthCheck>(HealthCheckNames.ResourceCache)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddEndpointsApiExplorer();
@@ -350,11 +350,27 @@ static void SetupMiddleware(WebApplication app)
     app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "normalization");
 
     app.AutoMigrateEF<NormalizationDbContext>();
+    EnsureNormalizationSnapshotReads(app);
 
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
     // Configure the HTTP request pipeline.
     app.MapControllers();
+}
+
+static void EnsureNormalizationSnapshotReads(WebApplication app)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(ReadCommittedSnapshotEnabler));
+        ReadCommittedSnapshotEnabler.EnsureAsync(database, logger, CancellationToken.None).GetAwaiter().GetResult();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Snapshot reads were not enabled on the Normalization database. Continuing.");
+    }
 }
 
 #endregion

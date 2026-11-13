@@ -22,6 +22,7 @@ jobs:
     outputs:
       run_job: ${{ steps.should.outputs.run_job }}
       run_admin_ui: ${{ steps.should.outputs.run_admin_ui }}
+      run_nhsn_app_ui: ${{ steps.should.outputs.run_nhsn_app_ui }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -38,7 +39,9 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|Web/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+          # Admin UI image and package changes are included because this job is the only one
+          # that builds the image: the mocked tier runs ng serve on the runner instead.
+          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|Web/Admin\.UI/(Dockerfile|(server/)?package(-lock)?\.json)|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
             echo "run_job=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_job=false" >> "$GITHUB_OUTPUT"
@@ -53,10 +56,33 @@ jobs:
             echo "run_admin_ui=false" >> "$GITHUB_OUTPUT"
           fi
 
+          # Same reasoning for the NHSN-App-UI mocked tier, and more strongly: MockApiClient
+          # implements the ApiClient port in-process, so that suite issues no HTTP at all and
+          # no backend change can reach it. Note nhsn/NHSN-App-UI/ also appears in the
+          # run_job filter above, because the compose stack builds the nhsn-app-ui image.
+          if echo "$CHANGED_FILES" | grep -Eq '^(nhsn/NHSN-App-UI/|\.github/workflows/tests\.yaml)'; then
+            echo "run_nhsn_app_ui=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_nhsn_app_ui=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Show decision
         run: |
           echo "run_job=${{ steps.should.outputs.run_job }}"
           echo "run_admin_ui=${{ steps.should.outputs.run_admin_ui }}"
+          echo "run_nhsn_app_ui=${{ steps.should.outputs.run_nhsn_app_ui }}"
+
+      # The pattern has to live in this file, so the search skips it. A hit anywhere else fails the job.
+      - name: Reject private NuGet feed references
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits=$(git grep -n -i -E 'Shared_BOTW|pkgs\.dev\.azure|pkgs\.visualstudio\.com|_packaging/|AZURE_ARTIFACTS_PAT|NuGetAuthenticate|CredentialProvider|credprovider|VSS_NUGET|restore-feed|feed-token|FEED_ACCESSTOKEN|packageSourceCredentials' -- . ':!.github/workflows/tests.yaml' || true)
+          if [ -n "$hits" ]; then
+            printf '%s\n' "$hits"
+            echo "Private NuGet feed reference found."
+            exit 1
+          fi
 
   backend-e2e-tests:
     # PR-safe Backend E2E against a SINGLE shared docker compose stack
@@ -76,7 +102,6 @@ jobs:
       CHECK_INTERVAL: 10
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
       LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE: false
-      AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
       LEFTOVER_CLEANUP_ENABLED: "false"
 
       # Live UI tier switch. Set to "false" to leave the Playwright live tests, and the
@@ -90,6 +115,29 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Download NHSN React Core package from Azure Repos
+        shell: bash
+        env:
+          AZDO_PAT: ${{ secrets.AZDO_PAT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AZDO_PAT}" ]]; then
+            echo "AZDO_PAT repository secret is required to download the NHSN React Core package." >&2
+            exit 1
+          fi
+
+          package_directory="nhsn/NHSN-App-UI/packages"
+          package_path="${package_directory}/nhsn-react-core-2.4.1.tgz"
+
+          mkdir -p "${package_directory}"
+          curl --fail --show-error --silent --location \
+            --user ":${AZDO_PAT}" \
+            --output "${package_path}" \
+            "https://dev.azure.com/lantanagroup/nhsnlink/_apis/git/repositories/nhsnlink/items?path=/nhsn-app-ui/nhsn-react-core-2.4.1.tgz&download=true&api-version=7.1"
+
+          test -s "${package_path}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -189,7 +237,7 @@ jobs:
         if: ${{ env.RUN_LIVE_UI == 'true' }}
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
           cache-dependency-path: Web/Admin.UI/package-lock.json
 
@@ -260,14 +308,6 @@ jobs:
       # with "The process cannot access the file ... being used by another
       # process" (MSB4018). Building once and passing --no-build/--no-restore
       # to each parallel run avoids the contention.
-      - name: Authenticate Shared_BOTW_Feed
-        run: |
-          dotnet nuget update source Shared_BOTW_Feed \
-            --username az \
-            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
-            --store-password-in-clear-text \
-            --configfile nuget.config
-
       - name: Restore & build BackendE2ETests
         run: |
           dotnet restore ./Tests/BackendE2ETests/BackendE2ETests.csproj
@@ -315,6 +355,7 @@ jobs:
             "Adhoc Report Daily ACH|AdhocReportDailyAchTest|adhoc-report-daily-ach-test-results.trx"
             "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
+            "DMRP Scheduled Report|DmrpScheduledReportTest|dmrp-scheduled-report-test-results.trx"
             "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
             "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
           )
@@ -462,7 +503,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
           cache-dependency-path: Web/Admin.UI/package-lock.json
 
@@ -533,6 +574,188 @@ jobs:
             Web/Admin.UI/test-results/
           if-no-files-found: ignore
 
+  nhsn-ui-tests:
+    # No other pipeline runs these suites: the NHSN App UI Azure pipeline only builds and pushes
+    # the image, and the Backend E2E job only starts it.
+    name: NHSN App UI Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    needs: changes
+    if: ${{ needs.changes.outputs.run_nhsn_app_ui == 'true' }}
+
+    # npm ci and the test runs execute third-party code, so the token stays read-only and is not
+    # left in .git/config.
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: nhsn/NHSN-App-UI
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Download NHSN React Core package from Azure Repos
+        shell: bash
+        env:
+          AZDO_PAT: ${{ secrets.AZDO_PAT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AZDO_PAT}" ]]; then
+            echo "AZDO_PAT repository secret is required to download the NHSN React Core package." >&2
+            exit 1
+          fi
+
+          mkdir -p packages
+          curl --fail --show-error --silent --location \
+            --user ":${AZDO_PAT}" \
+            --output packages/nhsn-react-core-2.4.1.tgz \
+            "https://dev.azure.com/lantanagroup/nhsnlink/_apis/git/repositories/nhsnlink/items?path=/nhsn-app-ui/nhsn-react-core-2.4.1.tgz&download=true&api-version=7.1"
+
+          test -s packages/nhsn-react-core-2.4.1.tgz
+
+      # Keep in step with the major version in nhsn/NHSN-App-UI/Dockerfile.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            nhsn/NHSN-App-UI/package-lock.json
+            nhsn/NHSN-App-UI/server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Bundle boundary tests
+        run: npm run test:boundary
+
+      - name: Install server dependencies
+        working-directory: nhsn/NHSN-App-UI/server
+        run: npm ci
+
+      - name: Server tests
+        working-directory: nhsn/NHSN-App-UI/server
+        run: npm test
+
+  nhsn-app-ui-mocked-tests:
+    # Mirrors admin-ui-mocked-tests, and needs a backend even less than that tier does:
+    # MockApiClient implements the whole ApiClient port in-process, so these specs issue no
+    # HTTP at all and Playwright only has to boot the webpack dev server on 4300.
+    name: NHSN App UI Tests (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    needs: changes
+    if: ${{ needs.changes.outputs.run_nhsn_app_ui == 'true' }}
+
+    permissions:
+      contents: read
+      checks: write
+
+    defaults:
+      run:
+        working-directory: nhsn/NHSN-App-UI
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # package.json depends on file:packages/nhsn-react-core-2.4.1.tgz, which is gitignored
+      # and kept in the private nhsnlink Azure repo — nothing installs without it. The
+      # lockfile pins its integrity hash, so `npm ci` below also proves this download is the
+      # same artifact the nhsn-app-ui image is already built from in backend-e2e-tests.
+      - name: Download NHSN React Core package from Azure Repos
+        shell: bash
+        env:
+          AZDO_PAT: ${{ secrets.AZDO_PAT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AZDO_PAT}" ]]; then
+            echo "AZDO_PAT repository secret is required to download the NHSN React Core package." >&2
+            exit 1
+          fi
+
+          package_path="packages/nhsn-react-core-2.4.1.tgz"
+
+          mkdir -p packages
+          curl --fail --show-error --silent --location \
+            --user ":${AZDO_PAT}" \
+            --output "${package_path}" \
+            "https://dev.azure.com/lantanagroup/nhsnlink/_apis/git/repositories/nhsnlink/items?path=/nhsn-app-ui/nhsn-react-core-2.4.1.tgz&download=true&api-version=7.1"
+
+          test -s "${package_path}"
+
+      # Keep in step with the major version in nhsn/NHSN-App-UI/Dockerfile.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: nhsn/NHSN-App-UI/package-lock.json
+
+      - name: Install NHSN App UI dependencies
+        run: npm ci
+
+      # Ahead of the browser download on purpose: the draft fixtures are typed against
+      # src/core/onboarding/types, and Playwright strips those types without checking them,
+      # so a drifted fixture should fail in seconds rather than after a Chromium install.
+      - name: Typecheck NHSN App UI e2e suite
+        run: npm run typecheck:e2e
+
+      # Keyed on the Playwright version, so only a real @playwright/test upgrade rotates the
+      # browser cache.
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # `npm run e2e` is --project=mocked; playwright.config.ts starts `npm start` itself
+      # (webpack dev server on 4300) and waits for it.
+      - name: NHSN App UI mocked e2e tests
+        run: npm run e2e
+
+      # playwright.config.ts emits test-results/junit.xml under CI. Paths here are
+      # repo-relative: defaults.run.working-directory applies to `run` steps only, not to
+      # action inputs. Reporting must never fail the job — the test step above is the gate.
+      - name: NHSN App UI Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        continue-on-error: true
+        with:
+          name: NHSN App UI e2e (mocked)
+          path: nhsn/NHSN-App-UI/test-results/junit.xml
+          reporter: java-junit
+
+      # The HTML report plus traces and screenshots retained on failure, so a red run can be
+      # reproduced locally with `npx playwright show-trace <trace.zip>`.
+      - name: Upload NHSN App UI mocked e2e report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nhsn-app-ui-mocked-e2e-report
+          path: |
+            nhsn/NHSN-App-UI/playwright-report/
+            nhsn/NHSN-App-UI/test-results/
+          if-no-files-found: ignore
+
   dotnet-tests:
     name: .NET Tests
     runs-on: ubuntu-latest
@@ -550,27 +773,13 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Authenticate Shared_BOTW_Feed
-        run: |
-          dotnet nuget update source Shared_BOTW_Feed \
-            --username az \
-            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
-            --store-password-in-clear-text \
-            --configfile nuget.config
-
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/packages.lock.json') }}
+          key: ${{ runner.os }}-nuget-v3-${{ hashFiles('**/packages.lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-v2-
-
-      # Drop any Thetis 1.0.0 that a previous run packed locally (NU1403 vs lock file).
-      - name: Drop cached Thetis packages
-        run: |
-          rm -rf "${HOME}/.nuget/packages/lantanagroup.thetis.generation.abstractions" \
-                 "${HOME}/.nuget/packages/lantanagroup.thetis.generation.engine"
+            ${{ runner.os }}-nuget-v3-
 
       # Pulled up-front so the integration fixtures (Testcontainers) don't
       # spend their per-test pull budget on the cold pull. Retry up to 3 times

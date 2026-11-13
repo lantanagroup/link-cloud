@@ -23,7 +23,7 @@ Stop it with Ctrl+C. Alternatively run it in Docker Compose:
 docker compose up --build -d --wait onboarding-chat
 ```
 
-This starts both onboarding services, exposing MCP on host loopback port 8090
+This starts both onboarding services, exposing MCP on host loopback port 8092
 and chat on port 8091. Stop standalone copies before using the same ports, or
 override `ONBOARDING_MCP_PORT` / `ONBOARDING_CHAT_PORT`. Inside Docker, the MCP
 server binds port 8080 and accepts the designated `tenant` and `measureeval`

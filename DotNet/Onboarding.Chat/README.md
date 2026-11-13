@@ -16,7 +16,8 @@ docker compose up --build -d --wait onboarding-chat
 ```
 
 This builds/starts `onboarding-chat` and its `onboarding-mcp` dependency. Open
-**http://127.0.0.1:8091**. The MCP endpoint is **http://127.0.0.1:8090/mcp**.
+**http://127.0.0.1:8091**. The compose MCP endpoint is **http://127.0.0.1:8092/mcp**
+(native MCP uses port 8090, also used by the NHSN UI).
 No host .NET SDK is required for this mode. Stop any standalone copies first,
 or set `ONBOARDING_CHAT_PORT` / `ONBOARDING_MCP_PORT` to unused host ports.
 

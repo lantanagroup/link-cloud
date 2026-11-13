@@ -266,7 +266,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>(nameof(HealthCheckType.Cache));
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckNames.RedisCache);
     }
 
 
@@ -479,6 +479,11 @@ static void SetupMiddleware(WebApplication app)
             tasks.Add(ServiceInformation.GetServiceInformation(client, "Terminology", serviceRegistry.TerminologyServiceApiUrl,
                 serviceRegistry.PublicTerminologyServiceUrl,
                 "/terminology/info", logger));
+
+        if (!string.IsNullOrEmpty(serviceRegistry.NhsnAppBffServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "NHSN App BFF",serviceRegistry.NhsnAppBffServiceApiUrl,
+                serviceRegistry.PublicNhsnAppBffServiceUrl,
+                "/nhsn-app-bff/info", logger));
 
         var results = await Task.WhenAll(tasks);
         serviceInfos.AddRange(results.Where(info => info != null)!);

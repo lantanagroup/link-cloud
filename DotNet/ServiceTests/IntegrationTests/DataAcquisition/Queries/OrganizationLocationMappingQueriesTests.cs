@@ -77,6 +77,44 @@ public class OrganizationLocationMappingQueriesTests
     }
 
     [Fact]
+    public async Task GetByFacilityIdAndLocationIdsAsync_EmptyLocationIds_ReturnsEmpty()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        var facilityId = NewFacilityId("Fac-Empty");
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-1" });
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var results = await queries.GetByFacilityIdAndLocationIdsAsync(facilityId, []);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task GetByFacilityIdAndLocationIdsAsync_MixedRows_ReturnsOnlyRequestedLocationsInFacility()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        var facilityId = NewFacilityId("Fac-Target");
+        var otherFacilityId = NewFacilityId("Fac-Other");
+        var requested = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+        {
+            FacilityId = facilityId,
+            LocationId = "Loc-1"
+        });
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-2" });
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = otherFacilityId, LocationId = "Loc-1" });
+
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var results = await queries.GetByFacilityIdAndLocationIdsAsync(facilityId, ["Loc-1", "Loc-Missing"]);
+
+        var result = Assert.Single(results);
+        Assert.Equal(requested.LocationMappingId, result.LocationMappingId);
+        Assert.Equal(facilityId, result.FacilityId);
+        Assert.Equal("Loc-1", result.LocationId);
+    }
+
+    [Fact]
     public async Task SearchAsync_WithFilters_ReturnsCorrectResults()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();

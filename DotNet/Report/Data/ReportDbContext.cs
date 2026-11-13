@@ -37,6 +37,14 @@ public partial class ReportDbContext : DbContext
 
     public virtual DbSet<ScheduleReportType> ScheduleReportType { get; set; }
 
+    public virtual DbSet<RetentionCleanup> RetentionCleanup { get; set; }
+
+    public virtual DbSet<RetentionCleanupReport> RetentionCleanupReport { get; set; }
+
+    public virtual DbSet<RetentionCleanupParticipant> RetentionCleanupParticipant { get; set; }
+
+    public virtual DbSet<RetentionCleanupResult> RetentionCleanupResult { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<GroupPopulation>(entity =>
@@ -119,15 +127,72 @@ public partial class ReportDbContext : DbContext
 
             entity.Property(e => e.ReportStartDate).HasColumnType("datetimeoffset(7)");
             entity.Property(e => e.ReportEndDate).HasColumnType("datetimeoffset(7)");
+            entity.Property(e => e.CompletedDate).HasColumnType("datetimeoffset(7)");
+            entity.Property(e => e.SoftDeletedDate).HasColumnType("datetimeoffset(7)");
 
             entity.Property(e => e.AdHocType).HasConversion<string>().HasMaxLength(50);
             entity.Property(e => e.Frequency).HasConversion<string>().HasMaxLength(50);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.RetentionStatus)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasDefaultValue(ReportRetentionStatus.None);
         });
 
         modelBuilder.Entity<ScheduleReportType>(entity =>
         {
             entity.HasOne(d => d.ReportSchedule).WithMany(p => p.ReportTypes).HasConstraintName("FK_ReportScheduleReportTypes_ReportSchedules");
+        });
+
+        modelBuilder.Entity<RetentionCleanup>(entity =>
+        {
+            entity.Property(e => e.InitiatedBy).HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.Mode).HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<RetentionCleanupReport>(entity =>
+        {
+            entity.Property(e => e.RetentionWindowUnit).HasConversion<string>().HasMaxLength(50);
+
+            entity.HasOne(d => d.RetentionCleanup)
+                .WithMany(p => p.Reports)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RetentionCleanupReport_RetentionCleanup");
+        });
+
+        modelBuilder.Entity<RetentionCleanupParticipant>(entity =>
+        {
+            entity.Property(e => e.Scope).HasConversion<string>().HasMaxLength(50);
+
+            entity.HasOne(d => d.RetentionCleanup)
+                .WithMany(p => p.Participants)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RetentionCleanupParticipant_RetentionCleanup");
+        });
+
+        modelBuilder.Entity<RetentionCleanupResult>(entity =>
+        {
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
+
+            // SQL Server's own null handling, rather than EF's IS NOT NULL filter, keeps a cutoff-scoped
+            // participant to one result. See dev-docs/retention-cleanup-record.md.
+            entity.HasIndex(e => new { e.RetentionCleanupParticipantId, e.RetentionCleanupReportId },
+                            "IX_RetentionCleanupResult_Participant_Report")
+                .IsUnique()
+                .HasFilter(null);
+
+            entity.HasOne(d => d.RetentionCleanupParticipant)
+                .WithMany(p => p.Results)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RetentionCleanupResult_RetentionCleanupParticipant");
+
+            // A second cascade path from the cleanup is rejected by SQL Server; the participant path removes
+            // these rows.
+            entity.HasOne(d => d.RetentionCleanupReport)
+                .WithMany(p => p.Results)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("FK_RetentionCleanupResult_RetentionCleanupReport");
         });
 
         modelBuilder.AddQuartz(builder => builder.UseSqlServer());

@@ -38,7 +38,7 @@ public static class GetReportSummaries
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize < 1) pageSize = 10;
 
-            var response = await reportService.ReportSummaryList(context.User,
+            using var response = await reportService.ReportSummaryList(context.User,
                 context.RequestAborted,
                 facilityId,
                 frequency,
@@ -96,7 +96,7 @@ public static class GetReportSummaries
             if (string.IsNullOrWhiteSpace(reportScheduleId))
                 return Results.BadRequest("Report schedule ID is required");
 
-            var response = await reportService.GetReportScheduleById(
+            using var response = await reportService.GetReportScheduleById(
                 context.User,
                 context.RequestAborted,
                 reportScheduleId);
@@ -128,14 +128,14 @@ public static class GetReportSummaries
 
     private static async Task PopulateSummaryCounts(HttpContext context, ReportService reportService, ScheduledReportListSummary summary)
     {
-        var patientInCensusCountResponse = await reportService.GetPatientInCensusCount(context.User, context.RequestAborted, summary.Id.ToString());
+        using var patientInCensusCountResponse = await reportService.GetPatientInCensusCount(context.User, context.RequestAborted, summary.Id.ToString());
         if (patientInCensusCountResponse.IsSuccessStatusCode)
         {
             var content = await patientInCensusCountResponse.Content.ReadAsStringAsync();
             summary.CensusCount = int.Parse(content);
         }
 
-        var populationResponse = await reportService.GetReportPopulationsByReportScheduleId(context.User, context.RequestAborted, summary.Id.ToString());
+        using var populationResponse = await reportService.GetReportPopulationsByReportScheduleId(context.User, context.RequestAborted, summary.Id.ToString());
         if (populationResponse.IsSuccessStatusCode)
         {
             var content = await populationResponse.Content.ReadAsStringAsync();
