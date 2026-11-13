@@ -1,0 +1,10 @@
+{
+  "FacilityId": "Hospital1",
+  "ReportTrackingId": "3f6a1c2e-8b4d-4e7a-9c15-2d0b7e9f4a61",
+  "PatientId": "pat-001",
+  "ReportType": "NHSNdQMAcuteCareHospitalInitialPopulation",
+  "MeasureReportId": "mr-001",
+  "MeasureReportURI": "http://azurite:10000/devstoreaccount1/internal/Hospital1/pat-001.json",
+  "MeasureReportBlobName": "Hospital1/pat-001.json",
+  "Reportable": true
+}

@@ -160,6 +160,35 @@
     </None>
   </ItemGroup>
 
+  <!-- The Kafka message fixtures checked by the tests in UnitTests/Shared/Contracts. -->
+  <ItemGroup>
+    <None Update="Resources\Contracts\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- The shipped appsettings files that set keys to null, checked by ConfigurationNullBindingTests. -->
+  <ItemGroup>
+    <None Include="..\Submission\appsettings.json" Link="Resources\Submission\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\MockFhirServer\appsettings.json" Link="Resources\MockFhirServer\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\MockFhirServer\appsettings.Docker.json" Link="Resources\MockFhirServer\appsettings.Docker.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\Automation.UI\appsettings.json" Link="Resources\Automation.UI\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\Automation.UI\appsettings.Docker.json" Link="Resources\Automation.UI\appsettings.Docker.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\nhsn\NHSN-App-BFF\appsettings.json" Link="Resources\NHSN-App-BFF\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- The retention message fixtures are shared with the Java tests, so both runtimes check the same JSON. -->
   <ItemGroup>
     <None Include="..\..\Java\shared\src\test\resources\retention\*.json" Link="Resources\Retention\%(Filename)%(Extension)">

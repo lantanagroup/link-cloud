@@ -307,6 +307,17 @@ public class OperationFailureFactoryTests
     }
 
     [Fact]
+    public void Crlf_body_is_kept_with_lf_line_endings()
+    {
+        const string body = "{\r\n  \"resourceType\": \"Bundle\"\r\n}";
+
+        var failure = OperationFailureFactory.FromHttp(Sample("patient-1_chunk01", "[patient-1] ", 500, body));
+
+        failure.TechnicalDetails.Should().Be("{\n  \"resourceType\": \"Bundle\"\n}");
+        failure.FormattedBlock.Should().NotContain("\r");
+    }
+
+    [Fact]
     public void Collect_unwraps_aggregate_exceptions_and_ignores_other_errors()
     {
         var failure = OperationFailureFactory.FromHttp(Sample("patient-1_chunk01", "[patient-1] ", 500, OperationOutcome));
