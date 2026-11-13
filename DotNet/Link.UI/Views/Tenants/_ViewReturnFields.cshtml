@@ -1,0 +1,5 @@
+@model FacilityViewQuery
+@foreach (var pair in Model.ToRoute())
+{
+    <input type="hidden" name="@pair.Key" value="@pair.Value" />
+}

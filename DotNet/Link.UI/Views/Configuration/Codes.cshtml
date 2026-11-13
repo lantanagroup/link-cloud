@@ -1,0 +1,114 @@
+@model CodeSearchPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    Dictionary<string, string> Route(int page, int pageSize = 0)
+    {
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string> { ["submitted"] = "true", ["page"] = page.ToString(), ["pageSize"] = chosen.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.Search)) route["search"] = query.Search;
+        if (!string.IsNullOrWhiteSpace(query.CodeSystem)) route["codeSystem"] = query.CodeSystem;
+        if (!string.IsNullOrWhiteSpace(query.ValueSet)) route["valueSet"] = query.ValueSet;
+        if (!string.IsNullOrWhiteSpace(query.Version)) route["version"] = query.Version;
+        if (query.ExcludeInactive) route["excludeInactive"] = "true";
+        return route.WithOrigin(ReturnUrlRules.FromQuery(Context.Request));
+    }
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Terminology")!, "Terminology"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Terminology codes</h1>
+<partial name="_Alerts" />
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search">
+            <input type="hidden" name="submitted" value="true" />
+            <input type="hidden" name="pageSize" value="@size" />
+            <partial name="_ReturnField" />
+            <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="search">Search</label>
+                <input id="search" name="search" value="@query.Search" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Codes" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Clear</a>
+            </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.CodeSystem) || !string.IsNullOrWhiteSpace(query.ValueSet) || !string.IsNullOrWhiteSpace(query.Version) || query.ExcludeInactive) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="codeSystem">Code system</label>
+                        <input id="codeSystem" name="codeSystem" value="@query.CodeSystem" class="form-control" maxlength="2000" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="valueSet">Value set</label>
+                        <input id="valueSet" name="valueSet" value="@query.ValueSet" class="form-control" maxlength="2000" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="version">Version</label>
+                        <input id="version" name="version" value="@query.Version" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="excludeInactive" name="excludeInactive" value="true" @(query.ExcludeInactive ? "checked" : null) />
+                            <label class="form-check-label" for="excludeInactive">Exclude inactive</label>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Enter a search of at least 3 characters, or one code system, or one value set. A version belongs with a system or a set.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else if (Model.Searched)
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Codes</div>
+        <div class="card-body">
+            @if (Model.Codes.Count == 0)
+            {
+                <p class="mb-0">No codes found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">System</th>
+                                <th scope="col">Code</th>
+                                <th scope="col">Display</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Codes)
+                        {
+                            <tr>
+                                <td class="text-break">@row.System</td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Code", Value = row.Code, Compact = true, CopyLabel = "Copy code" })" /></td>
+                                <td>@row.Display</td>
+                                <td><span class="badge @StatusPills.ForTerm(row.Status)">@(string.IsNullOrWhiteSpace(row.Status) ? "Unknown" : row.Status)</span></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Code pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = new[] { 10, 20, 50, 100 }, Route = Route })" />
+            }
+        </div>
+    </div>
+}

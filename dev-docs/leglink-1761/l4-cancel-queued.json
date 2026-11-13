@@ -1,0 +1,23 @@
+{
+  "http": 200,
+  "launchId": "ba55bbd0-a3a8-463f-8d2a-919b6d1061ed",
+  "pending": 0,
+  "inProgress": 0,
+  "failed": 0,
+  "cancelled": 2,
+  "open": false,
+  "items": [
+    {
+      "ordinal": 0,
+      "status": "Cancelled",
+      "runId": "79bdc7f6-7664-4950-b297-dc419f51aaf7",
+      "error": "Cancelled by user."
+    },
+    {
+      "ordinal": 1,
+      "status": "Cancelled",
+      "runId": null,
+      "error": "Cancelled before start."
+    }
+  ]
+}

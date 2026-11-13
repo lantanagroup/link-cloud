@@ -1,0 +1,7 @@
+@{
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
+}
+@if (origin is not null)
+{
+    <input type="hidden" name="returnUrl" value="@origin" />
+}

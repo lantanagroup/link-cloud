@@ -1,0 +1,237 @@
+@model AcquisitionLogListPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var search = Model.Search;
+    var bar = Model.Paging;
+    Dictionary<string, string> Route(int? page = null, string? sortBy = null, string? sortDir = null, int? pageSize = null)
+    {
+        var route = query.ToRoute(page, sortBy, sortDir, pageSize);
+        if (Model.RunId is Guid runId)
+            route["runId"] = runId.ToString("D");
+        return route;
+    }
+    string Href(Dictionary<string, string> route)
+    {
+        var path = Model.Embedded ? "/Logs/Acquisition/panel" : "/Logs/Acquisition";
+        if (route.Count == 0)
+            return path;
+        var query = string.Join("&", route.Select(pair =>
+            Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+        return path + "?" + query;
+    }
+    Dictionary<string, string> SortRoute(string column, bool dateColumn) => Route(
+        1,
+        column,
+        LogsRules.NextSort(search.SortBy, search.SortDir, column, dateColumn));
+    string Mark(string column) => string.Equals(search.SortBy, column, StringComparison.OrdinalIgnoreCase)
+        ? (search.SortDir == "asc" ? " ↑" : " ↓")
+        : "";
+    var hideFacility = Model.Embedded && !string.IsNullOrWhiteSpace(search.FacilityId);
+    var hideReport = Model.Embedded && !string.IsNullOrWhiteSpace(search.ReportId);
+    string OpenLogs()
+    {
+        var route = query.ToRoute();
+        if (route.Count == 0)
+            return "/Logs/Acquisition";
+        return "/Logs/Acquisition?" + string.Join("&", route.Select(pair =>
+            Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+{
+    <p class="small text-muted mt-3">@Model.ScopeNote</p>
+}
+@if (Model.Embedded)
+{
+    <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+        @if (hideFacility && !Model.HeaderOwnsIds)
+        {
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = search.FacilityId, CopyLabel = "Copy facility id" })" />
+        }
+        @if (hideReport && !Model.HeaderOwnsIds)
+        {
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = search.ReportId, CopyLabel = "Copy report id" })" />
+        }
+        <a class="btn btn-sm btn-au-link" href="@OpenLogs()">Open in Logs</a>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(search.FacilityId) && string.IsNullOrWhiteSpace(search.Error))
+{
+    <details class="au-card card mt-3 au-facility-actions">
+        <summary class="card-header">Facility actions</summary>
+        <div class="card-body">
+            @if (Model.HeaderOwnsIds)
+            {
+                <p>These actions change every acquisition log for this facility, including logs outside this search.</p>
+            }
+            else
+            {
+                <p>These actions change every acquisition log for <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = search.FacilityId, CopyLabel = "Copy facility id" })" />, including logs outside this search.</p>
+            }
+            <div class="d-flex flex-wrap gap-2">
+                <form method="post" data-au-save asp-action="DisableFacility">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button data-hold="@Hold.Of("Disable every acquisition log for this facility?", "Disable every acquisition log for this facility?", "Acquisition for these logs stops until they are restored.", "Hold to disable")" type="submit" class="btn btn-sm btn-danger">Disable logs</button>
+                </form>
+                <form method="post" data-au-save asp-action="RestoreFacility">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button data-hold="@Hold.Of("Restore every acquisition log for this facility?", "Restore every acquisition log for this facility?", "The selected logs change.", "Hold to restore")" type="submit" class="btn btn-sm btn-success">Restore logs</button>
+                </form>
+            </div>
+        </div>
+    </details>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    @if (search.ReportId is not null)
+    {
+        <div class="au-card card mt-3">
+            <div class="card-header">Status counts for this report</div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.CountsNote))
+                {
+                    <p class="mb-0">@Model.CountsNote</p>
+                }
+                else if (Model.Counts.Count == 0)
+                {
+                    <p class="mb-0">No status counts.</p>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var count in Model.Counts)
+                        {
+                            <span class="badge @StatusPills.ForLog(count.Name)">@count.Name @count.Count</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="au-card card mt-3">
+        <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+            <span class="me-auto">Logs</span>
+            @if (search.HasFilter && !(AutomationMarkRules.IsAutomation(query.Scope) && string.IsNullOrWhiteSpace(query.FacilityId)))
+            {
+                <form method="post" data-au-save asp-action="ProcessMatching" class="d-inline">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button data-hold="@Hold.Of("Process every acquisition log that matches these filters?", "Process every acquisition log that matches these filters?", "The selected logs change.", "Hold to process")" type="submit" class="btn btn-sm btn-au-execute">Process matching</button>
+                </form>
+                <form method="post" data-au-save asp-action="CancelMatching" class="d-inline">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button data-hold="@Hold.Of("Cancel every matching log that is old enough? This cannot be undone.", "Cancel every matching log that is old enough? This cannot be undone.", "This cannot be undone.", "Hold to cancel")" type="submit" class="btn btn-sm btn-warning">Cancel matching</button>
+                </form>
+            }
+        </div>
+        <div class="card-body">
+            @if (Model.Logs.Count == 0)
+            {
+                <p class="au-empty mb-0">@(
+                    !LinkUiFeatures.Value.AutomationEnabled ? "No acquisition logs found."
+                    : AutomationMarkRules.IsAutomation(query.Scope) ? "No automation acquisition logs."
+                    : AutomationMarkRules.IsReal(query.Scope) ? "No real acquisition logs."
+                    : "No acquisition logs found.")</p>
+            }
+            else
+            {
+                <form method="post" data-au-save asp-action="Process" id="acquisition-logs">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2 lu-logs-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><input class="form-check-input" type="checkbox" data-au-select-page aria-label="Select all logs on this page" /></th>
+                                    <th scope="col"><a href="@Href(SortRoute("Id", false))" @(Model.Embedded ? "data-da-panel" : null)>Id@(Mark("Id"))</a></th>
+                                    @if (!hideFacility)
+                                    {
+                                        <th scope="col" data-da-col="facility"><a href="@Href(SortRoute("FacilityId", false))" @(Model.Embedded ? "data-da-panel" : null)>Facility@(Mark("FacilityId"))</a></th>
+                                    }
+                                    <th scope="col"><a href="@Href(SortRoute("PatientId", false))" @(Model.Embedded ? "data-da-panel" : null)>Patient@(Mark("PatientId"))</a></th>
+                                    @if (!hideReport)
+                                    {
+                                        <th scope="col" data-da-col="report">Report</th>
+                                    }
+                                    <th scope="col"><a href="@Href(SortRoute("Status", false))" @(Model.Embedded ? "data-da-panel" : null)>Status@(Mark("Status"))</a></th>
+                                    <th scope="col"><a href="@Href(SortRoute("QueryPhase", false))" @(Model.Embedded ? "data-da-panel" : null)>Phase@(Mark("QueryPhase"))</a></th>
+                                    <th scope="col"><a href="@Href(SortRoute("QueryType", false))" @(Model.Embedded ? "data-da-panel" : null)>Type@(Mark("QueryType"))</a></th>
+                                    <th scope="col">Resources</th>
+                                    <th scope="col" class="lu-col-created"><a href="@Href(SortRoute("CreateDate", true))" @(Model.Embedded ? "data-da-panel" : null)>Created@(Mark("CreateDate"))</a></th>
+                                    <th scope="col" class="lu-col-action">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in Model.Logs)
+                            {
+                                <tr>
+                                    <td>
+                                        @{
+                                            var canCancel = !row.Deleted && LogsRules.CanCancel(row.Status, row.CreatedUtc, search.MinAgeHours, DateTime.UtcNow);
+                                            var canProcess = !row.Deleted && row.CanProcess;
+                                            var reason = row.Deleted
+                                                ? "Deleted logs cannot be selected."
+                                                : !canProcess && !canCancel
+                                                    ? row.Status + " logs cannot be selected."
+                                                    : null;
+                                        }
+                                        @if (reason is null)
+                                        {
+                                            <input class="form-check-input" type="checkbox" name="ids" value="@row.Id" data-can-process="@(canProcess ? "yes" : "no")" data-can-cancel="@(canCancel ? "yes" : "no")" aria-label="Select log @row.Id" />
+                                        }
+                                        else
+                                        {
+                                            <input class="form-check-input" type="checkbox" disabled title="@reason" aria-label="Log @row.Id cannot be selected" />
+                                        }
+                                    </td>
+                                    <td>
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy log id", LinkHref = Url.Action("AcquisitionDetail", new { id = row.Id }), ReturnUrl = Model.Embedded ? ReturnUrlRules.Sanitize(query.ReturnUrl) : ReturnUrlRules.Here(Context.Request) })" />
+                                        @(row.Deleted ? " (deleted)" : "")
+                                    </td>
+                                    @if (!hideFacility)
+                                    {
+                                        <td data-da-col="facility">
+                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
+                                            <partial name="_AutomationBadge" model="row.IsTest" />
+                                        </td>
+                                    }
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
+                                    @if (!hideReport)
+                                    {
+                                        <td data-da-col="report">
+                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = row.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = row.ReportLink ? Url.Action("Acquisition", "Reports", new { facilityId = row.FacilityId, reportId = row.ReportId }) : null })" />
+                                        </td>
+                                    }
+                                    <td><span class="badge @StatusPills.ForLog(row.Status)">@(string.IsNullOrWhiteSpace(row.Status) ? "Unknown" : row.Status)</span></td>
+                                    <td>@row.Phase</td>
+                                    <td>@row.QueryType</td>
+                                    <td>@row.Resources</td>
+                                    <td class="text-nowrap lu-col-created">@row.Created</td>
+                                    <td class="lu-col-action">
+                                        @if (!row.Deleted && row.CanProcess)
+                                        {
+                                            <button data-hold="@Hold.Of("Process this acquisition log?", "Process this acquisition log?", "The selected logs change.", "Hold to process")" type="submit" class="btn btn-sm btn-au-execute lu-icon-btn" formaction="@Url.Action("ProcessOne", new { id = row.Id })" formmethod="post" title="Execute" aria-label="Execute"><i class="bi bi-play-fill" aria-hidden="true"></i><span class="ms-1">Execute</span></button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-sm btn-au-execute" data-au-bulk="process" disabled>Process selected</button>
+                        <button type="submit" class="btn btn-sm btn-warning" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save data-au-bulk="cancel" disabled>Cancel selected</button>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @Counts.Of(search.MinAgeHours, "hour"), and logs in a terminal status.</p>
+                </form>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Log pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = search.PageSize, Sizes = LogsRules.PageSizes, Path = Model.Embedded ? "/Logs/Acquisition/panel" : "/Logs/Acquisition", Panel = Model.Embedded, Route = (page, size) => Route(page, pageSize: size) })" />
+            }
+        </div>
+    </div>
+}

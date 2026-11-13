@@ -19,6 +19,48 @@ namespace LantanaGroup.Automation;
 public class FhirDataLoader
 {
     private readonly ConcurrentBag<string> _createdResources = new();
+
+    /// <summary>True only for a create (HTTP 201). A 200 update of an existing resource is not tracked.</summary>
+    public static bool IsCreatedLocationStatus(string? status) =>
+        status != null && status.StartsWith("201", StringComparison.Ordinal);
+
+    /// <summary>Resource paths this loader will delete. Only 201 create locations are recorded.</summary>
+    public IReadOnlyCollection<string> CreatedResourcePaths => _createdResources;
+
+    /// <summary>Records create locations from a transaction-response bundle. Does not call the FHIR server.</summary>
+    public void TrackTransactionResponseForCleanup(string responseContent, IAutomationOutput output) =>
+        TrackCreatedResources(responseContent, "response", "", output);
+
+    /// <summary>
+    /// Drops tracked creates that must stay on the server. Returns how many were dropped.
+    /// </summary>
+    public int ForgetCreatedResources(IEnumerable<string> resourcePaths)
+    {
+        ArgumentNullException.ThrowIfNull(resourcePaths);
+        var drop = new HashSet<string>(
+            resourcePaths.Where(path => !string.IsNullOrWhiteSpace(path)),
+            StringComparer.Ordinal);
+        if (drop.Count == 0 || _createdResources.IsEmpty)
+            return 0;
+
+        var kept = new List<string>();
+        var removed = 0;
+        foreach (var path in _createdResources)
+        {
+            if (drop.Contains(path))
+                removed++;
+            else
+                kept.Add(path);
+        }
+
+        if (removed == 0)
+            return 0;
+
+        _createdResources.Clear();
+        foreach (var path in kept)
+            _createdResources.Add(path);
+        return removed;
+    }
     private string? _authorization;
     private readonly RestClient _restClient;
     /// <summary>
@@ -356,7 +398,7 @@ public class FhirDataLoader
                             output.WriteLine("Failed response for index " + entries.IndexOf(entry) + ": " + responseNode);
                         }
 
-                        if (!string.IsNullOrEmpty(location))
+                        if (IsCreatedLocationStatus(status) && !string.IsNullOrEmpty(location))
                         {
                             var resourcePath = location.Split("/_history")[0];
                             _createdResources.Add(resourcePath);
@@ -560,7 +602,7 @@ public class FhirDataLoader
                         output.WriteLine($"  {progress} Entry error in {name}: {responseNode}");
                     }
 
-                    if (!string.IsNullOrEmpty(location))
+                    if (IsCreatedLocationStatus(status) && !string.IsNullOrEmpty(location))
                     {
                         var resourcePath = location.Split("/_history")[0];
                         _createdResources.Add(resourcePath);

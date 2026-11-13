@@ -1,0 +1,28 @@
+@model PagerStep
+@{
+    var icon = Model.Direction switch
+    {
+        "first" => "bi-chevron-double-left",
+        "previous" => "bi-chevron-left",
+        "next" => "bi-chevron-right",
+        "last" => "bi-chevron-double-right",
+        _ => "bi-chevron-right"
+    };
+    var label = Model.Direction switch
+    {
+        "first" => "First",
+        "previous" => "Previous",
+        "next" => "Next",
+        "last" => "Last",
+        _ => "Next"
+    };
+    var on = Model.Enabled && !string.IsNullOrEmpty(Model.Href);
+}
+@if (on)
+{
+    <a class="lu-page-step" href="@Model.Href" aria-label="@label" title="@label" @(Model.Panel ? "data-da-panel" : null)><i class="bi @icon" aria-hidden="true"></i></a>
+}
+else
+{
+    <button type="button" class="lu-page-step" disabled aria-label="@label" title="@label"><i class="bi @icon" aria-hidden="true"></i></button>
+}

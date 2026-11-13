@@ -22,11 +22,14 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 {
                     headers.Add(KafkaConstants.HeaderConstants.CorrelationId, Encoding.ASCII.GetBytes(model.CorrelationId));
                 }
-                model.ServiceName = serviceInformation.ServiceConfigName;
+                var serviceName = string.IsNullOrWhiteSpace(serviceInformation.ServiceConfigName)
+                    ? serviceInformation.ServiceName
+                    : serviceInformation.ServiceConfigName;
+                model.ServiceName = serviceName;
                 await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Headers = headers,
-                    Key = model.FacilityId ?? "",
+                    Key = KafkaKeys.ForAudit(model.FacilityId, model.PatientId, serviceName),
                     Value = model
                 }, cancellationToken);
             }

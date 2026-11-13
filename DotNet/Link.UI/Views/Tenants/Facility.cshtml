@@ -1,0 +1,301 @@
+@model Link.UI.Models.FacilityHubViewModel
+@{
+    var titleName = Model.IsCreate ? null : LabeledIdRules.DisplayName(Model.FacilityName, Model.FacilityId);
+    var heading = Model.IsCreate ? "New facility" : (titleName ?? "Facility");
+    ViewData["Title"] = heading;
+}
+
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
+    @if (!Model.IsCreate && !string.IsNullOrWhiteSpace(Model.FacilityId))
+    {
+        <button type="button" class="btn btn-sm btn-au-link" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
+    }
+</div>
+<h1 class="h3 mb-3">@heading</h1>
+
+@if (Model.IsTest)
+{
+    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
+        <span>This is a test facility. Edits here change a throwaway facility.</span>
+        <span class="badge au-badge-test">Test facility</span>
+    </div>
+}
+
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound)
+{
+    <div class="au-card card">
+        <div class="card-header">Facility</div>
+        <div class="card-body">
+            <p class="mb-0">No facility named <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, CopyLabel = "Copy facility id" })" /> was found.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div id="facilityEditor">
+        @if (!Model.IsCreate)
+        {
+            <div id="facilitySaveBar" class="lu-savebar" role="region" aria-label="Save facility">
+                <span id="facilityDirtyFlag">No unsaved changes</span>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-success" id="facilitySaveButton" disabled>Save</button>
+                    <button type="button" class="btn btn-warning" id="facilityCancelButton">Cancel</button>
+                </div>
+                <div id="facilitySaveResults" class="w-100 small" role="status"></div>
+            </div>
+        }
+    <div class="au-card card" id="facilityIdentity">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>@heading</span>
+            @if (!Model.IsCreate)
+            {
+                <span class="d-flex align-items-center gap-2">
+                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)" title="View" aria-label="View"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">View</span></a>
+                </span>
+            }
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(Model.FormError))
+            {
+                <div class="alert alert-warning lu-section-error" id="facilityFormError">@Model.FormError</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.VendorWarning))
+            {
+                <div class="alert alert-warning">@Model.VendorWarning</div>
+            }
+
+            <form method="post" data-au-save asp-action="@(Model.IsCreate ? "Create" : "SaveFacility")" asp-route-id="@Model.FacilityId">
+                @if (!Model.IsCreate)
+                {
+                    <input type="hidden" name="FacilityId" value="@Model.FacilityId" />
+                }
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="facilityId">Facility ID</label>
+                        @if (Model.IsCreate)
+                        {
+                            <input id="facilityId" name="FacilityId" value="@Model.FacilityId" class="form-control" required maxlength="64" />
+                        }
+                        else
+                        {
+                            <input id="facilityId" class="form-control" value="@Model.FacilityId" readonly />
+                        }
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="facilityName">Facility name</label>
+                        <input id="facilityName" name="FacilityName" value="@Model.FacilityName" class="form-control" required maxlength="200" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="timeZone">Timezone</label>
+                        <select id="timeZone" name="TimeZone" class="form-select" required>
+                            <option value="">Select a timezone</option>
+                            @foreach (var zone in Model.TimeZones)
+                            {
+                                if (string.Equals(zone, Model.TimeZone, StringComparison.Ordinal))
+                                {
+                                    <option value="@zone" selected>@zone</option>
+                                }
+                                else
+                                {
+                                    <option value="@zone">@zone</option>
+                                }
+                            }
+                        </select>
+                        <div class="form-text">IANA ids, for example America/Chicago.</div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <partial name="_VendorVersionPicker" model="Model" />
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <partial name="_ReportingScheduleEditor" model="Model" />
+                </div>
+
+                <div class="mt-3 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-success">@(Model.IsCreate ? "Create facility" : "Save facility")</button>
+                </div>
+            </form>
+
+            @if (!Model.IsCreate)
+            {
+                <form method="post" data-au-save asp-action="Remove" asp-route-id="@Model.FacilityId" class="mt-3">
+                    <button type="submit" class="btn btn-danger btn-sm" data-hold="@Hold.Of("Remove this facility", "Remove this facility.", new[] { Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The facility leaves the active list.", "Its reports and logs stay available to restore with it." }, "", "Hold to remove")">Remove facility</button>
+                </form>
+            }
+        </div>
+    </div>
+
+    @if (!Model.IsCreate)
+    {
+        <div class="accordion" id="facilityPanels">
+            <partial name="_CensusEditor" model="Model" />
+
+            <div class="accordion-item" id="dispatchItem" data-collection="dispatch">
+                <h2 class="accordion-header" id="dispatchHeading">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#dispatchPanel" aria-expanded="true" aria-controls="dispatchPanel">
+                        Query dispatch
+                        <span class="text-muted ms-2" id="dispatchCount">@Model.Schedules.Count(row => !string.IsNullOrWhiteSpace(row.Event) || !string.IsNullOrWhiteSpace(row.Duration))</span>
+                    </button>
+                </h2>
+                <div id="dispatchPanel" class="accordion-collapse collapse show" aria-labelledby="dispatchHeading">
+                    <div class="accordion-body">
+                        @if (!Model.QueryDispatchConfigured)
+                        {
+                            <p class="text-muted mb-0">Query dispatch service URL is not configured (ServiceRegistry:QueryDispatchServiceUrl).</p>
+                        }
+                        else
+                        {
+                            @if (!string.IsNullOrWhiteSpace(Model.QueryDispatchError))
+                            {
+                                <div class="alert alert-warning lu-section-error">@Model.QueryDispatchError</div>
+                            }
+                            else if (!Model.QueryDispatchExists || !Model.Schedules.Any(row => !string.IsNullOrWhiteSpace(row.Event) || !string.IsNullOrWhiteSpace(row.Duration)))
+                            {
+                                <p class="mb-3" id="dispatchEmpty">No query dispatch schedules for this facility.</p>
+                            }
+                            else
+                            {
+                                <p class="mb-3 d-none" id="dispatchEmpty">No query dispatch schedules for this facility.</p>
+                            }
+                            <form method="post" data-au-save asp-action="SaveQueryDispatch" asp-route-id="@Model.FacilityId">
+                                <input type="hidden" name="queryDispatchExists" value="@(Model.QueryDispatchExists ? "true" : "false")" />
+                                @for (var i = 0; i < Model.Schedules.Count; i++)
+                                {
+                                    var blankRow = string.IsNullOrWhiteSpace(Model.Schedules[i].Event) && string.IsNullOrWhiteSpace(Model.Schedules[i].Duration);
+                                    <div class="border rounded p-2 mb-2@(blankRow ? " d-none" : "")" data-dispatch-row data-collection-row data-dispatch-blank="@(blankRow ? "true" : "false")">
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-12 col-md-5">
+                                                <label class="form-label" for="event-@i">Event</label>
+                                                <input id="event-@i" name="Schedules[@i].Event" value="@Model.Schedules[i].Event" class="form-control" />
+                                            </div>
+                                            <div class="col-12 col-md-5">
+                                                <label class="form-label" for="duration-@i">Duration</label>
+                                                <input id="duration-@i" name="Schedules[@i].Duration" value="@Model.Schedules[i].Duration" class="form-control" placeholder="PT10S" />
+                                            </div>
+                                            <div class="col-12 col-md-2">
+                                                <input class="d-none" type="checkbox" id="remove-@i" name="Schedules[@i].Remove" value="true" />
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-row-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                <button type="submit" class="btn btn-success">@(Model.QueryDispatchExists ? "Save query dispatch" : "Add query dispatch")</button>
+                            </form>
+                            @if (Model.QueryDispatchExists)
+                            {
+                                <form method="post" data-au-save asp-action="DeleteQueryDispatch" asp-route-id="@Model.FacilityId" class="mt-2">
+                                    <button data-hold="@Hold.Of("Delete the query dispatch configuration?", "Delete the query dispatch configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-danger btn-sm">Delete query dispatch</button>
+                                </form>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item" id="notificationItem" data-collection="notification">
+                <h2 class="accordion-header" id="notificationHeading">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#notificationPanel" aria-expanded="false" aria-controls="notificationPanel">
+                        Notification email
+                        @if (Model.Notification.Configured)
+                        {
+                            var emailCount = (Model.Notification.Emails ?? "").Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+                            <span class="text-muted ms-2" id="notificationCount">@emailCount</span>
+                        }
+                    </button>
+                </h2>
+                <div id="notificationPanel" class="accordion-collapse collapse" aria-labelledby="notificationHeading">
+                    <div class="accordion-body">
+                        @if (TempData["Error"] is string notificationError)
+                        {
+                            <div class="alert alert-warning lu-section-error">@notificationError</div>
+                        }
+                        @if (!Model.Notification.Configured)
+                        {
+                            <p class="text-muted mb-0">Notification service URL is not configured (ServiceRegistry:NotificationServiceUrl).</p>
+                        }
+                        else
+                        {
+                            @if (!string.IsNullOrWhiteSpace(Model.Notification.Error))
+                            {
+                                <div class="alert alert-warning lu-section-error">@Model.Notification.Error</div>
+                            }
+                            else if (!Model.Notification.Exists)
+                            {
+                                <p class="mb-3" id="notificationEmpty">No notification addresses for this facility.</p>
+                            }
+                            else
+                            {
+                                <p class="mb-3 d-none" id="notificationEmpty">No notification addresses for this facility.</p>
+                            }
+                            <form method="post" data-au-save data-facility-action="SaveNotification" asp-controller="Configuration" asp-action="SaveConfiguration">
+                                <input type="hidden" name="Id" value="@Model.Notification.Id" />
+                                <input type="hidden" name="FacilityId" value="@Model.FacilityId" />
+                                <input type="hidden" name="ReturnFacility" value="@Model.FacilityId" />
+                                <div class="mb-3" id="notificationRows">
+                                    <label class="form-label">Email addresses</label>
+                                    @{
+                                        var emailRows = (Model.Notification.Emails ?? "").Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                                    }
+                                    @foreach (var address in emailRows)
+                                    {
+                                        <div class="row g-2 align-items-center mb-2" data-email-row data-collection-row>
+                                            <div class="col">
+                                                <input class="form-control" data-email-input value="@address" aria-label="Email address" maxlength="254" />
+                                            </div>
+                                            <div class="col-auto">
+                                                <button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-email-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                            </div>
+                                        </div>
+                                    }
+                                    <textarea id="notificationEmails" name="Emails" class="d-none">@Model.Notification.Emails</textarea>
+                                    <div class="form-text">At most 20 addresses. A row is removed when you save the facility.</div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="notificationEmailEnabled" name="EmailEnabled" value="true" @(Model.Notification.EmailEnabled ? "checked" : null) />
+                                    <input type="hidden" name="EmailEnabled" value="false" />
+                                    <label class="form-check-label" for="notificationEmailEnabled">Email channel enabled</label>
+                                </div>
+                                <button type="submit" class="btn btn-success">@(Model.Notification.Exists ? "Save notification" : "Add notification")</button>
+                            </form>
+                            @if (Model.Notification.Exists)
+                            {
+                                <form method="post" data-au-save data-facility-action="DeleteNotification" asp-controller="Configuration" asp-action="DeleteConfiguration" class="mt-2">
+                                    <input type="hidden" name="id" value="@Model.Notification.Id" />
+                                    <input type="hidden" name="returnFacility" value="@Model.FacilityId" />
+                                    <button type="submit" class="btn btn-danger btn-sm">Delete notification</button>
+                                </form>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <partial name="_FhirQueryEditor" model="Model" />
+            <partial name="_NormalizationOperationEditor" model="Model" />
+        </div>
+        <p class="text-muted small mt-3 mb-0 lu-facility-note">
+            Edit a section, then save the facility once. A single setting shows + Add on its header until it exists, then Delete. A list shows its count and + Add on the header, and each row has its own Delete. Those changes stay staged until you save.
+        </p>
+    }
+    </div>
+}
+
+@if (!Model.IsCreate && !string.IsNullOrWhiteSpace(Model.FacilityId))
+{
+    <partial name="_DataAcquisitionLogsModal" model="@(new DataAcquisitionLogsModal { FacilityId = Model.FacilityId })" />
+}
+
+@section Scripts {
+    <script src="~/js/facility-save.js" asp-append-version="true"></script>
+}

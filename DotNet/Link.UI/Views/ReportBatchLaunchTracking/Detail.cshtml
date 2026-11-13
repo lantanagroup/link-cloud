@@ -1,0 +1,143 @@
+@model ReportBatchLaunchSummaryPage
+@{
+    var launch = Model.Launch;
+}
+
+@await Html.PartialAsync("~/Views/Automation/_Nav.cshtml")
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Report launch</h1>
+        <p class="text-muted mb-0">Each EHR system is its own batch. Status updates on its own, and a failure in one does not stop the others.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-au-link" asp-controller="ReportBatchTracking" asp-action="History">Recent batches</a>
+        <a class="btn btn-sm btn-au-link" asp-controller="ReportBatchLaunch" asp-action="Index">Launch</a>
+    </div>
+</div>
+
+@if (TempData["LaunchTrackingError"] is string error && !string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (!Model.Ready || !Model.Found)
+{
+    <div class="alert @(Model.Ready ? "alert-warning" : "alert-danger")" role="alert">@Model.Message</div>
+}
+else if (launch is not null)
+{
+    <div id="launchLive"
+         data-open="@(launch.Open ? "yes" : "no")"
+         data-status-url="@Url.Action("Status", new { launchId = launch.LaunchId })">
+        <div class="au-card card mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span>Summary</span>
+                <span class="d-flex align-items-center gap-2">
+                    @if (launch.Open)
+                    {
+                        <span id="launchLiveBadge" class="badge au-badge-active">Live</span>
+                    }
+                </span>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Launch</dt>
+                    <dd class="col-sm-9" id="launchId">@launch.LaunchId</dd>
+                </dl>
+                <ul class="list-inline mb-0 mt-3" aria-live="polite">
+                    <li class="list-inline-item me-3">Total <span id="launchTotal">@launch.Total</span></li>
+                    <li class="list-inline-item me-3">Pending <span id="launchPending">@launch.Pending</span></li>
+                    <li class="list-inline-item me-3">In progress <span id="launchInProgress">@launch.InProgress</span></li>
+                    <li class="list-inline-item me-3">Completed <span id="launchCompleted">@launch.Completed</span></li>
+                    <li class="list-inline-item me-3">Failed <span id="launchFailed">@launch.Failed</span></li>
+                    <li class="list-inline-item">Cancelled <span id="launchCancelled">@launch.Cancelled</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <form id="launchCancel" method="post" asp-action="Cancel" asp-route-launchId="@launch.LaunchId" class="mb-3 @(launch.CanCancel ? "" : "d-none")" data-cancel-launch>
+            @Html.AntiForgeryToken()
+            <button type="button" class="btn btn-warning" id="launchCancelButton">Cancel launch</button>
+        </form>
+
+        @foreach (var group in launch.Groups)
+        {
+            <section class="au-card card mb-3" aria-label="@group.EhrSystem" data-ehr-group="@group.BatchId">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span>@group.EhrSystem</span>
+                    <span class="d-flex align-items-center gap-2">
+                        <span class="badge @group.PillClass" data-ehr-status="@group.BatchId">@group.Status</span>
+                        <a href="@group.BatchHref">Open batch</a>
+                    </span>
+                </div>
+                <div class="card-body">
+                    <ul class="list-inline mb-3" data-ehr-counts="@group.BatchId">
+                        <li class="list-inline-item me-3">At once <span data-count="cap">@group.MaxConcurrency</span></li>
+                        <li class="list-inline-item me-3">Pending <span data-count="pending">@group.Pending</span></li>
+                        <li class="list-inline-item me-3">In progress <span data-count="inProgress">@group.InProgress</span></li>
+                        <li class="list-inline-item me-3">Completed <span data-count="completed">@group.Completed</span></li>
+                        <li class="list-inline-item me-3">Failed <span data-count="failed">@group.Failed</span></li>
+                        <li class="list-inline-item">Cancelled <span data-count="cancelled">@group.Cancelled</span></li>
+                    </ul>
+                    <form method="post" asp-action="CancelBatch" asp-route-launchId="@launch.LaunchId" asp-route-batchId="@group.BatchId" class="mb-3 @(group.CanCancel ? "" : "d-none")" data-cancel-batch="@group.BatchId">
+                        @Html.AntiForgeryToken()
+                        <button type="button" class="btn btn-sm btn-warning" data-cancel-batch-button>Cancel this EHR</button>
+                    </form>
+                    @if (group.Items.Count == 0)
+                    {
+                        <p class="mb-0 text-muted">No reports for this EHR.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table au-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Scenario</th>
+                                        <th scope="col">EHR</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Error</th>
+                                        <th scope="col">Run</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in group.Items)
+                                    {
+                                        <tr data-batch="@group.BatchId" data-ordinal="@item.Ordinal">
+                                            <td>@item.Ordinal</td>
+                                            <td>
+                                                @item.ScenarioName
+                                                @if (item.IsMetricsRun)
+                                                {
+                                                    <span class="badge au-badge-muted ms-1" data-nocopy>Metrics</span>
+                                                }
+                                            </td>
+                                            <td>@item.EhrSystem</td>
+                                            <td data-nocopy><span class="badge @item.PillClass" data-item-status>@item.Status</span></td>
+                                            <td class="text-break"><span data-item-error>@(item.Error ?? "—")</span></td>
+                                            <td data-item-run-cell>
+                                                @if (item.RunHref is not null && item.RunId is Guid runId)
+                                                {
+                                                    <a data-item-run href="@item.RunHref">@runId</a>
+                                                }
+                                                else
+                                                {
+                                                    <span data-item-run>—</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@section Scripts {
+    <script src="~/js/automation-launch.js" asp-append-version="true"></script>
+}

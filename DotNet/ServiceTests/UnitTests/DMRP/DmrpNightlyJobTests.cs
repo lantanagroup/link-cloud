@@ -132,7 +132,8 @@ public class DmrpNightlyJobTests
         monthly.ReportTypes.Should().BeEquivalentTo(["NHSNdQMHTCDI"]);
         monthly.StartDate.Should().Be(new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc));
         monthly.EndDate.Should().Be(new DateTime(2026, 12, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(-1));
-        _produced.Should().OnlyContain(m => m.Key == "100");
+        _produced.Should().OnlyContain(m => m.Key == KafkaKeys.ForFacility("100"));
+        _produced.Should().OnlyContain(m => ((ReportScheduledMessage)m.Value).FacilityId == "100");
 
         // Everything downstream keys off these two halves agreeing: the Report service dedupes on the
         // ReportTrackingId in the value, and every other service correlates on the header. The classic
@@ -310,7 +311,7 @@ public class DmrpNightlyJobTests
 
         await CreateJob().Execute(ContextFiredAt(NightOfOctober14));
 
-        _produced.Should().ContainSingle().Which.Key.Should().Be("100");
+        _produced.Should().ContainSingle().Which.Key.Should().Be(KafkaKeys.ForFacility("100"));
         _metrics.Verify(m => m.RecordFacilityOutcome(Zone, DmrpFireOutcome.Emitted), Times.Once);
         _metrics.Verify(m => m.RecordFacilityOutcome(Zone, DmrpFireOutcome.Failed), Times.Once);
     }

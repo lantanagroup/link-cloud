@@ -146,6 +146,8 @@ public class OrganizationLocationMappingApiModel
     public int? PartOfId { get; set; }
     public bool IsOrgLocation { get; set; }
     public bool IsActive { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime ModifiedDate { get; set; }
 }
 
 public class EncounterLocationApiModel
@@ -163,6 +165,8 @@ public class EncounterMappingApiModel
     public string PatientId { get; set; } = string.Empty;
     public string EncounterId { get; set; } = string.Empty;
     public bool MappedToOrg { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime ModifiedDate { get; set; }
     public List<EncounterLocationApiModel> EncounterLocations { get; set; } = [];
 }
 

@@ -1,0 +1,174 @@
+@model ValidationListPage
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to configuration"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Validation</h1>
+<partial name="_Alerts" />
+<p class="text-muted">Initialize the published implementation guides and categories, upload a package, check terminology dependencies, and import or export the category catalog. Importing replaces the catalog.</p>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <form method="post" data-au-save asp-action="Initialize">
+        <input type="hidden" name="categories" value="false" />
+        <button data-hold="@Hold.Of("Initialize implementation guides from the published packages?", "Initialize implementation guides from the published packages?", "Published configuration is overwritten.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Initialize guides</button>
+    </form>
+    <form method="post" data-au-save asp-action="Initialize">
+        <input type="hidden" name="categories" value="true" />
+        <button data-hold="@Hold.Of("Initialize validation categories from the published packages?", "Initialize validation categories from the published packages?", "Published configuration is overwritten.", "Hold to confirm")" type="submit" class="btn btn-au-execute">Initialize categories</button>
+    </form>
+    <a class="btn btn-au-link" asp-action="Dependencies" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">All dependencies</a>
+    <a class="btn btn-au-link" asp-action="ExportCategories">Export categories</a>
+</div>
+
+<div class="au-card card mb-3 d-none" id="packageUpload" data-lu-panel data-lu-hide-on-cancel>
+    <div class="card-header">Upload a package</div>
+    <div class="card-body">
+        <form method="post" data-au-save asp-action="UploadPackage" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="packageName">Package name</label>
+                <input id="packageName" name="name" class="form-control" maxlength="120" required />
+            </div>
+            <div class="col-12 col-md-5">
+                <label class="form-label" for="package">Package file</label>
+                <input id="package" name="package" type="file" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button data-hold="@Hold.Of("Uploading replaces the package with this name. Continue?", "Uploading replaces the package with this name. Continue?", "The current contents are replaced.", "Hold to confirm")" type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The name is the artifact name. The file is sent as the package bytes. The limit is 8 MB.</p>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Import categories</div>
+    <div class="card-body">
+        <form method="post" data-au-save asp-action="ImportCategories" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="categoryFile">Category export</label>
+                <input id="categoryFile" name="file" type="file" accept="application/json,.json" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <button data-hold="@Hold.Of("This replaces the category catalog. Categories that are not in the file are deleted. Continue?", "This replaces the category catalog. Categories that are not in the file are deleted. Continue?", "The current contents are replaced.", "Hold to confirm")" type="submit" class="btn btn-success">Import and replace</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Use an export from this page. uncategorized cannot be imported. The limit is 8 MB.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Implementation guides</span>
+        <button type="button" class="btn btn-sm btn-success" data-lu-reveal="packageUpload">+ Add</button>
+    </div>
+    <div class="card-body">
+        @if (Model.Artifacts.Count == 0)
+        {
+            <p class="mb-0">No implementation guides yet. Add a package when you have one to upload.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Type</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Artifacts)
+                    {
+                        <tr>
+                            <td>@row.Name</td>
+                            <td>@row.Type</td>
+                            <td>
+                                @if (string.Equals(row.Type, "PACKAGE", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Package" asp-route-name="@row.Name" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="ms-1">Open</span></a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.CategoryError))
+{
+    <div class="alert alert-warning">@Model.CategoryError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Open or create a category</div>
+    <div class="card-body">
+        <form method="get" asp-action="Category" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id">Category id</label>
+                <input id="id" name="id" class="form-control" maxlength="64" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-link">Open</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">A category that is not saved yet can be created from the next page. uncategorized is reserved.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Categories</div>
+    <div class="card-body">
+        @if (Model.Categories.Count == 0)
+        {
+            <p class="mb-0">No categories yet. Initialize the published categories, or open a category id to create one.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Id</th>
+                            <th scope="col">Title</th>
+                            <th scope="col">Severity</th>
+                            <th scope="col">Acceptable</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Categories)
+                    {
+                        <tr>
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = row.Id, Compact = true, CopyLabel = "Copy id" })" /></td>
+                            <td>@row.Title</td>
+                            <td>@row.Severity</td>
+                            <td>@(row.Acceptable ? "Yes" : "No")</td>
+                            <td>
+                                @if (row.Reserved)
+                                {
+                                    <span class="text-muted">Reserved</span>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Category" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

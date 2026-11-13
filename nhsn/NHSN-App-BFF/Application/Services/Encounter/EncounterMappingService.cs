@@ -7,6 +7,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using EncounterMapping = LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Encounter.EncounterMapping;
+using UpdateNormalizationOperationRequestApiModel = LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Normalization.UpdateNormalizationOperationRequestApiModel;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Encounter;
 

@@ -7,6 +7,8 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Messages;
 
 public class ResourcesAcquiredValue
 {
+    public string? FacilityId { get; set; }
+    public string? PatientId { get; set; }
     public string QueryType { get; set; }
     public List<ScheduledReport> ScheduledReports { get; set; }
     public string ReportableEvent { get; set; }

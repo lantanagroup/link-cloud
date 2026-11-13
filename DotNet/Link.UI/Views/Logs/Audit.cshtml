@@ -1,0 +1,167 @@
+@model AuditListPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Audit event log";
+    ViewData["LogsSection"] = "audit";
+    var query = Model.Query;
+    var search = Model.Search;
+    var bar = Model.Paging;
+    Dictionary<string, string> SortRoute(string column, bool dateColumn) => query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: LogsRules.NextSort(search.SortBy, search.SortDir, column, dateColumn));
+    string Mark(string column) => string.Equals(search.SortBy, column, StringComparison.OrdinalIgnoreCase)
+        ? (search.SortDir == "asc" ? " ↑" : " ↓")
+        : "";
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to logs"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Audit event log</h1>
+<partial name="_Alerts" />
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search" data-au-filter="400" data-au-target="auditResults">
+            <input type="hidden" name="pageSize" value="@search.PageSize" />
+            <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="searchText">Text</label>
+                <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="service">Service</label>
+                <select id="service" name="service" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var service in LogsRules.AuditServices)
+                    {
+                        if (string.Equals(service.Value, query.Service, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@service.Value" selected>@service.Label</option>
+                        }
+                        else
+                        {
+                            <option value="@service.Value">@service.Label</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="eventAction">Action</label>
+                <select id="eventAction" name="eventAction" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var action in LogsRules.AuditActions)
+                    {
+                        if (string.Equals(action, query.Action, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@action" selected>@action</option>
+                        }
+                        else
+                        {
+                            <option value="@action">@action</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                <a class="btn btn-warning" asp-action="Audit">Clear</a>
+            </div>
+            </div>
+            <details class="lu-advanced mt-2" @((!string.IsNullOrWhiteSpace(query.FacilityId) || !string.IsNullOrWhiteSpace(query.CorrelationId) || !string.IsNullOrWhiteSpace(query.User) || !string.IsNullOrWhiteSpace(query.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="facilityId">Facility</label>
+                        <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="correlationId">Correlation id</label>
+                        <input id="correlationId" name="correlationId" value="@query.CorrelationId" class="form-control" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="user">User</label>
+                        <input id="user" name="user" value="@query.User" class="form-control" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <partial name="_AutomationScope" model="query.Scope" />
+                    </div>
+                </div>
+            </details>
+        </form>
+    </div>
+</div>
+
+<p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
+<div id="auditResults" data-au-refresh="15000">
+@if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+{
+    <p class="small text-muted mt-3">@Model.ScopeNote</p>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Events</div>
+        <div class="card-body">
+            @if (Model.Events.Count == 0)
+            {
+                <p class="au-empty mb-0">@(
+                    !LinkUiFeatures.Value.AutomationEnabled ? "No audit events found."
+                    : Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation audit events."
+                    : Link.UI.Services.AutomationMarkRules.IsReal(query.Scope) ? "No real audit events."
+                    : "No audit events found.")</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead>
+                            <tr>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("CreatedOn", true)">When@(Mark("CreatedOn"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("FacilityId", false)">Facility@(Mark("FacilityId"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("ServiceName", false)">Service@(Mark("ServiceName"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("Action", false)">Action@(Mark("Action"))</a></th>
+                                <th scope="col">User</th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("Resource", false)">Resource@(Mark("Resource"))</a></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Events)
+                        {
+                            <tr>
+                                <td class="text-nowrap">
+                                    @if (row.Link)
+                                    {
+                                        <a asp-action="AuditDetail" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@row.When</a>
+                                    }
+                                    else
+                                    {
+                                        @row.When
+                                    }
+                                </td>
+                                <td>
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
+                                    <partial name="_AutomationBadge" model="row.IsTest" />
+                                </td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Service) ? "—" : row.Service)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Action) ? "—" : row.Action)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.User) ? "—" : row.User)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Resource) ? "—" : row.Resource)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Audit pages", Page = bar.Page, Pages = bar.TotalPages == 0 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = search.PageSize, Sizes = LogsRules.AuditPageSizes, Route = (page, size) => query.ToRoute(page, pageSize: size) })" />
+            }
+        </div>
+    </div>
+}
+</div>
