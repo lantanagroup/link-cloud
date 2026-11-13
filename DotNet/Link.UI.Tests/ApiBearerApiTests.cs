@@ -223,6 +223,7 @@ public sealed class ApiBearerDisabledTests : IClassFixture<BearerOffAnonymousHos
         body.GetProperty("isTerminal").GetBoolean().Should().BeTrue();
         body.GetProperty("runName").GetString().Should().Be("Ad hoc");
         body.GetProperty("error").GetString().Should().BeNull();
+        body.GetProperty("facilityId").GetString().Should().Be(ApiRunsFakes.RunId.ToString());
     }
 
     [Fact]
@@ -708,7 +709,8 @@ internal static class ApiRunsFakes
                 CreatedAt = DateTimeOffset.Parse("2026-10-07T15:00:00Z"),
                 StartedAt = DateTimeOffset.Parse("2026-10-07T15:00:01Z"),
                 FinishedAt = DateTimeOffset.Parse("2026-10-07T15:01:00Z"),
-                Duration = "00:00:59"
+                Duration = "00:00:59",
+                FacilityId = RunId.ToString()
             });
         }
 
