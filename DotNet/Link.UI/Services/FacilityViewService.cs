@@ -178,14 +178,17 @@ public sealed class FacilityViewService
             }
 
             var schedule = await _reports.GetScheduleAsync(page.ReportId, cancellationToken);
-            if (schedule.StatusCode == StatusCodes.Status404NotFound || schedule.Body is null)
+            // A 500 with an empty body is a failed read, not a missing report. Only a 404,
+            // or a success that carried no schedule, is confirmed absence.
+            if (schedule.StatusCode == StatusCodes.Status404NotFound
+                || (schedule.IsSuccessStatusCode && schedule.Body is null))
             {
                 page.NotFound = true;
                 page.LoadError = "That report was not found.";
                 return page;
             }
 
-            if (!schedule.IsSuccessStatusCode)
+            if (!schedule.IsSuccessStatusCode || schedule.Body is null)
             {
                 page.LoadError = FacilityFormRules.ServiceMessage("Report", schedule.StatusCode, schedule.RawBody);
                 return page;

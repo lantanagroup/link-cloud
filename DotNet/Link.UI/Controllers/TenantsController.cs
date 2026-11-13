@@ -449,7 +449,10 @@ public sealed class TenantsController : Controller
         return View(page);
     }
 
-    /// <summary>The report page's live region. Never fails the poll: a missing report renders its empty state and stops polling.</summary>
+    /// <summary>
+    /// The report page's live region. A confirmed missing report renders its empty state and stops polling.
+    /// A failed read is tried once more. If it is still failing, 503 leaves the page in place and the timer running.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> ReportLive(
         [FromRoute] string? id,
@@ -457,11 +460,26 @@ public sealed class TenantsController : Controller
         [FromServices] ReportProgressService progress,
         CancellationToken cancellationToken)
     {
-        ReportDetailModel page;
         try
         {
-            page = await _view.LoadReportAsync(id, reportId, new ReportPageQuery(), cancellationToken);
-            await AttachProgressAsync(page, progress, cancellationToken);
+            var page = await ReportLiveRules.LoadWithRetryAsync(
+                ct => _view.LoadReportAsync(id, reportId, new ReportPageQuery(), ct),
+                (model, ct) => AttachProgressAsync(model, progress, ct),
+                ReportLiveRules.RetryBackoff,
+                cancellationToken);
+
+            if (page.Report is null && string.IsNullOrWhiteSpace(page.LoadError))
+            {
+                page.NotFound = true;
+                page.LoadError = "That report was not found.";
+            }
+
+            Response.Headers.CacheControl = "no-store";
+            // live-region.js keeps the timer on any non-OK response and only stops on data-au-final.
+            if (ReportLiveRules.ShouldRetry(page))
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            return PartialView("_ReportLive", page);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -469,13 +487,9 @@ public sealed class TenantsController : Controller
         }
         catch (Exception)
         {
-            page = new ReportDetailModel { FacilityId = id, ReportId = reportId ?? "", LoadError = "The report could not be read right now." };
+            Response.Headers.CacheControl = "no-store";
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
-
-        if (page.Report is null && string.IsNullOrWhiteSpace(page.LoadError))
-            page.LoadError = "That report was not found.";
-        Response.Headers.CacheControl = "no-store";
-        return PartialView("_ReportLive", page);
     }
 
     /// <summary>Automation reports (test facility, Automation on) also show their run on this page.</summary>
