@@ -33,6 +33,11 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default);
 
         Task SaveChangesAsync();
+
+        /// <summary>
+        /// Saves pending changes, honoring <paramref name="cancellationToken"/>.
+        /// </summary>
+        Task SaveChangesAsync(CancellationToken cancellationToken);
     }
     public class Database : IDatabase
     {
@@ -92,6 +97,11 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public async Task SaveChangesAsync()
         {
             await _context.SaveChangesAsync();
+        }
+
+        public async Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
         public async Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default)
