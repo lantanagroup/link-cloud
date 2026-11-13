@@ -276,8 +276,7 @@ export function PatientStatusTimelineModal({open, onClose, patientId, measureNam
                   event.preventDefault();
                   setSelectedNodeId(node.id);
                 }
-              }}
-              style={{cursor: 'pointer'}}>
+              }}>
               <rect
                 x={xy.x}
                 y={xy.y}

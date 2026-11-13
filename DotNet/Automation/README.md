@@ -1,13 +1,11 @@
-﻿# Automation
+# Automation
 
 `Automation` is the platform-agnostic foundation library for deterministic synthetic FHIR
 generation, predictive pipeline modeling, and reusable automation primitives. It has no
 dependency on any Link-specific service; host projects compose it with environment-specific
 orchestration.
 
-Thetis generation packages (`LantanaGroup.Thetis.Generation.Abstractions` / `Engine`) come from Azure Artifacts feed `Shared_BOTW_Feed`. Do not write a PAT into the tracked `nuget.config`. For `docker compose`, run the one-time setup in `DEVELOPMENT.md` (`Scripts/docker-compose.feed-token-install.ps1`, or `bash ./Scripts/docker-compose.feed-token-install.sh`). The wrapper stores a short-lived Azure CLI token in gitignored `.azure-artifacts.env` and passes it only as the BuildKit secret `feed_accesstoken`. If Azure CLI cannot be installed, that setup prints the reason; install it for the current user from https://aka.ms/installazurecliwindows and run the fetch script again. Visual Studio restore still works after you sign into the `lantanagroup` Azure DevOps org, and it does not write credentials into `nuget.config`.
-
-Other Link services still restore from nuget.org. Restoring the whole solution still needs feed access because Directory.Packages.props pins Thetis.
+Thetis generation packages (`LantanaGroup.Thetis.Generation.Abstractions` and `Engine`) come from nuget.org under the PolyForm Noncommercial 1.0.0 license. The license file ships in each package. No extra NuGet source or token is required. See `DEVELOPMENT.md`.
 
 This README is the comprehensive reference for the project. It is aimed at three audiences:
 

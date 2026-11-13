@@ -1,10 +1,30 @@
 import {describe, expect, it} from 'vitest';
-import type {Capabilities, UserInfoResponse} from '../../../api/contracts';
+import type {Capabilities, UserInfoResponse, VendorProfile} from '../../../api/contracts';
 import {getStep} from '../../flow';
 import {createEmptyDraft} from '../../types';
 import {CENSUS_LIST_KEYS} from './validate';
 
 const isComplete = getStep('census')!.isComplete;
+
+const epicProfile: VendorProfile = {
+  vendor: 'Epic',
+  displayName: 'Epic',
+  censusAcquisition: 'PatientList',
+  patientListKeys: [...CENSUS_LIST_KEYS],
+  locationMethods: [],
+  documentKeys: {},
+  hslocSourceLabel: 'Epic Location'
+};
+
+const cernerProfile: VendorProfile = {
+  vendor: 'Cerner',
+  displayName: 'Cerner',
+  censusAcquisition: 'Sftp',
+  patientListKeys: [],
+  locationMethods: [],
+  documentKeys: {},
+  hslocSourceLabel: 'Cerner Location'
+};
 
 function userWith(capabilities: Partial<Capabilities>): UserInfoResponse {
   return {
@@ -30,22 +50,31 @@ function userWith(capabilities: Partial<Capabilities>): UserInfoResponse {
 
 describe('census step completion', () => {
   it('is incomplete on an empty draft', () => {
-    expect(isComplete(createEmptyDraft())).toBe(false);
+    expect(isComplete(createEmptyDraft(), undefined, epicProfile)).toBe(false);
+    expect(isComplete(createEmptyDraft(), undefined, cernerProfile)).toBe(false);
+  });
+
+  it('is incomplete until the vendor profile is known, however complete the draft is', () => {
+    const draft = createEmptyDraft();
+    draft.census.patientListIds = Object.fromEntries(CENSUS_LIST_KEYS.map(key => [key, `list-${key}`]));
+    draft.census.acquisitionFrequency = 'PT0H15M';
+    draft.census.accuracyAcknowledged = true;
+    expect(isComplete(draft)).toBe(false);
   });
 
   it('is incomplete once configured but not yet acknowledged, when validation is live', () => {
     const draft = createEmptyDraft();
     draft.census.patientListIds = Object.fromEntries(CENSUS_LIST_KEYS.map(key => [key, `list-${key}`]));
     draft.census.acquisitionFrequency = 'PT0H15M';
-    expect(isComplete(draft, userWith({patientListWithNames: true}))).toBe(false);
+    expect(isComplete(draft, userWith({patientListWithNames: true}), epicProfile)).toBe(false);
   });
 
   it('is complete once configured, with no acknowledgement required, when validation is not live', () => {
     const draft = createEmptyDraft();
     draft.census.patientListIds = Object.fromEntries(CENSUS_LIST_KEYS.map(key => [key, `list-${key}`]));
     draft.census.acquisitionFrequency = 'PT0H15M';
-    expect(isComplete(draft, userWith({patientListWithNames: false}))).toBe(true);
-    expect(isComplete(draft)).toBe(true);
+    expect(isComplete(draft, userWith({patientListWithNames: false}), epicProfile)).toBe(true);
+    expect(isComplete(draft, undefined, epicProfile)).toBe(true);
   });
 
   it('is complete for an Epic-shaped draft once acknowledged', () => {
@@ -53,7 +82,7 @@ describe('census step completion', () => {
     draft.census.patientListIds = Object.fromEntries(CENSUS_LIST_KEYS.map(key => [key, `list-${key}`]));
     draft.census.acquisitionFrequency = 'PT0H15M';
     draft.census.accuracyAcknowledged = true;
-    expect(isComplete(draft, userWith({patientListWithNames: true}))).toBe(true);
+    expect(isComplete(draft, userWith({patientListWithNames: true}), epicProfile)).toBe(true);
   });
 
   it('is complete for a Cerner-shaped draft once tested and acknowledged', () => {
@@ -63,7 +92,7 @@ describe('census step completion', () => {
     draft.census.acquisitionFrequency = 'PT1H0M';
     draft.census.sftpConnectionTested = true;
     draft.census.accuracyAcknowledged = true;
-    expect(isComplete(draft, userWith({sftpFileListing: true}))).toBe(true);
+    expect(isComplete(draft, userWith({sftpFileListing: true}), cernerProfile)).toBe(true);
   });
 
   it('stays incomplete for a Cerner-shaped draft without a successful connection test, regardless of the flag', () => {
@@ -72,8 +101,8 @@ describe('census step completion', () => {
     draft.census.sftpPort = 22;
     draft.census.acquisitionFrequency = 'PT1H0M';
     draft.census.accuracyAcknowledged = true;
-    expect(isComplete(draft, userWith({sftpFileListing: true}))).toBe(false);
-    expect(isComplete(draft, userWith({sftpFileListing: false}))).toBe(false);
+    expect(isComplete(draft, userWith({sftpFileListing: true}), cernerProfile)).toBe(false);
+    expect(isComplete(draft, userWith({sftpFileListing: false}), cernerProfile)).toBe(false);
   });
 
   it('stays incomplete if the acknowledged frequency is under 5 minutes', () => {
@@ -83,7 +112,7 @@ describe('census step completion', () => {
     draft.census.acquisitionFrequency = 'PT0H4M';
     draft.census.sftpConnectionTested = true;
     draft.census.accuracyAcknowledged = true;
-    expect(isComplete(draft, userWith({sftpFileListing: true}))).toBe(false);
+    expect(isComplete(draft, userWith({sftpFileListing: true}), cernerProfile)).toBe(false);
   });
 
   it('stays incomplete if the acknowledged frequency is over 24 hours', () => {
@@ -93,6 +122,6 @@ describe('census step completion', () => {
     draft.census.acquisitionFrequency = 'PT25H0M';
     draft.census.sftpConnectionTested = true;
     draft.census.accuracyAcknowledged = true;
-    expect(isComplete(draft, userWith({sftpFileListing: true}))).toBe(false);
+    expect(isComplete(draft, userWith({sftpFileListing: true}), cernerProfile)).toBe(false);
   });
 });

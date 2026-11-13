@@ -24,39 +24,11 @@ docker compose down -v --remove-orphans       # tear everything down (resets vol
 
 Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, admin-bff 8063, kafka 9092, kafka-ui 9095, loki 3100, grafana 3000, azurite 10000, mssql 1433, mongo 17017). Compose and locally run services read credentials from a root `.env`, which is not committed: copy `.env.example` to `.env` and set its two `CHANGE_ME` passwords (the template says what each needs).
 
-### Azure Artifacts (Thetis)
+### Thetis packages
 
-Automation, Automation.UI, Link.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` from Azure Artifacts feed `Shared_BOTW_Feed`. Repo `nuget.config` lists that source and does not store a token. Do not write a PAT or access token into `nuget.config`. `packageSourceMapping` keeps every other package on nuget.org.
+`LantanaGroup.Thetis.Generation.Abstractions` and `LantanaGroup.Thetis.Generation.Engine` come from nuget.org. Both are PolyForm Noncommercial 1.0.0; the license file ships inside each package. Restore and `docker compose build` need no extra NuGet source, token, or sign-in.
 
-`docker compose` inside this repo passes a short-lived Azure CLI token to those images only as the BuildKit secret `feed_accesstoken`. One-time setup from the repo root:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1
-```
-
-Git Bash:
-
-```bash
-bash ./Scripts/docker-compose.feed-token-install.sh
-```
-
-The installer adds one line to the shell profile:
-
-```powershell
-. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token
-```
-
-```bash
-. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token
-```
-
-Open a new shell in the repo and run `docker compose` as usual. The wrapper fetches a token into the gitignored file `.azure-artifacts.env` when that file is missing or the token has less than 10 minutes left, then passes `AZURE_ARTIFACTS_PAT` only to the docker process. The parent shell does not keep the variable. On Windows the file's ACL is limited to the current user. The token is not printed.
-
-If Azure CLI is missing, `Scripts/docker-compose.feed-token.ps1` (and the Git Bash script `Scripts/docker-compose.feed-token-fetch.sh`) installs it for the current user with `winget install --id Microsoft.AzureCLI --scope user`. If winget is missing, policy blocks the install, the install fails, or sign-in is cancelled, the command prints that reason and stops. A `docker compose` command in this repo then stops before Docker starts and tells you to run the installer lines above. Install Azure CLI yourself (no admin) from https://aka.ms/installazurecliwindows and run the fetch script again, or finish `az login`.
-
-Visual Studio can still restore on the host after you sign into the `lantanagroup` Azure DevOps org. That path does not write credentials into the tracked `nuget.config`.
-
-CI is unchanged. GitHub Actions sets `AZURE_ARTIFACTS_PAT` and bakes `docker-compose.yml`, which supplies the `feed_accesstoken` secret. The Automation image pipeline passes `--secret id=feed_accesstoken,env=SYSTEM_ACCESSTOKEN`.
+If a developer machine still has the old private feed in its own NuGet config, remove that source and any password stored with it (`dotnet nuget list source`, then `dotnet nuget remove source <name>`).
 
 ### .NET
 

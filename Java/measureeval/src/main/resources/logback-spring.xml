@@ -12,7 +12,11 @@
 
     <logger name="org.apache.kafka.clients.producer.ProducerConfig" level="WARN" />
 
-    <if condition='property("loki.enabled").equalsIgnoreCase("true")'>
+    <condition class="com.lantanagroup.link.shared.logging.PropertyEqualsIgnoreCaseCondition">
+        <key>loki.enabled</key>
+        <value>true</value>
+    </condition>
+    <if>
         <then>
             <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
                 <labels>

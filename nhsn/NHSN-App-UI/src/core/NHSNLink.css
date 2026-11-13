@@ -2611,6 +2611,10 @@ a.nhsn-link__report-results-link {
   overflow: visible;
 }
 
+.nhsn-link__timeline-node {
+  cursor: pointer;
+}
+
 .nhsn-link__report-results-timeline-detail {
   margin-top: 20px;
   padding-top: 16px;

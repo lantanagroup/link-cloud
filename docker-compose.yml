@@ -1,4 +1,4 @@
-﻿#### services and ports
+#### services and ports
 ## fhir_server: 6157
 ## mock-fhir-server: 6158
 ## redis_cache: 6379
@@ -573,7 +573,7 @@ services:
       PORT: 8090
       NHSN_APP_UI_DEFAULT_JWT_ISSUER: https://docker-nhsn-app.example.org
       NHSN_APP_UI_DEFAULT_JWT_KEY_ID: '399E34CBAADFE1B9EBF3484198B5B451C6FD3800'
-      NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM: '-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg8bBAWSvX80TrIXvT\niuwm0MhA2Babh4aomKZtnoszZfihRANCAAQNoNqXozIM+J/ZIq6fa/vhsayZ+GlY\nE2kQAYPpDGfo3boxro6EDvNAj5D+EbY5650CZZhBQTin3r3Ahk6/nNk2\n-----END PRIVATE KEY-----'
+      NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM: '-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg8bBAWSvX80TrIXvT\niuwm0MhA2Babh4aomKZtnoszZfihRANCAAQNoNqXozIM+J/ZIq6fa/vhsayZ+GlY\nE2kQAYPpDGfo3boxro6EDvNAj5D+EbY5650CZZhBQTin3r3Ahk6/nNk2\n-----END PRIVATE KEY-----' # trufflehog:ignore
     ports:
       - "8090:8090"
     build:
@@ -786,8 +786,6 @@ services:
       dockerfile: DotNet/Link.UI/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
-      secrets:
-        - feed_accesstoken
     networks:
       - link-nw
     depends_on:
@@ -1087,8 +1085,6 @@ services:
       dockerfile: DotNet/MockFhirServer/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
-      secrets:
-        - feed_accesstoken
     networks:
       - link-nw
     healthcheck:
@@ -1160,12 +1156,6 @@ services:
 
 networks:
   link-nw:
-     
-secrets:
-  # BuildKit secret for Shared_BOTW_Feed. Compose reads AZURE_ARTIFACTS_PAT
-  # from the process environment. Do not also pass the token as a build arg.
-  feed_accesstoken:
-    environment: AZURE_ARTIFACTS_PAT
 
 volumes:
   kafka_data:

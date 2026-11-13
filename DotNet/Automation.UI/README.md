@@ -1,10 +1,10 @@
-﻿# Automation.UI
+# Automation.UI
 
 `Automation.UI` is the interactive web host for Link automation runs. It lets users create and
 manage test scenarios, configure FHIR query plans, start runs, watch progress in real time,
 inspect pipeline state, and review validation outcomes -- all from a browser.
 
-Thetis packages restore from Azure Artifacts `Shared_BOTW_Feed`. Do not write a PAT into the tracked `nuget.config`. For `docker compose`, run the one-time setup in `DEVELOPMENT.md` (`Scripts/docker-compose.feed-token-install.ps1`, or `bash ./Scripts/docker-compose.feed-token-install.sh`). The wrapper stores a short-lived Azure CLI token in gitignored `.azure-artifacts.env` and passes it only as the BuildKit secret `feed_accesstoken`. If Azure CLI cannot be installed, that setup prints the reason; install it for the current user from https://aka.ms/installazurecliwindows and run the fetch script again. Visual Studio restore still works after you sign into the `lantanagroup` Azure DevOps org. CI still supplies the same secret id from `AZURE_ARTIFACTS_PAT` or `SYSTEM_ACCESSTOKEN`.
+Thetis packages (`LantanaGroup.Thetis.Generation.Abstractions` and `Engine`) come from nuget.org under the PolyForm Noncommercial 1.0.0 license. The license file ships in each package. No extra NuGet source or token is required. See `DEVELOPMENT.md`.
 
 It composes:
 
