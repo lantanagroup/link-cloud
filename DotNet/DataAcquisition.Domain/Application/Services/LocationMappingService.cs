@@ -718,7 +718,8 @@ public class LocationMappingService(
                 EncounterId = encounter.Id,
                 MappedToOrg = mappedToOrg,
                 OrganizationLocationMappingIds = organizationLocationMappingIds
-            });
+            },
+            cancellationToken);
     }
 
     private async Task<OrganizationLocationMappingModel> UpdateMapping(Location location, bool isOrgLocation,

@@ -882,9 +882,10 @@ public class LocationMappingServiceTests
 
         CreateEncounterMappingModel? captured = null;
         _mockEncounterMappingManager
-            .Setup(m => m.CreateFromAcquisitionAsync(It.IsAny<CreateEncounterMappingModel>()))
-            .Callback<CreateEncounterMappingModel>(m => captured = m)
-            .ReturnsAsync((CreateEncounterMappingModel m) => new EncounterMappingModel
+            .Setup(m => m.CreateFromAcquisitionAsync(It.IsAny<CreateEncounterMappingModel>(),
+                                                     It.IsAny<CancellationToken>()))
+            .Callback<CreateEncounterMappingModel, CancellationToken>((m, _) => captured = m)
+            .ReturnsAsync((CreateEncounterMappingModel m, CancellationToken _) => new EncounterMappingModel
             {
                 EncounterMappingId = 1,
                 FacilityId = m.FacilityId,
@@ -926,7 +927,8 @@ public class LocationMappingServiceTests
             });
 
         _mockEncounterMappingManager
-            .Setup(m => m.CreateFromAcquisitionAsync(It.IsAny<CreateEncounterMappingModel>()))
+            .Setup(m => m.CreateFromAcquisitionAsync(It.IsAny<CreateEncounterMappingModel>(),
+                                                     It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EncounterMappingModel());
 
         var encounter = new Encounter
@@ -940,12 +942,16 @@ public class LocationMappingServiceTests
             }
         };
 
-        await _service.UpdateEncounterLocationMappingAsync(FacilityId, encounter, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource();
+        await _service.UpdateEncounterLocationMappingAsync(FacilityId, encounter, cancellation.Token);
 
         _mockQueries.Verify(q => q.GetByFacilityIdAndLocationIdsAsync(
                 FacilityId,
                 It.Is<IReadOnlyCollection<string>>(ids => ids.Count == 1 && ids.Contains("loc-a")),
-                It.IsAny<CancellationToken>()),
+                cancellation.Token),
+            Times.Once);
+        _mockEncounterMappingManager.Verify(
+            m => m.CreateFromAcquisitionAsync(It.IsAny<CreateEncounterMappingModel>(), cancellation.Token),
             Times.Once);
         _mockQueries.Verify(q => q.GetByFacilityIdAsync(It.IsAny<string>()), Times.Never);
         _mockEncounterMappingManager.Verify(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()), Times.Never);

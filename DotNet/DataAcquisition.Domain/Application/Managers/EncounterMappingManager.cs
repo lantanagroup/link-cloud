@@ -15,7 +15,8 @@ public interface IEncounterMappingManager
     /// Creates a mapping from an acquired Encounter, without the facility and patient checks that
     /// <see cref="CreateAsync"/> runs for manual creates. Acquisition cannot produce either inconsistency.
     /// </summary>
-    Task<EncounterMappingModel> CreateFromAcquisitionAsync(CreateEncounterMappingModel model);
+    Task<EncounterMappingModel> CreateFromAcquisitionAsync(CreateEncounterMappingModel model,
+                                                           CancellationToken cancellationToken = default);
 
     Task<EncounterMappingModel> UpdateByIdAsync(int id, UpdateEncounterMappingModel model);
     Task<EncounterMappingModel> UpdateByFacilityIdAndEncounterIdAsync(string facilityId, string encounterId, UpdateEncounterMappingModel model);
@@ -64,14 +65,15 @@ public class EncounterMappingManager : IEncounterMappingManager
                 $"PatientId {model.PatientId} is not associated with FacilityId {model.FacilityId}.");
         }
 
-        return await InsertAsync(model);
+        return await InsertAsync(model, CancellationToken.None);
     }
 
-    public async Task<EncounterMappingModel> CreateFromAcquisitionAsync(CreateEncounterMappingModel model)
+    public async Task<EncounterMappingModel> CreateFromAcquisitionAsync(CreateEncounterMappingModel model,
+                                                                        CancellationToken cancellationToken = default)
     {
         ValidateRequiredFields(model);
 
-        return await InsertAsync(model);
+        return await InsertAsync(model, cancellationToken);
     }
 
     public async Task<EncounterMappingModel> UpdateByIdAsync(int id, UpdateEncounterMappingModel model)
@@ -224,7 +226,8 @@ public class EncounterMappingManager : IEncounterMappingManager
         ArgumentException.ThrowIfNullOrEmpty(model.PatientId, nameof(model.PatientId));
     }
 
-    private async Task<EncounterMappingModel> InsertAsync(CreateEncounterMappingModel model)
+    private async Task<EncounterMappingModel> InsertAsync(CreateEncounterMappingModel model,
+                                                          CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var entity = new EncounterMapping
@@ -237,9 +240,10 @@ public class EncounterMappingManager : IEncounterMappingManager
             ModifiedDate = now
         };
 
-        var existingMapping = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m => 
-            m.FacilityId == model.FacilityId && 
-            m.EncounterId == model.EncounterId);
+        var existingMapping = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m =>
+            m.FacilityId == model.FacilityId &&
+            m.EncounterId == model.EncounterId,
+            cancellationToken);
         
         if (existingMapping != null) {
             throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
@@ -260,7 +264,7 @@ public class EncounterMappingManager : IEncounterMappingManager
 
         try
         {
-            await _database.EncounterMappingRepository.AddAsync(entity);
+            await _database.EncounterMappingRepository.AddAsync(entity, cancellationToken);
             await _database.SaveChangesAsync();
         }
         catch (DbUpdateException)
@@ -271,7 +275,8 @@ public class EncounterMappingManager : IEncounterMappingManager
             // still surface a 409 in that race; if it isn't a duplicate, rethrow the original.
             var concurrent = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m =>
                 m.FacilityId == model.FacilityId &&
-                m.EncounterId == model.EncounterId);
+                m.EncounterId == model.EncounterId,
+                cancellationToken);
 
             if (concurrent != null)
             {
@@ -284,7 +289,7 @@ public class EncounterMappingManager : IEncounterMappingManager
             {
                 var requestedIds = model.OrganizationLocationMappingIds.Distinct().ToList();
                 var existingIds = (await _database.LocationMappingRepository
-                        .FindAsync(m => requestedIds.Contains(m.LocationMappingId)))
+                        .FindAsync(m => requestedIds.Contains(m.LocationMappingId), cancellationToken))
                     .Select(m => m.LocationMappingId)
                     .ToHashSet();
 

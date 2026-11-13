@@ -274,12 +274,15 @@ cause:
 
 1. It reads the children that name this Location in `PartOf` and still need its mapping id, or its org
    status when it is an org location. A child that already has both is not touched.
-2. It updates those children by id, repeating the condition so a child another worker has already
-   updated is not written again.
+2. It updates those children by id, repeating the whole condition, including the facility and the `PartOf`
+   value. A child another worker has since updated, or moved to a different parent, is left alone.
 3. It recomputes `MappedToOrg` only for children it promoted to org. An encounter's flag depends only on
    the `IsOrgLocation` of the locations it references, so setting `PartOfId` alone cannot change it.
 4. It walks further only below children it promoted. A child that was already an org location promoted
    its own children when it was acquired, and a non-org parent cannot promote anything, so it never walks.
+   Before walking, it re-reads the candidates and keeps only those that are now org locations still under
+   this parent, so a child moved elsewhere in the meantime never has its own children promoted on this
+   parent's behalf.
 
 `RecomputeMappedToOrgForLocationMappingAsync` writes only the encounters whose stored `MappedToOrg`
 differs from the recomputed value.

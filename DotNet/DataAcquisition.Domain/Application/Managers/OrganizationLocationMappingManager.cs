@@ -183,9 +183,12 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
             .Select(m => m.LocationMappingId)
             .ToList();
 
-        // The condition is repeated so a child another worker has already updated is not written again.
+        // The whole condition is repeated so a child another worker has since updated or moved to a different
+        // parent is left alone.
         var result = await _dbContext.OrganizationLocationMappings
             .Where(m => pendingIds.Contains(m.LocationMappingId)
+                    && m.FacilityId == facilityId
+                    && m.PartOfValue == parentLocationId
                     && (m.PartOfId != parentLocationMappingId || (isOrgLocation && !m.IsOrgLocation)))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(m => m.PartOfId, parentLocationMappingId)
@@ -200,9 +203,25 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
 
         // Only a promoted child changes any encounter's MappedToOrg, and only its children can need promoting
         // in turn. A child that was already an org location promoted its own children when it was acquired.
-        var promotedChildren = pendingChildren
+        var promotionCandidateIds = pendingChildren
             .Where(m => !m.IsOrgLocation)
+            .Select(m => m.LocationMappingId)
             .ToList();
+
+        if (promotionCandidateIds.Count == 0)
+        {
+            return result;
+        }
+
+        // Confirmed against the rows as they are now: a candidate another worker moved to a different parent
+        // must not have its own children promoted on this parent's behalf.
+        var promotedChildren = await _dbContext.OrganizationLocationMappings
+            .Where(m => promotionCandidateIds.Contains(m.LocationMappingId)
+                    && m.PartOfId == parentLocationMappingId
+                    && m.PartOfValue == parentLocationId
+                    && m.IsOrgLocation)
+            .Select(m => new { m.LocationMappingId, m.LocationId })
+            .ToListAsync(cancellationToken);
 
         foreach (var child in promotedChildren)
         {
