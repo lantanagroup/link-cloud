@@ -166,6 +166,20 @@ class RetryTopicRecovererDecisionTest {
     }
 
     @Test
+    void retryKeepsTheSameKeyAndFullValueAndDoesNotRepublishToTheMainTopic() {
+        ConsumerRecord<String, String> record = new ConsumerRecord<>(
+                "ResourcesNormalized", 2, 9L, "fac:pat", "{\"facilityId\":\"fac\",\"patientId\":\"pat\"}");
+
+        Outcome outcome = run(retryConfig(3, false), record, new RuntimeException("transient boom"));
+
+        assertEquals(RETRY_TOPIC, outcome.topic());
+        assertNotEquals(record.topic(), outcome.topic());
+        assertEquals("fac:pat", outcome.published().key());
+        assertEquals(record.value(), outcome.published().value());
+        assertEquals(2, outcome.published().partition());
+    }
+
+    @Test
     void transientFailure_withAttemptsRemaining_isLoggedAsARetry() {
         Outcome outcome = run(retryConfig(3, false), record(), new RuntimeException("transient boom"));
 

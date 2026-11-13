@@ -7,8 +7,10 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.KafkaIdentity;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
@@ -83,16 +85,21 @@ public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, E
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        String facilityId = record.key();
+        EvaluationRequested value = record.value();
+        String facilityId = KafkaIdentity.facility(value == null ? null : value.getFacilityId(), record.key());
+        String patientId = KafkaIdentity.patient(value == null ? null : value.getPatientId(), record.key());
+        if (facilityId == null || facilityId.isBlank()) {
+            throw new ValidationException("Facility ID is null or empty.");
+        }
         Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), facilityId).build();
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
-        var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId()).orElse(null);
+        var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, patientId, value.getPreviousReportId()).orElse(null);
 
         if (patientReportStatus != null) {
             var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
             evaluateMeasures(correlationId, record.value(), patientReportStatus, bundle, record.headers());
         } else {
-            logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
+            logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, patientId, value.getPreviousReportId());
             throw new IllegalStateException("Patient status not found for previous report ID");
         }
     }

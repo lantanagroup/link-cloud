@@ -1,0 +1,212 @@
+@model FacilityViewModel
+@using LantanaGroup.Link.Shared.Application.Enums
+@using Link.UI.Services
+@{
+    var statuses = FacilityViewRules.ParseStatuses(Model.Query.Status);
+    Dictionary<string, string> SortRoute(string column) => Model.Query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column));
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
+    Dictionary<string, string> Kept(string column) => SortRoute(column).WithOrigin(origin);
+    var sortId = Kept("Id");
+    var sortPeriod = Kept("ReportStartDate");
+    var sortCreated = Kept("CreateDate");
+    var sortFrequency = Kept("Frequency");
+    var sortStatus = Kept("Status");
+}
+
+<div class="au-card card">
+    <div class="card-header">Facility reports</div>
+    <div class="card-body">
+        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="mb-3 lu-search" data-au-filter="400" data-au-target="facilityReportResults">
+            <input type="hidden" name="section" value="reports" />
+            <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
+            <partial name="_ReturnField" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4 col-xl-3">
+                    <label class="form-label" for="reportId">Report ID</label>
+                    <input id="reportId" name="reportId" value="@Model.Query.ReportId" class="form-control" />
+                </div>
+                <div class="col-12 col-md-4 col-xl-2">
+                    <label class="form-label" for="frequency">Frequency</label>
+                    <select id="frequency" name="frequency" class="form-select">
+                        <option value="">Any</option>
+                        @foreach (var frequency in new[] { "Daily", "Weekly", "Monthly", "Adhoc", "Discharge" })
+                        {
+                            if (string.Equals(Model.Query.Frequency, frequency, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@frequency" selected>@frequency</option>
+                            }
+                            else
+                            {
+                                <option value="@frequency">@frequency</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="created">Created</label>
+                    <input id="created" name="created" type="date" value="@Model.Query.Created" class="form-control" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="periodFrom">Period from</label>
+                    <input id="periodFrom" name="periodFrom" type="date" value="@Model.Query.PeriodFrom" class="form-control" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="periodTo">Period to</label>
+                    <input id="periodTo" name="periodTo" type="date" value="@Model.Query.PeriodTo" class="form-control" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports" asp-route-returnUrl="@origin">Clear</a>
+                </div>
+            </div>
+            <details class="lu-advanced mt-2" @(statuses.Length > 0 || Model.Query.ShowDeleted ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="mt-1">
+                    <span class="form-label d-block">Status</span>
+                    <div class="d-flex flex-wrap gap-3">
+                        @foreach (var status in Enum.GetValues<ScheduleStatus>())
+                        {
+                            var selected = statuses.Contains(status);
+                            <label class="form-check-label">
+                                <input class="form-check-input me-1" type="checkbox" name="status" value="@status" @(selected ? "checked" : null) />
+                                @FacilityViewRules.StatusLabel(status)
+                            </label>
+                        }
+                        <label class="form-check-label">
+                            <input class="form-check-input me-1" type="checkbox" name="showDeleted" value="true" @(Model.Query.ShowDeleted ? "checked" : null) />
+                            Show deleted
+                        </label>
+                    </div>
+                </div>
+            </details>
+        </form>
+
+        <p class="lu-live-label mb-2">This list updates on its own.</p>
+        <div id="facilityReportResults" data-au-refresh="12000">
+        @if (!string.IsNullOrWhiteSpace(Model.SectionNote))
+        {
+            <div class="alert au-note">@Model.SectionNote</div>
+        }
+
+        @if (Model.Reports.Count == 0)
+        {
+            <p class="au-empty mb-0">No reports found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-reports-table">
+                    <thead>
+                        <tr>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortId">Report ID</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortPeriod">Reporting period</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortCreated">Created</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortFrequency">Cadence</a></th>
+                            <th class="text-end text-nowrap">Census / IP</th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@sortStatus">Status</a></th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var report in Model.Reports)
+                    {
+                        <tr class="@(report.Deleted ? "table-secondary" : null)">
+                            <td>
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = report.Id.ToString(), Compact = true, CopyLabel = "Copy report id", LinkHref = report.Deleted ? null : Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = report.Id }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
+                                @if (report.Deleted)
+                                {
+                                    <div class="small text-muted">Deleted</div>
+                                }
+                            </td>
+                            <td class="text-nowrap">
+                                <div>Start @report.PeriodStart</div>
+                                <div>End @report.PeriodEnd</div>
+                            </td>
+                            <td class="lu-created" data-lu-time-compact>@report.Created</td>
+                            <td>@report.Frequency</td>
+                            <td class="text-end text-nowrap">@(report.CensusCount?.ToString() ?? "—") / @(report.InitialPopulationCount?.ToString() ?? "—")</td>
+                            <td>
+                                <span class="badge @StatusPills.ForSchedule(report.Status)">@report.StatusLabel</span>
+                                @if (!string.IsNullOrWhiteSpace(report.Submitted))
+                                {
+                                    <div class="small text-muted text-nowrap" data-lu-time-compact>@report.Submitted</div>
+                                }
+                            </td>
+                            <td>
+                                <div class="lu-row-actions">
+                                @if (report.CanResubmit)
+                                {
+                                    <div class="lu-row-action">
+                                        <div class="d-none" data-resubmit-fields>
+                                            <partial name="_ViewReturnFields" model="Model.Query" />
+                                            <input type="hidden" name="targetId" value="@report.Id" />
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-au-execute lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@Model.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Rerun this report: re-evaluate, re-validate and regenerate it from cached data" aria-label="Rerun"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span class="ms-1">Rerun…</span></button>
+                                    </div>
+                                }
+                                @if (report.CanAbort)
+                                {
+                                    <form method="post" data-au-save asp-action="AbortReport" asp-route-id="@Model.FacilityId">
+                                        <partial name="_ViewReturnFields" model="Model.Query" />
+                                        <input type="hidden" name="targetId" value="@report.Id" />
+                                        <button type="submit" class="btn btn-sm btn-warning lu-icon-btn" title="Abort" aria-label="Abort" data-hold="@Hold.Of("Stop this report", "Stop this in-progress report. Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { FacilityViewRules.RestoreNote(report.Status) }, "", "Hold to stop")"><i class="bi bi-stop-fill" aria-hidden="true"></i><span class="ms-1">Abort</span></button>
+                                    </form>
+                                }
+                                @if (report.CanCleanUp)
+                                {
+                                    <form method="post" data-au-save asp-action="CleanUpReport" asp-route-id="@Model.FacilityId">
+                                        <partial name="_ViewReturnFields" model="Model.Query" />
+                                        <input type="hidden" name="targetId" value="@report.Id" />
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete report @report.Id" data-hold="@Hold.Of("Delete this report", "Remove this report and its associated acquisition logs.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { FacilityViewRules.RestoreNote(report.Status), "Acquisition logs for this report are removed with it." }, "", "Hold to delete")"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                    </form>
+                                }
+                                @if (report.Deleted && report.CanRestore)
+                                {
+                                    <form method="post" data-au-save asp-action="RestoreReport" asp-route-id="@Model.FacilityId">
+                                        <partial name="_ViewReturnFields" model="Model.Query" />
+                                        <input type="hidden" name="targetId" value="@report.Id" />
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore" data-hold="@Hold.Of("Restore this report", "Restore this report and its acquisition logs.", new[] { Hold.Pair("Report", report.Id), Hold.Pair("Facility", Model.FacilityId) }, Array.Empty<string[]>(), new[] { "The report and its acquisition logs come back onto the active lists." }, "", "Hold to restore")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
+                                    </form>
+                                }
+                                else if (report.Deleted)
+                                {
+                                    @* A disabled button leaves the tab order, so the wrapper takes focus and carries the reason. *@
+                                    <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" title="@FacilityViewRules.RestoreBlockedReason" aria-label="Restore unavailable. @FacilityViewRules.RestoreBlockedReason" data-restore-blocked><button type="button" class="btn btn-sm btn-success lu-icon-btn" disabled aria-hidden="true" tabindex="-1"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button></span>
+                                }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <partial name="_ViewPager" model="Model" />
+        }
+        </div>
+    </div>
+</div>
+@if (Model.Reports.Any(report => report.CanResubmit))
+{
+<div class="modal fade" id="resubmitDialog" tabindex="-1" aria-labelledby="resubmitTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" id="resubmitForm" class="modal-content" data-au-save asp-action="ResubmitReport" asp-route-id="@Model.FacilityId">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="resubmitTitle">Rerun report</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <p id="resubmitSummary"></p>
+                <p class="mb-0" data-rerun-explain>A rerun re-evaluates and re-validates this report and regenerates it from the cached EHR data. <strong>Rerun and submit</strong> sends the regenerated report to NHSN Azure Blob Storage (ABS). <strong>Rerun without submitting</strong> bypasses submission, so nothing is sent to NHSN ABS.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-au-execute" name="bypassSubmission" data-hold="@Hold.Of("Rerun without submitting", "Re-evaluate, re-validate and regenerate this report from cached data. Submission is bypassed.", "The report is regenerated. Nothing is sent to NHSN Azure Blob Storage (ABS).", "Hold to rerun")" value="true">Rerun without submitting</button>
+                <button data-hold="@Hold.Of("Rerun and submit this report", "Re-evaluate, re-validate and regenerate this report from cached data, then submit it.", "The regenerated report is sent to NHSN Azure Blob Storage (ABS).", "Hold to rerun")" type="submit" class="btn btn-sm btn-au-execute"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Rerun and submit</button>
+            </div>
+        </form>
+    </div>
+</div>
+}

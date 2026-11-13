@@ -21,9 +21,9 @@ using System.Text;
 namespace LantanaGroup.Link.Report.Listeners;
 
 public class PayloadSubmittedListener(
-    IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue> kafkaConsumerFactory,
-    ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue> transientExceptionHandler,
-    IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue> deadLetterExceptionHandler,
+    IKafkaConsumerFactory<string, PayloadSubmittedValue> kafkaConsumerFactory,
+    ITransientExceptionHandler<PayloadSubmittedListener, string, PayloadSubmittedValue> transientExceptionHandler,
+    IDeadLetterExceptionHandler<PayloadSubmittedListener, string, PayloadSubmittedValue> deadLetterExceptionHandler,
     ILogger<PayloadSubmittedListener> logger,
     IServiceScopeFactory serviceScopeFactory,
     ServiceInformation serviceInformation,
@@ -48,10 +48,11 @@ public class PayloadSubmittedListener(
             EnableAutoCommit = false
         };
 
-        using var consumer = kafkaConsumerFactory.CreateConsumer(config);
+        var assignmentTracker = new KafkaAssignmentTracker();
+        using var consumer = kafkaConsumerFactory.CreateConsumer(config, assignmentTracker: assignmentTracker);
         try
         {
-            consumer.Subscribe(nameof(KafkaTopic.PayloadSubmitted));
+            consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.PayloadSubmitted), "Report"));
             logger.LogInformation("{Name}: Started report submitted consumer for topic '{Topic}' at {StartTime}", Name, nameof(KafkaTopic.PayloadSubmitted), DateTime.UtcNow);
 
             while (!cancellationToken.IsCancellationRequested)
@@ -60,8 +61,24 @@ public class PayloadSubmittedListener(
                 {
                     await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
-                        await ProcessMessageAsync(result, consumeCancellationToken);
-                        consumer.SafeCommit(result, logger);
+                        var accounted = false;
+                        try
+                        {
+                            await ProcessMessageAsync(result, consumeCancellationToken);
+                            accounted = true;
+                        }
+                        catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        finally
+                        {
+                            if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
+                            {
+                                assignmentTracker.MarkProcessed(result);
+                                consumer.SafeCommit(result, logger);
+                            }
+                        }
                     }, cancellationToken);
                 }
                 catch (ConsumeException ex)
@@ -95,12 +112,14 @@ public class PayloadSubmittedListener(
         }
     }
 
-    public async Task ProcessMessageAsync(ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue> result, CancellationToken cancellationToken)
+    public async Task ProcessMessageAsync(ConsumeResult<string, PayloadSubmittedValue> result, CancellationToken cancellationToken)
     {
         using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
+        var facilityId = KafkaIdentity.Facility(result.Message.Value?.FacilityId, result.Message.Key) ?? string.Empty;
+        var reportScheduleId = KafkaIdentity.ReportSchedule(result.Message.Value?.ReportScheduleId, result.Message.Key);
         if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
         {
-            throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Key.ReportScheduleId}, FacilityId = {result.Message.Key.FacilityId}).");
+            throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {reportScheduleId}, FacilityId = {facilityId}).");
         }
 
         var correlationId = Encoding.UTF8.GetString(headerValue);
@@ -110,22 +129,26 @@ public class PayloadSubmittedListener(
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
 
-        var facilityId = result.Message.Key.FacilityId;
-
         try
         {
-            var reportTrackingId = result.Message.Key.ReportScheduleId;
+            if (reportScheduleId is null)
+            {
+                throw new DeadLetterException($"{Name}: Report schedule id is missing from the message value.");
+            }
+
+            var reportTrackingId = reportScheduleId.Value;
+            var patientId = KafkaIdentity.Patient(result.Message.Value?.PatientId, result.Message.Key);
             if (await PipelineAbortSkip.ShouldSkipAsync(
                     scope.ServiceProvider, logger, Name, facilityId, reportTrackingId.ToString(), cancellationToken))
                 return;
 
             var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, cancellationToken)).Single();
 
-            logger.LogDebug("Consuming PayloadSubmitted (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, result.Message.Value.PatientId, reportTrackingId);
+            logger.LogDebug("Consuming PayloadSubmitted (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, patientId, reportTrackingId);
 
             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
             {
-                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == reportTrackingId, cancellationToken);
+                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == patientId && e.ReportScheduleId == reportTrackingId, cancellationToken);
 
                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                 reportEntry.SubmitReportDateTime = DateTime.UtcNow;

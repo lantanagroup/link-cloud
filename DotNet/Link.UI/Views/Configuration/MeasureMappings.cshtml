@@ -1,0 +1,189 @@
+@model MappingPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    Dictionary<string, string> Route(int page, int pageSize = 0)
+    {
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = chosen.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.Measure)) route["measure"] = query.Measure;
+        if (!string.IsNullOrWhiteSpace(query.Dqm)) route["dqm"] = query.Dqm;
+        if (!string.IsNullOrWhiteSpace(query.Frequency)) route["frequency"] = query.Frequency;
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to configuration"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Measure mappings</h1>
+<partial name="_Alerts" />
+
+@if (!Model.Enabled)
+{
+    <div class="alert alert-warning">@(string.IsNullOrWhiteSpace(Model.LoadError) ? "DMRP is off for this environment (DMRP:Enabled)." : Model.LoadError)</div>
+}
+else if (!Model.Configured && !string.IsNullOrWhiteSpace(Model.LoadError) && Model.Mappings.Count == 0 && string.IsNullOrWhiteSpace(query.Measure) && string.IsNullOrWhiteSpace(query.Dqm) && string.IsNullOrWhiteSpace(query.Frequency))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card mb-3">
+        <div class="card-header">Search</div>
+        <div class="card-body">
+            <form method="get" class="lu-search">
+                <input type="hidden" name="pageSize" value="@size" />
+                <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="measure">Measure</label>
+                    <input id="measure" name="measure" value="@query.Measure" class="form-control" maxlength="255" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="frequency">Frequency</label>
+                    <select id="frequency" name="frequency" class="form-select">
+                        <option value="">Any</option>
+                        @foreach (var frequency in ConfigurationRules.Frequencies)
+                        {
+                            if (string.Equals(frequency, query.Frequency, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@frequency" selected>@frequency</option>
+                            }
+                            else
+                            {
+                                <option value="@frequency">@frequency</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="MeasureMappings">Clear</a>
+                </div>
+                </div>
+                <details class="lu-advanced mt-2" @(string.IsNullOrWhiteSpace(query.Dqm) ? null : "open")>
+                    <summary>Advanced</summary>
+                    <div class="row g-2 align-items-end mt-1">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="dqm">dQM</label>
+                            <input id="dqm" name="dqm" value="@query.Dqm" class="form-control" maxlength="255" />
+                        </div>
+                    </div>
+                </details>
+            </form>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.LoadError))
+    {
+        <div class="alert alert-warning">@Model.LoadError</div>
+    }
+    else
+    {
+        <div class="au-card card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Mappings</span>
+                <button type="button" class="btn btn-sm btn-success" data-lu-reveal="mappingCreate">+ Add</button>
+            </div>
+            <div class="card-body">
+                @if (Model.Mappings.Count == 0)
+                {
+                    <p class="mb-0">No measure mappings yet. Add one to connect a measure with a dQM.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2 lu-wide-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Measure</th>
+                                    <th scope="col">dQM</th>
+                                    <th scope="col">Frequency</th>
+                                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in Model.Mappings)
+                            {
+                                var formId = "mapping-" + row.Id;
+                                <tr>
+                                    <td>
+                                        <input form="@formId" name="Measure" value="@row.Measure" class="form-control form-control-sm" maxlength="255" required aria-label="Measure for @row.Id" />
+                                    </td>
+                                    <td>
+                                        <input form="@formId" name="Dqm" value="@row.Dqm" class="form-control form-control-sm" maxlength="255" required aria-label="dQM for @row.Id" />
+                                    </td>
+                                    <td>
+                                        <select form="@formId" name="Frequency" class="form-select form-select-sm" aria-label="Frequency for @row.Id">
+                                            @foreach (var frequency in ConfigurationRules.Frequencies)
+                                            {
+                                                if (string.Equals(frequency, row.Frequency, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <option value="@frequency" selected>@frequency</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@frequency">@frequency</option>
+                                                }
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div class="lu-row-actions">
+                                            <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveMapping">
+                                                <input type="hidden" name="Id" value="@row.Id" />
+                                                <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save mapping @row.Id"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="ms-1">Save</span></button>
+                                                <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing mapping @row.Id"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Cancel</span></button>
+                                            </form>
+                                            <form method="post" data-au-save asp-action="DeleteMapping">
+                                                <input type="hidden" name="id" value="@row.Id" />
+                                                <button data-hold="@Hold.Of("Delete this measure mapping?", "Delete this measure mapping?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete mapping @row.Id"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                <partial name="_BottomPager" model="@(new BottomPager { Label = "Mapping pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = ConfigurationRules.PageSizes, Route = Route })" />
+            </div>
+        </div>
+    }
+
+    @if (Model.Configured)
+    {
+        <div class="au-card card d-none" id="mappingCreate" data-lu-panel data-lu-hide-on-cancel>
+            <div class="card-header">New mapping</div>
+            <div class="card-body">
+                <form method="post" data-au-save asp-action="SaveMapping" class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="newMeasure">Measure</label>
+                        <input id="newMeasure" name="Measure" class="form-control" maxlength="255" required />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="newDqm">dQM</label>
+                        <input id="newDqm" name="Dqm" class="form-control" maxlength="255" required />
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label" for="newFrequency">Frequency</label>
+                        <select id="newFrequency" name="Frequency" class="form-select">
+                            @foreach (var frequency in ConfigurationRules.Frequencies)
+                            {
+                                <option value="@frequency">@frequency</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <button type="submit" class="btn btn-success">Save</button>
+                        <button type="button" class="btn btn-warning" data-lu-cancel>Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+}

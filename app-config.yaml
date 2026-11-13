@@ -60,6 +60,7 @@ serviceMeta:
   AdminBFF:              { label: "LinkAdminBFF",          runtime: "dotnet" }
   Audit:                 { label: "Audit",                 runtime: "dotnet" }
   AutomationUI:          { label: "Link Automation UI",    runtime: "dotnet" }
+  LinkUI:                { label: "Link UI",               runtime: "dotnet" }
   Census:                { label: "Census",                runtime: "dotnet" }
   DataAcquisition:       { label: "DataAcquisition",       runtime: "dotnet" }
   DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
@@ -128,33 +129,36 @@ global:
     sensitive: true
     consumers: ["Account", "Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
 
-  # Automation.UI inbound-auth coordination note:
-  # In Automation.UI Program.cs, the anonymous-access short-circuit middleware runs
-  # before UseAuthentication(). When Authentication:EnableAnonymousAccess is false,
-  # every non-/health request is returned as 503 before bearer-token validation can run.
-  # To make ApiBearer-protected endpoints reachable, EnableAnonymousAccess and
-  # Authentication:ApiBearer:Enabled must be configured together for the target environment.
+  # Inbound-auth coordination note:
+  # Automation.UI short-circuits every non-/health request with 503 when
+  # Authentication:EnableAnonymousAccess is false, before bearer validation runs.
+  # ApiBearer endpoints there are reachable only when anonymous access and
+  # Authentication:ApiBearer:Enabled are both true.
+  # Link.UI keeps /health and the Admin.BFF /api proxy open. When anonymous access
+  # is false and ApiBearer is disabled, /api/runs and /api/api-health-runs return 503.
+  # When ApiBearer is enabled, those bearer routes stay on ApiBearer and the other
+  # native automation routes still return 503.
   # Canonical key path is Authentication:ApiBearer:* (not top-level ApiBearer:*).
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
     required: true
     consumers: ["Account", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:EnableAnonymousAccess"
-    description: "Whether services skip authentication. The effect differs by consumer and the polarity is easy to misread. In the eleven backend services, false registers UseAuthentication() and UserScopeMiddleware, so true serves requests without authenticating them. Admin.BFF additionally stops attaching a bearer token to its downstream service calls and drops the YARP authorization transforms. Automation.UI is the exception: it has no built-in authentication, so false makes it serve nothing - every non-/health request is short-circuited with 503 - and true serves the UI anonymously, intended only behind an authenticating proxy. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation in Automation.UI; see the note above."
+    description: "Whether services skip authentication. The effect differs by consumer and the polarity is easy to misread. In the eleven backend services, false registers UseAuthentication() and UserScopeMiddleware, so true serves requests without authenticating them. Admin.BFF additionally stops attaching a bearer token to its downstream service calls and drops the YARP authorization transforms. Automation.UI is the exception: it has no built-in authentication, so false makes it serve nothing - every non-/health request is short-circuited with 503 - and true serves the UI anonymously, intended only behind an authenticating proxy. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation in Automation.UI. Link.UI uses the same flag for pages and hubs. When it is false and Authentication:ApiBearer:Enabled is false, Link.UI also returns 503 for /api/runs and /api/api-health-runs. When bearer auth is enabled, those bearer routes stay on ApiBearer and the other native automation routes still return 503. /health and the Admin.BFF /api proxy stay open. See the note above."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "LinkUI", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:ApiBearer:Enabled"
-    description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI for /api/runs endpoints."
+    description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI and Link.UI for /api/runs and POST /api/api-health-runs/start-all-for-pipeline."
     required: true
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "Authentication:ApiBearer:Authority"
-    description: "OIDC authority URL for validating inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
+    description: "OIDC authority URL for validating inbound Automation.UI and Link.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true. No default; set per environment."
     required: true
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "Authentication:ApiBearer:Audience"
-    description: "Expected audience for inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
+    description: "Expected audience for inbound Automation.UI and Link.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true. No default; set per environment."
     required: true
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
     required: true
@@ -187,9 +191,9 @@ global:
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Telemetry:PrometheusQueryEndpoint"
-    description: "Prometheus HTTP query base URL used by Automation.UI at Metrics-run completion for optional stage latency enrichment. Empty skips Prom queries and marks stages unavailable. Not the OTLP collector endpoint."
+    description: "Prometheus HTTP query base URL used by Automation.UI and Link.UI at Metrics-run completion for optional stage latency enrichment. Empty skips Prom queries and marks stages unavailable. Not the OTLP collector endpoint."
     required: false
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
     
   # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
   # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and
@@ -287,21 +291,21 @@ global:
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
     required: true
     sensitive: true
-    consumers: ["Report", "Submission", "AutomationUI"]
+    consumers: ["Report", "Submission", "AutomationUI", "LinkUI"]
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
     required: true
-    consumers: ["Report", "Submission", "AutomationUI"]
+    consumers: ["Report", "Submission", "AutomationUI", "LinkUI"]
   - key: "InternalBlobStorage:BlobRoot"
-    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage. Automation.UI imported bundles default to automation/imported-bundles when this is unset."
+    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage. Automation.UI and Link.UI imported bundles default to automation/imported-bundles when this is unset."
     required: false
     defaultValue: "automation/imported-bundles"
-    consumers: ["Report", "Submission", "AutomationUI"]
+    consumers: ["Report", "Submission", "AutomationUI", "LinkUI"]
   - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
-    description: "Optional blob-path prefix used by Automation.UI for generated template cache blobs. When unset, generated templates are written at the container root under generated-patient-templates."
+    description: "Optional blob-path prefix used by Automation.UI and Link.UI for generated template cache blobs. When unset, generated templates are written at the container root under generated-patient-templates."
     required: false
     defaultValue: "automation/generated-bundles"
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true
@@ -390,7 +394,7 @@ global:
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
     consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
-  # SYSTEM FEATURE SWITCH — one decision for the whole deployment, not a Tenant setting.
+  # SYSTEM FEATURE SWITCH â€” one decision for the whole deployment, not a Tenant setting.
   # It is catalogued here, unlabeled, so every service sees the same answer: today only Tenant acts
   # on it, but the switch decides whether this deployment does NHSN measure-enrollment reporting at
   # all, and further services are expected to read it as the workflow lands (LEGLINK-698/701).
@@ -502,9 +506,9 @@ services:
     # UI health page reports the NHSN App BFF as Unhealthy ("not configured") and leaves it out of
     # Service Meta Data; nothing fails to start.
     - key: "ServiceRegistry:NhsnAppBffServiceUrl"
-      description: "The base URL for the NHSN App BFF, used by the Admin BFF to read its health (including its database check) and service information for the Admin UI monitor page. /api is appended for the info call."
+      description: "The base URL for the NHSN App BFF, used by the Admin BFF to read its health (including its database check) and service information for the Admin UI monitor page, and by Link.UI for the same health row when that check is ported. /api is appended for the info call."
       required: false
-      consumers: ["AdminBFF"]
+      consumers: ["AdminBFF", "LinkUI"]
     # The explicit lists that make Admin.BFF's AllowCredentials safe. They exist only under
     # the LinkAdminBFF label - no unlabeled rows - because it is the one service a browser
     # calls cross-origin: the Admin UI is served from <env>-demo/<env>-dash and calls the BFF
@@ -552,16 +556,16 @@ services:
       description: "The MongoDB database name for automation data."
       required: true
     - key: "ApiHealth:EnableAdminBffAuthSuite"
-      description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI."
+      description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI and Link.UI."
       required: false
     - key: "Loki:Url"
-      description: "The Loki endpoint URL Automation.UI uses for run diagnostics scraping."
+      description: "The Loki endpoint URL Automation.UI and Link.UI use for run diagnostics scraping."
       required: true
     - key: "Loki:App"
-      description: "The Loki application label Automation.UI uses to scope diagnostics queries."
+      description: "The Loki application label Automation.UI and Link.UI use to scope diagnostics queries."
       required: true
     - key: "Authentication:UseBearerForServiceCalls"
-      description: "Whether Automation.UI uses Link bearer auth for service-to-service LinkSdk calls."
+      description: "Whether Automation.UI and Link.UI use Link bearer auth for service-to-service LinkSdk calls."
       required: false
       defaultValue: "true"
     - key: "Automation:SlackWebhookUrl"
@@ -569,7 +573,7 @@ services:
       required: true
       sensitive: true
     - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
-      description: "Optional blob-path prefix for generated template cache blobs in Automation.UI. Defaults to automation/generated-bundles."
+      description: "Optional blob-path prefix for generated template cache blobs in Automation.UI and Link.UI. Defaults to automation/generated-bundles."
       required: false
       defaultValue: "automation/generated-bundles"
     - key: "DataProtection:ApplicationName"
@@ -579,7 +583,7 @@ services:
       description: "Mongo collection name used by Automation.UI to store Data Protection keys. Defaults to 'automation_data_protection_keys' when unset."
       required: false
     - key: "LeftoverRunCleanup:Enabled"
-      description: "Master switch for scheduled Automation.UI leftover cleanup. False keeps quiesce, daily teardown, and weekly history purge from starting after deploy until an operator turns cleanup on. A Cleanup page save overrides this for that environment."
+      description: "Master switch for scheduled leftover cleanup in Automation.UI and Link.UI. False keeps quiesce, daily teardown, and weekly history purge from starting after deploy until an operator turns cleanup on. A Cleanup page save overrides this for that environment."
       required: false
       defaultValue: "false"
     - key: "LeftoverRunCleanup:QuiesceEnabled"
@@ -610,6 +614,145 @@ services:
       sensitive: true
     - key: "Automation:TestRail:ProjectId"
       description: "TestRail project that receives Automation.UI results: the numeric id (12 or P12) or the exact project name. A name is looked up in TestRail on first use. The shipped default is the project name NHSNLink 2.0. Blank or zero leaves publishing off."
+      required: false
+      defaultValue: "NHSNLink 2.0"
+    - key: "Automation:TestRail:ScenarioSuiteId"
+      description: "TestRail suite for scenario runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134. Blank or zero skips scenario publishing; the startup check then logs the project's suites."
+      required: false
+      defaultValue: "134"
+    - key: "Automation:TestRail:ApiHealthSuiteId"
+      description: "TestRail suite for API Health runs: the numeric id (34 or S34) or the exact suite name in the project. The shipped default is 134, the same suite as scenario runs. Blank or zero skips API Health publishing; the startup check then logs the project's suites."
+      required: false
+      defaultValue: "134"
+    - key: "Automation:TestRail:RequestTimeoutSeconds"
+      description: "HTTP timeout in seconds for each TestRail API call. Values below 1 use 15 seconds."
+      required: false
+      defaultValue: "15"
+    - key: "Automation:TestRail:UseSharedRun"
+      description: "When false (the default), each automation run creates its own TestRail run containing only that run's mapped cases. When true, scenario and API Health publishes reuse one TestRail run per suite."
+      required: false
+      defaultValue: "false"
+    - key: "Automation:TestRail:SharedScenarioRunId"
+      description: "Existing TestRail run id reused for scenario results when UseSharedRun is true. Blank creates a run on first publish and keeps it in memory for the process. 123 or R123 selects an existing run."
+      required: false
+      defaultValue: ""
+    - key: "Automation:TestRail:SharedApiHealthRunId"
+      description: "Existing TestRail run id reused for API Health results when UseSharedRun is true. Blank creates a run on first publish and keeps it in memory for the process. 123 or R123 selects an existing run."
+      required: false
+      defaultValue: ""
+    - key: "Automation:TestRail:ScenarioCaseIds"
+      description: "Optional map of scenario id or scenario name to a TestRail case id. The case id saved on the scenario is the source of truth and wins over this map. The automation run name is not a key."
+      required: false
+    - key: "Automation:TestRail:ApiHealthCaseIds"
+      description: "Map of API Health endpoint key or name to a TestRail case id. An endpoint definition's TestRailCaseId wins over this map."
+      required: false
+    - key: "ServiceHealth:CheckIntervalSeconds"
+      description: "How often a scenario run probes upstream service health, in seconds. Values below 1 are rejected at startup. The shipped default is 5."
+      required: false
+      defaultValue: "5"
+    - key: "ServiceHealth:OutageThresholdSeconds"
+      description: "How long an upstream service must stay unreachable before a scenario run records the outage, in seconds. Values below 1 are rejected at startup. The shipped default is 120."
+      required: false
+      defaultValue: "120"
+  LinkUI:
+    - key: "Authentication:RequireBffSession"
+      description: "When true, Link.UI pages without an Admin.BFF session redirect to sign-in. The shipped default is true. Local Development and Docker profiles set it to false so the shell stays browsable without a BFF session."
+      required: false
+      defaultValue: "true"
+    - key: "LinkUi:AutomationEnabled"
+      description: "When true, Link.UI serves the Automation area (runs, scenarios, cleanup, and related APIs). The shipped default is true. Set to false to hide that area."
+      required: false
+      defaultValue: "true"
+    - key: "Automation:FhirServerBase"
+      description: "The base URL of the FHIR server the generator writes test data to."
+      required: true
+    - key: "Automation:FacilityFhirServerBase"
+      description: "The base URL of the FHIR server as the facility reaches it. Differs from Automation:FhirServerBase only when the consumer's network vantage point differs."
+      required: true
+    - key: "MongoDB:ConnectionString"
+      description: "The MongoDB connection string for automation data."
+      required: true
+      sensitive: true
+    - key: "MongoDB:DatabaseName"
+      description: "The MongoDB database name for automation data."
+      required: true
+    - key: "ApiHealth:EnableAdminBffAuthSuite"
+      description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI and Link.UI."
+      required: false
+    - key: "Loki:Url"
+      description: "The Loki endpoint URL Automation.UI and Link.UI use for run diagnostics scraping."
+      required: true
+    - key: "Loki:App"
+      description: "The Loki application label Automation.UI and Link.UI use to scope diagnostics queries."
+      required: true
+    - key: "Authentication:UseBearerForServiceCalls"
+      description: "Whether Automation.UI and Link.UI use Link bearer auth for service-to-service LinkSdk calls."
+      required: false
+      defaultValue: "true"
+    - key: "LeftoverRunCleanup:Enabled"
+      description: "Master switch for scheduled leftover cleanup in Automation.UI and Link.UI. False keeps quiesce, daily teardown, and weekly history purge from starting after deploy until an operator turns cleanup on. A Cleanup page save overrides this for that environment."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:QuiesceEnabled"
+      description: "Whether the daytime leftover quiesce pass is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off so a new environment does not abort pipeline work on a schedule."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:DailyTeardownEnabled"
+      description: "Whether the daily off-hours leftover facility teardown is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:WeeklyHistoryPurgeEnabled"
+      description: "Whether the weekly scenario-run history purge is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
+      required: false
+      defaultValue: "false"
+    - key: "SubmissionRead:ExternalConnectionString"
+      description: "Connection string for the external submission container. Interactive mode streams patient-{id}.ndjson from that container. When unset, Interactive mode reads the MeasureEval patient bundle instead. This is not InternalBlobStorage, which Link.UI uses for automation bundles."
+      required: false
+      sensitive: true
+    - key: "SubmissionRead:ExternalContainerName"
+      description: "Name of the external submission container Submission writes, for example external."
+      required: false
+    - key: "SubmissionRead:ExternalBlobRoot"
+      description: "Optional path prefix Submission prepends on the external container. Match ExternalBlobStorage:BlobRoot. Leave empty when that root is empty."
+      required: false
+    - key: "SubmissionRead:InternalBlobRoot"
+      description: "Report's internal blob root, used only to strip that prefix when the schedule payload folder is turned into the external blob name. Leave empty when Report has no blob root. This is not Link.UI's automation blob root."
+      required: false
+    - key: "SubmissionRead:FlattenHierarchy"
+      description: "Match Submission ExternalBlobStorage:FlattenHierarchy. When true the patient file sits beside the report folder name instead of inside it."
+      required: false
+      defaultValue: "false"
+    - key: "SubmissionRead:UseMeasurePrefix"
+      description: "Match Submission ExternalBlobStorage:UseMeasurePrefix. When true a measure folder is inserted under the external root."
+      required: false
+      defaultValue: "false"
+    - key: "SubmissionRead:MeasurePrefixesByReportType"
+      description: "Map of report type to external folder name. Used only when SubmissionRead:UseMeasurePrefix is true. Match ExternalBlobStorage:MeasurePrefixesByReportType."
+      required: false
+    - key: "ServiceHealth:CheckIntervalSeconds"
+      description: "How often a scenario run probes upstream service health, in seconds. Values below 1 are rejected at startup. The shipped default is 5. Automation.UI and Link.UI both read this key."
+      required: false
+      defaultValue: "5"
+    - key: "ServiceHealth:OutageThresholdSeconds"
+      description: "How long an upstream service must stay unreachable before a scenario run records the outage, in seconds. Values below 1 are rejected at startup. The shipped default is 120. Automation.UI and Link.UI both read this key."
+      required: false
+      defaultValue: "120"
+    - key: "Automation:TestRail:Enabled"
+      description: "Master switch for publishing Automation.UI and Link.UI scenario and API Health results to TestRail: true or false. The code default is false. An environment publishes by setting this key to true in its App Configuration store; the service does not check the environment name. A value that is not true or false leaves publishing off and logs a warning at startup."
+      required: false
+      defaultValue: "false"
+    - key: "Automation:TestRail:BaseUrl"
+      description: "TestRail site address, for example https://<organization>.testrail.io. A trailing /index.php?/api/v2 is accepted and removed. Publishing stays off until this is set together with the user, API key, and project. Automation.UI and Link.UI each read the row for their own label."
+      required: false
+    - key: "Automation:TestRail:Username"
+      description: "Email address of the TestRail user that owns the API key. Publishing stays off until this is set."
+      required: false
+    - key: "Automation:TestRail:ApiKey"
+      description: "TestRail API key generated by the user in Username. Stored as a Key Vault reference to that environment's vault, never as a plain value. Startup logs only whether it is set."
+      required: false
+      sensitive: true
+    - key: "Automation:TestRail:ProjectId"
+      description: "TestRail project that receives Automation.UI and Link.UI results: the numeric id (12 or P12) or the exact project name. A name is looked up in TestRail on first use. The shipped default is the project name NHSNLink 2.0. Blank or zero leaves publishing off."
       required: false
       defaultValue: "NHSNLink 2.0"
     - key: "Automation:TestRail:ScenarioSuiteId"
@@ -880,8 +1023,6 @@ services:
       description: "The Entra tenant ID used for SMTP OAuth authentication."
       required: true
       sensitive: true
-  # No service-specific required config: this service reads only global keys. An explicit
-  # empty list keeps it paired with its serviceMeta entry.
   QueryDispatch: []
   Report:
     - key: "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging"

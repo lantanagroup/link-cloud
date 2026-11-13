@@ -15,6 +15,8 @@ import java.util.List;
 @Getter
 @Setter
 public class DataAcquisitionRequested {
+    private String facilityId;
+
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 

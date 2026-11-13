@@ -17,7 +17,7 @@
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.8.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.0" />
     <PackageVersion Include="CompareNETObjects" Version="4.84.0" />
-    <PackageVersion Include="Confluent.Kafka" Version="2.14.2" />
+    <PackageVersion Include="Confluent.Kafka" Version="2.16.0" />
     <PackageVersion Include="Confluent.Kafka.Extensions.Diagnostics" Version="0.5.0" />
     <PackageVersion Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.4.0" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />

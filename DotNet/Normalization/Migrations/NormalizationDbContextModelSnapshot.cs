@@ -687,6 +687,46 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.ToTable("HSLOC");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.NormalizationReportActivity", b =>
+                {
+                    b.Property<string>("ReportTrackingId")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("QueryType")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("Failures")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Resources")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ReportTrackingId", "CorrelationId", "QueryType");
+
+                    b.ToTable("NormalizationReportActivities");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Operation", b =>
                 {
                     b.Property<Guid>("Id")

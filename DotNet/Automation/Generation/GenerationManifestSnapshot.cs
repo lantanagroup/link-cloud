@@ -70,6 +70,9 @@ public sealed class GenerationManifestSnapshot
     public IReadOnlyDictionary<string, string> TemplateCacheKeyByPatient { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
 
+    /// <summary>The saved report manifest. Set on the copy keyed by report id; null on run-keyed copies.</summary>
+    public ReportManifestSection? Report { get; init; }
+
     /// <summary>
     /// Per-patient origin: <c>Generated</c> or <c>Uploaded</c>.
     /// Null on snapshots written before this field existed.

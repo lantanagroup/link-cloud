@@ -3,6 +3,7 @@ package com.lantanagroup.link.measureeval.services;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.records.MeasureReportGenerated;
 import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.KafkaKeys;
 import com.lantanagroup.link.shared.kafka.Topics;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
@@ -43,6 +44,10 @@ public class MeasureReportGeneratedProducer {
             throw new IllegalArgumentException("All parameters are required");
         }
 
+        // Reject a missing patient id before the value is built. A null reportable flag
+        // unboxes inside the record constructor, and that must not hide the key check.
+        String key = KafkaKeys.forPatient(patientStatus.getFacilityId(), patientStatus.getPatientId());
+
         logger.info(
                 "PRODUCING MeasureReportGenerated: REPORT_TYPE=[{}] REPORT_TRACKING_ID=[{}] REPORTABLE=[{}]",
                 report.getReportType(),
@@ -75,7 +80,7 @@ public class MeasureReportGeneratedProducer {
                     Topics.MEASURE_REPORT_GENERATED,
                     null,
                     null,
-                    null,
+                    key,
                     value,
                     headers));
         } catch (Exception ex) {

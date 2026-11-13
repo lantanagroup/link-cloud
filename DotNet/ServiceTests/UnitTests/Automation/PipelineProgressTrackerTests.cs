@@ -99,19 +99,14 @@ public class PipelineProgressTrackerTests
                 CreateDate: DateTime.UtcNow,
                 SubmitReportDateTime: null));
 
-        var entries = Enumerable.Range(1, patientCount)
-            .Select(i => new PipelineDataReader.ReportEntryInfo(
-                Guid.NewGuid(), FacilityId, $"patient-{i}",
-                ReportingStatus: "PassedValidation",
-                SubmissionStatus: entrySubmissionStatus,
-                MeasureReports:
-                [
-                    new PipelineDataReader.MeasureReportInfo($"mr-{i}", "ReadyForValidation", "DE-111", [])
-                ]))
-            .ToList();
-
+        var terminal = entrySubmissionStatus is "Submitted" or "NotSubmitted";
+        reader.Setup(r => r.GetReportEntrySummaryAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PipelineDataReader.ReportEntrySummaryInfo(
+                Total: patientCount, Evaluated: patientCount, Validated: patientCount,
+                Submitted: terminal ? patientCount : 0));
+        // The tracker must never read the per-patient list while polling.
         reader.Setup(r => r.GetReportEntriesWithMeasureReportsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(entries);
+            .ThrowsAsync(new InvalidOperationException("per-patient read while polling"));
 
         return reader;
     }

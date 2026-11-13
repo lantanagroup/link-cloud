@@ -1,0 +1,70 @@
+@model BottomPager
+@{
+    var pages = Model.Pages < 1 ? 1 : Model.Pages > int.MaxValue ? int.MaxValue : (int)Model.Pages;
+    var current = Model.Page < 1 ? 1 : Model.Page;
+    if (current > pages)
+        current = pages;
+    var start = Math.Max(1, current - 2);
+    var end = Math.Min(pages, current + 2);
+    var path = string.IsNullOrWhiteSpace(Model.Path) ? Context.Request.Path.ToString() : Model.Path;
+    string Link(int number, int size)
+    {
+        if (Model.Href is not null)
+            return Model.Href(number, size);
+        var route = Model.Route?.Invoke(number, size) ?? new Dictionary<string, string>();
+        if (route.Count == 0)
+            return path;
+        return path + "?" + string.Join("&", route.Select(pair =>
+            Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+    }
+    var fields = Model.Route?.Invoke(current, Model.PageSize);
+}
+
+<nav class="lu-pager" aria-label="@Model.Label">
+    <span class="small text-muted">@Model.Total</span>
+    <span class="small text-muted">Page @current of @pages</span>
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Link(1, Model.PageSize), Enabled = current > 1, Panel = Model.Panel })" />
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Link(current - 1, Model.PageSize), Enabled = current > 1, Panel = Model.Panel })" />
+    @for (var number = start; number <= end; number++)
+    {
+        if (number == current)
+        {
+            <span class="lu-page-num is-current" aria-current="page">@number</span>
+        }
+        else
+        {
+            <a class="lu-page-num" href="@Link(number, Model.PageSize)" @(Model.Panel ? "data-da-panel" : null)>@number</a>
+        }
+    }
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Link(current + 1, Model.PageSize), Enabled = current < pages, Panel = Model.Panel })" />
+    <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Link(pages, Model.PageSize), Enabled = current < pages, Panel = Model.Panel })" />
+    @if (!Model.Panel && fields is not null)
+    {
+        <form class="lu-pager-jump" method="get" action="@path">
+            @foreach (var pair in fields)
+            {
+                if (string.Equals(pair.Key, Model.PageKey, StringComparison.Ordinal))
+                    continue;
+                <input type="hidden" name="@pair.Key" value="@pair.Value" />
+            }
+            <label class="form-label mb-0" for="@("jump-" + Model.Label.Replace(' ', '-'))">Page</label>
+            <input class="form-control form-control-sm" id="@("jump-" + Model.Label.Replace(' ', '-'))" name="@Model.PageKey" type="number" min="1" max="@pages" value="@current" />
+            <button class="lu-page-go" type="submit">Go</button>
+        </form>
+    }
+    @if (Model.Sizes.Count > 0)
+    {
+        <span class="small text-muted">Per page</span>
+        @foreach (var size in Model.Sizes)
+        {
+            if (size == Model.PageSize)
+            {
+                <span class="lu-page-num is-current" aria-current="true">@size</span>
+            }
+            else
+            {
+                <a class="lu-page-num" href="@Link(1, size)" @(Model.Panel ? "data-da-panel" : null)>@size</a>
+            }
+        }
+    }
+</nav>

@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
@@ -61,8 +61,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 var message = new Message<string, PatientListMessage>
                 {
-                    Key = model.FacilityId,
-                    Value = new PatientListMessage { PatientLists = model.PatientLists, ReportTrackingId = model.ReportTrackingId.ToString() },
+                    Key = KafkaKeys.ForFacility(model.FacilityId),
+                    Value = new PatientListMessage
+                    {
+                        FacilityId = model.FacilityId,
+                        PatientLists = model.PatientLists,
+                        ReportTrackingId = model.ReportTrackingId.ToString()
+                    },
                     Headers = headers
                 };
 

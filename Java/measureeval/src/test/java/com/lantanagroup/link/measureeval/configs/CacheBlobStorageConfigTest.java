@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * The resource-cache blob client must fail fast: the Kafka retry-topic ladder owns retrying, and
  * the Azure SDK's default policy (4 exponential tries, effectively unbounded per-try timeout) hid
- * ~3 minutes of silent retrying inside every consumer attempt while blocking the single-threaded
- * consumer executor. These tests pin the tuned policy actually handed to the client builder.
+ * ~3 minutes of silent retrying inside every consumer attempt while blocking the listener
+ * thread. These tests pin the tuned policy actually handed to the client builder.
  */
 class CacheBlobStorageConfigTest {
 

@@ -1,0 +1,145 @@
+@model Link.UI.Models.TenantListViewModel
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Tenants";
+    var scopeQuery = AutomationMarkRules.ScopeForQuery(Model.Scope);
+    var emptyFacilities = !LinkUiFeatures.Value.AutomationEnabled
+        ? "No tenants found."
+        : AutomationMarkRules.NormalizeScope(Model.Scope) switch
+        {
+            AutomationMarkRules.Automation => "No automation facilities.",
+            AutomationMarkRules.Real => "No real facilities.",
+            _ => "No tenants found."
+        };
+    Dictionary<string, string> PageRoute(int page, int size)
+    {
+        var route = new Dictionary<string, string> { ["pageSize"] = size.ToString() };
+        if (!string.IsNullOrWhiteSpace(Model.Search))
+            route["search"] = Model.Search;
+        if (Model.IncludeDeleted)
+            route["includeDeleted"] = "true";
+        if (scopeQuery is not null)
+            route["scope"] = scopeQuery;
+        if (page > 1)
+            route["page"] = page.ToString();
+        return route;
+    }
+}
+
+<partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
+
+<div class="au-card card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Facilities</span>
+        <a class="btn btn-sm btn-success" asp-action="Create">New facility</a>
+    </div>
+    <div class="card-body">
+        @if (TempData["Message"] is string message)
+        {
+            <div class="alert alert-success">@message</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-warning">@error</div>
+        }
+        <form method="get" class="mb-3 lu-search" data-au-filter="300" data-au-target="tenantResults">
+            <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="pageSize" value="@Model.PageSize" />
+            <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-6">
+                <label class="visually-hidden" for="tenantSearch">Search facilities</label>
+                <input id="tenantSearch" type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search facilities..." />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+            </div>
+            </div>
+            <details class="lu-advanced mt-2" @((Model.IncludeDeleted || !string.IsNullOrWhiteSpace(Model.Scope)) ? "open" : null)>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-center mt-1">
+                    <div class="col-auto">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(Model.IncludeDeleted ? "checked" : null) />
+                            <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <partial name="_AutomationScope" model="Model.Scope" />
+                    </div>
+                </div>
+            </details>
+        </form>
+        <div id="tenantResults" data-au-refresh="20000">
+        @if (!string.IsNullOrWhiteSpace(Model.DeletedNote))
+        {
+            <div class="alert alert-warning">@Model.DeletedNote</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="alert alert-warning">@Model.ErrorMessage</div>
+        }
+        else if (Model.LoadedSuccessfully && Model.Tenants.Count == 0)
+        {
+            <div class="alert au-note mb-0">@emptyFacilities</div>
+        }
+        else if (Model.LoadedSuccessfully)
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Facility Id</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var tenant in Model.Tenants)
+                    {
+                        <tr>
+                            <td>
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = tenant.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", new { id = tenant.FacilityId }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
+                                <partial name="_AutomationBadge" model="tenant.IsTest" />
+                            </td>
+                            <td>
+                                <span class="d-inline-flex align-items-center gap-2">
+                                    <a asp-action="View" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@tenant.DisplayName</a>
+                                    <a class="btn btn-sm btn-au-link lu-icon-btn" asp-action="Facility" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Configuration" aria-label="Configuration"><i class="bi bi-gear" aria-hidden="true"></i><span class="ms-1">Configuration</span></a>
+                                </span>
+                            </td>
+                            <td>
+                                @if (tenant.IsDeleted)
+                                {
+                                    <span class="badge @StatusPills.ForAccountState(true, false)">Deleted</span>
+                                    <form method="post" data-au-save asp-action="Restore" asp-route-id="@tenant.FacilityId" class="mt-2">
+                                        <input type="hidden" name="search" value="@Model.Search" />
+                                        <input type="hidden" name="page" value="@Model.Page" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        @if (Model.IncludeDeleted)
+                                        {
+                                            <input type="hidden" name="includeDeleted" value="true" />
+                                        }
+                                        @if (scopeQuery is not null)
+                                        {
+                                            <input type="hidden" name="scope" value="@scopeQuery" />
+                                        }
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Restore" aria-label="Restore facility" data-hold="@Hold.Of("Restore this facility", "Restore this facility, its reports, and its logs.", new[] { Hold.Pair("Facility", tenant.FacilityId) }, Array.Empty<string[]>(), new[] { "The facility comes back onto the active list with its reports and logs." }, "", "Hold to restore")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ms-1">Restore</span></button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="badge @StatusPills.ForAccountState(false, true)">Active</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Tenant pages", Page = Model.Page, Pages = Model.TotalPages == 0 ? 1 : Model.TotalPages, Total = Model.TotalCount, PageSize = Model.PageSize, Sizes = TenantListRules.PageSizes, Route = PageRoute })" />
+            <p class="text-muted small mt-2 mb-0">@Model.TotalCount tenant(s). The name opens the facility. Configuration opens the editor.</p>
+        }
+        </div>
+    </div>
+</div>

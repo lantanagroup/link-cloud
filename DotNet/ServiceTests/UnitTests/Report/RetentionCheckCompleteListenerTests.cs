@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Retention;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -180,7 +181,8 @@ public class RetentionCheckCompleteListenerTests
         consumerFactory
             .Setup(item => item.CreateConsumer(It.IsAny<ConsumerConfig>(),
                                                It.IsAny<IDeserializer<string>>(),
-                                               It.IsAny<IDeserializer<RetentionCheckCompleteValue>>()))
+                                               It.IsAny<IDeserializer<RetentionCheckCompleteValue>>(),
+                                               It.IsAny<KafkaAssignmentTracker?>()))
             .Returns(consumer);
 
         return new RetentionCheckCompleteListener(

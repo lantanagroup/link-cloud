@@ -1,4 +1,4 @@
-﻿# Automation.UI
+# Automation.UI
 
 `Automation.UI` is the interactive web host for Link automation runs. It lets users create and
 manage test scenarios, configure FHIR query plans, start runs, watch progress in real time,

@@ -1,0 +1,51 @@
+@model LabeledId
+@{
+    var value = Model.Value?.Trim() ?? "";
+    var displayName = LabeledIdRules.DisplayName(Model.Name, value);
+    var empty = string.IsNullOrWhiteSpace(value) || value == "—" || value == "-";
+    var href = ReturnUrlRules.WithReturn(Model.LinkHref, Model.ReturnUrl);
+    var safeLink = !string.IsNullOrWhiteSpace(href)
+        && href.StartsWith('/')
+        && !href.StartsWith("//", StringComparison.Ordinal)
+        && href.IndexOf("://", StringComparison.Ordinal) < 0
+        && href.IndexOf('\\') < 0;
+}
+<span class="lu-labeled-id@(Model.Compact ? " lu-labeled-id-compact" : "")">
+    @if (!string.IsNullOrWhiteSpace(Model.Label))
+    {
+        <span class="lu-id-label@(Model.Compact ? " visually-hidden" : "")">@Model.Label</span>
+    }
+    @if (!string.IsNullOrWhiteSpace(displayName))
+    {
+        <span class="lu-id-name">@displayName</span>
+    }
+    <span class="lu-id-value">
+        @if (!string.IsNullOrWhiteSpace(Model.ValueElementId))
+        {
+            if (safeLink && !empty)
+            {
+                <a class="lu-clip" href="@href" title="@value" id="@Model.ValueElementId" data-copy="@value">@value</a>
+            }
+            else if (empty)
+            {
+                <code class="lu-facility-id" id="@Model.ValueElementId">—</code>
+            }
+            else
+            {
+                <code class="lu-facility-id" title="@value" id="@Model.ValueElementId" data-copy="@value">@value</code>
+            }
+        }
+        else if (empty)
+        {
+            <span class="text-muted">—</span>
+        }
+        else if (safeLink)
+        {
+            <a class="lu-clip" href="@href" title="@value" data-copy="@value">@value</a>
+        }
+        else
+        {
+            <code class="lu-facility-id" title="@value" data-copy="@value">@value</code>
+        }
+    </span>
+</span>

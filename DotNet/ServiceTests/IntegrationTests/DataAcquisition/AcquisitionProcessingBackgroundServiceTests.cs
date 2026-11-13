@@ -48,7 +48,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         var loggerMock = new Mock<ILogger<AcquisitionProcessorBackgroundService>>();
         var service = new AcquisitionProcessorBackgroundService(
             loggerMock.Object, _fixture.ServiceProvider, null,
-            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
+            Mock.Of<IProducer<string, MappingOutcomeEvaluatedValue>>());
 
         // Use an ID that definitely does not exist
         var workItem = new AcquisitionWorkItem(999999, "NonExistent");
@@ -238,14 +238,14 @@ public class AcquisitionProcessorBackgroundServiceTests
         _fixture.ResourcesAcquiredProducerMock
             .Setup(p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()))
             .Callback(() => tailProducedSignal.TrySetResult());
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessorBackgroundService>>();
         var service = new AcquisitionProcessorBackgroundService(
             loggerMock.Object, _fixture.ServiceProvider, _fixture.ResourcesAcquiredProducerMock.Object,
-            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
+            Mock.Of<IProducer<string, MappingOutcomeEvaluatedValue>>());
         using var cts = new CancellationTokenSource();
         await service.StartAsync(cts.Token);
         await service.EnqueueAsync(new AcquisitionWorkItem(conditionLogId, facilityId), cts.Token);
@@ -272,7 +272,7 @@ public class AcquisitionProcessorBackgroundServiceTests
         _fixture.ResourcesAcquiredProducerMock.Verify(
             p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<Message<string, ResourcesAcquired>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }

@@ -21,7 +21,7 @@
 ## dataacq: 8065
 ## dataacq-worker: 8078
 ## admin-ui: 8066
-## automation-ui: 5256
+## link-ui: 5258
 ## measureeval: 8067
 ## normalization: 8068
 ## querydispatch: 8071
@@ -174,9 +174,11 @@ services:
     ports:
       - 1433:1433
     container_name: sql-server
+    mem_limit: 3g
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=${LINK_DB_PASS}
+      - MSSQL_MEMORY_LIMIT_MB=2816
     volumes:
       - mssql_data:/var/opt/mssql
     restart: always
@@ -380,6 +382,7 @@ services:
       - .docker/kafka-client.properties:/etc/kafka-client.properties
       - ./Scripts/create-topics-rest.sh:/create-topics-rest.sh
       - ./topics.txt:/topics.txt
+      - ./kafka-retry-services.txt:/kafka-retry-services.txt
     depends_on:
       rest-proxy:
         condition: service_healthy
@@ -492,6 +495,7 @@ services:
       Authentication__Schemas__Jwt__Enabled: ${LOCAL_AUTH_ENABLE_JWT:-false}
       LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
       LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
+      ServiceRegistry__TerminologyServiceUrl: http://terminology:8076
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Redis__Password: ${REDIS_PASS}
@@ -726,7 +730,7 @@ services:
        start_period: 3s
        interval: 3s
        retries: 10
-  
+
   admin-ui:
     image: link-admin-ui
     container_name: link-admin-ui
@@ -744,16 +748,20 @@ services:
     depends_on:
       - admin-bff
 
-  automation-ui:
-    image: link-automation-ui
-    container_name: link-automation-ui
+  link-ui:
+    image: link-ui
+    container_name: link-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       Automation__LokiBaseUrl: http://loki:3100
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
-      InternalBlobStorage__BlobContainerName: link-automation-ui
+      InternalBlobStorage__BlobContainerName: link-ui
+      SubmissionRead__ExternalConnectionString: ${AZURITE_CONNECTION_STRING}
+      SubmissionRead__ExternalContainerName: ${EXTERNAL_BLOB_CONTAINER_NAME}
+      SubmissionRead__FlattenHierarchy: ${EXTERNAL_BLOB_FLATTEN_HIERARCHY:-false}
+      MongoDB__DatabaseName: link-ui
       ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
       KafkaConnection__BootstrapServers__0: kafka_b:9092
       KafkaConnection__SaslProtocolEnabled: true
@@ -761,7 +769,7 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Authentication__UseBearerForServiceCalls: ${LOCAL_AUTOMATION_UI_USE_BEARER_FOR_SERVICE_CALLS:-false}
       LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
-      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
+      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-}
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
@@ -770,13 +778,12 @@ services:
       Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
       Redis__Password: ${REDIS_PASS}
       LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-false}
-    volumes:
-      - automation_ui_keys:/keys/dataprotection
+      Automation__RouteServiceCallsThroughAdminBff: ${LINK_UI_ROUTE_SERVICE_CALLS_THROUGH_ADMIN_BFF:-true}
     ports:
-      - "5256:5257"
+      - "5258:5258"
     build:
       context: .
-      dockerfile: DotNet/Automation.UI/Dockerfile
+      dockerfile: DotNet/Link.UI/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
     networks:
@@ -791,8 +798,8 @@ services:
       redis_cache:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5257/"]
-      
+      test: ["CMD", "curl", "-f", "http://localhost:5258/health"]
+
   measureeval:
     image: link-measureeval
     container_name: link-measureeval
@@ -1169,8 +1176,3 @@ volumes:
     driver: local
   sftp_data:
     driver: local
-  automation_ui_keys:
-    driver: local
-
-
-

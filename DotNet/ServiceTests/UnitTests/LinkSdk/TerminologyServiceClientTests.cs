@@ -283,6 +283,34 @@ public class TerminologyServiceClientTests
         Assert.Equal("/api/terminology/fhir/CodeSystem/loinc/$lookup", request.Path);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task GetValueSetSummariesAsync_RequestsSummary()
+    {
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Bundle\",\"entry\":[]}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.GetValueSetSummariesAsync();
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/ValueSet", request.Path);
+        Assert.Contains("_summary=true", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetCodeSystemSummariesAsync_RequestsSummary()
+    {
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Bundle\",\"entry\":[]}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.GetCodeSystemSummariesAsync();
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/CodeSystem", request.Path);
+        Assert.Contains("_summary=true", request.Query);
+    }
+
     private static TerminologyServiceClient CreateClient(string baseUrl)
     {
         return new TerminologyServiceClient(

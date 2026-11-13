@@ -104,7 +104,9 @@ public class ReportScheduledJobTests
         await CreateJob().Execute(ContextFor(facility, ScheduleService.MONTHLY, scheduledUtc));
 
         _produced.Should().ContainSingle();
+        _produced.Single().Key.Should().Be(KafkaKeys.ForFacility("100"));
         var message = (ReportScheduledMessage)_produced.Single().Value;
+        message.FacilityId.Should().Be("100");
         message.Frequency.Should().Be(ScheduleService.MONTHLY);
         message.ReportTypes.Should().BeEquivalentTo(facility.ScheduledReports.Monthly);
 

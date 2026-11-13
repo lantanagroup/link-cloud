@@ -1,0 +1,1272 @@
+@model ReportManifestModel
+@using System.Text.Encodings.Web
+@using System.Text.Json
+@{
+    var jsonOptions = new JsonSerializerOptions { Encoder = JavaScriptEncoder.Default };
+    var chartPatients = JsonSerializer.Serialize(Model.ChartPatients.Select(row => new { row.PatientId, row.Total }), jsonOptions);
+    var donutRows = Model.ChartTypes.ToList();
+    var donutShown = donutRows.Sum(row => (long)row.Total);
+    var donutOther = string.IsNullOrWhiteSpace(Model.Query.TypeQuery) && Model.TotalResourceCount > donutShown
+        ? (int)(Model.TotalResourceCount - donutShown)
+        : 0;
+    if (donutOther > 0)
+        donutRows.Add(new ManifestCountRow { Name = "Other", Primary = donutOther, Total = donutOther });
+    var donutTotal = donutRows.Sum(row => row.Total);
+    var donutColors = new List<string>(ReportManifestRules.DonutColors);
+    if (donutOther > 0)
+        donutColors.Add(ReportManifestRules.DonutOtherColor);
+    var colorByType = string.Equals(Model.TypeHeading, "Resource types", StringComparison.OrdinalIgnoreCase);
+    var donutGradient = ReportManifestRules.DonutGradient(donutRows.Select(row => row.Total).ToList(), donutRows.Select((_, index) => SliceColor(index)).ToList());
+    var donutCenter = string.Equals(Model.TypeHeading, "Resource types", StringComparison.OrdinalIgnoreCase) ? "resources" : "patients";
+    // The "Other" remainder is always the neutral Other colour, even when it is the only slice.
+    // Resource types keep one colour per type everywhere; other contents (populations, statuses) use the category list.
+    string SliceColor(int index) => donutOther > 0 && index == donutRows.Count - 1
+        ? ReportManifestRules.DonutOtherColor
+        : colorByType ? ResourceTypeColors.For(donutRows[index].Name)
+        : ReportManifestRules.DonutColors[index % ReportManifestRules.DonutColors.Length];
+    string SlicePercent(int value) => donutTotal <= 0 ? "0%" : (value * 100.0 / donutTotal).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    var detailRows = Model.Patients.ToList();
+    foreach (var extra in Model.PopulationPatients)
+    {
+        if (detailRows.All(row => !string.Equals(row.PatientId, extra.PatientId, StringComparison.Ordinal)))
+            detailRows.Add(extra);
+    }
+    var patientDetails = JsonSerializer.Serialize(detailRows.Select(row => new
+    {
+        id = row.PatientId,
+        status = row.Status,
+        submission = row.Submission,
+        updated = row.Updated,
+        measures = row.Measures.Select(item => new { name = item.Name, outcome = item.Outcome, qualifies = item.Qualifies, tone = item.BadgeClass }),
+        resources = row.Resources.Select(item => new { name = item.Name, count = item.Count }),
+        events = row.Events.Select(item => new { label = item.Label, when = item.When }),
+        links = row.Links.Select(item => new { label = item.Label, href = item.Href }),
+        refs = row.ResourceRefs.Select(item => new { type = item.Type, id = item.Id }),
+        mapping = row.Mapping is null ? null : new { label = row.Mapping.Label, locationOrg = row.Mapping.LocationOrg, encounterMapping = row.Mapping.EncounterMapping, hsloc = row.Mapping.Hsloc },
+        diagnostics = row.DiagnosticsHref
+    }), jsonOptions);
+    var showMeasures = Model.Patients.Any(row => row.Measures.Count > 0);
+    var showSubmission = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Submission));
+    var showUpdated = Model.Patients.Any(row => !string.IsNullOrWhiteSpace(row.Updated));
+    var showMapping = Model.Patients.Any(row => row.Mapping is not null);
+    var countHeader = Model.ContentsAreStatus || Model.TypeHeading == "Populations" ? "Patients" : "Total";
+    var nameHeader = Model.TypeHeading == "Populations" ? "Population" : "Name";
+    var populationCards = Model.Populations.Take(ReportManifestModel.ChartCap).ToList();
+    var populationsOpen = Model.PopulationsOpen;
+    var patientsOpen = !populationsOpen && string.Equals(Model.Query.Tab, "patients", StringComparison.OrdinalIgnoreCase);
+    var comparisonOpen = !populationsOpen && !patientsOpen && Model.ShowComparison && string.Equals(Model.Query.Tab, "comparison", StringComparison.OrdinalIgnoreCase);
+    var overviewOpen = !populationsOpen && !patientsOpen && !comparisonOpen;
+    var stageTitle = Model.Query.Stage switch
+    {
+        "predicted" => "Predicted to qualify",
+        "not-predicted" => "Not predicted to qualify",
+        "missing" => "Predicted, missing from ABS",
+        "in-actual" => "In the ABS upload",
+        null or "" => "",
+        _ => ReportManifestRules.PopulationLabel(Model.Query.Stage)
+    };
+    string Count(int value) => value.ToString("N0");
+    string ValidationColor(string name) => ReportManifestRules.ValidationSliceColor(name);
+    var graphUrl = "";
+    if (Model.InteractiveBlocked is null
+        && !string.IsNullOrWhiteSpace(Model.GraphFacilityId)
+        && !string.IsNullOrWhiteSpace(Model.GraphReportId))
+    {
+        graphUrl = "/Reports/PatientGraph?facilityId=" + Uri.EscapeDataString(Model.GraphFacilityId)
+            + "&reportId=" + Uri.EscapeDataString(Model.GraphReportId);
+    }
+    else if (Model.InteractiveBlocked is null && string.Equals(Model.Path, "/Reports/Manifest", StringComparison.Ordinal)
+        && Model.Route.TryGetValue("facilityId", out var graphFacility)
+        && Model.Route.TryGetValue("reportId", out var graphReport)
+        && !string.IsNullOrWhiteSpace(graphFacility)
+        && !string.IsNullOrWhiteSpace(graphReport))
+    {
+        graphUrl = "/Reports/PatientGraph?facilityId=" + Uri.EscapeDataString(graphFacility)
+            + "&reportId=" + Uri.EscapeDataString(graphReport);
+        if (Model.Route.TryGetValue("scale", out var graphScale) && graphScale == "1")
+            graphUrl += "&scale=1";
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Notice))
+{
+    <div class="alert alert-secondary lu-alert" role="status"><i class="bi bi-archive me-2" aria-hidden="true"></i>@Model.Notice</div>
+}
+
+<ul class="nav lu-section-nav" role="tablist">
+    <li><button class="@(overviewOpen ? "active" : null)" data-manifest-tab="#manifest-overview" type="button">Overview</button></li>
+    <li><button class="@(patientsOpen ? "active" : null)" data-manifest-tab="#manifest-patients" type="button">Patients <span class="text-muted ms-1">@Count(Model.PatientCount)</span></button></li>
+    <li><button class="@(populationsOpen ? "active" : null)" data-manifest-tab="#manifest-populations" type="button">Populations</button></li>
+    @if (Model.ShowComparison)
+    {
+        <li><button class="@(comparisonOpen ? "active" : null)" data-manifest-tab="#manifest-comparison" type="button">Generated vs ABS</button></li>
+    }
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade @(overviewOpen ? "show active" : null)" id="manifest-overview">
+        @if (Model.ShowGeneration && Model.TemplateStale)
+        {
+            <div class="alert alert-warning">This run used generation templates v@(Model.TemplateVersion). The latest for this scenario is v@(Model.LatestTemplateVersion). A download replays the templates stored for this run.</div>
+        }
+        @foreach (var overviewPrediction in populationCards.Count == 0 ? Model.Predictions : [])
+        {
+            var predictionTiles = new (string Name, int? Count)[]
+            {
+                ("Predicted to qualify", overviewPrediction.Predicted),
+                ("Not predicted to qualify", overviewPrediction.NotPredicted),
+                ("In the ABS upload", overviewPrediction.InActual),
+                ("Predicted, missing from ABS", overviewPrediction.MissingFromActual)
+            };
+            <section class="card au-card lu-measure-card">
+                <h3 class="card-header h6 mb-0"><a class="text-white" href="@Model.Href(tab: "populations", clearStage: true)">@overviewPrediction.Measure</a></h3>
+                <div class="card-body">
+                    <div class="lu-measure-tiles">
+                        @foreach (var tile in predictionTiles)
+                        {
+                            if (tile.Count is not int tileCount)
+                                continue;
+                            <div class="au-stat-tile">
+                                <div class="au-stat-value">@Count(tileCount)</div>
+                                <div class="au-stat-label">@tile.Name @if (ReportManifestRules.PredictionHelp(tile.Name) is string tileHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + tile.Name, Text = tileHelp })" /> }</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
+        }
+        @if (populationCards.Count > 0)
+        {
+            <div class="row g-3 mb-3">
+                @foreach (var highlight in populationCards)
+                {
+                    <div class="@(populationCards.Count == 1 ? "col-12" : "col-lg-6")">
+                        <section class="card au-card mb-0 h-100 lu-measure-card">
+                            <h3 class="card-header h6 mb-0"><a class="text-white" href="@Model.Href(tab: "populations", clearStage: true)">@highlight.Measure</a></h3>
+                            <div class="card-body">
+                                <div class="lu-measure-tiles">
+                                    @if (highlight.InitialPopulation is int initialPopulation)
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(initialPopulation)</div><div class="au-stat-label">Initial Population <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Initial Population")" aria-label="About Initial Population"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
+                                    }
+                                    @if (highlight.Denominator is int denominator)
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(denominator)</div><div class="au-stat-label">Denominator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator")" aria-label="About Denominator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
+                                    }
+                                    @if (highlight.DenominatorExclusion is int denominatorExclusion)
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorExclusion)</div><div class="au-stat-label">Denominator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exclusion")" aria-label="About Denominator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
+                                    }
+                                    @if (highlight.DenominatorException is int denominatorException)
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(denominatorException)</div><div class="au-stat-label">Denominator Exception <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Denominator Exception")" aria-label="About Denominator Exception"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
+                                    }
+                                    @if (highlight.Numerator is int numerator)
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(numerator)</div><div class="au-stat-label">Numerator <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator")" aria-label="About Numerator"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
+                                    }
+                                    @if (highlight.NumeratorExclusion is int numeratorExclusion)
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(numeratorExclusion)</div><div class="au-stat-label">Numerator Exclusion <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Numerator Exclusion")" aria-label="About Numerator Exclusion"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(highlight.Rate))
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@highlight.Rate</div><div class="au-stat-label">Rate <span class="au-info-icon" data-bs-toggle="tooltip" title="@ReportManifestRules.PopulationHelp("Rate")" aria-label="About Rate"><i class="bi bi-info-circle" aria-hidden="true"></i></span></div></div>
+                                    }
+                                    @foreach (var other in highlight.Other)
+                                    {
+                                        <div class="au-stat-tile"><div class="au-stat-value">@Count(other.Total)</div><div class="au-stat-label">@other.Name</div></div>
+                                    }
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                }
+            </div>
+        }
+        @if (donutRows.Count > 0)
+        {
+            <section class="card au-card">
+                <h3 class="card-header h6 mb-0 d-flex justify-content-between align-items-center">
+                    <span>@Model.TypeHeading</span>
+                    <span>@Count(donutTotal)</span>
+                </h3>
+                <div class="card-body">
+                    <div class="lu-donut-layout">
+                        <div class="lu-donut-chart">
+                            <div class="lu-donut-ring" style="background: conic-gradient(@donutGradient)" role="img" aria-label="@Model.TypeHeading">
+                                <div class="lu-donut-hole">
+                                    <span class="lu-donut-total">@Count(donutTotal)</span>
+                                    <span class="lu-donut-total-label">@donutCenter</span>
+                                </div>
+                            </div>
+                        </div>
+                        @{
+                            // Bars keep each slice's colour and list the biggest type first.
+                            var barMax = donutRows.Count == 0 ? 0 : donutRows.Max(row => row.Total);
+                            var barOrder = Enumerable.Range(0, donutRows.Count).OrderByDescending(i => donutRows[i].Total).ThenBy(i => i).ToList();
+                        }
+                        <ul class="lu-donut-legend lu-donut-bars" aria-label="@Model.TypeHeading by count">
+                            @foreach (var index in barOrder)
+                            {
+                                var barWidth = barMax <= 0 ? 0 : donutRows[index].Total * 100.0 / barMax;
+                                <li>
+                                    <span class="lu-donut-swatch" style="background:@SliceColor(index)"></span>
+                                    <span class="lu-donut-name">@donutRows[index].Name</span>
+                                    <span class="lu-donut-bar" aria-hidden="true"><span style="width:@barWidth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;background:@SliceColor(index)"></span></span>
+                                    <span class="lu-donut-count">@Count(donutRows[index].Total)</span>
+                                    <span class="lu-donut-pct">@SlicePercent(donutRows[index].Total)</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        }
+        @if (Model.ShowValidation)
+        {
+            var validationRows = Model.StatusChart.ToList();
+            var validationTotal = validationRows.Sum(row => row.Total);
+            var validationColors = validationRows.Select(row => ValidationColor(row.Name)).ToList();
+            var validationGradient = ReportManifestRules.DonutGradient(validationRows.Select(row => row.Total).ToList(), validationColors);
+            var validationHole = validationTotal > 0 ? validationTotal : Model.PatientCount;
+            <section class="card au-card" id="manifest-validation">
+                <h3 class="card-header h6 mb-0 d-flex justify-content-between align-items-center">
+                    <span>Validation</span>
+                    <span>@Count(validationHole)</span>
+                </h3>
+                <div class="card-body">
+                    @if (validationRows.Count == 0)
+                    {
+                        <p class="mb-0">No validation counts were stored.</p>
+                    }
+                    else
+                    {
+                        <div class="lu-donut-layout">
+                            <div class="lu-donut-chart">
+                                <div class="lu-donut-ring" style="background: conic-gradient(@validationGradient)" role="img" aria-label="Validation">
+                                    <div class="lu-donut-hole">
+                                        <span class="lu-donut-total">@Count(validationHole)</span>
+                                        <span class="lu-donut-total-label">patients</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <ul class="lu-donut-legend">
+                                @for (var slice = 0; slice < validationRows.Count; slice++)
+                                {
+                                    var sliceTotal = validationRows[slice].Total;
+                                    var slicePercent = validationTotal <= 0
+                                        ? "0%"
+                                        : (sliceTotal * 100.0 / validationTotal).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+                                    <li>
+                                        <span class="lu-donut-swatch" style="background:@validationColors[slice]"></span>
+                                        <span class="lu-donut-name">@validationRows[slice].Name</span>
+                                        <span class="lu-donut-count">@Count(sliceTotal)</span>
+                                        <span class="lu-donut-pct">@slicePercent</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+        @if (Model.ShowQueryPlan)
+        {
+            <section class="card au-card">
+                <h3 class="card-header h6 mb-0">Query plan</h3>
+                <div class="card-body">
+                    <div class="lu-manifest-kpis">
+                        <div><span class="lu-kpi-value">@Count(Model.AcquiredTypes.Count)</span><span class="lu-kpi-label">Acquired</span></div>
+                        <div><span class="lu-kpi-value">@Count(Model.ParameterTypes.Count)</span><span class="lu-kpi-label">Parameter queries</span></div>
+                        <div><span class="lu-kpi-value">@Count(Model.CqlTypes.Count)</span><span class="lu-kpi-label">CQL referenced</span></div>
+                    </div>
+                    @if (Model.AcquiredTypes.Count > 0)
+                    {
+                        <p class="small text-muted mb-0 mt-3">@(string.Join(", ", Model.AcquiredTypes.Take(ReportManifestModel.ChartCap)))@(Model.AcquiredTypes.Count > ReportManifestModel.ChartCap ? " and " + (Model.AcquiredTypes.Count - ReportManifestModel.ChartCap) + " more." : "")</p>
+                    }
+                </div>
+            </section>
+        }
+        <section class="card au-card">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span>@(donutRows.Count > 0 ? "All " + Model.TypeHeading.ToLowerInvariant() : Model.TypeHeading)</span>
+                <form method="get" action="@Model.Path" class="d-flex gap-2">
+                    @foreach (var pair in Model.Route)
+                    {
+                        <input type="hidden" name="@pair.Key" value="@pair.Value" />
+                    }
+                    <input type="hidden" name="q" value="@Model.Query.PatientQuery" />
+                    <input type="hidden" name="sort" value="@Model.Query.Sort" />
+                    <input type="hidden" name="dir" value="@(Model.Query.Descending ? "desc" : "asc")" />
+                    <input type="hidden" name="page" value="@Model.Query.Page" />
+                    <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
+                    <input type="hidden" name="typeSize" value="@Model.Query.TypeSize" />
+                    <label class="visually-hidden" for="manifestTypeQuery">Search types</label>
+                    <input id="manifestTypeQuery" name="typeQ" value="@Model.Query.TypeQuery" class="form-control form-control-sm" placeholder="Search types" />
+                    <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
+                    <a class="btn btn-sm btn-warning" href="@Model.Href(clearType: true)">Clear</a>
+                </form>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.Types.Count == 0)
+                {
+                    <p class="p-3 mb-0">No matching rows.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                    <table class="au-table table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>@nameHeader</th>
+                                @if (Model.ShowSplit)
+                                {
+                                    <th class="text-end">Patient</th>
+                                    <th class="text-end">Shared</th>
+                                }
+                                <th class="text-end">@countHeader</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Types)
+                        {
+                            <tr>
+                                <td>@row.Name</td>
+                                @if (Model.ShowSplit)
+                                {
+                                    <td class="text-end">@(row.Primary > 0 ? Count(row.Primary) : "—")</td>
+                                    <td class="text-end">@(row.Secondary > 0 ? Count(row.Secondary) : "—")</td>
+                                }
+                                <td class="text-end">@Count(row.Total)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                    </div>
+                }
+            </div>
+            <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(typePage: 1), Enabled = Model.TypePaging.Page > 1 })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(typePage: Model.TypePaging.Page - 1), Enabled = Model.TypePaging.HasPrevious })" />
+                <span class="small text-muted">Page @Model.TypePaging.Page of @(Model.TypePaging.TotalPages == 0 ? 1 : Model.TypePaging.TotalPages) (@Model.TypePaging.TotalCount)</span>
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(typePage: Model.TypePaging.Page + 1), Enabled = Model.TypePaging.HasNext })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(typePage: (int)Model.TypePaging.TotalPages), Enabled = Model.TypePaging.HasNext })" />
+                <span class="lu-size-chips">
+                    <span class="visually-hidden">Rows per page</span>
+                    @foreach (var size in ReportManifestQuery.PageSizes)
+                    {
+                        <a class="lu-size-chip @(size == Model.Query.TypeSize ? "is-current" : null)" href="@Model.Href(typeSize: size)" aria-current="@(size == Model.Query.TypeSize ? "page" : "false")">@size</a>
+                    }
+                </span>
+            </div>
+        </section>
+    </div>
+
+    <div class="tab-pane fade @(patientsOpen ? "show active" : null)" id="manifest-patients">
+        @if (!string.IsNullOrWhiteSpace(Model.PatientNote))
+        {
+            <div class="alert alert-warning">@Model.PatientNote</div>
+        }
+        <div class="au-card">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span>Patients</span>
+                <form method="get" action="@Model.Path" class="d-flex gap-2">
+                    @foreach (var pair in Model.Route)
+                    {
+                        <input type="hidden" name="@pair.Key" value="@pair.Value" />
+                    }
+                    <input type="hidden" name="typeQ" value="@Model.Query.TypeQuery" />
+                    <input type="hidden" name="typePage" value="@Model.Query.TypePage" />
+                    <input type="hidden" name="pageSize" value="@Model.Query.PageSize" />
+                    <input type="hidden" name="typeSize" value="@Model.Query.TypeSize" />
+                    <label class="visually-hidden" for="manifestPatientQuery">Search patients</label>
+                    <input id="manifestPatientQuery" name="q" value="@Model.Query.PatientQuery" class="form-control form-control-sm" placeholder="@(Model.ShowGeneration ? "Patient id contains" : "Patient id")" />
+                    <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
+                    <a class="btn btn-sm btn-warning" href="@Model.Href(clearPatient: true)">Clear</a>
+                </form>
+            </div>
+            <div class="card-body">
+                @if (Model.ChartPatients.Count > 0)
+                {
+                    <div class="lu-chart mb-3"><canvas id="patientBarChart"></canvas></div>
+                }
+                @if (Model.Patients.Count == 0)
+                {
+                    <p class="mb-0">No matching patients.</p>
+                }
+                else
+                {
+                    @if (Model.ShowGeneration && !Model.OriginRecorded)
+                    {
+                        <p class="small text-muted mb-2" data-origin-note>Patient source was not recorded for this run.</p>
+                    }
+                    <div class="table-responsive">
+                    <table class="au-table table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th><a class="text-white" href="@Model.Href(sort: "id", descending: Model.Query.Sort == "id" ? !Model.Query.Descending : false)">Patient</a></th>
+                                @if (Model.ShowGeneration)
+                                {
+                                    <th>Source <span class="au-info-icon" data-bs-toggle="tooltip" title="Generated means the FHIR generator produced the patient. Uploaded means the patient was supplied or already existed." aria-label="About the source column"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
+                                }
+                                <th>
+                                    @if (Model.ShowGeneration)
+                                    {
+                                        <text>Status</text>
+                                    }
+                                    else
+                                    {
+                                        <a class="text-white" href="@Model.Href(sort: "status", descending: Model.Query.Sort == "status" ? !Model.Query.Descending : true)">Status</a>
+                                    }
+                                </th>
+                                @if (showSubmission)
+                                {
+                                    <th>Submission</th>
+                                }
+                                @if (showMapping)
+                                {
+                                    <th>Mapping <span class="au-info-icon" data-bs-toggle="tooltip" title="Location org, encounter mapping and HSLOC for this patient. The badge shows the weakest of the three; hover it for each one." aria-label="About the mapping badge"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
+                                }
+                                @if (showMeasures)
+                                {
+                                    <th>Measures <span class="au-info-icon" data-bs-toggle="tooltip" title="Green means the patient is in the Numerator when this report has one. Red means they are not. A cohort measure with only an Initial Population uses that instead. A run shows a prediction, not a scored Numerator. A badge is left off when the data does not say." aria-label="About measure badges"><i class="bi bi-info-circle" aria-hidden="true"></i></span></th>
+                                }
+                                @if (Model.ShowTotals)
+                                {
+                                    <th class="text-end">
+                                        @if (Model.ShowGeneration)
+                                        {
+                                            <a class="text-white" href="@Model.Href(sort: "total", descending: Model.Query.Sort == "total" ? !Model.Query.Descending : true)">Resources</a>
+                                        }
+                                        else
+                                        {
+                                            <text>Resources</text>
+                                        }
+                                    </th>
+                                }
+                                @if (showUpdated)
+                                {
+                                    <th>Updated</th>
+                                }
+                                @if (Model.ShowGeneration)
+                                {
+                                    <th>Pattern</th>
+                                    <th>Configuration</th>
+                                    <th><span class="visually-hidden">Download</span></th>
+                                }
+                                <th class="text-end"><span class="visually-hidden">Details</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @{
+                            var patientIndex = 0;
+                        }
+                        @foreach (var row in Model.Patients)
+                        {
+                            var index = patientIndex;
+                            patientIndex++;
+                            <tr>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = row.Href })" /></td>
+                                @if (Model.ShowGeneration)
+                                {
+                                    <td data-patient-origin>
+                                        @if (row.Origin is { } origin)
+                                        {
+                                            <span class="badge @ReportManifestRules.PatientOriginBadge(origin)">@origin</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted" title="Not recorded for this run">—</span>
+                                        }
+                                    </td>
+                                }
+                                <td data-nocopy><span class="badge @row.BadgeClass">@row.Status</span></td>
+                                @if (showSubmission)
+                                {
+                                    <td data-nocopy>
+                                        @if (string.IsNullOrWhiteSpace(row.Submission))
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @ReportManifestRules.SubmissionBadgeClass(row.Submission)">@row.Submission</span>
+                                        }
+                                    </td>
+                                }
+                                @if (showMapping)
+                                {
+                                    <td data-nocopy class="text-nowrap">
+                                        @if (row.Mapping is { } mapping)
+                                        {
+                                            <span class="badge @mapping.BadgeClass" data-bs-toggle="tooltip" tabindex="0" title="@mapping.Title" aria-label="Mapping @mapping.Label. @mapping.Title">@mapping.Label</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">&mdash;</span>
+                                        }
+                                    </td>
+                                }
+                                @if (showMeasures)
+                                {
+                                    <td data-nocopy>
+                                        @if (row.Measures.Count == 0)
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            foreach (var badge in row.Measures)
+                                            {
+                                                <span class="badge @badge.BadgeClass lu-measure-badge text-truncate" title="@badge.Name">@badge.Name</span>
+                                                <span class="au-info-icon" data-bs-toggle="tooltip" title="@badge.Name. @badge.Outcome" aria-label="@badge.Name. @badge.Outcome"><i class="bi bi-info-circle" aria-hidden="true"></i></span>
+                                            }
+                                        }
+                                    </td>
+                                }
+                                @if (Model.ShowTotals)
+                                {
+                                    <td class="text-end">@Count(row.Total)</td>
+                                }
+                                @if (showUpdated)
+                                {
+                                    <td>@(string.IsNullOrWhiteSpace(row.Updated) ? "—" : row.Updated)</td>
+                                }
+                                @if (Model.ShowGeneration)
+                                {
+                                    <td>@row.Pattern</td>
+                                    <td>@row.Configuration</td>
+                                    <td class="text-end" data-nocopy>
+                                        @if (row.HasBundle && !string.IsNullOrWhiteSpace(Model.BundlePath))
+                                        {
+                                            <a class="btn btn-sm btn-au-link" href="@Model.BundlePath&amp;patientId=@Uri.EscapeDataString(row.PatientId)">Download</a>
+                                        }
+                                    </td>
+                                }
+                                <td class="text-end text-nowrap" data-nocopy>
+                                    @if (!string.IsNullOrWhiteSpace(row.Href) && !string.IsNullOrWhiteSpace(row.LogHref))
+                                    {
+                                        <a class="btn btn-sm btn-au-link" href="@row.Href" title="Measure" aria-label="Measure for @row.PatientId"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Measure</a>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(row.LogHref))
+                                    {
+                                        <a class="btn btn-sm btn-au-link" href="@row.LogHref" title="Log" aria-label="Acquisition log for @row.PatientId"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Log</a>
+                                    }
+                                    <button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@index" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                    </div>
+                }
+            </div>
+            <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(page: 1), Enabled = Model.PatientPaging.Page > 1 })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(page: Model.PatientPaging.Page - 1), Enabled = Model.PatientPaging.HasPrevious })" />
+                <span class="small text-muted">Page @Model.PatientPaging.Page of @(Model.PatientPaging.TotalPages == 0 ? 1 : Model.PatientPaging.TotalPages) (@Model.PatientPaging.TotalCount)</span>
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(page: Model.PatientPaging.Page + 1), Enabled = Model.PatientPaging.HasNext })" />
+                <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(page: (int)Model.PatientPaging.TotalPages), Enabled = Model.PatientPaging.HasNext })" />
+                <span class="lu-size-chips">
+                    <span class="visually-hidden">Rows per page</span>
+                    @foreach (var size in ReportManifestQuery.PageSizes)
+                    {
+                        <a class="lu-size-chip @(size == Model.Query.PageSize ? "is-current" : null)" href="@Model.Href(pageSize: size)" aria-current="@(size == Model.Query.PageSize ? "page" : "false")">@size</a>
+                    }
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade @(populationsOpen ? "show active" : null)" id="manifest-populations">
+        @if (Model.Funnels.Count == 0 && Model.Prediction is null)
+        {
+            <div class="au-card"><div class="card-body"><p class="mb-0">No populations were stored for this report.</p></div></div>
+        }
+        @if (Model.Prediction is ManifestPrediction prediction)
+        {
+            <section class="card au-card mb-3">
+                <h3 class="card-header h6 mb-0">@prediction.Measure</h3>
+                <div class="card-body">
+                    <p class="small text-muted">Expected and actual for this run. These figures are a predicted Initial Population, not a scored Numerator.</p>
+                    @{
+                        var predictionRows = new (string Key, string Name, int? Count)[]
+                        {
+                            ("predicted", "Predicted to qualify", prediction.Predicted),
+                            ("not-predicted", "Not predicted to qualify", prediction.NotPredicted),
+                            ("in-actual", "In the ABS upload", prediction.InActual),
+                            ("missing", "Predicted, missing from ABS", prediction.MissingFromActual)
+                        };
+                    }
+                    @foreach (var item in predictionRows)
+                    {
+                        if (item.Count is not int count)
+                            continue;
+                        var selected = string.Equals(Model.Query.Stage, item.Key, StringComparison.Ordinal);
+                        var width = prediction.Predicted + prediction.NotPredicted == 0 ? 0 : (int)Math.Round(count * 100d / (prediction.Predicted + prediction.NotPredicted));
+                        <a class="lu-funnel-stage @(selected ? "is-selected" : null)" href="@Model.Href(stage: item.Key, stageMeasure: prediction.Measure, tab: "populations", populationPage: 1)">
+                            <span class="lu-funnel-name">@item.Name @if (ReportManifestRules.PredictionHelp(item.Name) is string predictionHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + item.Name, Text = predictionHelp })" /> }</span>
+                            <span class="lu-funnel-track"><span class="lu-funnel-bar" style="width:@(Math.Clamp(width, 0, 100))%"></span></span>
+                            <span class="lu-funnel-count">@Count(count)</span>
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+        @if (Model.PopulationComparison.Count > 1)
+        {
+            <section class="card au-card mb-3">
+                <h3 class="card-header h6 mb-0">Measures compared</h3>
+                <div class="card-body">
+                    <p class="small text-muted">Largest Initial Population first. At most @ReportManifestModel.ChartCap measures.</p>
+                    <div class="table-responsive">
+                    <table class="au-table table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Measure</th>
+                                <th class="text-end">Initial Population @if (ReportManifestRules.PopulationHelp("Initial Population") is string ipHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Initial Population", Text = ipHelp })" /> }</th>
+                                <th class="text-end">Denominator @if (ReportManifestRules.PopulationHelp("Denominator") is string denHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Denominator", Text = denHelp })" /> }</th>
+                                <th class="text-end">Numerator @if (ReportManifestRules.PopulationHelp("Numerator") is string numHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Numerator", Text = numHelp })" /> }</th>
+                                <th class="text-end">Rate @if (ReportManifestRules.PopulationHelp("Rate") is string rateHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Rate", Text = rateHelp })" /> }</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.PopulationComparison)
+                        {
+                            <tr>
+                                <td>@row.Measure</td>
+                                <td class="text-end">@(row.InitialPopulation is int ip ? Count(ip) : "—")</td>
+                                <td class="text-end">@(row.Denominator is int den ? Count(den) : "—")</td>
+                                <td class="text-end">@(row.Numerator is int num ? Count(num) : "—")</td>
+                                <td class="text-end">@(string.IsNullOrWhiteSpace(row.Rate) ? "—" : row.Rate)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                    </div>
+                    @if (Model.PopulationMeasureCount > Model.PopulationComparison.Count)
+                    {
+                        <p class="small text-muted mb-0 mt-2">@Model.PopulationComparison.Count of @Counts.Of(Model.PopulationMeasureCount, "measure") shown.</p>
+                    }
+                </div>
+            </section>
+        }
+        @foreach (var funnel in Model.Funnels)
+        {
+            <section class="card au-card mb-3">
+                <h3 class="card-header h6 mb-0">@funnel.Measure</h3>
+                <div class="card-body">
+                    <p class="small text-muted">Percentages are of the Initial Population. An exclusion or exception sits beside the stage it leaves.</p>
+                    @foreach (var stage in funnel.Stages)
+                    {
+                        var selected = string.Equals(Model.Query.Stage, stage.Key, StringComparison.Ordinal)
+                            && (string.IsNullOrWhiteSpace(Model.Query.StageMeasure) || string.Equals(Model.Query.StageMeasure, funnel.Measure, StringComparison.OrdinalIgnoreCase));
+                        <a class="lu-funnel-stage @(stage.Side ? "is-side" : null) @(selected ? "is-selected" : null)" href="@Model.Href(stage: stage.Key, stageMeasure: funnel.Measure, tab: "populations", populationPage: 1)">
+                            <span class="lu-funnel-name">@stage.Name @if (!string.IsNullOrWhiteSpace(stage.Help)) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About " + stage.Name, Text = stage.Help })" /> }</span>
+                            <span class="lu-funnel-track"><span class="lu-funnel-bar" style="width:@(stage.Width)%"></span></span>
+                            <span class="lu-funnel-count">@Count(stage.Count)@(string.IsNullOrWhiteSpace(stage.Percent) ? "" : " · " + stage.Percent)</span>
+                        </a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(funnel.Rate))
+                    {
+                        <p class="mb-0 mt-2">Rate @if (ReportManifestRules.PopulationHelp("Rate") is string funnelRateHelp) { <partial name="_TermInfo" model="@(new TermInfo { Label = "About Rate", Text = funnelRateHelp })" /> } <strong>@funnel.Rate</strong></p>
+                    }
+                </div>
+            </section>
+        }
+        @if (Model.PopulationMeasureCount > Model.Funnels.Count)
+        {
+            <p class="small text-muted">@Model.Funnels.Count of @Counts.Of(Model.PopulationMeasureCount, "measure") shown.</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Query.Stage))
+        {
+            <section class="card au-card mb-3" id="manifest-population-patients">
+                <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                    <span>@stageTitle@(string.IsNullOrWhiteSpace(Model.Query.StageMeasure) ? "" : " · " + Model.Query.StageMeasure)</span>
+                    <a class="btn btn-sm btn-au-link" href="@Model.Href(clearStage: true, tab: "populations")">All stages</a>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrWhiteSpace(Model.PopulationNote))
+                    {
+                        <p class="small text-muted">@Model.PopulationNote</p>
+                    }
+                    @if (Model.PopulationPatients.Count == 0)
+                    {
+                        <p class="mb-0">No patients in this population on the list.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                        <table class="au-table table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Patient</th>
+                                    <th>Status</th>
+                                    <th class="text-end"><span class="visually-hidden">Details</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in Model.PopulationPatients)
+                            {
+                                var detailIndex = detailRows.FindIndex(item => string.Equals(item.PatientId, row.PatientId, StringComparison.Ordinal));
+                                <tr>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = row.Href })" /></td>
+                                    <td><span class="badge @row.BadgeClass">@row.Status</span></td>
+                                    <td class="text-end"><button type="button" class="btn btn-sm btn-au-link" data-manifest-patient="@detailIndex" aria-label="View" title="View"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</button></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                        </div>
+                    }
+                </div>
+                <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-end">
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "first", Href = Model.Href(populationPage: 1, tab: "populations"), Enabled = Model.PopulationPaging.Page > 1 })" />
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "previous", Href = Model.Href(populationPage: Model.PopulationPaging.Page - 1, tab: "populations"), Enabled = Model.PopulationPaging.HasPrevious })" />
+                    <span class="small text-muted">Page @Model.PopulationPaging.Page of @(Model.PopulationPaging.TotalPages == 0 ? 1 : Model.PopulationPaging.TotalPages) (@Model.PopulationPaging.TotalCount)</span>
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "next", Href = Model.Href(populationPage: Model.PopulationPaging.Page + 1, tab: "populations"), Enabled = Model.PopulationPaging.HasNext })" />
+                    <partial name="_PagerStep" model="@(new PagerStep { Direction = "last", Href = Model.Href(populationPage: (int)Model.PopulationPaging.TotalPages, tab: "populations"), Enabled = Model.PopulationPaging.HasNext })" />
+                </div>
+            </section>
+        }
+    </div>
+
+    @if (Model.ShowComparison)
+    {
+        var comparison = Model.Comparison;
+        <div class="tab-pane fade @(comparisonOpen ? "show active" : null)" id="manifest-comparison">
+            <div class="au-card">
+                <div class="card-header">Generated vs ABS</div>
+                <div class="card-body">
+                    <p>A resource is predicted to reach ABS when the query plan acquires it and the measure CQL references it. The table lists mismatches first.</p>
+                    @if (comparison is null || comparison.Unavailable)
+                    {
+                        <p class="mb-0">ABS upload data is not available for this run. It is captured when the run finishes and ABS validation runs.</p>
+                    }
+                    else
+                    {
+                        <div class="row g-3 mb-3">
+                            <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(comparison.Generated)</div><div class="au-stat-label">Generated</div></div></div>
+                            <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(comparison.Predicted)</div><div class="au-stat-label">Predicted in ABS</div></div></div>
+                            <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(comparison.Actual)</div><div class="au-stat-label">Actual ABS</div></div></div>
+                            <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@comparison.Delta.ToString("+0;-0;0")</div><div class="au-stat-label">Prediction difference</div></div></div>
+                            <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@Count(comparison.Filtered)</div><div class="au-stat-label">Filtered out</div></div></div>
+                        </div>
+                        <p class="small text-muted">@Counts.Of(comparison.MismatchedTypes, "mismatched type"). @Counts.Of(comparison.MissingPatients, "patient") missing from ABS. This is one page of each list.</p>
+                        <form method="get" action="@Model.Path" class="d-flex gap-2 mb-3">
+                            @foreach (var pair in Model.Route)
+                            {
+                                <input type="hidden" name="@pair.Key" value="@pair.Value" />
+                            }
+                            <input type="hidden" name="q" value="@Model.Query.PatientQuery" />
+                            <input type="hidden" name="typeQ" value="@Model.Query.TypeQuery" />
+                            <label class="visually-hidden" for="manifestCompareQuery">Search the comparison</label>
+                            <input id="manifestCompareQuery" name="cmpQ" value="@Model.Query.CompareQuery" class="form-control form-control-sm" placeholder="Type or patient id" />
+                            <button type="submit" class="btn btn-sm btn-au-execute">Search</button>
+                            <a class="btn btn-sm btn-warning" href="@Model.Href(clearCompare: true)">Clear</a>
+                        </form>
+                        <div class="table-responsive mb-3">
+                        <table class="au-table table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Resource type</th>
+                                    <th class="text-end">Generated</th>
+                                    @if (comparison.HasFilters)
+                                    {
+                                        <th>Query plan</th>
+                                        <th>CQL</th>
+                                    }
+                                    <th class="text-end">Predicted</th>
+                                    <th class="text-end">Actual ABS</th>
+                                    <th class="text-end">Difference</th>
+                                    <th>Verdict</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in comparison.Types)
+                            {
+                                <tr>
+                                    <td>@row.Name</td>
+                                    <td class="text-end">@Count(row.Generated)</td>
+                                    @if (comparison.HasFilters)
+                                    {
+                                        <td>@(row.QueryPlan ? "Yes" : "No")</td>
+                                        <td>@(row.Cql ? "Yes" : "No")</td>
+                                    }
+                                    <td class="text-end">@Count(row.Predicted)</td>
+                                    <td class="text-end">@Count(row.Actual)</td>
+                                    <td class="text-end">@row.Delta.ToString("+0;-0;0")</td>
+                                    <td><span class="badge @row.BadgeClass">@row.Verdict</span></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                            @if (comparison.TypePaging.Page > 1)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: 1)">First types</a>
+                            }
+                            @if (comparison.TypePaging.HasPrevious)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: comparison.TypePaging.Page - 1)">Previous types</a>
+                            }
+                            <span class="small text-muted">Types page @comparison.TypePaging.Page of @(comparison.TypePaging.TotalPages == 0 ? 1 : comparison.TypePaging.TotalPages)</span>
+                            @if (comparison.TypePaging.HasNext)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: comparison.TypePaging.Page + 1)">Next types</a>
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(compareTypePage: (int)comparison.TypePaging.TotalPages)">Last types</a>
+                            }
+                        </div>
+                        <div class="table-responsive">
+                        <table class="au-table table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Patient</th>
+                                    <th class="text-end">Generated</th>
+                                    <th class="text-end">Predicted</th>
+                                    <th class="text-end">Actual ABS</th>
+                                    <th class="text-end">Difference</th>
+                                    <th>Verdict</th>
+                                    <th>Types</th>
+                                    @if (Model.ShowGeneration)
+                                    {
+                                        <th></th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in comparison.Patients)
+                            {
+                                <tr>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
+                                    <td class="text-end">@Count(row.Generated)</td>
+                                    <td class="text-end">@Count(row.Predicted)</td>
+                                    <td class="text-end">@Count(row.Actual)</td>
+                                    <td class="text-end">@row.Delta.ToString("+0;-0;0")</td>
+                                    <td><span class="badge @row.BadgeClass">@row.Verdict</span></td>
+                                    <td>@row.Types</td>
+                                    @if (Model.ShowGeneration)
+                                    {
+                                        <td class="text-end">
+                                            @if (row.HasBundle && !string.IsNullOrWhiteSpace(Model.BundlePath))
+                                            {
+                                                <a class="btn btn-sm btn-au-link" href="@Model.BundlePath&amp;patientId=@Uri.EscapeDataString(row.PatientId)">Download</a>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                            @if (comparison.PatientPaging.Page > 1)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: 1)">First patients</a>
+                            }
+                            @if (comparison.PatientPaging.HasPrevious)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: comparison.PatientPaging.Page - 1)">Previous patients</a>
+                            }
+                            <span class="small text-muted">Patients page @comparison.PatientPaging.Page of @(comparison.PatientPaging.TotalPages == 0 ? 1 : comparison.PatientPaging.TotalPages) (@comparison.PatientPaging.TotalCount)</span>
+                            @if (comparison.PatientPaging.HasNext)
+                            {
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: comparison.PatientPaging.Page + 1)">Next patients</a>
+                                <a class="btn btn-sm btn-au-link" href="@Model.Href(comparePage: (int)comparison.PatientPaging.TotalPages)">Last patients</a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="modal fade" id="manifestPatientModal" tabindex="-1" aria-labelledby="manifestPatientTitle" aria-hidden="true" data-graph-url="@graphUrl">
+    <div class="modal-dialog modal-dialog-scrollable lu-patient-modal">
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0" id="manifestPatientTitle">Patient details</h2>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Identity</h3>
+                    <div class="card-body" id="manifest-patient-identity"></div>
+                </section>
+                <section class="card au-card mb-3" id="manifest-patient-diagnostics-card" hidden>
+                    <h3 class="card-header h6 mb-0">Diagnostics</h3>
+                    <div class="card-body" id="manifest-patient-diagnostics" aria-live="polite"></div>
+                </section>
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Measures</h3>
+                    <div class="card-body" id="manifest-patient-measures"></div>
+                </section>
+                <section class="card au-card mb-3">
+                    <h3 class="card-header h6 mb-0">Resources by type</h3>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-end mb-2" id="manifest-interactive-bar">
+                            <span class="d-inline-block" id="manifest-interactive-wrap" tabindex="0" data-bs-toggle="tooltip" title="@(Model.InteractiveBlocked ?? "Load this patient's submitted bundle from ABS")"><button type="button" class="btn btn-sm btn-au-execute" id="manifest-interactive" data-manifest-interactive data-blocked="@(Model.InteractiveBlocked is null ? null : "1")" disabled="@(Model.InteractiveBlocked is not null)">Interactive mode</button></span>
+                        </div>
+                        <div class="alert alert-secondary lu-alert py-2 small mb-2" id="manifest-interactive-note" role="status" @(Model.InteractiveBlocked is null ? "hidden" : null)>@Model.InteractiveBlocked</div>
+                        <div id="manifest-patient-resources"></div>
+                    </div>
+                </section>
+                <section class="card au-card mb-3" id="manifest-resource-graph" hidden>
+                    <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                        <h3 class="h6 mb-0">Resource graph <span id="manifest-graph-count" class="lu-graph-count"></span></h3>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-warning" id="manifest-graph-cancel" hidden>Cancel</button>
+                            <button type="button" class="lu-dismiss" id="manifest-graph-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="lu-graph-progress" id="manifest-graph-progress" hidden>
+                            <div class="lu-graph-progress-bar" id="manifest-graph-bar"></div>
+                        </div>
+                        <p class="small text-muted mb-2" id="manifest-graph-status"></p>
+                        <div class="alert alert-danger lu-alert" id="manifest-graph-error" hidden>
+                            <span class="lu-alert-text" id="manifest-graph-error-text"></span>
+                            <button type="button" class="lu-dismiss" aria-label="Dismiss"><span aria-hidden="true">&times;</span></button>
+                        </div>
+                        <div class="lu-resource-graph lu-chart" id="manifest-graph-body" hidden>
+                            <canvas id="manifest-graph-canvas" class="lu-resource-canvas" role="img" aria-label="Resource graph"></canvas>
+                            <div id="manifest-graph-aside" class="lu-graph-aside"></div>
+                        </div>
+                    </div>
+                </section>
+                <section class="card au-card mb-3" id="manifest-resource-explorer">
+                    <h3 class="card-header h6 mb-0">Resources</h3>
+                    <div class="card-body" id="manifest-patient-refs"></div>
+                </section>
+                <section class="card au-card mb-3" id="manifest-patient-events-card" hidden>
+                    <h3 class="card-header h6 mb-0">Timeline</h3>
+                    <div class="card-body" id="manifest-patient-events"></div>
+                </section>
+                <section class="card au-card mb-0" id="manifest-patient-links-card" hidden>
+                    <h3 class="card-header h6 mb-0">Related</h3>
+                    <div class="card-body" id="manifest-patient-links"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="~/js/resource-graph.js" asp-append-version="true"></script>
+<script>
+(function () {
+    document.querySelectorAll("[data-manifest-tab]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            var target = button.getAttribute("data-manifest-tab");
+            var nav = button.closest(".lu-section-nav");
+            if (nav) {
+                nav.querySelectorAll("button").forEach(function (item) {
+                    item.classList.toggle("active", item === button);
+                });
+            }
+            ["manifest-overview", "manifest-patients", "manifest-populations", "manifest-comparison"].forEach(function (id) {
+                var pane = document.getElementById(id);
+                if (!pane) return;
+                var on = "#" + id === target;
+                pane.classList.toggle("show", on);
+                pane.classList.toggle("active", on);
+            });
+        });
+    });
+    var patients = @Html.Raw(chartPatients);
+    var details = @Html.Raw(patientDetails);
+    var donutColors = @Html.Raw(JsonSerializer.Serialize(ReportManifestRules.DonutColors));
+    var donutOther = @Html.Raw(JsonSerializer.Serialize(ReportManifestRules.DonutOtherColor));
+    var graphUrl = @Html.Raw(JsonSerializer.Serialize(graphUrl));
+    if (window.luResourceGraph) window.luResourceGraph.mount(graphUrl, donutColors.concat([donutOther]));
+    var blockedButton = document.querySelector("#manifest-interactive[data-blocked]");
+    if (blockedButton) {
+        blockedButton.disabled = true;
+        var blockedBar = document.getElementById("manifest-interactive-bar");
+        if (blockedBar) blockedBar.classList.remove("d-none");
+    }
+    var palette = (window.luChartPalette && window.luChartPalette.manifest) || [];
+    function draw(id, labels, data, kind) {
+        var canvas = document.getElementById(id);
+        if (!canvas || !window.Chart) return;
+        if (!labels.length) {
+            if (window.luChartFrame) window.luChartFrame.collapseEmpty(id);
+            return;
+        }
+        if (window.luChartFrame) window.luChartFrame.reveal(id);
+        new Chart(canvas, {
+            type: kind,
+            data: { labels: labels, datasets: [{ data: data, backgroundColor: labels.map(function (_, index) { return palette[index % palette.length]; }), borderWidth: 1 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+    draw("patientBarChart", patients.map(function (row) { return row.PatientId; }), patients.map(function (row) { return row.Total; }), "bar");
+
+    function mountDonut(host, rows, centerLabel) {
+        host.replaceChildren();
+        var clean = (rows || []).filter(function (row) { return Number(row.count || row.total || 0) > 0; });
+        if (!clean.length) {
+            note(host, "No resource counts were recorded.");
+            return;
+        }
+        clean.sort(function (left, right) { return Number(right.count || right.total || 0) - Number(left.count || left.total || 0); });
+        var slices = clean.slice(0, 8).map(function (row, index) {
+            return { name: row.name || "—", total: Number(row.count || row.total || 0), color: window.luChartPalette && window.luChartPalette.typeColor ? window.luChartPalette.typeColor(row.name) : donutColors[index % donutColors.length] };
+        });
+        if (clean.length > 8) {
+            var rest = clean.slice(8).reduce(function (sum, row) { return sum + Number(row.count || row.total || 0); }, 0);
+            if (rest > 0) slices.push({ name: "Other", total: rest, color: donutOther });
+        }
+        var total = slices.reduce(function (sum, row) { return sum + row.total; }, 0);
+        var cursor = 0;
+        var stops = slices.map(function (row) {
+            var next = cursor + (total ? row.total * 100 / total : 0);
+            var stop = row.color + " " + cursor.toFixed(3) + "% " + next.toFixed(3) + "%";
+            cursor = next;
+            return stop;
+        }).join(", ");
+        var layout = document.createElement("div");
+        layout.className = "lu-donut-layout";
+        var chart = document.createElement("div");
+        chart.className = "lu-donut-chart";
+        var ring = document.createElement("div");
+        ring.className = "lu-donut-ring";
+        ring.style.background = "conic-gradient(" + stops + ")";
+        ring.setAttribute("role", "img");
+        ring.setAttribute("aria-label", "Resources by type");
+        var hole = document.createElement("div");
+        hole.className = "lu-donut-hole";
+        var strong = document.createElement("span");
+        strong.className = "lu-donut-total";
+        strong.textContent = total.toLocaleString();
+        var caption = document.createElement("span");
+        caption.className = "lu-donut-total-label";
+        caption.textContent = centerLabel || "resources";
+        hole.appendChild(strong);
+        hole.appendChild(caption);
+        ring.appendChild(hole);
+        chart.appendChild(ring);
+        var legend = document.createElement("ul");
+        legend.className = "lu-donut-legend lu-donut-bars";
+        legend.setAttribute("aria-label", "Resources by type, by count");
+        var barMax = slices.reduce(function (max, row) { return Math.max(max, row.total); }, 0);
+        slices.slice().sort(function (left, right) { return right.total - left.total; }).forEach(function (row) {
+            var item = document.createElement("li");
+            var swatch = document.createElement("span");
+            swatch.className = "lu-donut-swatch";
+            swatch.style.background = row.color;
+            var name = document.createElement("span");
+            name.className = "lu-donut-name";
+            name.textContent = row.name;
+            var count = document.createElement("span");
+            count.className = "lu-donut-count";
+            count.textContent = row.total.toLocaleString();
+            var pct = document.createElement("span");
+            pct.className = "lu-donut-pct";
+            pct.textContent = (total ? (row.total * 100 / total).toFixed(1) : "0.0") + "%";
+            var bar = document.createElement("span");
+            bar.className = "lu-donut-bar";
+            bar.setAttribute("aria-hidden", "true");
+            var fill = document.createElement("span");
+            fill.style.width = (barMax ? row.total * 100 / barMax : 0).toFixed(2) + "%";
+            fill.style.background = row.color;
+            bar.appendChild(fill);
+            item.appendChild(swatch);
+            item.appendChild(name);
+            item.appendChild(bar);
+            item.appendChild(count);
+            item.appendChild(pct);
+            legend.appendChild(item);
+        });
+        layout.appendChild(chart);
+        layout.appendChild(legend);
+        host.appendChild(layout);
+    }
+
+    var openRow = null;
+    var refPage = 0;
+    var refSize = 10;
+
+    function line(parent, label, value) {
+        if (!value) return;
+        var paragraph = document.createElement("p");
+        paragraph.className = "mb-1";
+        var name = document.createElement("span");
+        name.className = "text-muted";
+        name.textContent = label + " ";
+        paragraph.appendChild(name);
+        paragraph.appendChild(document.createTextNode(value));
+        parent.appendChild(paragraph);
+    }
+
+    function note(parent, value) {
+        var paragraph = document.createElement("p");
+        paragraph.className = "mb-0 text-muted";
+        paragraph.textContent = value;
+        parent.appendChild(paragraph);
+    }
+
+    function fillRefs() {
+        var host = document.getElementById("manifest-patient-refs");
+        host.replaceChildren();
+        var refs = (openRow && openRow.refs) || [];
+        if (!refs.length) {
+            note(host, "Resource identifiers are not on this list. Counts by type are above.");
+            return;
+        }
+        var pages = Math.max(1, Math.ceil(refs.length / refSize));
+        if (refPage >= pages) refPage = pages - 1;
+        var slice = refs.slice(refPage * refSize, refPage * refSize + refSize);
+        var table = document.createElement("table");
+        table.className = "au-table table table-sm mb-2";
+        var head = document.createElement("thead");
+        var headRow = document.createElement("tr");
+        ["Type", "Resource"].forEach(function (label) {
+            var cell = document.createElement("th");
+            cell.textContent = label;
+            headRow.appendChild(cell);
+        });
+        head.appendChild(headRow);
+        table.appendChild(head);
+        var body = document.createElement("tbody");
+        slice.forEach(function (item) {
+            var row = document.createElement("tr");
+            var type = document.createElement("td");
+            type.textContent = item.type || "—";
+            var id = document.createElement("td");
+            if (window.luLabeledId) id.innerHTML = window.luLabeledId("Resource", item.id || "");
+            else id.textContent = item.id || "—";
+            row.appendChild(type);
+            row.appendChild(id);
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        host.appendChild(table);
+        var bar = document.createElement("div");
+        bar.className = "d-flex flex-wrap gap-2 align-items-center";
+        function step(label, icon, enabled, next) {
+            var control = document.createElement(enabled ? "a" : "button");
+            control.className = "lu-page-step";
+            control.setAttribute("aria-label", label);
+            control.setAttribute("title", label);
+            if (!enabled) control.disabled = true;
+            else control.href = "#manifest-patient-refs";
+            var mark = document.createElement("i");
+            mark.className = "bi " + icon;
+            mark.setAttribute("aria-hidden", "true");
+            control.appendChild(mark);
+            control.addEventListener("click", function (event) {
+                if (!enabled) return;
+                event.preventDefault();
+                refPage = next;
+                fillRefs();
+            });
+            bar.appendChild(control);
+        }
+        step("First", "bi-chevron-double-left", refPage > 0, 0);
+        step("Previous", "bi-chevron-left", refPage > 0, refPage - 1);
+        var place = document.createElement("span");
+        place.className = "small text-muted";
+        place.textContent = "Page " + (refPage + 1) + " of " + pages + " (" + refs.length + ")";
+        bar.appendChild(place);
+        step("Next", "bi-chevron-right", refPage + 1 < pages, refPage + 1);
+        step("Last", "bi-chevron-double-right", refPage + 1 < pages, pages - 1);
+        host.appendChild(bar);
+    }
+
+    var diagnosticsTicket = 0;
+    function loadDiagnostics(row) {
+        var card = document.getElementById("manifest-patient-diagnostics-card");
+        var host = document.getElementById("manifest-patient-diagnostics");
+        var ticket = ++diagnosticsTicket;
+        host.replaceChildren();
+        card.hidden = !row.diagnostics;
+        if (!row.diagnostics) return;
+        note(host, "Loading diagnostics...");
+        fetch(row.diagnostics, { headers: { "X-Requested-With": "XMLHttpRequest" }, credentials: "same-origin" })
+            .then(function (response) { if (!response.ok) throw new Error(String(response.status)); return response.text(); })
+            .then(function (html) { if (ticket === diagnosticsTicket) host.innerHTML = html; })
+            .catch(function () { if (ticket !== diagnosticsTicket) return; host.replaceChildren(); note(host, "Diagnostics could not be loaded. Try again."); });
+    }
+
+    function fill(index) {
+        openRow = details[index];
+        if (!openRow) return;
+        refPage = 0;
+        var identity = document.getElementById("manifest-patient-identity");
+        identity.replaceChildren();
+        var idLine = document.createElement("div");
+        idLine.className = "mb-2";
+        if (window.luLabeledId) idLine.innerHTML = window.luLabeledId("Patient", openRow.id || "");
+        else idLine.textContent = openRow.id || "—";
+        identity.appendChild(idLine);
+        line(identity, "Status", openRow.status);
+        line(identity, "Submission", openRow.submission);
+        line(identity, "Updated", openRow.updated);
+        if (openRow.mapping) {
+            line(identity, "Mapping", openRow.mapping.label);
+            line(identity, "Location org", openRow.mapping.locationOrg);
+            line(identity, "Encounter mapping", openRow.mapping.encounterMapping);
+            line(identity, "HSLOC", openRow.mapping.hsloc);
+        }
+        loadDiagnostics(openRow);
+
+        var measures = document.getElementById("manifest-patient-measures");
+        measures.replaceChildren();
+        if (!openRow.measures || !openRow.measures.length) note(measures, "No population membership was recorded for this patient.");
+        else openRow.measures.forEach(function (item) {
+            var row = document.createElement("p");
+            row.className = "lu-measure-chip";
+            var badge = document.createElement("span");
+            badge.className = "badge " + (item.tone || "au-badge-muted");
+            badge.textContent = item.name || "Measure";
+            row.appendChild(badge);
+            row.appendChild(document.createTextNode(" " + (item.outcome || "")));
+            measures.appendChild(row);
+        });
+
+        mountDonut(document.getElementById("manifest-patient-resources"), openRow.resources, "resources");
+
+        window.luManifestPatient = openRow;
+        if (window.luResourceExplorer) window.luResourceExplorer.render(openRow, graphUrl);
+        else fillRefs();
+        if (window.luResourceGraph) window.luResourceGraph.close();
+
+        var events = document.getElementById("manifest-patient-events");
+        events.replaceChildren();
+        // Cards with nothing to show stay hidden rather than showing placeholder text.
+        document.getElementById("manifest-patient-events-card").hidden = !(openRow.events && openRow.events.length);
+        (openRow.events || []).forEach(function (item) { line(events, item.label, item.when); });
+
+        var links = document.getElementById("manifest-patient-links");
+        links.replaceChildren();
+        var usable = (openRow.links || []).filter(function (item) { return item.href && item.href.charAt(0) === "/"; });
+        document.getElementById("manifest-patient-links-card").hidden = !usable.length;
+        usable.forEach(function (item) {
+            var anchor = document.createElement("a");
+            anchor.className = "btn btn-sm btn-au-link me-2 mb-2";
+            anchor.href = item.href;
+            anchor.textContent = item.label || "Open";
+            links.appendChild(anchor);
+        });
+
+        var modal = document.getElementById("manifestPatientModal");
+        if (window.bootstrap && bootstrap.Modal) bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+
+    document.addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("[data-manifest-patient]") : null;
+        if (!button) return;
+        fill(Number(button.getAttribute("data-manifest-patient")));
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        if (!window.bootstrap || !bootstrap.Tooltip) return;
+        document.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
+    });
+})();
+</script>
