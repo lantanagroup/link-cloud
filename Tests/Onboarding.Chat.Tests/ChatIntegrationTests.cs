@@ -20,7 +20,12 @@ public sealed class ChatIntegrationTests
     [Theory]
     [InlineData("http://localhost:11434", null, true)]
     [InlineData("http://host.docker.internal:11434", null, false)]
-    [InlineData("http://host.docker.internal:11434", "host.docker.internal", true)]
+    [InlineData("http://host.docker.internal:11434", "ollama", false)]
+    [InlineData("http://ollama:11434", null, false)]
+    [InlineData("http://ollama:11434", "ollama", true)]
+    [InlineData("http://ollama.untrusted.example:11434", "ollama", false)]
+    [InlineData("http://user:secret@ollama:11434", "ollama", false)] //trufflehog:ignore
+    [InlineData("https://ollama:11434", "ollama", false)]
     [InlineData("http://onboarding-mcp:8080/mcp", "onboarding-mcp", true)]
     [InlineData("http://untrusted.example/mcp", "onboarding-mcp", false)]
     [InlineData("http://user:secret@onboarding-mcp:8080/mcp", "onboarding-mcp", false)]

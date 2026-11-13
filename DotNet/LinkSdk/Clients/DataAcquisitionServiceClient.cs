@@ -11,6 +11,14 @@ namespace LantanaGroup.Link.Sdk.Clients;
 
 public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionServiceClient
 {
+    private readonly string _routePrefix = "data-acquisition/";
+
+    /// <summary>Uses a configured client with the full service base URL, including /api/data-acquisition/ (or a legacy route).</summary>
+    public DataAcquisitionServiceClient(IFlurlClient client) : base(client)
+    {
+        _routePrefix = "";
+    }
+
     public DataAcquisitionServiceClient(
         IOptions<ServiceRegistry> serviceRegistry,
         IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
@@ -25,19 +33,19 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> GetFhirQueryConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/fhirQueryConfiguration")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(
         CreateFhirQueryConfigurationRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("data-acquisition/fhirQueryConfiguration")
+        SendAsync(() => Request($"{_routePrefix}fhirQueryConfiguration")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryConfiguration")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/fhirQueryConfiguration")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     /// <summary>
@@ -48,8 +56,8 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> UpdateFhirQueryConfigurationAsync(
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("data-acquisition/fhirQueryConfiguration")
-            .PutJsonAsync(request, cancellationToken: cancellationToken));
+        SendAsync(() => Request($"{_routePrefix}fhirQueryConfiguration")
+            .PutJsonAsync(request, cancellationToken: cancellationToken), captureRequestBody: false);
 
     /// <summary>
     /// Reads the generic OAuth configuration of a facility whose EHR vendor is "Other":
@@ -60,7 +68,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> GetFhirAuthenticationConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/facilities/{facilityId}/fhir-authentication-configuration")
+        SendAsync(() => Request($"{_routePrefix}facilities/{facilityId}/fhir-authentication-configuration")
             .GetAsync(cancellationToken: cancellationToken));
 
     /// <summary>
@@ -73,7 +81,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         object request,
         CancellationToken cancellationToken = default) =>
         // The body carries the OAuth client secret, so it must not be copied into LinkApiResponse.RequestBody
-        SendAsync(() => Request($"data-acquisition/facilities/{facilityId}/fhir-authentication-configuration")
+        SendAsync(() => Request($"{_routePrefix}facilities/{facilityId}/fhir-authentication-configuration")
             .PutJsonAsync(request, cancellationToken: cancellationToken),
             captureRequestBody: false);
 
@@ -90,7 +98,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         DateTime? end = null,
         CancellationToken cancellationToken = default)
     {
-        var request = Request($"data-acquisition/connectionValidation/{facilityId}/$validate");
+        var request = Request($"{_routePrefix}connectionValidation/{facilityId}/$validate");
         if (!string.IsNullOrWhiteSpace(patientId)) request = request.SetQueryParam("patientId", patientId);
         if (!string.IsNullOrWhiteSpace(patientIdentifier)) request = request.SetQueryParam("patientIdentifier", patientIdentifier);
         if (!string.IsNullOrWhiteSpace(measureId)) request = request.SetQueryParam("measureId", measureId);
@@ -103,14 +111,14 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string facilityId,
         bool includePatients = false,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryList")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/fhirQueryList")
             .SetQueryParam("includePatients", includePatients ? "true" : null)
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> CreateFhirListConfigurationAsync(
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("data-acquisition/fhirQueryList")
+        SendAsync(() => Request($"{_routePrefix}fhirQueryList")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
     /// <summary>
@@ -120,20 +128,20 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> UpdateFhirListConfigurationAsync(
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("data-acquisition/fhirQueryList")
+        SendAsync(() => Request($"{_routePrefix}fhirQueryList")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteFhirListConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/fhirQueryList")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/fhirQueryList")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> GetQueryPlanAsync(
         string facilityId,
         string type,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/QueryPlan")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/QueryPlan")
             .SetQueryParam("type", type)
             .GetAsync(cancellationToken: cancellationToken));
 
@@ -141,7 +149,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string facilityId,
         CreateQueryPlanRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/QueryPlan")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/QueryPlan")
             .WithHeader("Content-Type", "application/json")
             .SendStringAsync(HttpMethod.Post,
                 Newtonsoft.Json.JsonConvert.SerializeObject(request),
@@ -155,7 +163,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string facilityId,
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/QueryPlan")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/QueryPlan")
             .WithHeader("Content-Type", "application/json")
             .SendStringAsync(HttpMethod.Put,
                 Newtonsoft.Json.JsonConvert.SerializeObject(request),
@@ -165,14 +173,14 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string facilityId,
         string type,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{facilityId}/QueryPlan")
+        SendAsync(() => Request($"{_routePrefix}{facilityId}/QueryPlan")
             .SetQueryParam("type", type)
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> SoftDeleteLogsByFacilityAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/acquisition-logs/facility/{facilityId}")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>> SearchAcquisitionLogsAsync(
@@ -184,7 +192,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string sortOrder = "Ascending",
         string? searchTerm = null,
         CancellationToken cancellationToken = default) =>
-        SendAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(() => Request("data-acquisition/acquisition-logs")
+        SendAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(() => Request($"{_routePrefix}acquisition-logs")
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("reportId", reportId)
             .SetQueryParam("pageSize", pageSize)
@@ -197,38 +205,38 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        SendAsync<DataAcquisitionLogApiModel>(() => Request($"data-acquisition/acquisition-logs/{id}")
+        SendAsync<DataAcquisitionLogApiModel>(() => Request($"{_routePrefix}acquisition-logs/{id}")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<string>>> GetAcquisitionLogNotesAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        SendAsync<List<string>>(() => Request($"data-acquisition/acquisition-logs/{id}/notes")
+        SendAsync<List<string>>(() => Request($"{_routePrefix}acquisition-logs/{id}/notes")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<DataAcquisitionLogStatusStatisticsApiModel>> GetReportStatusCountsAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
-        SendAsync<DataAcquisitionLogStatusStatisticsApiModel>(() => Request($"data-acquisition/acquisition-logs/report/{reportId}/status-counts")
+        SendAsync<DataAcquisitionLogStatusStatisticsApiModel>(() => Request($"{_routePrefix}acquisition-logs/report/{reportId}/status-counts")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> GetReportStatisticsAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/acquisition-logs/report/{reportId}/statistics")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/report/{reportId}/statistics")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<DataAcquisitionReportSummaryApiModel>> GetReportSummaryAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
-        SendAsync<DataAcquisitionReportSummaryApiModel>(() => Request($"data-acquisition/acquisition-logs/report/{reportId}/summary")
+        SendAsync<DataAcquisitionReportSummaryApiModel>(() => Request($"{_routePrefix}acquisition-logs/report/{reportId}/summary")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<string>>> GetAcquiredResourceIdsForReportAsync(
         string facilityId,
         string reportId,
         CancellationToken cancellationToken = default) =>
-        SendAsync<List<string>>(() => Request($"data-acquisition/acquisition-logs/report/{reportId}/acquired-resource-ids")
+        SendAsync<List<string>>(() => Request($"{_routePrefix}acquisition-logs/report/{reportId}/acquired-resource-ids")
             .SetQueryParam("facilityId", facilityId)
             .GetAsync(cancellationToken: cancellationToken));
 
@@ -238,7 +246,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync<List<AcquiredResourceCountByPatientApiModel>>(() =>
         {
-            var request = Request($"data-acquisition/acquisition-logs/report/{reportId}/acquired-resource-counts-by-patient");
+            var request = Request($"{_routePrefix}acquisition-logs/report/{reportId}/acquired-resource-counts-by-patient");
             if (!string.IsNullOrWhiteSpace(facilityId))
                 request = request.SetQueryParam("facilityId", facilityId);
             return request.GetAsync(cancellationToken: cancellationToken);
@@ -249,7 +257,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         int pageSize = 100,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        SendAsync<PagedConfigModel<ReferenceResourceApiModel>>(() => Request($"data-acquisition/acquisition-logs/{logId}/reference-resources")
+        SendAsync<PagedConfigModel<ReferenceResourceApiModel>>(() => Request($"{_routePrefix}acquisition-logs/{logId}/reference-resources")
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
@@ -257,105 +265,105 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> ProcessAcquisitionLogAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/acquisition-logs/{id}/process")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/{id}/process")
             .PostJsonAsync(id, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> ProcessAcquisitionLogsBulkAsync(
         List<long> ids,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("data-acquisition/acquisition-logs/process-bulk")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/process-bulk")
             .PostJsonAsync(ids, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<DataAcquisitionBulkActionResultApiModel>> CancelAcquisitionLogsBulkAsync(
         List<long> ids,
         int minAgeHours = 24,
         CancellationToken cancellationToken = default) =>
-        SendAsync<DataAcquisitionBulkActionResultApiModel>(() => Request("data-acquisition/acquisition-logs/cancel-bulk")
+        SendAsync<DataAcquisitionBulkActionResultApiModel>(() => Request($"{_routePrefix}acquisition-logs/cancel-bulk")
             .SetQueryParam("minAgeHours", minAgeHours)
             .PostJsonAsync(ids, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> ProcessAcquisitionLogsByFilterAsync(
         object filter,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("data-acquisition/acquisition-logs/process-by-filter")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/process-by-filter")
             .PostJsonAsync(filter, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<DataAcquisitionBulkActionResultApiModel>> CancelAcquisitionLogsByFilterAsync(
         object filter,
         int minAgeHours = 24,
         CancellationToken cancellationToken = default) =>
-        SendAsync<DataAcquisitionBulkActionResultApiModel>(() => Request("data-acquisition/acquisition-logs/cancel-by-filter")
+        SendAsync<DataAcquisitionBulkActionResultApiModel>(() => Request($"{_routePrefix}acquisition-logs/cancel-by-filter")
             .SetQueryParam("minAgeHours", minAgeHours)
             .PostJsonAsync(filter, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteAcquisitionLogAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/acquisition-logs/{id}")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> SoftDeleteLogsByReportTrackingIdAsync(
         string reportTrackingId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/acquisition-logs/report/{reportTrackingId}")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/report/{reportTrackingId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> RestoreLogsByReportTrackingIdAsync(
         string reportTrackingId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/acquisition-logs/report/{reportTrackingId}/restore")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/report/{reportTrackingId}/restore")
             .PatchJsonAsync(new { }, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> RestoreLogsByFacilityAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/acquisition-logs/facility/{facilityId}/restore")
+        SendAsync(() => Request($"{_routePrefix}acquisition-logs/facility/{facilityId}/restore")
             .PatchJsonAsync(new { }, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<OrganizationLocationConfigurationApiModel>>> GetOrganizationLocationConfigurationsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync<List<OrganizationLocationConfigurationApiModel>>(() => Request($"data-acquisition/location-config/facility/{facilityId}")
+        SendAsync<List<OrganizationLocationConfigurationApiModel>>(() => Request($"{_routePrefix}location-config/facility/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<OrganizationLocationConfigurationApiModel>> CreateOrganizationLocationConfigurationAsync(
         string facilityId,
         CreateOrganizationLocationConfigurationApiModel request,
         CancellationToken cancellationToken = default) =>
-        SendAsync<OrganizationLocationConfigurationApiModel>(() => Request($"data-acquisition/location-config/facility/{facilityId}")
+        SendAsync<OrganizationLocationConfigurationApiModel>(() => Request($"{_routePrefix}location-config/facility/{facilityId}")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteOrganizationLocationConfigurationsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/location-config/facility/{facilityId}")
+        SendAsync(() => Request($"{_routePrefix}location-config/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync<List<OrganizationLocationMappingApiModel>>(() => Request($"data-acquisition/location-mappings/facility/{facilityId}")
+        SendAsync<List<OrganizationLocationMappingApiModel>>(() => Request($"{_routePrefix}location-mappings/facility/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<EncounterMappingApiModel>>> GetEncounterMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        SendAsync<List<EncounterMappingApiModel>>(() => Request($"data-acquisition/encounter-mappings/facilities/{facilityId}")
+        SendAsync<List<EncounterMappingApiModel>>(() => Request($"{_routePrefix}encounter-mappings/facilities/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
         string fhirServerUrl,
         CancellationToken cancellationToken = default) =>
-        SendAsync<FhirServerConnectionResult>(() => Request("data-acquisition/connectionValidation/$validate")
+        SendAsync<FhirServerConnectionResult>(() => Request($"{_routePrefix}connectionValidation/$validate")
             .SetQueryParam("fhirServerUrl", fhirServerUrl)
-            .GetAsync(cancellationToken: cancellationToken));
+            .GetAsync(cancellationToken: cancellationToken), preserveRawResponse: true);
 
     public Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSftpConnectionAsync(
         SftpTestConnectionRequestApiModel request,
         bool includeFileContent = false,
         CancellationToken cancellationToken = default) =>
         // The body carries the SFTP password, so it must not be copied into LinkApiResponse.RequestBody
-        SendAsync<SftpTestConnectionResultApiModel>(() => Request("data-acquisition/sftp-configurations/test-connection")
+        SendAsync<SftpTestConnectionResultApiModel>(() => Request($"{_routePrefix}sftp-configurations/test-connection")
             .SetQueryParam("includeFileContent", includeFileContent ? "true" : "false")
             .PostJsonAsync(request, cancellationToken: cancellationToken),
             captureRequestBody: false);
@@ -370,7 +378,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string facilityId,
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/location-config/facility/{facilityId}")
+        SendAsync(() => Request($"{_routePrefix}location-config/facility/{facilityId}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
 
     // ----- Organization location mappings -----
@@ -378,13 +386,13 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse<OrganizationLocationMappingApiModel>> GetOrganizationLocationMappingAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        SendAsync<OrganizationLocationMappingApiModel>(() => Request($"data-acquisition/location-mappings/{id}")
+        SendAsync<OrganizationLocationMappingApiModel>(() => Request($"{_routePrefix}location-mappings/{id}")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteOrganizationLocationMappingAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/location-mappings/{id}")
+        SendAsync(() => Request($"{_routePrefix}location-mappings/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     /// <summary>
@@ -395,7 +403,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         int id,
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/location-mappings/{id}")
+        SendAsync(() => Request($"{_routePrefix}location-mappings/{id}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
 
     // ----- sFTP acquisition configuration (Cerner) -----
@@ -403,20 +411,20 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> GetSftpConfigurationByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/sftp-configurations/{id}")
+        SendAsync(() => Request($"{_routePrefix}sftp-configurations/{id}")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> GetOrganizationSftpConfigurationAsync(
         string organizationId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> CreateSftpConfigurationAsync(
         string organizationId,
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> UpdateSftpConfigurationAsync(
@@ -424,14 +432,14 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string configurationId,
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations/{configurationId}")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations/{configurationId}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteSftpConfigurationAsync(
         string organizationId,
         string configurationId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations/{configurationId}")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations/{configurationId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     /// <summary>
@@ -443,14 +451,14 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         object credentials,
         CancellationToken cancellationToken = default) =>
         // The body carries the SFTP password, so it must not be copied into LinkApiResponse.RequestBody
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations/credentials")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations/credentials")
             .PutJsonAsync(credentials, cancellationToken: cancellationToken),
             captureRequestBody: false);
 
     public Task<LinkApiResponse> DeleteSftpCredentialsAsync(
         string organizationId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations/credentials")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations/credentials")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     /// <summary>
@@ -460,7 +468,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> GetSftpCredentialStatusAsync(
         string organizationId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations/credentials/status")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations/credentials/status")
             .GetAsync(cancellationToken: cancellationToken));
 
     /// <summary>
@@ -470,7 +478,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> TestSavedSftpConnectionAsync(
         string organizationId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data-acquisition/{organizationId}/sftp-configurations/test-connection")
+        SendAsync(() => Request($"{_routePrefix}{organizationId}/sftp-configurations/test-connection")
             .PostJsonAsync(new { }, cancellationToken: cancellationToken));
 
     /// <summary>
@@ -488,7 +496,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         bool? includeDeleted = null,
         CancellationToken cancellationToken = default)
     {
-        var request = Request("data-acquisition/sftp-logs")
+        var request = Request($"{_routePrefix}sftp-logs")
             .SetQueryParam("pageNumber", pageNumber)
             .SetQueryParam("pageSize", pageSize);
         if (!string.IsNullOrWhiteSpace(facilityId)) request = request.SetQueryParam("facilityId", facilityId);
@@ -507,6 +515,6 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     public Task<LinkApiResponse> CreateSftpLogAsync(
         object request,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("data-acquisition/sftp-logs")
+        SendAsync(() => Request($"{_routePrefix}sftp-logs")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 }

@@ -1,5 +1,4 @@
 ﻿using Flurl.Http;
-using Flurl.Http;
 using Flurl.Http.Configuration;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -17,16 +16,20 @@ public abstract class LinkApiClientBase : IDisposable
     private readonly string? _signingKey;
     private bool _disposed;
 
+    /// <summary>Uses a caller-configured transport. The SDK owns and disposes the client.</summary>
+    protected LinkApiClientBase(IFlurlClient client)
+    {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+    }
+
     protected LinkApiClientBase(
         string baseUrl,
         IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
         IOptions<LinkTokenServiceSettings> tokenServiceSettings,
         ICreateSystemToken? tokenService)
+        : this(new FlurlClient(!string.IsNullOrWhiteSpace(baseUrl)
+            ? baseUrl : throw new ArgumentException("Base URL cannot be null or empty.", nameof(baseUrl))))
     {
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            throw new ArgumentException("Base URL cannot be null or empty.", nameof(baseUrl));
-
-        _client = new FlurlClient(baseUrl);
         _client.Settings.JsonSerializer = new DefaultJsonSerializer(new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -70,7 +73,8 @@ public abstract class LinkApiClientBase : IDisposable
     /// When false, the request body is not copied into the response's RequestBody. Pass false for any
     /// request whose body carries a credential, since callers display and log RequestBody.
     /// </param>
-    protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action, bool captureRequestBody = true)
+    /// <param name="preserveRawResponse">Keeps the original successful response JSON for strict field validation.</param>
+    protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action, bool captureRequestBody = true, bool preserveRawResponse = false)
     {
         try
         {
@@ -88,9 +92,10 @@ public abstract class LinkApiClientBase : IDisposable
                     return new LinkApiResponse<T> { StatusCode = statusCode, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
                 }
 
+                // Some callers must distinguish missing fields from DTO defaults.
+                string? rawBody = preserveRawResponse ? await response.GetStringAsync() : null;
                 var body = await response.GetJsonAsync<T>();
-                string? rawBody = null;
-                if (body is not null)
+                if (!preserveRawResponse && body is not null)
                 {
                     try
                     {

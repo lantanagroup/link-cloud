@@ -9,42 +9,82 @@ cloud AI account, embeddings model, vector database, or document ingestion is ne
 
 ### Docker Compose
 
-With Docker Desktop and Ollama running, from the repository root:
+With Docker Desktop running, from the repository root (no host Ollama install needed):
 
 ```powershell
 docker compose up --build -d --wait onboarding-chat
 ```
 
-This builds/starts `onboarding-chat` and its `onboarding-mcp` dependency. Open
+This starts Ollama, installs the selected model if it is not cached, and builds/starts
+`onboarding-chat` and `onboarding-mcp`. The first model download can take several
+minutes. Open
 **http://127.0.0.1:8091**. The compose MCP endpoint is **http://127.0.0.1:8092/mcp**
 (native MCP uses port 8090, also used by the NHSN UI).
 No host .NET SDK is required for this mode. Stop any standalone copies first,
 or set `ONBOARDING_CHAT_PORT` / `ONBOARDING_MCP_PORT` to unused host ports.
 
-Ollama remains on the host at `host.docker.internal:11434`; the model defaults to
-`gemma4:e2b` and can be changed with `ONBOARDING_CHAT_MODEL`. The MCP container
-uses Tenant and DataAcquisition on `link-nw`. Those services can be started with
-the full stack; the two onboarding containers also start alone.
+The chat connects directly to `http://ollama:11434` on the Docker network. Ollama is
+also available to native clients at `http://localhost:11434`. Stop/quit any host
+Ollama app first to free this port, and disable its launch at login if enabled.
+Alternatively, set `OLLAMA_PORT` to an unused host port; the container connection
+stays the same. The model defaults to `gemma4:12b` and can be changed with
+`ONBOARDING_CHAT_MODEL`; rerun the startup command after changing it.
+Models persist in the `ollama_data` named volume across container recreation.
+`docker compose down -v` deletes that cache along with the other stack volumes.
+The MCP container uses Tenant and DataAcquisition on `link-nw`. Those services can be started with
+the full stack; the onboarding services and Ollama also start alone.
 
-The health checks report application availability, not Ollama/upstream connectivity.
-Published ports bind only to host loopback. On Linux, Ollama must listen on an
-interface reachable from the Docker bridge; the compose host-gateway mapping alone
-does not make a loopback-only Ollama listener reachable. Docker Desktop provides
-the `host.docker.internal` host connection. If model requests fail, verify Ollama
-is reachable from the chat container before changing the application settings.
+Compose waits for Ollama's API and the model installation before starting the chat.
+The chat/MCP health checks report application availability, not upstream connectivity.
+Published ports bind only to host loopback. The base setup uses CPU inference.
+For an NVIDIA GPU with Docker GPU support enabled, use the override on each start:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.ollama-gpu.yml up --build -d --wait onboarding-chat
+```
+
+To keep GPU acceleration when using plain `docker compose` commands, add these
+optional settings to your local `.env` (also shown in `.env.example`):
+
+```dotenv
+COMPOSE_PATH_SEPARATOR=,
+COMPOSE_FILE=docker-compose.yml,docker-compose.ollama-gpu.yml
+```
+
+The override follows [Docker's GPU reservation setup](https://docs.docker.com/compose/how-tos/gpu-support/)
+for the [official Ollama image](https://docs.ollama.com/docker).
+Ollama uses an 8192-token context by default; override `OLLAMA_CONTEXT_LENGTH` if needed.
+Check the installed models with `docker compose exec ollama ollama list`.
+
+To reuse models from a previous Windows host installation before the first start:
+
+```powershell
+docker compose create ollama
+docker compose cp "$env:USERPROFILE/.ollama/models" ollama:/root/.ollama/
+```
+
+This copies only the model cache. It leaves the host files in place.
 
 Stop just the POC containers with:
 
 ```powershell
-docker compose stop onboarding-chat onboarding-mcp
+docker compose stop onboarding-chat onboarding-mcp ollama
 ```
 
-### Without Docker
+### Run the .NET projects natively
 
 Requires the **.NET 10 SDK** for this chat/template and .NET 8 runtime for the MCP
-server. Existing pipeline services remain on .NET 8. Ollama must already be running
-at `http://localhost:11434` with a model that supports tools. The default is
-`gemma4:e2b`, matching the locally installed model at implementation time.
+server. Existing pipeline services remain on .NET 8. Start the containerized model
+server first (use the GPU override above if desired):
+
+```powershell
+docker compose up -d --wait ollama-model
+```
+
+The default native Ollama endpoint is `http://localhost:11434`, which reaches the
+container's published port. If you changed `OLLAMA_PORT`, set
+`OnboardingChat__OllamaEndpoint` to match. A tool-capable model is required; the
+default is `gemma4:12b`.
 
 From the repository root, start MCP in one terminal:
 
@@ -81,20 +121,20 @@ Edit `appsettings.json` before starting, or override with environment variables:
 |---|---|---|
 | Ollama base URL | `http://localhost:11434` | `OnboardingChat__OllamaEndpoint` |
 | MCP endpoint | `http://127.0.0.1:8090/mcp` | `OnboardingChat__McpEndpoint` |
-| Model | `gemma4:e2b` | `OnboardingChat__Model` |
+| Model | `gemma4:12b` | `OnboardingChat__Model` |
 | Response timeout | 180 seconds | `OnboardingChat__ResponseTimeoutSeconds` |
 
-For example, select another installed tool-capable model in PowerShell:
+For example, install and select another tool-capable model for a native chat run:
 
 ```powershell
-ollama list
+docker compose exec ollama ollama pull your-installed-model-name
 $env:OnboardingChat__Model = "your-installed-model-name"
 dotnet run --project DotNet/Onboarding.Chat/Onboarding.Chat.csproj
 ```
 
 Use Ollama's base URL, without `/api`. Native runs accept only loopback HTTP service
-URLs. Containers additionally allow the designated `host.docker.internal` Ollama
-host and `onboarding-mcp` MCP service name.
+URLs. Containers additionally allow the designated `ollama` and `onboarding-mcp`
+service names for their respective endpoints.
 The browser UI itself binds only to `127.0.0.1:8091` and uses restricted host names.
 These are optional local settings with working defaults; the POC does not consume
 Azure App Configuration or require any environment-store provisioning.

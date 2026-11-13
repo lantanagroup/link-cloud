@@ -11,7 +11,10 @@ namespace LantanaGroup.Link.Sdk.Clients;
 
 public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
 {
-    private readonly IOptions<ServiceRegistry> _serviceRegistry;
+    private readonly IOptions<ServiceRegistry>? _serviceRegistry;
+
+    /// <summary>Uses a configured client whose base URL includes the API path, for example /api/.</summary>
+    public FacilityServiceClient(IFlurlClient client) : base(client) { }
 
     public FacilityServiceClient(
         IOptions<ServiceRegistry> serviceRegistry,
@@ -116,7 +119,7 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
         string facilityId,
         CancellationToken cancellationToken = default)
     {
-        if (_serviceRegistry.Value.TenantService?.CheckIfTenantExists != true)
+        if (_serviceRegistry is not null && _serviceRegistry.Value.TenantService?.CheckIfTenantExists != true)
             return Task.FromResult(new LinkApiResponse { StatusCode = 200 });
 
         return SendAsync(() => Request($"/Facility/{facilityId}")

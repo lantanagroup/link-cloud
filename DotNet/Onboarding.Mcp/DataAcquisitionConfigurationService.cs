@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using ModelContextProtocol;
 
 namespace LantanaGroup.Link.Onboarding.Mcp;
@@ -18,7 +18,7 @@ public sealed record GetDataAcquisitionConfigurationResult(string Status, int? H
 public sealed record SaveDataAcquisitionResult(string Status, int? HttpStatus, string FacilityId, string Message,
     ConnectionValidationResult? ConnectionValidation = null);
 
-public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, IOptions<OnboardingOptions> options)
+public sealed class DataAcquisitionConfigurationService(IFacilityServiceClient facilityClient, IDataAcquisitionServiceClient acquisitionClient)
 {
     public async Task<GetDataAcquisitionConfigurationResult> GetAsync(string facilityId, CancellationToken cancellationToken)
     {
@@ -28,20 +28,19 @@ public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, I
             throw new McpException("facilityId must contain only letters, digits, and hyphens.");
         try
         {
-            using var request = Request(HttpMethod.Get, options.Value.DataAcquisitionApiBaseUrl,
-                Uri.EscapeDataString(facilityId) + "/fhirQueryConfiguration", options.Value.DataAcquisitionBearerToken);
-            using var response = await httpClient.SendAsync(request, cancellationToken);
-            var status = (int)response.StatusCode;
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            var response = await acquisitionClient.GetFhirQueryConfigurationAsync(facilityId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var status = response.StatusCode;
+            if (response.StatusCode == (int)HttpStatusCode.NotFound)
             {
-                var problem = await ReadObject(response, cancellationToken);
+                var problem = ReadObject(response);
                 if (problem["status"]?.GetValue<int>() == 404 &&
                     problem["detail"]?.GetValue<string>() == $"No FhirQueryConfiguration found for facilityId: {facilityId}")
                     return new("not_found", status, facilityId, "No data acquisition configuration exists for this facility.");
             }
-            if (response.StatusCode != HttpStatusCode.OK)
-                return new("unavailable", status, facilityId, "Could not retrieve configuration. Check permissions and the DataAcquisition API route.");
-            var body = await ReadObject(response, cancellationToken);
+            if (response.StatusCode != (int)HttpStatusCode.OK)
+                return new("unavailable", HttpStatus(status), facilityId, "Could not retrieve configuration. Check permissions and the DataAcquisition API route.");
+            var body = ReadObject(response);
             if (body["facilityId"]?.GetValue<string>() != facilityId)
                 throw new JsonException();
             var baseUrl = body["fhirServerBaseUrl"]?.GetValue<string>();
@@ -82,29 +81,26 @@ public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, I
         var attempted = false;
         try
         {
-            using var tenantRequest = Request(HttpMethod.Get, options.Value.TenantApiBaseUrl,
-                "Facility/" + Uri.EscapeDataString(facilityId), options.Value.BearerToken);
-            using var tenantResponse = await httpClient.SendAsync(tenantRequest, cancellationToken);
-            if (tenantResponse.StatusCode != HttpStatusCode.OK)
-                return new("unavailable", (int)tenantResponse.StatusCode, facilityId, "Could not read the facility. No configuration write was attempted.");
-            var tenant = await ReadObject(tenantResponse, cancellationToken);
-            if (tenant["facilityId"]?.GetValue<string>() != facilityId)
-                throw new JsonException();
-            var timeZone = tenant["timeZone"]?.GetValue<string>();
+            var tenantResponse = await facilityClient.GetAsync(facilityId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (tenantResponse.StatusCode != (int)HttpStatusCode.OK)
+                return new("unavailable", HttpStatus(tenantResponse.StatusCode), facilityId, "Could not read the facility. No configuration write was attempted.");
+            var tenant = tenantResponse.Body ?? throw new JsonException();
+            if (tenant.FacilityId != facilityId) throw new JsonException();
+            var timeZone = tenant.TimeZone;
             if (string.IsNullOrWhiteSpace(timeZone)) throw new JsonException();
             _ = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
 
-            using var lookup = Request(HttpMethod.Get, options.Value.DataAcquisitionApiBaseUrl,
-                Uri.EscapeDataString(facilityId) + "/fhirQueryConfiguration", options.Value.DataAcquisitionBearerToken);
-            using var existingResponse = await httpClient.SendAsync(lookup, cancellationToken);
-            var exists = existingResponse.StatusCode == HttpStatusCode.OK;
-            if (!exists && existingResponse.StatusCode != HttpStatusCode.NotFound)
-                return new("unavailable", (int)existingResponse.StatusCode, facilityId, "Could not read the existing configuration. No write was attempted.");
+            var existingResponse = await acquisitionClient.GetFhirQueryConfigurationAsync(facilityId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var exists = existingResponse.StatusCode == (int)HttpStatusCode.OK;
+            if (!exists && existingResponse.StatusCode != (int)HttpStatusCode.NotFound)
+                return new("unavailable", HttpStatus(existingResponse.StatusCode), facilityId, "Could not read the existing configuration. No write was attempted.");
             if (!exists)
             {
                 // An unmatched route also returns 404. Only the service's explicit missing-record
                 // response authorizes creation; never turn an ambiguous 404 into a POST.
-                var problem = await ReadObject(existingResponse, cancellationToken);
+                var problem = ReadObject(existingResponse);
                 if (problem["status"]?.GetValue<int>() != 404 ||
                     problem["detail"]?.GetValue<string>() != $"No FhirQueryConfiguration found for facilityId: {facilityId}")
                     return new("unavailable", 404, facilityId,
@@ -113,7 +109,7 @@ public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, I
             JsonObject body = new();
             if (exists)
             {
-                var existing = await ReadObject(existingResponse, cancellationToken);
+                var existing = ReadObject(existingResponse);
                 if (existing["facilityId"]?.GetValue<string>() != facilityId || string.IsNullOrWhiteSpace(existing["id"]?.GetValue<string>()))
                     throw new JsonException();
                 // PUT replaces these fields. Retain authentication privately; never expose it to the model.
@@ -130,13 +126,15 @@ public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, I
             if (maxRetries != -1) body["maxRetries"] = maxRetries;
             ApplyTime(body, "minAcquisitionPullTime", minAcquisitionPullTime);
             ApplyTime(body, "maxAcquisitionPullTime", maxAcquisitionPullTime);
-            using var request = Request(exists ? HttpMethod.Put : HttpMethod.Post,
-                options.Value.DataAcquisitionApiBaseUrl, "fhirQueryConfiguration", options.Value.DataAcquisitionBearerToken);
-            request.Content = JsonContent.Create(body);
+            var createRequest = exists ? null : body.Deserialize<CreateFhirQueryConfigurationRequestApiModel>(
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? throw new JsonException();
             attempted = true;
-            using var response = await httpClient.SendAsync(request, cancellationToken);
-            var status = (int)response.StatusCode;
-            if (response.StatusCode == (exists ? HttpStatusCode.Accepted : HttpStatusCode.Created))
+            var response = exists
+                ? await acquisitionClient.UpdateFhirQueryConfigurationAsync(body, cancellationToken)
+                : await acquisitionClient.CreateFhirQueryConfigurationAsync(createRequest!, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var status = response.StatusCode;
+            if (response.StatusCode == (int)(exists ? HttpStatusCode.Accepted : HttpStatusCode.Created))
             {
                 var validation = fhirServerBaseUrl.Length > 0
                     ? await ValidateConnectionAsync(fhirServerBaseUrl, cancellationToken)
@@ -148,7 +146,7 @@ public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, I
                 return new("rejected", status, facilityId,
                     "The configuration write endpoint or target was not found. Check the DataAcquisition API base URL and route version; no retry was attempted.");
             var uncertain = status >= 500 || status < 400 || status == 408;
-            return new(uncertain ? "unknown" : "rejected", status, facilityId, uncertain
+            return new(uncertain ? "unknown" : "rejected", HttpStatus(status), facilityId, uncertain
                 ? "The write outcome is uncertain. Check DataAcquisition before retrying."
                 : "DataAcquisition rejected the configuration. Check permissions and settings; no retry was attempted.");
         }
@@ -170,17 +168,16 @@ public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, I
             throw new McpException("Use an absolute HTTP(S) FHIR base URL without credentials, query, or fragment.");
         try
         {
-            using var request = Request(HttpMethod.Get, options.Value.DataAcquisitionApiBaseUrl,
-                "connectionValidation/$validate?fhirServerUrl=" + Uri.EscapeDataString(fhirServerBaseUrl),
-                options.Value.DataAcquisitionBearerToken);
-            using var response = await httpClient.SendAsync(request, token);
-            var status = (int)response.StatusCode;
-            if (response.StatusCode != HttpStatusCode.OK)
-                return new(status == 502 ? "failed" : "unavailable", status == 502 ? false : null, status,
+            var response = await acquisitionClient.ValidateFhirServerConnectionAsync(fhirServerBaseUrl, token);
+            token.ThrowIfCancellationRequested();
+            var status = response.StatusCode;
+            if (response.StatusCode != (int)HttpStatusCode.OK)
+                return new(status == 502 ? "failed" : "unavailable", status == 502 ? false : null, HttpStatus(status),
                     status == 502 ? "The FHIR connection check failed."
                         : "Connection validation was unavailable. Check the DataAcquisition validation endpoint.");
-            var result = await ReadObject(response, token);
-            var connected = result["isConnected"]?.GetValue<bool>() ?? throw new JsonException();
+            // A missing boolean must not be interpreted as the typed DTO's default false.
+            var connected = JsonNode.Parse(response.RawBody ?? throw new JsonException())?["isConnected"]?.GetValue<bool>()
+                ?? throw new JsonException();
             // Do not expose raw upstream errors, which can contain server internals or response bodies.
             return new(connected ? "connected" : "failed", connected, status, connected
                 ? "The FHIR server connection check succeeded (unauthenticated metadata/CapabilityStatement check)."
@@ -203,12 +200,8 @@ public sealed class DataAcquisitionConfigurationService(HttpClient httpClient, I
         if (value == "clear") body[key] = null;
         else if (!string.IsNullOrEmpty(value)) body[key] = value;
     }
-    private static async Task<JsonObject> ReadObject(HttpResponseMessage response, CancellationToken token) =>
-        await JsonNode.ParseAsync(await response.Content.ReadAsStreamAsync(token), cancellationToken: token) as JsonObject ?? throw new JsonException();
-    private static HttpRequestMessage Request(HttpMethod method, string baseUrl, string path, string? token)
-    {
-        var request = new HttpRequestMessage(method, new Uri(new Uri(baseUrl), path));
-        if (!string.IsNullOrWhiteSpace(token)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return request;
-    }
+    private static JsonObject ReadObject(LinkApiResponse response) =>
+        JsonNode.Parse(response.RawBody ?? throw new JsonException()) as JsonObject ?? throw new JsonException();
+
+    private static int? HttpStatus(int status) => status == 0 ? null : status;
 }

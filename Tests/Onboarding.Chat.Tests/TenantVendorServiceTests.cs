@@ -2,7 +2,8 @@ using Xunit;
 using System.Net;
 using System.Text.Json;
 using LantanaGroup.Link.Onboarding.Mcp;
-using Microsoft.Extensions.Options;
+using Flurl.Http;
+using LantanaGroup.Link.Sdk.Clients;
 
 namespace Onboarding.Chat.Tests;
 
@@ -18,11 +19,12 @@ public sealed class TenantVendorServiceTests
         }
     }
 
-    private static TenantVendorService Service(Func<HttpRequestMessage, HttpResponseMessage> respond) =>
-        new(new HttpClient(new Handler(respond)), Options.Create(new OnboardingOptions
-        {
-            TenantApiBaseUrl = "http://localhost:8080/api/", BearerToken = "test-token"
-        }));
+    private static TenantVendorService Service(Func<HttpRequestMessage, HttpResponseMessage> respond)
+    {
+        var client = new FlurlClient(new HttpClient(new Handler(respond)) { BaseAddress = new Uri("http://localhost:8080/api/") });
+        client.WithOAuthBearerToken("test-token");
+        return new(new FacilityServiceClient(client));
+    }
 
     private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
     {

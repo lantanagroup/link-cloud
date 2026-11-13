@@ -1,9 +1,8 @@
 using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using ModelContextProtocol;
 
 namespace LantanaGroup.Link.Onboarding.Mcp;
@@ -11,7 +10,7 @@ namespace LantanaGroup.Link.Onboarding.Mcp;
 public sealed record CreatedFacility(string FacilityId, string FacilityName, string TimeZone, string? VendorVersionId);
 public sealed record CreateFacilityResult(string Status, int? HttpStatus, CreatedFacility? Facility, string Message);
 
-public sealed class CreateFacilityService(HttpClient httpClient, IOptions<OnboardingOptions> options)
+public sealed class CreateFacilityService(IFacilityServiceClient facilityClient)
 {
     public async Task<CreateFacilityResult> CreateAsync(string facilityId, string facilityName,
         string timeZone, string vendorVersionId, CancellationToken cancellationToken)
@@ -45,40 +44,36 @@ public sealed class CreateFacilityService(HttpClient httpClient, IOptions<Onboar
         var createAttempted = false;
         try
         {
-            using var lookup = Request(HttpMethod.Get, $"Facility/{Uri.EscapeDataString(facilityId)}");
-            using var existing = await httpClient.SendAsync(lookup, cancellationToken);
+            var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             if (existing.IsSuccessStatusCode)
-                return new("already_exists", (int)existing.StatusCode, null,
+                return new("already_exists", existing.StatusCode, null,
                     "The facility already exists. No changes were made.");
-            if (existing.StatusCode != HttpStatusCode.NotFound)
-                return new("unavailable", (int)existing.StatusCode, null,
+            if (existing.StatusCode != (int)HttpStatusCode.NotFound)
+                return new("unavailable", existing.StatusCode == 0 ? null : existing.StatusCode, null,
                     "Tenant could not confirm that the facility is absent. Creation was not attempted.");
 
-            using var request = Request(HttpMethod.Post, "Facility");
-            request.Content = JsonContent.Create(new
+            var request = new FacilityModel
             {
-                facilityId, facilityName, timeZone, vendorVersionId = vendorId,
-                scheduledReports = new { daily = Array.Empty<string>(), weekly = Array.Empty<string>(), monthly = Array.Empty<string>() }
-            });
+                FacilityId = facilityId, FacilityName = facilityName, TimeZone = timeZone, VendorVersionId = vendorId,
+                ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
+            };
             createAttempted = true;
-            using var response = await httpClient.SendAsync(request, cancellationToken);
-            var status = (int)response.StatusCode;
-            if (response.StatusCode != HttpStatusCode.Created)
+            var response = await facilityClient.CreateAsync(request, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var status = response.StatusCode;
+            if (response.StatusCode != (int)HttpStatusCode.Created)
             {
-                var uncertain = status >= 500 || status < 400 || response.StatusCode == HttpStatusCode.RequestTimeout;
-                return new(uncertain ? "unknown" : "rejected", status, null, uncertain
+                var uncertain = status >= 500 || status < 400 || response.StatusCode == (int)HttpStatusCode.RequestTimeout;
+                return new(uncertain ? "unknown" : "rejected", status == 0 ? null : status, null, uncertain
                     ? "Tenant did not confirm creation. The facility may have been saved. Check Tenant before retrying."
                     : "Tenant rejected creation. Check its facility ID policy, vendor version, permissions, and required fields. No update was attempted.");
             }
-            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
-            var facility = document.RootElement;
-            if (facility.GetProperty("facilityId").GetString() != facilityId)
+            var facility = response.Body ?? throw new JsonException("Missing facility response.");
+            if (facility.FacilityId != facilityId || facility.FacilityName is null || string.IsNullOrEmpty(facility.TimeZone))
                 throw new JsonException("Unexpected facility response.");
-            var created = new CreatedFacility(facilityId,
-                facility.GetProperty("facilityName").GetString() ?? throw new JsonException(),
-                facility.GetProperty("timeZone").GetString() ?? throw new JsonException(),
-                facility.TryGetProperty("vendorVersionId", out var version) && version.ValueKind == JsonValueKind.String
-                    ? version.GetString() : null);
+            var created = new CreatedFacility(facilityId, facility.FacilityName, facility.TimeZone,
+                facility.VendorVersionId?.ToString());
             return new("created", status, created,
                 "Tenant confirmed facility creation. Connection/query-plan configuration and reporting enrollment require separate steps.");
         }
@@ -94,14 +89,6 @@ public sealed class CreateFacilityService(HttpClient httpClient, IOptions<Onboar
         {
             return Failure(createAttempted, "Tenant returned an unexpected response.");
         }
-    }
-
-    private HttpRequestMessage Request(HttpMethod method, string path)
-    {
-        var request = new HttpRequestMessage(method, new Uri(new Uri(options.Value.TenantApiBaseUrl), path));
-        if (!string.IsNullOrWhiteSpace(options.Value.BearerToken))
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.BearerToken);
-        return request;
     }
 
     private static CreateFacilityResult Failure(bool createAttempted, string reason) =>

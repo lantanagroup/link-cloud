@@ -34,6 +34,7 @@
 ## nhsn-app-ui: 8090
 ## onboarding-mcp: 8092 (localhost only)
 ## onboarding-chat: 8091 (localhost only)
+## ollama: 11434 (localhost only)
 
 services:
   
@@ -1149,8 +1150,44 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8076/health"]
 
-  # Local AI onboarding POC. Ollama remains on the host; upstream catalogs are
-  # queried on demand, so Tenant/MeasureEval outages produce partial tool results.
+  # Local AI onboarding POC. Models persist independently of the containers.
+  # Upstream catalogs are queried on demand, so Tenant/MeasureEval outages
+  # produce partial tool results.
+  ollama:
+    image: ollama/ollama:0.40.16
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-8192}
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Reuse a cached model or download it once before the chat starts.
+  ollama-model:
+    image: ollama/ollama:0.40.16
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      ONBOARDING_CHAT_MODEL: ${ONBOARDING_CHAT_MODEL:-gemma4:12b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'ollama show "$$ONBOARDING_CHAT_MODEL" >/dev/null 2>&1 || ollama pull "$$ONBOARDING_CHAT_MODEL"'
+    networks:
+      - link-nw
+    depends_on:
+      ollama:
+        condition: service_healthy
+
   onboarding-mcp:
     image: link-onboarding-mcp
     build:
@@ -1183,16 +1220,18 @@ services:
       dockerfile: DotNet/Onboarding.Chat/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      OnboardingChat__OllamaEndpoint: http://host.docker.internal:11434
+      OnboardingChat__OllamaEndpoint: http://ollama:11434
       OnboardingChat__McpEndpoint: http://onboarding-mcp:8080/mcp
       OnboardingChat__Model: ${ONBOARDING_CHAT_MODEL:-gemma4:12b}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${ONBOARDING_CHAT_PORT:-8091}:8080"
     networks:
       - link-nw
     depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-model:
+        condition: service_completed_successfully
       onboarding-mcp:
         condition: service_healthy
     healthcheck:
@@ -1206,6 +1245,8 @@ networks:
   link-nw:
 
 volumes:
+  ollama_data:
+    driver: local
   kafka_data:
     driver: local
   mssql_data:

@@ -280,7 +280,7 @@ class ProtocolTests(unittest.TestCase):
     def test_discovery(self):
         tools = self.rpc("tools/list", {})["result"]["tools"]
         tools = {tool["name"]: tool for tool in tools}
-        self.assertEqual(set(tools), {"create_facility", "save_data_acquisition_configuration", "validate_fhir_server_connection", "get_data_acquisition_configuration", "search_fhir_endpoints"})
+        self.assertEqual(set(tools), {"create_facility", "save_data_acquisition_configuration", "validate_fhir_server_connection", "get_data_acquisition_configuration", "search_fhir_endpoints", "get_vendors"})
         self.assertTrue(tools["search_fhir_endpoints"]["annotations"]["readOnlyHint"])
         self.assertTrue(tools["get_data_acquisition_configuration"]["annotations"]["readOnlyHint"])
         connection_tool = tools["validate_fhir_server_connection"]

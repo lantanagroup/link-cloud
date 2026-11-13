@@ -55,10 +55,12 @@ Endpoints are read from env vars (see `Tests/BackendE2ETests/README.md` and `Tes
 ### Local onboarding AI POC
 
 `DotNet/Onboarding.Chat` is a Blazor chat generated from Microsoft's AI template.
-It requires the .NET 10 SDK, local Ollama with a tool-capable model, and the sibling
-`DotNet/Onboarding.Mcp` server (.NET 8). For native execution:
+It uses containerized Ollama with a tool-capable model and the sibling
+`DotNet/Onboarding.Mcp` server (.NET 8). Native .NET execution requires the .NET 10
+SDK and .NET 8 runtime. Start Ollama and install the model before the .NET apps:
 
 ```powershell
+docker compose up -d --wait ollama-model
 dotnet run --project DotNet/Onboarding.Mcp/Onboarding.Mcp.csproj    # terminal 1
 dotnet run --project DotNet/Onboarding.Chat/Onboarding.Chat.csproj  # terminal 2
 dotnet test Tests/Onboarding.Chat.Tests/Onboarding.Chat.Tests.csproj
@@ -68,7 +70,7 @@ Open `http://127.0.0.1:8091`. See [Onboarding.Chat/README.md](DotNet/Onboarding.
 for model selection, configuration, and troubleshooting. The main solution now
 includes the .NET 10 chat/test projects; existing service project builds still use .NET 8.
 
-Alternatively, with Ollama running on the host, run both POCs in compose (no host
+Alternatively, run both POCs and Ollama in Compose (no host Ollama install or
 .NET SDK required):
 
 ```powershell
@@ -77,8 +79,13 @@ docker compose up --build -d --wait onboarding-chat
 
 Compose exposes MCP on port 8092 (native MCP uses 8090, also used by the NHSN UI)
 and chat on port 8091. Stop native chat first if it occupies port 8091, or override
-`ONBOARDING_MCP_PORT` / `ONBOARDING_CHAT_PORT`. The chat uses host Ollama through
-`host.docker.internal`; MCP uses Tenant/MeasureEval service names on `link-nw`.
+`ONBOARDING_MCP_PORT` / `ONBOARDING_CHAT_PORT`. Stop any host Ollama app to free
+port 11434, or override `OLLAMA_PORT`. Native chat uses the published localhost
+port; containerized chat uses `http://ollama:11434`. Models persist in the
+`ollama_data` volume, and Compose installs `ONBOARDING_CHAT_MODEL` (default
+`gemma4:12b`) before starting the chat. The first download can take several minutes.
+For NVIDIA GPU acceleration, add `-f docker-compose.yml -f docker-compose.ollama-gpu.yml`
+to the compose command. MCP uses Tenant/MeasureEval service names on `link-nw`.
 
 ### Java
 

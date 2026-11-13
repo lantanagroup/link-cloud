@@ -1,8 +1,9 @@
 # Local facility onboarding MCP POC
 
 .NET 8 MCP server, using the official C# MCP SDK and Streamable HTTP.
-It is standalone: no Docker, database, Ollama, or other Link projects are required
-to start it.
+It uses LinkSdk for Tenant and DataAcquisition calls, referencing the SDK and its
+shared libraries. No Docker, database, or Ollama is required to start it.
+Luxera directory searches use a separate HTTP client because Luxera is an external API.
 The create_facility tool creates a facility through the existing Tenant API.
 
 ## Run
@@ -23,7 +24,12 @@ Stop it with Ctrl+C. Alternatively run it in Docker Compose:
 docker compose up --build -d --wait onboarding-chat
 ```
 
-This starts both onboarding services, exposing MCP on host loopback port 8092
+This starts both onboarding services plus containerized Ollama and installs the
+selected model (`ONBOARDING_CHAT_MODEL`, default `gemma4:12b`) if needed.
+No host Ollama installation is required. See the
+[chat setup](../Onboarding.Chat/README.md#docker-compose) for GPU acceleration,
+model persistence, and migrating a host model cache.
+It exposes MCP on host loopback port 8092
 and chat on port 8091. Stop standalone copies before using the same ports, or
 override `ONBOARDING_MCP_PORT` / `ONBOARDING_CHAT_PORT`. Inside Docker, the MCP
 server binds port 8080 and accepts the designated `tenant` and `measureeval`
@@ -152,7 +158,8 @@ and may download its package. See https://modelcontextprotocol.io/docs/tools/ins
 
 ## Where Ollama fits
 
-Your Ollama endpoint `http://localhost:11434/api` serves the model. It does not
+The containerized Ollama endpoint `http://localhost:11434/api` serves the model
+for native clients (`http://ollama:11434/api` inside Compose). It does not
 itself act as this server's MCP client. The next POC component is a chatbot host
 that connects to both services:
 
@@ -163,7 +170,7 @@ MCP server   -> Tenant API (read vendor catalogs and create facilities)
 ```
 
 The sibling [Onboarding.Chat](../Onboarding.Chat/README.md) Blazor project provides
-this host. It connects to your local Ollama and this MCP endpoint, discovers tools,
+this host. It connects to containerized Ollama and this MCP endpoint, discovers tools,
 executes model-requested calls, and returns the results to the model. Start both
 projects separately; open the chat at `http://127.0.0.1:8091`.
 

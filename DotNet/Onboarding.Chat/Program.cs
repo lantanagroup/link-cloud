@@ -14,7 +14,7 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddHealthChecks();
 builder.Services.AddOptions<ChatSettings>()
     .Bind(builder.Configuration.GetSection("OnboardingChat"))
-    .Validate(settings => ChatSettings.IsAllowedHttpUrl(settings.OllamaEndpoint, inContainer ? "host.docker.internal" : null)
+    .Validate(settings => ChatSettings.IsAllowedHttpUrl(settings.OllamaEndpoint, inContainer ? "ollama" : null)
         && ChatSettings.IsAllowedHttpUrl(settings.McpEndpoint, inContainer ? "onboarding-mcp" : null)
         && !string.IsNullOrWhiteSpace(settings.Model)
         && settings.ResponseTimeoutSeconds is >= 10 and <= 600,

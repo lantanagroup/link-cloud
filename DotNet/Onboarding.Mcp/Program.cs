@@ -1,4 +1,10 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Flurl.Http;
+using Flurl.Http.Configuration;
 using LantanaGroup.Link.Onboarding.Mcp;
+using LantanaGroup.Link.Sdk.Clients;
+using Microsoft.Extensions.Options;
 
 // Resolve appsettings beside the executable even when launched from the repository root.
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -25,11 +31,22 @@ builder.Services.AddOptions<OnboardingOptions>()
         && IsLocalApiUrl(options.DataAcquisitionApiBaseUrl, inContainer ? "dataacq" : null),
         "Configure loopback HTTP (or designated Docker service) Tenant and MeasureEval API URLs ending in '/'.")
     .ValidateOnStart();
-builder.Services.AddHttpClient<CreateFacilityService>(client => client.Timeout = TimeSpan.FromSeconds(5))
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<IFacilityServiceClient>(services =>
+{
+    var options = services.GetRequiredService<IOptions<OnboardingOptions>>().Value;
+    return new FacilityServiceClient(LinkClient(options.TenantApiBaseUrl, options.BearerToken, 5));
+});
+builder.Services.AddSingleton<IDataAcquisitionServiceClient>(services =>
+{
+    var options = services.GetRequiredService<IOptions<OnboardingOptions>>().Value;
+    // Allow the validation endpoint's 30-second metadata probe to finish.
+    return new DataAcquisitionServiceClient(LinkClient(options.DataAcquisitionApiBaseUrl,
+        options.DataAcquisitionBearerToken, 35));
+});
+builder.Services.AddSingleton<CreateFacilityService>();
+builder.Services.AddSingleton<TenantVendorService>();
+builder.Services.AddSingleton<DataAcquisitionConfigurationService>();
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<OnboardingTools>();
-builder.Services.AddHttpClient<TenantVendorService>(client => client.Timeout = TimeSpan.FromSeconds(5))
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<LuxeraEndpointApi>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient(LuxeraEndpointApi.ClientName, client =>
@@ -37,9 +54,6 @@ builder.Services.AddHttpClient(LuxeraEndpointApi.ClientName, client =>
     client.Timeout = TimeSpan.FromSeconds(20);
     client.MaxResponseContentBufferSize = 2 * 1024 * 1024;
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-// Allow the validation endpoint's 30-second metadata probe to finish.
-builder.Services.AddHttpClient<DataAcquisitionConfigurationService>(client => client.Timeout = TimeSpan.FromSeconds(35))
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 var app = builder.Build();
 app.MapHealthChecks("/health");
 app.MapMcp("/mcp");
@@ -49,3 +63,17 @@ static bool IsLocalApiUrl(string value, string? containerHost) =>
     Uri.TryCreate(value, UriKind.Absolute, out var uri)
     && (uri.IsLoopback || string.Equals(uri.Host, containerHost, StringComparison.OrdinalIgnoreCase))
     && uri.Scheme == "http" && uri.AbsolutePath.EndsWith('/') && string.IsNullOrEmpty(uri.UserInfo);
+
+static IFlurlClient LinkClient(string baseUrl, string? bearerToken, int timeoutSeconds)
+{
+    var client = new FlurlClient(baseUrl);
+    client.Settings.JsonSerializer = new DefaultJsonSerializer(new JsonSerializerOptions(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    });
+    client.Settings.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+    client.Settings.Redirects.Enabled = false;
+    if (!string.IsNullOrWhiteSpace(bearerToken))
+        client.WithOAuthBearerToken(bearerToken);
+    return client;
+}

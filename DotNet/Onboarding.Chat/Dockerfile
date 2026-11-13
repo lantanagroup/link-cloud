@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Keep the SDK's implicit web assets package aligned with packages.lock.json.
+FROM mcr.microsoft.com/dotnet/sdk:10.0.403 AS build
 WORKDIR /src
 COPY Directory.Packages.props ./
 COPY DotNet/Onboarding.Chat/Onboarding.Chat.csproj DotNet/Onboarding.Chat/packages.lock.json DotNet/Onboarding.Chat/

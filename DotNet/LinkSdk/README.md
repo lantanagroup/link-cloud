@@ -78,3 +78,12 @@ await using var file = File.Create("results.csv.partial");
 var response = await validationClient.CopyValidationResultsCsvAsync(facilityId, reportId, file, cancellationToken);
 // Check response.IsSuccessStatusCode before accepting the downloaded file.
 ```
+
+### Caller-configured transports
+
+`FacilityServiceClient(IFlurlClient)` and `DataAcquisitionServiceClient(IFlurlClient)`
+accept a configured Flurl client for hosts that supply an existing bearer token,
+custom timeouts, or redirect policy. The SDK owns and disposes the client. Set its
+base URL to the full API path: `/api/` for Tenant and `/api/data-acquisition/`
+(or a deployed legacy path such as `/api/data/`) for DataAcquisition. The existing
+ServiceRegistry constructors retain their current URL and system-token behavior.
