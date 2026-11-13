@@ -40,6 +40,7 @@ using Serilog.Exceptions;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -210,6 +211,8 @@ builder.Services.AddHealthChecks()
 
 // Logging using Serilog
 builder.Logging.AddSerilog();
+// Names this instance on every line (Serilog:Properties:ServiceInstance), to tell scaled-out copies apart.
+builder.Configuration.AddServiceInstanceLogProperty();
 Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration)
                 .Filter.ByExcluding("RequestPath like '/health%'")

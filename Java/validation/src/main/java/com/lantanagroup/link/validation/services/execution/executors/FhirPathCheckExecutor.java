@@ -75,7 +75,7 @@ public class FhirPathCheckExecutor implements CheckExecutor {
                             .severity(severity)
                             .code(code)
                             .message(failureMessage)
-                            .location(resourceLocation(target))
+                            .location(FindingLocation.of(target))
                             .expression(expression)
                             .build());
                 }
@@ -87,7 +87,7 @@ public class FhirPathCheckExecutor implements CheckExecutor {
                         .severity(Severity.ERROR)
                         .code("fhirpath-evaluation-error")
                         .message("FHIRPath evaluation error: " + e.getMessage())
-                        .location(resourceLocation(target))
+                        .location(FindingLocation.of(target))
                         .expression(expression)
                         .build());
             }
@@ -103,19 +103,19 @@ public class FhirPathCheckExecutor implements CheckExecutor {
             }
 
             if ("Bundle".equals(root.fhirType())) {
-                return "Bundle".equals(leadingResourceType(expression))
+                return "Bundle".equals(ExpressionTargets.leadingResourceType(expression))
                         ? List.of(root)
                         : Collections.emptyList();
             }
 
-            String singleType = leadingResourceType(expression);
+            String singleType = ExpressionTargets.leadingResourceType(expression);
             if (singleType == null || singleType.equals(root.fhirType())) {
                 return List.of(root);
             }
             return Collections.emptyList();
         }
 
-        String resourceType = leadingResourceType(expression);
+        String resourceType = ExpressionTargets.leadingResourceType(expression);
         if (resourceType == null) {
             return context.getBundleEntries();
         }
@@ -129,27 +129,4 @@ public class FhirPathCheckExecutor implements CheckExecutor {
                 .collect(Collectors.toList());
     }
 
-    private String leadingResourceType(String expression) {
-        int i = 0;
-        while (i < expression.length()
-                && (Character.isWhitespace(expression.charAt(i)) || expression.charAt(i) == '(')) {
-            i++;
-        }
-        int start = i;
-        while (i < expression.length()
-                && (Character.isLetterOrDigit(expression.charAt(i)) || expression.charAt(i) == '_')) {
-            i++;
-        }
-
-        if (start == i || i >= expression.length() || expression.charAt(i) != '.') {
-            return null;
-        }
-        String token = expression.substring(start, i);
-        return Character.isUpperCase(token.charAt(0)) ? token : null;
-    }
-
-    private String resourceLocation(IBaseResource resource) {
-        String id = resource.getIdElement() != null ? resource.getIdElement().getIdPart() : null;
-        return (id != null && !id.isBlank()) ? resource.fhirType() + "/" + id : resource.fhirType();
-    }
 }

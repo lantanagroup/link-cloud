@@ -958,10 +958,19 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
+            // When the group started, for the acquisition stage's log line.
+            var groupStarted = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+                .Where(l =>
+                    l.FacilityId == groupInfo.FacilityId
+                    && l.CorrelationId == groupInfo.CorrelationId
+                    && l.QueryPhase == groupInfo.QueryPhase)
+                .MinAsync(l => (DateTime?)l.CreateDate, cancellationToken);
+
             return new TailCompletionResult
             {
                 FacilityId = groupInfo.FacilityId,
                 PatientId = representative.PatientId ?? "",
+                GroupStartedUtc = groupStarted is { } started ? DateTime.SpecifyKind(started, DateTimeKind.Utc) : null,
                 CorrelationId = groupInfo.CorrelationId!,
                 QueryPhase = groupInfo.QueryPhase,
                 TraceParentId = representative.TraceId,

@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.1" />
+
+  <!--
+    The optional local orchestrator for link-cloud. It starts the infrastructure in containers and
+    every service with the settings it needs, and changes nothing about how the services build or
+    run elsewhere: docker-compose, the Dockerfiles and CI never reference this project.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- The app host runs with `dotnet run` or from the IDE. It does not need the Aspire CLI bundle. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+    <UserSecretsId>link-cloud-apphost-6f3c2a91-8d4e-4b7a-9c15-2e7d0f8b4a63</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.Kafka" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
+    <!-- Used to create the blob containers and initiate the Mongo replica set once those containers answer. -->
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="MongoDB.Driver" />
+  </ItemGroup>
+
+  <!-- The services this host starts. The Aspire SDK turns each into a Projects.* type and does not
+       reference its assembly. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Account\Account.csproj" />
+    <ProjectReference Include="..\Admin.BFF\Admin.BFF.csproj" />
+    <ProjectReference Include="..\Audit\Audit.csproj" />
+    <ProjectReference Include="..\Automation.UI\Automation.UI.csproj" />
+    <ProjectReference Include="..\Census\Census.csproj" />
+    <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
+    <ProjectReference Include="..\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj" />
+    <ProjectReference Include="..\MockDmrpApi\MockDmrpApi.csproj" />
+    <ProjectReference Include="..\MockFhirServer\MockFhirServer.csproj" />
+    <ProjectReference Include="..\Normalization\Normalization.csproj" />
+    <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
+    <ProjectReference Include="..\Report\Report.csproj" />
+    <ProjectReference Include="..\Submission\Submission.csproj" />
+    <ProjectReference Include="..\Tenant\Tenant.csproj" />
+    <ProjectReference Include="..\Terminology\Terminology.csproj" />
+    <ProjectReference Include="..\..\nhsn\NHSN-App-BFF\NHSN-App-BFF.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="AdminUi\proxy.mjs" CopyToOutputDirectory="Never" />
+    <None Update="Keycloak\link-realm.json" CopyToOutputDirectory="Never" />
+    <None Update="NhsnAppUi\webpack.config.js" CopyToOutputDirectory="Never" />
+    <None Update="FacilitySetup\**\*.json" CopyToOutputDirectory="Never" />
+    <None Update="SeedData\**\*" CopyToOutputDirectory="Never" />
+  </ItemGroup>
+
+</Project>

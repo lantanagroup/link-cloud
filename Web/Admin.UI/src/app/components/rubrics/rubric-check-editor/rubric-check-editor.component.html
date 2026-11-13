@@ -1,0 +1,348 @@
+<section class="check-editor" aria-labelledby="checkEditorHeading">
+  <h4 id="checkEditorHeading">
+    @if (readOnlyReason) {
+      Check {{ check.id }}
+    } @else {
+      {{ adding ? 'Add a check' : 'Edit check ' + (check.id || '') }}
+    }
+  </h4>
+
+  @if (readOnlyReason) {
+    <p class="check-editor-note">{{ readOnlyReason }} It is kept exactly as it is when the draft is saved.</p>
+    <pre class="rubric-mono" tabindex="0" aria-label="This check as JSON">{{ checkJson }}</pre>
+    <div class="check-editor-actions">
+      <button type="button" class="rubric-button" (click)="cancel()">Close</button>
+    </div>
+  } @else {
+    @if (otherErrors.length > 0) {
+      <ul class="check-editor-errors" role="alert">
+        @for (error of otherErrors; track $index) {
+          <li>{{ error.message }}</li>
+        }
+      </ul>
+    }
+
+    <div class="check-editor-grid">
+      <div class="check-editor-field check-editor-field--wide">
+        <label for="checkId">Check id</label>
+        <input id="checkId" type="text" [(ngModel)]="draft.id" (ngModelChange)="onChanged()" maxlength="128"
+          autocomplete="off" [attr.aria-invalid]="errors('id').length > 0" aria-describedby="checkIdHelp checkIdError">
+        <span id="checkIdHelp" class="check-editor-help">Stamped on every finding this check produces.</span>
+        <span id="checkIdError" class="check-editor-error">
+          @for (error of errors('id'); track $index) { {{ error.message }} }
+        </span>
+      </div>
+
+      <div class="check-editor-field">
+        <label for="checkType">Type</label>
+        <select id="checkType" [(ngModel)]="draft.type" (ngModelChange)="onTypeChanged()">
+          @for (type of types; track type) {
+            <option [value]="type">{{ checkTypeLabel(type) }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="check-editor-field">
+        <label for="checkDimension">Dimension</label>
+        <select id="checkDimension" [(ngModel)]="draft.dimension" (ngModelChange)="onChanged()"
+          [disabled]="fixedDimension !== null" [attr.aria-invalid]="errors('dimension').length > 0"
+          aria-describedby="checkDimensionHelp checkDimensionError">
+          @if (fixedDimension && !dimensions.includes(fixedDimension)) {
+            <option [value]="fixedDimension">{{ dimensionLabel(fixedDimension) }}</option>
+          }
+          @for (dimension of dimensions; track dimension) {
+            <option [value]="dimension">{{ dimensionLabel(dimension) }}</option>
+          }
+        </select>
+        <span id="checkDimensionHelp" class="check-editor-help">
+          @if (fixedDimension) { Fixed by the type. }
+        </span>
+        <span id="checkDimensionError" class="check-editor-error">
+          @for (error of errors('dimension'); track $index) { {{ error.message }} }
+        </span>
+      </div>
+
+      <div class="check-editor-field">
+        <label for="checkSeverity">Severity</label>
+        <select id="checkSeverity" [(ngModel)]="draft.severityOverride" (ngModelChange)="onChanged()"
+          [attr.aria-invalid]="errors('severityOverride').length > 0" aria-describedby="checkSeverityError">
+          @for (severity of severities; track severity) {
+            <option [value]="severity">{{ severityLabel(severity) }}</option>
+          }
+        </select>
+        <span id="checkSeverityError" class="check-editor-error">
+          @for (error of errors('severityOverride'); track $index) { {{ error.message }} }
+        </span>
+      </div>
+
+      <div class="check-editor-field check-editor-field--checkbox">
+        <input id="checkEnabled" type="checkbox" [ngModel]="draft.enabled !== false"
+          (ngModelChange)="draft.enabled = $event; onChanged()">
+        <label for="checkEnabled">Enabled</label>
+      </div>
+    </div>
+
+    <fieldset class="check-editor-settings">
+      <legend>What it tests</legend>
+
+      @if (draft.type === 'VALUESET') {
+        <div class="check-editor-mode" role="radiogroup" aria-label="Kind of value set check">
+          <label>
+            <input type="radio" name="valueSetMode" [checked]="!combined" (change)="setCombined(false)">
+            One coded element in a value set
+          </label>
+          <label>
+            <input type="radio" name="valueSetMode" [checked]="combined" (change)="setCombined(true)">
+            Several checks combined
+          </label>
+        </div>
+      }
+
+      @switch (kind) {
+        @case ('expression') {
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkExpression">FHIRPath expression</label>
+            <textarea id="checkExpression" rows="4" class="rubric-mono" spellcheck="false"
+              [(ngModel)]="draft.parameters!.expression" (ngModelChange)="onChanged()"
+              [attr.aria-invalid]="errors('parameters.expression').length > 0"
+              aria-describedby="checkExpressionHelp checkExpressionError"></textarea>
+            <span id="checkExpressionHelp" class="check-editor-help">
+              A finding is produced when this is false or empty for a resource.
+            </span>
+            <span id="checkExpressionError" class="check-editor-error">
+              @for (error of errors('parameters.expression'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkFailureMessage">Failure message</label>
+            <textarea id="checkFailureMessage" rows="2" [(ngModel)]="draft.parameters!.failureMessage"
+              (ngModelChange)="onChanged()" aria-describedby="checkFailureMessageHelp"></textarea>
+            <span id="checkFailureMessageHelp" class="check-editor-help">The message on the finding. Optional.</span>
+          </div>
+          <div class="check-editor-field">
+            <label for="checkCode">Code</label>
+            <input id="checkCode" type="text" [(ngModel)]="draft.parameters!.code" (ngModelChange)="onChanged()"
+              maxlength="128" autocomplete="off" [attr.aria-invalid]="errors('parameters.code').length > 0"
+              aria-describedby="checkCodeHelp checkCodeError">
+            <span id="checkCodeHelp" class="check-editor-help">A code for the finding. Optional.</span>
+            <span id="checkCodeError" class="check-editor-error">
+              @for (error of errors('parameters.code'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+        }
+
+        @case ('valueset') {
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkPath">Path</label>
+            <input id="checkPath" type="text" class="rubric-mono" spellcheck="false" [(ngModel)]="draft.parameters!.path"
+              (ngModelChange)="onChanged()" autocomplete="off" [attr.aria-invalid]="errors('parameters.path').length > 0"
+              aria-describedby="checkPathHelp checkPathError">
+            <span id="checkPathHelp" class="check-editor-help">FHIRPath to the coded element, such as Patient.gender.</span>
+            <span id="checkPathError" class="check-editor-error">
+              @for (error of errors('parameters.path'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkValueSet">Value set</label>
+            <input id="checkValueSet" type="text" class="rubric-mono" spellcheck="false"
+              [(ngModel)]="draft.parameters!.valueSet" (ngModelChange)="onChanged()" autocomplete="off"
+              [attr.aria-invalid]="errors('parameters.valueSet').length > 0"
+              aria-describedby="checkValueSetHelp checkValueSetError">
+            <span id="checkValueSetHelp" class="check-editor-help">The value set's URL, optionally followed by |version.</span>
+            <span id="checkValueSetError" class="check-editor-error">
+              @for (error of errors('parameters.valueSet'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkSystem">Code system</label>
+            <input id="checkSystem" type="text" class="rubric-mono" spellcheck="false"
+              [(ngModel)]="draft.parameters!.system" (ngModelChange)="onChanged()" autocomplete="off"
+              [attr.aria-invalid]="errors('parameters.system').length > 0"
+              aria-describedby="checkSystemHelp checkSystemError">
+            <span id="checkSystemHelp" class="check-editor-help">Only codes from this code system count. Optional.</span>
+            <span id="checkSystemError" class="check-editor-error">
+              @for (error of errors('parameters.system'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+        }
+
+        @case ('combined') {
+          <div class="check-editor-field">
+            <label for="checkMatchMode">Passes when</label>
+            <select id="checkMatchMode" [(ngModel)]="draft.parameters!.matchMode" (ngModelChange)="onChanged()">
+              <option value="ANY">Any of its checks passes</option>
+              <option value="ALL">All of its checks pass</option>
+            </select>
+          </div>
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkFailureMessage">Failure message</label>
+            <textarea id="checkFailureMessage" rows="2" [(ngModel)]="draft.parameters!.failureMessage"
+              (ngModelChange)="onChanged()"></textarea>
+          </div>
+          <div class="check-editor-field">
+            <label for="checkCode">Code</label>
+            <input id="checkCode" type="text" [(ngModel)]="draft.parameters!.code" (ngModelChange)="onChanged()"
+              maxlength="128" autocomplete="off" aria-describedby="checkCodeError">
+            <span id="checkCodeError" class="check-editor-error">
+              @for (error of errors('parameters.code'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+
+          <div class="check-editor-children">
+            <h5>Checks to combine</h5>
+            <span class="check-editor-error" role="alert">
+              @for (error of errors('parameters.checks'); track $index) { {{ error.message }} }
+            </span>
+            @for (child of draft.parameters!.checks; track $index; let childIndex = $index) {
+              <fieldset class="check-editor-child">
+                <legend>Check {{ childIndex + 1 }}</legend>
+                <div class="check-editor-grid">
+                  <div class="check-editor-field check-editor-field--wide">
+                    <label [for]="'childId' + childIndex">Id</label>
+                    <input [id]="'childId' + childIndex" type="text" [(ngModel)]="child.id" (ngModelChange)="onChanged()"
+                      maxlength="128" autocomplete="off" [attr.aria-invalid]="childErrors(childIndex, 'id').length > 0">
+                    <span class="check-editor-error">
+                      @for (error of childErrors(childIndex, 'id'); track $index) { {{ error.message }} }
+                    </span>
+                  </div>
+                  <div class="check-editor-field">
+                    <label [for]="'childType' + childIndex">Type</label>
+                    <select [id]="'childType' + childIndex" [(ngModel)]="child.type"
+                      (ngModelChange)="onChildTypeChanged(childIndex)">
+                      @for (type of childTypes; track type) {
+                        <option [value]="type">{{ checkTypeLabel(type) }}</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                @switch (childKind(child)) {
+                  @case ('expression') {
+                    <div class="check-editor-field check-editor-field--block">
+                      <label [for]="'childExpression' + childIndex">FHIRPath expression</label>
+                      <textarea [id]="'childExpression' + childIndex" rows="2" class="rubric-mono" spellcheck="false"
+                        [(ngModel)]="child.parameters!.expression" (ngModelChange)="onChanged()"
+                        [attr.aria-invalid]="childErrors(childIndex, 'parameters.expression').length > 0"></textarea>
+                      <span class="check-editor-error">
+                        @for (error of childErrors(childIndex, 'parameters.expression'); track $index) { {{ error.message }} }
+                      </span>
+                    </div>
+                  }
+                  @case ('valueset') {
+                    <div class="check-editor-field check-editor-field--block">
+                      <label [for]="'childPath' + childIndex">Path</label>
+                      <input [id]="'childPath' + childIndex" type="text" class="rubric-mono" spellcheck="false"
+                        [(ngModel)]="child.parameters!.path" (ngModelChange)="onChanged()" autocomplete="off"
+                        [attr.aria-invalid]="childErrors(childIndex, 'parameters.path').length > 0">
+                      <span class="check-editor-error">
+                        @for (error of childErrors(childIndex, 'parameters.path'); track $index) { {{ error.message }} }
+                      </span>
+                    </div>
+                    <div class="check-editor-field check-editor-field--block">
+                      <label [for]="'childValueSet' + childIndex">Value set</label>
+                      <input [id]="'childValueSet' + childIndex" type="text" class="rubric-mono" spellcheck="false"
+                        [(ngModel)]="child.parameters!.valueSet" (ngModelChange)="onChanged()" autocomplete="off"
+                        [attr.aria-invalid]="childErrors(childIndex, 'parameters.valueSet').length > 0">
+                      <span class="check-editor-error">
+                        @for (error of childErrors(childIndex, 'parameters.valueSet'); track $index) { {{ error.message }} }
+                      </span>
+                    </div>
+                    <div class="check-editor-field check-editor-field--block">
+                      <label [for]="'childSystem' + childIndex">Code system</label>
+                      <input [id]="'childSystem' + childIndex" type="text" class="rubric-mono" spellcheck="false"
+                        [(ngModel)]="child.parameters!.system" (ngModelChange)="onChanged()" autocomplete="off"
+                        [attr.aria-invalid]="childErrors(childIndex, 'parameters.system').length > 0">
+                      <span class="check-editor-error">
+                        @for (error of childErrors(childIndex, 'parameters.system'); track $index) { {{ error.message }} }
+                      </span>
+                    </div>
+                  }
+                  @case ('conformance') {
+                    <div class="check-editor-field check-editor-field--block">
+                      <label [for]="'childProfiles' + childIndex">Profiles</label>
+                      <textarea [id]="'childProfiles' + childIndex" rows="2" class="rubric-mono" spellcheck="false"
+                        [(ngModel)]="childProfilesText[childIndex]" (ngModelChange)="onChildProfilesChanged(childIndex)"></textarea>
+                      <span class="check-editor-help">One URL to a line. Empty checks each resource against its own profile.</span>
+                      <span class="check-editor-error">
+                        @for (error of childErrors(childIndex, 'parameters.profiles'); track $index) { {{ error.message }} }
+                      </span>
+                    </div>
+                  }
+                  @case ('terminology') {
+                    <div class="check-editor-field check-editor-field--block">
+                      <label [for]="'childRegex' + childIndex">Only value sets matching</label>
+                      <input [id]="'childRegex' + childIndex" type="text" class="rubric-mono" spellcheck="false"
+                        [(ngModel)]="child.parameters!.valueSetWhitelistRegex" (ngModelChange)="onChanged()" autocomplete="off">
+                      <span class="check-editor-error">
+                        @for (error of childErrors(childIndex, 'parameters.valueSetWhitelistRegex'); track $index) { {{ error.message }} }
+                      </span>
+                    </div>
+                  }
+                }
+
+                <button type="button" class="rubric-button check-editor-remove" (click)="removeChild(childIndex)"
+                  [attr.aria-label]="'Remove check ' + (childIndex + 1)">
+                  Remove
+                </button>
+              </fieldset>
+            }
+            <button type="button" class="rubric-button" (click)="addChild()">Add a check to combine</button>
+          </div>
+        }
+
+        @case ('conformance') {
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkProfiles">Profiles</label>
+            <textarea id="checkProfiles" rows="4" class="rubric-mono" spellcheck="false" [(ngModel)]="profilesText"
+              (ngModelChange)="onProfilesChanged()" [attr.aria-invalid]="errors('parameters.profiles').length > 0"
+              aria-describedby="checkProfilesHelp checkProfilesError"></textarea>
+            <span id="checkProfilesHelp" class="check-editor-help">
+              One profile URL to a line. Leave empty to check each resource against the profile it declares.
+            </span>
+            <span id="checkProfilesError" class="check-editor-error">
+              @for (error of errors('parameters.profiles'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+        }
+
+        @case ('terminology') {
+          <div class="check-editor-field">
+            <label for="checkValidateCodings">Validate codings</label>
+            <select id="checkValidateCodings" [ngModel]="validateCodings" (ngModelChange)="onValidateCodingsChanged($event)">
+              <option value="">Not set</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div class="check-editor-field check-editor-field--block">
+            <label for="checkRegex">Only value sets matching</label>
+            <input id="checkRegex" type="text" class="rubric-mono" spellcheck="false"
+              [(ngModel)]="draft.parameters!.valueSetWhitelistRegex" (ngModelChange)="onChanged()" autocomplete="off"
+              [attr.aria-invalid]="errors('parameters.valueSetWhitelistRegex').length > 0"
+              aria-describedby="checkRegexHelp checkRegexError">
+            <span id="checkRegexHelp" class="check-editor-help">
+              A regular expression on the value set's URL. Leave empty to check every value set.
+            </span>
+            <span id="checkRegexError" class="check-editor-error">
+              @for (error of errors('parameters.valueSetWhitelistRegex'); track $index) { {{ error.message }} }
+            </span>
+          </div>
+        }
+      }
+    </fieldset>
+
+    <div class="check-editor-actions">
+      @if (showIssues && issues.length > 0) {
+        <span class="check-editor-error" role="status">
+          This check has {{ issues.length === 1 ? 'a problem' : issues.length + ' problems' }}. The draft cannot be saved
+          until {{ issues.length === 1 ? 'it is' : 'they are' }} fixed.
+        </span>
+        <button type="button" class="rubric-button" (click)="apply(true)">Apply anyway</button>
+      }
+      <button type="button" class="rubric-button" (click)="cancel()">Cancel</button>
+      <button type="button" class="rubric-button rubric-button--primary" (click)="apply()">
+        {{ adding ? 'Add check' : 'Apply' }}
+      </button>
+    </div>
+  }
+</section>

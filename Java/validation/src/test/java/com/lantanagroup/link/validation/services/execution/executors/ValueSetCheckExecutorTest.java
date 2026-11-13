@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ValueSetCheckExecutorTest {
@@ -77,7 +79,48 @@ class ValueSetCheckExecutorTest {
 
         assertThat(findings).hasSize(1);
         assertThat(findings.get(0).getCode()).isEqualTo("valueset-membership-failed");
-        assertThat(findings.get(0).getLocation()).isEqualTo("Observation.code");
+        assertThat(findings.get(0).getLocation()).isEqualTo("Observation");
+        assertThat(findings.get(0).getExpression()).isEqualTo("Observation.code");
+    }
+
+    @Test
+    @DisplayName("each finding names the bundle entry it is about, not the check's path")
+    void findingsNameTheirResource() {
+        IValidationSupport.CodeValidationResult notMember = mock(IValidationSupport.CodeValidationResult.class);
+        when(notMember.isOk()).thenReturn(false);
+        IValidationSupport.CodeValidationResult member = mock(IValidationSupport.CodeValidationResult.class);
+        when(member.isOk()).thenReturn(true);
+        when(chain.validateCode(any(), any(), eq("http://loinc.org"), eq("9999-9"), any(), eq("http://x/vs"))).thenReturn(notMember);
+        when(chain.validateCode(any(), any(), eq("http://loinc.org"), eq("1234-5"), any(), eq("http://x/vs"))).thenReturn(member);
+
+        Observation good = new Observation();
+        good.setId("good");
+        good.getCode().addCoding(new Coding("http://loinc.org", "1234-5", null));
+        Observation bad = new Observation();
+        bad.setId("bad");
+        bad.getCode().addCoding(new Coding("http://loinc.org", "9999-9", null));
+        ExecutionContext context = ExecutionContext.builder().bundleEntries(List.of(good, bad)).build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"), context);
+
+        assertThat(findings).extracting(RawFinding::getLocation).containsExactly("Observation/bad");
+    }
+
+    @Test
+    @DisplayName("in a bundle, the path is evaluated only on entries of the type it starts with")
+    void onlyEntriesOfThePathsTypeAreEvaluated() {
+        IFhirPath fhirPath = mock(IFhirPath.class);
+        when(fhirPath.evaluate(any(), any(String.class), eq(org.hl7.fhir.instance.model.api.IBase.class))).thenReturn(List.of());
+        ValueSetCheckExecutor filtering = new ValueSetCheckExecutor(fhirPath, chain, new ObjectMapper(), registryProvider);
+        Observation observation = new Observation();
+        org.hl7.fhir.r4.model.Patient patient = new org.hl7.fhir.r4.model.Patient();
+        ExecutionContext context = ExecutionContext.builder().bundleEntries(List.of(patient, observation, patient)).build();
+
+        filtering.execute(check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"), context);
+
+        verify(fhirPath).evaluate(eq(observation), eq("Observation.code"), any());
+        verify(fhirPath, never()).evaluate(eq(patient), any(String.class), any());
     }
 
     @Test
@@ -154,6 +197,21 @@ class ValueSetCheckExecutorTest {
         assertThat(executor.execute(
                 check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"),
                 contextWithCoding("http://loinc.org", "1234-5"))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("membership is asked with system and code only, never the coding's display")
+    void membershipIsAskedWithoutDisplay() {
+        IValidationSupport.CodeValidationResult member = mock(IValidationSupport.CodeValidationResult.class);
+        when(member.isOk()).thenReturn(true);
+        when(chain.validateCode(any(), any(), eq("http://loinc.org"), eq("6690-2"), eq(null), eq("http://x/vs")))
+                .thenReturn(member);
+
+        assertThat(executor.execute(
+                check("{\"path\":\"Observation.code\",\"valueSet\":\"http://x/vs\"}"),
+                contextWithCoding("http://loinc.org", "6690-2"))).isEmpty();
+
+        verify(chain, never()).validateCode(any(), any(), any(), any(), eq("display"), any());
     }
 
     @Test

@@ -19,13 +19,18 @@ import java.util.Set;
 public class ApplicableContextValidator {
 
     private static final Set<String> ALLOWED_KEYS = Set.of("fhirResources", "workflowTags");
-    private static final int MAX_ENTRIES = 50;
+    public static final int MAX_ENTRIES = 50;
     private static final int MAX_WORKFLOW_TAG_LENGTH = 128;
 
     private final Set<String> fhirResourceTypes;
 
     public ApplicableContextValidator(FhirContext fhirContext) {
         this.fhirResourceTypes = Set.copyOf(fhirContext.getResourceTypes());
+    }
+
+    /** The FHIR resource types {@code fhirResources} accepts. */
+    public Set<String> getFhirResourceTypes() {
+        return fhirResourceTypes;
     }
 
     public void validate(JsonNode applicableContext, List<String> errors) {

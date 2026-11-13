@@ -191,12 +191,22 @@ public class ResourcesAcquiredListener : BackgroundService
     /// </remarks>
     public async Task ConsumeMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken consumeCancellationToken)
     {
+        using var stage = PipelineStageLog.Start(_logger,
+            PipelineStageLog.PhasedStage("Normalization", result?.Message?.Value?.QueryType), result,
+            result?.Message?.Key?.FacilityId,
+            result?.Message?.Key?.PatientId,
+            TryGetCorrelationId(result?.Message),
+            result?.Message?.Value?.ScheduledReports?.Select(sr => sr.ReportTrackingId),
+            result?.Message?.Value?.QueryType);
         try
         {
-            await ProcessMessageAsync(result, consumeCancellationToken);
+            stage.Outcome = await ProcessMessageAsync(result, consumeCancellationToken)
+                ? PipelineStageOutcome.Completed
+                : PipelineStageOutcome.Skipped;
         }
         catch (DeadLetterException ex)
         {
+            stage.Outcome = PipelineStageOutcome.DeadLettered;
             _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
 
             // Terminal failure: the message is on ResourcesAcquired-Error and will never be normalized,
@@ -209,21 +219,26 @@ public class ResourcesAcquiredListener : BackgroundService
         }
         catch (TransientException ex)
         {
+            stage.Outcome = PipelineStageOutcome.Retried;
             _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
         }
         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
         {
+            stage.Outcome = PipelineStageOutcome.Cancelled;
             throw;
         }
         catch (Exception ex)
         {
+            stage.Outcome = PipelineStageOutcome.Retried;
             _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
 
             _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
         }
     }
 
-    public async Task ProcessMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken cancellationToken)
+    /// <returns><c>true</c> when the message was normalized; <c>false</c> when it was skipped because its
+    /// facility or every one of its reports was aborted.</returns>
+    public async Task<bool> ProcessMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken cancellationToken)
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
@@ -244,7 +259,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     facilityId.SanitizeForLog(),
                     correlationId.SanitizeForLog());
                 await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
-                return;
+                return false;
             }
 
             var remaining = new List<ScheduledReport>();
@@ -262,7 +277,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     facilityId.SanitizeForLog(),
                     correlationId.SanitizeForLog());
                 await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
-                return;
+                return false;
             }
 
             result.Message.Value.ScheduledReports = remaining;
@@ -447,6 +462,7 @@ public class ResourcesAcquiredListener : BackgroundService
             cancellationToken);
 
         await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+        return true;
     }
 
     private static List<HSLOCMappingResult> BuildHSLOCMappingResults(string facilityId, DomainResource resource, OperationResult? operationResult)
@@ -708,6 +724,13 @@ public class ResourcesAcquiredListener : BackgroundService
     public void Cancel()
     {
         this._cancelled = true;
+    }
+
+    /// <summary>The correlation id header, or null when it is missing; for logging only.</summary>
+    private static string? TryGetCorrelationId(Message<ResourceKey, ResourcesAcquiredValue>? message)
+    {
+        var bytes = message?.Headers?.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
+        return bytes is { Length: > 0 } ? Encoding.UTF8.GetString(bytes) : null;
     }
 
     private string ExtractCorrelationId(Message<ResourceKey, ResourcesAcquiredValue> message)

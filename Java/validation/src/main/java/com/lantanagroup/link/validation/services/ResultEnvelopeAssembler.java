@@ -72,10 +72,10 @@ public class ResultEnvelopeAssembler {
             findingEntities.add(RubricFinding.builder()
                     .checkId(r.getCheckId())
                     .dimension(r.getDimension())
-                    // Effective severity, so persisted findings reconcile with the persisted status.
-                    // The pre-override severity is reported in the response but not stored; keeping
-                    // both would need a schema change.
+                    // Effective severity, so persisted findings reconcile with the persisted status, and the
+                    // pre-override severity, so they also reconcile with the summary counts.
                     .severity(f.effectiveSeverity())
+                    .originalSeverity(f.originalSeverity())
                     .code(r.getCode())
                     .message(r.getMessage())
                     .location(r.getLocation())

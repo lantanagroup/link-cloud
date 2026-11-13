@@ -141,6 +141,8 @@ authentication:
 link:
   info-route: /api/validation/info
   bundle-validation-parallelism: 4
+  # Resource types the legacy validator does not validate.
+  validation-excluded-resource-types: []
   terminology-service-url: ''
   rubric:
     max-payload-bytes: 262144

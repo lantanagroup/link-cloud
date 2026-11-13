@@ -8,6 +8,7 @@
 		<RootNamespace>LantanaGroup.Link.Terminology</RootNamespace>
 		<Version>0.8.1</Version>
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+		<UserSecretsId>cd8c8892-a1cb-4073-8ffc-e903cd2ee4d2</UserSecretsId>
 	</PropertyGroup>
 
 	<PropertyGroup>

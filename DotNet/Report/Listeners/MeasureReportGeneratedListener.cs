@@ -88,25 +88,35 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
+                            var value = result?.Message?.Value;
+                            using var stage = PipelineStageLog.Start(_logger, "ReportAggregation", result,
+                                value?.FacilityId, value?.PatientId,
+                                PipelineStageLog.Header(result?.Message?.Headers, "X-Correlation-Id"),
+                                [value?.ReportTrackingId], value?.ReportType);
                             try
                             {
                                 facilityId = result.Message.Value.FacilityId;
                                 await ProcessMessageAsync(result, facilityId, consumeCancellationToken);
+                                stage.Outcome = PipelineStageOutcome.Completed;
                             }
                             catch (DeadLetterException ex)
                             {
+                                stage.Outcome = PipelineStageOutcome.DeadLettered;
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
+                                stage.Outcome = PipelineStageOutcome.Retried;
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
+                                stage.Outcome = PipelineStageOutcome.Cancelled;
                                 throw;
                             }
                             catch (Exception ex)
                             {
+                                stage.Outcome = PipelineStageOutcome.DeadLettered;
                                 _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId);
                             }
                             finally

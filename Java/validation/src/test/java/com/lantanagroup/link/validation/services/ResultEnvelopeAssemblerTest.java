@@ -265,8 +265,8 @@ class ResultEnvelopeAssemblerTest {
     }
 
     @Test
-    @DisplayName("summary counts stay on the pre-override severities while the persisted finding stores the effective one")
-    void summaryCountsPreOverrideAndEntityStoresEffective() {
+    @DisplayName("summary counts stay on the pre-override severities; the persisted finding stores both")
+    void summaryCountsPreOverrideAndEntityStoresBoth() {
         RawFinding raw = finding(301L, PiqiDimension.CONFORMANCE, Severity.ERROR, "e1");
 
         ResultEnvelopeAssembler.AssembleOutput out = assembler.assemble(
@@ -276,6 +276,7 @@ class ResultEnvelopeAssemblerTest {
         assertThat(out.envelope().getSummary().getErrorCount()).isEqualTo(1);
         assertThat(out.envelope().getSummary().getWarningCount()).isZero();
         assertThat(out.findingEntities().get(0).getSeverity()).isEqualTo(Severity.WARNING);
+        assertThat(out.findingEntities().get(0).getOriginalSeverity()).isEqualTo(Severity.ERROR);
     }
 
     @Test

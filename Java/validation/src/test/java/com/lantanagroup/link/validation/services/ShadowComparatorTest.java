@@ -48,7 +48,7 @@ class ShadowComparatorTest {
         Result modern = result(OperationOutcome.IssueSeverity.ERROR, "loc");
 
         comparator.compareAndLog("corr-1", REQUEST_ID, "facility-1", "patient-1", "report-1", "rubric-1",
-                true, List.of(legacy), List.of(modern));
+                true, true, true, List.of(legacy), List.of(modern));
 
         ArgumentCaptor<ShadowComparisonResult> captor = ArgumentCaptor.forClass(ShadowComparisonResult.class);
         verify(shadowComparisonResultRepository).save(captor.capture());
@@ -77,7 +77,7 @@ class ShadowComparatorTest {
         Result modernExtra = result(OperationOutcome.IssueSeverity.WARNING, "other-loc");
 
         comparator.compareAndLog("corr-2", REQUEST_ID, "facility-1", "patient-1", "report-2", "rubric-1",
-                false, List.of(legacy), List.of(modernExtra));
+                false, false, null, List.of(legacy), List.of(modernExtra));
 
         ArgumentCaptor<ShadowComparisonResult> captor = ArgumentCaptor.forClass(ShadowComparisonResult.class);
         verify(shadowComparisonResultRepository).save(captor.capture());

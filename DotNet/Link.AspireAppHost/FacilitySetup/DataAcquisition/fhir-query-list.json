@@ -1,0 +1,36 @@
+{
+  "facilityId": "{{facilityId}}",
+  "fhirBaseServerUrl": "{{fhirServerBaseUrl}}",
+  "ehrPatientLists": [
+    {
+      "Status": "Admit",
+      "TimeFrame": "LessThan24Hours",
+      "FhirId": "Stu3multi-NamitaPatientsadmit1below24"
+    },
+    {
+      "Status": "Admit",
+      "TimeFrame": "Between24To48Hours",
+      "FhirId": "Stu3multi-NamitaPatientsadmit124to48"
+    },
+    {
+      "Status": "Admit",
+      "TimeFrame": "MoreThan48Hours",
+      "FhirId": "Stu3multi-NamitaPatientsadmit1over48"
+    },
+    {
+      "Status": "Discharge",
+      "TimeFrame": "LessThan24Hours",
+      "FhirId": "Stu3multi-NamitaPatientsdischarge1below24"
+    },
+    {
+      "Status": "Discharge",
+      "TimeFrame": "Between24To48Hours",
+      "FhirId": "Stu3multi-NamitaPatientsdischarge124-48"
+    },
+    {
+      "Status": "Discharge",
+      "TimeFrame": "MoreThan48Hours",
+      "FhirId": "Stu3multi-NamitaPatientsdischarge1over48"
+    }
+  ]
+}

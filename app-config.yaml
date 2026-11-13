@@ -1029,6 +1029,10 @@ services:
       description: "Resolved-rubric cache TTL in seconds. A backstop against missed invalidation; registering, publishing and retiring rubrics explicitly evict the cache."
       required: false
       defaultValue: "3600"
+    - key: "link.validation-excluded-resource-types"
+      description: "Resource types the legacy (HAPI) validator leaves out of each patient bundle, as a comma-separated list matched ignoring case, e.g. MeasureReport or MeasureReport,Device. Empty validates every entry. Findings still name each entry's position in the submitted bundle; the rubric engine is unaffected."
+      required: false
+      defaultValue: ""
     - key: "link.rubric.max-payload-bytes"
       description: "Maximum rubric-definition upload size in bytes (256 KiB). Enforced for both Content-Length and streamed bodies; does not limit the FHIR payload sent for rubric validation."
       required: false

@@ -1,0 +1,25 @@
+{
+  "FacilityId": "{{facilityId}}",
+  "ResourceTypes": [
+    "Encounter"
+  ],
+  "Operation": {
+    "OperationType": "CodeMap",
+    "Name": "Encounter Class Code Map",
+    "Description": "Encounter Class Code Map Operation",
+    "FhirPath": "class",
+    "CodeSystemMaps": [
+      {
+        "SourceSystem": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+        "TargetSystem": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+        "CodeMaps": {
+          "ACUTE": {
+            "Code": "IMP",
+            "Display": "inpatient encounter"
+          }
+        }
+      }
+    ]
+  },
+  "VendorIds": []
+}

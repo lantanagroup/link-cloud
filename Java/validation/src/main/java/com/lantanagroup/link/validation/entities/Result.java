@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 @Getter
@@ -26,6 +28,7 @@ import java.util.function.Function;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Result {
     private static final Logger logger = LoggerFactory.getLogger(Result.class);
+    private static final Set<String> UNKNOWN_MESSAGE_IDS_LOGGED = ConcurrentHashMap.newKeySet();
 
     @Id
     @SequenceGenerator(name = "result_seq", sequenceName = "result_sequence", allocationSize = 100)
@@ -232,6 +235,9 @@ public class Result {
             case I18nConstants.EXT_VER_URL_NO_MATCH:
             case I18nConstants.EXT_VER_URL_NOT_ALLOWED:
             case I18nConstants.EXT_VER_URL_REVERSION:
+            case I18nConstants.EXTENSION_EXT_VERSION_INVALID:
+            case I18nConstants.EXTENSION_EXT_VERSION_INVALIDID:
+            case I18nConstants.EXTENSION_EXT_VERSION_NOTALLOWED:
             case I18nConstants.EXTENSION_EXT_SUBEXTENSION_INVALID:
             case I18nConstants.EXTENSION_EXT_URL_ABSOLUTE:
             case I18nConstants.EXTENSION_EXT_URL_NOTFOUND:
@@ -467,7 +473,10 @@ public class Result {
                     return OperationOutcome.IssueType.INVARIANT;
                 }
 
-                logger.warn("Unknown message ID: {}", messageId);
+                // Once per id per process: a single resource can produce thousands of findings with the same id.
+                if (UNKNOWN_MESSAGE_IDS_LOGGED.add(messageId)) {
+                    logger.warn("Unknown message ID: {} (its findings get issue type NULL; logged once per id)", messageId);
+                }
                 return OperationOutcome.IssueType.NULL;
         }
     }

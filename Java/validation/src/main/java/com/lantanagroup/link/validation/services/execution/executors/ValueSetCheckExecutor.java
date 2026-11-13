@@ -82,11 +82,9 @@ public class ValueSetCheckExecutor implements CheckExecutor {
         ValidationSupportContext supportContext = new ValidationSupportContext(validationSupportChain);
         ConceptValidationOptions options = new ConceptValidationOptions().setInferSystem(true);
 
-        List<IBaseResource> targets = context.getBundleEntries().isEmpty()
-                ? List.of(context.getResource())
-                : context.getBundleEntries();
+        List<IBaseResource> targets = targets(context, path);
 
-        log.info("VALUESET check '{}': evaluating FHIRPath '{}' on {} resource(s), then checking membership in value set {} via the ValidationSupportChain",
+        log.debug("VALUESET check '{}': evaluating FHIRPath '{}' on {} resource(s), then checking membership in value set {} via the ValidationSupportChain",
                 check.getCheckLocalId(), path, targets.size(), valueSet);
 
         int checked = 0;
@@ -103,7 +101,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                 continue;
             }
             if (!nodes.isEmpty()) {
-                log.info("VALUESET check '{}': FHIRPath '{}' matched {} node(s) on {}",
+                log.debug("VALUESET check '{}': FHIRPath '{}' matched {} node(s) on {}",
                         check.getCheckLocalId(), path, nodes.size(), resource.fhirType());
             }
             for (IBase node : nodes) {
@@ -115,21 +113,26 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                     checked++;
                     IValidationSupport.CodeValidationResult result;
                     try {
-                        result = validationSupportChain.validateCode(supportContext, options, system, code, display, valueSet);
+                        // Membership is a question about system and code; the display is not sent. Given a display,
+                        // $validate-code asks whether the code *and* the display are valid, and a terminology server
+                        // answers result=false for a member code whose display differs from its own (FHIR R4), which
+                        // this check would report as "not in value set". HAPI's own default is the same:
+                        // ConceptValidationOptions doesn't validate displays unless asked.
+                        result = validationSupportChain.validateCode(supportContext, options, system, code, null, valueSet);
                     } catch (Exception e) {
-                        log.info("VALUESET check '{}': validateCode threw for {}|{} in {} — skipping this code: {}",
+                        log.debug("VALUESET check '{}': validateCode threw for {}|{} in {} — skipping this code: {}",
                                 check.getCheckLocalId(), system, code, valueSet, e.getMessage());
                         skipped++;
                         continue;
                     }
                     if (result == null) {
-                        log.info("VALUESET check '{}': no validation support could answer for code {}|{} against {} — SKIPPED (counts as pass)",
+                        log.debug("VALUESET check '{}': no validation support could answer for code {}|{} against {} — SKIPPED (counts as pass)",
                                 check.getCheckLocalId(), system, code, valueSet);
                         skipped++;
                         continue;
                     }
                     if (result.isOk()) {
-                        log.info("VALUESET check '{}': code {}|{} -> IS a member of {}",
+                        log.debug("VALUESET check '{}': code {}|{} -> IS a member of {}",
                                 check.getCheckLocalId(), system, code, valueSet);
                     } else if (UnresolvedBindingClassifier.isUnresolvable(result) && !validationSupportChain.isCodeSystemSupported(supportContext, system)) {
                         // The value set (or the code system behind it) could not be resolved, so
@@ -137,7 +140,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                         // resolution-failure message). Emit a "not evaluated" finding (INCONCLUSIVE,
                         // ignored by scoring) instead of a false membership error.
                         notEvaluated++;
-                        log.info("VALUESET check '{}': value set {} could not be resolved for code {}|{} -> NOT EVALUATED{}",
+                        log.debug("VALUESET check '{}': value set {} could not be resolved for code {}|{} -> NOT EVALUATED{}",
                                 check.getCheckLocalId(), valueSet, system, code,
                                 result.getMessage() != null ? " (" + result.getMessage() + ")" : "");
                         findings.add(RawFinding.builder()
@@ -148,12 +151,12 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                                 .code("binding-not-evaluated")
                                 .message(String.format("Value set %s could not be resolved; membership of code '%s'%s was not evaluated",
                                         valueSet, code, system != null ? " (" + system + ")" : ""))
-                                .location(path)
+                                .location(FindingLocation.of(resource))
                                 .expression(path)
                                 .build());
                     } else {
                         notMember++;
-                        log.info("VALUESET check '{}': code {}|{} -> NOT a member of {}{}",
+                        log.debug("VALUESET check '{}': code {}|{} -> NOT a member of {}{}",
                                 check.getCheckLocalId(), system, code, valueSet,
                                 result.getMessage() != null ? " (" + result.getMessage() + ")" : "");
                         findings.add(RawFinding.builder()
@@ -163,7 +166,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                                 .code("valueset-membership-failed")
                                 .message(String.format("Code '%s'%s is not in value set %s",
                                         code, system != null ? " (" + system + ")" : "", valueSet))
-                                .location(path)
+                                .location(FindingLocation.of(resource))
                                 .expression(path)
                                 .build());
                     }
@@ -173,6 +176,24 @@ public class ValueSetCheckExecutor implements CheckExecutor {
         log.info("VALUESET check '{}' done: {} code(s) checked against {}, {} not-a-member, {} not-evaluated, {} skipped -> {} finding(s)",
                 check.getCheckLocalId(), checked, valueSet, notMember, notEvaluated, skipped, findings.size());
         return findings;
+    }
+
+    /**
+     * The resources the path is evaluated on. In a bundle, only entries of the type the path starts with: the path
+     * selects nothing from any other entry, and evaluating it on every entry made each check cost as much as the
+     * whole bundle.
+     */
+    private static List<IBaseResource> targets(ExecutionContext context, String path) {
+        if (context.getBundleEntries().isEmpty()) {
+            return List.of(context.getResource());
+        }
+        String type = ExpressionTargets.onlyResourceType(path);
+        if (type == null) {
+            return context.getBundleEntries();
+        }
+        return context.getBundleEntries().stream()
+                .filter(resource -> type.equals(resource.fhirType()))
+                .toList();
     }
 
     private List<String[]> extractCodes(IBase node, String fallbackSystem) {

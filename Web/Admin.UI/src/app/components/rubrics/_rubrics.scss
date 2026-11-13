@@ -1,0 +1,159 @@
+@use '../../../styles/validation-theme.scss' as vt;
+
+// The mixins the rubric screens share. Only mixins belong here: a rule in this file would be copied into
+// every rubric component's stylesheet. The classes they share are in src/styles/rubrics.scss.
+
+@mixin rubric-page() {
+  background-color: vt.$vd-neutral-50;
+  min-height: 100%;
+  padding-bottom: 80px;
+}
+
+@mixin rubric-banner() {
+  background-image: url('/assets/backgrounds/bg-eggplant-md.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  padding: 35px vt.$vd-container-padding-x;
+  color: vt.$vd-neutral-0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 2rem;
+
+  .rubric-banner-kicker {
+    @include vt.vd-subheading-02();
+    text-transform: uppercase;
+
+    a {
+      color: vt.$vd-neutral-0;
+      text-decoration: underline;
+    }
+  }
+
+  .rubric-banner-heading {
+    @include vt.vd-heading-02();
+    margin-top: .5rem;
+    overflow-wrap: anywhere;
+  }
+
+  .rubric-banner-meta {
+    margin-top: .5rem;
+    font-family: vt.$vd-font-family-sans-serif;
+    overflow-wrap: anywhere;
+  }
+
+  .rubric-banner-actions {
+    display: flex;
+    gap: .75rem;
+    flex-shrink: 0;
+  }
+}
+
+@mixin rubric-body() {
+  margin: vt.$vd-container-margin-x;
+
+  h4 {
+    @include vt.vd-subheading-01();
+    margin-bottom: 1.25rem;
+  }
+}
+
+// The state of the page itself: loading, failed, or nothing to show.
+@mixin rubric-message() {
+  background-color: vt.$vd-neutral-0;
+  box-shadow: vt.$vd-box-shadow-sm;
+  padding: 2rem;
+  font-family: vt.$vd-font-family-sans-serif;
+
+  &.rubric-message--error {
+    border-left: solid 6px vt.$vd-error-800;
+  }
+
+  p {
+    margin: 0 0 .5rem 0;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+// Forms: the draft editor, the check editor and the import.
+
+@mixin rubric-form-grid() {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem 1.5rem;
+  align-items: start;
+}
+
+// A label above its control, with help and an error line below.
+@mixin rubric-form-field() {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  min-width: 0;
+
+  label {
+    font-weight: vt.$vd-font-weight-semibold;
+    font-size: .875rem;
+  }
+
+  input[type='text'],
+  input[type='search'],
+  select,
+  textarea {
+    padding: .375rem .5rem;
+    border: solid 1px vt.$vd-neutral-500;
+    background-color: vt.$vd-neutral-0;
+    font-size: 1rem;
+    box-sizing: border-box;
+    width: 100%;
+
+    &[aria-invalid='true'] {
+      border-color: vt.$vd-error-800;
+      outline: solid 1px vt.$vd-error-800;
+    }
+
+    &:disabled {
+      background-color: vt.$vd-neutral-100;
+      color: vt.$vd-neutral-700;
+    }
+  }
+
+  textarea {
+    resize: vertical;
+    font-family: inherit;
+
+    &.rubric-mono {
+      font-family: Consolas, 'Courier New', monospace;
+    }
+  }
+
+  &--wide {
+    grid-column: span 2;
+  }
+
+  &--block {
+    grid-column: 1 / -1;
+  }
+
+  &--checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: .5rem;
+    align-self: center;
+  }
+}
+
+@mixin rubric-form-help() {
+  font-size: .8125rem;
+  color: vt.$vd-neutral-700;
+}
+
+@mixin rubric-form-error() {
+  font-size: .875rem;
+  color: vt.$vd-error-800;
+  font-weight: vt.$vd-font-weight-semibold;
+
+  &:empty {
+    display: none;
+  }
+}

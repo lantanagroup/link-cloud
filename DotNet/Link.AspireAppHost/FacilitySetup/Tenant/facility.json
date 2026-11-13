@@ -1,0 +1,12 @@
+{
+  "FacilityId": "{{facilityId}}",
+  "FacilityName": "{{facilityName}}",
+  "TimeZone": "{{timeZone}}",
+  "ScheduledReports": {
+    "monthly": [
+      "{{measure}}"
+    ],
+    "daily": [],
+    "weekly": []
+  }
+}

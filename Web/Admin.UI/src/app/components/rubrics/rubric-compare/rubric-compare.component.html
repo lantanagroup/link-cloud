@@ -1,0 +1,171 @@
+<div class="rubric-compare">
+  <div class="rubric-compare-banner">
+    <div>
+      <div class="rubric-banner-kicker">
+        Configuration &gt; <a routerLink="/rubrics">Validation Rubrics</a>
+        &gt; <a [routerLink]="['/rubrics', rubricId]">{{ rubricId }}</a>
+      </div>
+      <h2 class="rubric-banner-heading">Compare versions · {{ rubric?.title || rubricId }}</h2>
+    </div>
+  </div>
+
+  <div class="rubric-compare-body">
+    @if (rubric && versions.length >= 2) {
+      <section class="rubric-compare-panel rubric-compare-choice" aria-label="Versions to compare">
+        <div class="rubric-compare-field">
+          <label for="compareFrom">From</label>
+          <select id="compareFrom" [(ngModel)]="from" (ngModelChange)="choose()">
+            @for (version of versions; track version.semver) {
+              <option [value]="version.semver">{{ describe(version) }}</option>
+            }
+          </select>
+        </div>
+        <button type="button" class="rubric-button" (click)="swap()" aria-label="Swap the two versions">Swap</button>
+        <div class="rubric-compare-field">
+          <label for="compareTo">To</label>
+          <select id="compareTo" [(ngModel)]="to" (ngModelChange)="choose()">
+            @for (version of versions; track version.semver) {
+              <option [value]="version.semver">{{ describe(version) }}</option>
+            }
+          </select>
+        </div>
+      </section>
+    }
+
+    @if (loading) {
+      <div class="rubric-message">
+        <mat-spinner diameter="32" aria-label="Loading versions"></mat-spinner>
+      </div>
+    } @else if (notFound) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The rubric or one of the versions does not exist.</strong></p>
+        <p><a class="rubric-link" [routerLink]="['/rubrics', rubricId]">Back to the rubric</a></p>
+      </div>
+    } @else if (error) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The versions could not be loaded.</strong></p>
+        <p>{{ error }}</p>
+      </div>
+    } @else if (rubric && versions.length < 2) {
+      <div class="rubric-message">
+        <p><strong>This rubric has only one version, so there is nothing to compare it with.</strong></p>
+        <p><a class="rubric-link" [routerLink]="['/rubrics', rubricId]">Back to the rubric</a></p>
+      </div>
+    } @else if (sameVersion) {
+      <div class="rubric-message">
+        <p><strong>Choose two different versions.</strong></p>
+      </div>
+    } @else if (before && after && !comparison) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The definition of one of these versions could not be read.</strong></p>
+      </div>
+    } @else if (comparison; as diff) {
+      <section class="rubric-compare-panel" aria-labelledby="compareSummaryHeading">
+        <h4 id="compareSummaryHeading">
+          <a class="rubric-link" [routerLink]="['/rubrics', rubricId, 'versions', from]">{{ from }}</a>
+          to
+          <a class="rubric-link" [routerLink]="['/rubrics', rubricId, 'versions', to]">{{ to }}</a>
+        </h4>
+        @if (diff.identical) {
+          <p><strong>These two versions have the same settings and the same checks.</strong></p>
+        } @else {
+          <p class="rubric-compare-counts">
+            {{ diff.settings.length }} {{ diff.settings.length === 1 ? 'setting' : 'settings' }} changed
+            · {{ diff.added.length }} {{ diff.added.length === 1 ? 'check' : 'checks' }} added
+            · {{ diff.removed.length }} removed
+            · {{ diff.changed.length }} changed
+            · {{ diff.unchangedCount }} unchanged
+          </p>
+          @if (diff.reordered) {
+            <p>The checks both versions have run in a different order.</p>
+          }
+        }
+      </section>
+
+      @if (diff.settings.length > 0) {
+        <section class="rubric-compare-panel" aria-labelledby="compareSettingsHeading">
+          <h4 id="compareSettingsHeading">Settings changed</h4>
+          <table class="rubric-compare-table" aria-label="Settings changed">
+            <thead>
+              <tr><th>Setting</th><th>{{ from }}</th><th>{{ to }}</th></tr>
+            </thead>
+            <tbody>
+              @for (change of diff.settings; track change.label) {
+                <tr>
+                  <th scope="row">{{ change.label }}</th>
+                  <td class="rubric-compare-before">{{ change.before || '—' }}</td>
+                  <td class="rubric-compare-after">{{ change.after || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+
+      @if (diff.added.length > 0) {
+        <section class="rubric-compare-panel" aria-labelledby="compareAddedHeading">
+          <h4 id="compareAddedHeading">Checks added ({{ diff.added.length }})</h4>
+          <table class="rubric-compare-table" aria-label="Checks added">
+            <thead>
+              <tr><th>Check</th><th>Type</th><th>Tests</th></tr>
+            </thead>
+            <tbody>
+              @for (check of diff.added; track check.id) {
+                <tr>
+                  <td class="rubric-mono">{{ check.id }}</td>
+                  <td>{{ checkTypeLabel(check.type) }}</td>
+                  <td class="rubric-mono rubric-compare-after">{{ checkSummary(check) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+
+      @if (diff.removed.length > 0) {
+        <section class="rubric-compare-panel" aria-labelledby="compareRemovedHeading">
+          <h4 id="compareRemovedHeading">Checks removed ({{ diff.removed.length }})</h4>
+          <table class="rubric-compare-table" aria-label="Checks removed">
+            <thead>
+              <tr><th>Check</th><th>Type</th><th>Tested</th></tr>
+            </thead>
+            <tbody>
+              @for (check of diff.removed; track check.id) {
+                <tr>
+                  <td class="rubric-mono">{{ check.id }}</td>
+                  <td>{{ checkTypeLabel(check.type) }}</td>
+                  <td class="rubric-mono rubric-compare-before">{{ checkSummary(check) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+
+      @if (diff.changed.length > 0) {
+        <section class="rubric-compare-panel" aria-labelledby="compareChangedHeading">
+          <h4 id="compareChangedHeading">Checks changed ({{ diff.changed.length }})</h4>
+          <table class="rubric-compare-table" aria-label="Checks changed">
+            <thead>
+              <tr><th>Check</th><th>What</th><th>{{ from }}</th><th>{{ to }}</th></tr>
+            </thead>
+            <tbody>
+              @for (check of diff.changed; track check.id) {
+                @for (change of check.changes; track change.label; let first = $first) {
+                  <tr [class.rubric-compare-first]="first">
+                    @if (first) {
+                      <th scope="rowgroup" class="rubric-mono" [attr.rowspan]="check.changes.length">{{ check.id }}</th>
+                    }
+                    <td>{{ change.label }}</td>
+                    <td class="rubric-mono rubric-compare-before">{{ change.before || '—' }}</td>
+                    <td class="rubric-mono rubric-compare-after">{{ change.after || '—' }}</td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+    }
+  </div>
+</div>

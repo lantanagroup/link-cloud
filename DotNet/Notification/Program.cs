@@ -38,6 +38,7 @@ using System.Text;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
+using LantanaGroup.Link.Shared.Application.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -275,6 +276,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Logging using Serilog
     builder.Logging.AddSerilog();
     var loggerOptions = new ConfigurationReaderOptions { SectionName = NotificationConstants.AppSettingsSectionNames.Serilog };
+    // Names this instance on every line (Serilog:Properties:ServiceInstance), to tell scaled-out copies apart.
+    builder.Configuration.AddServiceInstanceLogProperty();
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")

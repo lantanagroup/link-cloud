@@ -272,6 +272,19 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         }
     }
 
+    private void LogAcquisitionStage(TailCompletionResult tailResult)
+    {
+        var started = tailResult.GroupStartedUtc;
+        var tookMs = started is { } s ? Math.Max(0, (long)(DateTime.UtcNow - s).TotalMilliseconds) : (long?)null;
+        using var stage = PipelineStageLog.Start(_logger,
+            PipelineStageLog.PhasedStage("Acquisition", tailResult.ResourcesAcquired.QueryType),
+            tailResult.FacilityId, tailResult.PatientId, tailResult.CorrelationId,
+            tailResult.ResourcesAcquired.ScheduledReports?.Select(r => r.ReportTrackingId),
+            tailResult.ResourcesAcquired.QueryType);
+        stage.TookMsOverride = tookMs;
+        stage.Outcome = PipelineStageOutcome.Completed;
+    }
+
     private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, bool isPerformanceMode, CancellationToken ct)
     {
         TailCompletionResult? tailResult = null;
@@ -378,6 +391,11 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
                 tailResult.FacilityId.SanitizeForLog(), tailResult.CorrelationId.SanitizeForLog());
+
+            // The acquisition stage's per-patient line. Its time runs from the group's first query log
+            // to now, so it spans every query the worker ran for this patient and phase; there is no
+            // Kafka wait to report, since the stage is not one message.
+            LogAcquisitionStage(tailResult);
         }
         catch (OperationCanceledException)
         {

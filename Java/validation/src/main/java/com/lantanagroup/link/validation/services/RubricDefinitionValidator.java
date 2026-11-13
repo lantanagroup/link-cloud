@@ -29,11 +29,11 @@ import java.util.regex.PatternSyntaxException;
 public class RubricDefinitionValidator {
 
     private static final int MAX_CODE_LENGTH = 128;
-    private static final int MAX_PROFILES = 20;
+    public static final int MAX_PROFILES = 20;
     private static final int MAX_SEMVER_LENGTH = 32;
-    private static final int MAX_COMBINATOR_CHECKS = 20;
-    private static final int MAX_COMBINATOR_DEPTH = 5;
-    private static final Set<String> COMBINATOR_MATCH_MODES = Set.of("ANY", "ALL");
+    public static final int MAX_COMBINATOR_CHECKS = 20;
+    public static final int MAX_COMBINATOR_DEPTH = 5;
+    public static final Set<String> COMBINATOR_MATCH_MODES = Set.of("ANY", "ALL");
 
     // Allowed parameter keys per check type (Rubric JSON Field Reference §6); unknown keys rejected.
     private static final Map<CheckType, Set<String>> ALLOWED_PARAMETER_KEYS = Map.of(
@@ -73,6 +73,20 @@ public class RubricDefinitionValidator {
         this.scoringPolicyValidator = scoringPolicyValidator;
         this.applicableContextValidator = applicableContextValidator;
         this.maxChecks = maxChecks;
+    }
+
+    /** The parameter keys a check of this type accepts; any other key is rejected. */
+    public static Set<String> allowedParameterKeys(CheckType type) {
+        return ALLOWED_PARAMETER_KEYS.getOrDefault(type, Set.of());
+    }
+
+    /** The dimension a check of this type must use, or null when it may use any the rubric declares. */
+    public static PiqiDimension requiredDimension(CheckType type) {
+        return REQUIRED_DIMENSION_BY_TYPE.get(type);
+    }
+
+    public int getMaxChecks() {
+        return maxChecks;
     }
 
     public void validate(RubricVersionPayloadDto payload) {

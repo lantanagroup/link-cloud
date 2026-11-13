@@ -1,0 +1,344 @@
+<div class="rubric-version">
+  <div class="rubric-version-banner">
+    <div>
+      <div class="rubric-banner-kicker">
+        Configuration &gt; <a routerLink="/rubrics">Validation Rubrics</a>
+        &gt; <a [routerLink]="['/rubrics', rubricId]">{{ rubricId }}</a>
+      </div>
+      <h2 class="rubric-banner-heading">{{ title }} · {{ version?.semver || semver }}</h2>
+      @if (version) {
+        <div class="rubric-banner-meta">
+          <span [class]="statusChipClass">{{ statusLabel(version.status) }}</span>
+          @if (isActive) {
+            <span class="rubric-chip rubric-chip--active">Active</span>
+          }
+          <span class="rubric-mono" title="Checksum of this version's definition">{{ version.checksum }}</span>
+        </div>
+      }
+    </div>
+    @if (version?.definition) {
+      <div class="rubric-banner-actions">
+        @if (version?.status === 'DRAFT') {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'versions', version!.semver, 'edit']">
+            Edit
+          </a>
+        } @else {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'versions', 'new']"
+            [queryParams]="{ from: version!.semver }">
+            New version from this
+          </a>
+        }
+        @if (version?.status !== 'RETIRED') {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'versions', version!.semver, 'dry-run']">
+            Dry run
+          </a>
+        }
+        @if (compareWith) {
+          <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', rubricId, 'compare']"
+            [queryParams]="{ from: compareWith, to: version!.semver }">
+            Compare with {{ compareWith }}
+          </a>
+        }
+        <button type="button" class="rubric-button rubric-button--on-banner" [disabled]="exporting !== null"
+          (click)="export('yaml')">
+          {{ exporting === 'yaml' ? 'Exporting…' : 'Export YAML' }}
+        </button>
+        <button type="button" class="rubric-button rubric-button--on-banner" [disabled]="exporting !== null"
+          (click)="export('json')">
+          {{ exporting === 'json' ? 'Exporting…' : 'Export JSON' }}
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="rubric-version-body">
+    @if (loading) {
+      <div class="rubric-message">
+        <mat-spinner diameter="32" aria-label="Loading version"></mat-spinner>
+      </div>
+    } @else if (notFound) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The rubric "{{ rubricId }}" has no version {{ semver }}.</strong></p>
+        <p><a class="rubric-link" [routerLink]="['/rubrics', rubricId]">Back to the rubric</a></p>
+      </div>
+    } @else if (error) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The version could not be loaded.</strong></p>
+        <p>{{ error }}</p>
+      </div>
+    } @else if (version) {
+      @if (exportError) {
+        <div class="rubric-message rubric-message--error rubric-version-export-error" role="alert">
+          <p><strong>The definition could not be exported.</strong></p>
+          <p>{{ exportError }}</p>
+        </div>
+      }
+      @if (notice) {
+        <div class="rubric-message rubric-version-notice" role="status">
+          <p><strong>{{ notice }}</strong></p>
+        </div>
+      }
+
+      @if (plan) {
+        <section class="rubric-action" [class.rubric-action--danger]="plan.action !== 'publish'"
+          aria-labelledby="rubricActionHeading">
+          <h3 id="rubricActionHeading">{{ plan.heading }}</h3>
+
+          @if (plan.action === 'publish') {
+            <p class="rubric-action-facts">
+              {{ checks.length }} {{ checks.length === 1 ? 'check' : 'checks' }}, {{ enabledCheckCount }} enabled
+              · Dry run: {{ dryRunLabel(version) }}
+              @if (version.dryRunCompletedAt) {
+                <span class="rubric-muted">{{ version.dryRunCompletedAt | date: 'medium' }}</span>
+              }
+            </p>
+          }
+
+          @if (plan.blocked) {
+            <p class="rubric-action-blocked" role="alert">
+              <strong>{{ plan.blocked }}</strong>
+              @if (plan.needsDryRun) {
+                <a class="rubric-link" [routerLink]="['/rubrics', rubricId, 'versions', version.semver, 'dry-run']">Run a dry run</a>
+              }
+            </p>
+          } @else {
+            <ul class="rubric-action-consequences">
+              @for (consequence of plan.consequences; track consequence) {
+                <li>{{ consequence }}</li>
+              }
+            </ul>
+            @for (warning of plan.warnings; track warning) {
+              <p class="rubric-action-warning">{{ warning }}</p>
+            }
+            @if (plan.typeToConfirm) {
+              <div class="rubric-action-type">
+                <label for="rubricActionConfirm">
+                  Type the rubric's id, <span class="rubric-mono">{{ plan.typeToConfirm }}</span>, to go ahead
+                </label>
+                <input id="rubricActionConfirm" type="text" autocomplete="off" spellcheck="false" [(ngModel)]="confirmText">
+              </div>
+            }
+          }
+
+          @if (actionError) {
+            <p class="rubric-action-blocked" role="alert"><strong>{{ actionError }}</strong></p>
+          }
+
+          <div class="rubric-action-buttons">
+            @if (!plan.blocked) {
+              <button type="button" class="rubric-button rubric-button--primary" [disabled]="!canConfirm" (click)="confirm()">
+                {{ acting ? 'Working…' : plan.confirmLabel }}
+              </button>
+            }
+            <button type="button" class="rubric-button" (click)="cancelAction()">
+              {{ plan.blocked ? 'Close' : 'Cancel' }}
+            </button>
+          </div>
+        </section>
+      }
+
+      <dl class="rubric-version-facts">
+        <div>
+          <dt>Saved</dt>
+          <dd>{{ version.createdAt | date: 'medium' }} <span class="rubric-muted">{{ version.createdBy }}</span></dd>
+        </div>
+        <div>
+          <dt>Published</dt>
+          <dd>
+            @if (version.publishedAt) {
+              {{ version.publishedAt | date: 'medium' }} <span class="rubric-muted">{{ version.publishedBy }}</span>
+            } @else {
+              <span class="rubric-muted">Not published</span>
+            }
+          </dd>
+        </div>
+        @if (version.retiredAt) {
+          <div>
+            <dt>Retired</dt>
+            <dd>{{ version.retiredAt | date: 'medium' }} <span class="rubric-muted">{{ version.retiredBy }}</span></dd>
+          </div>
+        }
+        <div>
+          <dt>Dry run</dt>
+          <dd>
+            {{ dryRunLabel(version) }}
+            @if (version.dryRunCompletedAt) {
+              <span class="rubric-muted">{{ version.dryRunCompletedAt | date: 'medium' }}</span>
+            }
+          </dd>
+        </div>
+        @if (actions.length > 0 && !plan) {
+          <div class="rubric-version-lifecycle">
+            @for (action of actions; track action) {
+              <button type="button" class="rubric-button" [class.rubric-button--primary]="action === 'publish'"
+                (click)="open(action)">
+                {{ actionNames[action] }}
+              </button>
+            }
+          </div>
+        }
+      </dl>
+
+      @if (!definition) {
+        <div class="rubric-message rubric-message--error" role="alert">
+          <p><strong>This version's definition could not be read.</strong></p>
+        </div>
+      } @else {
+        <mat-tab-group animationDuration="0ms">
+          <mat-tab label="Checks ({{ checks.length }})">
+            <p class="rubric-version-tab-note">
+              {{ enabledCheckCount }} of {{ checks.length }} enabled, in the order they run. Select a check to see its
+              settings.
+            </p>
+            <div class="vd-mat-table rubric-version-tab">
+              <table mat-table [dataSource]="checks" multiTemplateDataRows aria-label="Checks of this version">
+
+                <ng-container matColumnDef="order">
+                  <th mat-header-cell *matHeaderCellDef>Order</th>
+                  <td mat-cell *matCellDef="let check">{{ check.ordinal ?? '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="id">
+                  <th mat-header-cell *matHeaderCellDef>Check</th>
+                  <td mat-cell *matCellDef="let check">
+                    <button type="button" class="rubric-version-check-toggle" (click)="toggleCheck(check); $event.stopPropagation()"
+                      [attr.aria-expanded]="expandedCheckId === check.id">
+                      <span class="rubric-mono">{{ check.id }}</span>
+                    </button>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="type">
+                  <th mat-header-cell *matHeaderCellDef>Type</th>
+                  <td mat-cell *matCellDef="let check">{{ checkTypeLabel(check.type) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="dimension">
+                  <th mat-header-cell *matHeaderCellDef>Dimension</th>
+                  <td mat-cell *matCellDef="let check">{{ dimensionLabel(check.dimension) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="severity">
+                  <th mat-header-cell *matHeaderCellDef>Severity</th>
+                  <td mat-cell *matCellDef="let check">
+                    <span [class]="severityChipClass(check)">{{ severityLabel(check.severityOverride) }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="enabled">
+                  <th mat-header-cell *matHeaderCellDef>Enabled</th>
+                  <td mat-cell *matCellDef="let check">{{ isCheckEnabled(check) ? 'Yes' : 'No' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="summary">
+                  <th mat-header-cell *matHeaderCellDef>Tests</th>
+                  <td mat-cell *matCellDef="let check">
+                    <span class="rubric-mono rubric-version-summary" [title]="checkSummary(check)">{{ checkSummary(check) }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="expandedDetail">
+                  <td mat-cell *matCellDef="let check" [attr.colspan]="checkColumns.length">
+                    @if (expandedCheckId === check.id) {
+                    <div class="rubric-version-check-detail">
+                      <dl>
+                        @for (setting of settingsOf(check); track setting.label) {
+                          <div>
+                            <dt>{{ setting.label }}</dt>
+                            <dd class="rubric-mono">{{ setting.value }}</dd>
+                          </div>
+                        } @empty {
+                          @if (childrenOf(check).length === 0) {
+                            <div><dd class="rubric-muted">This check has no settings.</dd></div>
+                          }
+                        }
+                      </dl>
+                      @if (childrenOf(check).length > 0) {
+                        <table class="rubric-version-children" aria-label="Child checks">
+                          <thead>
+                            <tr><th>Child check</th><th>Type</th><th>Tests</th></tr>
+                          </thead>
+                          <tbody>
+                            @for (child of childrenOf(check); track child.id) {
+                              <tr>
+                                <td class="rubric-mono">{{ child.id }}</td>
+                                <td>{{ checkTypeLabel(child.type) }}</td>
+                                <td class="rubric-mono">{{ checkSummary(child) }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      }
+                    </div>
+                    }
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="checkColumns"></tr>
+                <tr mat-row *matRowDef="let check; columns: checkColumns;" class="expandable-main-row"
+                  [class.expanded-main-row]="expandedCheckId === check.id"
+                  [class.rubric-version-check--disabled]="!isCheckEnabled(check)" (click)="toggleCheck(check)"></tr>
+                <!-- Every check has a detail row; the table decides its rows when the data is set, not when a
+                     check is selected, so the row is hidden rather than left out. -->
+                <tr mat-row *matRowDef="let check; columns: ['expandedDetail']" class="rubric-version-detail-row"
+                  [class.rubric-version-detail-row--collapsed]="expandedCheckId !== check.id"></tr>
+              </table>
+            </div>
+          </mat-tab>
+
+          <mat-tab label="Settings">
+            <dl class="rubric-version-settings rubric-version-tab">
+              <div>
+                <dt>Rubric id</dt>
+                <dd class="rubric-mono">{{ definition.id }}</dd>
+              </div>
+              <div>
+                <dt>Version</dt>
+                <dd>{{ definition.semver }}</dd>
+              </div>
+              <div>
+                <dt>Title</dt>
+                <dd>{{ definition.title || '—' }}</dd>
+              </div>
+              <div>
+                <dt>Owner</dt>
+                <dd>{{ definition.owner || '—' }}</dd>
+              </div>
+              <div>
+                <dt>Dimensions</dt>
+                <dd>
+                  @for (dimension of definition.dimensions; track dimension; let last = $last) {
+                    {{ dimensionLabel(dimension) }}{{ last ? '' : ', ' }}
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Scoring</dt>
+                <dd>{{ scoringLabel(definition.scoringPolicy) }}</dd>
+              </div>
+              <div>
+                <dt>Resource types</dt>
+                <dd>{{ definition.applicableContext?.fhirResources?.join(', ') || 'Not limited' }}</dd>
+              </div>
+              <div>
+                <dt>Workflow tags</dt>
+                <dd>{{ definition.applicableContext?.workflowTags?.join(', ') || 'None' }}</dd>
+              </div>
+            </dl>
+          </mat-tab>
+
+          <mat-tab label="Definition">
+            <div class="rubric-version-definition rubric-version-tab">
+              <div class="rubric-version-definition-actions">
+                <button type="button" class="rubric-button" (click)="copyDefinition()">
+                  {{ copied ? 'Copied' : 'Copy' }}
+                </button>
+              </div>
+              <pre class="rubric-mono" tabindex="0" aria-label="Definition as JSON">{{ definitionJson }}</pre>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      }
+    }
+  </div>
+</div>

@@ -3,18 +3,15 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.exceptions.PayloadParseException;
-import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
+import com.lantanagroup.link.validation.records.BridgeOutcome;
 import com.lantanagroup.link.validation.records.ShadowCompareEvent;
 import com.lantanagroup.link.validation.records.ShadowFindingDto;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -87,6 +84,8 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
 
             List<Result> legacyResults;
             List<Result> newResults;
+            Boolean legacyValid;
+            Boolean rubricValid;
 
             if (event.isRanNewEngine()) {
                 // primary ran the new engine; we run the old one, purely for comparison
@@ -98,17 +97,25 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
                         event.getFacilityId(), event.getPatientId(), event.getReportId(), legacyResults,
                         requestedAt, completedAt);
                 newResults = toResults(event.getAuthoritativeResult());
+                legacyValid = ValidationVerdict.legacyValid(legacyResults);
+                rubricValid = event.getAuthoritativeValid();
             } else {
                 // primary ran the old engine; we run the new one -- persists to rubric_result/rubric_finding
                 // exactly as it does when the modern engine is authoritative
-                newResults = runModernValidation(event.getCorrelationId(), event.getFacilityId(), event.getPatientId(),
-                        event.getReportId(), bundle);
+                ValidationResultEnvelope envelope = runModernValidation(event.getCorrelationId(), event.getFacilityId(),
+                        event.getPatientId(), event.getReportId(), bundle);
+                BridgeOutcome outcome = legacyResultMapper.toResults(envelope, event.getFacilityId(),
+                        event.getPatientId(), event.getReportId());
+                newResults = outcome.results();
                 legacyResults = toResults(event.getAuthoritativeResult());
+                legacyValid = event.getAuthoritativeValid();
+                // As the primary consumer decides it: by the rubric status, or unknown when there is none.
+                rubricValid = outcome.status() == null ? null : ValidationVerdict.rubricValid(outcome.status());
             }
 
             shadowComparator.compareAndLog(event.getCorrelationId(), event.getRequestId(), event.getFacilityId(),
-                    event.getPatientId(), event.getReportId(), rubricId, event.isRanNewEngine(), legacyResults,
-                    newResults);
+                    event.getPatientId(), event.getReportId(), rubricId, event.isRanNewEngine(), legacyValid, rubricValid,
+                    legacyResults, newResults);
         } catch (Exception e) {
             _logger.warn("Shadow comparison failed for report {}; skipping",
                     LogUtils.sanitize(event.getReportId()), e);
@@ -148,26 +155,14 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
         return results;
     }
 
-    private List<Result> runModernValidation(String correlationId, String facilityId, String patientId, String reportId, Bundle bundle) {
-        EvaluateRequestDto request = EvaluateRequestDto.builder()
-                .subject(SubjectDto.builder()
-                        .facilityId(facilityId)
-                        .patientId(patientId)
-                        .reportId(reportId)
-                        .build())
-                .payload(bundleToJsonNode(bundle))
+    private ValidationResultEnvelope runModernValidation(String correlationId, String facilityId, String patientId, String reportId, Bundle bundle) {
+        SubjectDto subject = SubjectDto.builder()
+                .facilityId(facilityId)
+                .patientId(patientId)
+                .reportId(reportId)
                 .build();
-        ValidationResultEnvelope envelope = rubricExecutionService.evaluate(rubricId, null, request, true, correlationId);
-        return legacyResultMapper.toResults(envelope, facilityId, patientId, reportId).results();
-    }
-
-    private JsonNode bundleToJsonNode(Bundle bundle) {
-        try {
-            String json = fhirContext.newJsonParser().encodeResourceToString(bundle);
-            return objectMapper.readTree(json);
-        } catch (JsonProcessingException e) {
-            throw new PayloadParseException("Failed to convert bundle to JSON for rubric evaluation", e);
-        }
+        // The bundle as already parsed; encoding it to JSON for the engine to parse again doubled the parsing cost.
+        return rubricExecutionService.evaluate(rubricId, null, subject, bundle, true, correlationId);
     }
 
     private List<Result> toResults(List<ShadowFindingDto> findings) {

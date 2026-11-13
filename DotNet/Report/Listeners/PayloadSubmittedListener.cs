@@ -98,6 +98,10 @@ public class PayloadSubmittedListener(
     public async Task ProcessMessageAsync(ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue> result, CancellationToken cancellationToken)
     {
         using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
+        using var stage = PipelineStageLog.Start(logger, "ReportSubmissionResult", result,
+            result.Message?.Key?.FacilityId, result.Message?.Value?.PatientId,
+            PipelineStageLog.Header(result.Message?.Headers, "X-Correlation-Id"),
+            [result.Message?.Key?.ReportScheduleId.ToString()], result.Message?.Value?.PayloadType.ToString());
         if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
         {
             throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Key.ReportScheduleId}, FacilityId = {result.Message.Key.FacilityId}).");
@@ -117,7 +121,10 @@ public class PayloadSubmittedListener(
             var reportTrackingId = result.Message.Key.ReportScheduleId;
             if (await PipelineAbortSkip.ShouldSkipAsync(
                     scope.ServiceProvider, logger, Name, facilityId, reportTrackingId.ToString(), cancellationToken))
+            {
+                stage.Outcome = PipelineStageOutcome.Skipped;
                 return;
+            }
 
             var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, cancellationToken)).Single();
 
@@ -147,27 +154,34 @@ public class PayloadSubmittedListener(
                 reportSchedule.ModifyDate = DateTime.UtcNow;
                 await reportScheduledManager.UpdateAsync(reportSchedule, cancellationToken);
             }
+
+            stage.Outcome = PipelineStageOutcome.Completed;
         }
         catch (DeadLetterException ex)
         {
+            stage.Outcome = PipelineStageOutcome.DeadLettered;
             deadLetterExceptionHandler.HandleException(result, ex, facilityId);
         }
         catch (TransientException ex)
         {
+            stage.Outcome = PipelineStageOutcome.Retried;
             transientExceptionHandler.HandleException(result, ex, facilityId);
         }
         catch (TimeoutException ex)
         {
+            stage.Outcome = PipelineStageOutcome.Retried;
             var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [PayloadSubmitted] at offset: {result.TopicPartitionOffset}";
             var transientException = new TransientException(exceptionMessage, ex);
             transientExceptionHandler.HandleException(result, transientException, facilityId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            stage.Outcome = PipelineStageOutcome.Cancelled;
             throw;
         }
         catch (Exception ex)
         {
+            stage.Outcome = PipelineStageOutcome.Retried;
             transientExceptionHandler.HandleException(result, ex, facilityId);
         }
     }

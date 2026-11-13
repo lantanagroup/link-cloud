@@ -82,10 +82,28 @@ public class RubricExecutionService {
     }
 
 
+    /** Evaluates a payload received as JSON (the REST endpoints). */
     public ValidationResultEnvelope evaluate(
             String rubricId, String semver, EvaluateRequestDto request, boolean persist, String correlationId) {
         OffsetDateTime requestedAt = OffsetDateTime.now();
+        return evaluate(rubricId, semver, request.getSubject(), request.getContext(),
+                parseResource(request.getPayload()), request.getPayload(), persist, correlationId, requestedAt);
+    }
 
+    /**
+     * Evaluates a resource the caller has already parsed (the Kafka consumers), so it isn't encoded to JSON and
+     * parsed again. The resource is read, not changed.
+     */
+    public ValidationResultEnvelope evaluate(
+            String rubricId, String semver, SubjectDto subject, IBaseResource resource, boolean persist, String correlationId) {
+        OffsetDateTime requestedAt = OffsetDateTime.now();
+        return evaluate(rubricId, semver, subject, null, resource, null, persist, correlationId, requestedAt);
+    }
+
+    private ValidationResultEnvelope evaluate(
+            String rubricId, String semver, SubjectDto subject, Map<String, Object> requestContext,
+            IBaseResource resource, JsonNode rawPayload, boolean persist, String correlationId,
+            OffsetDateTime requestedAt) {
 
         // the resolver returns version + checks together (soft-deleted checks already excluded)
         RubricVersionResolver.ResolvedRubric resolved = versionResolver.resolve(rubricId, semver, persist);
@@ -93,12 +111,8 @@ public class RubricExecutionService {
         List<RubricCheck> checks = resolved.checks();
         log.debug("Resolved rubric {} v{} ({})", version.getRubricId(), version.getSemver(), version.getRubricVersionId());
 
-        SubjectDto subject = request.getSubject();
-
         Map<String, Object> contextVars = new HashMap<>();
-        if (request.getContext() != null) contextVars.putAll(request.getContext());
-
-        IBaseResource resource = parseResource(request.getPayload());
+        if (requestContext != null) contextVars.putAll(requestContext);
 
         List<IBaseResource> bundleEntries = Collections.emptyList();
         if (resource instanceof Bundle bundle) {
@@ -116,7 +130,7 @@ public class RubricExecutionService {
                 .resource(resource)
                 .bundleEntries(bundleEntries)
                 .referenceIndex(BundleReferenceResolver.buildIndex(bundleEntries))
-                .rawPayload(request.getPayload())
+                .rawPayload(rawPayload)
                 .contextVars(contextVars)
                 .requestedAt(requestedAt)
                 .build();

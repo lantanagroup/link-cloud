@@ -14,5 +14,11 @@ public class TailCompletionResult
     public QueryPhase? QueryPhase { get; set; }
     public string? TraceParentId { get; set; }
     public string PatientId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When the group's first query log was created, so the time the whole acquisition took can be logged.
+    /// Null when it couldn't be read.
+    /// </summary>
+    public DateTime? GroupStartedUtc { get; set; }
     public ResourcesAcquired ResourcesAcquired { get; set; } = new ResourcesAcquired();
 }

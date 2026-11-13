@@ -24,6 +24,14 @@ docker compose down -v --remove-orphans       # tear everything down (resets vol
 
 Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, admin-bff 8063, kafka 9092, kafka-ui 9095, loki 3100, grafana 3000, azurite 10000, mssql 1433, mongo 17017). Compose and locally run services read credentials from a root `.env`, which is not committed: copy `.env.example` to `.env` and set its two `CHANGE_ME` passwords (the template says what each needs).
 
+### Aspire AppHost (optional alternative to compose)
+
+```powershell
+dotnet run --project DotNet/Link.AspireAppHost --launch-profile http   # dashboard at http://localhost:15190
+```
+
+Or choose `Link.AspireAppHost` as the startup project in the IDE. It starts the infrastructure in containers and every service with the settings compose would give it, on ports of its own (each service is its compose port plus 10000), so it can run beside the compose stack. Nothing else references it: compose, the Dockerfiles and CI are unaffected, and ignoring it changes nothing. It needs Docker, Maven, a JDK 21 and Node. Set the Terminology data folder and, if `JAVA_HOME` is not a JDK 21, the JDK in its user secrets. See [DotNet/Link.AspireAppHost/README.md](DotNet/Link.AspireAppHost/README.md).
+
 ### Thetis packages
 
 `LantanaGroup.Thetis.Generation.Abstractions` and `LantanaGroup.Thetis.Generation.Engine` come from nuget.org. Both are PolyForm Noncommercial 1.0.0; the license file ships inside each package. Restore and `docker compose build` need no extra NuGet source, token, or sign-in.

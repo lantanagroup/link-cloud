@@ -2,10 +2,12 @@ package com.lantanagroup.link.validation.controllers;
 
 import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionException;
+import com.lantanagroup.link.validation.exceptions.InvalidRubricRequestException;
 import com.lantanagroup.link.validation.exceptions.PayloadParseException;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
+import com.lantanagroup.link.validation.exceptions.RubricPreconditionFailedException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
 import com.lantanagroup.link.validation.records.ApiResponse;
@@ -23,6 +25,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -77,11 +81,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return envelope(HttpStatus.CONFLICT, ex.getMessage(), null);
     }
 
+    @ExceptionHandler(RubricPreconditionFailedException.class)
+    public ResponseEntity<Object> handlePreconditionFailed(RubricPreconditionFailedException ex) {
+        logger.warn("Rubric save precondition failed: {}", LogUtils.sanitize(ex.getMessage()));
+        return envelope(HttpStatus.PRECONDITION_FAILED, ex.getMessage(), null);
+    }
+
     @ExceptionHandler(InvalidRubricDefinitionException.class)
     public ResponseEntity<Object> handleInvalidDefinition(InvalidRubricDefinitionException ex) {
         logger.warn("Rejected rubric definition: {} {}",
                 LogUtils.sanitize(ex.getMessage()), LogUtils.sanitize(ex.getErrors()));
         return envelope(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getErrors());
+    }
+
+    @ExceptionHandler(InvalidRubricRequestException.class)
+    public ResponseEntity<Object> handleInvalidRequest(InvalidRubricRequestException ex) {
+        logger.warn("Rejected rubric registry request: {}", LogUtils.sanitize(ex.getMessage()));
+        return envelope(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
     }
 
     @ExceptionHandler(PayloadParseException.class)
@@ -160,6 +176,32 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 : "Request could not be processed";
         logger.warn("Rejected governance request [{}]: {}", statusCode, LogUtils.sanitize(message));
         return envelope(statusCode, message, null);
+    }
+
+    // --- A caller an endpoint's @PreAuthorize turns away. These are raised inside the controller call, so
+    //     without handlers of their own the catch-all below would answer 500. ---
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Object> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
+        logger.warn("Refused a caller without the permission the endpoint requires");
+        // Says only that it was refused. What the endpoint requires is not for the caller to be told.
+        String message = "You do not have permission to do this.";
+        if (isGovernance(request)) {
+            return envelope(HttpStatus.FORBIDDEN, message, null);
+        }
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, message));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Object> handleUnauthenticated(AuthenticationException ex, WebRequest request) {
+        logger.warn("Refused a caller that is not signed in");
+        String message = "Authentication is required.";
+        if (isGovernance(request)) {
+            return envelope(HttpStatus.UNAUTHORIZED, message, null);
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, message));
     }
 
     // --- Catch-all: returns an envelope 500 for governance requests and a framework-style

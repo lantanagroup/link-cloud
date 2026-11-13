@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.configs;
 
 import ca.uhn.fhir.parser.DataFormatException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.shared.kafka.ConsumerStartPositionLogger;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.exceptions.FhirParseException;
@@ -225,6 +226,8 @@ public class KafkaConfig {
         ContainerProperties containerProperties = container.getContainerProperties();
         containerProperties.setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         containerProperties.setAsyncAcks(true);
+        containerProperties.setConsumerRebalanceListener(
+                ConsumerStartPositionLogger.forConfig(factory.getConsumerFactory().getConfigurationProperties()));
         containerProperties.setMessageListener(listener);
         return container;
     }
@@ -276,6 +279,8 @@ public class KafkaConfig {
         factory.setConsumerFactory(consumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         factory.getContainerProperties().setAsyncAcks(true);
+        factory.getContainerProperties().setConsumerRebalanceListener(
+                ConsumerStartPositionLogger.forConfig(consumerFactory.getConfigurationProperties()));
         factory.setCommonErrorHandler(errorHandler);
         return factory;
     }

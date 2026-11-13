@@ -38,6 +38,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -58,6 +59,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Logging using Serilog    
     builder.Logging.AddSerilog();
     var loggerOptions = new ConfigurationReaderOptions { SectionName = LinkAdminConstants.AppSettingsSectionNames.Serilog };
+    // Names this instance on every line (Serilog:Properties:ServiceInstance), to tell scaled-out copies apart.
+    builder.Configuration.AddServiceInstanceLogProperty();
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")

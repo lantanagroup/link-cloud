@@ -12,6 +12,7 @@ import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
+import com.lantanagroup.link.shared.logging.PipelineStageLog;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import io.opentelemetry.api.common.Attributes;
@@ -87,6 +88,26 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     @Override
     protected void process(ConsumerRecord<ResourceKey, T> record) {
+        ResourceKey key = record != null ? record.key() : null;
+        T value = record != null ? record.value() : null;
+        List<String> reportIds = value == null || value.getScheduledReports() == null ? List.of()
+                : value.getScheduledReports().stream()
+                        .filter(Objects::nonNull)
+                        .map(AbstractResourceRecord.ScheduledReport::getReportTrackingId)
+                        .toList();
+        String phase = value != null && value.getQueryType() != null ? value.getQueryType().toString() : null;
+        try (PipelineStageLog stage = PipelineStageLog.start(logger, PipelineStageLog.phasedStage("Evaluation", phase), record,
+                key != null ? key.getFacilityId() : null,
+                key != null ? key.getPatientId() : null,
+                value != null && value.getCacheKey() != null ? value.getCacheKey() : PipelineStageLog.header(record, Headers.CORRELATION_ID),
+                reportIds,
+                phase)) {
+            processRecord(record);
+            stage.setOutcome(PipelineStageLog.COMPLETED);
+        }
+    }
+
+    private void processRecord(ConsumerRecord<ResourceKey, T> record) {
         boolean perf = performanceLogger.isInfoEnabled();
         StopWatch totalStopWatch = perf ? new StopWatch() : null;
         StopWatch taskStopWatch = perf ? new StopWatch() : null;

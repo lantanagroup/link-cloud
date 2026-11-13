@@ -59,6 +59,7 @@ export class LinkNavBarComponent implements OnInit {
           { label: 'Query Plans', path: '/query-plans' },
           { label: 'Terminology', path: '/terminology-config' },
           { label: 'Validation Categories', path: '/validation-config/validation-categories-management' },
+          { label: 'Validation Rubrics', path: '/rubrics' },
           { label: 'Vendors', path: '/vendor' },
         ]
       },

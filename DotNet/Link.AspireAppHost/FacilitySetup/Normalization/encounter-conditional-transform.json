@@ -1,0 +1,21 @@
+{
+  "ResourceTypes": [
+    "Encounter"
+  ],
+  "FacilityId": "{{facilityId}}",
+  "Operation": {
+    "OperationType": "ConditionalTransform",
+    "Name": "ConditionalTransform",
+    "TargetFhirPath": "status",
+    "TargetValue": 5,
+    "Conditions": [
+      {
+        "FhirPathSource": "priority",
+        "Operator": 7,
+        "Value": ""
+      }
+    ]
+  },
+  "Description": "new ct for priority not available",
+  "VendorIds": []
+}

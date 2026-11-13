@@ -19,6 +19,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<!-- Lets the unit tests construct types through constructors kept internal for testing, such as
+		     LocalSecretManager's with a secrets folder of its own. -->
+		<InternalsVisibleTo Include="ServiceTests" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations" />
 		<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" />
 		<PackageReference Include="AspNetCore.HealthChecks.Kafka" />
