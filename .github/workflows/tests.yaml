@@ -337,14 +337,14 @@ jobs:
           }
 
           # name|category|trx-file
+          # Adhoc, Daily ACH, and Regenerate run together as ConcurrentReportBatch
+          # instead of three separate processes. The smoke test still starts Adhoc on its own.
           API_STABILITY="API Stability|ApiStabilityTest|api-stability-test-results.trx"
           PARALLEL_TESTS=(
-            "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
-            "Adhoc Report Daily ACH|AdhocReportDailyAchTest|adhoc-report-daily-ach-test-results.trx"
+            "Concurrent Report Batch|ConcurrentReportBatch|concurrent-report-batch-test-results.trx"
             "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
             "DMRP Scheduled Report|DmrpScheduledReportTest|dmrp-scheduled-report-test-results.trx"
-            "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
             "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
           )
 

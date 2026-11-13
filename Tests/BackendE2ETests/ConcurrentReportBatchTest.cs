@@ -1,0 +1,473 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using LantanaGroup.Link.Sdk.Clients;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace LantanaGroup.Link.Tests.E2ETests;
+
+/// <summary>
+/// Three existing report scenarios in one Link.UI batch. Cleanup runs before a
+/// run reports Succeeded, so facility, patient, and FHIR evidence is taken
+/// while the run is still going.
+/// </summary>
+public sealed class ConcurrentReportBatchTest : IClassFixture<BackendE2ETestFixture>
+{
+    private const int BatchCap = 3;
+    private const string EhrSystem = "local";
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(30);
+    private static readonly Regex PatientIdPattern = new(
+        "^Patient-(?<tag>[0-9a-fA-F]{8})-\\d{3}$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private readonly IServiceProvider _sp;
+
+    public ConcurrentReportBatchTest(BackendE2ETestFixture fixture)
+    {
+        _sp = fixture.ServiceProvider;
+    }
+
+    [Fact]
+    [Trait("Category", "ConcurrentReportBatch")]
+    public async Task ExecuteConcurrentReportBatch()
+    {
+        using var timeoutCts = new CancellationTokenSource(Timeout);
+        var cancellationToken = timeoutCts.Token;
+        var output = _sp.GetRequiredService<ConsoleAutomationOutput>();
+        using var link = new HttpClient
+        {
+            BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/")
+        };
+
+        var originalCap = await GetCapAsync(link, cancellationToken);
+        var capChanged = false;
+        try
+        {
+            if (originalCap != BatchCap)
+            {
+                await PutCapAsync(link, BatchCap, cancellationToken);
+                capChanged = true;
+            }
+
+            output.WriteLine(
+                $"Starting concurrent batch on {EhrSystem} at cap {BatchCap}: Adhoc, Daily ACH, Regenerate.");
+            await RunBatchAsync(link, output, cancellationToken);
+        }
+        finally
+        {
+            if (capChanged)
+                await PutCapAsync(link, originalCap, CancellationToken.None);
+        }
+    }
+
+    private async Task RunBatchAsync(HttpClient link, ConsoleAutomationOutput output, CancellationToken cancellationToken)
+    {
+        using var startResponse = await link.PostAsJsonAsync(
+            "api/report-batches",
+            new
+            {
+                ehrSystem = EhrSystem,
+                scenarioIds = new[]
+                {
+                    AutomationUiScenarioRunner.AdhocReportScenarioId,
+                    AutomationUiScenarioRunner.AdhocReportDailyAchScenarioId,
+                    AutomationUiScenarioRunner.RegenerateReportScenarioId
+                }
+            },
+            cancellationToken);
+        var startText = await startResponse.Content.ReadAsStringAsync(cancellationToken);
+        Assert.True(
+            startResponse.IsSuccessStatusCode,
+            $"POST /api/report-batches returned {(int)startResponse.StatusCode}: {startText}");
+
+        var batch = JsonSerializer.Deserialize<BatchBody>(startText, JsonOpts);
+        Assert.NotNull(batch);
+        Assert.Equal(BatchCap, batch.MaxConcurrency);
+        Assert.Equal(3, batch.Items.Count);
+
+        var watches = batch.Items.ToDictionary(
+            item => item.ScenarioId,
+            item => new RunWatch(item.ScenarioId, item.ScenarioName));
+        var overlapped = false;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            using var batchResponse = await link.GetAsync($"api/report-batches/{batch.BatchId}", cancellationToken);
+            var batchText = await batchResponse.Content.ReadAsStringAsync(cancellationToken);
+            Assert.True(
+                batchResponse.IsSuccessStatusCode,
+                $"GET /api/report-batches/{batch.BatchId} returned {(int)batchResponse.StatusCode}: {batchText}");
+            batch = JsonSerializer.Deserialize<BatchBody>(batchText, JsonOpts);
+            Assert.NotNull(batch);
+
+            foreach (var item in batch.Items)
+            {
+                if (!watches.TryGetValue(item.ScenarioId, out var watch))
+                    continue;
+                watch.ItemStatus = item.Status;
+                watch.ItemError = item.Error;
+                if (item.RunId is Guid runId && runId != Guid.Empty)
+                    watch.RunId = runId;
+            }
+
+            var started = new List<RunWatch>();
+            foreach (var watch in watches.Values)
+            {
+                if (watch.RunId is not Guid runId)
+                    continue;
+
+                using var statusResponse = await link.GetAsync($"api/runs/{runId}/status", cancellationToken);
+                var statusText = await statusResponse.Content.ReadAsStringAsync(cancellationToken);
+                Assert.True(
+                    statusResponse.IsSuccessStatusCode,
+                    $"GET /api/runs/{runId}/status returned {(int)statusResponse.StatusCode}: {statusText}");
+                var status = JsonSerializer.Deserialize<RunStatusBody>(statusText, JsonOpts);
+                Assert.NotNull(status);
+                watch.Status = status.Status;
+                watch.IsTerminal = status.IsTerminal;
+                watch.StartedAt = status.StartedAt ?? watch.StartedAt;
+                watch.FinishedAt = status.FinishedAt ?? watch.FinishedAt;
+                watch.RunError = status.Error;
+                if (!string.IsNullOrWhiteSpace(status.FacilityId))
+                    watch.FacilityId = status.FacilityId;
+
+                output.WriteLine(
+                    $"  {watch.ScenarioName} status={status.Status} facility={watch.FacilityId ?? "(none)"}" +
+                    (status.Error != null ? $" error={status.Error}" : ""));
+
+                if (!status.IsTerminal && status.StartedAt != null)
+                    started.Add(watch);
+
+                if (!status.IsTerminal && !string.IsNullOrWhiteSpace(watch.FacilityId))
+                    await SampleAsync(watch, output, cancellationToken);
+            }
+
+            if (started.Count == watches.Count)
+                overlapped = true;
+
+            if (batch.Items.Count > 0 && batch.Items.TrueForAll(item => IsTerminalItem(item.Status)))
+                break;
+
+            await Task.Delay(PollInterval, cancellationToken);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        Assert.NotNull(batch);
+        Assert.True(overlapped, "The three runs were not all in progress at the same time.");
+        Assert.Equal("Completed", batch.Status);
+        Assert.True(
+            batch.Items.TrueForAll(item => item.Status == "Succeeded"),
+            "Batch items: " + string.Join("; ", batch.Items.Select(item => $"{item.ScenarioName}={item.Status} {item.Error}")));
+
+        var runs = watches.Values.ToList();
+        Assert.Equal(3, runs.Count);
+        Assert.All(runs, run => Assert.False(string.IsNullOrWhiteSpace(run.FacilityId), $"{run.ScenarioName} has no facility id."));
+        Assert.Equal(3, runs.Select(run => run.FacilityId).Distinct(StringComparer.Ordinal).Count());
+
+        var latestStart = runs.Max(run => run.StartedAt);
+        var earliestFinish = runs.Min(run => run.FinishedAt);
+        Assert.True(
+            latestStart != null && earliestFinish != null && latestStart < earliestFinish,
+            "Run intervals do not overlap. " + string.Join("; ", runs.Select(run =>
+                $"{run.ScenarioName} {run.StartedAt:o}..{run.FinishedAt:o}")));
+
+        Assert.All(runs, run => Assert.True(
+            run.Patients.Count > 0 && run.ResourcePatientIds.Count > 0,
+            $"{run.ScenarioName} finished before its facility had patients and report resources."));
+
+        foreach (var run in runs)
+        {
+            var tags = run.Patients.Select(TagOf).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            Assert.True(tags.Count == 1 && tags[0] != null, $"{run.ScenarioName} patient ids did not share one tag: {string.Join(", ", run.Patients)}");
+            run.Tag = tags[0]!;
+            Assert.True(
+                run.EntryPatientIds.All(id => run.Patients.Contains(id)),
+                $"{run.ScenarioName} report entries left its census patients: {string.Join(", ", run.EntryPatientIds)}");
+            Assert.True(
+                run.ResourcePatientIds.All(id => run.Patients.Contains(id)),
+                $"{run.ScenarioName} report resources left its census patients: {string.Join(", ", run.ResourcePatientIds)}");
+        }
+
+        Assert.Equal(3, runs.Select(run => run.Tag).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        foreach (var run in runs)
+        {
+            foreach (var other in runs)
+            {
+                if (ReferenceEquals(run, other))
+                    continue;
+                Assert.True(
+                    !run.Patients.Overlaps(other.Patients),
+                    $"{run.ScenarioName} and {other.ScenarioName} share patients.");
+                Assert.True(
+                    run.ResourceIds.All(id => id.IndexOf(other.Tag!, StringComparison.OrdinalIgnoreCase) < 0),
+                    $"{run.ScenarioName} resource ids contain {other.ScenarioName}'s tag {other.Tag}.");
+            }
+        }
+
+        var facilities = _sp.GetRequiredService<IFacilityServiceClient>();
+        using var fhir = new HttpClient();
+        var fhirBase = TestConfig.FhirServerBase.TrimEnd('/');
+        foreach (var run in runs)
+        {
+            Assert.True(run.FhirSeen, $"{run.ScenarioName} FHIR patients were not readable during the run.");
+            var facility = await facilities.GetAsync(run.FacilityId!, cancellationToken);
+            Assert.True(
+                facility.StatusCode is 404 or 204 || (facility.IsSuccessStatusCode && facility.Body is { IsDeleted: true }),
+                $"{run.ScenarioName} facility {run.FacilityId} is still present (HTTP {facility.StatusCode}).");
+
+            foreach (var patientId in run.Patients)
+            {
+                using var patient = await fhir.GetAsync($"{fhirBase}/Patient/{Uri.EscapeDataString(patientId)}", cancellationToken);
+                Assert.False(
+                    patient.IsSuccessStatusCode,
+                    $"{run.ScenarioName} patient {patientId} is still on the FHIR server (HTTP {(int)patient.StatusCode}).");
+            }
+        }
+    }
+
+    private async Task SampleAsync(RunWatch watch, ConsoleAutomationOutput output, CancellationToken cancellationToken)
+    {
+        var patients = await ReadCensusPatientsAsync(watch.FacilityId!, cancellationToken);
+        var report = await ReadReportAsync(watch.FacilityId!, cancellationToken);
+        if (patients.Count == 0 || report.ResourcePatientIds.Count == 0)
+            return;
+
+        var firstSample = watch.Patients.Count == 0;
+        watch.Patients = patients;
+        watch.EntryPatientIds = report.EntryPatientIds;
+        watch.ResourcePatientIds = report.ResourcePatientIds;
+        watch.ResourceIds = report.ResourceIds;
+        if (firstSample)
+        {
+            output.WriteLine(
+                $"  {watch.ScenarioName} sampled facility {watch.FacilityId}: {patients.Count} census patient(s), {report.ResourceIds.Count} report resource(s).");
+        }
+
+        if (watch.FhirSeen)
+            return;
+
+        using var fhir = new HttpClient();
+        var fhirBase = TestConfig.FhirServerBase.TrimEnd('/');
+        foreach (var patientId in patients)
+        {
+            using var patient = await fhir.GetAsync($"{fhirBase}/Patient/{Uri.EscapeDataString(patientId)}", cancellationToken);
+            if (!patient.IsSuccessStatusCode)
+                return;
+        }
+
+        watch.FhirSeen = true;
+    }
+
+    private async Task<HashSet<string>> ReadCensusPatientsAsync(string facilityId, CancellationToken cancellationToken)
+    {
+        var census = _sp.GetRequiredService<ICensusServiceClient>();
+        var response = await census.GetAdmittedPatientsAsync(
+            facilityId,
+            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            cancellationToken);
+        if (response.StatusCode == 404 || string.IsNullOrWhiteSpace(response.RawBody))
+            return [];
+
+        Assert.True(
+            response.IsSuccessStatusCode,
+            $"Census admitted list for {facilityId} returned HTTP {response.StatusCode}: {response.RawBody}");
+
+        var list = JsonSerializer.Deserialize<CensusList>(response.RawBody, JsonOpts);
+        var patients = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in list?.Entry ?? [])
+        {
+            var patientId = PatientIdFromReference(entry.Item?.Reference);
+            if (patientId != null)
+                patients.Add(patientId);
+        }
+
+        return patients;
+    }
+
+    private async Task<ReportSample> ReadReportAsync(string facilityId, CancellationToken cancellationToken)
+    {
+        var reports = _sp.GetRequiredService<IReportServiceClient>();
+        var sample = new ReportSample();
+        var entries = await reports.SearchEntriesAsync(facilityId, pageSize: 50, cancellationToken: cancellationToken);
+        if (entries.IsSuccessStatusCode && entries.Body?.Records != null)
+        {
+            foreach (var entry in entries.Body.Records)
+            {
+                Assert.Equal(facilityId, entry.FacilityId);
+                var patientId = NormalizePatientId(entry.PatientId);
+                if (patientId != null)
+                    sample.EntryPatientIds.Add(patientId);
+            }
+        }
+
+        var summaries = await reports.GetReportSummariesAsync(facilityId, pageSize: 20, cancellationToken: cancellationToken);
+        if (!summaries.IsSuccessStatusCode || summaries.Body?.Records == null)
+            return sample;
+
+        foreach (var summary in summaries.Body.Records)
+        {
+            Assert.Equal(facilityId, summary.FacilityId);
+            if (string.IsNullOrWhiteSpace(summary.ReportScheduleId))
+                continue;
+
+            for (var page = 1; page <= 20; page++)
+            {
+                var resources = await reports.SearchResourcesAsync(
+                    facilityId,
+                    summary.ReportScheduleId,
+                    pageSize: 5000,
+                    pageNumber: page,
+                    cancellationToken: cancellationToken);
+                if (!resources.IsSuccessStatusCode || resources.Body?.Records == null || resources.Body.Records.Count == 0)
+                    break;
+
+                foreach (var resource in resources.Body.Records)
+                {
+                    Assert.Equal(facilityId, resource.FacilityId);
+                    var patientId = NormalizePatientId(resource.PatientId);
+                    if (patientId != null)
+                        sample.ResourcePatientIds.Add(patientId);
+                    if (!string.IsNullOrWhiteSpace(resource.ResourceId))
+                        sample.ResourceIds.Add(resource.ResourceId);
+                }
+
+                var totalPages = resources.Body.Metadata?.TotalPages ?? page;
+                if (page >= totalPages)
+                    break;
+            }
+        }
+
+        return sample;
+    }
+
+    private static async Task<int> GetCapAsync(HttpClient link, CancellationToken cancellationToken)
+    {
+        using var response = await link.GetAsync("api/report-batch-settings", cancellationToken);
+        var text = await response.Content.ReadAsStringAsync(cancellationToken);
+        Assert.True(response.IsSuccessStatusCode, $"GET /api/report-batch-settings returned {(int)response.StatusCode}: {text}");
+        var body = JsonSerializer.Deserialize<CapBody>(text, JsonOpts);
+        Assert.NotNull(body);
+        return body.MaxConcurrency;
+    }
+
+    private static async Task PutCapAsync(HttpClient link, int cap, CancellationToken cancellationToken)
+    {
+        using var response = await link.PutAsJsonAsync(
+            "api/report-batch-settings",
+            new { maxConcurrency = cap },
+            cancellationToken);
+        var text = await response.Content.ReadAsStringAsync(cancellationToken);
+        Assert.True(response.IsSuccessStatusCode, $"PUT /api/report-batch-settings returned {(int)response.StatusCode}: {text}");
+    }
+
+    private static bool IsTerminalItem(string? status)
+        => status is "Succeeded" or "Failed" or "Cancelled";
+
+    private static string? PatientIdFromReference(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+            return null;
+        var slash = reference.LastIndexOf('/');
+        return NormalizePatientId(slash < 0 ? reference : reference[(slash + 1)..]);
+    }
+
+    private static string? NormalizePatientId(string? patientId)
+    {
+        if (string.IsNullOrWhiteSpace(patientId))
+            return null;
+        var trimmed = patientId.Trim();
+        const string prefix = "Patient/";
+        if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
+            trimmed = trimmed[prefix.Length..];
+        return trimmed.Length == 0 ? null : trimmed;
+    }
+
+    private static string? TagOf(string patientId)
+    {
+        var match = PatientIdPattern.Match(patientId);
+        return match.Success ? match.Groups["tag"].Value : null;
+    }
+
+    private sealed class RunWatch(Guid scenarioId, string scenarioName)
+    {
+        public Guid ScenarioId { get; } = scenarioId;
+        public string ScenarioName { get; } = scenarioName;
+        public Guid? RunId { get; set; }
+        public string? FacilityId { get; set; }
+        public string? Status { get; set; }
+        public string? ItemStatus { get; set; }
+        public string? ItemError { get; set; }
+        public string? RunError { get; set; }
+        public bool IsTerminal { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? FinishedAt { get; set; }
+        public string? Tag { get; set; }
+        public bool FhirSeen { get; set; }
+        public HashSet<string> Patients { get; set; } = new(StringComparer.Ordinal);
+        public HashSet<string> EntryPatientIds { get; set; } = new(StringComparer.Ordinal);
+        public HashSet<string> ResourcePatientIds { get; set; } = new(StringComparer.Ordinal);
+        public List<string> ResourceIds { get; set; } = [];
+    }
+
+    private sealed class ReportSample
+    {
+        public HashSet<string> EntryPatientIds { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> ResourcePatientIds { get; } = new(StringComparer.Ordinal);
+        public List<string> ResourceIds { get; } = [];
+    }
+
+    private sealed class BatchBody
+    {
+        public Guid BatchId { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public int MaxConcurrency { get; set; }
+        public List<BatchItemBody> Items { get; set; } = [];
+    }
+
+    private sealed class BatchItemBody
+    {
+        public Guid ScenarioId { get; set; }
+        public string ScenarioName { get; set; } = string.Empty;
+        public Guid? RunId { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? Error { get; set; }
+    }
+
+    private sealed class RunStatusBody
+    {
+        public string Status { get; set; } = string.Empty;
+        public bool IsTerminal { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? FinishedAt { get; set; }
+        public string? Error { get; set; }
+        public string? FacilityId { get; set; }
+    }
+
+    private sealed class CapBody
+    {
+        public int MaxConcurrency { get; set; }
+    }
+
+    private sealed class CensusList
+    {
+        public List<CensusEntry>? Entry { get; set; }
+    }
+
+    private sealed class CensusEntry
+    {
+        public CensusItem? Item { get; set; }
+    }
+
+    private sealed class CensusItem
+    {
+        public string? Reference { get; set; }
+    }
+}

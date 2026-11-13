@@ -179,6 +179,7 @@ public sealed class AutomationRunsApiController(
             Duration = summary.Duration,
             Error = summary.Error,
             EhrSystem = summary.EhrSystem,
+            FacilityId = summary.FacilityId,
         });
     }
 
@@ -364,5 +365,8 @@ public sealed class AutomationRunsApiController(
 
         /// <summary>Named FHIR endpoint for this run.</summary>
         public string? EhrSystem { get; set; }
+
+        /// <summary>Facility this run allocated. Empty until the run has one.</summary>
+        public string? FacilityId { get; set; }
     }
 }
