@@ -83,6 +83,17 @@ public class SystemRulesTests
         SystemRules.CheckHealthService(" ", out var blank).Should().BeNull();
         blank.Should().BeNull();
 
+        SystemRules.CheckHealthService("nhsnappbff", out var nhsn).Should().BeNull();
+        nhsn.Should().Be("nhsnappbff");
+        SystemRules.CheckHealthService("NHSN App BFF", out var labeled).Should().BeNull();
+        labeled.Should().Be("nhsnappbff");
+        SystemRules.CheckHealthService("nhsn-app-bff", out var dashed).Should().BeNull();
+        dashed.Should().Be("nhsnappbff");
+        var names = SystemRules.HealthServices;
+        names.Should().Contain("nhsnappbff");
+        Array.IndexOf(names, "nhsnappbff").Should().Be(Array.IndexOf(names, "measureevaluation") + 1);
+        Array.IndexOf(names, "normalization").Should().Be(Array.IndexOf(names, "nhsnappbff") + 1);
+
         var health = """
             [{"service":"Account","status":"Healthy","totalDuration":"00:00:00.012","entries":{"db":{"status":"Healthy","duration":"00:00:00.002","description":"ok"}}}]
             """;
