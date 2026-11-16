@@ -33,10 +33,7 @@
     } @else if (version) {
       <section class="rubric-dry-run-panel" aria-labelledby="dryRunSampleHeading">
         <h4 id="dryRunSampleHeading">Sample</h4>
-        <p class="rubric-dry-run-help">
-          One FHIR resource or a Bundle, as JSON: upload a file or paste it. The sample is sent to the Validation
-          service to be checked and is not kept. Only the outcome and the time are recorded on the version.
-        </p>
+        <p class="rubric-dry-run-help">Choose a file or paste FHIR JSON to run the rubric against.</p>
 
         <div class="rubric-dry-run-file">
           <label for="dryRunFile" class="rubric-button">Choose a file</label>
@@ -103,11 +100,6 @@
             </div>
           }
 
-          <p class="rubric-dry-run-help">
-            The dry run completed and is recorded on version {{ run.rubricVersion }}. What it found is about the
-            sample: a rubric that correctly reports a bad sample has done its job, and can be published.
-          </p>
-
           <div class="rubric-dry-run-actions">
             <a class="rubric-button" [routerLink]="['/rubrics', rubricId, 'versions', version.semver]">Back to the version</a>
             @if (version.status === 'DRAFT') {
@@ -156,14 +148,9 @@
               }
             </div>
 
-            <p class="rubric-dry-run-help" role="status">
-              @if (matchingCount === 0) {
-                No finding matches these filters.
-              } @else {
-                Showing {{ shownFindings.length | number }} of {{ matchingCount | number }}
-                {{ hasFilter ? 'matching findings' : 'findings' }}.
-              }
-            </p>
+            @if (matchingCount === 0) {
+              <p class="rubric-dry-run-help" role="status">No finding matches these filters.</p>
+            }
 
             @if (matchingCount > 0) {
               <div class="vd-mat-table rubric-dry-run-table">
@@ -201,12 +188,11 @@
                   <tr mat-header-row *matHeaderRowDef="findingColumns"></tr>
                   <tr mat-row *matRowDef="let row; columns: findingColumns;"></tr>
                 </table>
+                <mat-paginator [length]="matchingCount" [pageIndex]="findingsPageIndex" [pageSize]="findingsPageSize"
+                  [pageSizeOptions]="pageSizeOptions" (page)="onFindingsPage($event)" showFirstLastButtons
+                  aria-label="Select page of findings">
+                </mat-paginator>
               </div>
-              @if (shownFindings.length < matchingCount) {
-                <div class="rubric-dry-run-actions">
-                  <button type="button" class="rubric-button" (click)="showMore()">Show more</button>
-                </div>
-              }
             }
           }
         </section>
@@ -215,7 +201,7 @@
           <h4 id="dryRunChecksHeading">Checks ({{ checkRuns.length }})</h4>
           <p class="rubric-dry-run-help">Every check of the version, in the order they ran, and how long each took.</p>
           <div class="vd-mat-table rubric-dry-run-table">
-            <table mat-table [dataSource]="checkRuns" aria-label="Checks of this dry run">
+            <table mat-table [dataSource]="shownChecks" aria-label="Checks of this dry run">
               <ng-container matColumnDef="check">
                 <th mat-header-cell *matHeaderCellDef>Check</th>
                 <td mat-cell *matCellDef="let check"><span class="rubric-mono">{{ check.id }}</span></td>
@@ -256,6 +242,10 @@
               <tr mat-header-row *matHeaderRowDef="checkColumns"></tr>
               <tr mat-row *matRowDef="let row; columns: checkColumns;"></tr>
             </table>
+            <mat-paginator [length]="checkRuns.length" [pageIndex]="checksPageIndex" [pageSize]="checksPageSize"
+              [pageSizeOptions]="pageSizeOptions" (page)="onChecksPage($event)" showFirstLastButtons
+              aria-label="Select page of checks">
+            </mat-paginator>
           </div>
         </section>
       }

@@ -66,7 +66,6 @@ test.describe('dry run', () => {
     await expect(result).toContainText('840 ms');
     await expect(result).toContainText('Bundle with 1 entry');
     await expect(result).toContainText('Conformance: Unacceptable');
-    await expect(result).toContainText('The dry run completed and is recorded on version 1.2.0.');
 
     expect(runs).toHaveLength(1);
     expect(runs[0].body).toEqual({ payload: SAMPLE });
@@ -85,7 +84,6 @@ test.describe('dry run', () => {
     const findings = page.getByRole('table', { name: 'Findings of this dry run' });
     await page.getByLabel('Severity').selectOption('WARNING');
     await expect(findings.getByRole('row')).toHaveCount(2);
-    await expect(page.getByText('Showing 1 of 1 matching findings.')).toBeVisible();
 
     await page.getByLabel('Severity').selectOption('INFORMATION');
     await expect(page.getByText('No finding matches these filters.')).toBeVisible();

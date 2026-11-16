@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -67,8 +68,9 @@ export interface CheckRun {
   durationMs?: number;
 }
 
-/** How many findings are shown before the person asks for more. A sample can produce thousands. */
-export const FINDINGS_PAGE = 200;
+/** Page sizes for the findings and checks tables. A sample can produce thousands of findings. */
+export const PAGE_SIZE_OPTIONS = [10, 20, 50];
+export const DEFAULT_PAGE_SIZE = 20;
 
 const SEVERITIES: RubricSeverity[] = ['ERROR', 'WARNING', 'INFORMATION'];
 
@@ -79,7 +81,7 @@ const SEVERITIES: RubricSeverity[] = ['ERROR', 'WARNING', 'INFORMATION'];
  */
 @Component({
   selector: 'app-rubric-dry-run',
-  imports: [DecimalPipe, FormsModule, MatProgressSpinnerModule, MatTableModule, RouterLink],
+  imports: [DecimalPipe, FormsModule, MatPaginatorModule, MatProgressSpinnerModule, MatTableModule, RouterLink],
   templateUrl: './rubric-dry-run.component.html',
   styleUrls: ['./rubric-dry-run.component.scss']
 })
@@ -87,6 +89,7 @@ export class RubricDryRunComponent implements OnInit, OnDestroy {
   readonly findingColumns = ['check', 'severity', 'dimension', 'message', 'location'];
   readonly checkColumns = ['check', 'outcome', 'findings', 'duration'];
   readonly severities = SEVERITIES;
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
 
   readonly statusLabel = statusLabel;
   readonly resultLabel = resultLabel;
@@ -117,15 +120,20 @@ export class RubricDryRunComponent implements OnInit, OnDestroy {
   checkFilter = '';
   severityFilter: RubricSeverity | '' = '';
   dimensionFilter: RubricDimension | '' = '';
-  /** The findings the filters leave, and the part of them on the page. */
+  /** The findings the filters leave, and the page of them shown. */
   matchingCount = 0;
   shownFindings: IRubricFinding[] = [];
+  findingsPageIndex = 0;
+  findingsPageSize = DEFAULT_PAGE_SIZE;
   checkRuns: CheckRun[] = [];
+  /** The page of checks shown. */
+  shownChecks: CheckRun[] = [];
+  checksPageIndex = 0;
+  checksPageSize = DEFAULT_PAGE_SIZE;
   /** The dimensions and checks that have findings, for the filters. */
   findingDimensions: RubricDimension[] = [];
   findingChecks: string[] = [];
 
-  private shownLimit = FINDINGS_PAGE;
   private subscription?: Subscription;
   private run?: Subscription;
 
@@ -281,7 +289,7 @@ export class RubricDryRunComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
-    this.shownLimit = FINDINGS_PAGE;
+    this.findingsPageIndex = 0;
     this.refreshFindings();
   }
 
@@ -300,9 +308,16 @@ export class RubricDryRunComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
-  showMore(): void {
-    this.shownLimit += FINDINGS_PAGE;
+  onFindingsPage(event: PageEvent): void {
+    this.findingsPageIndex = event.pageIndex;
+    this.findingsPageSize = event.pageSize;
     this.refreshFindings();
+  }
+
+  onChecksPage(event: PageEvent): void {
+    this.checksPageIndex = event.pageIndex;
+    this.checksPageSize = event.pageSize;
+    this.refreshChecks();
   }
 
   private showResult(result: IRubricRunResult): void {
@@ -329,6 +344,8 @@ export class RubricDryRunComponent implements OnInit, OnDestroy {
       }
     }
     this.checkRuns = runs;
+    this.checksPageIndex = 0;
+    this.refreshChecks();
 
     this.checkFilter = '';
     this.severityFilter = '';
@@ -342,7 +359,14 @@ export class RubricDryRunComponent implements OnInit, OnDestroy {
       && (!this.severityFilter || finding.severity === this.severityFilter)
       && (!this.dimensionFilter || finding.dimension === this.dimensionFilter));
     this.matchingCount = matching.length;
-    this.shownFindings = matching.slice(0, this.shownLimit);
+    const start = this.findingsPageIndex * this.findingsPageSize;
+    this.shownFindings = matching.slice(start, start + this.findingsPageSize);
+    this.changeDetector.markForCheck();
+  }
+
+  private refreshChecks(): void {
+    const start = this.checksPageIndex * this.checksPageSize;
+    this.shownChecks = this.checkRuns.slice(start, start + this.checksPageSize);
     this.changeDetector.markForCheck();
   }
 }

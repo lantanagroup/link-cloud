@@ -4,7 +4,7 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { IRubricFinding, IRubricRunResult, IRubricVersionDetail } from '../../../interfaces/validation/rubric.interface';
 import { RubricApiError, RubricService } from '../../../services/gateway/validation/rubric.service';
-import { FINDINGS_PAGE, readSample, RubricDryRunComponent } from './rubric-dry-run.component';
+import { DEFAULT_PAGE_SIZE, readSample, RubricDryRunComponent } from './rubric-dry-run.component';
 
 const version: IRubricVersionDetail = {
   rubricVersionId: 3,
@@ -165,13 +165,6 @@ describe('RubricDryRunComponent', () => {
       ]);
     });
 
-    it('says the run is recorded, and that findings are about the sample', () => {
-      run();
-
-      expect(text()).toContain('The dry run completed and is recorded on version 1.2.0.');
-      expect(text()).toContain('can be published');
-    });
-
     it('offers to publish a draft, and not a version that is already published', () => {
       run();
       const links = (): string[] => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a.rubric-button'))
@@ -270,21 +263,38 @@ describe('RubricDryRunComponent', () => {
     });
   });
 
-  it('shows a page of findings at a time when there are thousands', () => {
-    const many: IRubricFinding[] = Array.from({ length: FINDINGS_PAGE * 2 + 5 },
+  it('pages the findings, and goes back to the first page when the filters change', () => {
+    const many: IRubricFinding[] = Array.from({ length: DEFAULT_PAGE_SIZE * 2 + 5 },
       (_, index) => ({ checkId: 'name', severity: 'ERROR', message: `m${index}` }));
     rubricService.dryRun.and.returnValue(of(runResult({ findings: many })));
 
     run();
-    expect(component.shownFindings.length).toBe(FINDINGS_PAGE);
+    expect(component.shownFindings.length).toBe(DEFAULT_PAGE_SIZE);
+    expect(component.shownFindings[0].message).toBe('m0');
 
-    component.showMore();
-    expect(component.shownFindings.length).toBe(FINDINGS_PAGE * 2);
-    component.showMore();
+    component.onFindingsPage({ pageIndex: 2, pageSize: DEFAULT_PAGE_SIZE, length: many.length });
+    expect(component.shownFindings.map(finding => finding.message)).toEqual(['m40', 'm41', 'm42', 'm43', 'm44']);
+
+    component.onFindingsPage({ pageIndex: 0, pageSize: 50, length: many.length });
     expect(component.shownFindings.length).toBe(many.length);
 
+    component.onFindingsPage({ pageIndex: 1, pageSize: 10, length: many.length });
     component.applyFilters();
-    expect(component.shownFindings.length).toBe(FINDINGS_PAGE);
+    expect(component.findingsPageIndex).toBe(0);
+    expect(component.shownFindings[0].message).toBe('m0');
+  });
+
+  it('pages the checks', () => {
+    const durations = Object.fromEntries(Array.from({ length: DEFAULT_PAGE_SIZE + 3 }, (_, index) => [`c${index}`, 1]));
+    rubricService.dryRun.and.returnValue(of(runResult({ trace: { durationMs: 1, checkDurationsMs: durations } })));
+
+    run();
+    // the checks that ran, then the disabled one
+    expect(component.checkRuns.length).toBe(DEFAULT_PAGE_SIZE + 4);
+    expect(component.shownChecks.length).toBe(DEFAULT_PAGE_SIZE);
+
+    component.onChecksPage({ pageIndex: 1, pageSize: DEFAULT_PAGE_SIZE, length: component.checkRuns.length });
+    expect(component.shownChecks.map(check => check.id)).toEqual(['c20', 'c21', 'c22', 'off']);
   });
 
   describe('a run that could not be done', () => {
