@@ -2,7 +2,6 @@
 using IntegrationTests.Census;
 using IntegrationTests.DataAcquisition;
 using IntegrationTests.DMRP;
-using IntegrationTests.MigrationRoundTrip;
 using IntegrationTests.MockDmrpApi;
 using IntegrationTests.Normalization;
 using IntegrationTests.Report;
@@ -38,8 +37,7 @@ public class IntegrationTestCollection :
     ICollectionFixture<ReportIntegrationTestFixture>,
     ICollectionFixture<ReportSqlServerIntegrationTestFixture>,
     ICollectionFixture<AutomationUIIntegrationTestFixture>,
-    ICollectionFixture<MockDmrpApiIntegrationTestFixture>,
-    ICollectionFixture<MigrationSqlServerFixture>
+    ICollectionFixture<MockDmrpApiIntegrationTestFixture>
 {
     public const string Name = "IntegrationTests";
 }

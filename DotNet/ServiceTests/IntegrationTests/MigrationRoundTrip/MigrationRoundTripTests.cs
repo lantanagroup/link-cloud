@@ -12,7 +12,7 @@ namespace IntegrationTests.MigrationRoundTrip;
 /// </summary>
 [Collection(IntegrationTestCollection.Name)]
 [Trait("Category", "IntegrationTests")]
-public sealed class MigrationRoundTripTests
+public sealed class MigrationRoundTripTests : IClassFixture<MigrationSqlServerFixture>
 {
     private const string QuartzColumnMigrationName = "AddQuartzMisfireOrigFireTime";
 
@@ -97,7 +97,7 @@ public sealed class MigrationRoundTripTests
 
     [Theory]
     [MemberData(nameof(QuartzColumnContextNames))]
-    public async Task QuartzColumnMigration_ColumnAddedByHand_AppliesWithoutErrorAndRollbackRemovesIt(string contextName)
+    public async Task QuartzColumnMigration_ColumnAddedByHand_AppliesAndRollbackRemovesIt(string contextName)
     {
         var connectionString = await _fixture.CreateDatabaseAsync($"MigrationTest_{contextName}");
 
