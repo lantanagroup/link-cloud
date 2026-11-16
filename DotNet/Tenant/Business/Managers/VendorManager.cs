@@ -12,6 +12,8 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Utils;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
@@ -32,10 +34,14 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         Task DeleteVendorVersionAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
     }
 
+    /// <summary>
+    /// A vendor version cannot be deleted while something still points at it. The controllers answer
+    /// this with 409 Conflict; the message names which reference stood in the way.
+    /// </summary>
     public sealed class VendorVersionInUseException : InvalidOperationException
     {
-        public VendorVersionInUseException(Guid vendorVersionId)
-            : base($"Vendor version '{vendorVersionId}' is referenced by Normalization and cannot be deleted.")
+        public VendorVersionInUseException(string message, Exception? innerException = null)
+            : base(message, innerException)
         {
         }
     }
@@ -145,16 +151,53 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
             foreach (var vendorVersionId in vendorVersionIds)
             {
-                await EnsureVendorVersionIsNotReferencedByNormalizationAsync(vendorVersionId, cancellationToken);
+                await EnsureVendorVersionIsNotInUseAsync(vendorVersionId, cancellationToken);
             }
 
-            await _dbContext.Vendors.Where(q => q.Id == vendorId).ExecuteDeleteAsync(cancellationToken);
+            //deleting the vendor cascades to its versions, so a facility still holding one of them
+            //fails the very foreign key the version delete would.
+            await DeleteAndTranslateStillReferencedAsync(
+                () => _dbContext.Vendors.Where(q => q.Id == vendorId).ExecuteDeleteAsync(cancellationToken),
+                $"Vendor '{vendorId}' has a version that is still referenced and cannot be deleted.");
         }
 
         public async Task DeleteVendorVersionAsync(Guid vendorVersionId, CancellationToken cancellationToken = default)
         {
+            await EnsureVendorVersionIsNotInUseAsync(vendorVersionId, cancellationToken);
+
+            await DeleteAndTranslateStillReferencedAsync(
+                () => _dbContext.VendorVersions.Where(q => q.Id == vendorVersionId).ExecuteDeleteAsync(cancellationToken),
+                $"Vendor version '{vendorVersionId}' is still referenced and cannot be deleted.");
+        }
+
+        private async Task EnsureVendorVersionIsNotInUseAsync(Guid vendorVersionId, CancellationToken cancellationToken)
+        {
+            //the local reference comes first: one indexed read against the service's own database,
+            //before an HTTP call to Normalization that a facility-held version makes pointless.
+            await EnsureVendorVersionIsNotAssignedToAFacilityAsync(vendorVersionId, cancellationToken);
             await EnsureVendorVersionIsNotReferencedByNormalizationAsync(vendorVersionId, cancellationToken);
-            await _dbContext.VendorVersions.Where(q => q.Id == vendorVersionId).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        private async Task EnsureVendorVersionIsNotAssignedToAFacilityAsync(Guid vendorVersionId, CancellationToken cancellationToken)
+        {
+            //Facilities.VendorVersionId is a restricted foreign key, so a referenced version cannot
+            //be deleted at all. Soft-deleted facilities keep the column set and so still hold it;
+            //counting them is what the database does, and leaving them out would return a 204 the
+            //delete never achieved.
+            var facilityCount = await _dbContext.Facilities
+                .CountAsync(facility => facility.VendorVersionId == vendorVersionId, cancellationToken);
+
+            if (facilityCount > 0)
+            {
+                _logger.LogInformation(
+                    "Refused to delete vendor version {VendorVersionId}: {FacilityCount} facility configuration(s) are assigned to it.",
+                    vendorVersionId,
+                    facilityCount);
+
+                throw new VendorVersionInUseException(
+                    $"Vendor version '{vendorVersionId}' is assigned to {facilityCount} facility " +
+                    $"configuration{(facilityCount == 1 ? string.Empty : "s")} and cannot be deleted.");
+            }
         }
 
         private async Task EnsureVendorVersionIsNotReferencedByNormalizationAsync(Guid vendorVersionId, CancellationToken cancellationToken)
@@ -170,8 +213,46 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
             if (response.Body?.Count > 0)
             {
-                throw new VendorVersionInUseException(vendorVersionId);
+                throw new VendorVersionInUseException(
+                    $"Vendor version '{vendorVersionId}' is referenced by Normalization and cannot be deleted.");
             }
+        }
+
+        /// <summary>
+        /// Runs a delete and turns a foreign key refusal into <see cref="VendorVersionInUseException"/>,
+        /// which the controllers answer with 409. The checks above cannot close the window between
+        /// themselves and the delete - another request may assign the version to a facility in it -
+        /// and this also keeps a reference added later from reaching the client as a 500.
+        /// </summary>
+        private static async Task DeleteAndTranslateStillReferencedAsync(Func<Task<int>> delete, string message)
+        {
+            try
+            {
+                await delete();
+            }
+            catch (Exception ex) when (IsStillReferenced(ex))
+            {
+                throw new VendorVersionInUseException(message, ex);
+            }
+        }
+
+        //EF wraps the provider's exception, at times several levels deep, so walk the chain. SQL
+        //Server raises 547 for a foreign key violation. SQLite, which the integration tests run on,
+        //reports a constraint violation as primary code 19 and an extended code that varies by how
+        //the statement reached it (1811 here, not the 787 the documentation suggests); the primary
+        //code is enough, because the only constraint a DELETE can break is a reference to the row.
+        private static bool IsStillReferenced(Exception exception)
+        {
+            for (Exception? current = exception; current is not null; current = current.InnerException)
+            {
+                if (current is SqlException { Number: 547 }
+                    || current is SqliteException { SqliteErrorCode: 19 })
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public async Task<VendorModel> UpdateVendorAsync(Guid id, VendorModel vendor, CancellationToken cancellationToken = default)

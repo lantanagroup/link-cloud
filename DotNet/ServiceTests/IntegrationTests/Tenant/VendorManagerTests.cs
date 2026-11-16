@@ -3,6 +3,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Business.Managers;
+using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Http;
@@ -73,6 +74,95 @@ public class VendorManagerTests : IDisposable
 
         Assert.Null(await _dbContext.VendorVersions
             .AsNoTracking()
+            .SingleOrDefaultAsync(version => version.Id == vendorVersion.Id));
+    }
+
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityUsesIt_ThrowsAndRetainsVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+    }
+
+    /// <summary>
+    /// A soft-deleted facility keeps its VendorVersionId, so the row still holds the foreign key and
+    /// the delete would still be refused by the database.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenOnlyASoftDeletedFacilityUsesIt_ThrowsAndRetainsVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id, isDeleted: true);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+    }
+
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityUsesIt_SkipsTheNormalizationCall()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        _normalizationServiceClient.Verify(
+            client => client.GetVendorVersionOperationPresetsAsync(It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// Deleting the vendor cascades to its versions, so a facility holding one of them fails the same
+    /// foreign key.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendor_WhenAFacilityUsesOneOfItsVersions_ThrowsAndRetainsVendor()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorAsync(vendorVersion.VendorId));
+
+        Assert.NotNull(await _dbContext.Vendors.FindAsync(vendorVersion.VendorId));
+        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+    }
+
+    /// <summary>
+    /// The pre-checks cannot close the window between themselves and the delete: here the facility
+    /// is assigned while Normalization is being asked, so the database is what refuses the delete.
+    /// It still has to reach the caller as a conflict rather than a 500.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityIsAssignedAfterTheChecks_ThrowsAndRetainsVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+
+        _normalizationServiceClient
+            .Setup(client => client.GetVendorVersionOperationPresetsAsync(vendorVersion.Id, null, It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                await CreateFacilityAsync(vendorVersion.Id);
+                return new LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>
+                {
+                    StatusCode = StatusCodes.Status200OK,
+                    Body = []
+                };
+            });
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains("still referenced", exception.Message);
+        Assert.NotNull(await _dbContext.VendorVersions.AsNoTracking()
             .SingleOrDefaultAsync(version => version.Id == vendorVersion.Id));
     }
 
@@ -185,6 +275,41 @@ public class VendorManagerTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         return vendorVersion;
+    }
+
+    private async Task<Facility> CreateFacilityAsync(Guid vendorVersionId, bool isDeleted = false)
+    {
+        var facility = new Facility
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = $"facility-{Guid.NewGuid():N}",
+            FacilityName = "Vendor Version Delete Test Facility",
+            TimeZone = "America/Chicago",
+            IsDeleted = isDeleted,
+            VendorVersionId = vendorVersionId,
+            ScheduledReports = new ScheduledReportModel
+            {
+                Daily = [],
+                Weekly = [],
+                Monthly = []
+            }
+        };
+
+        await _dbContext.Facilities.AddAsync(facility);
+        await _dbContext.SaveChangesAsync();
+
+        return facility;
+    }
+
+    private void ConfigureNoNormalizationReferences(Guid vendorVersionId)
+    {
+        _normalizationServiceClient
+            .Setup(client => client.GetVendorVersionOperationPresetsAsync(vendorVersionId, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>
+            {
+                StatusCode = StatusCodes.Status200OK,
+                Body = []
+            });
     }
 
     private void ConfigureNormalizationReferences(Guid vendorVersionId)
