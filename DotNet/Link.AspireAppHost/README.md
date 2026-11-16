@@ -379,6 +379,7 @@ Each service runs the way compose runs it, with compose's hostnames swapped for 
 | `Extensions/SeedDataExtensions.cs` | Seed data and the **Seed data** command |
 | `Extensions/AccountUserExtensions.cs` | The **Create user** command |
 | `Extensions/FacilitySetupExtensions.cs` | The **Create test facility** command, which runs `FacilitySetup/steps.json` |
+| `Extensions/ResetExtensions.cs` | The **Reset data** command |
 | `Extensions/CommandNotifications.cs` | The running, success and failure notices the dashboard commands show |
 | `AdminUi/proxy.mjs` | The Admin UI's `ng serve` proxy |
 | `NhsnAppUi/webpack.config.js` | The NHSN App UI's webpack config: the UI's own, with `/api` proxied to this host's BFF |
@@ -446,6 +447,34 @@ or a red one on failure, which stays until dismissed.
 - **Apply Validation migrations** (on `validation`): runs
   `Java/validation/src/main/resources/database/migrations/V*.sql` in order. The `U*.sql` undo scripts
   beside them are not run.
+- **Reset data** (on `sql`): empties what the services keep, so the next run starts from nothing. It
+  can't be undone. It's on `sql` rather than `admin-bff` because `sql` stays up throughout, and the
+  Admin BFF can be one of the services it stops. A form asks what to keep:
+  - **Keep Account (users and roles)**, ticked by default. Untick it to empty Account's database too.
+    In Keycloak mode, Keycloak keeps its users either way, so after emptying Account run **Create
+    user** again for each of them.
+  - **Also clear Automation UI data**, unticked by default: its Mongo database (`botw-automation`)
+    and its `link-automation-ui` blob container.
+  - **Also clear Kafka**, unticked by default: deletes every topic and creates them again from
+    `topics.txt`, so messages not yet consumed, retries included, don't reach the emptied services.
+    Without it, consumers keep their committed offsets and old messages aren't replayed, but anything
+    still waiting on a topic is delivered after the restart.
+
+  It then:
+  1. Stops every running service that uses something being emptied. A service you never started (such as
+     Automation UI with `AutomationUi:AutoStart` off) or stopped yourself is left alone. Nothing is
+     emptied unless they've all stopped.
+  2. Drops and recreates, empty, every SQL Server database except Account's when it's kept; drops the
+     Mongo databases (MeasureEval's measures, and Automation UI's if chosen); empties the `internal` and
+     `external` blob containers; flushes Redis; and clears Kafka if chosen.
+  3. Starts the services again, each once whatever it waits for is healthy. They rebuild their schemas
+     as they start, as on a first run (EF migrations, and Hibernate for Validation).
+  4. Runs **Seed data**.
+
+  It doesn't recreate a facility. Run **Create test facility** afterwards. It also leaves Keycloak's
+  users, the SFTP folder and the local secrets file alone. HAPI FHIR keeps nothing between runs anyway.
+  If emptying fails part way, the services stay stopped so the cause can be looked at. Fix it and run
+  the command again.
 
 ## Things to know
 

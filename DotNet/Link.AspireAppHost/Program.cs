@@ -56,9 +56,11 @@ var tenant = builder.AddLinkService<Projects.Tenant>("tenant", Ports.Tenant)
     .WithEnvironment("MockDmrpApi__Enabled", "true")
     .WaitFor(mockDmrp);
 
+// Reset data can keep this database, so users and roles survive a reset.
+var accountDatabase = infrastructure.Database("account");
 var account = builder.AddLinkService<Projects.Account>("account", Ports.Account)
     .WithKafka(infrastructure)
-    .WithDatabase(infrastructure.Database("account"))
+    .WithDatabase(accountDatabase)
     .WithRedis(infrastructure)
     .WithLocalAuthentication(requireToken, keycloak);
 
@@ -145,6 +147,10 @@ var terminology = builder.AddLinkService<Projects.Terminology>("terminology", Po
 var (measureEval, validation) = builder.AddJavaServices(infrastructure, infrastructure.Database("validation"), requireToken, keycloak);
 measureEval.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(infrastructure.Azurite);
 validation.WaitFor(infrastructure.Kafka).WaitFor(infrastructure.Redis).WaitFor(infrastructure.Azurite).WaitFor(terminology);
+
+// Empties what the services keep and starts them again, optionally keeping Account. It sits on sql, which stays up
+// throughout; the Admin BFF, where the other cross-service commands are, is one of the services it stops.
+infrastructure.Sql.WithResetDataCommand(infrastructure, accountDatabase, keycloakMode: keycloak is not null);
 
 
 // ---------------------------------------------------------------------------------------------------

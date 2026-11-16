@@ -351,14 +351,16 @@ internal static class InfrastructureExtensions
     /// Waits for the broker, then creates every topic in <c>/topics.txt</c> (<c>name:partitions:replicas</c>
     /// per line) that does not exist, eight at a time, then <see cref="HealthCheckTopic"/>. There is one
     /// broker, so every topic gets one replica whatever the file asks for. POSIX sh, for the image's shell.
+    /// <c>TOPICS_FILE</c> names another copy of the file: <b>Reset data</b> runs this inside the broker's own
+    /// container, where <c>topics.txt</c> is not mounted.
     /// </summary>
-    private const string CreateTopicsScript = """
+    internal const string CreateTopicsScript = """
         set -e
         T=/opt/kafka/bin/kafka-topics.sh
         until existing=$($T --bootstrap-server "$BOOTSTRAP" --list 2>/dev/null); do
           echo "waiting for the broker at $BOOTSTRAP"; sleep 2
         done
-        tr -d '\r' < /topics.txt | grep -v '^#' | grep -v '^[[:space:]]*$' | while IFS=: read -r name partitions replicas; do
+        tr -d '\r' < "${TOPICS_FILE:-/topics.txt}" | grep -v '^#' | grep -v '^[[:space:]]*$' | while IFS=: read -r name partitions replicas; do
           echo "$existing" | grep -qx "$name" || echo "$name ${partitions:-2}"
         done > /tmp/missing.txt
         count=$(wc -l < /tmp/missing.txt | tr -d ' ')

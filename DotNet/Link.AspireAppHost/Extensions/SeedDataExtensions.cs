@@ -53,8 +53,9 @@ internal static class SeedDataExtensions
         IResourceBuilder<ExecutableResource> measureEval,
         IResourceBuilder<ExecutableResource> validation)
     {
-        var measuresDirectory = Path.GetFullPath(Path.Combine(host.ApplicationBuilder.AppHostDirectory, "..", "Automation", "measures"));
-        var rubricFile = RubricFile(host.ApplicationBuilder.AppHostDirectory);
+        var appHostDirectory = host.ApplicationBuilder.AppHostDirectory;
+        var measuresDirectory = MeasuresDirectory(appHostDirectory);
+        var rubricFile = RubricFile(appHostDirectory);
 
         SeedWhenReady(account, "roles", (logger, cancellationToken) => SeedRolesAsync(logger, cancellationToken));
         SeedWhenReady(validation, "validation", (logger, cancellationToken) => SeedValidationAsync(rubricFile, logger, cancellationToken));
@@ -67,31 +68,7 @@ internal static class SeedDataExtensions
                 "Seeding Account roles, Validation artifacts, categories and rubric, and measures. Loading measures can take a minute.", async () =>
             {
                 var logger = context.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Link.SeedData");
-                var parts = new (string Name, Func<Task<string>> Run)[]
-                {
-                    ("roles", () => SeedRolesAsync(logger, context.CancellationToken)),
-                    ("validation", () => SeedValidationAsync(rubricFile, logger, context.CancellationToken)),
-                    ("measures", () => SeedMeasuresAsync(measuresDirectory, logger, context.CancellationToken))
-                };
-
-                // Each part runs whatever happened to the others, so one service being down does not stop the rest.
-                var results = new List<string>();
-                var failed = false;
-                foreach (var (name, run) in parts)
-                {
-                    try
-                    {
-                        results.Add(await run());
-                    }
-                    catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException or TaskCanceledException)
-                    {
-                        failed = true;
-                        logger.LogError("Seeding {Part} failed: {Error}", name, ex.Message);
-                        results.Add($"Seeding {name} failed; the AppHost console has the details.");
-                    }
-                }
-
-                var summary = string.Join(" ", results);
+                var (failed, summary) = await SeedAllAsync(appHostDirectory, logger, context.CancellationToken);
                 return failed ? CommandResults.Failure(summary) : CommandResults.Success(summary);
             }),
             commandOptions: new CommandOptions
@@ -105,6 +82,72 @@ internal static class SeedDataExtensions
             });
     }
 
+    /// <summary>
+    /// Runs every seed part, each whatever happened to the others, so one service being down does not stop the rest.
+    /// Used by the <b>Seed data</b> command and by <b>Reset data</b> once the services are back.
+    /// </summary>
+    /// <returns>Whether any part failed, and one sentence per part.</returns>
+    public static async Task<(bool Failed, string Summary)> SeedAllAsync(string appHostDirectory, ILogger logger, CancellationToken cancellationToken)
+    {
+        var measuresDirectory = MeasuresDirectory(appHostDirectory);
+        var rubricFile = RubricFile(appHostDirectory);
+        var parts = new (string Name, Func<Task<string>> Run)[]
+        {
+            ("roles", () => SeedRolesAsync(logger, cancellationToken)),
+            ("validation", () => SeedValidationAsync(rubricFile, logger, cancellationToken)),
+            ("measures", () => SeedMeasuresAsync(measuresDirectory, logger, cancellationToken))
+        };
+
+        var results = new List<string>();
+        var failed = false;
+        foreach (var (name, run) in parts)
+        {
+            try
+            {
+                results.Add(await RunPartAsync(name, run, cancellationToken));
+            }
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException or TaskCanceledException)
+            {
+                failed = true;
+                logger.LogError("Seeding {Part} failed: {Error}", name, ex.Message);
+                results.Add($"Seeding {name} failed; the AppHost console has the details.");
+            }
+        }
+
+        return (failed, string.Join(" ", results));
+    }
+
+    private static string MeasuresDirectory(string appHostDirectory) =>
+        Path.GetFullPath(Path.Combine(appHostDirectory, "..", "Automation", "measures"));
+
+    /// <summary>One lock per seed part, so a part never runs twice at once.</summary>
+    private static readonly Dictionary<string, SemaphoreSlim> PartLocks = new()
+    {
+        ["roles"] = new SemaphoreSlim(1, 1),
+        ["validation"] = new SemaphoreSlim(1, 1),
+        ["measures"] = new SemaphoreSlim(1, 1)
+    };
+
+    /// <summary>
+    /// Runs one part under its lock. A part runs when its service turns healthy and from the commands, and
+    /// after <b>Reset data</b> restarts a service both can happen together. Each part only creates what is
+    /// missing, but two runs at once would both see a thing missing and both create it. Taking turns, the
+    /// second finds it there.
+    /// </summary>
+    private static async Task<string> RunPartAsync(string part, Func<Task<string>> run, CancellationToken cancellationToken)
+    {
+        var gate = PartLocks[part];
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            return await run();
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     /// <summary>Runs one seed part when <paramref name="resource"/> turns healthy. A failure is logged, not thrown.</summary>
     private static void SeedWhenReady<T>(IResourceBuilder<T> resource, string part, Func<ILogger, CancellationToken, Task<string>> seed)
         where T : IResource =>
@@ -113,7 +156,8 @@ internal static class SeedDataExtensions
             var logger = ready.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Link.SeedData");
             try
             {
-                logger.LogInformation("Seed data ({Part}): {Summary}", part, await seed(logger, cancellationToken));
+                logger.LogInformation("Seed data ({Part}): {Summary}",
+                    part, await RunPartAsync(part, () => seed(logger, cancellationToken), cancellationToken));
             }
             catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException or TaskCanceledException)
             {
