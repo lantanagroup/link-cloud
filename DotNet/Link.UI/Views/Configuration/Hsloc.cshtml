@@ -49,6 +49,21 @@
             <input type="hidden" name="text" value="@query.Text" />
             <input type="hidden" name="version" value="@query.Version" />
             <input type="hidden" name="page" value="@query.Page" />
+            <div class="col-12">
+                <div id="hsloc-format-help" class="alert au-note mb-0" role="note" aria-label="Required HSLOC CSV format">
+                    <p class="mb-2"><strong>The HSLOC CSV published on the CDC website cannot be uploaded as-is.</strong>
+                        Reformat it so the first row is a header containing exactly these four columns, in any order:</p>
+                    <ul class="mb-2">
+                        <li><code>CDCCode</code>: NHSN CDC location code, for example IN:ACUTE:CC:M</li>
+                        <li><code>ShortDescription</code>: Short location description</li>
+                        <li><code>HSLOCCode</code>: HL7 HSLOC code, for example 1027-2</li>
+                        <li><code>LongDescription</code>: Full location description</li>
+                    </ul>
+                    <p class="mb-2">Every row needs a value in all four columns, each HSLOC code may appear only once, and any other columns must be removed. Example:</p>
+                    <pre class="mb-0"><code>CDCCode,ShortDescription,HSLOCCode,LongDescription
+IN:ACUTE:CC:M,Medical Critical Care,1027-2,Medical Critical Care</code></pre>
+                </div>
+            </div>
             <div class="col-12 col-md-3">
                 <label class="form-label" for="oldVersion">Old version</label>
                 <input id="oldVersion" name="oldVersion" class="form-control" maxlength="255" required />
@@ -59,10 +74,13 @@
             </div>
             <div class="col-12 col-md-4">
                 <label class="form-label" for="csv">CSV file</label>
-                <input id="csv" name="csv" type="file" accept=".csv,text/csv" class="form-control" required />
+                <input id="csv" name="csv" type="file" accept=".csv,text/csv" class="form-control" required aria-describedby="hsloc-format-help file-error" />
             </div>
             <div class="col-12 col-md-2">
-                <button data-hold="@Hold.Of("Replace this HSLOC version with the uploaded CSV?", "Replace this HSLOC version with the uploaded CSV?", "The current contents are replaced.", "Hold to confirm")" type="submit" class="btn btn-success">Replace</button>
+                <button id="hsloc-replace" data-hold="@Hold.Of("Replace this HSLOC version with the uploaded CSV?", "Replace this HSLOC version with the uploaded CSV?", "The current contents are replaced.", "Hold to confirm")" type="submit" class="btn btn-success">Replace</button>
+            </div>
+            <div class="col-12">
+                <div id="file-error" class="text-danger small" role="alert" hidden></div>
             </div>
         </form>
     </div>
@@ -124,3 +142,5 @@ else
         </div>
     </div>
 }
+
+<script src="~/js/hsloc-csv.js" asp-append-version="true"></script>
