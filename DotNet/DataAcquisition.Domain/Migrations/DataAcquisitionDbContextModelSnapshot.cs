@@ -1150,8 +1150,9 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasIndex(new[] { "FacilityId", "LocationId", "IsOrgLocation" }, "IX_LocationMapping_FacilityId_LocationId_IsOrgLocation");
 
-                    b.HasIndex(new[] { "FacilityId", "PartOfValue" }, "IX_LocationMapping_FacilityId_PartOfValue")
-                        .HasFilter("([PartOfId] IS NULL)");
+                    b.HasIndex(new[] { "FacilityId", "PartOfValue" }, "IX_LocationMapping_FacilityId_PartOfValue_All");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex(new[] { "FacilityId", "PartOfValue" }, "IX_LocationMapping_FacilityId_PartOfValue_All"), new[] { "PartOfId", "IsOrgLocation" });
 
                     b.HasIndex(new[] { "PartOfId" }, "IX_LocationMapping_PartOfId")
                         .HasFilter("([PartOfId] IS NOT NULL)");

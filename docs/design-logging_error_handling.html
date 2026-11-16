@@ -1121,7 +1121,7 @@ which reads like a failed test when it's really a failed setup. The traps are fl
 </tr>
 <tr>
 <td>Mongo credentials</td>
-<td><code>spring.data.mongodb.uri: mongodb://linkuser:wrongpass@mongo:27017/link-measureeval?authSource=admin&amp;serverSelectionTimeoutMS=4000</code></td>
+<td><code>spring.data.mongodb.uri: mongodb://linkuser:&lt;any wrong password&gt;@mongo:27017/link-measureeval?authSource=admin&amp;serverSelectionTimeoutMS=4000</code></td>
 <td>✅ Runtime — every Mongo access fails with <code>AuthenticationFailed</code> (error 18) → ladder. Works even though the local compose Mongo has <strong>no auth enabled</strong>: the server still validates the SCRAM handshake against its user catalog, and the user doesn't exist</td>
 </tr>
 <tr>

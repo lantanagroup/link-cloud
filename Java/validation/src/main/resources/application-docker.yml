@@ -7,7 +7,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
+    url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true # trufflehog:ignore
     username: sa
 
   kafka:

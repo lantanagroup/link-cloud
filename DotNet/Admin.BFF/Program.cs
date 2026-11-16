@@ -480,6 +480,11 @@ static void SetupMiddleware(WebApplication app)
                 serviceRegistry.PublicTerminologyServiceUrl,
                 "/terminology/info", logger));
 
+        if (!string.IsNullOrEmpty(serviceRegistry.NhsnAppBffServiceApiUrl))
+            tasks.Add(ServiceInformation.GetServiceInformation(client, "NHSN App BFF",serviceRegistry.NhsnAppBffServiceApiUrl,
+                serviceRegistry.PublicNhsnAppBffServiceUrl,
+                "/nhsn-app-bff/info", logger));
+
         var results = await Task.WhenAll(tasks);
         serviceInfos.AddRange(results.Where(info => info != null)!);
 
