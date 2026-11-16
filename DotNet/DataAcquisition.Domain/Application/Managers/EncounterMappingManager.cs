@@ -10,6 +10,14 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 public interface IEncounterMappingManager
 {
     Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model);
+
+    /// <summary>
+    /// Creates a mapping from an acquired Encounter, without the facility and patient checks that
+    /// <see cref="CreateAsync"/> runs for manual creates. Acquisition cannot produce either inconsistency.
+    /// </summary>
+    Task<EncounterMappingModel> CreateFromAcquisitionAsync(CreateEncounterMappingModel model,
+                                                           CancellationToken cancellationToken = default);
+
     Task<EncounterMappingModel> UpdateByIdAsync(int id, UpdateEncounterMappingModel model);
     Task<EncounterMappingModel> UpdateByFacilityIdAndEncounterIdAsync(string facilityId, string encounterId, UpdateEncounterMappingModel model);
     Task<int> RecomputeMappedToOrgForLocationMappingAsync(int organizationLocationMappingId, CancellationToken cancellationToken = default);
@@ -32,11 +40,7 @@ public class EncounterMappingManager : IEncounterMappingManager
 
     public async Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
-
-        ArgumentException.ThrowIfNullOrEmpty(model.FacilityId, nameof(model.FacilityId));
-        ArgumentException.ThrowIfNullOrEmpty(model.EncounterId, nameof(model.EncounterId));
-        ArgumentException.ThrowIfNullOrEmpty(model.PatientId, nameof(model.PatientId));
+        ValidateRequiredFields(model);
 
         // EncounterMapping rows are normally written by the acquisition pipeline, where the
         // (FacilityId, PatientId) pair is always internally consistent. A manual create can supply
@@ -61,79 +65,15 @@ public class EncounterMappingManager : IEncounterMappingManager
                 $"PatientId {model.PatientId} is not associated with FacilityId {model.FacilityId}.");
         }
 
-        var now = DateTime.UtcNow;
-        var entity = new EncounterMapping
-        {
-            FacilityId = model.FacilityId,
-            PatientId = model.PatientId,
-            EncounterId = model.EncounterId,
-            MappedToOrg = model.MappedToOrg,
-            CreateDate = now,
-            ModifiedDate = now
-        };
+        return await InsertAsync(model, CancellationToken.None);
+    }
 
-        var existingMapping = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m => 
-            m.FacilityId == model.FacilityId && 
-            m.EncounterId == model.EncounterId);
-        
-        if (existingMapping != null) {
-            throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
-        }
-        
-        if (model.OrganizationLocationMappingIds != null)
-        {
-            foreach (var locId in model.OrganizationLocationMappingIds)
-            {
-                entity.EncounterLocations.Add(new EncounterLocation
-                {
-                    OrganizationLocationMappingId = locId,
-                    CreateDate = now,
-                    ModifiedDate = now
-                });
-            }
-        }
+    public async Task<EncounterMappingModel> CreateFromAcquisitionAsync(CreateEncounterMappingModel model,
+                                                                        CancellationToken cancellationToken = default)
+    {
+        ValidateRequiredFields(model);
 
-        try
-        {
-            await _database.EncounterMappingRepository.AddAsync(entity);
-            await _database.SaveChangesAsync();
-        }
-        catch (DbUpdateException)
-        {
-            // The pre-check above is non-atomic: a concurrent request can insert the same
-            // (FacilityId, EncounterId) between the check and SaveChanges, tripping the
-            // unique constraint (UQ_EncounterMapping_FacilityId_EncounterId). Re-check so we
-            // still surface a 409 in that race; if it isn't a duplicate, rethrow the original.
-            var concurrent = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m =>
-                m.FacilityId == model.FacilityId &&
-                m.EncounterId == model.EncounterId);
-
-            if (concurrent != null)
-            {
-                throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
-            }
-
-            // Not a duplicate. Check to see if it's a foreign key failure where the location id is invalid, if
-            // so, return the invalid ids
-            if (model.OrganizationLocationMappingIds is { Count: > 0 })
-            {
-                var requestedIds = model.OrganizationLocationMappingIds.Distinct().ToList();
-                var existingIds = (await _database.LocationMappingRepository
-                        .FindAsync(m => requestedIds.Contains(m.LocationMappingId)))
-                    .Select(m => m.LocationMappingId)
-                    .ToHashSet();
-
-                var missingIds = requestedIds.Where(id => !existingIds.Contains(id)).ToList();
-                if (missingIds.Count > 0)
-                {
-                    throw new BadRequestException($"Invalid OrganizationLocationMappingId(s): {string.Join(", ", missingIds)}");
-                }
-            }
-
-            throw;
-        }
-
-        return ProjectToModel(entity);
+        return await InsertAsync(model, cancellationToken);
     }
 
     public async Task<EncounterMappingModel> UpdateByIdAsync(int id, UpdateEncounterMappingModel model)
@@ -191,27 +131,38 @@ public class EncounterMappingManager : IEncounterMappingManager
         // Recompute (not overwrite): an encounter is mapped to the org if ANY of its referenced
         // locations is an org location. Overwriting MappedToOrg with a single location's value would
         // let a trailing non-org location clear the flag for a multi-location encounter.
-        var recomputed = await _dbContext.EncounterMappings
+        //
+        // Only rows whose stored flag is wrong are written. Rewriting unchanged rows under a widely
+        // shared location made concurrent acquisition workers block on each other.
+        var stale = await _dbContext.EncounterMappings
             .Where(mapping => mapping.EncounterLocations.Any(location =>
                 location.OrganizationLocationMappingId == organizationLocationMappingId))
             .Select(mapping => new
             {
                 mapping.EncounterMappingId,
+                mapping.MappedToOrg,
                 AnyOrg = mapping.EncounterLocations.Any(location => location.OrganizationLocationMapping.IsOrgLocation)
             })
+            .Where(mapping => mapping.MappedToOrg != mapping.AnyOrg)
             .ToListAsync(cancellationToken);
 
-        if (recomputed.Count == 0)
+        if (stale.Count == 0)
+        {
             return 0;
+        }
 
         var now = DateTime.UtcNow;
         var total = 0;
 
-        foreach (var group in recomputed.GroupBy(x => x.AnyOrg))
+        foreach (var group in stale.GroupBy(x => x.AnyOrg))
         {
-            var ids = group.Select(x => x.EncounterMappingId).ToList();
+            var ids = group
+                .Select(x => x.EncounterMappingId)
+                .ToList();
+
+            // The flag is checked again so a row another worker has already corrected is not rewritten.
             total += await _dbContext.EncounterMappings
-                .Where(mapping => ids.Contains(mapping.EncounterMappingId))
+                .Where(mapping => ids.Contains(mapping.EncounterMappingId) && mapping.MappedToOrg != group.Key)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(mapping => mapping.MappedToOrg, group.Key)
                     .SetProperty(mapping => mapping.ModifiedDate, now),
@@ -226,7 +177,7 @@ public class EncounterMappingManager : IEncounterMappingManager
         var entity = await _database.EncounterMappingRepository.GetAsync(id);
         if (entity != null)
         {
-            // Related EncounterLocations should be handled by cascade delete if configured in EF, 
+            // Related EncounterLocations should be handled by cascade delete if configured in EF,
             // but let's be explicit if needed or rely on repository.
             // Based on EncounterLocation entity, it has a FK to EncounterMapping.
             _database.EncounterMappingRepository.Remove(entity);
@@ -264,6 +215,95 @@ public class EncounterMappingManager : IEncounterMappingManager
             .ExecuteDeleteAsync();
 
         await _dbContext.SaveChangesAsync();
+    }
+
+    private static void ValidateRequiredFields(CreateEncounterMappingModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        ArgumentException.ThrowIfNullOrEmpty(model.FacilityId, nameof(model.FacilityId));
+        ArgumentException.ThrowIfNullOrEmpty(model.EncounterId, nameof(model.EncounterId));
+        ArgumentException.ThrowIfNullOrEmpty(model.PatientId, nameof(model.PatientId));
+    }
+
+    private async Task<EncounterMappingModel> InsertAsync(CreateEncounterMappingModel model,
+                                                          CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var entity = new EncounterMapping
+        {
+            FacilityId = model.FacilityId,
+            PatientId = model.PatientId,
+            EncounterId = model.EncounterId,
+            MappedToOrg = model.MappedToOrg,
+            CreateDate = now,
+            ModifiedDate = now
+        };
+
+        var existingMapping = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m =>
+            m.FacilityId == model.FacilityId &&
+            m.EncounterId == model.EncounterId,
+            cancellationToken);
+        
+        if (existingMapping != null) {
+            throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
+        }
+        
+        if (model.OrganizationLocationMappingIds != null)
+        {
+            foreach (var locId in model.OrganizationLocationMappingIds)
+            {
+                entity.EncounterLocations.Add(new EncounterLocation
+                {
+                    OrganizationLocationMappingId = locId,
+                    CreateDate = now,
+                    ModifiedDate = now
+                });
+            }
+        }
+
+        try
+        {
+            await _database.EncounterMappingRepository.AddAsync(entity, cancellationToken);
+            await _database.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // The pre-check above is non-atomic: a concurrent request can insert the same
+            // (FacilityId, EncounterId) between the check and SaveChanges, tripping the
+            // unique constraint (UQ_EncounterMapping_FacilityId_EncounterId). Re-check so we
+            // still surface a 409 in that race; if it isn't a duplicate, rethrow the original.
+            var concurrent = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m =>
+                m.FacilityId == model.FacilityId &&
+                m.EncounterId == model.EncounterId,
+                cancellationToken);
+
+            if (concurrent != null)
+            {
+                throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
+            }
+
+            // Not a duplicate. Check to see if it's a foreign key failure where the location id is invalid, if
+            // so, return the invalid ids
+            if (model.OrganizationLocationMappingIds is { Count: > 0 })
+            {
+                var requestedIds = model.OrganizationLocationMappingIds.Distinct().ToList();
+                var existingIds = (await _database.LocationMappingRepository
+                        .FindAsync(m => requestedIds.Contains(m.LocationMappingId), cancellationToken))
+                    .Select(m => m.LocationMappingId)
+                    .ToHashSet();
+
+                var missingIds = requestedIds.Where(id => !existingIds.Contains(id)).ToList();
+                if (missingIds.Count > 0)
+                {
+                    throw new BadRequestException($"Invalid OrganizationLocationMappingId(s): {string.Join(", ", missingIds)}");
+                }
+            }
+
+            throw;
+        }
+
+        return ProjectToModel(entity);
     }
 
     private static EncounterMappingModel ProjectToModel(EncounterMapping entity)

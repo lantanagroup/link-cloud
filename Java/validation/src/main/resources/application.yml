@@ -50,7 +50,7 @@ spring:
         # See dev-docs/validation-category-counts.md.
         sendStringParametersAsUnicode: false
   #datasource:
-  #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
+  #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true # trufflehog:ignore
   #  username: link-user
   #  password: link-password
   kafka:

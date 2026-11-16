@@ -490,11 +490,11 @@ public class DataAcquisitionDbContext : DbContext
 
             entity.HasIndex(e => e.PartOfId, "IX_LocationMapping_PartOfId").HasFilter("([PartOfId] IS NOT NULL)");
 
-            // Supports the orphan-adoption backfill (SetPartOfIdForChildrenAsync), which filters on
-            // (FacilityId, PartOfValue) for rows whose PartOfId is not yet resolved. Filtered to the
-            // unresolved rows so the index stays small and the update is a seek rather than a scan.
-            entity.HasIndex(e => new { e.FacilityId, e.PartOfValue }, "IX_LocationMapping_FacilityId_PartOfValue")
-                .HasFilter("([PartOfId] IS NULL)");
+            // SetParentForChildrenAsync runs for every acquired Location and matches children whose PartOfId is
+            // already set as well as unresolved ones, so this index is unfiltered. See
+            // DataAcquisition.Domain/Docs/OrgLocationMapping-AsBuilt.md.
+            entity.HasIndex(e => new { e.FacilityId, e.PartOfValue }, "IX_LocationMapping_FacilityId_PartOfValue_All")
+                .IncludeProperties(e => new { e.PartOfId, e.IsOrgLocation });
 
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
