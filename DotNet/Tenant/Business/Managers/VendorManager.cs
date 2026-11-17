@@ -144,63 +144,188 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
         public async Task DeleteVendorAsync(Guid vendorId, CancellationToken cancellationToken = default)
         {
-            var vendorVersionIds = await _dbContext.VendorVersions
-                .Where(vendorVersion => vendorVersion.VendorId == vendorId)
-                .Select(vendorVersion => vendorVersion.Id)
-                .ToListAsync(cancellationToken);
+            //the vendor's name comes back with its version ids, in the read that was already being
+            //made: a refusal has to name the vendor the administrator picked off the list, and the id
+            //identifies the row without telling them which one it is.
+            var existing = await _dbContext.Vendors
+                .Where(vendor => vendor.Id == vendorId)
+                .Select(vendor => new
+                {
+                    vendor.Name,
+                    Versions = vendor.VendorVersions
+                        .Select(version => new { version.Id, version.Version })
+                        .ToList()
+                })
+                .FirstOrDefaultAsync(cancellationToken);
 
-            foreach (var vendorVersionId in vendorVersionIds)
+            List<Guid> vendorVersionIds = existing?.Versions.Select(version => version.Id).ToList() ?? [];
+
+            //deleting the vendor cascades to its versions, so a facility holding any one of them
+            //fails the same foreign key. One read covers every version, and the refusal names the
+            //vendor the caller asked to delete rather than a version id they never saw.
+            var facilities = await DescribeFacilitiesUsingAsync(vendorVersionIds, withVersion: true, cancellationToken);
+            if (facilities.Count > 0)
             {
-                await EnsureVendorVersionIsNotInUseAsync(vendorVersionId, cancellationToken);
+                throw InUse(DescribeVendor(existing?.Name, vendorId), facilities, vendorId, nameof(DeleteVendorAsync));
             }
 
-            //deleting the vendor cascades to its versions, so a facility still holding one of them
-            //fails the very foreign key the version delete would.
+            if (existing is not null)
+            {
+                foreach (var version in existing.Versions)
+                {
+                    await EnsureVendorVersionIsNotReferencedByNormalizationAsync(
+                        version.Id,
+                        DescribeVendorVersion(existing.Name, version.Version, version.Id),
+                        cancellationToken);
+                }
+            }
+
             await DeleteAndTranslateStillReferencedAsync(
                 () => _dbContext.Vendors.Where(q => q.Id == vendorId).ExecuteDeleteAsync(cancellationToken),
-                $"Vendor '{vendorId}' has a version that is still referenced and cannot be deleted.");
+                $"{DescribeVendor(existing?.Name, vendorId)} is still referenced by a facility configuration and cannot be deleted.");
         }
 
         public async Task DeleteVendorVersionAsync(Guid vendorVersionId, CancellationToken cancellationToken = default)
         {
-            await EnsureVendorVersionIsNotInUseAsync(vendorVersionId, cancellationToken);
+            //the version string and its vendor's name, so a refusal names what the administrator is
+            //looking at: version '2026.1' of vendor 'Epic', not the id the row happens to carry.
+            var existing = await _dbContext.VendorVersions
+                .Where(vendorVersion => vendorVersion.Id == vendorVersionId)
+                .Select(vendorVersion => new
+                {
+                    vendorVersion.Version,
+                    VendorName = vendorVersion.Vendor!.Name
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var subject = DescribeVendorVersion(existing?.VendorName, existing?.Version, vendorVersionId);
+
+            //the local reference comes first: one indexed read against the service's own database,
+            //before an HTTP call to Normalization that a facility-held version makes pointless.
+            var facilities = await DescribeFacilitiesUsingAsync([vendorVersionId], withVersion: false, cancellationToken);
+            if (facilities.Count > 0)
+            {
+                throw InUse(subject, facilities, vendorVersionId, nameof(DeleteVendorVersionAsync));
+            }
+
+            await EnsureVendorVersionIsNotReferencedByNormalizationAsync(vendorVersionId, subject, cancellationToken);
 
             await DeleteAndTranslateStillReferencedAsync(
                 () => _dbContext.VendorVersions.Where(q => q.Id == vendorVersionId).ExecuteDeleteAsync(cancellationToken),
-                $"Vendor version '{vendorVersionId}' is still referenced and cannot be deleted.");
+                $"{subject} is still referenced by a facility configuration and cannot be deleted.");
         }
 
-        private async Task EnsureVendorVersionIsNotInUseAsync(Guid vendorVersionId, CancellationToken cancellationToken)
+        /// <summary>
+        /// The facilities holding any of these vendor versions, described for a refusal message.
+        /// Soft-deleted facilities keep their VendorVersionId, so the row still holds the foreign key
+        /// and the database would refuse the delete anyway; they are named as deleted rather than left
+        /// out, because an administrator cannot find one in the UI and would read the refusal as a bug.
+        /// </summary>
+        private async Task<List<string>> DescribeFacilitiesUsingAsync(
+            IReadOnlyCollection<Guid> vendorVersionIds,
+            bool withVersion,
+            CancellationToken cancellationToken)
         {
-            //the local reference comes first: one indexed read against the service's own database,
-            //before an HTTP call to Normalization that a facility-held version makes pointless.
-            await EnsureVendorVersionIsNotAssignedToAFacilityAsync(vendorVersionId, cancellationToken);
-            await EnsureVendorVersionIsNotReferencedByNormalizationAsync(vendorVersionId, cancellationToken);
-        }
-
-        private async Task EnsureVendorVersionIsNotAssignedToAFacilityAsync(Guid vendorVersionId, CancellationToken cancellationToken)
-        {
-            //Facilities.VendorVersionId is a restricted foreign key, so a referenced version cannot
-            //be deleted at all. Soft-deleted facilities keep the column set and so still hold it;
-            //counting them is what the database does, and leaving them out would return a 204 the
-            //delete never achieved.
-            var facilityCount = await _dbContext.Facilities
-                .CountAsync(facility => facility.VendorVersionId == vendorVersionId, cancellationToken);
-
-            if (facilityCount > 0)
+            if (vendorVersionIds.Count == 0)
             {
-                _logger.LogInformation(
-                    "Refused to delete vendor version {VendorVersionId}: {FacilityCount} facility configuration(s) are assigned to it.",
-                    vendorVersionId,
-                    facilityCount);
-
-                throw new VendorVersionInUseException(
-                    $"Vendor version '{vendorVersionId}' is assigned to {facilityCount} facility " +
-                    $"configuration{(facilityCount == 1 ? string.Empty : "s")} and cannot be deleted.");
+                return [];
             }
+
+            var facilities = await _dbContext.Facilities
+                .Where(facility => facility.VendorVersionId != null
+                    && vendorVersionIds.Contains(facility.VendorVersionId.Value))
+                .OrderBy(facility => facility.FacilityId)
+                .Select(facility => new
+                {
+                    facility.FacilityId,
+                    facility.FacilityName,
+                    facility.IsDeleted,
+                    Version = facility.VendorVersion!.Version
+                })
+                .ToListAsync(cancellationToken);
+
+            //"ABC123 (Mercy General, version 2026.1)", or "ABC123 (deleted)" - the name is optional,
+            //and the version only earns its place when the refusal spans more than one of them.
+            return facilities
+                .Select(facility =>
+                {
+                    var parts = new List<string>(3);
+                    if (!string.IsNullOrWhiteSpace(facility.FacilityName))
+                    {
+                        parts.Add(facility.FacilityName);
+                    }
+
+                    if (facility.IsDeleted)
+                    {
+                        parts.Add("deleted");
+                    }
+
+                    if (withVersion && !string.IsNullOrWhiteSpace(facility.Version))
+                    {
+                        parts.Add($"version {facility.Version}");
+                    }
+
+                    return parts.Count == 0
+                        ? facility.FacilityId
+                        : $"{facility.FacilityId} ({string.Join(", ", parts)})";
+                })
+                .ToList();
         }
 
-        private async Task EnsureVendorVersionIsNotReferencedByNormalizationAsync(Guid vendorVersionId, CancellationToken cancellationToken)
+        /// <summary>
+        /// A vendor as the administrator being refused sees it: by the name on the row they picked. The
+        /// id identifies the row and stays in the log line, where it is the thing worth searching on,
+        /// and only stands in here when the row is gone - another request may have deleted it.
+        /// </summary>
+        private static string DescribeVendor(string? name, Guid vendorId) =>
+            string.IsNullOrWhiteSpace(name)
+                ? $"Vendor '{vendorId}'"
+                : $"Vendor '{name}'";
+
+        /// <summary>
+        /// A version named the way the UI lists it, which is by its vendor: "Version '2026.1' of
+        /// vendor 'Epic'". The version string alone is not unique across vendors, so the vendor's name
+        /// goes with it whenever it is known.
+        /// </summary>
+        private static string DescribeVendorVersion(string? vendorName, string? version, Guid vendorVersionId)
+        {
+            if (string.IsNullOrWhiteSpace(version))
+            {
+                return $"Vendor version '{vendorVersionId}'";
+            }
+
+            return string.IsNullOrWhiteSpace(vendorName)
+                ? $"Vendor version '{version}'"
+                : $"Version '{version}' of vendor '{vendorName}'";
+        }
+
+        /// <summary>
+        /// A count alone leaves an administrator hunting, so the refusal names the facilities. Capped,
+        /// because this message reaches the client on Problem Details `detail`; the count stays exact.
+        /// </summary>
+        private VendorVersionInUseException InUse(string subject, List<string> facilities, Guid id, string operation)
+        {
+            const int maxNamed = 5;
+            var named = string.Join(", ", facilities.Take(maxNamed));
+            if (facilities.Count > maxNamed)
+            {
+                named += $" and {facilities.Count - maxNamed} more";
+            }
+
+            _logger.LogInformation(
+                "{Operation} refused for {Id}: in use by {FacilityCount} facility configuration(s) ({Facilities}).",
+                operation,
+                id,
+                facilities.Count,
+                HtmlInputSanitizer.Sanitize(named));
+
+            return new VendorVersionInUseException(
+                $"{subject} is in use by {facilities.Count} facility " +
+                $"configuration{(facilities.Count == 1 ? string.Empty : "s")} and cannot be deleted: {named}. " +
+                "Clear the vendor version on each facility before deleting it.");
+        }
+
+        private async Task EnsureVendorVersionIsNotReferencedByNormalizationAsync(Guid vendorVersionId, string subject, CancellationToken cancellationToken)
         {
             var response = await _normalizationServiceClient.GetVendorVersionOperationPresetsAsync(
                 vendorVersionId: vendorVersionId,
@@ -214,7 +339,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             if (response.Body?.Count > 0)
             {
                 throw new VendorVersionInUseException(
-                    $"Vendor version '{vendorVersionId}' is referenced by Normalization and cannot be deleted.");
+                    $"{subject} is referenced by Normalization and cannot be deleted.");
             }
         }
 

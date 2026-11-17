@@ -124,9 +124,10 @@ describe('VendorService', () => {
     req.flush({});
   });
 
-  // The config dialog shows its own snackbar for a failed save and stays open. Letting
-  // ErrorHandlingService also raise its toastr would report one failure twice.
-  it('suppresses the global toastr when a save fails', () => {
+  // The config dialog shows its own snackbar for a failed save and stays open, and the dashboard
+  // shows an alert dialog for a failed delete. Letting ErrorHandlingService also raise its toastr
+  // would report one failure twice.
+  it('suppresses the global toastr when a save or delete fails', () => {
     failRequest(
       () => service.updateVendor({ id: 'vendor-1', name: 'Epic' }).subscribe({ error: () => {} }),
       'PUT', `${BASE}/vendor/vendor-1`);
@@ -136,18 +137,18 @@ describe('VendorService', () => {
       () => service.createVendor({ id: '', name: 'Veradigm' }).subscribe({ error: () => {} }),
       'POST', `${BASE}/vendor`);
     expect(toastrShown()).toBeFalse();
-  });
-
-  // No dialog is open for these, so the toastr is the only thing that would tell the admin.
-  it('keeps the global toastr for list and delete failures', () => {
-    failRequest(
-      () => service.getVendors().subscribe({ error: () => {} }),
-      'GET', `${BASE}/vendor`);
-    expect(toastrShown()).toBeTrue();
 
     failRequest(
       () => service.deleteVendor('vendor-1').subscribe({ error: () => {} }),
       'DELETE', `${BASE}/vendor/vendor-1`);
+    expect(toastrShown()).toBeFalse();
+  });
+
+  // No dialog is open for a failed list, so the toastr is the only thing that would tell the admin.
+  it('keeps the global toastr for list failures', () => {
+    failRequest(
+      () => service.getVendors().subscribe({ error: () => {} }),
+      'GET', `${BASE}/vendor`);
     expect(toastrShown()).toBeTrue();
   });
 });

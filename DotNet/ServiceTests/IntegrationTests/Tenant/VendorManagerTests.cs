@@ -120,6 +120,71 @@ public class VendorManagerTests : IDisposable
     }
 
     /// <summary>
+    /// A count alone leaves an administrator hunting, and a soft-deleted facility cannot be found in
+    /// the UI at all - so the refusal names each facility and says which of them is deleted.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenFacilitiesUseIt_NamesThemInTheRefusal()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var live = await CreateFacilityAsync(vendorVersion.Id);
+        var softDeleted = await CreateFacilityAsync(vendorVersion.Id, isDeleted: true);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains("is in use by 2 facility configurations", exception.Message);
+        Assert.Contains(live.FacilityId, exception.Message);
+        Assert.Contains(softDeleted.FacilityId, exception.Message);
+        Assert.Contains($"{softDeleted.FacilityId} ({softDeleted.FacilityName}, deleted)", exception.Message);
+    }
+
+    /// <summary>
+    /// The refusal reaches an administrator who picked a version off a list by its vendor and version,
+    /// so that is what it names them by; the id identifies the row for the log line, not for them.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityUsesIt_NamesTheVendorAndVersionRatherThanTheId()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var vendorName = await VendorNameAsync(vendorVersion.VendorId);
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.StartsWith(
+            $"Version '{vendorVersion.Version}' of vendor '{vendorName}' is in use by 1 facility configuration",
+            exception.Message);
+        Assert.DoesNotContain(vendorVersion.Id.ToString(), exception.Message);
+        Assert.DoesNotContain(vendorVersion.VendorId.ToString(), exception.Message);
+    }
+
+    /// <summary>
+    /// A vendor delete is refused by the same foreign key, so its message has to be about the vendor
+    /// the caller asked to delete - naming the facilities, and which version each one holds.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendor_WhenAFacilityUsesOneOfItsVersions_NamesTheFacilityAndVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var vendorName = await VendorNameAsync(vendorVersion.VendorId);
+        var facility = await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorAsync(vendorVersion.VendorId));
+
+        //the vendor by name: the id is in the log line, and means nothing to whoever reads this.
+        Assert.Contains($"Vendor '{vendorName}' is in use by 1 facility configuration", exception.Message);
+        Assert.Contains($"{facility.FacilityId} ({facility.FacilityName}, version {vendorVersion.Version})", exception.Message);
+        Assert.DoesNotContain(vendorVersion.Id.ToString(), exception.Message);
+        Assert.DoesNotContain(vendorVersion.VendorId.ToString(), exception.Message);
+    }
+
+    /// <summary>
     /// Deleting the vendor cascades to its versions, so a facility holding one of them fails the same
     /// foreign key.
     /// </summary>
@@ -241,6 +306,13 @@ public class VendorManagerTests : IDisposable
 
         Assert.Equal("rotated-key", persisted.Authentication?.SigningKeySecretId);
     }
+
+    private async Task<string> VendorNameAsync(Guid vendorId) =>
+        await _dbContext.Vendors
+            .AsNoTracking()
+            .Where(vendor => vendor.Id == vendorId)
+            .Select(vendor => vendor.Name)
+            .SingleAsync();
 
     private async Task<Vendor> CreateVendorAsync()
     {
