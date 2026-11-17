@@ -150,6 +150,160 @@ public sealed class ReportPopulationConcurrencyTests
         }
     }
 
+    [LocalDbFact]
+    public async Task SecondApply_OfTheSameMeasureReport_DoesNotChangeTheTotal()
+    {
+        await using var database = await LocalDbReportDatabase.CreateAsync();
+        var scheduleId = Guid.NewGuid();
+        const string facilityId = "fac-second";
+        const string reportType = "second-type";
+
+        await database.SeedScheduleAsync(scheduleId, facilityId);
+
+        await using var scope = database.Provider.CreateAsyncScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+        var delivery = Delivery(reportType, "mr-1", 5);
+
+        await manager.ApplyAggregateResultAsync(facilityId, scheduleId, delivery, CancellationToken.None);
+        await manager.ApplyAggregateResultAsync(facilityId, scheduleId, delivery, CancellationToken.None);
+        await manager.ApplyAggregateResultAsync(facilityId, scheduleId, Delivery(reportType, "mr-2", 7), CancellationToken.None);
+
+        await AssertPopulationAsync(database, scheduleId, reportType, expectedTotal: 12, expectedChildren: 2);
+    }
+
+    [LocalDbFact]
+    public async Task DuplicateChild_ReportsSqlNumber2601ForTheMeasureReportIndex()
+    {
+        await using var database = await LocalDbReportDatabase.CreateAsync();
+        var scheduleId = Guid.NewGuid();
+        const string facilityId = "fac-number";
+        const string reportType = "number-type";
+
+        await database.SeedScheduleAsync(scheduleId, facilityId);
+
+        await using var scope = database.Provider.CreateAsyncScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+        await manager.ApplyAggregateResultAsync(facilityId, scheduleId, Delivery(reportType, "mr-1", 5), CancellationToken.None);
+
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var existing = await context.MeasureReportPopulation.AsNoTracking().FirstAsync();
+        context.MeasureReportPopulation.Add(new MeasureReportPopulation
+        {
+            GroupPopulationId = existing.GroupPopulationId,
+            MeasureReportId = existing.MeasureReportId,
+            PopulationCount = 9
+        });
+
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+        var sql = FindSqlException(exception);
+
+        Assert.True(
+            sql.Number is 2601 or 2627,
+            $"LocalDB duplicate number was {sql.Number}. Message: {sql.Message}");
+        Assert.Contains(
+            "'IX_MeasureReportPopulation_Group_MeasureReport'",
+            sql.Message,
+            StringComparison.Ordinal);
+    }
+
+    [LocalDbFact]
+    public async Task UniqueViolation_OfADifferentIndex_IsNotSwallowed()
+    {
+        await using var database = await LocalDbReportDatabase.CreateAsync();
+        var scheduleId = Guid.NewGuid();
+        const string facilityId = "fac-other-index";
+        const string reportType = "other-index-type";
+
+        await database.SeedScheduleAsync(scheduleId, facilityId);
+
+        await using var scope = database.Provider.CreateAsyncScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+        await manager.ApplyAggregateResultAsync(facilityId, scheduleId, Delivery(reportType, "mr-1", 5), CancellationToken.None);
+
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        await context.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IX_Test_Group_Count ON MeasureReportPopulation (GroupPopulationId, PopulationCount);");
+
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            manager.ApplyAggregateResultAsync(facilityId, scheduleId, Delivery(reportType, "mr-2", 5), CancellationToken.None));
+
+        var sql = FindSqlException(exception);
+        Assert.Contains("IX_Test_Group_Count", sql.Message, StringComparison.Ordinal);
+        await AssertPopulationAsync(database, scheduleId, reportType, expectedTotal: 5, expectedChildren: 1);
+    }
+
+    [LocalDbFact]
+    public async Task ErrorMessageThatMentions2601_IsNotSwallowed()
+    {
+        await using var database = await LocalDbReportDatabase.CreateAsync();
+        var scheduleId = Guid.NewGuid();
+        const string facilityId = "fac-message";
+        const string reportType = "message-type";
+
+        await database.SeedScheduleAsync(scheduleId, facilityId);
+
+        await using var scope = database.Provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        // The constraint name is in the error text. The number is 547, not 2601.
+        // An insert trigger cannot be used here: EF reads the identity with OUTPUT, which rejects a trigger.
+        await context.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE MeasureReportPopulation ADD CONSTRAINT CK_Message2601 CHECK (1 = 0);");
+
+        var manager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            manager.ApplyAggregateResultAsync(facilityId, scheduleId, Delivery(reportType, "mr-1", 5), CancellationToken.None));
+
+        var sql = FindSqlException(exception);
+        Assert.Contains("2601", sql.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(sql.Number, new[] { 2601, 2627 });
+
+        var children = await context.MeasureReportPopulation.CountAsync();
+        var total = await context.GroupPopulation.SumAsync(g => (int?)g.TotalPopulationCount) ?? 0;
+        Assert.Equal(0, children);
+        Assert.Equal(0, total);
+    }
+
+    [LocalDbFact]
+    public async Task ValueLongerThanTheColumn_IsNotSwallowed()
+    {
+        await using var database = await LocalDbReportDatabase.CreateAsync();
+        var scheduleId = Guid.NewGuid();
+        const string facilityId = "fac-length";
+        const string reportType = "length-type";
+
+        await database.SeedScheduleAsync(scheduleId, facilityId);
+
+        await using var scope = database.Provider.CreateAsyncScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            manager.ApplyAggregateResultAsync(
+                facilityId,
+                scheduleId,
+                Delivery(reportType, new string('m', 101), 5),
+                CancellationToken.None));
+
+        var sql = FindSqlException(exception);
+        Assert.DoesNotContain(sql.Number, new[] { 2601, 2627 });
+
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var children = await context.MeasureReportPopulation.CountAsync();
+        var total = await context.GroupPopulation.SumAsync(g => (int?)g.TotalPopulationCount) ?? 0;
+        Assert.Equal(0, children);
+        Assert.Equal(0, total);
+    }
+
+    private static SqlException FindSqlException(Exception exception)
+    {
+        for (var current = exception; current != null; current = current.InnerException)
+        {
+            if (current is SqlException sql)
+                return sql;
+        }
+
+        Assert.Fail(exception.ToString());
+        return null!;
+    }
+
     private static AggregateMeasureReportResult[] BuildDeliveries(string reportType, string prefix)
     {
         return Enumerable.Range(1, PatientCount)

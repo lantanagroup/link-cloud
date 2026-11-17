@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -36,6 +37,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
     public class ReportPopulationManager : IReportPopulationManager
     {
+        private const string MeasureReportPopulationDuplicateIndex = "IX_MeasureReportPopulation_Group_MeasureReport";
+
+        private const string SqliteMeasureReportPopulationDuplicate =
+            "UNIQUE constraint failed: MeasureReportPopulation.GroupPopulationId, MeasureReportPopulation.MeasureReportId";
+
         private readonly ReportDbContext _context;
         private readonly ILogger<ReportPopulationManager> _logger;
 
@@ -370,10 +376,24 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
                 await transaction.CommitAsync(cancellationToken);
             }
-            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            catch (DbUpdateException ex)
             {
                 _context.Entry(child).State = EntityState.Detached;
                 await RollbackQuietlyAsync(transaction, cancellationToken);
+
+                // A duplicate delivery is only this unique index, and only when that row is already stored.
+                // Any other failure during this save, including another unique index, must surface.
+                if (!IsDuplicateMeasureReportPopulation(ex))
+                    throw;
+
+                var alreadyDelivered = await _context.MeasureReportPopulation
+                    .AsNoTracking()
+                    .AnyAsync(
+                        m => m.GroupPopulationId == groupId && m.MeasureReportId == measureReportId,
+                        cancellationToken);
+
+                if (!alreadyDelivered)
+                    throw;
             }
         }
 
@@ -411,24 +431,61 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         private static bool IsUniqueViolation(Exception exception)
         {
-            // 2601 is a unique index and 2627 is a unique constraint (or a primary key). The number
-            // does not change with the SQL Server language. SQLite has no language pack; its message
-            // is "UNIQUE constraint failed". Result code 19 is every SQLite constraint, so a null or
-            // foreign-key failure would be treated as a duplicate and the total would not move.
+            // 2601 is a unique index and 2627 is a unique constraint or primary key. The number does
+            // not change with the SQL Server language. A message that merely contains those digits is
+            // not a duplicate. SQLite result code 19 is every constraint, so only extended code 2067
+            // (unique) or 1555 (primary key) counts. Null is 1299 and a foreign key is 787.
             for (var current = exception; current != null; current = current.InnerException)
             {
                 if (current is SqlException { Number: 2601 or 2627 })
                     return true;
 
-                if (current.Message.Contains("2601", StringComparison.Ordinal)
-                    || current.Message.Contains("2627", StringComparison.Ordinal)
-                    || current.Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase))
+                if (TryGetSqliteExtendedCode(current, out var extended) && extended is 2067 or 1555)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsDuplicateMeasureReportPopulation(Exception exception)
+        {
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                if (current is SqlException { Number: 2601 or 2627 } sql
+                    && sql.Message.Contains(
+                        "'" + MeasureReportPopulationDuplicateIndex + "'",
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                if (TryGetSqliteExtendedCode(current, out var extended)
+                    && extended == 2067
+                    && current.Message.Contains(SqliteMeasureReportPopulationDuplicate, StringComparison.Ordinal))
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        // The Report service does not reference SQLite. Tests do, and they throw SqliteException.
+        private static bool TryGetSqliteExtendedCode(Exception exception, out int extendedErrorCode)
+        {
+            extendedErrorCode = 0;
+            var type = exception.GetType();
+            if (type.FullName != "Microsoft.Data.Sqlite.SqliteException")
+                return false;
+
+            if (type.GetProperty("SqliteErrorCode")?.GetValue(exception) is not 19)
+                return false;
+
+            if (type.GetProperty("SqliteExtendedErrorCode")?.GetValue(exception) is not int extended)
+                return false;
+
+            extendedErrorCode = extended;
+            return true;
         }
 
         public async Task<List<ReportPopulationModel>> FindAsync(Expression<Func<ReportPopulation, bool>> predicate, CancellationToken cancellationToken = default)
