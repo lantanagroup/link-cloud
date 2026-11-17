@@ -24,3 +24,13 @@
   align-items: center;
   padding: 4rem 0;
 }
+
+.counts-warning {
+  margin: vt.$vd-container-margin-x;
+  padding: 1rem 1.25rem;
+  border: 1px solid vt.$vd-warning-800;
+  border-left-width: 4px;
+  border-radius: 4px;
+  background-color: #fff8e6;
+  color: #704b12;
+}

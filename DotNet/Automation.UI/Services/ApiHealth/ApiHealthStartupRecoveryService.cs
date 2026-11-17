@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
 using LantanaGroup.Link.Automation.Link.Models;
 
 namespace Automation.UI.Services.ApiHealth;
@@ -10,6 +11,7 @@ public sealed class ApiHealthStartupRecoveryService(
     IApiHealthRunStore apiHealthRunStore,
     IAutomationRunManager automationRunManager,
     ISnapshotStore snapshotStore,
+    ITestRailPublisher testRailPublisher,
     ILogger<ApiHealthStartupRecoveryService> logger) : IHostedService
 {
     private const string InterruptedRunMessage = "API Health run was interrupted by application restart and has been cancelled.";
@@ -56,12 +58,37 @@ public sealed class ApiHealthStartupRecoveryService(
                 }
             }
 
+            var finishedAt = DateTimeOffset.UtcNow;
             await apiHealthRunStore.CompleteExecutionRunAsync(
                 activeExecution.RunId,
                 failed: true,
                 error: InterruptedRunMessage,
-                finishedAt: DateTimeOffset.UtcNow,
+                finishedAt: finishedAt,
                 ct: cancellationToken);
+
+            // The in-memory execution is gone with the previous process, so this is the
+            // only publish for the interrupted run. A live cancel publishes from CompleteAsync.
+            try
+            {
+                await testRailPublisher.PublishApiHealthRunAsync(new ApiHealthTestRailPublishRequest
+                {
+                    RunId = activeExecution.RunId,
+                    Scope = activeExecution.Scope,
+                    ServiceName = activeExecution.ServiceName,
+                    Failed = true,
+                    Cancelled = true,
+                    Error = InterruptedRunMessage,
+                    StartedAt = activeExecution.StartedAt,
+                    FinishedAt = finishedAt
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "TestRail publish failed for recovered API Health run {ApiHealthRunId}.",
+                    activeExecution.RunId);
+            }
 
             logger.LogWarning(
                 "Startup recovery marked interrupted API Health run {ApiHealthRunId} as cancelled. CancelledSeedRun={CancelledSeedRun}",

@@ -314,10 +314,17 @@ public class GetReportValidationCategoryCountsTests
     {
         var scheduleJson = "{\"id\":\"" + ReportId + "\",\"facilityId\":\"" + FacilityId + "\"," +
                            scheduleFields + "}";
-        var handler = new MockHttpMessageHandler(request => request.RequestUri!.Host == "report"
-            ? OkJson(scheduleJson)
-            : OkJson("{\"facilityId\":\"" + FacilityId + "\",\"reportId\":\"" + ReportId + "\"," +
-                     "\"lastUpdated\":\"2026-10-21T12:00:00Z\",\"categories\":[]}"));
+        string? reportQuery = null;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            if (request.RequestUri!.Host == "report")
+            {
+                reportQuery = request.RequestUri.Query;
+                return OkJson(scheduleJson);
+            }
+            return OkJson("{\"facilityId\":\"" + FacilityId + "\",\"reportId\":\"" + ReportId + "\"," +
+                          "\"lastUpdated\":\"2026-10-21T12:00:00Z\",\"categories\":[]}");
+        });
         var (report, validation) = BuildServices(handler);
 
         var result = await GetReportValidationCategoryCounts.Handle(
@@ -326,6 +333,8 @@ public class GetReportValidationCategoryCountsTests
         var counts = Assert.IsType<Ok<ReportValidationCategoryCounts>>(result).Value!;
         Assert.Equal(expectedStatus, counts.ReportStatus);
         Assert.Equal(expectedInProgress, counts.InProgress);
+        // Report hides deleted schedules by default, so the deleted row only means something if we ask for them.
+        Assert.Equal("?includeDeleted=true", reportQuery);
     }
 
     [Fact]

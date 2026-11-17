@@ -70,8 +70,10 @@ import config_key_matching as matching
 
 SKIP_DIR_PARTS = {"bin", "obj", ".vs", "node_modules", "Migrations"}
 # Test and generator projects are not deployed services; their config reads would pollute
-# the inventory with keys no environment needs to provision.
-SKIP_PROJECTS = {"ServiceTests", "Audit.Specification"}
+# the inventory with keys no environment needs to provision. Nor is the Aspire AppHost: it
+# orchestrates local development, and what it reads (Java:Maven, Validation:Engine, ...) comes
+# from its own settings to start the services, never from App Configuration.
+SKIP_PROJECTS = {"ServiceTests", "Audit.Specification", "Link.AspireAppHost"}
 
 COLLECTION_RE = re.compile(r"^(?:List|IList|IEnumerable|ICollection|IReadOnlyList|HashSet)<(.+)>$")
 DICT_RE = re.compile(r"^(?:Dictionary|IDictionary|IReadOnlyDictionary)<\s*string\s*,\s*(.+)>$")

@@ -1,6 +1,9 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
+using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
@@ -19,9 +22,18 @@ public interface IPatientEncounterQueries
     Task<PagedConfigModel<PatientEncounterModel>> GetPagedViewAsOf(string facilityId, DateTime threshold, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<PagedConfigModel<PatientEncounterModel>> GetPagedCurrentPatientEncounters(string facilityId, string? correlationId = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task RebuildPatientEncounterTable(string? facilityId = default, string? correlationId = default, bool useTransaction = true, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Replays a correlation id's events that Census had recorded (CreateDate) by <paramref name="dateThreshold"/> into the
+    /// encounter they described at that moment, without reading or writing the stored PatientEncounters. Null when no event
+    /// recorded by then admits the patient.
+    /// </summary>
+    Task<PatientEncounterModel?> GetSnapshotAsOf(string facilityId, string correlationId, DateTime dateThreshold, CancellationToken cancellationToken = default);
     Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default);
     Task<IEnumerable<string>> GetCurrentlyAdmittedPatientsForFacility(string facilityId, CancellationToken cancellationToken = default);
     Task<List<PatientEncounter>> GetAdmittedPatientsByFacility(string facilityId, CancellationToken cancellationToken = default);
+    Task<List<PatientEncounter>> GetTrackedEncountersByFhirPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default);
+    Task<List<PatientEncounter>> GetTrackedEncountersByIdentifiers(string facilityId, IReadOnlyCollection<string> identifiers, CancellationToken cancellationToken = default);
+    Task SaveTrackedChanges(CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterQueries : IPatientEncounterQueries
@@ -287,100 +299,14 @@ public class PatientEncounterQueries : IPatientEncounterQueries
 
         await Parallel.ForEachAsync(eventsByCorrelation, options, async (correlationGroup, ct) =>
         {
-            PatientEncounter encounter = null;
             string correlationId = correlationGroup.Key;
 
             // Process each event for this correlation ID in chronological order
-            foreach (var evt in correlationGroup.OrderBy(e => e.ModifyDate))
-            {
-                var payload = evt.Payload;
-
-                // For admit events - create a new encounter
-                if (evt.EventType == EventType.FHIRListAdmit && payload is FHIRListAdmitPayload admitPayload)
-                {
-                    encounter = admitPayload.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
-
-                    // Ensure ID is set - generate a new one if null
-                    if (string.IsNullOrEmpty(encounter.Id))
-                    {
-                        encounter.Id = Guid.NewGuid().ToString();
-                    }
-
-                    // Ensure all PatientIdentifiers have IDs
-                    foreach (var identifier in encounter.PatientIdentifiers)
-                    {
-                        if (string.IsNullOrEmpty(identifier.Id))
-                        {
-                            identifier.Id = Guid.NewGuid().ToString();
-                        }
-                    }
-
-                    // Ensure all PatientVisitIdentifiers have IDs
-                    foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
-                    {
-                        if (string.IsNullOrEmpty(visitIdentifier.Id))
-                        {
-                            visitIdentifier.Id = Guid.NewGuid().ToString();
-                        }
-                    }
-                }
-                // For discharge or update events - update existing encounter
-                else if (encounter != null && IsUpdateablePayload(payload))
-                {
-                    encounter = payload.UpdatePatientEncounter(encounter);
-                    encounter.ModifyDate = evt.ModifyDate;
-
-                    // Re-check identifiers after update
-                    foreach (var identifier in encounter.PatientIdentifiers)
-                    {
-                        if (string.IsNullOrEmpty(identifier.Id))
-                        {
-                            identifier.Id = Guid.NewGuid().ToString();
-                        }
-                    }
-
-                    foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
-                    {
-                        if (string.IsNullOrEmpty(visitIdentifier.Id))
-                        {
-                            visitIdentifier.Id = Guid.NewGuid().ToString();
-                        }
-                    }
-                }
-            }
+            var encounter = ReplayEvents(correlationGroup.OrderBy(e => e.ModifyDate));
 
             // Add the final state of the encounter to our concurrent dictionary
             if (encounter != null)
             {
-                // Final ID check before adding
-                if (string.IsNullOrEmpty(encounter.Id))
-                {
-                    encounter.Id = Guid.NewGuid().ToString();
-                }
-
-                // One last check for all related entities
-                foreach (var identifier in encounter.PatientIdentifiers)
-                {
-                    if (string.IsNullOrEmpty(identifier.Id))
-                    {
-                        identifier.Id = Guid.NewGuid().ToString();
-                    }
-
-                    // Ensure the relationship is properly set
-                    identifier.PatientEncounterId = encounter.Id;
-                }
-
-                foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
-                {
-                    if (string.IsNullOrEmpty(visitIdentifier.Id))
-                    {
-                        visitIdentifier.Id = Guid.NewGuid().ToString();
-                    }
-
-                    // Ensure the relationship is properly set
-                    visitIdentifier.PatientEncounterId = encounter.Id;
-                }
-
                 newEncounters.TryAdd(correlationId, encounter);
             }
 
@@ -485,13 +411,18 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
 
         var currentDateTime = DateTime.UtcNow;
+        // ADT identifiers are the facility's own, not FHIR ids
+        var adtSourceType = SourceType.ADT.ToString();
         return _context.PatientEncounters
             .AsNoTracking()
             .Include(e => e.PatientIdentifiers)
             .Include(e => e.PatientVisitIdentifiers)
             .Where(e => e.FacilityId == facilityId
                 && (e.AdmitDate <= currentDateTime && (e.DischargeDate == null || e.DischargeDate >= currentDateTime)))
-            .Select(x => x.PatientIdentifiers.FirstOrDefault().Identifier);
+            .Select(x => x.PatientIdentifiers
+                .Where(i => i.SourceType != adtSourceType)
+                .Select(i => i.Identifier)
+                .FirstOrDefault());
     }
 
     public async Task<List<PatientEncounter>> GetAdmittedPatientsByFacility(string facilityId, CancellationToken cancellationToken = default)
@@ -519,6 +450,145 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             .Where(e => e.FacilityId == facilityId
                 && (e.AdmitDate <= endDateTime && (e.DischargeDate == null || e.DischargeDate >= startDateTime)))
             .Select(x => PatientEncounterModel.FromDomain(x));
+    }
+
+    /// <summary>
+    /// Gets a patient's encounters, most recently admitted first and leaving out any an A11 or A23 cancelled, as tracked entities for
+    /// <see cref="SaveTrackedChanges"/>.
+    /// </summary>
+    public async Task<List<PatientEncounter>> GetTrackedEncountersByFhirPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default)
+    {
+        var fhirSourceType = SourceType.ADT_FHIR.ToString();
+
+        return await _context.PatientEncounters
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && !_context.PatientEvents.Any(x => x.FacilityId == facilityId && x.CorrelationId == e.CorrelationId
+                    && (x.EventType == EventType.A11 || x.EventType == EventType.A23))
+                && e.PatientIdentifiers.Any(i => i.SourceType == fhirSourceType && i.Identifier == patientId))
+            .OrderByDescending(e => e.AdmitDate)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the encounters carrying any of these identifiers, as an MRN or a patient identifier, as tracked entities for
+    /// <see cref="SaveTrackedChanges"/>.
+    /// </summary>
+    public async Task<List<PatientEncounter>> GetTrackedEncountersByIdentifiers(string facilityId, IReadOnlyCollection<string> identifiers, CancellationToken cancellationToken = default)
+    {
+        return await _context.PatientEncounters
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && ((e.MedicalRecordNumber != null && identifiers.Contains(e.MedicalRecordNumber))
+                    || e.PatientIdentifiers.Any(i => identifiers.Contains(i.Identifier))))
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Saves changes made to tracked encounters. Use this rather than the repository's Update for an encounter that gained
+    /// identifiers: identifier keys are client-assigned, so Update would treat new rows as existing ones.
+    /// </summary>
+    public async Task SaveTrackedChanges(CancellationToken cancellationToken = default)
+    {
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PatientEncounterModel?> GetSnapshotAsOf(
+        string facilityId,
+        string correlationId,
+        DateTime dateThreshold,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("Facility ID is required.", nameof(facilityId));
+        if (string.IsNullOrWhiteSpace(correlationId))
+            throw new ArgumentException("Correlation ID is required.", nameof(correlationId));
+
+        // AsNoTracking: replaying folds the events into a new encounter, which must never be saved from here.
+        // Same ordering as Rebuild, so a snapshot taken now matches the stored encounter.
+        var events = await _context.PatientEvents
+            .AsNoTracking()
+            .Where(e => e.FacilityId == facilityId
+                && e.CorrelationId == correlationId
+                && e.CreateDate <= dateThreshold)
+            .OrderBy(e => e.EventDate)
+            .ToListAsync(cancellationToken);
+
+        var encounter = ReplayEvents(events.OrderBy(e => e.ModifyDate));
+
+        return encounter == null ? null : PatientEncounterModel.FromDomain(encounter);
+    }
+
+    /// <summary>
+    /// Folds one correlation id's events, in the order given, into the encounter they describe; null when none of them admits
+    /// the patient. Rebuild and snapshots both go through here so the two can never disagree about what the events mean.
+    /// </summary>
+    internal static PatientEncounter? ReplayEvents(IEnumerable<PatientEvent> orderedEvents)
+    {
+        PatientEncounter? encounter = null;
+
+        foreach (var evt in orderedEvents)
+        {
+            var payload = evt.Payload;
+
+            // For admit events - create a new encounter
+            if (payload is FHIRListAdmitPayload or CernerListAdmitPayload)
+            {
+                encounter = payload.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
+            }
+            // ADT messages each know how to create or update the encounter
+            else if (payload is AdtPayload adtPayload)
+            {
+                if (encounter != null)
+                {
+                    encounter = adtPayload.UpdatePatientEncounter(encounter);
+                    encounter.ModifyDate = evt.ModifyDate;
+                }
+                else if (adtPayload.ImpliesAdmission)
+                {
+                    encounter = adtPayload.CreatePatientEncounter(evt.FacilityId, evt.CorrelationId);
+                    encounter.ModifyDate = evt.ModifyDate;
+                }
+            }
+            // For discharge or update events - update existing encounter
+            else if (encounter != null && IsUpdateablePayload(payload))
+            {
+                encounter = payload.UpdatePatientEncounter(encounter);
+                encounter.ModifyDate = evt.ModifyDate;
+            }
+        }
+
+        if (encounter == null)
+            return null;
+
+        if (string.IsNullOrEmpty(encounter.Id))
+        {
+            encounter.Id = Guid.NewGuid().ToString();
+        }
+
+        foreach (var identifier in encounter.PatientIdentifiers)
+        {
+            if (string.IsNullOrEmpty(identifier.Id))
+            {
+                identifier.Id = Guid.NewGuid().ToString();
+            }
+
+            identifier.PatientEncounterId = encounter.Id;
+        }
+
+        foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
+        {
+            if (string.IsNullOrEmpty(visitIdentifier.Id))
+            {
+                visitIdentifier.Id = Guid.NewGuid().ToString();
+            }
+
+            visitIdentifier.PatientEncounterId = encounter.Id;
+        }
+
+        return encounter;
     }
 
     #region Private Methods
@@ -551,11 +621,13 @@ public class PatientEncounterQueries : IPatientEncounterQueries
         };
     }
 
-    private bool IsUpdateablePayload(IPayload payload)
+    private static bool IsUpdateablePayload(IPayload payload)
     {
         return payload switch
         {
             FHIRListDischargePayload => true,
+            CernerListUpdatePayload => true,
+            CernerListDischargePayload => true,
             _ => false
         };
     }

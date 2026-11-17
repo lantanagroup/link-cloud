@@ -2,10 +2,11 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { VendorDashboardComponent } from './vendor-dashboard.component';
 import { VendorConfigDialogComponent } from '../vendor-config-dialog/vendor-config-dialog.component';
+import { AlertDialogComponent } from '../../core/alert-dialog/alert-dialog.component';
 import { VendorService } from '../../../services/gateway/vendor/vendor.service';
 import { FormMode } from '../../../models/FormMode.enum';
 import { IVendorConfigModel } from '../../../interfaces/vendor/vendor-config-model.interface';
@@ -116,5 +117,63 @@ describe('VendorDashboardComponent', () => {
 
     const remove = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Delete Vendor"]');
     expect(remove).not.toBeNull();
+  });
+
+  // LEGLINK-1808: a vendor a facility still uses cannot be deleted. The API refuses it with 409 and
+  // names the facilities; a generic "500 - use the trace id" toastr told the admin nothing they
+  // could act on.
+  it('names the facilities in a dialog when the API refuses the delete', () => {
+    dialogClosingWith(true);
+    vendorService.deleteVendor.and.returnValue(throwError(() => ({
+      status: 409,
+      error: {
+        detail: "Vendor 'Epic' is in use by 1 facility configuration and cannot be deleted: "
+          + 'ABC123 (Mercy General, version 2026.1). '
+          + 'Clear the vendor version on each facility before deleting it.'
+      },
+      message: 'the toastr text, which the dialog replaces'
+    })));
+    fixture.detectChanges();
+
+    component.onDelete(vendors[0]);
+
+    const [opened, config] = dialog.open.calls.mostRecent().args as [unknown, any];
+    expect(opened).toBe(AlertDialogComponent);
+    expect(config.data.title).toBe('Vendor In Use');
+    //the vendor by name, as the API names it: the row the admin clicked, not its id.
+    expect(config.data.message).toContain("Vendor 'Epic' is in use");
+    expect(config.data.message).toContain('ABC123 (Mercy General, version 2026.1)');
+    expect(config.data.message).toContain('Clear the vendor version on each facility');
+  });
+
+  // An unexpected failure has no reason to show, so the trace id is the one useful thing in it.
+  it('keeps the trace id in view when the delete fails unexpectedly', () => {
+    dialogClosingWith(true);
+    vendorService.deleteVendor.and.returnValue(throwError(() => ({
+      status: 500,
+      error: { detail: 'An error occured in our API. Please use the trace id when requesting assistence.' },
+      message: 'An error occured in our API. Please use the trace id when requesting assistence.\nTrace ID: 00-abc'
+    })));
+    fixture.detectChanges();
+
+    component.onDelete(vendors[0]);
+
+    const [opened, config] = dialog.open.calls.mostRecent().args as [unknown, any];
+    expect(opened).toBe(AlertDialogComponent);
+    expect(config.data.title).toBe('Delete Failed');
+    expect(config.data.message).toContain('Trace ID: 00-abc');
+  });
+
+  it('reports a successful delete and refreshes the list', () => {
+    dialogClosingWith(true);
+    vendorService.deleteVendor.and.returnValue(of({ success: true, message: '' } as any));
+    fixture.detectChanges();
+    vendorService.getVendors.calls.reset();
+
+    component.onDelete(vendors[0]);
+
+    expect(vendorService.deleteVendor).toHaveBeenCalledWith('vendor-1');
+    expect(vendorService.getVendors).toHaveBeenCalled();
+    expect(dialog.open.calls.mostRecent().args[0]).not.toBe(AlertDialogComponent);
   });
 });

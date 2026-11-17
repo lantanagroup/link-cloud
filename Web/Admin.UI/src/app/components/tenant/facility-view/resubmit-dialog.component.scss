@@ -1,10 +1,8 @@
-::ng-deep .blue-dialog {
-  background-color: #00756B;
-  border-radius: 8px;
-  padding: 8px;
+// The bypass label wraps to several lines, so pin the box to its first line instead of the middle.
+mat-checkbox ::ng-deep .mdc-form-field {
+  align-items: flex-start;
 }
 
-::ng-deep .blue-dialog .resubmit-button {
-  background-color: #005f55 !important;
-  color: white;
+mat-checkbox ::ng-deep .mdc-form-field > label {
+  padding-top: 8px;
 }

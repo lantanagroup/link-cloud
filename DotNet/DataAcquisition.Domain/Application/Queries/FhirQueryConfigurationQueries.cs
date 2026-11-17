@@ -43,7 +43,7 @@ public class FhirQueryConfigurationQueries : IFhirQueryConfigurationQueries
 
         var result = await (from fl in _database.FhirQueryConfigurations.AsNoTracking()
                             where fl.FacilityId == facilityId
-                            select FhirQueryConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
+                            select FhirQueryConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync(cancellationToken);
 
         return result;
     }

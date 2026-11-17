@@ -67,3 +67,15 @@ export function canCleanUpScheduleStatus(status: string): boolean {
     || status === ScheduleStatus.CompletedNotSubmitted
     || status === ScheduleStatus.Scheduled;
 }
+
+/** Shown on a disabled Restore control, and returned by the restore API for the same case. */
+export const RESTORE_BLOCKED_REASON = 'Reports deleted mid flight cannot be restored.';
+
+/**
+ * A soft-deleted schedule can be restored only when it had not started (Scheduled)
+ * or had finished submission (Submitted). An aborted run stays New or EndOfPeriod.
+ * CompletedNotSubmitted finished its work but was not submitted, so it stays deleted.
+ */
+export function canRestoreScheduleStatus(status: string): boolean {
+  return status === ScheduleStatus.Scheduled || status === ScheduleStatus.Submitted;
+}

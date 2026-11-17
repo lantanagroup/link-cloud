@@ -16,7 +16,7 @@ public class ScenarioSeedServiceTests
     private static readonly Guid DmrpScheduledReportScenarioId = new("00000000-0000-0000-0000-000000000010");
 
     [Fact]
-    public async global::System.Threading.Tasks.Task Adhoc_report_daily_ach_scenario_uses_daily_measure_and_distinct_org_id()
+    public async global::System.Threading.Tasks.Task Adhoc_report_daily_ach_scenario_uses_the_daily_measure()
     {
         var store = new InMemoryScenarioStore();
         var sut = new ScenarioSeedService(store, NullLogger<ScenarioSeedService>.Instance);
@@ -28,7 +28,6 @@ public class ScenarioSeedServiceTests
         monthly!.IsSystemScenario.Should().BeTrue();
         monthly.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
-        monthly.NhsnOrganizationId.Should().Be("10756");
         monthly.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Facility);
         monthly.FacilityTemplateId.Should().Be(FacilityTemplateCatalog.SystemDefaultId);
 
@@ -39,8 +38,6 @@ public class ScenarioSeedServiceTests
         daily.ReportMethod.Should().Be(ReportMethod.Adhoc);
         daily.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
-        daily.NhsnOrganizationId.Should().Be("10764");
-        daily.NhsnOrganizationId.Should().NotBe(monthly.NhsnOrganizationId);
         daily.PatientCount.Should().Be(1);
         daily.ResourcesPerPatientMin.Should().Be(1000);
         daily.ResourcesPerPatientMax.Should().Be(1000);
@@ -69,7 +66,7 @@ public class ScenarioSeedServiceTests
     }
 
     [Fact]
-    public async global::System.Threading.Tasks.Task Dmrp_scheduled_report_scenario_is_seeded_with_expected_configuration()
+    public async global::System.Threading.Tasks.Task Dmrp_scheduled_report_scenario_is_seeded()
     {
         var store = new InMemoryScenarioStore();
         var sut = new ScenarioSeedService(
@@ -89,7 +86,6 @@ public class ScenarioSeedServiceTests
         scenario.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
 
         scenario.EnableDmrp.Should().BeTrue();
-        scenario.NhsnOrganizationId.Should().Be("10765");
 
         scenario.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(
@@ -104,6 +100,38 @@ public class ScenarioSeedServiceTests
 
         scenario.PatientCohorts[0].ScheduledInpatientPattern.Should().Be(
             ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+    }
+
+    [Fact]
+    public async global::System.Threading.Tasks.Task Startup_refreshes_system_scenarios_and_leaves_user_scenarios_unchanged()
+    {
+        var store = new InMemoryScenarioStore();
+        var user = new TestScenarioDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "User scenario",
+            Description = "keep me",
+            IsSystemScenario = false,
+            EnableDmrp = true,
+            PatientCount = 4
+        };
+        await store.UpsertAsync(user, CancellationToken.None);
+
+        var sut = new ScenarioSeedService(store, NullLogger<ScenarioSeedService>.Instance);
+        await sut.StartAsync(CancellationToken.None);
+
+        var saved = await store.GetByIdAsync(user.Id, CancellationToken.None);
+        saved.Should().NotBeNull();
+        saved!.Name.Should().Be("User scenario");
+        saved.Description.Should().Be("keep me");
+        saved.EnableDmrp.Should().BeTrue();
+        saved.PatientCount.Should().Be(4);
+        saved.IsSystemScenario.Should().BeFalse();
+
+        var monthly = await store.GetByIdAsync(AdhocReportScenarioId, CancellationToken.None);
+        monthly.Should().NotBeNull();
+        monthly!.IsSystemScenario.Should().BeTrue();
+        monthly.EnableDmrp.Should().BeFalse();
     }
 
     private sealed class InMemoryScenarioStore : IScenarioStore

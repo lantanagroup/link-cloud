@@ -1,6 +1,7 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using System.Net;
+using System.Text;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Admin.BFF.Aggregation;
@@ -127,6 +129,60 @@ public class RestoreReportTests
         Assert.Equal(StatusCodes.Status500InternalServerError, await ExecuteResultAsync(result));
         Assert.True(scheduleRolledBack);
         Assert.True(logsRolledBack);
+    }
+
+    [Fact]
+    public async Task Handle_ReportRejected_ReturnsConflictAndDoesNotRestoreLogs()
+    {
+        var logsCalled = false;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.PathAndQuery;
+            if (request.Method == HttpMethod.Patch && path.Contains($"api/schedules/{ReportId}/restore"))
+            {
+                return new HttpResponseMessage(HttpStatusCode.Conflict)
+                {
+                    Content = new StringContent(
+                        $"{{\"detail\":\"{ScheduleStatusExtensions.RestoreBlockedDetail} Report schedule '{ReportId}' is New.\"}}",
+                        Encoding.UTF8,
+                        "application/problem+json")
+                };
+            }
+
+            if (path.Contains("acquisition-logs"))
+            {
+                logsCalled = true;
+                return NoContent();
+            }
+
+            throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
+        });
+
+        var (report, da) = BuildServices(handler);
+        var result = await RestoreReport.Handle(
+            _loggerFactory, BuildHttpContext(), report, da, new InMemoryPipelineAbortRegistry(), ReportId);
+
+        var (status, body) = await ExecuteResultWithBodyAsync(result);
+        Assert.Equal(StatusCodes.Status409Conflict, status);
+        Assert.Contains(ScheduleStatusExtensions.RestoreBlockedDetail, body);
+        Assert.False(logsCalled);
+    }
+
+    private static async Task<(int Status, string Body)> ExecuteResultWithBodyAsync(IResult result)
+    {
+        var services = new ServiceCollection();
+        services.AddProblemDetails();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var httpContext = new DefaultHttpContext
+        {
+            RequestServices = provider,
+            Response = { Body = new MemoryStream() }
+        };
+        await result.ExecuteAsync(httpContext);
+        httpContext.Response.Body.Position = 0;
+        var body = await new StreamReader(httpContext.Response.Body).ReadToEndAsync();
+        return (httpContext.Response.StatusCode, body);
     }
 
     private sealed class ThrowingClearRegistry : IPipelineAbortRegistry

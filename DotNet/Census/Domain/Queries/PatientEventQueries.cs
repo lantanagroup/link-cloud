@@ -46,6 +46,14 @@ public interface IPatientEventQueries
         string correlationId,
         CancellationToken cancellationToken);
 
+    Task<bool> AdtEventExists(
+        string facilityId,
+        string patientId,
+        EventType eventType,
+        DateTime eventDate,
+        string? visitId,
+        CancellationToken cancellationToken);
+
     Task<IDbContextTransaction> StartTransaction(CancellationToken cancellationToken = default);
 
     Task CommitTransaction(
@@ -172,6 +180,21 @@ public class PatientEventQueries : IPatientEventQueries
         var combinedQuery = GetPatientQuery(facilityId, correlationId, startDate, endDate);
 
         return await combinedQuery.ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Whether this ADT message was already recorded, identified by its patient, type, message date/time (MSH-7) and visit.
+    /// </summary>
+    public async Task<bool> AdtEventExists(string facilityId, string patientId, EventType eventType, DateTime eventDate, string? visitId, CancellationToken cancellationToken)
+    {
+        return await _context.PatientEvents.AnyAsync(x =>
+            x.FacilityId == facilityId
+            && x.SourcePatientId == patientId
+            && x.SourceType == SourceType.ADT
+            && x.EventType == eventType
+            && x.EventDate == eventDate
+            && x.SourceVisitId == visitId,
+            cancellationToken);
     }
 
     public async Task<IDbContextTransaction> StartTransaction(CancellationToken cancellationToken = default)

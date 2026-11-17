@@ -1,6 +1,6 @@
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { Component, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary } from '../../tenant/facility-view/report-view.interface';
+import { Component, EventEmitter, Output, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { IValidationIssueCategorySummary } from '../../tenant/facility-view/report-view.interface';
 
 import { BaseChartDirective } from 'ng2-charts';
 import { VdButtonComponent } from "../../core/vd-button/vd-button.component";
@@ -19,7 +19,7 @@ import { VdIconComponent } from "../../core/vd-icon/vd-icon.component";
   standalone: true
 })
 export class SubPreQualReportSummaryComponent implements OnChanges {
-  @Input() reportIssues: IValidationIssue[] | undefined;
+  @Output() downloadReport = new EventEmitter<void>();
   @Input() reportIssuesSummary: IValidationIssueCategorySummary[] | undefined;
 
   @ViewChild(BaseChartDirective) chart: BaseChartDirective<'bar'> | undefined;
@@ -111,8 +111,8 @@ export class SubPreQualReportSummaryComponent implements OnChanges {
   ) { }
 
   ngOnChanges(changes: SimpleChanges): void {
-    // Only reload if reportIssues or reportIssuesSummary inputs have changed
-    if (changes['reportIssues'] || changes['reportIssuesSummary']) {
+    // Only reload when the category summary changes
+    if (changes['reportIssuesSummary']) {
       this.loadReportData();
     }
   }

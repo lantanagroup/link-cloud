@@ -1,0 +1,136 @@
+<div class="rubric-list">
+  <div class="rubric-list-banner">
+    <div>
+      <div class="rubric-banner-kicker">Configuration</div>
+      <h2 class="rubric-banner-heading">Validation Rubrics</h2>
+    </div>
+    <div class="rubric-banner-actions">
+      <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', '-', 'import']">Import</a>
+      <a class="rubric-button rubric-button--on-banner" [routerLink]="['/rubrics', '-', 'new']">New rubric</a>
+    </div>
+  </div>
+
+  <div class="rubric-list-body">
+    <div class="rubric-list-filters">
+      <div class="rubric-list-filter rubric-list-filter--search">
+        <label for="rubricSearch">Search</label>
+        <input id="rubricSearch" type="search" [(ngModel)]="search" (input)="onSearchTyped()"
+          (keydown.enter)="applyFilters()" placeholder="Id, title or owner" autocomplete="off">
+      </div>
+      <div class="rubric-list-filter">
+        <label for="rubricStatusFilter">Status</label>
+        <select id="rubricStatusFilter" [(ngModel)]="status" (change)="applyFilters()">
+          @for (option of statusOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+      @if (owners.length > 0) {
+        <div class="rubric-list-filter">
+          <label for="rubricOwnerFilter">Owner</label>
+          <select id="rubricOwnerFilter" [(ngModel)]="owner" (change)="applyFilters()">
+            <option value="">Any</option>
+            @for (option of owners; track option) {
+              <option [value]="option">{{ option }}</option>
+            }
+          </select>
+        </div>
+      }
+      @if (filtered) {
+        <button type="button" class="rubric-button" (click)="clearFilters()">Clear filters</button>
+      }
+      @if (loading) {
+        <mat-spinner diameter="24" aria-label="Loading rubrics"></mat-spinner>
+      }
+    </div>
+
+    @if (error) {
+      <div class="rubric-message rubric-message--error" role="alert">
+        <p><strong>The rubrics could not be loaded.</strong></p>
+        <p>{{ error }}</p>
+        <button type="button" class="rubric-button" (click)="load()">Try again</button>
+      </div>
+    } @else if (empty) {
+      <div class="rubric-message">
+        @if (filtered) {
+          <p><strong>No rubric matches.</strong></p>
+          <p>Change the search or the filters, or clear them to see every rubric.</p>
+          <button type="button" class="rubric-button" (click)="clearFilters()">Clear filters</button>
+        } @else {
+          <p><strong>There are no rubrics yet.</strong></p>
+          <p>
+            <a class="rubric-link" [routerLink]="['/rubrics', '-', 'new']">Create a rubric</a>, or
+            <a class="rubric-link" [routerLink]="['/rubrics', '-', 'import']">import one</a> from a file.
+          </p>
+        }
+      </div>
+    } @else {
+      <div class="vd-mat-table">
+        <table mat-table [dataSource]="rows" matSort matSortActive="rubricId" matSortDirection="asc"
+          matSortDisableClear="false" (matSortChange)="onSort($event)" aria-label="Validation rubrics">
+
+          <ng-container matColumnDef="rubricId">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Rubric</th>
+            <td mat-cell *matCellDef="let row">
+              <a class="rubric-link" [routerLink]="['/rubrics', row.rubric.rubricId]">
+                {{ row.rubric.title || row.rubric.rubricId }}
+              </a>
+              <div class="rubric-mono rubric-muted">{{ row.rubric.rubricId }}</div>
+              @if (row.pipelineUse) {
+                <span class="rubric-chip rubric-chip--active" [title]="pipelineUseTitle(row.pipelineUse)">In Use</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="owner">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Owner</th>
+            <td mat-cell *matCellDef="let row">{{ row.rubric.owner || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="published">
+            <th mat-header-cell *matHeaderCellDef>Published</th>
+            <td mat-cell *matCellDef="let row">
+              @if (row.published) {
+                <a class="rubric-link"
+                  [routerLink]="['/rubrics', row.rubric.rubricId, 'versions', row.published.semver]">
+                  {{ row.published.semver }}
+                </a>
+              } @else if (row.retired && !row.draft) {
+                <span class="rubric-chip rubric-chip--retired">Retired</span>
+              } @else {
+                <span class="rubric-muted">—</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="draft">
+            <th mat-header-cell *matHeaderCellDef>Draft</th>
+            <td mat-cell *matCellDef="let row">
+              @if (row.draft) {
+                <a class="rubric-link"
+                  [routerLink]="['/rubrics', row.rubric.rubricId, 'versions', row.draft.semver]">
+                  {{ row.draft.semver }}
+                </a>
+              } @else {
+                <span class="rubric-muted">—</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="updatedAt">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Updated</th>
+            <td mat-cell *matCellDef="let row">{{ row.rubric.updatedAt | date: 'medium' }}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+        </table>
+
+        <mat-paginator [length]="totalCount" [pageIndex]="pageIndex" [pageSize]="pageSize"
+          [pageSizeOptions]="pageSizeOptions" (page)="onPage($event)" showFirstLastButtons
+          aria-label="Select page of rubrics">
+        </mat-paginator>
+      </div>
+    }
+  </div>
+</div>

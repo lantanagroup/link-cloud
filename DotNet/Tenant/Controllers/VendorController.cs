@@ -1,5 +1,6 @@
 using AutoMapper;
 using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -46,6 +47,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a
+        /// request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
+
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -88,6 +95,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpPost]
+        [Auditable(AuditEventType.Create, "Vendor")]
         [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -102,6 +110,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Name = createVendorModel.Name,
                     Authentication = createVendorModel.Authentication
                 });
+
+                //a vendor is not facility-scoped, so the event carries no facility; its own id is
+                //only known once it is created.
+                if (Audit is { } audit)
+                {
+                    audit.RecordId = newVendor.Id.ToString();
+                }
+
                 return CreatedAtAction(nameof(Get), new { id = newVendor.Id }, newVendor);
             }
             catch (InvalidOperationException ex)
@@ -115,6 +131,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpPut("{id}")]
+        [Auditable(AuditEventType.Update, "Vendor")]
         [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -149,12 +166,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Auditable(AuditEventType.Delete, "Vendor")]
         [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Delete(string id)
+        public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -172,16 +190,21 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 {
                     return BadRequest();
                 }
-                await _vendorManager.DeleteVendorAsync(parsedId);
+                await _vendorManager.DeleteVendorAsync(parsedId, cancellationToken);
 
                 return NoContent();
             }
             catch (VendorVersionInUseException ex)
             {
-                return Conflict(ex.Message);
+                //a refused delete is a conflict. Problem Details, as the other services answer a
+                //409 with, so the reason reaches a client on `detail` alongside a traceId.
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
             catch (Exception ex)
             {
+                //a 500 here is the database refusing something; record what it was, because the
+                //response carries only the message and the logs are where it gets diagnosed.
+                _logger.LogError(ex, "Exception encountered in VendorController.Delete");
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }

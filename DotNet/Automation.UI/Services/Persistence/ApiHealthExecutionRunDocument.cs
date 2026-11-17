@@ -29,6 +29,9 @@ public sealed class ApiHealthExecutionRunDocument
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset? FinishedAt { get; set; }
 
+    /// <summary>TestRail runs that accepted this execution's results. Empty when nothing was published.</summary>
+    public List<TestRailRunReference> TestRailRuns { get; set; } = [];
+
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset UpdatedAt { get; set; }
 }

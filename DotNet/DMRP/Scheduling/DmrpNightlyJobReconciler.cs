@@ -1,4 +1,5 @@
 using LantanaGroup.Link.DMRP.Config;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -61,49 +62,39 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 return;
             }
 
-            var cron = _settings.CurrentValue.Scheduling.ResolvedNightlyCron;
             var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-            var jobKey = new JobKey(timeZoneId, JobGroup);
 
-            if (!await scheduler.CheckExists(jobKey, cancellationToken))
+            // Not recoverable: a night cut off by a dying instance is not re-run on another one.
+            var definition = new CronJobDefinition
             {
-                var job = JobBuilder.Create<DmrpNightlyJob>()
-                    .WithIdentity(jobKey)
-                    .WithDescription($"DMRP nightly scheduling for {timeZoneId}")
-                    .UsingJobData(DmrpNightlyJob.TimeZoneKey, timeZoneId)
-                    .StoreDurably()
-                    .Build();
+                JobKey = new JobKey(timeZoneId, JobGroup),
+                JobType = typeof(DmrpNightlyJob),
+                Cron = _settings.CurrentValue.Scheduling.ResolvedNightlyCron,
+                TimeZone = timeZone,
+                Description = $"DMRP nightly scheduling for {timeZoneId}",
+                JobData = new Dictionary<string, string> { [DmrpNightlyJob.TimeZoneKey] = timeZoneId }
+            };
 
-                try
-                {
-                    await scheduler.ScheduleJob(job, BuildTrigger(jobKey, cron, timeZone), cancellationToken);
+            var result = await CronJobReconciler.EnsureAsync(scheduler, definition, cancellationToken);
 
-                    _logger.LogInformation("Scheduled DMRP nightly job for timezone {TimeZone} ({Cron}).", timeZoneId.SanitizeForLog(), cron.SanitizeForLog());
-                    return;
-                }
-                catch (ObjectAlreadyExistsException ex)
-                {
-                    // Another cluster node's ReconcileAllAsync won the race between our CheckExists
-                    // and this ScheduleJob. Fall through to the verify/reschedule logic below instead
-                    // of crashing the loser out of the hosted service's StartAsync.
-                    _logger.LogDebug(ex, "DMRP nightly job for timezone {TimeZone} was scheduled by another node; verifying its trigger.", timeZoneId.SanitizeForLog());
-                }
-            }
-
-            var existing = (await scheduler.GetTriggersOfJob(jobKey, cancellationToken)).OfType<ICronTrigger>().FirstOrDefault();
-
-            if (existing is null)
+            switch (result.Outcome)
             {
-                await scheduler.ScheduleJob(BuildTrigger(jobKey, cron, timeZone), cancellationToken);
-                return;
-            }
-
-            if (existing.CronExpressionString != cron || !Equals(existing.TimeZone, timeZone))
-            {
-                await scheduler.RescheduleJob(existing.Key, BuildTrigger(jobKey, cron, timeZone), cancellationToken);
-
-                _logger.LogInformation("Rescheduled DMRP nightly job for timezone {TimeZone}: {OldCron} -> {NewCron}.",
-                    timeZoneId.SanitizeForLog(), existing.CronExpressionString.SanitizeForLog(), cron.SanitizeForLog());
+                case CronJobReconcileOutcome.Created:
+                    _logger.LogInformation("Scheduled DMRP nightly job for timezone {TimeZone} ({Cron}).",
+                        timeZoneId.SanitizeForLog(), result.Cron.SanitizeForLog());
+                    break;
+                case CronJobReconcileOutcome.TriggerAdded:
+                    _logger.LogInformation(
+                        "DMRP nightly job for timezone {TimeZone} was stored without its trigger; added it ({Cron}).",
+                        timeZoneId.SanitizeForLog(), result.Cron.SanitizeForLog());
+                    break;
+                case CronJobReconcileOutcome.Rescheduled:
+                    _logger.LogInformation(
+                        "Rescheduled DMRP nightly job for timezone {TimeZone}: {OldCron} -> {NewCron}.",
+                        timeZoneId.SanitizeForLog(),
+                        result.PreviousCron.SanitizeForLog(),
+                        result.Cron.SanitizeForLog());
+                    break;
             }
         }
 
@@ -155,17 +146,5 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 _logger.LogInformation("Removed {Count} DMRP nightly job(s); DMRP is disabled.", keys.Count);
             }
         }
-
-        private static ITrigger BuildTrigger(JobKey jobKey, string cron, TimeZoneInfo timeZone) =>
-            TriggerBuilder.Create()
-                .ForJob(jobKey)
-                .WithIdentity(jobKey.Name, JobGroup)
-                .WithDescription(cron)
-                .WithCronSchedule(cron, x => x
-                    .InTimeZone(timeZone)
-                    // A fire missed while the service was down runs once on recovery, anchored on
-                    // its scheduled time, rather than being dropped or run once per missed night.
-                    .WithMisfireHandlingInstructionFireAndProceed())
-                .Build();
     }
 }

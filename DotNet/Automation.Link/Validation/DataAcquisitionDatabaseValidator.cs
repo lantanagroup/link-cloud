@@ -139,7 +139,10 @@ public class DataAcquisitionDatabaseValidator
                 AddError(errors, $"No DataAcquisitionLog rows found for expected patient {patientId}.");
         }
 
-        var failedLogs = logs.Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) || string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase)).ToList();
+        var failedLogs = logs
+            .Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) ||
+                        AcquisitionTerminalFailures.IsTerminalFailure(l.Status))
+            .ToList();
         foreach (var failed in failedLogs.Take(10))
         {
             AddError(errors, $"Failed acquisition log: Id={failed.Id}, Patient={failed.PatientId}, Status={failed.Status}");

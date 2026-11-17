@@ -1,0 +1,288 @@
+﻿using System.Net;
+using Automation.UI.Services;
+using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Task = System.Threading.Tasks.Task;
+
+namespace UnitTests.AutomationUI;
+
+[Trait("Category", "UnitTests")]
+public class RunExecutorServiceHealthTests
+{
+    [Fact]
+    public async Task CheckHealthAsync_Http200_ReturnsTrue()
+    {
+        using var client = CreateClient(
+            (_, _) => Task.FromResult(
+                new HttpResponseMessage(HttpStatusCode.OK)));
+
+        var result = await RunExecutor.CheckHealthAsync(
+            client,
+            "https://terminology.example.com/health",
+            CancellationToken.None);
+
+        result.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task CheckHealthAsync_NonSuccessStatus_ReturnsFalse(
+        HttpStatusCode statusCode)
+    {
+        using var client = CreateClient(
+            (_, _) => Task.FromResult(
+                new HttpResponseMessage(statusCode)));
+
+        var result = await RunExecutor.CheckHealthAsync(
+            client,
+            "https://terminology.example.com/health",
+            CancellationToken.None);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CheckHealthAsync_HttpRequestException_ReturnsFalse()
+    {
+        using var client = CreateClient(
+            (_, _) => Task.FromException<HttpResponseMessage>(
+                new HttpRequestException("Connection refused")));
+
+        var result = await RunExecutor.CheckHealthAsync(
+            client,
+            "https://terminology.example.com/health",
+            CancellationToken.None);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CheckHealthAsync_RequestTimeout_ReturnsFalse()
+    {
+        using var client = CreateClient(
+            (_, _) => Task.FromException<HttpResponseMessage>(
+                new TaskCanceledException("Request timed out")));
+
+        var result = await RunExecutor.CheckHealthAsync(
+            client,
+            "https://terminology.example.com/health",
+            CancellationToken.None);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CheckHealthAsync_CallerCancellation_Propagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+
+        using var client = CreateClient(
+            (_, token) =>
+            {
+                cancellation.Cancel();
+
+                return Task.FromCanceled<HttpResponseMessage>(
+                    token);
+            });
+
+        Func<Task> action = async () =>
+            await RunExecutor.CheckHealthAsync(
+                client,
+                "https://terminology.example.com/health",
+                cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public void BuildMonitoredServiceHealthUrls_ConstructsExpectedUrls()
+    {
+        var configuration = CreateConfiguration(
+            ("ServiceRegistry:TerminologyServiceUrl",
+                "https://terminology.example.com/"),
+            ("ServiceRegistry:ValidationServiceUrl",
+                "https://validation.example.com"));
+
+        var services = RunExecutor.BuildMonitoredServiceHealthUrls(
+            configuration);
+
+        services.Should().HaveCount(2);
+
+        services.Should().Contain(service =>
+            service.Name == "Terminology" &&
+            service.Url == "https://terminology.example.com/health");
+
+        services.Should().Contain(service =>
+            service.Name == "Validation" &&
+            service.Url == "https://validation.example.com/health");
+    }
+
+    [Fact]
+    public void BuildMonitoredServiceHealthUrls_MissingUrls_ReturnsEmptyList()
+    {
+        var configuration = CreateConfiguration();
+
+        var services = RunExecutor.BuildMonitoredServiceHealthUrls(
+            configuration);
+
+        services.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Preflight_ValidationUnavailable_DoesNotBlockStartup()
+    {
+        var monitoredServices = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health"),
+        ("Validation", "https://validation.example.com/health")
+    };
+
+        var requiredServices = RunExecutor.GetRequiredStartupServices(
+            monitoredServices);
+
+        var checkedServices = new List<string>();
+
+        await RunExecutor.ValidateRequiredServicesCoreAsync(
+            requiredServices,
+            (url, _) =>
+            {
+                checkedServices.Add(url);
+                return Task.FromResult<bool?>(true);
+            },
+            _ => { },
+            CancellationToken.None);
+
+        checkedServices.Should().ContainSingle()
+            .Which.Should().Be("https://terminology.example.com/health");
+
+        monitoredServices.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Preflight_UnhealthyDependency_ThrowsBeforeExecution()
+    {
+        var services = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health")
+    };
+
+        Func<Task> action = () =>
+            RunExecutor.ValidateRequiredServicesCoreAsync(
+                services,
+                (_, _) => Task.FromResult<bool?>(false),
+                _ => { },
+                CancellationToken.None);
+
+        await action.Should()
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Terminology service is unavailable*");
+    }
+
+    [Fact]
+    public async Task Preflight_HealthyDependency_Completes()
+    {
+        var services = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health")
+    };
+
+        Func<Task> action = () =>
+            RunExecutor.ValidateRequiredServicesCoreAsync(
+                services,
+                (_, _) => Task.FromResult<bool?>(true),
+                _ => { },
+                CancellationToken.None);
+
+        await action.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task Preflight_NoDependencies_SkipsHealthChecks()
+    {
+        var checkCount = 0;
+
+        await RunExecutor.ValidateRequiredServicesCoreAsync(
+            new List<(string Name, string Url)>(),
+            (_, _) =>
+            {
+                checkCount++;
+                return Task.FromResult<bool?>(true);
+            },
+            _ => { },
+            CancellationToken.None);
+
+        checkCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Preflight_CallerCancellation_Propagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var services = new List<(string Name, string Url)>
+    {
+        ("Terminology", "https://terminology.example.com/health")
+    };
+
+        Func<Task> action = () =>
+            RunExecutor.ValidateRequiredServicesCoreAsync(
+                services,
+                (_, _) => Task.FromResult<bool?>(true),
+                _ => { },
+                cancellation.Token);
+
+        await action.Should()
+            .ThrowAsync<OperationCanceledException>();
+    }
+
+    [Theory]
+    [InlineData("not-a-url")]
+    [InlineData("ftp://terminology.example.com")]
+    public void BuildMonitoredServiceHealthUrls_InvalidUrl_Throws(
+        string serviceUrl)
+    {
+        var configuration = CreateConfiguration(
+            ("ServiceRegistry:TerminologyServiceUrl", serviceUrl));
+
+        Action action = () =>
+            RunExecutor.BuildMonitoredServiceHealthUrls(
+                configuration);
+
+        action.Should().Throw<ArgumentException>();
+    }
+
+    private static IConfiguration CreateConfiguration(
+        params (string Key, string Value)[] values)
+    {
+        var configurationValues = values.ToDictionary(
+            value => value.Key,
+            value => (string?)value.Value);
+
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationValues)
+            .Build();
+    }
+
+    private static HttpClient CreateClient(
+        Func<HttpRequestMessage, CancellationToken,
+            Task<HttpResponseMessage>> response)
+    {
+        return new HttpClient(new StubHttpMessageHandler(response));
+    }
+
+    private sealed class StubHttpMessageHandler(
+        Func<HttpRequestMessage, CancellationToken,
+            Task<HttpResponseMessage>> response)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return response(request, cancellationToken);
+        }
+    }
+}

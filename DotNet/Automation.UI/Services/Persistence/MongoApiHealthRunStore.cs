@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Models.ApiHealth;
+using Automation.UI.Services.TestRail;
 using MongoDB.Driver;
 
 namespace Automation.UI.Services.Persistence;
@@ -20,6 +21,11 @@ public interface IApiHealthRunStore
     Task<ApiHealthExecutionRunStatus?> GetLatestExecutionRunStatusAsync(CancellationToken ct = default);
     Task<ApiHealthExecutionRunStatus?> GetExecutionRunStatusAsync(Guid runId, CancellationToken ct = default);
     Task CompleteExecutionRunAsync(Guid runId, bool failed, string? error, DateTimeOffset finishedAt, CancellationToken ct = default);
+    /// <summary>
+    /// Stores TestRail runs that accepted this execution's results.
+    /// An empty list is ignored so a later status write cannot clear a stored link.
+    /// </summary>
+    Task SetExecutionTestRailRunsAsync(Guid runId, IReadOnlyList<TestRailRunReference> runs, CancellationToken ct = default);
 }
 
 public sealed class MongoApiHealthRunStore : IApiHealthRunStore
@@ -433,6 +439,23 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         return _executionCollection.UpdateOneAsync(filter, update, cancellationToken: ct);
     }
 
+    public Task SetExecutionTestRailRunsAsync(
+        Guid runId,
+        IReadOnlyList<TestRailRunReference> runs,
+        CancellationToken ct = default)
+    {
+        var stored = TestRailRunLinks.Copy(runs);
+        if (stored.Count == 0)
+            return Task.CompletedTask;
+
+        var filter = Builders<ApiHealthExecutionRunDocument>.Filter.Eq(d => d.RunId, runId);
+        var update = Builders<ApiHealthExecutionRunDocument>.Update
+            .Set(d => d.TestRailRuns, stored)
+            .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow);
+
+        return _executionCollection.UpdateOneAsync(filter, update, cancellationToken: ct);
+    }
+
     private static ApiHealthExecutionRunStatus ToExecutionStatus(ApiHealthExecutionRunDocument d) => new()
     {
         RunId = d.RunId,
@@ -447,6 +470,7 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         IsCompleted = d.IsCompleted,
         Failed = d.Failed,
         Error = d.Error,
-        FinishedAt = d.FinishedAt
+        FinishedAt = d.FinishedAt,
+        TestRailRuns = TestRailRunLinks.Copy(d.TestRailRuns)
     };
 }

@@ -1,0 +1,1052 @@
+# Derived from PQ_ACHMonthly-FHIR DD-v3.2.0_final.xlsx.
+# Selection reconciliation: 92 visible Unacceptable rows; one Encounter.partOf row is marked NR and excluded;
+# 91 valid Unacceptable rows less 10 resource-presence, 10 resource.id, and 14 technical reference-URL rows = 57 source requirement rows.
+# 40 source rows contain two separately labelled Error/Warning findings; splitting them adds 40 checks, for 97 atomic checks.
+# VALUESET parameters intentionally contain only path and versioned valueSet for VaaS registrar compatibility.
+# Every FHIRPATH failureMessage is copied from its atomic Proposed Action for User finding; line breaks are normalized to '. '.
+# Resource.exists() root checks and technical-only id/reference checks are not included.
+# 2026-11-04 (link-engine-prototype run 14): birth sex and sex value set paths select their extension by url
+# (Patient.extension.valueCode matched nothing); the lab and vital-sign Observation checks apply only to
+# Observations of that category, except the two category-required checks, which apply to every Observation.
+id: bare-minimum-requirements
+semver: 1.1.0
+title: ACH Monthly Bare-Minimum Requirements
+owner: lcg
+dimensions:
+- CONFORMANCE
+- TERMINOLOGY
+scoringPolicy:
+  type: piqi-dimension-scorecard
+  rollup: worst-of
+checks:
+- id: diagnosticreport-category-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 1
+  enabled: true
+  parameters:
+    expression: DiagnosticReport.category.exists()
+    failureMessage: 'Error 1: Missing DiagnosticReport.category code. The DiagnosticReport resource does not contain a category code. Populate
+      DiagnosticReport.category with a valid code from the HL7 v2-0074 Diagnostic Service Section value set (http://terminology.hl7.org/CodeSystem/v2-0074)
+      to identify the type of diagnostic report.'
+    code: diagnosticreport-category-required
+- id: diagnosticreport-category-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 2
+  enabled: true
+  parameters:
+    path: DiagnosticReport.category
+    valueSet: http://hl7.org/fhir/ValueSet/diagnostic-service-sections|4.0.1
+- id: diagnosticreport-code-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 3
+  enabled: true
+  parameters:
+    expression: DiagnosticReport.code.exists()
+    failureMessage: 'Error: Missing DiagnosticReport.code. Provide a US Core Laboratory Test Codes value set (http://hl7.org/fhir/us/core/ValueSet/us-core-laboratory-test-codes).
+      If an applicable code exists, the code must be used and sent.'
+    code: diagnosticreport-code-required
+- id: diagnosticreport-code-lab-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 4
+  enabled: true
+  parameters:
+    path: DiagnosticReport.code
+    valueSet: http://hl7.org/fhir/us/core/ValueSet/us-core-laboratory-test-codes|6.1.0
+- id: diagnosticreport-effective-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 5
+  enabled: true
+  parameters:
+    expression: (DiagnosticReport.status = 'partial' or DiagnosticReport.status = 'preliminary' or DiagnosticReport.status = 'final' or DiagnosticReport.status
+      = 'amended' or DiagnosticReport.status = 'corrected' or DiagnosticReport.status = 'appended') implies DiagnosticReport.effective.exists()
+    failureMessage: 'Warning 1: Missing. DiagnosticReport.effective. Populate DiagnosticReport.effective with the clinically relevant date/time
+      or period during which the diagnostic data was collected. If using DiagnosticReport.effectivePeriod, ensure that the start date/time occurs
+      before the end date/time and that both values are valid FHIR date/time formats.'
+    code: diagnosticreport-effective-required
+- id: diagnosticreport-effective-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 6
+  enabled: true
+  parameters:
+    expression: DiagnosticReport.effective.all(($this is dateTime) implies ($this.toString().length() >= 10)) and DiagnosticReport.effective.ofType(Period).all(start.exists()
+      and start.toString().length() >= 10 and (end.empty() or (end.toString().length() >= 10 and end > start)))
+    failureMessage: 'Warning 2: Invalid DiagnosticReport.effective date/time or period format. Use a valid dateTime formatted as YYYY-MM-DDThh:mm:ss±zz:zz.'
+    code: diagnosticreport-effective-valid
+- id: diagnosticreport-result-reference-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 7
+  enabled: true
+  parameters:
+    expression: DiagnosticReport.result.exists() and DiagnosticReport.result.all(reference.exists() and resolve().is(Observation))
+    failureMessage: 'Warning: Missing DiagnosticReport.result reference. The DiagnosticReport.result does not contain references. Populate DiagnosticReport.result
+      with one or more references to Observation resources that contain the findings, measurements, or test results associated with this diagnostic
+      report.'
+    code: diagnosticreport-result-reference-required
+- id: observation-lab-status-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 8
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).all(status.exists())'
+    failureMessage: 'Error message 1: Missing an observation.status code. Populate Observation.status with a valid status code that indicates
+      the current state of the observation. For labs, reference Non-Negative Observation Status: http://hl7.org/fhir/us/qicore/ValueSet/qicore-non-negative-observation-status.'
+    code: observation-lab-status-required
+- id: observation-lab-status-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 9
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).status'
+    valueSet: http://hl7.org/fhir/us/qicore/ValueSet/qicore-non-negative-observation-status|6.0.0
+- id: observation-lab-category-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 10
+  enabled: true
+  parameters:
+    expression: Observation.category.exists()
+    failureMessage: 'Error message 1: Missing observation.category.code. . Populate Observation.category with an appropriate category code such
+      as "laboratory" for a lab from http://terminology.hl7.org/CodeSystem/observation-category.'
+    code: observation-lab-category-required
+- id: observation-lab-category-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 11
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).category'
+    valueSet: http://hl7.org/fhir/us/core/ValueSet/us-core-clinical-result-observation-category|6.1.0
+- id: observation-lab-code-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 12
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).all(code.exists())'
+    failureMessage: 'Error1: Missing Observation.code. Add a valid LOINC code to Observation.code. Use a laboratory LOINC code (CLASSTYPE=1) for
+      lab observations and a code from http://hl7.org/fhir/us/core/ValueSet/us-core-laboratory-test-codes.'
+    code: observation-lab-code-required
+- id: observation-lab-code-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 13
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).code'
+    valueSet: http://hl7.org/fhir/us/core/ValueSet/us-core-laboratory-test-codes|6.1.0
+- id: observation-lab-effective-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 14
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).all(effective.exists())'
+    failureMessage: 'Error 1: Missing observation.effective date/time. Populate Observation.effective with the date/time or period when the observation
+      was performed or collected. Ensure the date/time falls within or overlaps the required measurement period when applicable. Use the format
+      YYYY-MM-DDThh:mm:ss+zz:zz.'
+    code: observation-lab-effective-required
+- id: observation-lab-effective-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 15
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).all(effective.all(($this is dateTime) implies ($this.toString().length() >= 10)) and effective.ofType(Period).all(start.exists() and start.toString().length() >= 10 and (end.empty() or (end.toString().length() >= 10 and end > start))))'
+    failureMessage: 'Error 2: Invalid Observation.effective date/time format. Provide a valid date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz.'
+    code: observation-lab-effective-valid
+- id: observation-lab-value-or-absent-reason
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 16
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).all(component.exists() or hasMember.exists() or value.exists() or dataAbsentReason.exists())'
+    failureMessage: 'Warning: Missing observation.value or laboratory result. This Observation must include a result. Add a result in Observation.value.
+      If the result is represented by Observation.component or Observation.hasMember, no top-level value is required. If a result is unavailable,
+      provide Observation.dataAbsentReason explaining why the result is missing. For coded results, use the required SNOMED CT code.'
+    code: observation-lab-value-or-absent-reason
+- id: observation-lab-interpretation-present
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 17
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).all(interpretation.exists())'
+    failureMessage: 'Warning 1: The Observation resource does not contain an interpretation. Consider populating Observation.interpretation with
+      a clinically relevant interpretation, such as high, low, normal, or abnormal, to help users understand the significance of the observation
+      result from value set http://hl7.org/fhir/ValueSet/observation-interpretation. If an applicable code exists, the code must be used and sent.'
+    code: observation-lab-interpretation-present
+- id: observation-lab-interpretation-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 18
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).interpretation'
+    valueSet: http://hl7.org/fhir/ValueSet/observation-interpretation|4.0.1
+- id: observation-lab-component-code-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 19
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).all(component.all(code.exists()))'
+    failureMessage: 'Error 1: Missing Observation.component.code Provide a valid LOINC code and include it in Observation.code from US Core Laboratory
+      Test Codes: http://hl7.org/fhir/us/core/ValueSet/us-core-laboratory-test-codes) value set if exist. Local codes or codes from third party
+      pharmacy vendors must be mapped to standardized codes.'
+    code: observation-lab-component-code-required
+- id: observation-lab-component-code-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 20
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''laboratory'').exists()).component.code'
+    valueSet: http://hl7.org/fhir/us/core/ValueSet/us-core-laboratory-test-codes|6.1.0
+- id: encounter-identifier-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 21
+  enabled: true
+  parameters:
+    expression: Encounter.identifier.exists()
+    failureMessage: 'Error: Please assign an identifier to the the encounter.'
+    code: encounter-identifier-required
+- id: encounter-status-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 22
+  enabled: true
+  parameters:
+    expression: Encounter.status.exists()
+    failureMessage: 'Error: Missing encounter.status code. Please assign an encounter status code from the value set http://hl7.org/fhir/ValueSet/encounter-status|4.0.1.'
+    code: encounter-status-required
+- id: encounter-status-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 23
+  enabled: true
+  parameters:
+    path: Encounter.status
+    valueSet: http://hl7.org/fhir/ValueSet/encounter-status|4.0.1
+- id: encounter-classhistory-period-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 24
+  enabled: true
+  parameters:
+    expression: Encounter.classHistory.all(period.exists())
+    failureMessage: 'Error 1: Missing Encounter.classHistory.period. Enter the missing time period for Encounter.classHistory.period. Use a valid
+      dateTime formatted as YYYY-MM-DDThh:mm:ss±zz:zz.'
+    code: encounter-classhistory-period-required
+- id: encounter-classhistory-period-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 25
+  enabled: true
+  parameters:
+    expression: Encounter.classHistory.period.all(start.empty() or (start.toString().length() >= 10 and (end.empty() or (end.toString().length()
+      >= 10 and end > start))))
+    failureMessage: 'Error 2: Invalid Encounter.classHistory.period format. Correct Encounter.classHistory.period to meet FHIR date/time requirements.
+      Use a valid dateTime formatted as YYYY-MM-DDThh:mm:ss±zz:zz.'
+    code: encounter-classhistory-period-valid
+- id: encounter-class-or-type-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 26
+  enabled: true
+  parameters:
+    expression: Encounter.class.exists() or Encounter.type.exists()
+    failureMessage: 'Error: Missing encounter.class. Must include either an encounter.class or encounter.type code. Please assign an encounter
+      class code from either. valueset "NHSN Inpatient Encounter Class Codes" http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1046.274''
+      or ''observation encounter'' ''emergency'' from valueset "v3.ActEncounterCode" https://hl7.org/fhir/R4/v3/ActEncounterCode/vs.html''. or.
+      Please assign the encounter.class code from one of these value sets:. "Emergency Department Visit":. ''http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.117.1.7.1.292''.
+      "Observation Services": ''http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1111.143''. "Encounter Inpatient": ''http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.666.5.307''.'
+    code: encounter-class-or-type-required
+- id: encounter-class-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 27
+  enabled: true
+  parameters:
+    path: Encounter.class
+    valueSet: http://terminology.hl7.org/ValueSet/v3-ActEncounterCode|3.0.0
+- id: encounter-classhistory-class-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 28
+  enabled: true
+  parameters:
+    expression: Encounter.classHistory.all(class.exists())
+    failureMessage: 'Error 1: Missing Encounter.classHistory.class. Please assign a code from the value set http://terminology.hl7.org/ValueSet/v3-ActEncounterCode.
+      If an applicable code exists, the code must be used and sent.'
+    code: encounter-classhistory-class-required
+- id: encounter-classhistory-class-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 29
+  enabled: true
+  parameters:
+    path: Encounter.classHistory.class
+    valueSet: http://terminology.hl7.org/ValueSet/v3-ActEncounterCode|3.0.0
+- id: encounter-period-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 30
+  enabled: true
+  parameters:
+    expression: Encounter.period.exists() and Encounter.period.start.exists()
+    failureMessage: 'Error 1. Encounter. period is missing: Enter a valid time period for Encounter.period. Provide the start date/time and, if
+      applicable, the end date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz. When both are provided, the start date/time must occur before the
+      end date/time.'
+    code: encounter-period-required
+- id: encounter-period-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 31
+  enabled: true
+  parameters:
+    expression: Encounter.period.all(start.empty() or (start.toString().length() >= 10 and (end.empty() or (end.toString().length() >= 10 and
+      end > start))))
+    failureMessage: 'Error 2. Encounter. period is in the wrong format: Correct the date/time values in Encounter.period to use the format YYYY-MM-DDThh:mm:ss+zz:zz.
+      If both a start and end date/time are provided, make sure the start occurs before the end.'
+    code: encounter-period-valid
+- id: encounter-type-or-class-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 32
+  enabled: true
+  parameters:
+    expression: Encounter.type.exists() or Encounter.class.exists()
+    failureMessage: 'Error 1: Missing encounter.type. Must include either an encounter.class or encounter.type code. Please assign an encounter
+      class code from either. valueset "NHSN Inpatient Encounter Class Codes" http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1046.274''
+      or ''observation encounter'' ''emergency'' from valueset "v3.ActEncounterCode" https://hl7.org/fhir/R4/v3/ActEncounterCode/vs.html''. or.
+      Please assign the encounter.type code from one of these value sets:. "Emergency Department Visit":. ''http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.117.1.7.1.292''.
+      "Observation Services": ''http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1111.143''. "Encounter Inpatient": ''http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.666.5.307''.'
+    code: encounter-type-or-class-required
+- id: encounter-type-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 33
+  enabled: true
+  parameters:
+    path: Encounter.type
+    valueSet: http://hl7.org/fhir/us/core/ValueSet/us-core-encounter-type|6.1.0
+- id: encounter-location-period-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 34
+  enabled: true
+  parameters:
+    expression: Encounter.location.all(period.exists())
+    failureMessage: Error 1. Missing Encounter. location.period. Enter a valid time period for Encounter.location.period. Provide the start date/time
+      and, if applicable, the end date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz. When both are provided, the start date/time must occur before
+      the end date/time.
+    code: encounter-location-period-required
+- id: encounter-location-period-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 35
+  enabled: true
+  parameters:
+    expression: Encounter.location.period.all(start.empty() or (start.toString().length() >= 10 and (end.empty() or (end.toString().length() >=
+      10 and end > start))))
+    failureMessage: Error 2. Invalid Encounter. location.period. Correct the date/time values in Encounter.location.period to use the format YYYY-MM-DDThh:mm:ss+zz:zz.
+      If both a start and end date/time are provided, make sure the start occurs before the end.
+    code: encounter-location-period-valid
+- id: encounter-diagnosis-condition-reference
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 36
+  enabled: true
+  parameters:
+    expression: Encounter.diagnosis.all(condition.exists() and condition.reference.exists() and (condition.resolve().is(Condition) or condition.resolve().is(Procedure)))
+    failureMessage: 'Warning: The reference to the encounter.diagnosis.condition is missing. Provide the URL reference to the conditionrelevant
+      to this encounter.'
+    code: encounter-diagnosis-condition-reference
+- id: encounter-admit-source-present
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 37
+  enabled: true
+  parameters:
+    expression: Encounter.hospitalization.admitSource.exists()
+    failureMessage: 'Warning 1: Missing encounter.hopsitalization.admitSource. Enter a valid code that represents from where the patient was admitted
+      (physician referral, transfer) from the value set http://hl7.org/fhir/ValueSet/encounter-admit-source. If an appropriate code is not available
+      in the value set, send another code that accurately represents the admission source.'
+    code: encounter-admit-source-present
+- id: encounter-admit-source-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 38
+  enabled: true
+  parameters:
+    path: Encounter.hospitalization.admitSource
+    valueSet: http://hl7.org/fhir/ValueSet/encounter-admit-source|4.0.1
+- id: encounter-discharge-disposition-present
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 39
+  enabled: true
+  parameters:
+    expression: Encounter.hospitalization.dischargeDisposition.exists()
+    failureMessage: 'Warning 1: Missing encounter.hopsitalization.dischargeDisposition. Enter a valid code that represents the kind location after
+      the patient is discharge using a code from the value set http://terminology.hl7.org/ValueSet/clinical-discharge-disposition. If an appropriate
+      code is not available in the value set, send another code that accurately represents the dischargeDisposition.'
+    code: encounter-discharge-disposition-present
+- id: encounter-discharge-disposition-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 40
+  enabled: true
+  parameters:
+    path: Encounter.hospitalization.dischargeDisposition
+    valueSet: http://hl7.org/fhir/ValueSet/encounter-discharge-disposition|4.0.1
+- id: encounter-location-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 41
+  enabled: true
+  parameters:
+    expression: Encounter.location.exists()
+    failureMessage: 'Error : Missing encounter.location code. Enter at least one valid code that represents the location where the patient is
+      during the encounter using the Inpatient, Emergency, and Observation Locations value set (2.16.840.1.113762.1.4.1046.265). If multiple location
+      codes are submitted, at least one must be a code from this value set.'
+    code: encounter-location-required
+- id: encounter-location-coded-reference-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 42
+  enabled: true
+  parameters:
+    expression: Encounter.location.location.resolve().where($this is Location and type.exists()).exists()
+    failureMessage: 'Warning: The encounter.location codes are invalid. Enter at least one valid code that represents the location where the patient
+      is during the encounter using the Inpatient, Emergency, and Observation Locations value set (2.16.840.1.113762.1.4.1046.265). If multiple
+      location codes are submitted, at least one must be a code from this value set.'
+    code: encounter-location-coded-reference-required
+- id: location-type-or-parent-type-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 43
+  enabled: true
+  parameters:
+    expression: Location.type.exists() or Location.repeat(partOf.resolve()).type.exists()
+    failureMessage: 'Error: Missing Location.type. Enter a valid Location.type code. The Location must include, either directly or through its
+      Location.partOf hierarchy, at least one code from the HSLOC Inpatient, Emergency, and Observation Locations Value Set: http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1046.265.
+      Not every Location.type must itself use an HSLOC code, but an HSLOC code must be present somewhere in the Location’s partOf traversal.'
+    code: location-type-or-parent-type-required
+- id: location-type-inpatient-emergency-observation-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 44
+  enabled: true
+  parameters:
+    path: Location.type
+    valueSet: http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1046.265|20240606
+- id: medication-code-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 45
+  enabled: true
+  parameters:
+    expression: Medication.code.exists()
+    failureMessage: 'Error: Medication code is missing:. Enter a code for Medication.code that identifies the medication from the Medication Clinical
+      Drug Value Set: https://vsac.nlm.nih.gov/valueset/2.16.840.1.113762.1.4.1010.4/expansion. If an applicable RxNorm code exists, the RxNorm
+      code must be used and sent.'
+    code: medication-code-required
+- id: medication-code-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 46
+  enabled: true
+  parameters:
+    path: Medication.code
+    valueSet: http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1010.4|20240606
+- id: medication-ingredient-item-required-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 47
+  enabled: true
+  parameters:
+    expression: Medication.ingredient.all(item.exists() and (item.ofType(CodeableConcept).exists() or (item.ofType(Reference).reference.exists()
+      and (item.ofType(Reference).resolve().is(Medication) or item.ofType(Reference).resolve().is(Substance)))))
+    failureMessage: 'Error: Medication ingredient is missing. Enter Medication.ingredient.item[x] to identify the ingredient contained in the
+      medication. Provide the ingredient as either a valid coded concept or a reference to the appropriate medication resource, as applicable.'
+    code: medication-ingredient-item-required-valid
+- id: medicationrequest-status-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 48
+  enabled: true
+  parameters:
+    expression: MedicationRequest.status.exists()
+    failureMessage: 'Error 1: The MedicationRequest.status does not contain a code. Populate MedicationRequest.status with a code from http://hl7.org/fhir/ValueSet/medicationrequest-status.'
+    code: medicationrequest-status-required
+- id: medicationrequest-status-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 49
+  enabled: true
+  parameters:
+    path: MedicationRequest.status
+    valueSet: http://hl7.org/fhir/ValueSet/medicationrequest-status|4.0.1
+- id: medicationrequest-medication-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 50
+  enabled: true
+  parameters:
+    expression: MedicationRequest.medication.exists()
+    failureMessage: 'Error: The MedicationRequest.medication is missing. Provide either the missing RxNorm code from value set http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1010.4
+      or a URL reference to the medication.'
+    code: medicationrequest-medication-required
+- id: medicationrequest-medication-code-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 51
+  enabled: true
+  parameters:
+    path: MedicationRequest.medicationCodeableConcept
+    valueSet: http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1010.4|20240606
+- id: medicationrequest-authoredon-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 52
+  enabled: true
+  parameters:
+    expression: MedicationRequest.authoredOn.exists()
+    failureMessage: 'Error 1: MedicationRequest.authoredOn date time is missing. Enter a date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz.'
+    code: medicationrequest-authoredon-required
+- id: medicationrequest-authoredon-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 53
+  enabled: true
+  parameters:
+    expression: MedicationRequest.authoredOn.empty() or MedicationRequest.authoredOn.toString().length() >= 10
+    failureMessage: 'Error 2: Invalid form at for MedicationRequest.authoredOn date/time. Enter a date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz.'
+    code: medicationrequest-authoredon-valid
+- id: medicationrequest-route-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 54
+  enabled: true
+  parameters:
+    expression: MedicationRequest.dosageInstruction.all(route.exists())
+    failureMessage: 'Error: The MedicationRequest.medication is missing. Provide either the missing RxNorm code from value set http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1010.4
+      or a URL reference to the medication.'
+    code: medicationrequest-route-required
+- id: medicationrequest-route-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 55
+  enabled: true
+  parameters:
+    path: MedicationRequest.dosageInstruction.route
+    valueSet: http://hl7.org/fhir/ValueSet/route-codes|4.0.1
+- id: medicationrequest-category-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 56
+  enabled: true
+  parameters:
+    expression: MedicationRequest.category.exists()
+    failureMessage: 'Error1: The medicationRequest.category code is missing. Populate the medication.category with a code from. http://hl7.org/fhir/ValueSet/medicationrequest-category.'
+    code: medicationrequest-category-required
+- id: medicationrequest-category-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 57
+  enabled: true
+  parameters:
+    path: MedicationRequest.category
+    valueSet: http://hl7.org/fhir/ValueSet/medicationrequest-category|4.0.1
+- id: medicationrequest-dosageinstruction-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 58
+  enabled: true
+  parameters:
+    expression: MedicationRequest.dosageInstruction.exists()
+    failureMessage: 'Warning: MedicationRequest.dosageInstruction information is missing. If available, please provide instructions on how the
+      medication should be taken.'
+    code: medicationrequest-dosageinstruction-required
+- id: medicationrequest-dosageinstruction-timing-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 59
+  enabled: true
+  parameters:
+    expression: MedicationRequest.dosageInstruction.timing.exists()
+    failureMessage: 'Warning: MedicationRequest.dosageInstruction.timing information is missing. If available, please provide information on the
+      start and end date/time period.'
+    code: medicationrequest-dosageinstruction-timing-required
+- id: medicationadministration-status-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 60
+  enabled: true
+  parameters:
+    expression: MedicationAdministration.status.exists()
+    failureMessage: 'Error 1: The MedicationAdministration.status does not contain a code. Populate MedicationAdministration.status with a code
+      from http://hl7.org/fhir/us/qicore/ValueSet/qicore-non-negative-medication-admin-status.'
+    code: medicationadministration-status-required
+- id: medicationadministration-status-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 61
+  enabled: true
+  parameters:
+    path: MedicationAdministration.status
+    valueSet: http://hl7.org/fhir/us/qicore/ValueSet/qicore-non-negative-medication-admin-status|6.0.0
+- id: medicationadministration-medication-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 62
+  enabled: true
+  parameters:
+    expression: MedicationAdministration.medication.exists()
+    failureMessage: 'Error: The MedicationAdministration.medication is missing. Provide either the missing RxNorm code from value set https://vsac.nlm.nih.gov/valueset/2.16.840.1.113762.1.4.1010.4/expansion
+      or a URL reference to the medication.'
+    code: medicationadministration-medication-required
+- id: medicationadministration-medication-code-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 63
+  enabled: true
+  parameters:
+    path: MedicationAdministration.medicationCodeableConcept
+    valueSet: http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1010.4|20240606
+- id: medicationadministration-effective-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 64
+  enabled: true
+  parameters:
+    expression: MedicationAdministration.effective.exists()
+    failureMessage: 'Error 1: MedicationAdministration.effective date time or period is missing: Enter a valid date time or period for MedicationAdministration.effective.
+      Provide the start date/time and, if applicable, the end date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz. When both are provided, the start
+      date/time must occur before the end date/time.'
+    code: medicationadministration-effective-required
+- id: medicationadministration-effective-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 65
+  enabled: true
+  parameters:
+    expression: MedicationAdministration.effective.all(($this is dateTime) implies ($this.toString().length() >= 10)) and MedicationAdministration.effective.ofType(Period).all(start.exists()
+      and start.toString().length() >= 10 and (end.empty() or (end.toString().length() >= 10 and end > start)))
+    failureMessage: 'Error 2: Invalid format for MedicationAdministration.effective time or period. Correct the date/time values in MedicationAdministration.effective
+      to use the format YYYY-MM-DDThh:mm:ss+zz:zz. If both a start and end date/time are provided, make sure the start occurs before the end.".'
+    code: medicationadministration-effective-valid
+- id: medicationadministration-dosage-required-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 66
+  enabled: true
+  parameters:
+    expression: MedicationAdministration.dosage.exists() and MedicationAdministration.dosage.all(dose.exists() or rate.exists())
+    failureMessage: 'Error: MedicationAdministration.dosage data is missing. Please provide details on how the medication was taken.'
+    code: medicationadministration-dosage-required-valid
+- id: medicationadministration-route-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 67
+  enabled: true
+  parameters:
+    expression: MedicationAdministration.dosage.all(route.exists())
+    failureMessage: 'Error: MedicationAdministration.dosage.route code is missing. Please provide details on the route the medication was adminstered.
+      Selected a code from the value set http://hl7.org/fhir/ValueSet/route-codes.'
+    code: medicationadministration-route-required
+- id: medicationadministration-route-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 68
+  enabled: true
+  parameters:
+    path: MedicationAdministration.dosage.route
+    valueSet: http://hl7.org/fhir/ValueSet/route-codes|4.0.1
+- id: medicationadministration-dose-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 69
+  enabled: true
+  parameters:
+    expression: MedicationAdministration.dosage.dose.exists()
+    failureMessage: 'Error: MedicationAdministration.dosage.dose data is missing. Please provide details on quantity of medication administered
+      to the patient.'
+    code: medicationadministration-dose-required
+- id: patient-birthsex-present
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 70
+  enabled: true
+  parameters:
+    expression: Patient.extension.where(url = 'http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex').value.exists()
+    failureMessage: 'Warning: Missing Patient birthsex information. Select a code from http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex.'
+    code: patient-birthsex-present
+- id: patient-birthsex-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 71
+  enabled: true
+  parameters:
+    path: 'Patient.extension.where(url = ''http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex'').value'
+    valueSet: http://hl7.org/fhir/us/core/ValueSet/birthsex|6.1.0
+- id: patient-sex-present
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 72
+  enabled: true
+  parameters:
+    expression: Patient.extension.where(url = 'http://hl7.org/fhir/us/core/StructureDefinition/us-core-sex').value.exists()
+    failureMessage: 'Warning: Missing Patient sex. Select a code from http://hl7.org/fhir/us/core/StructureDefinition/us-core-sex.'
+    code: patient-sex-present
+- id: patient-sex-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 73
+  enabled: true
+  parameters:
+    path: 'Patient.extension.where(url = ''http://hl7.org/fhir/us/core/StructureDefinition/us-core-sex'').value'
+    valueSet: http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1240.3|20240606
+- id: patient-identifier-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 74
+  enabled: true
+  parameters:
+    expression: Patient.identifier.exists()
+    failureMessage: 'Error: Missing patient.identifier. Patient.identifier is required to uniquely identify the patient. Assign at least one identifier
+      for the patient.'
+    code: patient-identifier-required
+- id: patient-mrn-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 75
+  enabled: true
+  parameters:
+    expression: Patient.identifier.where(type.coding.where(system = 'http://terminology.hl7.org/CodeSystem/v2-0203' and code = 'MR').exists()).exists()
+    failureMessage: 'Error: Missing Medical Record Number (MRN). Please assign at least one MRN for the patient.'
+    code: patient-mrn-required
+- id: patient-mrn-type-fixed
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 76
+  enabled: true
+  parameters:
+    expression: Patient.identifier.where(type.coding.where(system = 'http://terminology.hl7.org/CodeSystem/v2-0203').exists()).all(type.coding.where(system
+      = 'http://terminology.hl7.org/CodeSystem/v2-0203' and code = 'MR').exists())
+    failureMessage: 'Error: Missing patient identifier type of MRN. A Medical Record Number (MRN) has not been identified for this patient. Please
+      verify that at least one patient identifier is present and that its type is set to MR to indicate the patient''s MRN.'
+    code: patient-mrn-type-fixed
+- id: patient-name-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 77
+  enabled: true
+  parameters:
+    expression: Patient.name.exists()
+    failureMessage: 'Error: Missing patient name. The patient record does not include a name. Please enter the patient''s name to complete the
+      record. If no name is available, enter a reason that the name is not available.'
+    code: patient-name-required
+- id: patient-family-or-absent-reason
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 78
+  enabled: true
+  parameters:
+    expression: Patient.name.where(family.exists() or extension.where(url = 'http://hl7.org/fhir/StructureDefinition/data-absent-reason').exists()).exists()
+    failureMessage: 'Error: Missing family name. Provide at least a patient given and/or family name. If neither are available, enter a reason
+      that the name is not available.'
+    code: patient-family-or-absent-reason
+- id: patient-given-or-absent-reason
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 79
+  enabled: true
+  parameters:
+    expression: Patient.name.where(given.exists() or extension.where(url = 'http://hl7.org/fhir/StructureDefinition/data-absent-reason').exists()).exists()
+    failureMessage: 'Error: Missing given name. The patient record does not include a given name. Provide at least a patient given and/or family
+      name. If neither are available, enter a reason that the name is not available.'
+    code: patient-given-or-absent-reason
+- id: patient-gender-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 80
+  enabled: true
+  parameters:
+    expression: Patient.gender.exists()
+    failureMessage: 'Error 1: Missing patient gender. The patient''s gender was not provided. Please add a gender value of male or female from
+      the HL7 Administrative Gender Value Set: http://hl7.org/fhir/ValueSet/administrative-gender.'
+    code: patient-gender-required
+- id: patient-gender-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 81
+  enabled: true
+  parameters:
+    path: Patient.gender
+    valueSet: http://hl7.org/fhir/ValueSet/administrative-gender|4.0.1
+- id: patient-birthdate-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 82
+  enabled: true
+  parameters:
+    expression: Patient.birthDate.exists()
+    failureMessage: 'Error 1: Missing patient date of birth (DOB). Please provide the data in the form at of YYYY/MM/DD.'
+    code: patient-birthdate-required
+- id: patient-birthdate-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 83
+  enabled: true
+  parameters:
+    expression: Patient.birthDate.empty() or (Patient.birthDate.toString().length() = 10 and Patient.birthDate <= today())
+    failureMessage: 'Error 2: Invalid date of birth (DOB) format. Please enter the DOB in YYYY/MM/DD format.'
+    code: patient-birthdate-valid
+- id: specimen-accessionidentifier-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 84
+  enabled: true
+  parameters:
+    expression: Specimen.accessionIdentifier.exists()
+    failureMessage: 'Warning: Missing an accession identifier assigned by the laboratory. Please add the accession identifier (Specimen.accessionIdentifier)
+      to help uniquely identify and track the specimen.'
+    code: specimen-accessionidentifier-required
+- id: specimen-type-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 85
+  enabled: true
+  parameters:
+    expression: Specimen.type.exists()
+    failureMessage: 'Error:Missing specimen type code. Please specify the kind of material collected (for example, blood, urine, or tissue) by
+      providing a valid code from Specimen Type: https://vsac.nlm.nih.gov/valueset/2.16.840.1.113762.1.4.1099.54/expansion. If an applicable SNOMED-CT
+      code exists, the code must be used and sent.'
+    code: specimen-type-required
+- id: specimen-type-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: WARNING
+  ordinal: 86
+  enabled: true
+  parameters:
+    path: Specimen.type
+    valueSet: http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1099.54|20240606
+- id: specimen-collected-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 87
+  enabled: true
+  parameters:
+    expression: Specimen.collection.collected.exists()
+    failureMessage: 'Error 1: Missing Specimen.collection.collected datetime or period. Enter a valid date time or period for Specimen.collection.collected.
+      Provide the start/date time and, if applicable, the end date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz. When both are provided, the start
+      date/time must occur before the end date/time.'
+    code: specimen-collected-required
+- id: specimen-collected-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 88
+  enabled: true
+  parameters:
+    expression: Specimen.collection.collected.all(($this is dateTime) implies ($this.toString().length() >= 10)) and Specimen.collection.collected.ofType(Period).all(start.exists()
+      and start.toString().length() >= 10 and (end.empty() or (end.toString().length() >= 10 and end > start)))
+    failureMessage: 'Error 2: Invalid format for Specimen.collection.collected or period. Correct the date/time values in Encounter.period to
+      use the format YYYY-MM-DDThh:mm:ss+zz:zz. If both a start and end date/time are provided, make sure the start occurs before the end.".'
+    code: specimen-collected-valid
+- id: observation-vitals-status-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 89
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).all(status.exists())'
+    failureMessage: 'Error 1: Missing observation. status for vital sign. The Observation.status for vital signs does not contain a code. Populate
+      Observation.status for vital signs with a code from http://hl7.org/fhir/ValueSet/observation-status.'
+    code: observation-vitals-status-required
+- id: observation-vitals-status-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 90
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).status'
+    valueSet: http://hl7.org/fhir/ValueSet/observation-status|4.0.1
+- id: observation-vitals-category-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 91
+  enabled: true
+  parameters:
+    expression: Observation.category.exists()
+    failureMessage: 'Error 1: Missing Observation.category code for vital sign. Populate Observation.category for vital signs with VSCat code
+      from http://hl7.org/fhir/ValueSet/observation-category. Shanai - how does this work if we are checking for either a category of vital sign
+      or laboratory? Will the system know how to discern and ask for the vital sign category vs. the lab category?.'
+    code: observation-vitals-category-required
+- id: observation-vitals-category-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 92
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).category'
+    valueSet: http://hl7.org/fhir/ValueSet/observation-category|4.0.1
+- id: observation-vitals-code-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 93
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).all(code.exists())'
+    failureMessage: 'Error 1: Missing Observation.code for vital signs. Populate Observation. code with a LOINC code from Vital Signs ValueSet:
+      http://hl7.org/fhir/us/core/ValueSet/us-core-vital-signs.'
+    code: observation-vitals-code-required
+- id: observation-vitals-code-terminology
+  type: VALUESET
+  dimension: TERMINOLOGY
+  severityOverride: ERROR
+  ordinal: 94
+  enabled: true
+  parameters:
+    path: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).code'
+    valueSet: http://hl7.org/fhir/us/core/ValueSet/us-core-vital-signs|6.1.0
+- id: observation-vitals-effective-required
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 95
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).all(effective.exists())'
+    failureMessage: 'Error 1: Missing Observation.effective date time or period. Enter a valid date time or period for Observation.effective.
+      Provide the start date/time and, if applicable, the end date/time in the format YYYY-MM-DDThh:mm:ss+zz:zz. When both are provided, the start
+      date/time must occur before the end date/time.'
+    code: observation-vitals-effective-required
+- id: observation-vitals-effective-valid
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: ERROR
+  ordinal: 96
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).all(effective.all(($this is dateTime) implies ($this.toString().length() >= 10)) and effective.ofType(Period).all(start.exists() and start.toString().length() >= 10 and (end.empty() or (end.toString().length() >= 10 and end > start))))'
+    failureMessage: 'Error 2: Invalid format forObservation.effective time or period. Correct the date/time values in Observation.effective to
+      use the format YYYY-MM-DDThh:mm:ss+zz:zz. If both a start and end date/time are provided, make sure the start occurs before the end.".'
+    code: observation-vitals-effective-valid
+- id: observation-vitals-value-or-absent-reason
+  type: FHIRPATH
+  dimension: CONFORMANCE
+  severityOverride: WARNING
+  ordinal: 97
+  enabled: true
+  parameters:
+    expression: 'Observation.where(category.coding.where(system = ''http://terminology.hl7.org/CodeSystem/observation-category'' and code = ''vital-signs'').exists()).all(component.exists() or hasMember.exists() or value.exists() or dataAbsentReason.exists())'
+    failureMessage: 'Warning: Missing observation.value. Add a vital sign result in Observation.value. If the result is represented by Observation.component
+      or Observation.hasMember, no top-level value is required. If a result is unavailable, provide Observation.dataAbsentReason explaining why
+      the result is missing.'
+    code: observation-vitals-value-or-absent-reason

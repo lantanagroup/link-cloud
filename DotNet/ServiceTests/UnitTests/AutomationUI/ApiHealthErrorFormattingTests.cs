@@ -108,11 +108,12 @@ public class ApiHealthErrorFormattingTests
 
         result.ErrorMessage.Should().Be(string.Join(Environment.NewLine,
             "Error: Expected HTTP 200 but got 500.",
-            $"Detail: {ExpectedDetail}"));
+            $"Detail: {ExpectedDetail}",
+            "Trace ID: Not provided"));
     }
 
     [Fact]
-    public async Task Untyped_step_500_with_missing_detail_and_trace_keeps_single_error_line_only()
+    public async Task Untyped_step_500_with_missing_detail_and_trace_marks_the_trace_not_provided()
     {
         var result = await _suite.RunUntypedAsync(200, () => Task.FromResult(new LinkApiResponse
         {
@@ -121,7 +122,9 @@ public class ApiHealthErrorFormattingTests
             TraceId = null
         }));
 
-        result.ErrorMessage.Should().Be("Error: Expected HTTP 200 but got 500.");
+        result.ErrorMessage.Should().Be(string.Join(Environment.NewLine,
+            "Error: Expected HTTP 200 but got 500.",
+            "Trace ID: Not provided"));
     }
 
     [Fact]

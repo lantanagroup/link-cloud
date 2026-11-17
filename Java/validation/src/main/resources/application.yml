@@ -50,7 +50,7 @@ spring:
         # See dev-docs/validation-category-counts.md.
         sendStringParametersAsUnicode: false
   #datasource:
-  #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
+  #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true # trufflehog:ignore
   #  username: link-user
   #  password: link-password
   kafka:
@@ -95,6 +95,8 @@ cache:
   type: redis   # or "redis" and uncomment spring.data.redis properties
   validate-code:
     ttl: 3600
+  rubric:
+    ttl: 3600   # seconds; backstop only — register/publish/retire evict explicitly
 
 management:
   endpoints:
@@ -135,7 +137,9 @@ management:
 
 logging:
   level:
-    com.lantanagroup.link: debug
+    # info, not debug: the rubric engine logs a line per check per patient at debug. The local profile turns
+    # debug back on; elsewhere, set logging.level.com.lantanagroup.link (or a narrower package) to debug.
+    com.lantanagroup.link: info
 
 secret-management:
   key-vault-uri: ''
@@ -148,7 +152,13 @@ authentication:
 link:
   info-route: /api/validation/info
   bundle-validation-parallelism: 4
+  # Resource types the legacy validator does not validate.
+  validation-excluded-resource-types: []
   terminology-service-url: ''
+  rubric:
+    max-payload-bytes: 262144
+    dry-run:
+      required-for-publish: false
   validation-result-ignore-rules:
     - id: ignore_measureeval_measure_report_population_description_invalid_version
       description: Ignore known MeasureEval-generated MeasureReport population description extension version warnings
@@ -195,3 +205,30 @@ internal-blob-storage:
 pre-qualification:
   write-pre-qual-operation-outcome: false
   write-expressions-in-operation-outcome: true
+
+vaas:
+  checks:
+    parallel: true
+    core-pool-size: 4
+    max-pool-size: 8
+    queue-capacity: 0
+    keep-alive-seconds: 60
+  bridge:
+    enabled: false
+    rubric-id: measure-report-submission-v1
+    shadow-enabled: true
+    shadow-report:
+       daily-blob-path: shadow-reports/shadow-comparison-daily-report.csv
+      # Cron (Spring format, evaluated in UTC) for ShadowComparisonDailyReportJob; defaults to 00:15 UTC daily.
+       daily-cron: "0 15 0 * * *"
+
+validation:
+  categoryOverride:
+    enabled: true
+
+  scoring:
+    rollup: WORST_OF
+
+  response:
+    includeOriginalSeverity: true
+    includeCategoryIds: true

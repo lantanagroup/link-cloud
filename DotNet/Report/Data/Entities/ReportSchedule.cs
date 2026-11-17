@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +49,24 @@ public partial class ReportSchedule
     public ScheduleStatus Status { get; set; }
 
     public bool? IsDeleted { get; set; }
+
+    /// <summary>
+    /// When the report first reached a terminal status, in UTC. Set once; later writes never move it.
+    /// See dev-docs/report-retention-dates.md.
+    /// </summary>
+    public DateTimeOffset? CompletedDate { get; set; }
+
+    /// <summary>
+    /// When a report that had not finished was soft-deleted, in UTC. Cleared on restore.
+    /// See dev-docs/report-retention-dates.md.
+    /// </summary>
+    public DateTimeOffset? SoftDeletedDate { get; set; }
+
+    /// <summary>
+    /// Where the report stands in data retention. Moves to <c>PendingDeletion</c> when a cleanup includes it.
+    /// See dev-docs/retention-cleanup-record.md.
+    /// </summary>
+    public ReportRetentionStatus RetentionStatus { get; set; }
 
     [InverseProperty("ReportSchedule")]
     public virtual ICollection<ReportEntry> ReportEntries { get; set; } = new List<ReportEntry>();

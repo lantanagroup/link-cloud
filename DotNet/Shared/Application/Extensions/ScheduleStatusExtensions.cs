@@ -33,4 +33,20 @@ public static class ScheduleStatusExtensions
     /// <param name="status">ScheduleStatus to check</param>
     /// <returns>True if the schedule status is terminal</returns>
     public static bool IsTerminal(this ScheduleStatus status) => TerminalStatuses.Contains(status);
+
+    /// <summary>
+    /// Shown when a soft-deleted schedule is not eligible to be restored.
+    /// </summary>
+    public const string RestoreBlockedDetail = "Reports deleted mid flight cannot be restored.";
+
+    /// <summary>
+    /// A soft-deleted schedule can be restored only when it had not started
+    /// (<see cref="ScheduleStatus.Scheduled"/>) or had finished submission
+    /// (<see cref="ScheduleStatus.Submitted"/>). An aborted run stays
+    /// <see cref="ScheduleStatus.New"/> or <see cref="ScheduleStatus.EndOfPeriod"/>.
+    /// <see cref="ScheduleStatus.CompletedNotSubmitted"/> has finished its work but
+    /// was not submitted, so it is not restorable either.
+    /// </summary>
+    public static bool CanRestore(this ScheduleStatus status) =>
+        status is ScheduleStatus.Scheduled or ScheduleStatus.Submitted;
 }

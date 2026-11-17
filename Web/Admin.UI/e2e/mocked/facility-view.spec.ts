@@ -5,7 +5,9 @@ import { testFacilities } from '../fixtures/facilities';
 import { pagedReportSchedules, reportSchedules } from '../fixtures/report-summaries';
 import { locationMappings, pagedLocationMappings, pagedOperations } from '../fixtures/facility-detail';
 import { measureDefinitions } from '../fixtures/measure-defs';
-import { IPagedReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+import { IPagedReportSchedule, IReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+
+const RESTORE_BLOCKED = 'Reports deleted mid flight cannot be restored.';
 
 const facility = testFacilities[0];
 const facilityId = facility.facilityId;
@@ -75,9 +77,9 @@ test('lists the facility report schedules and links each id to its report', asyn
   );
   await expect(submitted).toContainText(schedules[0].frequency);
   await expect(submitted).toContainText(String(schedules[0].censusCount));
-  // Resubmit is offered only for reports that already reached Submitted.
-  await expect(submitted.getByRole('button', { name: /Resubmit/ })).toBeVisible();
-  await expect(view.reportRow(schedules[1].id).getByRole('button', { name: /Resubmit/ })).toHaveCount(0);
+  // Rerun is offered only for reports that already reached Submitted.
+  await expect(submitted.getByRole('button', { name: /Rerun/ })).toBeVisible();
+  await expect(view.reportRow(schedules[1].id).getByRole('button', { name: /Rerun/ })).toHaveCount(0);
 });
 
 test('filtering by status refetches the schedules with that status', async ({ page, api }) => {
@@ -93,6 +95,42 @@ test('filtering by status refetches the schedules with that status', async ({ pa
 
   await expect.poll(() => api.callsTo('GET', SUMMARIES).length).toBe(2);
   expect(lastSummariesQuery(api).getAll('status')).toEqual(['Submitted']);
+});
+
+test('restore is enabled only for deleted reports that had not started or had finished', async ({ page, api }) => {
+  const rows: IReportSchedule[] = [
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000021', facilityId, status: 'Scheduled', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000022', facilityId, status: 'Submitted', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000023', facilityId, status: 'New', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000024', facilityId, status: 'EndOfPeriod', isDeleted: true },
+    { ...reportSchedules[0], id: 'aaaaaaaa-0000-0000-0000-000000000025', facilityId, status: 'CompletedNotSubmitted', isDeleted: true },
+  ];
+  mockFacilityView(api, pagedReportSchedules(rows));
+
+  const view = new FacilityViewPage(page);
+  await view.goto(facilityId);
+  await view.showDeletedCheckbox.check();
+
+  await expect(view.reportRow(rows[0].id).getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+  await expect(view.reportRow(rows[1].id).getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+  for (const row of rows.slice(2)) {
+    await expect(view.reportRow(row.id).getByRole('button', { name: RESTORE_BLOCKED })).toBeDisabled();
+  }
+
+  const blockedWrapper = view.reportRow(rows[2].id).getByRole('button', { name: RESTORE_BLOCKED }).locator('xpath=..');
+  await expect(blockedWrapper).toHaveAttribute('tabindex', '0');
+  await expect(blockedWrapper).toHaveAttribute('aria-label', RESTORE_BLOCKED);
+  await blockedWrapper.hover();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await page.locator('body').hover({ position: { x: 1, y: 1 } });
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveCount(0);
+  // Material shows this tooltip on keyboard focus only, so step away and tab back.
+  await blockedWrapper.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(blockedWrapper).toBeFocused();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await expect(view.reportRow(rows[0].id).getByRole('button', { name: 'Restore this report' }).locator('xpath=..')).not.toHaveAttribute('tabindex');
 });
 
 test('showing deleted reports refetches with includeDeleted and reveals the Deleted column', async ({ page, api }) => {

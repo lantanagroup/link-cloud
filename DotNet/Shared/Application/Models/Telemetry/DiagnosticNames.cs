@@ -47,6 +47,8 @@
         public const string ServiceFilter = "service.filter";
         public const string ActionFilter = "action.filter";
         public const string UserFilter = "user.filter";
+        public const string ResourceFilter = "resource.filter";
+        public const string ResourceIdFilter = "resource-id.filter";
         public const string SortBy = "sort.by";
         public const string SortOrder = "sort.order";
         public const string PageNumber = "page.number";

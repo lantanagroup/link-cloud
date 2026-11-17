@@ -1,7 +1,9 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using Automation.UI.Services.TestRail;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,7 +64,9 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
     /// (SignalR hub, query-plan template store, host services) are mocked; the
     /// orchestrator is constructed without being started.
     /// </summary>
-    public AutomationRunManager CreateRunManager()
+    public AutomationRunManager CreateRunManager(
+        ITestRailPublisher? testRailPublisher = null,
+        IMeasureTemplateStore? measureTemplateStore = null)
     {
         var store = CreateStore();
         var orchestrator = new RunSnapshotOrchestrator(
@@ -71,7 +75,7 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             NullLogger<RunSnapshotOrchestrator>.Instance);
 
         return new AutomationRunManager(
-            Mock.Of<IHubContext<RunHub>>(),
+            CreateHub(),
             Options.Create(new AutomationConfig()),
             NullLogger<AutomationRunManager>.Instance,
             new ServiceCollection().BuildServiceProvider(),
@@ -86,8 +90,25 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             new GeneratedTemplateCacheVersionStore(Database),
             Mock.Of<ILivePatientEventInjector>(),
             Mock.Of<IPatientConfigurationStore>(),
-            Mock.Of<IMeasureTemplateStore>(),
-            Mock.Of<IFacilityTemplateStore>());
+            measureTemplateStore ?? Mock.Of<IMeasureTemplateStore>(),
+            Mock.Of<IFacilityTemplateStore>(),
+            testRailPublisher ?? new NoOpTestRailPublisher(),
+            Options.Create(new FacilityIdFormatSettings()));
+    }
+
+    private static IHubContext<RunHub> CreateHub()
+    {
+        var proxy = new Mock<IClientProxy>();
+        proxy.Setup(p => p.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object?[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var clients = new Mock<IHubClients>();
+        clients.Setup(c => c.Group(It.IsAny<string>())).Returns(proxy.Object);
+        var hub = new Mock<IHubContext<RunHub>>();
+        hub.SetupGet(h => h.Clients).Returns(clients.Object);
+        return hub.Object;
     }
 
     public async Task InitializeAsync()
@@ -141,5 +162,39 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
     {
         if (_disposed) return;
         DisposeAsync().GetAwaiter().GetResult();
+    }
+}
+
+internal sealed class NoOpTestRailPublisher : ITestRailPublisher
+{
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishScenarioRunAsync(
+        ScenarioTestRailPublishRequest request, CancellationToken cancellationToken = default)
+        => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
+
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishApiHealthRunAsync(
+        ApiHealthTestRailPublishRequest request, CancellationToken cancellationToken = default)
+        => System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
+}
+
+internal sealed class RecordingTestRailPublisher : ITestRailPublisher
+{
+    private readonly List<ScenarioTestRailPublishRequest> _scenarios = [];
+    private readonly List<ApiHealthTestRailPublishRequest> _apiHealth = [];
+
+    public IReadOnlyList<ScenarioTestRailPublishRequest> ScenarioCalls => _scenarios;
+    public IReadOnlyList<ApiHealthTestRailPublishRequest> ApiHealthCalls => _apiHealth;
+
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishScenarioRunAsync(
+        ScenarioTestRailPublishRequest request, CancellationToken cancellationToken = default)
+    {
+        _scenarios.Add(request);
+        return System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
+    }
+
+    public System.Threading.Tasks.Task<IReadOnlyList<TestRailRunReference>> PublishApiHealthRunAsync(
+        ApiHealthTestRailPublishRequest request, CancellationToken cancellationToken = default)
+    {
+        _apiHealth.Add(request);
+        return System.Threading.Tasks.Task.FromResult<IReadOnlyList<TestRailRunReference>>([]);
     }
 }

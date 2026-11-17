@@ -3,6 +3,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Business.Managers;
+using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Http;
@@ -43,7 +44,7 @@ public class VendorManagerTests : IDisposable
 
         await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
 
-        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public class VendorManagerTests : IDisposable
 
         await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorAsync(vendorVersion.VendorId));
 
-        Assert.NotNull(await _dbContext.Vendors.FindAsync(vendorVersion.VendorId));
+        Assert.NotNull(await RetainedVendorAsync(vendorVersion.VendorId));
     }
 
     [Fact]
@@ -73,6 +74,208 @@ public class VendorManagerTests : IDisposable
 
         Assert.Null(await _dbContext.VendorVersions
             .AsNoTracking()
+            .SingleOrDefaultAsync(version => version.Id == vendorVersion.Id));
+    }
+
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityUsesIt_ThrowsAndRetainsVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
+    }
+
+    /// <summary>
+    /// A soft-deleted facility keeps its VendorVersionId, so the row still holds the foreign key and
+    /// the delete would still be refused by the database.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenOnlyASoftDeletedFacilityUsesIt_ThrowsAndRetainsVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id, isDeleted: true);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
+    }
+
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityUsesIt_SkipsTheNormalizationCall()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        _normalizationServiceClient.Verify(
+            client => client.GetVendorVersionOperationPresetsAsync(It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// A count alone leaves an administrator hunting, and a soft-deleted facility cannot be found in
+    /// the UI at all - so the refusal names each facility and says which of them is deleted.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenFacilitiesUseIt_NamesThemInTheRefusal()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var live = await CreateFacilityAsync(vendorVersion.Id);
+        var softDeleted = await CreateFacilityAsync(vendorVersion.Id, isDeleted: true);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains("is in use by 2 facility configurations", exception.Message);
+        Assert.Contains(live.FacilityId, exception.Message);
+        Assert.Contains(softDeleted.FacilityId, exception.Message);
+        Assert.Contains($"{softDeleted.FacilityId} ({softDeleted.FacilityName}, deleted)", exception.Message);
+    }
+
+    /// <summary>
+    /// Five is the boundary the cap is set at: at five every facility is named and nothing is
+    /// summarised, so the administrator has the whole list to work from.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenFiveFacilitiesUseIt_NamesEveryOneOfThem()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var facilities = await CreateFacilitiesAsync(vendorVersion.Id, 5);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains("is in use by 5 facility configurations", exception.Message);
+        Assert.All(facilities, facility => Assert.Contains(facility.FacilityId, exception.Message));
+        Assert.DoesNotContain("more", exception.Message);
+    }
+
+    /// <summary>
+    /// The sixth facility is what starts the overflow: this message reaches the client on Problem
+    /// Details `detail`, so the names are capped at five and the rest are summarised - while the
+    /// count stays exact, because it is the number the administrator has to clear.
+    /// </summary>
+    [Theory]
+    [InlineData(6, 1)]
+    [InlineData(7, 2)]
+    [InlineData(23, 18)]
+    public async Task DeleteVendorVersion_WhenMoreThanFiveFacilitiesUseIt_NamesFiveAndCountsTheRest(
+        int facilityCount,
+        int summarised)
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var facilities = await CreateFacilitiesAsync(vendorVersion.Id, facilityCount);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains($"is in use by {facilityCount} facility configurations", exception.Message);
+        Assert.Contains($"and {summarised} more", exception.Message);
+
+        //the named five are the first five in FacilityId order, which is the order the refusal reads
+        //them in - not whichever five the database happened to return.
+        Assert.All(facilities.Take(5), facility => Assert.Contains(facility.FacilityId, exception.Message));
+        Assert.All(facilities.Skip(5), facility => Assert.DoesNotContain(facility.FacilityId, exception.Message));
+    }
+
+    /// <summary>
+    /// The refusal reaches an administrator who picked a version off a list by its vendor and version,
+    /// so that is what it names them by; the id identifies the row for the log line, not for them.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityUsesIt_NamesTheVendorAndVersionRatherThanTheId()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var vendorName = await VendorNameAsync(vendorVersion.VendorId);
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.StartsWith(
+            $"Version '{vendorVersion.Version}' of vendor '{vendorName}' is in use by 1 facility configuration",
+            exception.Message);
+        Assert.DoesNotContain(vendorVersion.Id.ToString(), exception.Message);
+        Assert.DoesNotContain(vendorVersion.VendorId.ToString(), exception.Message);
+    }
+
+    /// <summary>
+    /// A vendor delete is refused by the same foreign key, so its message has to be about the vendor
+    /// the caller asked to delete - naming the facilities, and which version each one holds.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendor_WhenAFacilityUsesOneOfItsVersions_NamesTheFacilityAndVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var vendorName = await VendorNameAsync(vendorVersion.VendorId);
+        var facility = await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorAsync(vendorVersion.VendorId));
+
+        //the vendor by name: the id is in the log line, and means nothing to whoever reads this.
+        Assert.Contains($"Vendor '{vendorName}' is in use by 1 facility configuration", exception.Message);
+        Assert.Contains($"{facility.FacilityId} ({facility.FacilityName}, version {vendorVersion.Version})", exception.Message);
+        Assert.DoesNotContain(vendorVersion.Id.ToString(), exception.Message);
+        Assert.DoesNotContain(vendorVersion.VendorId.ToString(), exception.Message);
+    }
+
+    /// <summary>
+    /// Deleting the vendor cascades to its versions, so a facility holding one of them fails the same
+    /// foreign key.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendor_WhenAFacilityUsesOneOfItsVersions_ThrowsAndRetainsVendor()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        await CreateFacilityAsync(vendorVersion.Id);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorAsync(vendorVersion.VendorId));
+
+        Assert.NotNull(await RetainedVendorAsync(vendorVersion.VendorId));
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
+    }
+
+    /// <summary>
+    /// The pre-checks cannot close the window between themselves and the delete: here the facility
+    /// is assigned while Normalization is being asked, so the database is what refuses the delete.
+    /// It still has to reach the caller as a conflict rather than a 500.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenAFacilityIsAssignedAfterTheChecks_ThrowsAndRetainsVersion()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+
+        _normalizationServiceClient
+            .Setup(client => client.GetVendorVersionOperationPresetsAsync(vendorVersion.Id, null, It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                await CreateFacilityAsync(vendorVersion.Id);
+                return new LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>
+                {
+                    StatusCode = StatusCodes.Status200OK,
+                    Body = []
+                };
+            });
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains("still referenced", exception.Message);
+        Assert.NotNull(await _dbContext.VendorVersions.AsNoTracking()
             .SingleOrDefaultAsync(version => version.Id == vendorVersion.Id));
     }
 
@@ -152,6 +355,59 @@ public class VendorManagerTests : IDisposable
         Assert.Equal("rotated-key", persisted.Authentication?.SigningKeySecretId);
     }
 
+    /// <summary>
+    /// Facilities whose ids sort in the order they were created, so a test can say which five of them
+    /// the refusal had room to name.
+    /// </summary>
+    private async Task<List<Facility>> CreateFacilitiesAsync(Guid vendorVersionId, int count)
+    {
+        var prefix = $"boundary-{Guid.NewGuid():N}";
+        var facilities = Enumerable.Range(1, count)
+            .Select(index => new Facility
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = $"{prefix}-{index:D3}",
+                FacilityName = "Boundary Facility",
+                TimeZone = "America/Chicago",
+                VendorVersionId = vendorVersionId,
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = [],
+                    Weekly = [],
+                    Monthly = []
+                }
+            })
+            .ToList();
+
+        await _dbContext.Facilities.AddRangeAsync(facilities);
+        await _dbContext.SaveChangesAsync();
+
+        return facilities;
+    }
+
+    /// <summary>
+    /// Retention has to be read from the database. The fixture helpers add their rows through this
+    /// same context, so they stay tracked, and the manager deletes with ExecuteDeleteAsync, which
+    /// does not tell the change tracker: FindAsync would hand back the tracked instance without
+    /// querying at all, and the assertion would hold whether or not the row survived.
+    /// </summary>
+    private async Task<VendorVersion?> RetainedVersionAsync(Guid vendorVersionId) =>
+        await _dbContext.VendorVersions
+            .AsNoTracking()
+            .SingleOrDefaultAsync(version => version.Id == vendorVersionId);
+
+    private async Task<Vendor?> RetainedVendorAsync(Guid vendorId) =>
+        await _dbContext.Vendors
+            .AsNoTracking()
+            .SingleOrDefaultAsync(vendor => vendor.Id == vendorId);
+
+    private async Task<string> VendorNameAsync(Guid vendorId) =>
+        await _dbContext.Vendors
+            .AsNoTracking()
+            .Where(vendor => vendor.Id == vendorId)
+            .Select(vendor => vendor.Name)
+            .SingleAsync();
+
     private async Task<Vendor> CreateVendorAsync()
     {
         var vendor = new Vendor
@@ -185,6 +441,41 @@ public class VendorManagerTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         return vendorVersion;
+    }
+
+    private async Task<Facility> CreateFacilityAsync(Guid vendorVersionId, bool isDeleted = false)
+    {
+        var facility = new Facility
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = $"facility-{Guid.NewGuid():N}",
+            FacilityName = "Vendor Version Delete Test Facility",
+            TimeZone = "America/Chicago",
+            IsDeleted = isDeleted,
+            VendorVersionId = vendorVersionId,
+            ScheduledReports = new ScheduledReportModel
+            {
+                Daily = [],
+                Weekly = [],
+                Monthly = []
+            }
+        };
+
+        await _dbContext.Facilities.AddAsync(facility);
+        await _dbContext.SaveChangesAsync();
+
+        return facility;
+    }
+
+    private void ConfigureNoNormalizationReferences(Guid vendorVersionId)
+    {
+        _normalizationServiceClient
+            .Setup(client => client.GetVendorVersionOperationPresetsAsync(vendorVersionId, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>
+            {
+                StatusCode = StatusCodes.Status200OK,
+                Body = []
+            });
     }
 
     private void ConfigureNormalizationReferences(Guid vendorVersionId)

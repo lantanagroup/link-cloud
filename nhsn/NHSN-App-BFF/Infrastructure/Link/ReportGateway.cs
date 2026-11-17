@@ -1,0 +1,286 @@
+using System.Text.Json;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+
+namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
+
+// IReportGateway over LinkSdk's IReportServiceClient, plus IReportRawClient for the one route
+// whose fields the typed client drops (see IReportRawClient).
+internal sealed class ReportGateway : IReportGateway
+{
+    private const string ServiceName = "Report";
+
+    private static readonly JsonSerializerOptions JsonOptions = new() {PropertyNameCaseInsensitive = true};
+
+    private readonly IReportServiceClient _reportClient;
+    private readonly IReportRawClient _reportRawClient;
+    private readonly IReportingPlanGateway _reportingPlanGateway;
+
+    public ReportGateway(IReportServiceClient reportClient, IReportRawClient reportRawClient, IReportingPlanGateway reportingPlanGateway)
+    {
+        _reportClient = reportClient;
+        _reportRawClient = reportRawClient;
+        _reportingPlanGateway = reportingPlanGateway;
+    }
+
+    public async Task<ReportScheduleSummary?> GetLatestScheduleAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var response = await _reportClient.GetSchedulesByFacilityAsync(facilityId, cancellationToken: cancellationToken);
+        var schedules = LinkResponseHandler.Optional(response, ServiceName, nameof(GetLatestScheduleAsync));
+        if (schedules is null || schedules.Count == 0)
+        {
+            return null;
+        }
+
+        var latest = schedules.OrderByDescending(schedule => schedule.CreateDate ?? DateTime.MinValue).First();
+        return new ReportScheduleSummary
+        {
+            ReportId = latest.Id.ToString(),
+            Measures = latest.ReportTypes
+        };
+    }
+
+    public async Task<Paged<ReportDetail>> ListReportsAsync(string facilityId, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        var schedulesResponse = await _reportClient.GetSchedulesByFacilityAsync(facilityId, cancellationToken: cancellationToken);
+        var schedules = LinkResponseHandler.Optional(schedulesResponse, ServiceName, nameof(ListReportsAsync)) ?? [];
+
+        var ordered = schedules.OrderByDescending(schedule => schedule.CreateDate ?? DateTime.MinValue).ToList();
+        var pageItems = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        // One facility backs every row in this page, so the facility's measure mapping is fetched
+        // once here rather than once per row.
+        var availableMeasures = await _reportingPlanGateway.GetAvailableMeasuresAsync(facilityId, cancellationToken);
+
+        var items = new List<ReportDetail>(pageItems.Count);
+        foreach (var schedule in pageItems)
+        {
+            var summaryResponse = await _reportClient.GetReportSummaryAsync(schedule.Id.ToString(), cancellationToken);
+            var summary = LinkResponseHandler.Optional(summaryResponse, ServiceName, nameof(ListReportsAsync));
+            items.Add(ToDetail(schedule, summary, availableMeasures));
+        }
+
+        return new Paged<ReportDetail>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = ordered.Count
+        };
+    }
+
+    public async Task<ReportDetail?> GetReportAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        var scheduleResponse = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
+        var schedule = LinkResponseHandler.Optional(scheduleResponse, ServiceName, nameof(GetReportAsync));
+        if (schedule is null)
+        {
+            return null;
+        }
+
+        var summaryResponse = await _reportClient.GetReportSummaryAsync(reportId, cancellationToken);
+        var summary = LinkResponseHandler.Optional(summaryResponse, ServiceName, nameof(GetReportAsync));
+
+        var availableMeasures = await _reportingPlanGateway.GetAvailableMeasuresAsync(schedule.FacilityId, cancellationToken);
+
+        return ToDetail(schedule, summary, availableMeasures);
+    }
+
+    public async Task<List<ReportPatientEntry>> GetReportPatientsAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        var response = await _reportClient.GetEntriesByScheduleAsync(reportId, cancellationToken);
+        var entries = LinkResponseHandler.Optional(response, ServiceName, nameof(GetReportPatientsAsync)) ?? [];
+
+        return entries.Select(ToPatientEntry).ToList();
+    }
+
+    // Same building blocks as ListReportsAsync (schedules) and GetReportPatientsAsync (entries per
+    // schedule), just unioned across every schedule instead of one -- mirrors the onboarding POC's
+    // getMrnIntakePatients(), which unions patientIds across facility.reports and, on a duplicate,
+    // keeps the entry from the most-recently-created report. Newest-schedule-first here achieves
+    // the same "most recent wins" dedupe: the first time a patient id is seen is from its newest
+    // report.
+    public async Task<IReadOnlyList<string>> GetFacilityPatientIdsAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var schedulesResponse = await _reportClient.GetSchedulesByFacilityAsync(facilityId, cancellationToken: cancellationToken);
+        var schedules = LinkResponseHandler.Optional(schedulesResponse, ServiceName, nameof(GetFacilityPatientIdsAsync)) ?? [];
+        var ordered = schedules.OrderByDescending(schedule => schedule.CreateDate ?? DateTime.MinValue);
+
+        var patientIds = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var schedule in ordered)
+        {
+            var entriesResponse = await _reportClient.GetEntriesByScheduleAsync(schedule.Id.ToString(), cancellationToken);
+            var entries = LinkResponseHandler.Optional(entriesResponse, ServiceName, nameof(GetFacilityPatientIdsAsync)) ?? [];
+            foreach (var entry in entries)
+            {
+                if (seen.Add(entry.PatientId))
+                {
+                    patientIds.Add(entry.PatientId);
+                }
+            }
+        }
+
+        return patientIds;
+    }
+
+    public async Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default)
+    {
+        var response = await _reportClient.GetEntryByScheduleAndPatientAsync(reportId, patientId, cancellationToken);
+        var entry = LinkResponseHandler.Optional(response, ServiceName, nameof(GetPatientMappingEvidenceAsync));
+        if (entry is null)
+        {
+            return null;
+        }
+
+        return new PatientMappingEvidence
+        {
+            LocationOrg = entry.Acquisition is null
+                ? null
+                : new LocationOrgEvidence
+                {
+                    EncounterCount = entry.Acquisition.LocationOrg.EncounterCount,
+                    OrgEncounterCount = entry.Acquisition.LocationOrg.OrgEncounterCount,
+                    AssumedOrgEncounterCount = entry.Acquisition.LocationOrg.AssumedOrgEncounterCount,
+                    Matches = entry.Acquisition.LocationOrg.Matches.Select(match => new LocationOrgMatch
+                    {
+                        LocationId = match.LocationId,
+                        LocationName = match.LocationName,
+                        LocationAlias = match.LocationAlias,
+                        PartOfValue = match.PartOfValue,
+                        IsOrgLocation = match.IsOrgLocation
+                    }).ToList()
+                },
+            CodeMaps = entry.Normalization?.CodeMaps.Select(codeMap => new CodeMapEvidence
+            {
+                SourceSystem = codeMap.SourceSystem,
+                TargetSystem = codeMap.TargetSystem,
+                MappedCount = codeMap.MappedCount,
+                UnmappedCount = codeMap.UnmappedCount,
+                FailureCount = codeMap.FailureCount,
+                UnmappedCodes = codeMap.UnmappedCodes
+            }).ToList() ?? []
+        };
+    }
+
+    // Schedule carries CreateDate and the report window; summary (when Report has generated one
+    // yet) carries the patient count and completion status. Falls back to the schedule's own
+    // report types/status when Report has not produced a summary for it yet.
+    private static ReportDetail ToDetail(ReportScheduleApiModel schedule, ReportSummaryApiModel? summary, IReadOnlyList<AvailableMeasure> availableMeasures)
+    {
+        var measures = summary is {ReportTypes.Count: > 0} ? summary.ReportTypes : schedule.ReportTypes;
+        var measureSet = new HashSet<string>(measures, StringComparer.Ordinal);
+
+        return new ReportDetail
+        {
+            ReportId = schedule.Id.ToString(),
+            Measures = measures,
+            PatientCount = summary?.PatientCount ?? 0,
+            StartDate = schedule.ReportStartDate.ToString("O"),
+            EndDate = schedule.ReportEndDate.ToString("O"),
+            CreateDate = (schedule.CreateDate ?? schedule.ReportStartDate).ToString("O"),
+            Status = ToUiStatus(summary?.Status),
+            // Scoped to this report's own dQMs -- a facility's available measures can include ones
+            // this particular report did not use (a later report, a different reporting period).
+            // A dQM the report used that no longer appears here (the facility unenrolled or the
+            // measure definition was removed from MeasureEval since) is simply absent -- the UI
+            // falls back to the raw dQM id for that one rather than guessing a name for it.
+            MeasureMapping = availableMeasures
+                .Where(measure => measureSet.Contains(measure.DigitalQualityMeasure))
+                .Select(measure => new MeasureMapping
+                {
+                    NhsnMeasure = measure.Name,
+                    DigitalQualityMeasure = measure.DigitalQualityMeasure
+                })
+                .ToList()
+        };
+    }
+
+    // Report's ReportStatus has no distinct "Failed" value -- Unknown (including "no summary yet")
+    // is the closest fit and surfaces as the UI's Failed pill rather than silently reading Pending.
+    private static string ToUiStatus(ReportStatus? status) => status switch
+    {
+        ReportStatus.Completed => "Complete",
+        ReportStatus.Pending => "Pending",
+        ReportStatus.Canceled => "Cancelled",
+        _ => "Failed"
+    };
+
+    private static ReportPatientEntry ToPatientEntry(ReportEntryApiModel entry)
+    {
+        var resourceCountsByType = new Dictionary<string, int>();
+        foreach (var measureReport in entry.MeasureReports)
+        {
+            foreach (var (resourceType, count) in measureReport.ResourceCount)
+            {
+                resourceCountsByType[resourceType] = resourceCountsByType.GetValueOrDefault(resourceType) + count;
+            }
+        }
+
+        return new ReportPatientEntry
+        {
+            PatientId = entry.PatientId,
+            ReportingStatus = entry.ReportingStatus.ToString(),
+            ResourceCount = resourceCountsByType.Values.Sum(),
+            ResourceCountsByType = resourceCountsByType,
+            LocationOrgMapped = IsMapped(entry.LocationOrgStatus),
+            EncounterMapped = IsMapped(entry.EncounterMappingStatus),
+            HslocMapped = IsMapped(entry.HslocMappingStatus),
+            // Validation has no per-patient result endpoint available to this BFF -- approximated
+            // by whether validation has run for this patient at all.
+            HasPreQualResults = entry.ReportingStatus is ReportingStatus.PassedValidation or ReportingStatus.FailedValidation,
+            MeasureReports = entry.MeasureReports.Select(measureReport => new PatientMeasureReport
+            {
+                ReportType = measureReport.ReportType,
+                ResourceCount = measureReport.ResourceCount.Values.Sum(),
+                ResourceCountsByType = measureReport.ResourceCount
+            }).ToList()
+        };
+    }
+
+    public async Task<PatientReportBlobReference?> GetPatientReportBlobReferenceAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
+    {
+        var raw = await _reportRawClient.GetEntryDetailRawAsync(reportId, patientId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var entry = JsonSerializer.Deserialize<EntryDetailWire>(raw, JsonOptions);
+        var uri = entry?.MeasureReports?.FirstOrDefault(report => report.ReportType == reportType)?.MeasureReportUri;
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            uri = entry?.AggregateReportUri;
+        }
+
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            return null;
+        }
+
+        return new PatientReportBlobReference
+        {
+            Uri = uri,
+            FileName = new Uri(uri).Segments[^1]
+        };
+    }
+
+    private static bool IsMapped(MappingIndicatorStatus status) =>
+        status is MappingIndicatorStatus.Mapped or MappingIndicatorStatus.PartiallyMapped or MappingIndicatorStatus.Assumed;
+
+    private sealed record EntryDetailWire
+    {
+        public string? AggregateReportUri { get; init; }
+        public List<MeasureReportWire>? MeasureReports { get; init; }
+    }
+
+    private sealed record MeasureReportWire
+    {
+        public string? ReportType { get; init; }
+        public string? MeasureReportUri { get; init; }
+    }
+}

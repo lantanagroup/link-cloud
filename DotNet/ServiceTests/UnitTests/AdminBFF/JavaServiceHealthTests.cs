@@ -16,21 +16,22 @@ namespace UnitTests.AdminBFF;
 [Trait("Category", "UnitTests")]
 public class JavaServiceHealthTests
 {
+    /// <summary>
+    /// A failing component's details are what name the backend and the reason, so every shape Spring
+    /// can put in them has to survive the trip to the dashboard verbatim.
+    /// </summary>
     [Theory]
-    [InlineData(true, "UP", HttpStatusCode.OK, HealthStatus.Healthy)]
-    [InlineData(false, "UP", HttpStatusCode.OK, HealthStatus.Healthy)]
-    [InlineData(true, "DOWN", HttpStatusCode.ServiceUnavailable, HealthStatus.Unhealthy)]
-    [InlineData(false, "DOWN", HttpStatusCode.ServiceUnavailable, HealthStatus.Unhealthy)]
-    public async Task HealthCheck_PreservesAllDetailsInDescription(
-        bool measureEval, string status, HttpStatusCode statusCode, HealthStatus expectedStatus)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_PreservesAllDetailsInDescription(bool measureEval)
     {
-                var componentName = measureEval ? "Resource Cache" : "Redis";
+        var componentName = measureEval ? "Resource Cache" : "Redis";
         var payload = $$"""
             {
-              "status": "{{status}}",
+              "status": "DOWN",
               "components": {
-                                "{{componentName}}": {
-                  "status": "{{status}}",
+                "{{componentName}}": {
+                  "status": "DOWN",
                   "details": {
                     "Redis": "Available",
                     "ABS": "Unavailable",
@@ -44,13 +45,13 @@ public class JavaServiceHealthTests
             }
             """;
 
-        var report = await CheckHealth(measureEval, payload, statusCode);
+        var report = await CheckHealth(measureEval, payload, HttpStatusCode.ServiceUnavailable);
 
         Assert.Equal(measureEval ? "Measure Evaluation" : "Validation", report.Service);
-        Assert.Equal(expectedStatus, report.Status);
+        Assert.Equal(HealthStatus.Unhealthy, report.Status);
         var entry = Assert.Single(report.Entries);
         Assert.Equal(componentName, entry.Key);
-        Assert.Equal(expectedStatus, entry.Value.Status);
+        Assert.Equal(HealthStatus.Unhealthy, entry.Value.Status);
         Assert.Equal(TimeSpan.Zero, entry.Value.Duration);
         using var description = JsonDocument.Parse(entry.Value.Description!);
         var details = description.RootElement;
@@ -61,6 +62,74 @@ public class JavaServiceHealthTests
         Assert.Equal(2, details.GetProperty("attempts").GetInt32());
         Assert.False(details.GetProperty("reachable").GetBoolean());
         Assert.Equal("second", details.GetProperty("nested").GetProperty("hosts")[1].GetString());
+    }
+
+    /// <summary>
+    /// LEGLINK-1545. A healthy indicator's details only restate the status the row already shows --
+    /// the dashboard read <c>{"Cache":"Available"}</c> beside a green Healthy, where every .NET row
+    /// read "-". The details are dropped at Healthy so both runtimes' Description columns say the
+    /// same thing: nothing, while there is nothing wrong.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_DropsAHealthyComponentsRedundantDetails(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "UP",
+              "components": {
+                "Cache (Redis)":          { "status": "UP", "details": { "Cache": "Available" } },
+                "Database (SQL Server)":  { "status": "UP", "details": { "Database": "Available" } },
+                "Kafka":                  { "status": "UP", "details": { "Kafka": "Available" } }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload);
+
+        Assert.Equal(HealthStatus.Healthy, report.Status);
+        Assert.Equal(3, report.Entries.Count);
+        Assert.All(report.Entries, entry =>
+        {
+            Assert.Equal(HealthStatus.Healthy, entry.Value.Status);
+            Assert.Null(entry.Value.Description);
+        });
+    }
+
+    /// <summary>
+    /// The two rules together, on the report an operator actually reads during an outage: the row
+    /// that failed keeps everything its indicator said, and the rows beside it stay quiet rather
+    /// than filling the column with "Available".
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_DescribesOnlyTheFailingComponent(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "DOWN",
+              "components": {
+                "Kafka":                 { "status": "UP",   "details": { "Kafka": "Available" } },
+                "Database (SQL Server)": { "status": "DOWN", "details": { "Database": "Unavailable", "error": "Login failed." } }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload, HttpStatusCode.ServiceUnavailable);
+
+        Assert.Equal(HealthStatus.Unhealthy, report.Status);
+
+        var healthy = report.Entries["Kafka"];
+        Assert.Equal(HealthStatus.Healthy, healthy.Status);
+        Assert.Null(healthy.Description);
+
+        var failed = report.Entries["Database (SQL Server)"];
+        Assert.Equal(HealthStatus.Unhealthy, failed.Status);
+        using var description = JsonDocument.Parse(failed.Description!);
+        Assert.Equal("Unavailable", description.RootElement.GetProperty("Database").GetString());
+        Assert.Equal("Login failed.", description.RootElement.GetProperty("error").GetString());
     }
 
     [Theory]
@@ -180,9 +249,40 @@ public class JavaServiceHealthTests
         var report = await CheckHealth(measureEval, payload);
 
         var entry = Assert.Single(report.Entries);
+        // Taken even though the rest of the details are dropped: the timing is what says which
+        // backend spent the budget, and it is wanted on a healthy row as much as on a failing one.
         Assert.Equal(TimeSpan.FromMilliseconds(1200), entry.Value.Duration);
+        Assert.Null(entry.Value.Description);
+    }
+
+    /// <summary>
+    /// The duration is lifted out of a failing component's details too, rather than left to appear
+    /// twice -- once in its own column and again inside the description beside the backend detail
+    /// the operator is actually reading.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HealthCheck_KeepsTheDurationOutOfAFailingComponentsDescription(bool measureEval)
+    {
+        var payload = """
+            {
+              "status": "DOWN",
+              "components": {
+                "Kafka": {
+                  "status": "DOWN",
+                  "details": { "Kafka": "Unavailable", "durationMs": 1500 }
+                }
+              }
+            }
+            """;
+
+        var report = await CheckHealth(measureEval, payload, HttpStatusCode.ServiceUnavailable);
+
+        var entry = Assert.Single(report.Entries);
+        Assert.Equal(TimeSpan.FromMilliseconds(1500), entry.Value.Duration);
         using var description = JsonDocument.Parse(entry.Value.Description!);
-        Assert.Equal("Available", description.RootElement.GetProperty("Kafka").GetString());
+        Assert.Equal("Unavailable", description.RootElement.GetProperty("Kafka").GetString());
         Assert.False(description.RootElement.TryGetProperty("durationMs", out _),
             "the duration belongs in the entry, not repeated in the description");
     }
