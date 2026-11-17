@@ -1,0 +1,8 @@
+{
+  "PayloadType": 200,
+  "PayloadUri": "http://azurite:10000/devstoreaccount1/internal/Hospital1/manifest.ndjson",
+  "ReportTypes": [ "NHSNdQMAcuteCareHospitalInitialPopulation" ],
+  "StartDate": "2026-10-01T05:00:00Z",
+  "EndDate": "2026-11-01T04:59:59Z",
+  "PatientId": null
+}
