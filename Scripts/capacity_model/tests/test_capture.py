@@ -39,7 +39,7 @@ except ImportError:
 from confluent_kafka import ConsumerGroupTopicPartitions, TopicPartition  # noqa: E402
 
 import snapshot  # noqa: E402
-from capture import cloud, kafka, loki, mongo, sql  # noqa: E402
+from capture import cloud, kafka, kafka_rest, loki, mongo, sql  # noqa: E402
 from capture import targets as targets_mod  # noqa: E402
 from capture.common import Unavailable, cadence_of, normalize_guid  # noqa: E402
 
@@ -361,6 +361,155 @@ class KafkaTests(unittest.TestCase):
         self.assertEqual(lag, {"report": {"ReportScheduled": 2}})
 
 
+class FakeResponse:
+    def __init__(self, payload=None, status=200):
+        self.status_code = 204 if payload is None and status == 200 else status
+        self._payload = payload
+        self.content = b"" if payload is None else json.dumps(payload).encode()
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+class FakeHttp:
+    """Routes (method, path) to a payload, an int status, or a callable returning one; records every call.
+
+    A route ending in "*" matches any path with that prefix (for the generated consumer instance name).
+    """
+
+    def __init__(self, base, routes):
+        self.base, self.routes, self.calls = base, routes, []
+
+    def request(self, method, url, **kw):
+        self.calls.append((method, url, kw))
+        assert url.startswith(self.base), url  # never a link the proxy handed back
+        path = url[len(self.base):]
+        value = self.routes.get((method, path))
+        if value is None:
+            value = next((v for (m, k), v in self.routes.items()
+                          if m == method and k.endswith("*") and path.startswith(k[:-1])), None)
+        if value is None:
+            return FakeResponse(status=404)
+        value = value(path, kw) if callable(value) else value
+        return FakeResponse(status=value) if isinstance(value, int) else FakeResponse(value)
+
+
+INTERNAL = "http://rest-proxy:8082"  # the proxy's in-cluster name, as it appears in response links
+BASE = "http://localhost:8082"
+
+
+def page(items, nxt=None):
+    return {"metadata": {"self": f"{INTERNAL}/whatever", "next": nxt}, "data": items}
+
+
+def b64(data: bytes) -> str:
+    import base64  # noqa: PLC0415
+    return base64.b64encode(data).decode()
+
+
+class RestProxyTests(unittest.TestCase):
+    def proxy(self, routes, **cfg):
+        routes.setdefault(("GET", "/v3/clusters"), page([{"cluster_id": "c1"}]))
+        http = FakeHttp(BASE, routes)
+        return kafka_rest.RestProxyKafka({"rest_proxy_url": BASE + "/", **cfg}, http=http, max_polls=5), http
+
+    def test_topics_skip_internal_and_follow_next_on_our_own_host(self):
+        k, http = self.proxy({
+            ("GET", "/v3/clusters/c1/topics"): page(
+                [{"topic_name": "ReportScheduled", "is_internal": False, "partitions_count": 3, "replication_factor": 3},
+                 {"topic_name": "__consumer_offsets", "is_internal": True, "partitions_count": 50,
+                  "replication_factor": 3}], nxt=f"{INTERNAL}/v3/clusters/c1/topics?page_token=2"),
+            ("GET", "/v3/clusters/c1/topics?page_token=2"): page(
+                [{"topic_name": "_confluent-x", "is_internal": True, "partitions_count": 1, "replication_factor": 1}]),
+        })
+        self.assertEqual(k.topics(), {"ReportScheduled": {"partitions": [0, 1, 2], "replication": 3}})
+        self.assertEqual(len(http.calls), 3)  # clusters, topics, and the next page on our own host
+
+    def test_cluster_id(self):
+        k, _ = self.proxy({("GET", "/v3/clusters"): page([{"cluster_id": "a"}, {"cluster_id": "b"}])})
+        with self.assertRaises(ValueError):
+            _ = k.cluster
+        k, http = self.proxy({("GET", "/v3/clusters"): 500}, rest_proxy_cluster_id="given")
+        self.assertEqual(k.cluster, "given")
+        self.assertEqual(http.calls, [])
+
+    def test_credentials_are_refused_in_the_url(self):
+        with self.assertRaises(ValueError):
+            kafka_rest.RestProxyKafka({"rest_proxy_url": "http://u:p@localhost:8082"}, http=object())
+
+    def test_watermarks_and_retention(self):
+        k, _ = self.proxy({
+            ("GET", "/topics/ReportScheduled/partitions/0/offsets"): {"beginning_offset": 5, "end_offset": 10},
+            ("GET", "/topics/ReportScheduled/partitions/1/offsets"): {"beginning_offset": 0, "end_offset": 7},
+            ("GET", "/v3/clusters/c1/topics/-/configs"): page(
+                [{"topic_name": "ReportScheduled", "name": "retention.ms", "value": "604800000"},
+                 {"topic_name": "ReportScheduled", "name": "cleanup.policy", "value": "delete"},
+                 {"topic_name": "Other", "name": "retention.ms", "value": "1"}]),
+        })
+        marks = k.watermarks("ReportScheduled", [0, 1])
+        self.assertEqual(kafka.summarize_watermarks(marks), {"high_watermark": 17, "messages_held": 12})
+        self.assertEqual(k.retention_ms(["ReportScheduled", "Missing"]),
+                         {"ReportScheduled": 604800000, "Missing": None})
+
+    def test_consumer_lag(self):
+        k, _ = self.proxy({
+            ("GET", "/v3/clusters/c1/consumer-groups"): page(
+                [{"consumer_group_id": g} for g in ("report", "capacity-snapshot-x", "gone")]),
+            ("GET", "/v3/clusters/c1/consumer-groups/report/lags"): page(
+                [{"topic_name": "ReportScheduled", "partition_id": 0, "current_offset": 8, "log_end_offset": 9},
+                 {"topic_name": "ReportScheduled", "partition_id": 1, "current_offset": 1, "log_end_offset": 4},
+                 {"topic_name": "Other", "partition_id": 0, "current_offset": -1, "log_end_offset": 4}]),
+            # "gone" has no lag rows: 404, skipped
+        })
+        # partition 0 uses the high watermark just read (10); partition 1 falls back to the proxy's log end (4)
+        self.assertEqual(k.consumer_lag({("ReportScheduled", 0): 10}), {"report": {"ReportScheduled": 5}})
+
+    def test_sampling_assigns_seeks_reads_and_deletes_the_instance(self):
+        batches = [[], [{"topic": "T", "partition": 0, "offset": 98, "key": b64(b"key"), "value": b64(b"value-1")}],
+                   [{"topic": "T", "partition": 0, "offset": 99, "key": None, "value": b64(b"value-22")}]]
+        seen = {}
+
+        def post(path, kw):
+            if path.count("/") == 2:  # /consumers/{group}: create the instance
+                seen["create"] = (path, kw["json"])
+                return {"instance_id": kw["json"]["name"], "base_uri": f"{INTERNAL}/consumers/x/instances/x"}
+            seen[path.rsplit("/", 1)[1]] = (path, kw["json"])  # assignments, positions
+            return None
+
+        def delete(path, kw):
+            seen["deleted"] = (path, None)
+
+        k, http = self.proxy({
+            ("POST", "/consumers/*"): post,
+            ("GET", "/consumers/*"): lambda path, kw: batches.pop(0) if batches else [],
+            ("DELETE", "/consumers/*"): delete,
+        })
+        s = k.sample_sizes("T", {0: (0, 100), 1: (3, 3)}, per_partition=2)
+        self.assertEqual(s, {"sampled": 2, "avg_message_bytes": ((3 + 7) + 8) / 2})
+        create_path, create_body = seen["create"]
+        name = create_body["name"]
+        self.assertTrue(name.startswith("capacity-snapshot-"))
+        self.assertEqual(create_path, f"/consumers/{name}")
+        self.assertEqual((create_body["format"], create_body["auto.commit.enable"]), ("binary", "false"))
+        inst = f"/consumers/{name}/instances/{name}"
+        self.assertEqual(seen["assignments"], (inst + "/assignments", {"partitions": [{"topic": "T", "partition": 0}]}))
+        self.assertEqual(seen["positions"][1], {"offsets": [{"topic": "T", "partition": 0, "offset": 98}]})
+        self.assertEqual(k.sample_sizes("Empty", {0: (4, 4)}, 2), {"sampled": 0, "avg_message_bytes": None})
+        k.close()
+        self.assertEqual(seen["deleted"][0], inst)
+        self.assertFalse(any(INTERNAL in url for _, url, _ in http.calls))
+
+    def test_sampling_stops_at_the_poll_limit(self):
+        k, http = self.proxy({("POST", "/consumers/*"): 204, ("GET", "/consumers/*"): []})
+        k._instance = "/consumers/g/instances/g"
+        self.assertEqual(k.sample_sizes("T", {0: (0, 10)}, 2), {"sampled": 0, "avg_message_bytes": None})
+        self.assertEqual(sum(1 for _, url, _ in http.calls if url.endswith("/records")), 5)
+
+
 # --------------------------------------------------------------------------------------------
 # Loki and cloud
 # --------------------------------------------------------------------------------------------
@@ -458,6 +607,18 @@ class TargetsTests(unittest.TestCase):
         t = {"sql": {"connection_string": "Server=tcp:db.example.net,1433;UID=sa;PWD=x", "connection_strings": {}}}
         self.assertEqual(targets_mod.sql_server_key(t, "report"), "tcp:db.example.net,1433")
 
+    def test_rest_proxy_flags(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = Path(d) / ".env"
+            env.write_text("LINK_DB_PASS=x\nKAFKA_SASL_CLIENT_USER=u\nKAFKA_SASL_CLIENT_PASSWORD=p\n", encoding="utf-8")
+            t = targets_mod.resolve(self.args(env_file=str(env), kafka_rest_proxy_url="http://localhost:8082",
+                                              kafka_rest_proxy_username="ru", kafka_rest_proxy_password="rp",
+                                              kafka_rest_proxy_cluster_id="c1"))
+        self.assertEqual({k: t["kafka"][k] for k in ("rest_proxy_url", "rest_proxy_username", "rest_proxy_password",
+                                                      "rest_proxy_cluster_id")},
+                         {"rest_proxy_url": "http://localhost:8082", "rest_proxy_username": "ru",
+                          "rest_proxy_password": "rp", "rest_proxy_cluster_id": "c1"})
+
 
 # --------------------------------------------------------------------------------------------
 # snapshot.take end to end, against fakes
@@ -499,7 +660,7 @@ class SnapshotTests(unittest.TestCase):
         targets = {"environment": "test", "sql": {"connection_string": "Server=s;", "connection_strings": {}},
                    "mongo": {"connection_string": "mongodb://localhost", "databases": {"measureeval": "m"}},
                    "kafka": {"bootstrap_servers": "b"}, "loki": {}, "cosmos": {}, "replicas": {"provider": "none"}}
-        return FakeSession({"report": report, "census": census}, client, (admin, consumer), targets)
+        return FakeSession({"report": report, "census": census}, client, kafka.NativeKafka(admin, consumer), targets)
 
     def stores(self):
         return [
@@ -543,6 +704,33 @@ class SnapshotTests(unittest.TestCase):
         self.assertNotIn("by_report", snap["stores"]["report.ReportSchedule"])
         self.assertNotIn("avg_message_bytes", snap["kafka"]["ReportScheduled"])
         self.assertNotIn("context", snap)
+
+    def test_full_snapshot_through_the_rest_proxy(self):
+        session = self.build()
+        session.targets["kafka"] = {"rest_proxy_url": BASE}
+        session._kafka = kafka_rest.RestProxyKafka(session.targets["kafka"], max_polls=2, http=FakeHttp(BASE, {
+            ("GET", "/v3/clusters"): page([{"cluster_id": "c1"}]),
+            ("GET", "/v3/clusters/c1/topics"): page([{"topic_name": "ReportScheduled", "is_internal": False,
+                                                      "partitions_count": 1, "replication_factor": 3}]),
+            ("GET", "/topics/ReportScheduled/partitions/0/offsets"): {"beginning_offset": 0, "end_offset": 4},
+            ("POST", "/consumers/*"): lambda path, kw: {"instance_id": "x", "base_uri": f"{INTERNAL}/x"}
+            if path.count("/") == 2 else None,
+            ("GET", "/consumers/*"): [{"topic": "ReportScheduled", "partition": 0, "offset": 3,
+                                       "key": b64(b"k"), "value": b64(b"vvvv")}],
+            ("DELETE", "/consumers/*"): 204,
+            ("GET", "/v3/clusters/c1/topics/-/configs"): page(
+                [{"topic_name": "ReportScheduled", "name": "retention.ms", "value": "604800000"}]),
+            ("GET", "/v3/clusters/c1/consumer-groups"): page([{"consumer_group_id": "report"}]),
+            ("GET", "/v3/clusters/c1/consumer-groups/report/lags"): page(
+                [{"topic_name": "ReportScheduled", "partition_id": 0, "current_offset": 3, "log_end_offset": 4}]),
+        }))
+        snap = snapshot.take(session, self.stores(), "full", "after", datetime(2026, 11, 11, tzinfo=timezone.utc))
+        topic = snap["kafka"]["ReportScheduled"]
+        self.assertEqual((topic["high_watermark"], topic["retention_ms"]), (4, 604800000))
+        self.assertEqual((topic["avg_message_bytes"], topic["size_basis"]), (5, "key+value"))
+        self.assertEqual(snap["consumer_lag"], {"report": {"ReportScheduled": 1}})
+        self.assertEqual(snap["context"]["kafka"]["via"], "rest_proxy")
+        self.assertNotIn("kafka", {u["source"] for u in snap["unavailable"]})
 
     def test_deadlock_xml_is_split_out(self):
         snap = {"contention": {"sql": {"s": {"deadlocks": {"count": 1, "events": [], "xml": ["<deadlock/>"]}}}}}

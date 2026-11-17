@@ -1,5 +1,5 @@
 {
-  "_comment": "Local docker-compose stack. Secrets come from .env (LINK_DB_PASS, KAFKA_SASL_CLIENT_USER, KAFKA_SASL_CLIENT_PASSWORD); copy this file for another environment and override anything with the CLI flags.",
+  "_comment": "Local docker-compose stack. Secrets come from .env (LINK_DB_PASS, KAFKA_SASL_CLIENT_USER, KAFKA_SASL_CLIENT_PASSWORD); copy this file for another environment and override anything with the CLI flags. Kafka is read through the REST proxy (rest_proxy_url), as in deployed environments; pass --kafka-rest-proxy-url \"\" to use the broker settings instead.",
   "environment": "local-compose",
   "sql": {
     "connection_string": "Server=localhost,1433;UID=sa;PWD=${LINK_DB_PASS};TrustServerCertificate=yes",
@@ -21,6 +21,7 @@
     }
   },
   "kafka": {
+    "rest_proxy_url": "http://localhost:8082",
     "bootstrap_servers": "localhost:9094",
     "security_protocol": "SASL_PLAINTEXT",
     "sasl_mechanism": "PLAIN",

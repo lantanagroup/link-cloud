@@ -209,6 +209,15 @@ class PairTests(unittest.TestCase):
         self.assertEqual(text.count("Cosmos RU and 429 metrics"), 1)  # de-duplicated across snapshots
         self.assertNotIn("Tooling check", diff.summary(self.pair, None, tooling_check=False))
         self.assertIn("= retention_participants → **4**", text)  # a parameter-driven model multiplier
+        self.assertNotIn("exclude headers", text)
+
+    def test_rest_proxy_sizes_are_flagged(self):
+        a = after()
+        a["kafka"]["DataAcquisitionRequested"]["size_basis"] = "key+value"
+        pair = diff.diff_pair(STORES, before(), a)
+        r = next(s for s in pair["stores"] if s["id"] == "kafka.DataAcquisitionRequested")
+        self.assertEqual(r["size_basis"], ["key+value"])
+        self.assertIn("Kafka bytes per message exclude headers", diff.summary(pair, None, tooling_check=False))
 
 
 def sample(t, pending, entries, high, lag, blocked):

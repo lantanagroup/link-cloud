@@ -45,7 +45,9 @@ $py = "$env:USERPROFILE/.venvs/link-capacity/Scripts/python"
 ```
 
 **Local Compose stack.** The default targets file reads `LINK_DB_PASS` and the Kafka SASL user from
-the repository's `.env`, so no flags are needed.
+the repository's `.env`, so no flags are needed. It reads Kafka through the stack's REST proxy
+(`http://localhost:8082`), as deployed environments do; add `--kafka-rest-proxy-url ""` to read the
+brokers directly instead.
 
 ```powershell
 & $py Scripts/capacity_model/snapshot.py --label before --out before.json
@@ -61,10 +63,14 @@ A local run proves the tooling. It doesn't produce numbers for the model.
 1. **Write a targets file for the environment, outside this repository.** The repository is public,
    so its hostnames don't belong here. Copy `targets/docker-compose.json` and set the SQL server or
    per-service connection strings, the Cosmos Mongo connection string and `cosmos.resource_id`, the
-   Kafka brokers and security, the Loki URL, and `replicas` (`kubectl` with namespace and context, or
-   `none`). Make every credential a `${VAR}`, supplied from your shell or a private `--env-file`.
+   Kafka REST proxy URL (or the brokers and security, if they're reachable directly), the Loki URL,
+   and `replicas` (`kubectl` with namespace and context, or `none`). Make every credential a `${VAR}`,
+   supplied from your shell or a private `--env-file`.
 2. **Run from somewhere that can reach every endpoint,** using `kubectl port-forward` for in-cluster
-   services. Use a read-only SQL login with VIEW DATABASE STATE, plus VIEW SERVER STATE where the
+   services. For Kafka on AKS, forward the REST proxy, not a broker:
+   `kubectl port-forward svc/<rest-proxy service> 8082:8082`, then set `kafka.rest_proxy_url` to
+   `http://localhost:8082` (or pass `--kafka-rest-proxy-url`). See [Kafka through the REST
+   proxy](#kafka-through-the-rest-proxy). Use a read-only SQL login with VIEW DATABASE STATE, plus VIEW SERVER STATE where the
    server allows it. For Cosmos RU and 429s, `az login` with Reader on the Cosmos account.
 3. **Check connectivity** with a full snapshot and a recent `--since`, so every source is exercised:
    `snapshot.py --targets <file> --env-file <file> --since <five minutes ago, ISO> --out check.json`.
@@ -137,7 +143,7 @@ pyodbc also needs a SQL Server ODBC driver (17 or 18). Use the venv's `python` f
 A targets file names one environment's connections. `targets/docker-compose.json` is the local stack.
 For another environment, copy it, or override any value on the command line. The flags mirror
 `Scripts/clean.py`: `--db-connection-string`, `--<service>-db-name`, `--<service>-connection-string`,
-`--mongo-connection-string`, `--kafka-broker`, `--kafka-username`, and so on.
+`--mongo-connection-string`, `--kafka-broker`, `--kafka-username`, `--kafka-rest-proxy-url`, and so on.
 
 Credentials are never written into a targets file. Reference them as `${VAR}` instead. Values come
 from `.env` in the current directory (or `--env-file`) and the environment, with the environment
@@ -151,6 +157,7 @@ The optional sections:
 | `cosmos` | `resource_id`: the Cosmos DB account's Azure resource ID | RU and HTTP 429 totals for the run, from `az monitor metrics` (needs `az login` with reader access) |
 | `replicas` | `provider`: `docker`, `kubectl` (with `namespace`, `context`) or `none` | Running replicas, plus HPA min/max on Kubernetes |
 | `loki` | `url`, optionally `org_id`, `bearer_token`, `selector` | Log bytes per service over the run |
+| `kafka` (REST proxy) | `rest_proxy_url`, optionally `rest_proxy_username` and `rest_proxy_password` (basic auth), `rest_proxy_cluster_id` (only if the proxy lists several clusters) | Kafka through the Confluent REST proxy instead of the brokers. When `rest_proxy_url` is set it is used, and the broker settings are ignored. |
 
 ### A run
 
@@ -216,6 +223,7 @@ source.
   Bytes per message come from reading up to 50 of the newest messages per partition with an
   assign-only consumer, which joins no group and commits nothing. `SubmitPayload` and
   `PayloadSubmitted` carry per-patient and per-report messages that offsets can't separate.
+  Through the REST proxy, bytes per message exclude headers (see below).
 - **Work queues** (`fixed_residency`: `patientDispatches`, the QueryDispatch Quartz rows,
   `EventRetries`). Rows drain as the queue works, so a before/after pair can't show rows written.
   The series reports their maximum depth and whether they drained. `PendingReferenceIds` looks like a
@@ -223,6 +231,46 @@ source.
   the other log child tables.
 - **Loki.** Bytes come from `bytes_over_time` grouped by `component`, over the window from the before
   snapshot to the after snapshot. Logs from anything else running in that window are included.
+
+### Kafka through the REST proxy
+
+A Kafka client connects to the bootstrap address, then reconnects to each broker at the address the
+broker *advertises*. On AKS those are cluster-internal host names, so a client outside the cluster gets
+through bootstrap over `kubectl port-forward`, then fails with "Broker transport failure". The
+Confluent REST proxy runs inside the cluster and reaches the brokers itself, so one forwarded port is
+enough.
+
+```powershell
+kubectl port-forward svc/<rest-proxy service> 8082:8082 --namespace <namespace> --context <context>
+& $py Scripts/capacity_model/snapshot.py --targets <file> --env-file <file> --kafka-rest-proxy-url http://localhost:8082 --since <ISO> --out check.json
+```
+
+The local targets file (`targets/docker-compose.json`) uses the Compose stack's proxy on port 8082 the
+same way. When `rest_proxy_url` is set the broker settings are ignored; `--kafka-rest-proxy-url ""`
+clears it for one run, so the snapshot reads the brokers and its sizes include headers.
+
+| Fact | Through the brokers | Through the REST proxy |
+|---|---|---|
+| Topics, partitions, replication | admin metadata | `GET /v3/clusters/{id}/topics` |
+| `retention.ms` | `describe_configs` | `GET /v3/clusters/{id}/topics/-/configs`, one call |
+| Watermarks | `get_watermark_offsets` | `GET /topics/{topic}/partitions/{p}/offsets`, one call per partition |
+| Consumer lag | committed offsets against the watermarks | `GET /v3/clusters/{id}/consumer-groups/{group}/lags` against the watermarks |
+| Bytes per message | key + value + headers | **key + value only**: v2 records carry no headers |
+
+- **Sizes run slightly low.** Each sampled topic records its `size_basis`, and `diff_snapshots.py`
+  notes in the summary when Kafka sizes exclude headers.
+- **Sampling uses a temporary consumer instance** in a `capacity-snapshot-<uuid>` group. It is only
+  ever assigned partitions, never subscribed, and never commits, so no group appears or moves. It is
+  deleted when the snapshot closes; the proxy also expires idle instances.
+- **The instance lives on one proxy pod.** Forward to the service or a single pod, as above. Don't go
+  through a load-balanced route that could send its requests to different replicas.
+- **Links in the proxy's responses are never followed.** They carry its in-cluster host name, so every
+  URL is built from `rest_proxy_url`.
+- **Credentials:** if the proxy requires basic auth, use `rest_proxy_username` and
+  `rest_proxy_password` as `${VAR}`. A URL with embedded credentials is refused, because request errors
+  quote the URL.
+- **A light series makes one HTTP call per partition per sample.** Over a port-forward that takes a
+  few seconds for about 200 partitions, so keep `--interval` at 15 s or more.
 
 ### PHI and secrets
 
@@ -303,7 +351,7 @@ Rerun the model, and commit the inputs together with the regenerated tables.
 `tests/test_capture.py` runs each collector against fakes and recorded responses, covering:
 - SQL sizes, attribution, the phase split, run facts, waits, blocking and deadlocks
 - Mongo without aggregation
-- Kafka watermarks, sampling and lag
+- Kafka watermarks, sampling and lag, through the brokers and through the REST proxy (including that no URL is built from a link the proxy returned)
 - the Loki and `az` parsers
 - the targets resolution
 - a full and a light `snapshot.take`

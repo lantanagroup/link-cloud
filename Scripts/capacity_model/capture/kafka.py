@@ -3,6 +3,9 @@
 Messages produced during a run are the change in the summed high watermarks, which retention can't reduce;
 messages held now are high minus low. Message sizes come from reading the newest messages with an assign-only
 consumer that never subscribes or commits, so no consumer group is created or moved.
+
+`NativeKafka` talks to the brokers directly. `capture.kafka_rest.RestProxyKafka` offers the same methods through
+the Confluent REST proxy, for clusters whose advertised broker addresses can't be reached from the workstation.
 """
 
 from __future__ import annotations
@@ -23,13 +26,41 @@ def client_config(kafka: dict) -> dict:
     return conf
 
 
-def clients(kafka: dict):
+def clients(kafka: dict) -> "NativeKafka":
     from confluent_kafka import Consumer  # noqa: PLC0415 - optional dependency
     from confluent_kafka.admin import AdminClient  # noqa: PLC0415
     conf = client_config(kafka)
     consumer = Consumer({**conf, "group.id": f"capacity-snapshot-{uuid.uuid4()}", "enable.auto.commit": False,
                          "enable.partition.eof": False, "auto.offset.reset": "latest"})
-    return AdminClient(conf), consumer
+    return NativeKafka(AdminClient(conf), consumer)
+
+
+class NativeKafka:
+    """The collector's Kafka interface over confluent-kafka clients connected to the brokers."""
+
+    via = "broker"
+    size_basis = "key+value+headers"
+
+    def __init__(self, admin, consumer):
+        self.admin, self.consumer = admin, consumer
+
+    def topics(self) -> dict[str, dict]:
+        return topic_metadata(self.admin)
+
+    def watermarks(self, topic: str, partitions: list[int]) -> dict[int, tuple[int, int]]:
+        return watermarks(self.consumer, topic, partitions)
+
+    def sample_sizes(self, topic: str, marks: dict[int, tuple[int, int]], per_partition: int) -> dict:
+        return sample_sizes(self.consumer, topic, marks, per_partition)
+
+    def retention_ms(self, topics: list[str]) -> dict[str, int | None]:
+        return retention_ms(self.admin, topics)
+
+    def consumer_lag(self, high_by_topic_partition: dict[tuple[str, int], int]) -> dict:
+        return consumer_lag(self.admin, high_by_topic_partition)
+
+    def close(self) -> None:
+        self.consumer.close()
 
 
 def topic_metadata(admin, timeout: float = 10) -> dict[str, dict]:

@@ -48,6 +48,12 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     g.add_argument("--kafka-password")
     g.add_argument("--kafka-security-protocol")
     g.add_argument("--kafka-sasl-mechanism")
+    g.add_argument("--kafka-rest-proxy-url",
+                   help="capture Kafka through the Confluent REST proxy instead of the brokers, "
+                        "e.g. http://localhost:8082 behind kubectl port-forward")
+    g.add_argument("--kafka-rest-proxy-username", help="REST proxy basic-auth user, if it requires one")
+    g.add_argument("--kafka-rest-proxy-password")
+    g.add_argument("--kafka-rest-proxy-cluster-id", help="needed only if the proxy lists several clusters")
     g.add_argument("--loki-url")
     g.add_argument("--loki-org-id", help="X-Scope-OrgID header for multi-tenant Loki")
     g.add_argument("--loki-bearer-token")
@@ -107,6 +113,10 @@ def resolve(args: argparse.Namespace) -> dict:
     override(kafka, "password", args.kafka_password)
     override(kafka, "security_protocol", args.kafka_security_protocol)
     override(kafka, "sasl_mechanism", args.kafka_sasl_mechanism)
+    override(kafka, "rest_proxy_url", args.kafka_rest_proxy_url)
+    override(kafka, "rest_proxy_username", args.kafka_rest_proxy_username)
+    override(kafka, "rest_proxy_password", args.kafka_rest_proxy_password)
+    override(kafka, "rest_proxy_cluster_id", args.kafka_rest_proxy_cluster_id)
     override(loki, "url", args.loki_url)
     override(loki, "org_id", args.loki_org_id)
     override(loki, "bearer_token", args.loki_bearer_token)

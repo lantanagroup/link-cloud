@@ -190,6 +190,9 @@ def diff_store(store: dict, before: dict, after: dict, run: dict, elapsed_days: 
                       bytes_per_row=sum(v * n for v, n in sampled if v is not None) / weight if weight else None,
                       retention_ms=sorted({at[t].get("retention_ms") for t in topics} - {None}),
                       replication=sorted({at[t].get("replication") for t in topics} - {None}))
+        bases = sorted({at[t]["size_basis"] for t in topics if at[t].get("size_basis")})
+        if bases:
+            result["size_basis"] = bases
     elif store["kind"] == "loki":
         window = after.get("loki", {}).get(sid)
         if window is None:
@@ -480,6 +483,10 @@ def summary(pair: dict | None, series_result: dict | None, tooling_check: bool) 
              f"{_n(run.get('decided_resources_per_patient'))}"],
             ["Shadow / rubric validation active", f"{run['enabled']['shadow']} / {run['enabled']['rubric']}"],
         ], "ll"))
+        if any("headers" not in b for r in pair["stores"] for b in r.get("size_basis", [])):
+            parts.append("> **Kafka bytes per message exclude headers.** The after snapshot sampled messages through "
+                         "the REST proxy, whose records carry key and value only, so Kafka bytes per row run "
+                         "slightly low against a capture made through the brokers.")
         rows, skipped = [], []
         for r in pair["stores"]:
             if r.get("multiplier") is None:

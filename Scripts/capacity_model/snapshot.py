@@ -24,7 +24,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from capture import SCHEMA_VERSION  # noqa: E402
-from capture import cloud, kafka, loki, mongo, sql  # noqa: E402
+from capture import cloud, kafka, kafka_rest, loki, mongo, sql  # noqa: E402
 from capture import targets as targets_mod  # noqa: E402
 from capture.common import (Unavailable, iso, normalize_guid, parse_iso, read_json, stores_of_kind,  # noqa: E402
                             utc_now, write_json)
@@ -71,8 +71,10 @@ class Session:
         return self._mongo
 
     def kafka(self):
+        """The Kafka backend: the REST proxy when `kafka.rest_proxy_url` is set, otherwise the brokers."""
         if self._kafka is None:
-            self._kafka = kafka.clients(self.targets["kafka"])
+            cfg = self.targets["kafka"]
+            self._kafka = kafka_rest.RestProxyKafka(cfg) if cfg.get("rest_proxy_url") else kafka.clients(cfg)
         return self._kafka
 
     def close(self) -> None:
@@ -82,7 +84,7 @@ class Session:
         if self._mongo is not None:
             self._mongo.close()
         if self._kafka is not None:
-            self._kafka[1].close()
+            self._kafka.close()
 
 
 # --------------------------------------------------------------------------------------------
@@ -232,12 +234,13 @@ def capture_mongo(session: Session, stores: list[dict], full: bool, report_ids: 
 
 def capture_kafka(session: Session, stores: list[dict], full: bool) -> tuple[dict, dict, dict]:
     """(topics, consumer lag, context)."""
-    if not stores_of_kind(stores, "kafka") or not session.targets.get("kafka", {}).get("bootstrap_servers"):
+    cfg = session.targets.get("kafka", {})
+    if not stores_of_kind(stores, "kafka") or not (cfg.get("bootstrap_servers") or cfg.get("rest_proxy_url")):
         return {}, {}, {}
     u = session.unavailable
     try:
-        admin, consumer = session.kafka()
-        meta = kafka.topic_metadata(admin)
+        backend = session.kafka()
+        meta = backend.topics()
     except Exception as e:  # noqa: BLE001
         u.add("kafka", "connection", e)
         return {}, {}, {}
@@ -245,7 +248,7 @@ def capture_kafka(session: Session, stores: list[dict], full: bool) -> tuple[dic
     topics, highs = {}, {}
     for name, m in sorted(meta.items()):
         try:
-            marks = kafka.watermarks(consumer, name, m["partitions"])
+            marks = backend.watermarks(name, m["partitions"])
         except Exception as e:  # noqa: BLE001
             u.add("kafka", f"{name} watermarks", e)
             continue
@@ -254,18 +257,20 @@ def capture_kafka(session: Session, stores: list[dict], full: bool) -> tuple[dic
                  **kafka.summarize_watermarks(marks)}
         if full and name in modeled:
             try:
-                entry.update(kafka.sample_sizes(consumer, name, marks, SAMPLE_PER_PARTITION))
+                entry.update(backend.sample_sizes(name, marks, SAMPLE_PER_PARTITION))
+                if entry.get("sampled"):
+                    entry["size_basis"] = backend.size_basis
             except Exception as e:  # noqa: BLE001
                 u.add("kafka", f"{name} message sizes", e)
         topics[name] = entry
     if full:
         try:
-            for name, ms in kafka.retention_ms(admin, sorted(topics)).items():
+            for name, ms in backend.retention_ms(sorted(topics)).items():
                 topics[name]["retention_ms"] = ms
         except Exception as e:  # noqa: BLE001
             u.add("kafka", "retention.ms", e)
     try:
-        lag = kafka.consumer_lag(admin, highs)
+        lag = backend.consumer_lag(highs)
     except Exception as e:  # noqa: BLE001
         u.add("kafka", "consumer lag", e)
         lag = {}
@@ -273,7 +278,8 @@ def capture_kafka(session: Session, stores: list[dict], full: bool) -> tuple[dic
         missing = [t for t in s["location"]["topics"] if t not in topics]
         if missing:
             u.add("kafka", s["id"], f"topics not found: {', '.join(missing)}")
-    context = {"topics": len(topics), "partitions": sum(t["partitions"] for t in topics.values())} if full else {}
+    context = {"via": backend.via, "topics": len(topics),
+               "partitions": sum(t["partitions"] for t in topics.values())} if full else {}
     return topics, lag, context
 
 
