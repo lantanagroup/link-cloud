@@ -18,6 +18,7 @@ import {VendorConfigDialogComponent} from "../vendor-config-dialog/vendor-config
 import {FormMode} from "../../../models/FormMode.enum";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {AlertDialogComponent} from "../../core/alert-dialog/alert-dialog.component";
 import {VendorService} from "../../../services/gateway/vendor/vendor.service";
 import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model.interface";
 
@@ -146,15 +147,49 @@ export class VendorDashboardComponent {
   }
 
   private deleteVendorConfig(row: any): void {
-    console.log(`Deleted Vendor Config: ${JSON.stringify(row)}`);
-    this.vendorService.deleteVendor(row.id).subscribe(() => {
-      this.snackBar.open('Vendor configuration deleted successfully!', '', {
-        duration: 3500,
-        panelClass: 'success-snackbar',
-        horizontalPosition: 'end',
-        verticalPosition: 'top'
-      });
-      this.getVendors();
+    this.vendorService.deleteVendor(row.id).subscribe({
+      next: () => {
+        this.snackBar.open('Vendor configuration deleted successfully!', '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+        this.getVendors();
+      },
+      error: (err) => {
+        // A vendor a facility still uses cannot be deleted: the API refuses that with 409 and names
+        // the facilities on Problem Details `detail`, which is what the admin has to act on. A
+        // toastr would scroll that away, so it goes in a dialog instead. Anything else is
+        // unexpected, and `message` already carries the sanitized detail plus the trace id to quote.
+        const inUse = err?.status === 409;
+
+        this.dialog.open(AlertDialogComponent, {
+          width: '480px',
+          data: {
+            title: inUse ? 'Vendor In Use' : 'Delete Failed',
+            message: inUse
+              ? this.problemDetail(err)
+                ?? 'This vendor is in use by a facility configuration and cannot be deleted.'
+              : err?.message
+                ?? this.problemDetail(err)
+                ?? 'Failed to delete the vendor. Please try again.',
+            icon: inUse ? 'link_off' : 'error',
+            iconColor: 'warn'
+          }
+        });
+      }
     });
+  }
+
+  /** The API's Problem Details `detail`, which carries the reason a delete was refused. */
+  private problemDetail(err: any): string | null {
+    if (!err?.error) return null;
+    if (typeof err.error === 'object') return err.error.detail ?? null;
+    try {
+      return JSON.parse(err.error)?.detail ?? null;
+    } catch {
+      return null;
+    }
   }
 }
