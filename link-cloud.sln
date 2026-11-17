@@ -77,6 +77,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MockFhirServer", "DotNet\Mo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MockDmrpApi", "DotNet\MockDmrpApi\MockDmrpApi.csproj", "{7E4C1A93-6D2F-4B18-9C05-3A7F81E2D460}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DMRP", "DotNet\DMRP\DMRP.csproj", "{EE071683-C878-41D9-85FC-E437FFBBDDB0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -603,6 +605,24 @@ Global
 		{7E4C1A93-6D2F-4B18-9C05-3A7F81E2D460}.Release|x64.Build.0 = Release|Any CPU
 		{7E4C1A93-6D2F-4B18-9C05-3A7F81E2D460}.Release|x86.ActiveCfg = Release|Any CPU
 		{7E4C1A93-6D2F-4B18-9C05-3A7F81E2D460}.Release|x86.Build.0 = Release|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Debug|x64.Build.0 = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Debug|x86.Build.0 = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.NoVariablesDefault|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.NoVariablesDefault|Any CPU.Build.0 = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.NoVariablesDefault|x64.ActiveCfg = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.NoVariablesDefault|x64.Build.0 = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.NoVariablesDefault|x86.ActiveCfg = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.NoVariablesDefault|x86.Build.0 = Debug|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Release|x64.ActiveCfg = Release|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Release|x64.Build.0 = Release|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Release|x86.ActiveCfg = Release|Any CPU
+		{EE071683-C878-41D9-85FC-E437FFBBDDB0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

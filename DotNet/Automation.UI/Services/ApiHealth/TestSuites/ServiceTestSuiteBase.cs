@@ -340,8 +340,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             if (!string.IsNullOrWhiteSpace(apiResponse))
                 parts.Add($"Detail: {apiResponse}");
 
-            if (!string.IsNullOrWhiteSpace(traceId))
-                parts.Add($"Trace ID: {traceId}");
+            parts.Add($"Trace ID: {(string.IsNullOrWhiteSpace(traceId) ? "Not provided" : traceId)}");
 
             return string.Join(Environment.NewLine, parts);
         }

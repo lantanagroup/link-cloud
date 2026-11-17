@@ -224,6 +224,9 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
 
             var entityType = entry.Metadata.ClrType;
 
+            //every change from this entry belongs to one row, so the identity is read once.
+            var rowKey = RowKey(entry);
+
             foreach (var property in entry.Properties)
             {
                 if (!property.IsModified)
@@ -231,9 +234,11 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
                     continue;
                 }
 
-                //keys identify the row rather than describe it, and the modify timestamp moves on
-                //every save, so it would appear in every event.
-                if (property.Metadata.IsPrimaryKey() || property.Metadata.IsForeignKey())
+                //the primary key identifies the row rather than describing it - and an owned type's
+                //key is its owner's, so skipping it also keeps the owner's id out of the owned
+                //entry's changes. A foreign key is not in the same position: it says which related
+                //row this one points at, which is a configuration change worth recording.
+                if (property.Metadata.IsPrimaryKey())
                 {
                     continue;
                 }
@@ -263,9 +268,43 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
 
                 //a masked value was described only to learn whether it changed. Neither form is kept.
                 _saving.Changes.Add(IsMasked(entityType, property)
-                    ? new PropertyChangeModel(property.Metadata.Name, AuditOptions.MaskedValue, AuditOptions.MaskedValue)
-                    : new PropertyChangeModel(property.Metadata.Name, initial, current));
+                    ? new PropertyChangeModel(property.Metadata.Name, AuditOptions.MaskedValue,
+                        AuditOptions.MaskedValue, entityType.Name, rowKey)
+                    : new PropertyChangeModel(property.Metadata.Name, initial, current, entityType.Name, rowKey));
             }
+        }
+
+        /// <summary>
+        /// Which row a change belongs to, so one event can describe an update that touched several.
+        /// </summary>
+        /// <remarks>
+        /// Read from the original values: Entity Framework does not allow a tracked row's key to
+        /// change, so both sides agree, and the original is the row as a reader will find it.
+        /// <para>
+        /// A key property one of the masking rules catches is masked like any other value, which
+        /// leaves the rows of such an entity indistinguishable rather than publishing a key that
+        /// identifies a person. Composite keys are joined with '|' in the order the model declares
+        /// them.
+        /// </para>
+        /// </remarks>
+        private string? RowKey(EntityEntry entry)
+        {
+            var key = entry.Metadata.FindPrimaryKey();
+            if (key is null)
+            {
+                return null;
+            }
+
+            var parts = key.Properties.Select(property =>
+            {
+                var tracked = entry.Property(property.Name);
+
+                return IsMasked(entry.Metadata.ClrType, tracked)
+                    ? AuditOptions.MaskedValue
+                    : Describe(property.GetValueConverter(), tracked.OriginalValue);
+            });
+
+            return string.Join('|', parts);
         }
 
         /// <summary>

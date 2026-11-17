@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Session;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Concurrency;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Storage;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
@@ -30,6 +31,13 @@ public static class LinkGatewayRegistration
         });
 
         services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
+
+        //LEGLINK-1359: this BFF authenticates a real person, so the token it mints for a Link service
+        //names them instead of this deployment's Link admin address - which is what the receiving
+        //service records as the actor on an audit event. Registering the provider is the whole of the
+        //opt-in; no SDK call site changes.
+        services.AddSingleton<IActorEmailProvider, NhsnActorEmailProvider>();
+
         services.AddLinkSdk();
         services.AddHttpClient();
 

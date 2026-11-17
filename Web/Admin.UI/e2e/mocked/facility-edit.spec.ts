@@ -115,6 +115,98 @@ test('expanding data acquisition loads every configuration behind its tabs', asy
   }
 });
 
+test('an SFTP census can be configured as an HL7 ADT feed', async ({ page, api }) => {
+  mockFacilityEdit(api);
+  mockDataAcquisitionPanel(api);
+  const SFTP = `/api/data-acquisition/${facilityId}/sftp-configurations`;
+  api.mock(`POST ${SFTP}`, { status: 201, json: { id: 'sftp-1', organizationId: facilityId } });
+
+  const edit = new FacilityEditPage(page);
+  await edit.goto(facilityId);
+  await edit.expand(edit.dataAcquisitionPanel);
+  await edit.dataAcquisitionPanel.getByRole('tab', { name: 'SFTP Configuration' }).click();
+  await edit.dataAcquisitionPanel.getByRole('button', { name: 'Add SFTP configuration' }).click();
+
+  const dialog = page.getByRole('dialog');
+  const create = dialog.getByRole('button', { name: 'Create SFTP Configuration' });
+  await dialog.getByLabel('Host').fill('sftp.example.org');
+  await dialog.getByLabel('Remote Directory').fill('/adt');
+
+  await dialog.getByRole('button', { name: 'Add Acquisition Type' }).click();
+  await dialog.locator('mat-expansion-panel-header').click();
+
+  // Nothing ADT-specific until the sub type asks for it
+  await expect(dialog.getByRole('radio', { name: 'Patient MRN search' })).toHaveCount(0);
+
+  await dialog.getByRole('combobox', { name: 'Sub Type' }).click();
+  await page.getByRole('option', { name: 'HL7ADT' }).click();
+
+  // Starts on Patient.Id on the ADT event, and neither that nor a place for read files are filled in yet
+  await expect(dialog.getByLabel('Patient.Id Location')).toBeVisible();
+  await expect(dialog.getByLabel('MRN Identifier System')).toHaveCount(0);
+  await expect(dialog.getByText('ADT files must leave the directory once read')).toBeVisible();
+  await expect(create).toBeDisabled();
+
+  await dialog.getByLabel('Patient.Id Location').fill('not a location');
+  await dialog.getByLabel('Patient.Id Location').blur();
+  await expect(dialog.getByText('Enter a location such as PID-2')).toBeVisible();
+
+  // Switching option drops the other one's error along with its field
+  await dialog.getByRole('radio', { name: 'Patient MRN search' }).click();
+  await expect(dialog.getByLabel('Patient.Id Location')).toHaveCount(0);
+  await dialog.getByLabel('MRN Identifier System').fill('urn:oid:1.2.3');
+  await dialog.getByLabel('MRN Location').fill('PID-18');
+  await dialog.getByLabel('Processed Directory').fill('/adt/processed');
+  await expect(dialog.getByText('ADT files must leave the directory once read')).toHaveCount(0);
+
+  await expect(create).toBeEnabled();
+  await create.click();
+
+  await expect.poll(() => api.callsTo('POST', SFTP).length).toBe(1);
+  const body = JSON.parse(api.callsTo('POST', SFTP)[0].postData!);
+  expect(body.acquisitionConfigurations).toEqual([
+    expect.objectContaining({
+      acquisitionType: 'Census',
+      subType: 'HL7ADT',
+      processedDirectory: '/adt/processed',
+      adtConfiguration: { mrnIdentifierSystem: 'urn:oid:1.2.3', mrnLocation: 'PID-18' },
+    }),
+  ]);
+});
+
+test('an existing HL7 ADT configuration is shown read-only', async ({ page, api }) => {
+  mockFacilityEdit(api);
+  mockDataAcquisitionPanel(api, {
+    sftp: {
+      id: 'sftp-1',
+      organizationId: facilityId,
+      host: 'sftp.example.org',
+      port: 22,
+      remoteDirectory: '/adt',
+      timeout: '00:01:00',
+      removeAfterProcessing: true,
+      authenticationProtocol: 'Basic',
+      enableBenchmarking: false,
+      acquisitionConfigurations: [
+        { acquisitionType: 'Census', subType: 'HL7ADT', adtConfiguration: { patientIdLocation: 'OBX[3.1=FHIRID]-5' } },
+      ],
+    },
+  });
+  api.mock(`GET /api/data-acquisition/${facilityId}/sftp-configurations/credentials/status`, { hasCredentials: true });
+
+  const edit = new FacilityEditPage(page);
+  await edit.goto(facilityId);
+  await edit.expand(edit.dataAcquisitionPanel);
+  await edit.dataAcquisitionPanel.getByRole('tab', { name: 'SFTP Configuration' }).click();
+
+  const tabPanel = edit.dataAcquisitionPanel.getByRole('tabpanel', { name: 'SFTP Configuration' });
+  await tabPanel.locator('mat-expansion-panel-header', { hasText: 'HL7ADT' }).click();
+
+  await expect(tabPanel.getByLabel('Patient.Id Location')).toHaveValue('OBX[3.1=FHIRID]-5');
+  await expect(tabPanel.getByLabel('Patient.Id Location')).toBeDisabled();
+  await expect(tabPanel.getByRole('radio', { name: 'Patient.Id on ADT event' })).toBeChecked();
+});
+
 test('the Reporting Organization tab is disabled until the facility has a vendor', async ({ page, api }) => {
   // The shared fixture now carries a vendor, so strip it here — the absence is the point.
   mockFacilityEdit(api, { ...facility, vendor: undefined });

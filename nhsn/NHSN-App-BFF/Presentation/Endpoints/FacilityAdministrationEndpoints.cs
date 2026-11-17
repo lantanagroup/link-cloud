@@ -15,7 +15,10 @@ public class FacilityAdministrationEndpoints : IApi
             {
                 if (!userContext.HasFacility)
                 {
-                    return Results.BadRequest(new { message = "Facility context is required." });
+                    return Results.Problem(
+                        title: "Facility context is required",
+                        detail: "Facility context is required.",
+                        statusCode: StatusCodes.Status400BadRequest);
                 }
 
                 try
@@ -25,12 +28,15 @@ public class FacilityAdministrationEndpoints : IApi
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return Results.BadRequest(new { message = ex.Message });
+                    return Results.Problem(
+                        title: "The facility onboarding update was rejected",
+                        detail: ex.Message,
+                        statusCode: StatusCodes.Status400BadRequest);
                 }
             })
             .WithName("UpdateFacilityOnboarding")
             .Produces(StatusCodes.Status202Accepted)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
     }
 }

@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.repositories;
 
 import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.r4.model.OperationOutcome;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +13,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Repository
-public interface ResultRepository extends JpaRepository<Result, Long> {
+public interface ResultRepository extends JpaRepository<Result, Long>, ResultPagingCounts {
 
     @Modifying
     @Query(value = "DELETE FROM result_category WHERE category_id IN :categoryIds", nativeQuery = true)
@@ -38,6 +39,18 @@ public interface ResultRepository extends JpaRepository<Result, Long> {
     void deletePatientResults(@Param("facilityId") String facilityId,
                               @Param("reportId") String reportId,
                               @Param("patientId") String patientId);
+
+    @Query("select r from Result r join r.categories c where r.facilityId = :facilityId "
+            + "and r.reportId = :reportId and c.id = :categoryId")
+    List<Result> findCategoryResults(
+            @Param("facilityId") String facilityId, @Param("reportId") String reportId,
+            @Param("categoryId") String categoryId, Pageable pageable);
+
+    @Query("select r from Result r where r.facilityId = :facilityId and r.reportId = :reportId "
+            + "and r.categories is empty")
+    List<Result> findUncategorizedResults(
+            @Param("facilityId") String facilityId, @Param("reportId") String reportId,
+            Pageable pageable);
 
     List<Result> findAllByFacilityIdAndReportId(String facilityId, String reportId);
 

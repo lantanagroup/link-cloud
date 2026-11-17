@@ -43,6 +43,17 @@ namespace IntegrationTests.Tenant
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
 
+        /// <summary>
+        /// Stands up Tenant's own service graph in a started host, so an integration test exercises
+        /// the service's real wiring instead of hand-built doubles. Everything that would leave the
+        /// process is stubbed - HTTP, both Kafka producer factories, the system-token service and the
+        /// Normalization client - and bearer auth is left anonymous, so no test needs a broker, a
+        /// token service or a network. Audit events are published through
+        /// <see cref="RecordingAuditProducer"/> rather than Kafka, which is what lets a test assert on
+        /// the event a real request would have emitted. Each instance owns a uniquely named SQLite
+        /// file in the temp directory and creates the schema in it, so fixtures never share state;
+        /// <see cref="Dispose"/> drops it again.
+        /// </summary>
         public TenantIntegrationTestFixture()
         {
             var builder = Host.CreateApplicationBuilder();
@@ -155,7 +166,7 @@ namespace IntegrationTests.Tenant
 
             // Add Kafka producer factories (mirrors Program.cs):
             //   <string, GenerateReportValue> -> FacilityController (ad-hoc report path)
-            //   <string, object>              -> ReportScheduledJob / RetentionCheckScheduledJob
+            //   <string, object>              -> ReportScheduledJob
             builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
             builder.Services.AddTransient<IKafkaProducerFactory<string, object>, StubKafkaProducerFactory<string, object>>();
 

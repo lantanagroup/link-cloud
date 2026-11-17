@@ -84,9 +84,8 @@ service builds its `DbContext`. Work out which of these the service is before ad
 
 | The service builds its context with | Do this | Example |
 | --- | --- | --- |
-| the shared `AddSQLServerEF<T>()` helper | nothing - the helper attaches it | Tenant, QueryDispatch |
-| its own `AddDbContext` | add `.AddLinkAuditInterceptor(sp)` to the options chain | Census, Normalization, Report, DataAcquisition |
-| its own `AddDbContext`, already listing interceptors positionally | add `sp.GetRequiredService<AuditPropertyChangeInterceptor>()` to `AddInterceptors(...)` | Account |
+| the shared `AddSQLServerEF<T>()` helper | nothing - the helper attaches it | QueryDispatch |
+| its own `AddDbContext` | add `.AddLinkAuditInterceptor(sp)` to the options chain - or, where it already calls `AddInterceptors(...)`, hand `sp.GetRequiredService<AuditPropertyChangeInterceptor>()` to that call | Census, Normalization, Report, DataAcquisition, Account, Tenant |
 | no `DbContext` at all | call the non-generic `AddLinkAuditing()`; events carry no property changes | Terminology |
 
 The service must already register a `KafkaConnection` - auditing publishes to Kafka, and a service

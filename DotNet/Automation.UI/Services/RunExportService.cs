@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Models;
+using Automation.UI.Services.TestRail;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using System.Globalization;
@@ -56,6 +57,9 @@ public sealed class RunExportService : IRunExportService
             {
                 await SafeWriteAsync(archive, "RunDetails.txt",
                     () => Task.FromResult(BuildRunDetails(run)));
+
+                await SafeWriteAsync(archive, "Failures.txt",
+                    () => Task.FromResult(BuildFailures(run)));
 
                 await SafeWriteAsync(archive, "RunManifest.txt",
                     async () => await BuildRunManifestAsync(runId));
@@ -134,6 +138,7 @@ public sealed class RunExportService : IRunExportService
         WriteKvp(sb, "Finished", FormatTime(run.FinishedAt));
         WriteKvp(sb, "Pipeline Duration", run.Duration);
         WriteKvp(sb, "Error", NormalizeErrorSummary(run.Error));
+        TestRailRunLinks.AppendExport(sb, run.TestRailRuns);
 
         if (!string.IsNullOrWhiteSpace(run.RunConfigurationJson))
         {
@@ -148,6 +153,14 @@ public sealed class RunExportService : IRunExportService
             sb.AppendLine(line);
 
         return sb.ToString();
+    }
+
+    private static string BuildFailures(AutomationRunSummary run)
+    {
+        if (run.FailureDetails == null || run.FailureDetails.Count == 0)
+            return "(no operation failures recorded for this run)";
+
+        return string.Join("\n\n", run.FailureDetails);
     }
 
     private static string? NormalizeErrorSummary(string? error) =>

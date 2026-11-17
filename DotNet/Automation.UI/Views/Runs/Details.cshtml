@@ -1,6 +1,35 @@
+@using Automation.UI.Services.TestRail
 @model LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary
+@functions {
+    private static void SplitFailureBlock(string block, out string before, out string? technical, out string? search)
+    {
+        before = block;
+        technical = null;
+        search = null;
+        const string marker = "\nTechnical details:\n";
+        var index = block.IndexOf(marker, StringComparison.Ordinal);
+        if (index < 0)
+            return;
+
+        before = block[..index];
+        var rest = block[(index + marker.Length)..];
+        const string searchMarker = "\nSearch: ";
+        var searchIndex = rest.LastIndexOf(searchMarker, StringComparison.Ordinal);
+        if (searchIndex < 0)
+        {
+            technical = rest;
+            return;
+        }
+
+        technical = rest[..searchIndex];
+        search = rest[(searchIndex + 1)..];
+    }
+}
 @{
     ViewData["Title"] = "Run Details";
+    var failureBlocks = Model.FailureDetails ?? Array.Empty<string>();
+    var failureBlocksJson = System.Text.Json.JsonSerializer.Serialize(failureBlocks)
+        .Replace("<", "\\u003c", StringComparison.Ordinal);
 }
 
 <div class="container mt-4">
@@ -49,6 +78,7 @@
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">TestRail</span><span class="au-value" id="testRailRuns">@TestRailRunLinks.NotPublished</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">FHIR generator</span><span class="au-value" id="fhirGenerator">Thetis Engine</span></div></div>
                 @{
                     var templateCacheVersion = ViewBag.TemplateCacheVersionNumber as int?;
@@ -58,7 +88,7 @@
                     <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Generation templates</span><span class="au-value" id="generationTemplateVersion">v@(templateCacheVersion.Value)</span></div></div>
                 }
             </div>
-            <div id="errorRow" class="mt-3" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
+            <div id="errorRow" class="mt-3" style="@(string.IsNullOrWhiteSpace(Model.Error) ? "display:none;" : "")"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
             <div id="validationHoldBanner" class="alert alert-info mt-3 mb-0 py-2 small" style="display:none;" role="status">
                 <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
                 <span id="validationHoldText"></span>
@@ -68,6 +98,34 @@
                 <span id="finalizingBadgeText">Finalizing…</span>
             </span>
         </div>
+    </div>
+
+    <div class="au-card" id="failureDetailsCard" style="@(failureBlocks.Count == 0 ? "display:none;" : "")">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-bug me-2"></i>Failures</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCopyFailures">Copy</button>
+        </div>
+        <div class="card-body" id="failureDetailsHost">
+            @foreach (var block in failureBlocks)
+            {
+                SplitFailureBlock(block, out var before, out var technical, out var search);
+                <div class="failure-record mb-3">
+                    <pre class="mb-2 small" style="white-space:pre-wrap;">@before</pre>
+                    @if (technical != null)
+                    {
+                        <details class="mb-2">
+                            <summary class="small">Technical details</summary>
+                            <pre class="mb-0 small mt-2" style="white-space:pre-wrap;">@technical</pre>
+                        </details>
+                    }
+                    @if (!string.IsNullOrEmpty(search))
+                    {
+                        <pre class="mb-0 small" style="white-space:pre-wrap;">@search</pre>
+                    }
+                </div>
+            }
+        </div>
+        <script type="application/json" id="failureDetailsSource">@Html.Raw(failureBlocksJson)</script>
     </div>
 
     @if (Model.IsMetricsRun)
@@ -1053,6 +1111,8 @@
                     display = v ? '<i class="bi bi-check-circle-fill text-success"></i> Yes' : '<i class="bi bi-x-circle text-muted"></i> No';
                 } else if (typeof v === 'object') {
                     return;
+                } else if (k === 'facilityConfigurationMode' && v === 'AlaCarte') {
+                    display = 'A La Carte';
                 } else {
                     display = escapeHtml(String(v));
                 }
@@ -1703,6 +1763,169 @@
                 el.textContent = value;
         }
 
+        function isSafeTestRailUrl(value) {
+            if (typeof value !== 'string') return false;
+            if (!/^https?:\/\//i.test(value)) return false;
+            try {
+                const url = new URL(value);
+                return url.protocol === 'https:' || url.protocol === 'http:';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function renderTestRailRuns(runs) {
+            const el = document.getElementById('testRailRuns');
+            if (!el || runs == null) return;
+            const items = Array.isArray(runs) ? runs : [];
+            const links = items.filter(run => {
+                const id = Number(run && (run.runId != null ? run.runId : run.RunId));
+                const url = run && (run.url || run.Url);
+                return id > 0 && isSafeTestRailUrl(url);
+            });
+            el.replaceChildren();
+            if (!links.length) {
+                el.textContent = 'Not published';
+                return;
+            }
+            links.forEach((run, index) => {
+                if (index > 0) el.appendChild(document.createTextNode(', '));
+                const id = Number(run.runId != null ? run.runId : run.RunId);
+                const url = run.url || run.Url;
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = 'R' + id;
+                link.title = 'Open TestRail run R' + id;
+                el.appendChild(link);
+                const testId = Number(run.testId != null ? run.testId : run.TestId);
+                const testUrl = run.testUrl || run.TestUrl;
+                if (testId > 0 && isSafeTestRailUrl(testUrl)) {
+                    el.appendChild(document.createTextNode(' '));
+                    const testLink = document.createElement('a');
+                    testLink.href = testUrl;
+                    testLink.target = '_blank';
+                    testLink.rel = 'noopener noreferrer';
+                    testLink.className = 'ms-1';
+                    testLink.textContent = 'T' + testId;
+                    testLink.title = 'Open TestRail test T' + testId;
+                    el.appendChild(testLink);
+                }
+            });
+        }
+
+        renderTestRailRuns(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            TestRailRunLinks.Copy(Model.TestRailRuns),
+            new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            })));
+
+        var failureDetailBlocks = [];
+        try {
+            var failureSource = document.getElementById('failureDetailsSource');
+            if (failureSource && failureSource.textContent)
+                failureDetailBlocks = JSON.parse(failureSource.textContent) || [];
+        } catch (e) {
+            failureDetailBlocks = [];
+        }
+
+        function splitFailureBlock(block) {
+            var marker = '\nTechnical details:\n';
+            var index = block.indexOf(marker);
+            if (index < 0)
+                return { before: block, technical: null, search: '' };
+            var before = block.slice(0, index);
+            var rest = block.slice(index + marker.length);
+            var searchMarker = '\nSearch: ';
+            var searchIndex = rest.lastIndexOf(searchMarker);
+            if (searchIndex < 0)
+                return { before: before, technical: rest, search: '' };
+            return {
+                before: before,
+                technical: rest.slice(0, searchIndex),
+                search: rest.slice(searchIndex + 1)
+            };
+        }
+
+        function renderFailureHost(items) {
+            var host = document.getElementById('failureDetailsHost');
+            if (!host) return;
+            host.replaceChildren();
+            items.forEach(function (block) {
+                var parts = splitFailureBlock(block);
+                var record = document.createElement('div');
+                record.className = 'failure-record mb-3';
+                var before = document.createElement('pre');
+                before.className = 'mb-2 small';
+                before.style.whiteSpace = 'pre-wrap';
+                before.textContent = parts.before;
+                record.appendChild(before);
+                if (parts.technical != null) {
+                    var details = document.createElement('details');
+                    details.className = 'mb-2';
+                    var summary = document.createElement('summary');
+                    summary.className = 'small';
+                    summary.textContent = 'Technical details';
+                    var technical = document.createElement('pre');
+                    technical.className = 'mb-0 small mt-2';
+                    technical.style.whiteSpace = 'pre-wrap';
+                    technical.textContent = parts.technical;
+                    details.appendChild(summary);
+                    details.appendChild(technical);
+                    record.appendChild(details);
+                }
+                if (parts.search) {
+                    var search = document.createElement('pre');
+                    search.className = 'mb-0 small';
+                    search.style.whiteSpace = 'pre-wrap';
+                    search.textContent = parts.search;
+                    record.appendChild(search);
+                }
+                host.appendChild(record);
+            });
+        }
+
+        function renderFailureDetails(run) {
+            if (!run || !Object.prototype.hasOwnProperty.call(run, 'failureDetails')) return;
+            const card = document.getElementById('failureDetailsCard');
+            if (!card) return;
+            const items = Array.isArray(run.failureDetails) ? run.failureDetails.filter(function (item) { return item; }) : [];
+            failureDetailBlocks = items;
+            if (items.length === 0) {
+                card.style.display = 'none';
+                renderFailureHost([]);
+                return;
+            }
+            renderFailureHost(items);
+            card.style.display = '';
+        }
+
+        function copyFailureText(value) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(value).catch(function () { copyFailureTextFallback(value); });
+                return;
+            }
+            copyFailureTextFallback(value);
+        }
+
+        function copyFailureTextFallback(value) {
+            var area = document.createElement('textarea');
+            area.value = value;
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            area.remove();
+        }
+
+        var copyFailuresBtn = document.getElementById('btnCopyFailures');
+        if (copyFailuresBtn) {
+            copyFailuresBtn.addEventListener('click', function () {
+                copyFailureText(failureDetailBlocks.join('\n\n'));
+            });
+        }
+
         function applyRunStatus(run) {
             if (!run) return;
             currentRunStatus = run.status || currentRunStatus;
@@ -1716,9 +1939,17 @@
             document.getElementById('status').textContent = displayStatus(run.status);
             showValidationHold();
             document.getElementById('error').textContent = run.error || '-';
+            const errorRowLive = document.getElementById('errorRow');
+            if (errorRowLive) {
+                const errorText = run.error || '';
+                errorRowLive.style.display = errorText && errorText !== '-' ? '' : 'none';
+            }
+            renderFailureDetails(run);
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
             document.getElementById('pipelineDuration').textContent = run.duration || '-';
+            if (Object.prototype.hasOwnProperty.call(run, 'testRailRuns') || Object.prototype.hasOwnProperty.call(run, 'TestRailRuns'))
+                renderTestRailRuns(run.testRailRuns != null ? run.testRailRuns : run.TestRailRuns);
             currentFinishedAt = run.finishedAt || currentFinishedAt;
 
             if (isRunComplete(currentRunStatus) && !runCompletedAtMs) {

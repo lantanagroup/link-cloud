@@ -3,6 +3,9 @@ package com.lantanagroup.link.validation.controllers;
 import com.lantanagroup.link.validation.models.ReportCategoryCountsModel;
 import com.lantanagroup.link.validation.services.CategoryCountService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.http.ProblemDetail;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,7 +35,12 @@ public class CategoryCountController {
                     + "Categories are ordered by issue count, highest first.")
     @ApiResponse(responseCode = "200", description = "The report's counts; the list is empty when no category matches")
     @ApiResponse(responseCode = "404", description = "The report has no stored counts, for example because it was "
-            + "validated before counts were stored")
+            + "validated before counts were stored",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid submit filter",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "500", description = "Unexpected failure returned as Problem Details",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
     @GetMapping("/{facilityId}/reports/{reportId}/category-counts")
     public ReportCategoryCountsModel getReportCategoryCounts(
             @PathVariable String facilityId,

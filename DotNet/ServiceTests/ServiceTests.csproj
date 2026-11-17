@@ -72,6 +72,7 @@
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\Automation\Automation.csproj" />
     <ProjectReference Include="..\Automation.UI\Automation.UI.csproj" />
+    <ProjectReference Include="..\..\nhsn\NHSN-App-BFF\NHSN-App-BFF.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -155,6 +156,35 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\Admin.BFF\appsettings.Development.json" Link="Resources\Admin.BFF\appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- The Kafka message fixtures checked by the tests in UnitTests/Shared/Contracts. -->
+  <ItemGroup>
+    <None Update="Resources\Contracts\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- The shipped appsettings files that set keys to null, checked by ConfigurationNullBindingTests. -->
+  <ItemGroup>
+    <None Include="..\Submission\appsettings.json" Link="Resources\Submission\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\MockFhirServer\appsettings.json" Link="Resources\MockFhirServer\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\MockFhirServer\appsettings.Docker.json" Link="Resources\MockFhirServer\appsettings.Docker.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\Automation.UI\appsettings.json" Link="Resources\Automation.UI\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\Automation.UI\appsettings.Docker.json" Link="Resources\Automation.UI\appsettings.Docker.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\nhsn\NHSN-App-BFF\appsettings.json" Link="Resources\NHSN-App-BFF\appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

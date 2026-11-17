@@ -97,6 +97,42 @@ namespace UnitTests.Shared.Auditing
         public DateTime? EffectiveFrom { get; set; }
     }
 
+    /// <summary>
+    /// A schedule owned by a facility and stored as one JSON column, the way Tenant maps
+    /// <c>Facility.ScheduledReports</c>.
+    /// </summary>
+    internal sealed class TestScheduledReports
+    {
+        public string[] Daily { get; set; } = [];
+
+        public string[] Weekly { get; set; } = [];
+    }
+
+    /// <summary>
+    /// One of a collection of owned rows stored as a single JSON column, the way Notification maps
+    /// <c>NotificationConfig.Channels</c>.
+    /// </summary>
+    internal sealed class TestChannel
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public bool Enabled { get; set; }
+    }
+
+    /// <summary>
+    /// A facility with an owned schedule and an owned collection, the two shapes Tenant and
+    /// Notification actually have. An owned entry's primary key is the owner's, so one save can show
+    /// whether a reader can tell the owner's change apart from its owned types'.
+    /// </summary>
+    internal class TestFacility : BaseEntityExtended
+    {
+        public string FacilityName { get; set; } = string.Empty;
+
+        public TestScheduledReports ScheduledReports { get; set; } = new();
+
+        public List<TestChannel> Channels { get; set; } = [];
+    }
+
     internal sealed class AuditTestDbContext(DbContextOptions<AuditTestDbContext> options) : DbContext(options)
     {
         public DbSet<TestVendor> Vendors => Set<TestVendor>();
@@ -109,8 +145,16 @@ namespace UnitTests.Shared.Auditing
 
         public DbSet<TestFhirQuery> FhirQueries => Set<TestFhirQuery>();
 
+        public DbSet<TestFacility> Facilities => Set<TestFacility>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<TestFacility>()
+                .OwnsOne(facility => facility.ScheduledReports, navBuilder => navBuilder.ToJson());
+
+            modelBuilder.Entity<TestFacility>()
+                .OwnsMany(facility => facility.Channels, navBuilder => navBuilder.ToJson());
+
             modelBuilder.Entity<TestDispatchConfiguration>()
                 .Property(configuration => configuration.Schedules)
                 .HasConversion(

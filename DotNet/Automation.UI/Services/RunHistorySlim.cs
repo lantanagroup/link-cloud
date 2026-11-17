@@ -147,7 +147,7 @@ public static class RunHistorySlim
     private static bool IsFailureStatus(string status)
         => status.Contains("fail", StringComparison.OrdinalIgnoreCase)
             || status.Contains("error", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("MaxRetriesReached", StringComparison.OrdinalIgnoreCase);
+            || AcquisitionTerminalFailures.IsTerminalFailure(status);
 
     private static AcquisitionLogFailure FailureSample(PipelineDataReader.AcquisitionLogInfo log, string status)
     {

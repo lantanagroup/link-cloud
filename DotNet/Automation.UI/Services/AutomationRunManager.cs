@@ -2,6 +2,7 @@
 using System.Text.Json.Nodes;
 using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Automation.Diagnostics;
 using Automation.UI.Services.TestRail;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -34,6 +35,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IMeasureTemplateStore _measureTemplateStore;
     private readonly IFacilityTemplateStore _facilityTemplateStore;
     private readonly ITestRailPublisher _testRailPublisher;
+    private readonly TestRailRunLinkRecorder _testRailRunLinks;
     private readonly bool _numericOnlyFacilityId;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
     private readonly SemaphoreSlim _organizationIdGate = new(1, 1);
@@ -91,6 +93,7 @@ public class AutomationRunManager : IAutomationRunManager
             configuration,
             _logger,
             liveInjector);
+        _testRailRunLinks = new TestRailRunLinkRecorder(_hub, _logger, _snapshotStore);
     }
 
     public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
@@ -158,14 +161,22 @@ public class AutomationRunManager : IAutomationRunManager
                 if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
                 {
                     _logger.LogInformation("Run {RunId} threw after cancellation: {Message}", state.RunId, ex.Message);
-                    return;
                 }
-
-                _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
-                state.Status = AutomationRunStatus.Failed;
-                state.Error = ex.Message;
-                state.FinishedAt = DateTimeOffset.UtcNow;
-                await BroadcastStatus(state);
+                else
+                {
+                    _logger.LogError(ex, "Unhandled exception in run {RunId}", state.RunId);
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = ex.Message;
+                    state.FinishedAt = DateTimeOffset.UtcNow;
+                    await BroadcastStatus(state);
+                }
+            }
+            finally
+            {
+                // Terminal status is broadcast before the executor writes its last lines
+                // ("Run completed successfully", failure text, quiesce). Publish after
+                // those writes so TestRail gets the same log the run page shows.
+                await TryPublishToTestRailAsync(state);
             }
         }, CancellationToken.None);
 
@@ -348,23 +359,42 @@ public class AutomationRunManager : IAutomationRunManager
             _logger.LogWarning(ex, "Could not load the scenario id for TestRail publish of run {RunId}.", runId);
         }
 
+        IReadOnlyList<TestRailRunReference> published = [];
         try
         {
-            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            var publishRequest = new ScenarioTestRailPublishRequest
             {
                 RunId = runId,
                 ScenarioId = scenarioId,
                 RunName = summary.RunName,
                 Status = summary.Status,
                 Error = summary.Error,
+                FailureDetails = summary.FailureDetails ?? [],
                 Logs = summary.Logs ?? [],
                 StartedAt = summary.StartedAt,
                 FinishedAt = summary.FinishedAt
-            }, cancellationToken);
+            };
+            published = await _testRailPublisher.PublishScenarioRunAsync(publishRequest, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "TestRail publish failed for zombie scenario run {RunId}.", runId);
+        }
+
+        var persistedLinks = TestRailRunLinks.Copy(summary.TestRailRuns);
+        if (TestRailRunLinks.AddDistinct(summary.TestRailRuns, published))
+        {
+            try
+            {
+                // The cancel request can end before this write finishes. Do not drop the link.
+                await _snapshotStore.UpsertRunSummaryAsync(
+                    summary, summary.FacilityId, summary.ReportId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                summary.TestRailRuns = persistedLinks;
+                _logger.LogError(ex, "Failed to persist the TestRail run link for zombie scenario run {RunId}.", runId);
+            }
         }
 
         QueueCancellationCleanup(
@@ -773,6 +803,10 @@ public class AutomationRunManager : IAutomationRunManager
         }
         catch (Exception ex)
         {
+            var operationFailures = OperationFailedException.Collect(ex);
+            if (operationFailures.Count > 0)
+                throw new LiveInjectionException(operationFailures[0].OneLineSummary, StatusCodes.Status500InternalServerError);
+
             logFault(ex);
             throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
         }
@@ -794,17 +828,142 @@ public class AutomationRunManager : IAutomationRunManager
         {
             state.Logs.Add(line);
             if (state.Logs.Count > 4000)
+            {
                 state.Logs.RemoveRange(0, 500);
+                state.LogTrimmed = true;
+            }
+
+            BeginLogAppend(state);
+            // The store assigns a sequence number only after its Mongo calls. Overlapping
+            // appends can take those numbers out of write order, and publish sorts by them.
+            var prior = state.LogPersistChain ?? Task.CompletedTask;
+            state.LogPersistChain = prior.ContinueWith(
+                _ => PersistLogLineAsync(state, line),
+                CancellationToken.None,
+                TaskContinuationOptions.RunContinuationsAsynchronously,
+                TaskScheduler.Default).Unwrap();
         }
 
         _ = _hub.Clients.Group(state.RunId.ToString()).SendAsync("log", line);
+    }
 
-        // Persist to store (fire-and-forget, best effort)
-        _ = Task.Run(async () =>
+    private static void BeginLogAppend(MutableRunState state)
+    {
+        if (state.PendingLogAppends == 0)
+            state.LogAppendIdle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        state.PendingLogAppends++;
+    }
+
+    private void FinishLogAppend(MutableRunState state)
+    {
+        TaskCompletionSource? completed = null;
+        lock (state.Sync)
         {
-            try { await _snapshotStore.AppendLogsAsync(state.RunId, [line]); }
-            catch { /* log persistence is best-effort */ }
-        });
+            state.PendingLogAppends--;
+            if (state.PendingLogAppends == 0)
+            {
+                completed = state.LogAppendIdle;
+                state.LogAppendIdle = null;
+            }
+        }
+
+        completed?.TrySetResult();
+    }
+
+    private async Task PersistLogLineAsync(MutableRunState state, string line)
+    {
+        try
+        {
+            await _snapshotStore.AppendLogsAsync(state.RunId, [line]);
+        }
+        catch
+        {
+            // log persistence is best-effort
+            lock (state.Sync)
+                state.FailedLogAppends++;
+        }
+        finally
+        {
+            FinishLogAppend(state);
+        }
+    }
+
+    private static Task WaitForLogAppendsAsync(MutableRunState state)
+    {
+        lock (state.Sync)
+        {
+            if (state.PendingLogAppends == 0)
+                return Task.CompletedTask;
+            return state.LogAppendIdle?.Task ?? Task.CompletedTask;
+        }
+    }
+
+    private static readonly TimeSpan LogPublishWait = TimeSpan.FromSeconds(15);
+
+    private Task<(IReadOnlyList<string> Lines, bool MayBeIncomplete)> ReadLogsForPublishAsync(MutableRunState state)
+        => ReadLogsForPublishAsync(state, _snapshotStore, _logger);
+
+    /// <summary>
+    /// The Run Details page shows the persisted log once the run is no longer in memory,
+    /// and the open page has every line as it was written. The in-memory list drops the
+    /// oldest lines once it passes 4,000, so publish reads the store after those appends finish.
+    /// A stuck store must not block the result post, so the wait is bounded. When the in-memory
+    /// log is still complete, a timed-out or failed append uses that list: the store is missing
+    /// those lines. Once the in-memory list has been trimmed, the store is the only copy of the
+    /// earlier lines. The store read uses the same budget on its own token. A cancelled run has
+    /// already cancelled <see cref="MutableRunState.RunCancellation"/>, and linking that token
+    /// would skip the store and publish the trimmed list. When the list has been trimmed and an
+    /// append failed, neither copy has every line, and the publish request says so.
+    /// </summary>
+    internal static async Task<(IReadOnlyList<string> Lines, bool MayBeIncomplete)> ReadLogsForPublishAsync(
+        MutableRunState state,
+        ISnapshotStore snapshotStore,
+        ILogger logger)
+    {
+        var appendsSettled = true;
+        try
+        {
+            await WaitForLogAppendsAsync(state).WaitAsync(LogPublishWait);
+        }
+        catch (Exception ex)
+        {
+            appendsSettled = false;
+            logger.LogWarning(ex,
+                "Persisted logs for run {RunId} were still writing when TestRail publish started. Using the in-memory log.",
+                state.RunId);
+        }
+
+        bool trimmed;
+        int failedAppends;
+        lock (state.Sync)
+        {
+            trimmed = state.LogTrimmed;
+            failedAppends = state.FailedLogAppends;
+        }
+
+        // Untrimmed memory still has every line. Prefer it when the store is short.
+        // Trimmed memory plus a failed append means neither copy is complete.
+        var mayBeIncomplete = trimmed && failedAppends > 0;
+        var memoryIsComplete = !trimmed && (!appendsSettled || failedAppends > 0);
+        if (!memoryIsComplete)
+        {
+            try
+            {
+                using var readTimeout = new CancellationTokenSource(LogPublishWait);
+                var persisted = await snapshotStore.GetLogsAsync(state.RunId, readTimeout.Token);
+                if (persisted.Count > 0)
+                    return (persisted, mayBeIncomplete);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Could not read persisted logs for TestRail publish of run {RunId}. Using the in-memory log.",
+                    state.RunId);
+            }
+        }
+
+        lock (state.Sync)
+            return (state.Logs.ToList(), mayBeIncomplete);
     }
 
     private async Task BroadcastStatus(MutableRunState state)
@@ -812,7 +971,6 @@ public class AutomationRunManager : IAutomationRunManager
         await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", ToSummary(state));
         await PersistRunSummaryAsync(state);
-        await TryPublishToTestRailAsync(state);
     }
 
     private async Task TryPublishToTestRailAsync(MutableRunState state)
@@ -824,26 +982,50 @@ public class AutomationRunManager : IAutomationRunManager
 
         try
         {
-            List<string> logs;
+            var (logs, logsMayBeIncomplete) = await ReadLogsForPublishAsync(state);
+            List<string> failureDetails;
             lock (state.Sync)
-                logs = state.Logs.ToList();
+                failureDetails = state.FailureDetails.ToList();
 
-            await _testRailPublisher.PublishScenarioRunAsync(new ScenarioTestRailPublishRequest
+            var publishRequest = new ScenarioTestRailPublishRequest
             {
                 RunId = state.RunId,
                 ScenarioId = state.ScenarioId,
                 RunName = state.RunNameOverride ?? state.Scenario.ToString(),
                 Status = state.Status,
                 Error = state.Error,
+                FailureDetails = failureDetails,
                 Logs = logs,
+                LogsMayBeIncomplete = logsMayBeIncomplete,
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt
-            });
+            };
+            var published = await _testRailPublisher.PublishScenarioRunAsync(publishRequest);
+            await RecordTestRailRunsAsync(state.RunId, published);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "TestRail publish failed for scenario run {RunId}.", state.RunId);
         }
+    }
+
+    /// <summary>
+    /// Stores TestRail runs that accepted this automation run's results.
+    /// The same run id is kept once. A missing automation run is left unchanged.
+    /// </summary>
+    internal Task RecordTestRailRunsAsync(
+        Guid runId,
+        IReadOnlyList<TestRailRunReference> runs,
+        CancellationToken cancellationToken = default)
+    {
+        _runs.TryGetValue(runId, out var state);
+        return _testRailRunLinks.RecordAsync(
+            runId,
+            runs,
+            state,
+            TryPersistRunSummaryAsync,
+            ToSummary,
+            cancellationToken);
     }
 
     private async Task PersistOwnershipAsync(MutableRunState state)
@@ -878,11 +1060,15 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    private async Task PersistRunSummaryAsync(MutableRunState state)
+    private Task PersistRunSummaryAsync(MutableRunState state) =>
+        TryPersistRunSummaryAsync(state);
+
+    private async Task<bool> TryPersistRunSummaryAsync(MutableRunState state)
     {
         try
         {
             await WriteRunSummaryAsync(state, CancellationToken.None);
+            return true;
         }
         catch (Exception ex)
         {
@@ -895,6 +1081,7 @@ public class AutomationRunManager : IAutomationRunManager
                 "on the dashboard KPIs (via the in-memory merge) but will NOT appear " +
                 "in the Recent Runs table until a successful upsert lands.",
                 state.RunId);
+            return false;
         }
     }
 
@@ -979,6 +1166,7 @@ public class AutomationRunManager : IAutomationRunManager
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
+                FailureDetails = state.FailureDetails.ToList(),
                 FacilityId = state.FacilityId,
                 AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,
@@ -986,6 +1174,7 @@ public class AutomationRunManager : IAutomationRunManager
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
                 GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
                 GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
+                TestRailRuns = TestRailRunLinks.Copy(state.TestRailRuns),
                 Logs = state.Logs.ToList()
             };
         }

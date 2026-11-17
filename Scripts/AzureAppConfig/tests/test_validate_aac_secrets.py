@@ -79,7 +79,7 @@ class NonProductionFixtureSecretTests(unittest.TestCase):
         findings = validator.check_item(
             "config.json", 0, item(
                 self.CLIENT_SECRET,
-                "mongodb://admin:hunter2@cluster.example.net:27017/link"))
+                "mongodb://admin:hunter2@cluster.example.net:27017/link"))  # trufflehog:ignore
 
         self.assertEqual(1, len(findings))
         self.assertEqual("ERROR", findings[0].severity)

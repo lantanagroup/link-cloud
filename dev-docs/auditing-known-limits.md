@@ -137,8 +137,10 @@ need a producer of their own, publishing the same `AuditEventMessage` to `Audita
 Nothing on the topic enforces this mechanism's rules, so that producer must follow them itself, or the
 Audit service stores Java events that read differently from the .NET ones:
 
-- `Action` in the format the ADR's open wire-format question settles. Today that is a number; a Java
-  serializer's default, the name, is dead-lettered.
+- `Action` by its name, `"SoftDelete"` rather than `6`, which is what a Java serializer writes by
+  default. LEGLINK-1630 put `JsonStringEnumConverter` on `AuditEventType`, so that is what the .NET
+  producer writes too; the number is still read, so a producer that sends one is not dead-lettered,
+  but it depends on the enum's declaration order and nothing enforces that across repositories.
 - Secrets and personal data masked as `[redacted]` on both sides.
 - `ResourceId` the id of the row acted on, never the facility.
 - Property changes on Updates only.

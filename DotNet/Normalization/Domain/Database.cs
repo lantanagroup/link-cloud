@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LantanaGroup.Link.Normalization.Domain
@@ -16,6 +17,7 @@ namespace LantanaGroup.Link.Normalization.Domain
 
         bool HasActiveTransaction { get; }
         void ClearChanges();
+        void Detach(object entity);
         Task<IDbContextTransaction> BeginTransactionAsync();
         Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
         Task RollbackTransactionAsync();
@@ -52,6 +54,15 @@ namespace LantanaGroup.Link.Normalization.Domain
         public void ClearChanges()
         {
             _dbContext.ChangeTracker.Clear();
+        }
+
+        public void Detach(object entity)
+        {
+            var entry = _dbContext.Entry(entity);
+            if (entry.State != EntityState.Detached)
+            {
+                entry.State = EntityState.Detached;
+            }
         }
 
         public Task<IDbContextTransaction> BeginTransactionAsync()

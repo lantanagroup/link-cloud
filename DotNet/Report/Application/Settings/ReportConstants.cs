@@ -42,6 +42,12 @@
             public const string Group = "MeasureReportSubmissionGroup";
         }
 
+        public static class RetentionScheduler
+        {
+            public const string JobName = "RetentionCheck";
+            public const string Group = "Retention";
+        }
+
         public static class MeasureReportLoggingIds
         {
             public const int HealthCheck = 10010;

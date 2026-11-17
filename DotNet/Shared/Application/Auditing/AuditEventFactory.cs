@@ -104,9 +104,14 @@ namespace LantanaGroup.Link.Shared.Application.Auditing
         /// </summary>
         /// <remarks>
         /// No placeholder is invented: a null User says truthfully that the caller is unknown, where
-        /// "SystemAccount" would claim something the token does not support. A token from
-        /// CreateSystemToken does carry an email - the configured Link admin address - so those
-        /// calls record it until LEGLINK-1359 decides whether un-attributed calls should omit it.
+        /// "SystemAccount" would claim something the token does not support.
+        /// <para>
+        /// LEGLINK-1359 settled what a token from CreateSystemToken carries. A host that fronts real
+        /// users registers an IActorEmailProvider, so a call made on someone's behalf names them here;
+        /// if that host cannot attribute the call it sends no email claim and this returns null. Every
+        /// other host registers no provider and still sends the configured Link admin address, so a
+        /// genuinely system-originated call records that address rather than nothing.
+        /// </para>
         /// </remarks>
         private static string? ResolveActor(ClaimsPrincipal? principal)
         {

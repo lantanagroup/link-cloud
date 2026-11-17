@@ -180,7 +180,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entity.Frequency = model.Frequency;
             entity.PayloadRootUri = model.PayloadRootUri;
             entity.Status = model.Status;
-            entity.IsDeleted = model.IsDeleted;
+            // Only delete/restore operations change deletion state; this model may be stale.
             StampCompletedDate(entity, now);
 
             var existingTypes = entity.ReportTypes.ToList();
@@ -198,9 +198,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 entity.ReportTypes.Remove(orphan);
             }
 
-            _context.Update(entity);
+            // The query tracks changes, so concurrent deletion fields are not written back.
             await _context.SaveChangesAsync(cancellationToken);
-            return model;
+            return await SingleAsync(r => r.Id == model.Id, cancellationToken);
         }
 
         public async Task<ReportScheduleModel> AddAsync(ReportScheduleModel model, CancellationToken cancellationToken)
@@ -412,19 +412,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 r.SoftDeletedDate = deleted ? now : null;
             }
 
+            // The reports are tracked, so SaveChanges writes only the columns set above. Update would write every
+            // column and could put back a retention status a cleanup set after they were loaded.
             if (scheduledToUpdate.Count > 0)
             {
-                _context.ReportSchedule.UpdateRange(scheduledToUpdate);
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            // Batching for Submitted reports
+            // Batching for reports
             List<ReportSchedule> batch;
             do
             {
                 batch = await _context.ReportSchedule
                     .Where(r => r.FacilityId == facilityId &&
-                                ScheduleStatusExtensions.TerminalStatuses.Contains(r.Status) &&
+                                (ScheduleStatusExtensions.TerminalStatuses.Contains(r.Status) ||
+                                 (deleted && (r.Status == ScheduleStatus.New || r.Status == ScheduleStatus.EndOfPeriod))) &&
                                 (deleted
                                     ? !r.IsDeleted.HasValue || r.IsDeleted == false
                                     : r.IsDeleted == true))
@@ -435,16 +437,25 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
                 foreach (var r in batch)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (deleted)
+                    {
+                        // A tracked report may have completed since it was loaded.
+                        await _context.Entry(r).ReloadAsync(cancellationToken);
+                    }
+
                     r.IsDeleted = deleted;
                     r.ModifyDate = now.UtcDateTime;
-                    // A finished report ages from CompletedDate, so deleting it records no date, and restoring clears any.
-                    if (!deleted)
+                    if (deleted)
+                    {
+                        StampSoftDeletedDate(r, now);
+                    }
+                    else
                     {
                         r.SoftDeletedDate = null;
                     }
                 }
 
-                _context.ReportSchedule.UpdateRange(batch);
                 await _context.SaveChangesAsync(cancellationToken);
             }
             while (batch.Count == BatchSize);
@@ -476,10 +487,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             var now = DateTimeOffset.UtcNow;
 
+            // Tracked: SaveChanges writes only these columns, so a concurrent retention claim is kept.
             entity.IsDeleted = true;
             entity.ModifyDate = now.UtcDateTime;
             StampSoftDeletedDate(entity, now);
-            _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);
         }
 
@@ -525,10 +536,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
             }
 
+            // Tracked: SaveChanges writes only these columns, so a concurrent retention claim is kept.
             entity.IsDeleted = false;
             entity.ModifyDate = DateTime.UtcNow;
             entity.SoftDeletedDate = null;
-            _context.ReportSchedule.Update(entity);
             await _context.SaveChangesAsync(cancellationToken);
         }
 

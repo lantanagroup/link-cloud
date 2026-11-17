@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpParams } from "@angular/common/http"
 import { Injectable } from "@angular/core";
 import { catchError, map, Observable } from "rxjs";
 import { AppConfigService } from "src/app/services/app-config.service";
-import { IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IValidationIssue, IValidationIssueCategorySummary, IValidationIssuesSummary, IReportListSummary } from "./report-view.interface";
+import { ICategoryIssuePage, IReportCategoryCounts, IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 import { IApiResponse } from "src/app/interfaces/api-response.interface";
 import {IPagedReportSchedule} from "../../../interfaces/report/report-schedule.interface";
@@ -13,6 +13,11 @@ import {IPagedReportSchedule} from "../../../interfaces/report/report-schedule.i
 })
 export class FacilityViewService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
+
+  downloadValidationResults(facilityId: string, reportId: string): void {
+    // Let the browser stream the attachment directly to disk instead of buffering a multi-GB blob.
+    window.location.href = `${this.appConfigService.config?.baseApiUrl}/validation/facilities/${encodeURIComponent(facilityId)}/reports/${encodeURIComponent(reportId)}/results.csv`;
+  }
 
   downloadReport(facilityId: string, reportId: string) {
     window.location.href = `${this.appConfigService.config?.baseApiUrl}/Submission/${facilityId}/${reportId}`;
@@ -38,8 +43,9 @@ export class FacilityViewService {
       );
   }
 
-  getReportSummary(facilityId: string, reportId: string): Observable<IReportListSummary> {
-    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/schedules/${reportId}`)
+  getReportSummary(facilityId: string, reportId: string, includeDeleted = false): Observable<IReportListSummary> {
+    return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/schedules/${encodeURIComponent(reportId)}`,
+      {params: {includeDeleted}})
       .pipe(
         map((response: IReportListSummary) => {
           return response;
@@ -169,29 +175,17 @@ export class FacilityViewService {
       );
   }
 
-  getReportIssues(facilityId: string, reportId: string): Observable<IValidationIssue[]> {
-    return this.http.get<IValidationIssue[]>(`${this.appConfigService.config?.baseApiUrl}/validation/result/${facilityId}/${reportId}`)
-      .pipe(
-        map((response: IValidationIssue[]) => {
-          return response;
-        }),
-        catchError((error: HttpErrorResponse) => {
-          this.errorHandler.handleError(error);
-          return [];
-        })
-      );
+  getCategoryIssuesPage(facilityId: string, reportId: string, categoryId: string,
+                       pageNumber: number, pageSize: number): Observable<ICategoryIssuePage> {
+    return this.http.get<ICategoryIssuePage>(
+      `${this.appConfigService.config?.baseApiUrl}/validation/facilities/${encodeURIComponent(facilityId)}/reports/${encodeURIComponent(reportId)}/categories/${encodeURIComponent(categoryId)}/issues`,
+      {params: {pageNumber, pageSize}}
+    );
   }
 
-  getReportIssuesSummary(issues: IValidationIssue[]): Observable<IValidationIssueCategorySummary[]> {
-    return this.http.post<IValidationIssueCategorySummary[]>(`${this.appConfigService.config?.baseApiUrl}/validation/$categorize?summarize=true`, issues)
-      .pipe(
-        map((response: IValidationIssueCategorySummary[]) => {
-          return response;
-        }),
-        catchError((error: HttpErrorResponse) => {
-          this.errorHandler.handleError(error);
-          return [];
-        })
-      )
+  getReportCategoryCounts(reportId: string): Observable<IReportCategoryCounts> {
+    return this.http.get<IReportCategoryCounts>(
+      `${this.appConfigService.config?.baseApiUrl}/aggregate/reports/${encodeURIComponent(reportId)}/validation-category-counts`
+    );
   }
 }

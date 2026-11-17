@@ -176,7 +176,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Delete(string id)
+        public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -190,7 +190,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     return BadRequest();
                 }
                 
-                var existingVendorVersion = await _vendorQueries.GetVendorVersion(parsedId);
+                var existingVendorVersion = await _vendorQueries.GetVendorVersion(parsedId, cancellationToken);
                 if (existingVendorVersion == null)
                 {
                     return BadRequest();
@@ -204,7 +204,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     audit.Set("Version", existingVendorVersion.Version);
                 }
 
-                await _vendorManager.DeleteVendorVersionAsync(parsedId);
+                await _vendorManager.DeleteVendorVersionAsync(parsedId, cancellationToken);
 
                 return NoContent();
             }
