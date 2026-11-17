@@ -18,6 +18,11 @@ public class AutomationRunSummary
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public string? Error { get; set; }
+    /// <summary>Short note of what this run kept or removed. Empty when both cleanup settings are off.</summary>
+    public string? RetentionNotice { get; set; }
+    /// <summary>Who started the run (Admin.BFF user email or id). Sent as the audit initiator on background service calls.</summary>
+    public string? InitiatedById { get; set; }
+    public string? InitiatedByName { get; set; }
     /// <summary>Formatted operation-failure blocks, capped when recorded. Empty when the run had none.</summary>
     public IReadOnlyList<string> FailureDetails { get; set; } = [];
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
@@ -36,6 +41,11 @@ public class AutomationRunSummary
     public string? GeneratedTemplateSetHash { get; set; }
     /// <summary>TestRail runs that accepted this automation run's results. Empty when nothing was published.</summary>
     public List<TestRailRunReference> TestRailRuns { get; set; } = [];
+    /// <summary>
+    /// Named FHIR endpoint this run used. Empty on rows written before named EHR systems.
+    /// This is not a vendor.
+    /// </summary>
+    public string? EhrSystem { get; set; }
     public IReadOnlyList<string> Logs { get; set; } = [];
 }
 

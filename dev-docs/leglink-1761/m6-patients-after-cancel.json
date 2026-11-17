@@ -1,0 +1,45 @@
+{
+  "at": "2026-11-12T20:01:00-06:00",
+  "label": "after-cancel",
+  "launchId": "bb061283-f873-44e0-a604-cc4db316743d",
+  "note": "Cancel does not expunge. Each server gained the patient its own run created. qa-seed remained on both.",
+  "servers": [
+    {
+      "name": "local",
+      "base": "http://localhost:6157/fhir",
+      "seed": 200,
+      "total": 14,
+      "added": ["Patient-56734ad9-001"],
+      "ids": [
+        "Patient-0ba4e70f-001",
+        "Patient-4405b478-001",
+        "Patient-476119dc-001",
+        "Patient-4d840e45-001",
+        "Patient-55047578-001",
+        "Patient-56734ad9-001",
+        "Patient-5ddb259c-001",
+        "Patient-886ea2ed-001",
+        "Patient-88bc914d-001",
+        "Patient-ba78fb66-001",
+        "Patient-c372b4a2-001",
+        "Patient-d952f578-001",
+        "Patient-e7755558-001",
+        "qa-seed"
+      ]
+    },
+    {
+      "name": "sandbox",
+      "base": "http://localhost:6257/fhir",
+      "seed": 200,
+      "total": 5,
+      "added": ["Patient-4d3b2c34-001"],
+      "ids": [
+        "Patient-48dcc2af-001",
+        "Patient-4d3b2c34-001",
+        "Patient-57e31d09-001",
+        "Patient-d2a60bfa-001",
+        "qa-seed"
+      ]
+    }
+  ]
+}

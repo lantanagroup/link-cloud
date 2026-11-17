@@ -24,6 +24,39 @@ public static class AuthHelper
 
     public static string GetBearerToken(OAuthConfig config)
     {
+        RequirePasswordGrant(config);
+
+        var client = new RestClient(config.TokenEndpoint!);
+        var response = client.Execute(TokenRequest(config));
+        return ReadAccessToken(response);
+    }
+
+    /// <summary>
+    /// Same password grant as <see cref="GetBearerToken(OAuthConfig)"/>, bounded by
+    /// <paramref name="timeout"/> and <paramref name="cancellationToken"/>.
+    /// RestSharp's synchronous execute uses a 100 second timeout and no caller token.
+    /// </summary>
+    public static async Task<string> GetBearerTokenAsync(
+        OAuthConfig config,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        if (timeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+
+        RequirePasswordGrant(config);
+
+        using var client = new RestClient(config.TokenEndpoint!);
+        var request = TokenRequest(config);
+        request.Timeout = timeout;
+
+        var response = await client.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ReadAccessToken(response);
+    }
+
+    private static void RequirePasswordGrant(OAuthConfig config)
+    {
         if (string.IsNullOrEmpty(config.TokenEndpoint))
             throw new InvalidOperationException("OAuth token endpoint is not configured");
 
@@ -35,10 +68,11 @@ public static class AuthHelper
 
         if (string.IsNullOrEmpty(config.Password))
             throw new InvalidOperationException("OAuth password is not configured");
+    }
 
-        var client = new RestClient(config.TokenEndpoint);
+    private static RestRequest TokenRequest(OAuthConfig config)
+    {
         var request = new RestRequest("", Method.Post);
-
         request.AddParameter("grant_type", "password");
         request.AddParameter("client_id", config.ClientId);
         if (!string.IsNullOrEmpty(config.ClientSecret))
@@ -46,9 +80,11 @@ public static class AuthHelper
         request.AddParameter("username", config.Username);
         request.AddParameter("password", config.Password);
         request.AddParameter("scope", config.Scope);
+        return request;
+    }
 
-        var response = client.Execute(request);
-
+    private static string ReadAccessToken(RestResponse response)
+    {
         if (!response.IsSuccessful)
             throw new InvalidOperationException($"Failed to obtain OAuth token: {response.ErrorMessage}");
 

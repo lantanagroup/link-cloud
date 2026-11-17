@@ -1,0 +1,19 @@
+[
+  "Account",
+  "Audit",
+  "Census",
+  "DataAcquisition",
+  "DataAcquisitionWorker",
+  "LinkAdminBFF",
+  "MockDmrpApi",
+  "Normalization",
+  "Notification",
+  "Operations",
+  "QueryDispatch",
+  "Report",
+  "Submission",
+  "Tenant",
+  "Terminology",
+  "ValidationService",
+  "measureeval"
+]

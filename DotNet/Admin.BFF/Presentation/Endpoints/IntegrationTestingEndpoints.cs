@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Filters;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
@@ -179,7 +179,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public async Task<IResult> CreatePatientAcquired(HttpContext context, PatientAcquired model)
         {
             var user = context.User;
-
             var correlationId = await _createPatientAcquired.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
             return Results.Ok(new EventProducerResponse
             {
@@ -191,7 +190,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public async Task<IResult> CreatePatientListAcquired(HttpContext context, PatientListAcquired model)
         {
             var user = context.User;
-
             var correlationId = await _createPatientListAcquired.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
             return Results.Ok(new EventProducerResponse
             {
@@ -200,11 +198,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             });
         }
 
-
         public async Task<IResult> CreatePatientEvent(HttpContext context, PatientEvent model)
         {
             var user = context.User;
-
             var correlationId = await _createPatientEvent.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
             return Results.Ok(new EventProducerResponse
             {
@@ -212,10 +208,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 Message = $"The patient event was created succcessfully with a correlation id of '{correlationId}'."
             });
         }
+
         public async Task<IResult> CreateReportScheduled(HttpContext context, ReportScheduled model)
         {
             var user = context.User;
-
             var correlationId = await _createReportScheduled.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
             return Results.Ok(new EventProducerResponse
             {
@@ -227,7 +223,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public async Task<IResult> CreateDataAcquisitionRequested(HttpContext context, DataAcquisitionRequested model)
         {
             var user = context.User;
-
             var correlationId = await _createDataAcquisitionRequested.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
             return Results.Ok(new EventProducerResponse
             {

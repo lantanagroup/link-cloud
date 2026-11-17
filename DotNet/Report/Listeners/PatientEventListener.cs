@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
 using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
@@ -66,11 +67,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
 
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.PatientEvent));
+                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.PatientEvent), "Report"));
 
                 _logger.LogInformation("{Name}: Started PatientEvent consumer for topic '{Topic}' at {StartTime}", Name, nameof(KafkaTopic.PatientEvent), DateTime.UtcNow);
 
@@ -82,8 +84,24 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            await ProcessMessageAsync(result, consumeCancellationToken);
-                            consumer.SafeCommit(result, _logger);
+                            var accounted = false;
+                            try
+                            {
+                                await ProcessMessageAsync(result, consumeCancellationToken);
+                                accounted = true;
+                            }
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
+                            finally
+                            {
+                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                    consumer.SafeCommit(result, _logger);
+                                }
+                            }
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
@@ -125,7 +143,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
 
             using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
-            string facilityId = result.Message.Key;
+            string facilityId = KafkaIdentity.Facility(result.Message.Value?.FacilityId, result.Message.Key) ?? string.Empty;
 
             try
             {
@@ -143,6 +161,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 if (string.IsNullOrWhiteSpace(facilityId) || value == null)
                 {
                     throw new DeadLetterException("Invalid Patient Event");
+                }
+
+                var patientId = KafkaIdentity.Patient(value.PatientId, result.Message.Key);
+                if (!string.IsNullOrWhiteSpace(patientId))
+                {
+                    value.PatientId = patientId;
                 }
 
                 if (await PipelineAbortSkip.ShouldSkipAsync(

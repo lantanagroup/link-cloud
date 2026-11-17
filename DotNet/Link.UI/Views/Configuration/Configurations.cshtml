@@ -1,0 +1,122 @@
+@model NotificationConfigPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var form = Model.Form;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    Dictionary<string, string> Route(int page, string? edit = null, int pageSize = 0)
+    {
+        var chosen = pageSize > 0 ? pageSize : size;
+        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = chosen.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
+        if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
+        if (!string.IsNullOrWhiteSpace(edit)) route["edit"] = edit;
+        return route;
+    }
+    Dictionary<string, string> PageRoute(int page, int pageSize) => Route(page, query.Edit, pageSize);
+}
+
+<div class="mb-3">
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Notifications")!, "Back to notifications"))" />
+</div>
+<partial name="_Nav" />
+<h1 class="h3">Notification configuration</h1>
+<partial name="_Alerts" />
+<p class="text-muted">Each facility has one email list. Add or change it on the facility, then save the facility. This page lists every facility.</p>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Open a facility</div>
+    <div class="card-body">
+        <form method="get" asp-controller="Tenants" asp-action="Facility" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="configFacility">Facility id</label>
+                <input id="configFacility" name="id" value="@form.FacilityId" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-link">Open</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The facility page shows + Add when that facility has no email list.</p>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="lu-search">
+            <input type="hidden" name="pageSize" value="@size" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="searchText">Text</label>
+                    <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-execute"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-warning" asp-action="Configurations">Clear</a>
+                </div>
+            </div>
+            <details class="lu-advanced mt-2" @(string.IsNullOrWhiteSpace(query.FacilityId) ? null : "open")>
+                <summary>Advanced</summary>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="facilityId">Facility</label>
+                        <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+                    </div>
+                </div>
+            </details>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header">Configurations</div>
+        <div class="card-body">
+            @if (Model.Configurations.Count == 0)
+            {
+                <p class="mb-0">No notification configurations found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Facility</th>
+                                <th scope="col">Email</th>
+                                <th scope="col">Enabled</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Configurations)
+                        {
+                            <tr>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", "Tenants", new { id = row.FacilityId }) })" /></td>
+                                <td class="text-break">@row.Emails</td>
+                                <td>@(row.EmailEnabled ? "Yes" : "No")</td>
+                                <td class="text-nowrap">
+                                    <div class="lu-row-actions">
+                                        <a class="btn btn-sm btn-au-link lu-icon-btn" asp-controller="Tenants" asp-action="Facility" asp-route-id="@row.FacilityId" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
+                                        <form method="post" data-au-save asp-action="DeleteConfiguration">
+                                            <input type="hidden" name="id" value="@row.Id" />
+                                            <button data-hold="@Hold.Of("Delete this notification configuration?", "Delete this notification configuration?", "This is removed.", "Hold to delete")" type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <partial name="_BottomPager" model="@(new BottomPager { Label = "Configuration pages", Page = bar.Page, Pages = bar.TotalPages < 1 ? 1 : bar.TotalPages, Total = bar.TotalCount, PageSize = size, Sizes = ConfigurationRules.NotificationPageSizes, Route = PageRoute })" />
+        </div>
+    </div>
+}

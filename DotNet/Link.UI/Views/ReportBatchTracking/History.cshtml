@@ -1,0 +1,69 @@
+@model ReportBatchHistoryPage
+
+@await Html.PartialAsync("~/Views/Automation/_Nav.cshtml")
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Recent batches</h1>
+        <p class="text-muted mb-0">The newest batches, grouped by EHR. Open one to see each report.</p>
+    </div>
+    <a class="btn btn-sm btn-au-link" asp-controller="ReportBatchSettings" asp-action="Index">Settings</a>
+</div>
+
+@if (!Model.Ready)
+{
+    <div class="alert alert-danger" role="alert">@Model.Message</div>
+}
+else if (Model.Groups.Count == 0)
+{
+    <div class="au-card card">
+        <div class="card-body text-muted mb-0">No batches yet.</div>
+    </div>
+}
+else
+{
+    @foreach (var group in Model.Groups)
+    {
+        <section class="au-card card mb-3" aria-label="@group.EhrSystem">
+            <div class="card-header">@group.EhrSystem</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table au-table mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Created</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Reports</th>
+                                <th scope="col">At once</th>
+                                <th scope="col">Batch</th>
+                                <th scope="col">Launch</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var batch in group.Batches)
+                            {
+                                <tr>
+                                    <td data-lu-time-compact>@(batch.CreatedAt ?? "—")</td>
+                                    <td data-nocopy><span class="badge @batch.PillClass">@batch.Status</span></td>
+                                    <td>@batch.ItemCount</td>
+                                    <td>@batch.MaxConcurrency</td>
+                                    <td><a href="@batch.Href">@batch.BatchId</a></td>
+                                    <td>
+                                        @if (batch.LaunchHref is not null && batch.LaunchId is Guid launchId)
+                                        {
+                                            <a href="@batch.LaunchHref">@launchId</a>
+                                        }
+                                        else
+                                        {
+                                            <span>—</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    }
+}

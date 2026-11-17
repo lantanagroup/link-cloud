@@ -25,7 +25,7 @@ public class BlobStorageConfig {
      * entirely on the consumer path — the bundle download and the pre-qual append both run inside
      * process() — where the Kafka retry-topic ladder owns real retrying. The SDK default of 4
      * exponential tries hid minutes of silent retrying inside every consumer attempt while blocking
-     * the single-threaded consumer executor.
+     * the listener thread.
      */
     private int maxTries = 2;
 

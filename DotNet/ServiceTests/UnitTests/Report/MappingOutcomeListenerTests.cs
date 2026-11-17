@@ -40,9 +40,9 @@ public class MappingOutcomeListenerTests
     private readonly Mock<ILogger<MappingOutcomeListener>> _logger = new();
     private readonly MappingOutcomeListener _listener;
 
-    private readonly Mock<IDeadLetterExceptionHandler<MappingOutcomeListener, ResourceKey, string>> _consumeHandler = new();
-    private readonly Mock<IDeadLetterExceptionHandler<MappingOutcomeListener, ResourceKey, MappingOutcomeEvaluatedValue>> _deadLetterHandler = new();
-    private readonly Mock<ITransientExceptionHandler<MappingOutcomeListener, ResourceKey, MappingOutcomeEvaluatedValue>> _transientHandler = new();
+    private readonly Mock<IDeadLetterExceptionHandler<MappingOutcomeListener, string, string>> _consumeHandler = new();
+    private readonly Mock<IDeadLetterExceptionHandler<MappingOutcomeListener, string, MappingOutcomeEvaluatedValue>> _deadLetterHandler = new();
+    private readonly Mock<ITransientExceptionHandler<MappingOutcomeListener, string, MappingOutcomeEvaluatedValue>> _transientHandler = new();
 
     public MappingOutcomeListenerTests()
     {
@@ -64,7 +64,7 @@ public class MappingOutcomeListenerTests
 
         _listener = new MappingOutcomeListener(
             _logger.Object,
-            Mock.Of<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>(),
+            Mock.Of<IKafkaConsumerFactory<string, MappingOutcomeEvaluatedValue>>(),
             new ServiceInformation { ServiceConfigName = "Report" },
             _consumeHandler.Object,
             _deadLetterHandler.Object,
@@ -416,7 +416,7 @@ public class MappingOutcomeListenerTests
     public async Task PatientIdPrefixIsStrippedBeforeStoring()
     {
         var message = AcquisitionMessage(Outcome(LocationOrgStatus.Found, 1, 1, 0));
-        message.Message.Key.PatientId = "Patient/patient-1";
+        message.Message.Value.PatientId = "Patient/patient-1";
 
         await ConsumeAsync(message);
 
@@ -434,8 +434,9 @@ public class MappingOutcomeListenerTests
     public async Task MessageMissingItsKey_DeadLetters(string facilityId, string patientId)
     {
         var message = AcquisitionMessage(Outcome(LocationOrgStatus.Found, 1, 1, 0));
-        message.Message.Key.FacilityId = facilityId;
-        message.Message.Key.PatientId = patientId;
+        message.Message.Value.FacilityId = string.IsNullOrEmpty(facilityId) ? null : facilityId;
+        message.Message.Value.PatientId = string.IsNullOrEmpty(patientId) ? null : patientId;
+        message.Message.Key = string.Empty;
 
         // Nothing downstream can place an outcome without both halves of the key.
         //
@@ -502,19 +503,23 @@ public class MappingOutcomeListenerTests
     private static CodeMapOutcome CodeMap(string targetSystem, MappingStatus status, int mapped, int unmapped) =>
         new(LocalSystem, targetSystem, status, mapped, unmapped, 0, []);
 
-    private static ConsumeResult<ResourceKey, MappingOutcomeEvaluatedValue> AcquisitionMessage(
+    private static ConsumeResult<string, MappingOutcomeEvaluatedValue> AcquisitionMessage(
         LocationOrgOutcome locationOrgOutcome) =>
         Message(new MappingOutcomeEvaluatedValue
         {
+            FacilityId = FacilityId,
+            PatientId = PatientId,
             Source = MappingOutcomeSource.Acquisition,
             ScheduledReports = [new ScheduledReport { ReportTrackingId = ScheduleId.ToString() }],
             LocationOrgOutcome = locationOrgOutcome
         });
 
-    private static ConsumeResult<ResourceKey, MappingOutcomeEvaluatedValue> NormalizationMessage(
+    private static ConsumeResult<string, MappingOutcomeEvaluatedValue> NormalizationMessage(
         params CodeMapOutcome[] codeMapOutcomes) =>
         Message(new MappingOutcomeEvaluatedValue
         {
+            FacilityId = FacilityId,
+            PatientId = PatientId,
             Source = MappingOutcomeSource.Normalization,
             ScheduledReports = [new ScheduledReport { ReportTrackingId = ScheduleId.ToString() }],
             CodeMapOutcomes = codeMapOutcomes.ToList(),
@@ -522,21 +527,21 @@ public class MappingOutcomeListenerTests
             QueryType = "Initial"
         });
 
-    private static ConsumeResult<ResourceKey, MappingOutcomeEvaluatedValue> Message(
+    private static ConsumeResult<string, MappingOutcomeEvaluatedValue> Message(
         MappingOutcomeEvaluatedValue value) =>
         new()
         {
             Topic = "MappingOutcomeEvaluated",
             Partition = new Partition(0),
             Offset = new Offset(0),
-            Message = new Message<ResourceKey, MappingOutcomeEvaluatedValue>
+            Message = new Message<string, MappingOutcomeEvaluatedValue>
             {
-                Key = new ResourceKey { FacilityId = FacilityId, PatientId = PatientId },
+                Key = KafkaKeys.ForPatient(FacilityId, PatientId),
                 Value = value
             }
         };
 
-    private Task ConsumeAsync(ConsumeResult<ResourceKey, MappingOutcomeEvaluatedValue> message)
+    private Task ConsumeAsync(ConsumeResult<string, MappingOutcomeEvaluatedValue> message)
     {
         var method = typeof(MappingOutcomeListener)
             .GetMethod("ConsumeMessageAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;

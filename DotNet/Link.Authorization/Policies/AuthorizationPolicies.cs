@@ -119,6 +119,48 @@ namespace Link.Authorization.Policies
                 .Build();
         }
 
+        public static AuthorizationPolicy CanViewInfrastructure()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewInfrastructure)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanManageKafkaTopics()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanManageKafkaTopics)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanManageScaling()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanManageScaling)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanMigrateKafkaTopics()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanMigrateKafkaTopics)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanOperateKafka()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context =>
+                    context.User.HasClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkSystemPermissions.CanManageKafkaTopics))
+                    || context.User.HasClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkSystemPermissions.CanManageScaling)))
+                .Build();
+        }
+
 
 
         //!** DEPRECATED **!

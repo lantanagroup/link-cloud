@@ -1,4 +1,5 @@
 ﻿using Automation.UI.Services;
+using Link.UI.Services;
 using Automation.UI.Services.TestRail;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Normalization.Engine;
@@ -407,6 +408,7 @@ builder.Services.AddSingleton<LeftoverRunCleanupService>();
 builder.Services.AddSingleton<ILeftoverRunCleanup>(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
+builder.Services.AddSingleton<EhrSystemCatalog>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 builder.Services.AddSingleton<MetricsRunPresenter>();
 builder.Services.AddSingleton<PatientReplacementManager>();

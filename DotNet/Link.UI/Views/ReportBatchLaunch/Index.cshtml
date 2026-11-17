@@ -1,0 +1,174 @@
+@using Link.UI.Services.ReportBatches
+@model ReportBatchLaunchPage
+@{
+    ViewData["Title"] = "Launch";
+    var anySelected = Model.EhrSystems.Any(ehr => ehr.Selected);
+    var selectedBlocked = Model.EhrSystems.Any(ehr => ehr.Selected && !ehr.Ready);
+}
+
+@await Html.PartialAsync("~/Views/Automation/_Nav.cshtml")
+
+<div class="mb-3">
+    <h1 class="h3 mb-1">Launch</h1>
+    <p class="text-muted mb-0">Start report runs on one or more EHR systems. Each selected EHR gets its own batch, its own scenarios, and its own facility for every run. The batches start together and then run on their own. A failure in one does not stop the others.</p>
+</div>
+
+@if (Model.Errors.Count > 0)
+{
+    <div class="alert alert-danger" role="alert">
+        <ul class="mb-0">
+            @foreach (var error in Model.Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (!Model.Ready)
+{
+    @if (Model.EhrSystems.Count > 0)
+    {
+        <div class="au-card card">
+            <div class="card-header">EHR systems</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var ehr in Model.EhrSystems)
+                {
+                    <li class="list-group-item">
+                        <span class="fw-semibold">@ehr.Name</span>
+                        <span class="text-muted">@ehr.FhirServerBase</span>
+                        @if (ehr.Ready)
+                        {
+                            <span class="badge au-badge-success ms-2">Ready</span>
+                        }
+                        else
+                        {
+                            <span class="badge au-badge-warning ms-2">Not ready</span>
+                            @if (!string.IsNullOrWhiteSpace(ehr.ReadinessError))
+                            {
+                                <div class="small text-danger">@ehr.ReadinessError</div>
+                            }
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+}
+else if (Model.EhrSystems.Count == 0)
+{
+    <p>No EHR systems are configured.</p>
+}
+else
+{
+    <form method="post" id="launchBatchForm">
+        @Html.AntiForgeryToken()
+        @for (var index = 0; index < Model.EhrSystems.Count; index++)
+        {
+            var ehr = Model.EhrSystems[index];
+            var cardId = "ehr-" + index.ToString();
+            <section class="au-card card mb-3" data-ehr-card data-ready="@(ehr.Ready ? "yes" : "no")" aria-label="@ehr.Name">
+                <div class="card-header">
+                    <input type="hidden" name="ehrs[@index].Name" value="@ehr.Name" />
+                    <div class="form-check mb-0">
+                        <input type="checkbox" class="form-check-input" id="@cardId" name="ehrs[@index].Selected" value="true" data-ehr-selected @(ehr.Selected ? "checked" : null) />
+                        <input type="hidden" name="ehrs[@index].Selected" value="false" />
+                        <label class="form-check-label fw-semibold" for="@cardId">@ehr.Name</label>
+                        <span class="text-muted">@ehr.FhirServerBase</span>
+                        @if (ehr.IsDefault)
+                        {
+                            <span class="badge au-badge-muted ms-1">Default</span>
+                        }
+                        @if (ehr.Ready)
+                        {
+                            <span class="badge au-badge-success ms-1">Ready</span>
+                        }
+                        else
+                        {
+                            <span class="badge au-badge-warning ms-1">Not ready</span>
+                        }
+                    </div>
+                </div>
+                <div class="card-body" data-ehr-body hidden="@(ehr.Selected ? null : "hidden")">
+                    <p class="form-text">Facility template: @ehr.FacilityTemplate</p>
+                    @if (!ehr.Ready && !string.IsNullOrWhiteSpace(ehr.ReadinessError))
+                    {
+                        <p class="text-danger">@ehr.Name is not ready. @ehr.ReadinessError</p>
+                    }
+                    <p class="text-muted">Parameters come from the saved scenario. <a asp-controller="Scenarios" asp-action="Index">Edit scenarios</a> before launching. A scenario that already names a facility template keeps it. Otherwise this EHR's template is used. Copies of a scenario share that configuration, and each copy gets its own facility.</p>
+                    @if (Model.Scenarios.Count == 0)
+                    {
+                        <p>No scenarios yet.</p>
+                    }
+                    else
+                    {
+                        <div class="border rounded p-2 mb-3" style="max-height: 280px; overflow-y: auto;">
+                            @foreach (var group in Model.Scenarios.GroupBy(scenario => scenario.Group))
+                            {
+                                <h2 class="h6 mt-2">@group.Key</h2>
+                                @foreach (var scenario in group)
+                                {
+                                    var inputId = cardId + "-scenario-" + scenario.Id.ToString("N");
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="ehrs[@index].ScenarioIds" value="@scenario.Id" id="@inputId" @(ehr.SelectedScenarioIds.Contains(scenario.Id) ? "checked" : null) @(ehr.Selected ? null : "disabled") />
+                                        <label class="form-check-label" for="@inputId">
+                                            @scenario.Name
+                                            <span class="text-muted">@scenario.ReportMethodLabel</span>
+                                            @if (scenario.IsSystemScenario)
+                                            {
+                                                <span class="text-muted">[System]</span>
+                                            }
+                                        </label>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="@(cardId + "-copies")">Copies</label>
+                            <input class="form-control w-auto" type="number" id="@(cardId + "-copies")" name="ehrs[@index].Copies" min="1" max="@ReportBatchConcurrencyPolicy.MaxScenariosPerBatch" step="1" required value="@ehr.Copies" @(ehr.Selected ? null : "disabled") />
+                            <div class="form-text">How many times to run each selected scenario. This EHR's batch can hold at most @ReportBatchConcurrencyPolicy.MaxScenariosPerBatch runs.</div>
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label class="form-label" for="@(cardId + "-cap")">Max concurrent runs</label>
+                            <input class="form-control w-auto" type="number" id="@(cardId + "-cap")" name="ehrs[@index].MaxConcurrency" min="1" max="@Model.SavedCap" step="1" required value="@ehr.MaxConcurrency" @(ehr.Selected ? null : "disabled") />
+                            <div class="form-text">Defaults to the saved cap of @Model.SavedCap. This EHR can use that or a lower number. <a asp-controller="ReportBatchSettings" asp-action="Index">Change the saved cap</a>.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <button type="submit" class="btn btn-au-run" id="startLaunch" @(anySelected && !selectedBlocked ? null : "disabled")>Start launch</button>
+    </form>
+    <script>
+        (function () {
+            var form = document.getElementById("launchBatchForm");
+            var button = document.getElementById("startLaunch");
+            if (!form || !button) return;
+            function sync() {
+                var cards = form.querySelectorAll("[data-ehr-card]");
+                var any = false;
+                var blocked = false;
+                cards.forEach(function (card) {
+                    var box = card.querySelector("[data-ehr-selected]");
+                    var body = card.querySelector("[data-ehr-body]");
+                    var selected = !!(box && box.checked);
+                    if (body) {
+                        body.hidden = !selected;
+                        body.querySelectorAll("input").forEach(function (field) {
+                            field.disabled = !selected;
+                        });
+                    }
+                    if (!selected) return;
+                    any = true;
+                    if (card.getAttribute("data-ready") !== "yes") blocked = true;
+                });
+                button.disabled = !any || blocked;
+            }
+            form.addEventListener("change", sync);
+            sync();
+        })();
+    </script>
+}

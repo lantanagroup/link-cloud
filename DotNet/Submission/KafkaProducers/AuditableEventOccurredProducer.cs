@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Submission.KafkaProducers
                 await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Headers = headers,
-                    Key = model.FacilityId ?? "",
+                    Key = KafkaKeys.ForAudit(model.FacilityId, model.PatientId, SubmissionConstants.ServiceName),
                     Value = model
                 }, cancellationToken);
             }

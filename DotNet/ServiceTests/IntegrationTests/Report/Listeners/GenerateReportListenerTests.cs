@@ -205,7 +205,8 @@ public class GenerateReportListenerTests
             p => p.Produce(
                 It.IsAny<string>(),
                 It.Is<Message<string, DataAcquisitionRequestedValue>>(m =>
-                    m.Key == facilityId &&
+                    m.Key == KafkaKeys.ForPatient(facilityId, m.Value.PatientId) &&
+                    m.Value.FacilityId == facilityId &&
                     m.Value.ScheduledReports.Count == 1 &&
                     m.Value.ScheduledReports[0].ReportTrackingId == adhocReportId.ToString()),
                 It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()),
@@ -259,7 +260,8 @@ public class GenerateReportListenerTests
             p => p.Produce(
                 It.IsAny<string>(),
                 It.Is<Message<string, DataAcquisitionRequestedValue>>(m =>
-                    m.Key == facilityId &&
+                    m.Key == KafkaKeys.ForPatient(facilityId, m.Value.PatientId) &&
+                    m.Value.FacilityId == facilityId &&
                     m.Value.ScheduledReports.Count == 1 &&
                     m.Value.ScheduledReports[0].ReportTrackingId == adhocReportId.ToString()),
                 It.IsAny<Action<DeliveryReport<string, DataAcquisitionRequestedValue>>>()),
@@ -270,6 +272,7 @@ public class GenerateReportListenerTests
     public async Task ProcessMessageAsync_RegenerateReport_CreatesNewScheduleAndReCreatesEntries()
     {
         _fixture.DataAcquisitionRequestedKafkaProducerMock.Reset();
+        _fixture.EvaluationRequestedProducerMock.Reset();
 
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<GenerateReportListener>();
@@ -331,6 +334,16 @@ public class GenerateReportListenerTests
 
         var newEntries = await reportEntryManager.FindAsync(e => e.ReportScheduleId == newAdhocReportId);
         Assert.Single(newEntries);
+
+        _fixture.EvaluationRequestedProducerMock.Verify(
+            p => p.Produce(
+                nameof(KafkaTopic.EvaluationRequested),
+                It.Is<Message<string, EvaluationRequestedValue>>(m =>
+                    m.Key == KafkaKeys.ForPatient(facilityId, "pat-regen-001") &&
+                    m.Value.FacilityId == facilityId &&
+                    m.Value.PatientId == "pat-regen-001"),
+                It.IsAny<Action<DeliveryReport<string, EvaluationRequestedValue>>>()),
+            Times.Once);
     }
 
     [Fact]

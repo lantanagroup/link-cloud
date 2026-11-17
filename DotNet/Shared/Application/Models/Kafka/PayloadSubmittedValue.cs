@@ -5,5 +5,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 public class PayloadSubmittedValue
 {
     public required PayloadType PayloadType { get; set; }
+    public string? FacilityId { get; set; }
+    public Guid? ReportScheduleId { get; set; }
     public string? PatientId { get; set; }
 }

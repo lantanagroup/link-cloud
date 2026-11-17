@@ -63,7 +63,9 @@ public class ADTAcquiredListener : BackgroundService
         using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
         try
         {
-            consumer.Subscribe(nameof(KafkaTopic.ADTAcquired));
+            consumer.Subscribe(KafkaTopicNames.Subscription(
+                nameof(KafkaTopic.ADTAcquired),
+                CensusConstants.ServiceName));
             _logger.LogInformation("Started {Name} consumer on {Date} for topic '{TopicName}'", ClassName, DateTime.UtcNow, nameof(KafkaTopic.ADTAcquired));
 
             while (!cancellationToken.IsCancellationRequested)

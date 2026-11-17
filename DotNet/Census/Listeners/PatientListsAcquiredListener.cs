@@ -6,12 +6,14 @@ using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Data.SqlClient;
 using System.Text;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Census.Listeners;
 
@@ -63,10 +65,13 @@ public class PatientListsAcquiredListener : BackgroundService
             GroupId = CensusConstants.ServiceName,
             EnableAutoCommit = false
         };
-        using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+        var assignmentTracker = new KafkaAssignmentTracker();
+        using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
 
         IEnumerable<IBaseResponse>? responseMessages = null;
-        kafkaConsumer.Subscribe(KafkaTopic.PatientListsAcquired.ToString());
+        kafkaConsumer.Subscribe(KafkaTopicNames.Subscription(
+            KafkaTopic.PatientListsAcquired.ToString(),
+            CensusConstants.ServiceName));
         ConsumeResult<string, PatientListMessage>? rawmessage = null;
 
         using var scope = _scopeFactory.CreateScope();
@@ -80,6 +85,7 @@ public class PatientListsAcquiredListener : BackgroundService
                     await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, PatientListMessage>?, CancellationToken, Task>)(async (result, consumeCancellationToken) =>
                     {
                         rawmessage = result;
+                        var accounted = false;
 
                         try
                         {
@@ -92,15 +98,20 @@ public class PatientListsAcquiredListener : BackgroundService
                                     if (Encoding.UTF8.GetString(exceptionService) != CensusConstants.ServiceName)
                                     {
                                         _logger.LogWarning("({className}) is detecting that ({instanceServiceName}) is different from the service that produced the message ({messageServiceName}). Message will be disregarded.", nameof(PatientListsAcquiredListener), CensusConstants.ServiceName, Encoding.UTF8.GetString(exceptionService));
+                                        accounted = true;
                                         return;
                                     }
                                 }
 
-                                var facilityId = rawmessage.Key ?? throw new DeadLetterException("FacilityId is null.", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
-
                                 if (rawmessage.Message.Value == null)
                                 {
                                     throw new DeadLetterException("Message value is null", new Exception("No message value provided. Unable to process message."));
+                                }
+
+                                var facilityId = KafkaIdentity.Facility(rawmessage.Message.Value.FacilityId, rawmessage.Key);
+                                if (string.IsNullOrWhiteSpace(facilityId))
+                                {
+                                    throw new DeadLetterException("FacilityId is null.", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
                                 }
 
                                 var msgValue = rawmessage.Message.Value;
@@ -146,17 +157,28 @@ public class PatientListsAcquiredListener : BackgroundService
 
                                     throw new TransientException("Error processing message: " + ex.Message, ex);
                                 }
+
+                                accounted = true;
                             }
                         }
                         catch (DeadLetterException ex)
                         {
-                            _nonTransientExceptionHandler.Topic = rawmessage?.Topic + "-Error";
-                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
+                            if (!string.IsNullOrWhiteSpace(rawmessage?.Topic))
+                            {
+                                _nonTransientExceptionHandler.Topic = KafkaTopicNames.Error(KafkaTopicNames.Main(rawmessage.Topic));
+                            }
+
+                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, FacilityIdOf(rawmessage?.Message));
+                            accounted = true;
                         }
                         catch (TransientException ex)
                         {
-                            _transientExceptionHandler.Topic = rawmessage?.Topic + "-Retry";
-                            _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
+                            if (!string.IsNullOrWhiteSpace(rawmessage?.Topic))
+                            {
+                                _transientExceptionHandler.Topic = KafkaTopicNames.Main(rawmessage.Topic) + "-Retry";
+                            }
+                            _transientExceptionHandler.HandleException(rawmessage, ex, FacilityIdOf(rawmessage?.Message));
+                            accounted = true;
                         }
                         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                         {
@@ -164,13 +186,17 @@ public class PatientListsAcquiredListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, $"Failed to process Patient Event.");
-                            _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
+                            _logger.LogError(ex, "Failed to process Patient Event.");
+                            _transientExceptionHandler.HandleException(rawmessage, ex, FacilityIdOf(rawmessage?.Message));
+                            accounted = true;
                         }
                         finally
                         {
-                            if (!consumeCancellationToken.IsCancellationRequested)
-                                kafkaConsumer.Commit(rawmessage);
+                            if (accounted && rawmessage != null && !consumeCancellationToken.IsCancellationRequested)
+                            {
+                                assignmentTracker.MarkProcessed(rawmessage);
+                                kafkaConsumer.SafeCommit(rawmessage, _logger);
+                            }
                         }
 
                     }), cancellationToken);
@@ -184,12 +210,12 @@ public class PatientListsAcquiredListener : BackgroundService
                         throw new OperationCanceledException(ex.Error.Reason, ex);
                     }
 
-                    var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
+                    var facilityId = FacilityIdFromConsumeException(ex);
 
                     _nonTransientExceptionHandler.HandleConsumeException(ex, facilityId);
 
                     var offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                    kafkaConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    kafkaConsumer.SafeCommit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset }, _logger);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -198,7 +224,6 @@ public class PatientListsAcquiredListener : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error consuming message for topics: [{subs}] at {dateTime}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
-                    kafkaConsumer.Commit();
                 }
             }
         }
@@ -208,5 +233,37 @@ public class PatientListsAcquiredListener : BackgroundService
             kafkaConsumer.Close();
             kafkaConsumer.Dispose();
         }
+    }
+
+    private static string FacilityIdOf(Message<string, PatientListMessage>? message) =>
+        KafkaIdentity.Facility(message?.Value?.FacilityId, message?.Key) ?? string.Empty;
+
+    private static string FacilityIdFromConsumeException(ConsumeException exception)
+    {
+        string? keyText = null;
+        if (exception.ConsumerRecord?.Message?.Key is { Length: > 0 } keyBytes)
+        {
+            keyText = Encoding.UTF8.GetString(keyBytes);
+        }
+
+        string? valueFacilityId = null;
+        if (exception.ConsumerRecord?.Message?.Value is { Length: > 0 } valueBytes)
+        {
+            try
+            {
+                var value = JsonSerializer.Deserialize<PatientListMessage>(valueBytes, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true
+                });
+                valueFacilityId = value?.FacilityId;
+            }
+            catch (JsonException)
+            {
+                // The value is not readable. The legacy key is the remaining source.
+            }
+        }
+
+        return KafkaIdentity.Facility(valueFacilityId, keyText) ?? string.Empty;
     }
 }

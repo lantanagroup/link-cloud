@@ -30,7 +30,7 @@ public class OperationFailureFactoryTests
             name: "patient-1_chunk01",
             progressPrefix: "[patient-1] ",
             statusCode: 500,
-            body: OperationOutcome));
+            body: OperationOutcome.Replace("\r\n", "\n", StringComparison.Ordinal)));
 
         failure.Step.Should().Be("Upload patient chunk");
         failure.PatientOrChunk.Should().Be("patient-1_chunk01");

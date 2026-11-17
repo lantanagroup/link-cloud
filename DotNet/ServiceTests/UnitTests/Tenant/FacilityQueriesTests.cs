@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+﻿using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
@@ -79,6 +81,60 @@ namespace UnitTests.Tenant
 
             _context.Facilities.AddRange(_sampleFacilities);
             _context.SaveChanges();
+        }
+
+        [Fact]
+        public async Task IsTest_defaults_false_and_round_trips()
+        {
+            var untouched = await _queries.GetAsync("FAC001");
+            Assert.NotNull(untouched);
+            Assert.False(untouched!.IsTest);
+
+            var marked = new Facility
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = "TEST1",
+                FacilityName = "Test Facility",
+                TimeZone = "UTC",
+                IsTest = true,
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = Array.Empty<string>(),
+                    Weekly = Array.Empty<string>(),
+                    Monthly = Array.Empty<string>()
+                },
+                CreateDate = DateTime.UtcNow
+            };
+            _context.Facilities.Add(marked);
+            await _context.SaveChangesAsync();
+
+            var loaded = await _queries.GetAsync("TEST1");
+            Assert.NotNull(loaded);
+            Assert.True(loaded!.IsTest);
+
+            var flags = await _queries.FlagsAsync(["FAC001", "TEST1", "missing"], CancellationToken.None);
+            Assert.Contains(flags, flag => flag.FacilityId == "TEST1" && flag.IsTest);
+            Assert.Contains(flags, flag => flag.FacilityId == "FAC001" && !flag.IsTest);
+            Assert.DoesNotContain(flags, flag => flag.FacilityId == "missing");
+
+            var onlyTest = await _queries.PagedSearchAsync(new FacilitySearchModel { IsTest = true }, pageSize: 20);
+            Assert.Contains(onlyTest.Records, record => record.FacilityId == "TEST1");
+            Assert.DoesNotContain(onlyTest.Records, record => record.FacilityId == "FAC001");
+        }
+
+        [Fact]
+        public void FacilityModel_json_treats_a_missing_is_test_as_false()
+        {
+            var omitted = JsonSerializer.Deserialize<FacilityModel>("{}");
+            Assert.NotNull(omitted);
+            Assert.False(omitted!.IsTest);
+
+            var json = JsonSerializer.Serialize(new FacilityModel { FacilityId = "TEST1", IsTest = true });
+            Assert.Contains("\"isTest\":true", json, StringComparison.Ordinal);
+            var roundTrip = JsonSerializer.Deserialize<FacilityModel>(json);
+            Assert.NotNull(roundTrip);
+            Assert.True(roundTrip!.IsTest);
+            Assert.Equal("TEST1", roundTrip.FacilityId);
         }
 
         [Fact]

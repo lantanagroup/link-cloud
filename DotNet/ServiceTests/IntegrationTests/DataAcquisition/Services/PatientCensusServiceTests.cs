@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
@@ -395,7 +395,8 @@ public class PatientCensusServiceTests
         kafkaProducerMock.Verify(p => p.ProduceAsync(
             It.Is<string>(topic => topic == "PatientListsAcquired"),
             It.Is<Message<string, PatientListMessage>>(m =>
-                m.Key == facilityId &&
+                m.Key == KafkaKeys.ForFacility(facilityId) &&
+                m.Value.FacilityId == facilityId &&
                 m.Value.PatientLists.Count == 6),
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -696,7 +697,7 @@ public class PatientCensusServiceTests
 
         // ── Assertions on Kafka message
         Assert.NotNull(capturedMessage);
-        Assert.Equal(facilityId, capturedMessage!.Key);
+        Assert.Equal(KafkaKeys.ForFacility(facilityId), capturedMessage!.Key);
         Assert.Equal(6, capturedMessage.Value.PatientLists.Count);
         var allPatientIds = capturedMessage.Value.PatientLists.SelectMany(pl => pl.PatientIds).ToList();
         Assert.Equal(18, allPatientIds.Count); // 6 lists × 3 patients

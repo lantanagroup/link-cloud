@@ -37,9 +37,37 @@ public static class TestConfig
     public static string ValidationServiceBase => Environment.GetEnvironmentVariable("VALIDATION_SERVICE_BASE_URL") ?? "http://localhost:8075";
     public static string SubmissionServiceBase => Environment.GetEnvironmentVariable("SUBMISSION_SERVICE_BASE_URL") ?? "http://localhost:8073";
 
-    // Automation.UI — used by AutomationUiApiSmokeTest to exercise the /api/runs endpoints.
-    // Host port 5256 matches the docker-compose mapping (5256:5257).
-    public static string AutomationUiBase => Environment.GetEnvironmentVariable("AUTOMATION_UI_BASE_URL") ?? "http://localhost:5256";
+    // Link.UI base URL for /api/runs, /api/api-health-runs, and GET /Runs
+    // (the antiforgery page). Precedence: LINK_UI_BASE_URL, then
+    // AUTOMATION_UI_BASE_URL, then the link-ui compose port.
+    // http://localhost:5280 is the dotnet run port (launchSettings.json).
+    // http://localhost:5256 is the automation-ui compose port and is not the default.
+    public const string LocalLinkUiBaseUrl = "http://localhost:5258";
+
+    public static string AutomationUiBase => ResolveLinkUiBaseUrl(static name => Environment.GetEnvironmentVariable(name));
+
+    public static string ResolveLinkUiBaseUrl(Func<string, string?> read)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+
+        var link = NormalizeBaseUrl(read("LINK_UI_BASE_URL"));
+        if (link != null)
+            return link;
+
+        var legacy = NormalizeBaseUrl(read("AUTOMATION_UI_BASE_URL"));
+        if (legacy != null)
+            return legacy;
+
+        return LocalLinkUiBaseUrl;
+    }
+
+    private static string? NormalizeBaseUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        return value.Trim();
+    }
 
     // Infrastructure
     public static string LokiBaseUrl => Environment.GetEnvironmentVariable("Loki__Url") ?? "http://localhost:3100";

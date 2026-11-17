@@ -39,7 +39,8 @@ internal sealed class FakeHttpBoundary : IDisposable
             Method = call.Request.Verb.Method,
             Path = url.AbsolutePath,
             Query = url.Query,
-            Body = call.RequestBody ?? string.Empty
+            Body = call.RequestBody ?? string.Empty,
+            ContentType = call.HttpRequestMessage?.Content?.Headers.ContentType?.MediaType ?? string.Empty
         };
     }
 

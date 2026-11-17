@@ -1,0 +1,153 @@
+@using Link.UI.Models
+@using Link.UI.Services
+@inject IAdminBffUserService UserService
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    bool Ctrl(string name) => string.Equals(currentController, name, StringComparison.OrdinalIgnoreCase);
+
+    // A detail page names the section that owns it. Report pages reached from Automation belong to Automation;
+    // the other report tabs belong to Reports, so every tab of one report highlights the same section.
+    var navSection = ViewData["NavSection"] as string;
+    if (navSection is null && ViewData["ReportSection"] is string)
+    {
+        var reportOrigin = ReturnUrlRules.FromQuery(Context.Request);
+        navSection = reportOrigin is not null && reportOrigin.StartsWith("/Automation", StringComparison.OrdinalIgnoreCase) ? "Automation" : "Reports";
+    }
+    bool Nav(string name) => navSection is null ? Ctrl(name) : string.Equals(navSection, name, StringComparison.OrdinalIgnoreCase);
+    var automationActive = navSection is null ? AutomationSurface.IsAutomationPath(Context.Request.Path) : string.Equals(navSection, "Automation", StringComparison.OrdinalIgnoreCase);
+
+    var user = Context.Items[AdminBffUserService.HttpContextItemKey] as AdminBffUser
+        ?? await UserService.GetCurrentUserAsync(Context.RequestAborted);
+    var adminShell = Ctrl("Tenants") || Ctrl("Reports") || Ctrl("Logs") || Ctrl("Configuration") || Ctrl("System");
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Link.UI</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script src="~/js/status-pills.js" asp-append-version="true"></script>
+    <script>window.luTypeColors = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ResourceTypeColors.Map));</script>
+    <script src="~/js/chart-palette.js" asp-append-version="true"></script>
+    <script src="~/js/chart-frame.js" asp-append-version="true"></script>
+    <script src="~/js/lu-query.js" asp-append-version="true"></script>
+    <script>
+        window.luCopyControl = function (value, label) {
+            var raw = value == null ? "" : String(value);
+            var safe = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            var title = String(label || "Copy").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            return '<button type="button" class="btn btn-sm btn-au-link lu-icon-btn lu-copy" data-lu-copy="' + safe
+                + '" title="' + title + '" aria-label="' + title + '"><i class="bi bi-copy" aria-hidden="true"></i><span class="visually-hidden">Copy</span></button>';
+        };
+        window.luLabeledId = function (label, value) {
+            var raw = value == null ? "" : String(value);
+            var trimmed = raw.trim();
+            if (!trimmed || trimmed === "—" || trimmed === "-") return '<span class="text-muted">—</span>';
+            var safe = trimmed.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            var shown = String(label || "Id").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            return '<span class="lu-labeled-id lu-labeled-id-compact"><span class="lu-id-label visually-hidden">' + shown
+                + '</span><span class="lu-id-value"><code class="lu-facility-id" title="' + safe + '" data-copy="' + safe + '">' + safe
+                + '</code></span></span>';
+        };
+    </script>
+</head>
+<body class="lu-body@(adminShell ? " lu-admin" : "")">
+    <div class="lu-shell">
+        <aside class="lu-sidebar" id="luSidebar">
+            <div class="lu-brand">
+                <button type="button" class="lu-nav-toggle" aria-controls="luSidebar" aria-expanded="false">
+                    <i class="bi bi-list" aria-hidden="true"></i>
+                    <span class="visually-hidden">Menu</span>
+                </button>
+                <a asp-controller="Home" asp-action="Index" class="lu-brand-link">
+                    <i class="bi bi-link-45deg me-1"></i> Link.UI
+                </a>
+            </div>
+            <nav class="lu-nav" aria-label="Primary">
+                <div class="lu-nav-section-label">Admin</div>
+                <a class="lu-nav-link @(Nav("Home") ? "active" : "")" asp-controller="Home" asp-action="Index">
+                    <i class="bi bi-house-door me-2"></i>Dashboard
+                </a>
+                <a class="lu-nav-link @(Nav("Tenants") ? "active" : "")" asp-controller="Tenants" asp-action="Index">
+                    <i class="bi bi-building me-2"></i>Tenants
+                </a>
+                <a class="lu-nav-link @(Nav("Reports") ? "active" : "")" asp-controller="Reports" asp-action="Index">
+                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Reports
+                </a>
+                <a class="lu-nav-link @(Nav("Configuration") ? "active" : "")" asp-controller="Configuration" asp-action="Index">
+                    <i class="bi bi-sliders me-2"></i>Configuration
+                </a>
+                <a class="lu-nav-link @(Nav("Logs") ? "active" : "")" asp-controller="Logs" asp-action="Index">
+                    <i class="bi bi-journal-text me-2"></i>Logs
+                </a>
+                @if (LinkUiFeatures.Value.AutomationEnabled)
+                {
+                    <a class="lu-nav-link @(automationActive ? "active" : "")" asp-controller="Automation" asp-action="Index">
+                        <i class="bi bi-lightning-charge me-2"></i>Automation
+                    </a>
+                }
+                <a class="lu-nav-link @(Nav("System") ? "active" : "")" asp-controller="System" asp-action="Index">
+                    <i class="bi bi-gear me-2"></i>System
+                </a>
+            </nav>
+            <div class="lu-sidebar-footer">
+                @if (user?.IsAuthenticated == true)
+                {
+                    <div class="lu-user-chip" title="@user.Email">
+                        <i class="bi bi-person-circle me-1"></i>@(user.UserName ?? user.Email ?? "Signed in")
+                    </div>
+                    <a class="lu-nav-link" asp-controller="Auth" asp-action="Logout">
+                        <i class="bi bi-box-arrow-right me-2"></i>Logout
+                    </a>
+                }
+                else if (LinkUiFeatures.Value.SignInRequired)
+                {
+                    <a class="lu-nav-link" asp-controller="Auth" asp-action="Login">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Login
+                    </a>
+                }
+            </div>
+        </aside>
+        <div class="lu-main">
+            <header class="lu-topbar">
+                <h1 class="lu-page-title">@ViewData["Title"]</h1>
+            </header>
+            <main class="lu-content" role="main">
+                @RenderBody()
+            </main>
+            <footer class="lu-footer text-muted">
+                &copy; 2026 - Link.UI
+            </footer>
+        </div>
+    </div>
+    <div id="auToasts" class="toast-container position-fixed bottom-0 end-0 p-3" aria-live="polite" aria-atomic="true"></div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <partial name="_HoldConfirmModal" />
+    <script src="~/js/hold-confirm.js" asp-append-version="true"></script>
+    <script src="~/js/section-validity.js" asp-append-version="true"></script>
+    <script src="~/js/live-region.js" asp-append-version="true"></script>
+    <script src="~/js/cell-copy.js" asp-append-version="true"></script><script src="~/js/row-icons.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            var button = document.querySelector(".lu-nav-toggle");
+            var sidebar = document.getElementById("luSidebar");
+            if (!button || !sidebar) return;
+            button.addEventListener("click", function () {
+                var open = sidebar.classList.toggle("is-open");
+                button.setAttribute("aria-expanded", open ? "true" : "false");
+            });
+            document.addEventListener("keydown", function (event) {
+                if (event.key !== "Escape" || !sidebar.classList.contains("is-open")) return;
+                sidebar.classList.remove("is-open");
+                button.setAttribute("aria-expanded", "false");
+                button.focus();
+            });
+        })();
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

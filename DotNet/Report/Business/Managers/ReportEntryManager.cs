@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -724,11 +724,18 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             IQueryable<ReportEntry> entityQuery = _dbContext.ReportEntry.Where(predicate);
 
-            if (!string.IsNullOrWhiteSpace(sortBy))
+            // Callers send sort names in any case (for example "reportingstatus"). EF.Property is
+            // case-sensitive, so map to the real property name and ignore names that do not exist.
+            var sortProperty = string.IsNullOrWhiteSpace(sortBy)
+                ? null
+                : _dbContext.Model.FindEntityType(typeof(ReportEntry))?.GetProperties()
+                    .FirstOrDefault(p => string.Equals(p.Name, sortBy.Trim(), StringComparison.OrdinalIgnoreCase))?.Name;
+
+            if (sortProperty != null)
             {
                 entityQuery = sortOrder == SortOrder.Descending
-                    ? entityQuery.OrderByDescending(x => EF.Property<object>(x, sortBy))
-                    : entityQuery.OrderBy(x => EF.Property<object>(x, sortBy));
+                    ? entityQuery.OrderByDescending(x => EF.Property<object>(x, sortProperty))
+                    : entityQuery.OrderBy(x => EF.Property<object>(x, sortProperty));
             }
             else
             {
@@ -847,6 +854,17 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     }
                 }
             }
+
+            // Report-wide resource types from the stored per-measure-report counts, grouped in the database.
+            var typeCounts = await _dbContext.ReportEntry
+                .Where(x => x.ReportScheduleId == reportScheduleId)
+                .SelectMany(e => e.MeasureReports)
+                .SelectMany(m => m.ResourceCounts)
+                .GroupBy(rc => rc.ResourceType)
+                .Select(g => new { ResourceType = g.Key, Total = g.Sum(rc => rc.ResourceCount) })
+                .ToListAsync(cancellationToken);
+            foreach (var row in typeCounts.Where(row => !string.IsNullOrWhiteSpace(row.ResourceType) && row.Total > 0))
+                summary.ResourceTypeCounts[row.ResourceType] = row.Total;
 
             return summary;
         }

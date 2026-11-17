@@ -33,7 +33,7 @@ public class CacheBlobStorageConfig {
      * Azure SDK in-process tries per blob call (initial call + quick retries). The Kafka
      * retry-topic ladder owns real retrying; one extra in-process try only absorbs a dropped
      * connection. The SDK default of 4 exponential tries hid minutes of silent retrying inside
-     * every consumer attempt while blocking the single-threaded consumer executor.
+     * every consumer attempt while blocking the listener thread.
      */
     private int maxTries = 2;
 

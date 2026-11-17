@@ -220,6 +220,38 @@ public class NormalizationServiceClientTests
         Assert.Equal(204, result.StatusCode);
     }
 
+    [Fact]
+    public async Task SearchOperationsAsync_OmitsBlankFacilityAndSendsVendorVersion()
+    {
+        using var http = new FakeHttpBoundary("{\"records\":[],\"metadata\":{\"pageSize\":10,\"pageNumber\":1,\"totalCount\":0,\"totalPages\":0}}");
+        using var client = CreateClient(http.BaseUrl);
+        var vendorVersionId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+
+        await client.SearchOperationsAsync(facilityId: " ", vendorVersionId: vendorVersionId, sortBy: "Name", sortOrder: "Ascending");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/normalization/Operations", request.Path);
+        Assert.DoesNotContain("facilityId", request.Query, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("vendorVersionId=" + vendorVersionId, request.Query, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sortBy=Name", request.Query);
+    }
+
+    [Fact]
+    public async Task DeleteHslocCodeAsync_DeletesOneCode()
+    {
+        using var http = new FakeHttpBoundary(string.Empty, 204);
+        using var client = CreateClient(http.BaseUrl);
+        var id = Guid.Parse("11111111-2222-3333-4444-555555555555");
+
+        var result = await client.DeleteHslocCodeAsync(id);
+        var request = http.SingleRequest();
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/normalization/HSLOC/" + id, request.Path);
+        Assert.Equal(204, result.StatusCode);
+    }
+
     private static NormalizationServiceClient CreateClient(string baseUrl) => new(
         Options.Create(new ServiceRegistry { NormalizationServiceUrl = baseUrl }),
         Options.Create(new BackendAuthenticationServiceExtension.LinkBearerServiceOptions { AllowAnonymous = true }),

@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using HealthChecks.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Shared.Application.Health
 {
@@ -31,6 +32,8 @@ namespace LantanaGroup.Link.Shared.Application.Health
                 producerConfig.SaslPassword = _connection.SaslPassword;
             }
 
+            KafkaClientDefaults.ApplyProducer(producerConfig, _serviceName);
+
             return new KafkaHealthCheckOptions()
             {
                 Configuration = producerConfig,
@@ -42,7 +45,11 @@ namespace LantanaGroup.Link.Shared.Application.Health
         private Message<string, string> MessageBuilder(KafkaHealthCheckOptions options)
         {
             var utcDate = DateTime.UtcNow;
-            return new Message<string, string>() { Key = _serviceName, Value = $"Service health check on {utcDate} ({utcDate.Kind})" };
+            return new Message<string, string>()
+            {
+                Key = KafkaKeys.ForService(_serviceName),
+                Value = $"Service health check on {utcDate} ({utcDate.Kind})"
+            };
         }
     }
 }

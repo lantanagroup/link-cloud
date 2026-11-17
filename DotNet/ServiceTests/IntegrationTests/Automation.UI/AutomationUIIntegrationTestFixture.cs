@@ -1,6 +1,7 @@
 ﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using Automation.UI.Services.TestRail;
+using Link.UI.Services;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Models;
@@ -73,13 +74,15 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             store,
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<RunSnapshotOrchestrator>.Instance);
+        var configuration = new ConfigurationBuilder().Build();
+        var automation = new AutomationConfig();
 
         return new AutomationRunManager(
             CreateHub(),
-            Options.Create(new AutomationConfig()),
+            Options.Create(automation),
             NullLogger<AutomationRunManager>.Instance,
             new ServiceCollection().BuildServiceProvider(),
-            new ConfigurationBuilder().Build(),
+            configuration,
             orchestrator,
             store,
             Mock.Of<IQueryPlanTemplateStore>(),
@@ -93,7 +96,15 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             measureTemplateStore ?? Mock.Of<IMeasureTemplateStore>(),
             Mock.Of<IFacilityTemplateStore>(),
             testRailPublisher ?? new NoOpTestRailPublisher(),
-            Options.Create(new FacilityIdFormatSettings()));
+            Options.Create(new FacilityIdFormatSettings()),
+            new EhrSystemCatalog(configuration, new FixedAutomationOptions(automation)));
+    }
+
+    private sealed class FixedAutomationOptions(AutomationConfig value) : IOptionsMonitor<AutomationConfig>
+    {
+        public AutomationConfig CurrentValue { get; } = value;
+        public AutomationConfig Get(string? name) => CurrentValue;
+        public IDisposable? OnChange(Action<AutomationConfig, string?> listener) => null;
     }
 
     private static IHubContext<RunHub> CreateHub()

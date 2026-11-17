@@ -1,0 +1,35 @@
+{
+  "http": 200,
+  "launchId": "28ebded6-214a-4879-9954-95809060cf24",
+  "pending": 0,
+  "inProgress": 2,
+  "completed": 0,
+  "failed": 1,
+  "cancelled": 0,
+  "open": true,
+  "groups": [
+    {
+      "ehr": "local",
+      "atOnce": 2,
+      "pending": 0,
+      "inProgress": 2,
+      "items": [
+        {
+          "ordinal": 0,
+          "status": "In Progress",
+          "runId": "194fe6cf-06e9-477c-97c7-5a3d6df2f2f1"
+        },
+        {
+          "ordinal": 1,
+          "status": "Failed",
+          "runId": "7713c64e-8cf7-4575-8f75-a5997a23daa3"
+        },
+        {
+          "ordinal": 2,
+          "status": "In Progress",
+          "runId": "8bb0ed0c-6bac-4189-bb12-2adec904b626"
+        }
+      ]
+    }
+  ]
+}

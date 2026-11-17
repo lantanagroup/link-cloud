@@ -156,6 +156,42 @@ public class RunMetricsSnapshotServiceTests
             .Should().Contain("histogram_quantile(0.95")
             .And.Contain("increase(")
             .And.Contain("_bucket{facility_id=\"fac-1\"}");
+        RunMetricsSnapshotService.StageRawCountQuery("link_validation_validate_duration_milliseconds", "fac-1")
+            .Should().Be("sum(link_validation_validate_duration_milliseconds_count{facility_id=\"fac-1\"})");
+        RunMetricsSnapshotService.StageRawCountOffsetQuery("link_validation_validate_duration_milliseconds", "fac-1", 90)
+            .Should().Be("sum(link_validation_validate_duration_milliseconds_count{facility_id=\"fac-1\"} offset 90s)");
+        RunMetricsSnapshotService.StageRawQuantileQuery("link_submission_upload_duration_milliseconds", "fac-1", "0.95")
+            .Should().Be("histogram_quantile(0.95, sum by (le) (link_submission_upload_duration_milliseconds_bucket{facility_id=\"fac-1\"}))");
+    }
+
+    [Fact]
+    public void New_facility_series_uses_the_cumulative_histogram()
+    {
+        RunMetricsSnapshotService.ChooseHistogram(new RunMetricsSnapshotService.StageCounterReading(0, 1, null))
+            .Should().Be(RunMetricsSnapshotService.StageHistogramSource.Cumulative);
+        RunMetricsSnapshotService.ChooseHistogram(new RunMetricsSnapshotService.StageCounterReading(1, 4, null))
+            .Should().Be(RunMetricsSnapshotService.StageHistogramSource.Cumulative);
+        RunMetricsSnapshotService.ChooseHistogram(new RunMetricsSnapshotService.StageCounterReading(null, 2, 0))
+            .Should().Be(RunMetricsSnapshotService.StageHistogramSource.Cumulative);
+    }
+
+    [Fact]
+    public void Facility_with_earlier_observations_keeps_the_increase()
+    {
+        RunMetricsSnapshotService.ChooseHistogram(new RunMetricsSnapshotService.StageCounterReading(2, 10, 8))
+            .Should().Be(RunMetricsSnapshotService.StageHistogramSource.Increase);
+        RunMetricsSnapshotService.ChooseHistogram(new RunMetricsSnapshotService.StageCounterReading(0, 5, 5))
+            .Should().Be(RunMetricsSnapshotService.StageHistogramSource.None);
+        RunMetricsSnapshotService.ChooseHistogram(new RunMetricsSnapshotService.StageCounterReading(null, null, null))
+            .Should().Be(RunMetricsSnapshotService.StageHistogramSource.None);
+        RunMetricsSnapshotService.ObservedCount(
+                new RunMetricsSnapshotService.StageCounterReading(1, 4, null),
+                RunMetricsSnapshotService.StageHistogramSource.Cumulative)
+            .Should().Be(4);
+        RunMetricsSnapshotService.ObservedCount(
+                new RunMetricsSnapshotService.StageCounterReading(2, 10, 8),
+                RunMetricsSnapshotService.StageHistogramSource.Increase)
+            .Should().Be(2);
     }
 
     [Fact]
@@ -319,6 +355,63 @@ public class RunMetricsSnapshotServiceTests
     }
 
     [Fact]
+    public async Task Capture_compares_against_an_older_full_baseline_when_the_previous_snapshot_is_partial()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        var partial = new AutomationRunMetricsDocument
+        {
+            RunId = Guid.NewGuid(),
+            Outcome = "Succeeded",
+            E2eDurationSeconds = 40,
+            FinishedAt = DateTimeOffset.Parse("2026-10-14T11:00:00Z"),
+            Stages = new Dictionary<string, StageLatencySnapshot>(StringComparer.Ordinal)
+            {
+                ["acquisition"] = new() { Unavailable = false, P95Ms = 100, Count = 1 },
+                ["normalization"] = new() { Unavailable = false, P95Ms = 100, Count = 1 }
+            }
+        };
+        var full = new AutomationRunMetricsDocument
+        {
+            RunId = Guid.NewGuid(),
+            Outcome = "Succeeded",
+            E2eDurationSeconds = 60,
+            FinishedAt = DateTimeOffset.Parse("2026-10-14T10:00:00Z"),
+            Stages = new Dictionary<string, StageLatencySnapshot>(StringComparer.Ordinal)
+            {
+                ["acquisition"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["normalization"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["measureeval"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["validation"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 },
+                ["submission"] = new() { Unavailable = false, P95Ms = 1000, Count = 1 }
+            }
+        };
+        store.Setup(s => s.GetPreviousSucceededSameFingerprintAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(partial);
+        store.Setup(s => s.GetPreviousSucceededAsync(
+                It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(partial);
+        store.Setup(s => s.ListRecentSucceededSameFingerprintAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([partial, full]);
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+
+        var finished = DateTimeOffset.Parse("2026-10-14T12:00:00Z");
+        var service = CreateService(store.Object, new TelemetrySettings());
+        await service.CaptureAsync(Input(
+            isMetricsRun: true,
+            startedAt: finished.AddSeconds(-50),
+            finishedAt: finished));
+
+        saved.Should().NotBeNull();
+        saved!.Regression.PreviousRunId.Should().Be(full.RunId);
+        saved.Regression.Flags.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Capture_applies_target_duration_slo()
     {
         var store = new Mock<IRunMetricsStore>();
@@ -414,6 +507,114 @@ public class RunMetricsSnapshotServiceTests
     }
 
     [Fact]
+    public async Task Capture_reads_a_new_facility_series_from_the_cumulative_histogram()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string query, DateTimeOffset _, CancellationToken _) =>
+            {
+                if (!query.Contains("_duration_milliseconds", StringComparison.Ordinal))
+                    return null;
+                if (query.Contains(" offset ", StringComparison.Ordinal))
+                    return null;
+                if (query.Contains("increase(", StringComparison.Ordinal) && query.Contains("_count{", StringComparison.Ordinal))
+                    return 0;
+                if (query.Contains("_count{", StringComparison.Ordinal))
+                    return 4;
+                if (query.Contains("histogram_quantile(0.95", StringComparison.Ordinal))
+                    return 9750;
+                if (query.Contains("histogram_quantile(0.50", StringComparison.Ordinal))
+                    return 500;
+                if (query.Contains("histogram_quantile(0.99", StringComparison.Ordinal))
+                    return 9900;
+                return null;
+            });
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://prometheus:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true));
+
+        saved.Should().NotBeNull();
+        saved!.Stages["measureeval"].Unavailable.Should().BeFalse();
+        saved.Stages["measureeval"].Count.Should().Be(4);
+        saved.Stages["measureeval"].P95Ms.Should().Be(9750);
+        saved.Stages["validation"].P95Ms.Should().Be(9750);
+        saved.Stages["submission"].P95Ms.Should().Be(9750);
+        saved.Stages["normalization"].Count.Should().Be(4);
+        prom.Verify(p => p.QueryScalarAsync(
+            It.Is<string>(q => q.Contains("histogram_quantile(", StringComparison.Ordinal)
+                && q.Contains("increase(", StringComparison.Ordinal)),
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Capture_keeps_increase_when_the_facility_already_had_observations()
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string query, DateTimeOffset _, CancellationToken _) =>
+            {
+                if (!query.Contains("_duration_milliseconds", StringComparison.Ordinal))
+                    return null;
+                if (query.Contains(" offset ", StringComparison.Ordinal))
+                    return 20;
+                if (query.Contains("increase(", StringComparison.Ordinal) && query.Contains("_count{", StringComparison.Ordinal))
+                    return 3;
+                if (query.Contains("_count{", StringComparison.Ordinal))
+                    return 23;
+                if (query.Contains("increase(", StringComparison.Ordinal) && query.Contains("histogram_quantile(0.95", StringComparison.Ordinal))
+                    return 400;
+                if (query.Contains("histogram_quantile(0.95", StringComparison.Ordinal))
+                    return 9000;
+                if (query.Contains("histogram_quantile(0.50", StringComparison.Ordinal))
+                    return 100;
+                if (query.Contains("histogram_quantile(0.99", StringComparison.Ordinal))
+                    return 800;
+                return null;
+            });
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://prometheus:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true));
+
+        saved.Should().NotBeNull();
+        saved!.Stages["validation"].Unavailable.Should().BeFalse();
+        saved.Stages["validation"].Count.Should().Be(3);
+        saved.Stages["validation"].P95Ms.Should().Be(400);
+        saved.Stages["submission"].P95Ms.Should().Be(400);
+        prom.Verify(p => p.QueryScalarAsync(
+            It.Is<string>(q => q.Contains("histogram_quantile(", StringComparison.Ordinal)
+                && !q.Contains("increase(", StringComparison.Ordinal)),
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Capture_queries_prometheus_after_the_wait_not_at_finish_time()
     {
         var finishedAt = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
@@ -474,6 +675,13 @@ public class RunMetricsSnapshotServiceTests
                     || query.Contains("jvm_", StringComparison.Ordinal)
                     || query.Contains("http_server_request_duration_seconds", StringComparison.Ordinal))
                     return null;
+                // The retry counts increase() samples. A series that already existed
+                // stays on that path; the raw counter is not this test's signal.
+                if (query.Contains(" offset ", StringComparison.Ordinal))
+                    return 1;
+                if (query.Contains("_count{", StringComparison.Ordinal)
+                    && !query.Contains("increase(", StringComparison.Ordinal))
+                    return 9;
                 var stage = RunMetricsSnapshotService.StageHistograms
                     .FirstOrDefault(s => query.Contains(s.HistogramBase, StringComparison.Ordinal));
                 if (string.IsNullOrEmpty(stage.Stage) || !query.Contains("_count{", StringComparison.Ordinal))

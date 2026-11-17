@@ -39,9 +39,11 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
+          # Here-string, not a pipe. With pipefail, grep -q exits on the first match and echo
+          # dies with SIGPIPE, so the if is false and a job that should run is skipped.
           # Admin UI image and package changes are included because this job is the only one
           # that builds the image: the mocked tier runs ng serve on the runner instead.
-          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|Web/Admin\.UI/(Dockerfile|(server/)?package(-lock)?\.json)|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+          if grep -Eq '^(DotNet/|Tests/|Java/|nhsn/NHSN-App-UI/|Web/Admin\.UI/(Dockerfile|(server/)?package(-lock)?\.json)|docker-compose\.yml|\.github/workflows/tests\.yaml)' <<< "$CHANGED_FILES"; then
             echo "run_job=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_job=false" >> "$GITHUB_OUTPUT"
@@ -50,7 +52,7 @@ jobs:
           # The mocked Admin UI tier stubs every /api call, so no backend change can affect
           # it — gate it on its own sources rather than the shared filter above. The workflow
           # itself counts, so a change to this file still exercises the job that runs it.
-          if echo "$CHANGED_FILES" | grep -Eq '^(Web/Admin\.UI/|\.github/workflows/tests\.yaml)'; then
+          if grep -Eq '^(Web/Admin\.UI/|\.github/workflows/tests\.yaml)' <<< "$CHANGED_FILES"; then
             echo "run_admin_ui=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_admin_ui=false" >> "$GITHUB_OUTPUT"
@@ -60,7 +62,8 @@ jobs:
           # implements the ApiClient port in-process, so that suite issues no HTTP at all and
           # no backend change can reach it. Note nhsn/NHSN-App-UI/ also appears in the
           # run_job filter above, because the compose stack builds the nhsn-app-ui image.
-          if echo "$CHANGED_FILES" | grep -Eq '^(nhsn/NHSN-App-UI/|\.github/workflows/tests\.yaml)'; then
+          # Here-string, same pipefail reason as the filters above.
+          if grep -Eq '^(nhsn/NHSN-App-UI/|\.github/workflows/tests\.yaml)' <<< "$CHANGED_FILES"; then
             echo "run_nhsn_app_ui=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_nhsn_app_ui=false" >> "$GITHUB_OUTPUT"
@@ -89,6 +92,9 @@ jobs:
     # (one build, one up). API Stability runs first; the remaining
     # categories run concurrently. Each `dotnet test` log is rendered as
     # its own collapsible ::group:: in the Actions UI.
+    # UI calls go to Link.UI: LINK_UI_BASE_URL, then AUTOMATION_UI_BASE_URL,
+    # then http://localhost:5258 (the link-ui compose port). This job sets
+    # neither variable.
     name: Backend E2E Tests with Docker Compose
     runs-on: [docker-16core-64gb]
     timeout-minutes: 60
@@ -349,14 +355,14 @@ jobs:
           }
 
           # name|category|trx-file
+          # Adhoc, Daily ACH, and Regenerate run together as ConcurrentReportBatch
+          # instead of three separate processes. The smoke test still starts Adhoc on its own.
           API_STABILITY="API Stability|ApiStabilityTest|api-stability-test-results.trx"
           PARALLEL_TESTS=(
-            "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
-            "Adhoc Report Daily ACH|AdhocReportDailyAchTest|adhoc-report-daily-ach-test-results.trx"
+            "Concurrent Report Batch|ConcurrentReportBatch|concurrent-report-batch-test-results.trx"
             "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
             "DMRP Scheduled Report|DmrpScheduledReportTest|dmrp-scheduled-report-test-results.trx"
-            "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
             "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
           )
 
