@@ -1,4 +1,5 @@
 ﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 
@@ -6,6 +7,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 public class DataAcquisitionRequestedValue
 {
     [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? FacilityId { get; set; }
     [DataMember]
     public string PatientId { get; set; } = string.Empty;

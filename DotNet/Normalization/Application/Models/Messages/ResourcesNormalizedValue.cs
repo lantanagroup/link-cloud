@@ -6,7 +6,9 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Messages;
 
 public class ResourcesNormalizedValue
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? FacilityId { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? PatientId { get; set; }
     public string QueryType { get; set; }
     public List<ScheduledReport> ScheduledReports { get; set; }

@@ -18,6 +18,7 @@ public static class KafkaKeyLegacy
         "DataAcquisitionWorker",
         "LinkAdminBFF",
         "MockDmrpApi",
+        "NHSN App BFF",
         "Normalization",
         "Notification",
         "Operations",
