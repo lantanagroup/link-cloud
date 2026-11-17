@@ -4,13 +4,7 @@
 manage test scenarios, configure FHIR query plans, start runs, watch progress in real time,
 inspect pipeline state, and review validation outcomes -- all from a browser.
 
-Thetis packages restore from Azure Artifacts `Shared_BOTW_Feed`. Authenticate once per machine before `dotnet restore` of Automation / Automation.UI / MockFhirServer. You can add `Shared_BOTW_Feed` as a NuGet source in Visual Studio (Tools > Options > NuGet Package Manager > Package Sources) using `https://pkgs.dev.azure.com/lantanagroup/nhsnlink/_packaging/Shared_BOTW_Feed/nuget/v3/index.json` and sign into Azure DevOps, or create a Packaging-Read PAT and set `AZURE_ARTIFACTS_PAT` for CLI restore and docker compose. Both are in `DEVELOPMENT.md`.
-
-```
-dotnet nuget update source Shared_BOTW_Feed --username az --password %AZURE_ARTIFACTS_PAT% --store-password-in-clear-text --configfile nuget.config
-```
-
-Set `AZURE_ARTIFACTS_PAT` in the environment for compose (feed secret / `FEED_ACCESSTOKEN` ARG fallback). CI uses the `AZURE_ARTIFACTS_PAT` GitHub/Azure secret.
+Thetis packages (`LantanaGroup.Thetis.Generation.Abstractions` and `Engine`) come from nuget.org under the PolyForm Noncommercial 1.0.0 license. The license file ships in each package. No extra NuGet source or token is required. See `DEVELOPMENT.md`.
 
 It composes:
 
@@ -435,7 +429,7 @@ scenarios, the Custom scenario kind, and any saved scenario.
 
 ### Imported patients
 
-Imported patients are fully integrated into the run and into the Generation Manifest, so
+Imported patients are fully integrated into the run and into the Patient Manifest, so
 prediction-vs-actual reconciliation works for them too. They come from one of two
 sources:
 
@@ -734,7 +728,7 @@ otherwise query-plan-acquired and CQL-referenced.
 
 See `DotNet/Automation/README.md` section 8 for the full prediction formula and profile table.
 
-### Generation Manifest page
+### Patient Manifest page
 
 `Runs/Manifest` provides a deep-dive UX for this model:
 

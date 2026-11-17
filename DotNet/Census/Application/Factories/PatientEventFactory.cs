@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models.Enums;
+using LantanaGroup.Link.Census.Application.Models.Payloads.Adt;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Cerner;
 using LantanaGroup.Link.Census.Application.Models.Payloads.CernerList;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
@@ -36,6 +37,7 @@ public static class PatientEventFactory
             CernerListAdmitPayload cernerAdmit => DateTime.UtcNow,
             CernerListUpdatePayload cernerUpdate => DateTime.UtcNow,
             CernerListDischargePayload cernerDischarge => DateTime.UtcNow,
+            AdtPayload adt => adt.MessageDateTime ?? DateTime.UtcNow,
             _ => throw new Exception("Unsupported payload type for event date extraction")
         };
     }

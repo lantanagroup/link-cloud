@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 using Census.Domain.Entities;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Application.Repositories;
@@ -30,6 +29,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -114,7 +114,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-        options.JsonSerializerOptions.ForFhir();
+        LinkFhirSerializerOptions.ConfigurePermissiveFhirDeserialization(options.JsonSerializerOptions);
     });
     builder.Services.AddGrpcReflection();
 
@@ -122,9 +122,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientListMessage>, KafkaConsumerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, CernerPatientsAcquired>, KafkaConsumerFactory<string, CernerPatientsAcquired>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, ADTAcquired>, KafkaConsumerFactory<string, ADTAcquired>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ADTAcquired>, KafkaProducerFactory<string, ADTAcquired>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, KafkaProducerFactory<string, LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
@@ -153,6 +155,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Application Services
     builder.Services.AddScoped<IPatientListService, PatientListService>();
     builder.Services.AddScoped<ICernerListService, CernerListService>();
+    builder.Services.AddScoped<IAdtEventService, AdtEventService>();
     builder.Services.AddTransient<IEventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>, EventProducerService<LantanaGroup.Link.Census.Application.Models.Messages.PatientEvent>>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
@@ -169,11 +172,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddHostedService<PatientListsAcquiredListener>();
         builder.Services.AddHostedService<CernerPatientsAcquiredListener>();
+        builder.Services.AddHostedService<ADTAcquiredListener>();
     }
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.PatientListsAcquiredRetry.GetStringValue(), KafkaTopic.ADTAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
     }
 
@@ -192,7 +196,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Health Checks
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, CensusConstants.ServiceName).GetHealthCheckOptions();
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<CensusContext>>(HealthCheckType.Database.ToString())
+        .AddCheck<DatabaseHealthCheck<CensusContext>>(HealthCheckNames.SqlServerDatabase)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Swagger

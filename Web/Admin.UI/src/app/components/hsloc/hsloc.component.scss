@@ -9,6 +9,12 @@ mat-form-field { flex: 1 1 220px; min-width: 0; }
 .file-field { display: flex; flex: 1 1 240px; flex-direction: column; gap: 8px; min-width: 0; }
 input[type='file'] { max-width: 100%; }
 .error { color: #b3261e; overflow-wrap: anywhere; }
+.format-help { display: flex; gap: 12px; margin: 0 0 16px; padding: 12px 16px; border: 1px solid #b6c8e0; border-left: 4px solid #1f5fa8; border-radius: 4px; background: #f3f7fc; }
+.format-help mat-icon { flex: none; color: #1f5fa8; }
+.format-help > div { min-width: 0; }
+.format-help p { margin: 0 0 8px; }
+.format-help ul { margin: 0 0 8px; padding-left: 20px; }
+.format-help pre { margin: 0; padding: 8px; overflow-x: auto; background: #fff; border: 1px solid #d0d7de; border-radius: 4px; }
 .table-container { overflow-x: auto; }
 table { width: 100%; min-width: 850px; }
 td { overflow-wrap: anywhere; max-width: 320px; }

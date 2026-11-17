@@ -300,6 +300,37 @@ public class DataAcquisitionLogQueriesTests
     }
 
     [Fact]
+    public async Task HasNoteContainingAsync_MatchesOnlyThatLogsNotes()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var facilityId = $"NoteLookup_{Guid.NewGuid():N}";
+        var withNote = new DataAcquisitionLog { FacilityId = facilityId, FhirVersion = "R4", Status = RequestStatus.Failed };
+        var withoutNote = new DataAcquisitionLog { FacilityId = facilityId, FhirVersion = "R4", Status = RequestStatus.Failed };
+        dbContext.DataAcquisitionLogs.AddRange(withNote, withoutNote);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.DataAcquisitionLogNotes.AddRange(
+            new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = withNote.Id,
+                Note = "[11/2/2026 3:00:00 PM] OperationOutcome encountered (HTTP Unauthorized): Retrying. Attempt 1."
+            },
+            new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = withoutNote.Id,
+                Note = "[11/2/2026 3:00:00 PM] OperationOutcome encountered (HTTP InternalServerError): Retrying. Attempt 1."
+            });
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        Assert.True(await queries.HasNoteContainingAsync(withNote.Id, "OperationOutcome encountered (HTTP Unauthorized)"));
+        Assert.False(await queries.HasNoteContainingAsync(withoutNote.Id, "OperationOutcome encountered (HTTP Unauthorized)"));
+    }
+
+    [Fact]
     public async Task GetTailingMessages_WithCompleted_ReturnsEligibleTailingMessages()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -1450,6 +1481,80 @@ public class DataAcquisitionLogQueriesTests
         var message = Assert.Single(result, m => m.CorrelationId == correlationId);
         Assert.Equal(facilityId, message.FacilityId);
         Assert.Contains(log.Id, message.LogIds);
+    }
+
+    [Fact]
+    public async Task GetAcquiredResourceCountsByPatientTypeAsync_GroupsByPatientAndType()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var reportId = Guid.NewGuid();
+        var otherReportId = Guid.NewGuid();
+        var facilityId = $"AcqCount_{Guid.NewGuid():N}";
+        var otherFacilityId = $"AcqCountOther_{Guid.NewGuid():N}";
+        var schedule = new ScheduledReportEntity
+        {
+            ReportTrackingId = reportId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+        var otherSchedule = new ScheduledReportEntity
+        {
+            ReportTrackingId = otherReportId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        DataAcquisitionLog Log(
+            ScheduledReportEntity scheduledReport,
+            string facility,
+            string? patientId,
+            RequestStatus status,
+            bool deleted,
+            params string[] resourceIds) =>
+            new()
+            {
+                FacilityId = facility,
+                PatientId = patientId,
+                Status = status,
+                IsDeleted = deleted,
+                ReportTrackingId = scheduledReport.ReportTrackingId,
+                CorrelationId = Guid.NewGuid().ToString(),
+                TraceId = Guid.NewGuid().ToString(),
+                FhirVersion = "test",
+                TailSent = true,
+                ScheduledReportEntity = scheduledReport,
+                ResourceIds = resourceIds.Select(id => new DataAcquisitionLogResourceId { ResourceId = id }).ToList()
+            };
+
+        dbContext.DataAcquisitionLogs.AddRange(
+            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false,
+                "Observation/1", "Observation/2", "Encounter/enc-1"),
+            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false, "Observation/3"),
+            Log(schedule, facilityId, "patient-2", RequestStatus.Completed, false, "Condition/c1"),
+            Log(schedule, facilityId, "patient-1", RequestStatus.Pending, false, "Observation/pending"),
+            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, true, "Observation/deleted"),
+            Log(schedule, facilityId, null, RequestStatus.Completed, false, "Observation/no-patient"),
+            Log(schedule, otherFacilityId, "patient-1", RequestStatus.Completed, false, "MedicationRequest/m1"),
+            Log(otherSchedule, facilityId, "patient-1", RequestStatus.Completed, false, "Observation/other-report"));
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var forFacility = await queries.GetAcquiredResourceCountsByPatientTypeAsync(reportId.ToString(), facilityId);
+        var byKey = forFacility.ToDictionary(row => (row.PatientId, row.ResourceType), row => row.Count);
+
+        Assert.Equal(3, forFacility.Count);
+        Assert.Equal(3, byKey[("patient-1", "Observation")]);
+        Assert.Equal(1, byKey[("patient-1", "Encounter")]);
+        Assert.Equal(1, byKey[("patient-2", "Condition")]);
+
+        var forReport = await queries.GetAcquiredResourceCountsByPatientTypeAsync(reportId.ToString());
+        Assert.Equal(4, forReport.Count);
+        Assert.Equal(3, forReport.Single(row => row.PatientId == "patient-1" && row.ResourceType == "Observation").Count);
+        Assert.Contains(forReport, row =>
+            row.PatientId == "patient-1" && row.ResourceType == "MedicationRequest" && row.Count == 1);
     }
 }
 

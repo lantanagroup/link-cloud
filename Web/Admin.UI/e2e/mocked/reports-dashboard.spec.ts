@@ -1,0 +1,295 @@
+import { test, expect } from '../support/test';
+import { ApiMock } from '../support/api-mock';
+import { ReportsDashboardPage } from '../support/pages/reports-dashboard.page';
+import { pagedReportSchedules, reportSchedules } from '../fixtures/report-summaries';
+import { facilityLookup } from '../fixtures/facilities';
+import { IPagedReportSchedule, IReportSchedule } from '../../src/app/interfaces/report/report-schedule.interface';
+
+const RESTORE_BLOCKED = 'Reports deleted mid flight cannot be restored.';
+
+function deletedReport(id: string, facilityId: string, status: string): IReportSchedule {
+  return { ...reportSchedules[0], id, facilityId, status, isDeleted: true };
+}
+
+const SUMMARIES = '/api/aggregate/reports/summaries';
+
+/** The dashboard's own load, plus the lookup behind the facility autocomplete. */
+function mockReports(api: ApiMock, paged: IPagedReportSchedule = pagedReportSchedules()): void {
+  api.mock(`GET ${SUMMARIES}`, paged);
+  api.mock('GET /api/facility/list', facilityLookup());
+}
+
+/** More records than a page, so the paginator has somewhere to go. */
+function multiPage(): IPagedReportSchedule {
+  return { records: reportSchedules, metadata: { pageSize: 10, pageNumber: 1, totalCount: 109, totalPages: 11 } };
+}
+
+/** Params of the most recent summaries request — every filter here refetches server-side. */
+function lastQuery(api: ApiMock): URLSearchParams {
+  const calls = api.callsTo('GET', SUMMARIES);
+  expect(calls.length, 'expected at least one summaries request').toBeGreaterThan(0);
+  return new URL(calls[calls.length - 1].url).searchParams;
+}
+
+test('renders report schedules from the summaries API', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await expect(reports.rows).toHaveCount(reportSchedules.length);
+  await expect(reports.rows.filter({ hasText: 'TestFacility01' })).toContainText(
+    'NHSNdQMAcuteCareHospitalInitialPopulation',
+  );
+  await expect(reports.rows.filter({ hasText: 'TestFacility02' })).toContainText('Monthly');
+});
+
+test('shows the empty state without errors when there are no reports', async ({ page, api }) => {
+  mockReports(api, pagedReportSchedules([]));
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await expect(reports.rows).toHaveCount(0);
+  await expect(reports.emptyState).toBeVisible();
+});
+
+test('the initial load asks for the first page, newest first', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  const q = lastQuery(api);
+  // The component pages from 0 but the API is 1-based — see loadReportSchedules().
+  expect(q.get('pageNumber')).toBe('1');
+  expect(q.get('pageSize')).toBe('10');
+  expect(q.get('sortBy')).toBe('CreateDate');
+  expect(q.get('sortOrder')).toBe('1'); // 1 = descending
+  expect(q.get('includeDeleted')).toBe('false');
+});
+
+test('status is a multi-select and sends one status parameter per selection', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await reports.statusFilter.click();
+  // The options render spaced ("End of Period") but travel as the enum name (EndOfPeriod),
+  // so they must be selected by their display text.
+  await page.getByRole('option', { name: 'Submitted', exact: true }).click();
+  await page.getByRole('option', { name: 'End of Period', exact: true }).click();
+  await page.keyboard.press('Escape');
+
+  // HttpParams.append, not set — repeated keys rather than a comma-joined value.
+  await expect.poll(() => lastQuery(api).getAll('status').sort()).toEqual(['EndOfPeriod', 'Submitted']);
+});
+
+test('the report id filter debounces into a single request', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+  const before = api.callsTo('GET', SUMMARIES).length;
+
+  const term = reportSchedules[0].id.slice(0, 8);
+  await reports.reportIdFilter.pressSequentially(term, { delay: 30 });
+
+  await expect.poll(() => lastQuery(api).get('reportScheduleId')).toBe(term);
+  expect(api.callsTo('GET', SUMMARIES).length - before, 'debounce should collapse the keystrokes').toBe(1);
+});
+
+test('the reporting period To date is widened to the end of that day', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await reports.periodTo.fill('6/30/2026');
+  await reports.periodTo.blur();
+
+  // Picked as local midnight, then pushed to 23:59:59.999 *local* before being serialised as
+  // UTC — so the wire value can land on the following calendar day (verified live: selecting
+  // 6/30 sent 2026-07-01T03:59:59.999Z from a UTC-4 browser). Asserted through a Date so the
+  // check holds in any timezone rather than pinning that ISO string.
+  await expect.poll(() => lastQuery(api).get('reportEndDate')).not.toBeNull();
+  const end = new Date(lastQuery(api).get('reportEndDate')!);
+  expect([end.getFullYear(), end.getMonth(), end.getDate()]).toEqual([2026, 5, 30]); // month is 0-based
+  expect([end.getHours(), end.getMinutes(), end.getSeconds(), end.getMilliseconds()]).toEqual([23, 59, 59, 999]);
+});
+
+test('sorting maps the column to its API field and returns to the first page', async ({ page, api }) => {
+  mockReports(api, { records: reportSchedules, metadata: { pageSize: 10, pageNumber: 2, totalCount: 109, totalPages: 11 } });
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await reports.sortHeader('Facility ID').click();
+
+  await expect.poll(() => lastQuery(api).get('sortBy')).toBe('FacilityId');
+  expect(lastQuery(api).get('sortOrder')).toBe('0'); // first click is ascending
+  expect(lastQuery(api).get('pageNumber'), 'sorting resets paging').toBe('1');
+});
+
+test('paging requests the next page using 1-based numbering', async ({ page, api }) => {
+  mockReports(api, multiPage());
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await page.getByRole('button', { name: 'Next page' }).click();
+
+  await expect.poll(() => lastQuery(api).get('pageNumber')).toBe('2');
+});
+
+test('the chosen page size is remembered across visits', async ({ page, api }) => {
+  mockReports(api, multiPage());
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await reports.setPageSize('25');
+  await expect.poll(() => lastQuery(api).get('pageSize')).toBe('25');
+
+  // Persisted under reportsDashboardPageSize and re-read in ngOnInit, so a fresh visit asks
+  // for 25 without the user touching the paginator again.
+  await reports.goto();
+  await expect.poll(() => lastQuery(api).get('pageSize')).toBe('25');
+});
+
+test('showing deleted reports refetches with includeDeleted and reveals the Deleted column', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+  await expect(reports.table.getByRole('columnheader', { name: 'Deleted' })).toHaveCount(0);
+
+  await reports.showDeletedCheckbox.check();
+
+  await expect.poll(() => lastQuery(api).get('includeDeleted')).toBe('true');
+  await expect(reports.table.getByRole('columnheader', { name: 'Deleted' })).toBeVisible();
+});
+
+test('Clear All Filters shows only while filters are active and resets the query', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+  await expect(reports.clearFiltersButton).toHaveCount(0);
+
+  await reports.frequencyFilter.click();
+  await page.getByRole('option', { name: 'Monthly', exact: true }).click();
+  await expect.poll(() => lastQuery(api).get('frequency')).toBe('Monthly');
+  await expect(reports.clearFiltersButton).toBeVisible();
+
+  await reports.clearFiltersButton.click();
+
+  await expect.poll(() => lastQuery(api).get('frequency')).toBeNull();
+  await expect(reports.clearFiltersButton).toHaveCount(0);
+});
+
+test('row actions appear only for the statuses that allow them', async ({ page, api }) => {
+  mockReports(api);
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  // Rerun covers Submitted and CompletedNotSubmitted; cleanup covers those plus Scheduled
+  // (canCleanUpScheduleStatus), and only while the report is not already deleted. Abort is for
+  // New and EndOfPeriod. TestFacility01 is Submitted; TestFacility02 is "InProgress", which is
+  // not a ScheduleStatus member at all, so that row is bare — it reads like a rendering
+  // fault until you check the template.
+  const submitted = reports.rows.filter({ hasText: 'TestFacility01' });
+  const inProgress = reports.rows.filter({ hasText: 'TestFacility02' });
+
+  await expect(submitted.getByRole('button', { name: /Rerun/ })).toBeVisible();
+  await expect(submitted.getByRole('button', { name: 'Clean up this report' })).toBeVisible();
+  await expect(inProgress.getByRole('button')).toHaveCount(0);
+});
+
+test('soft deleting a report confirms first, then refetches the list', async ({ page, api }) => {
+  mockReports(api);
+  const target = reportSchedules[0]; // Submitted, so it has a delete button
+  api.mock(`DELETE /api/aggregate/reports/${target.id}`, { status: 204 });
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+  const before = api.callsTo('GET', SUMMARIES).length;
+
+  await reports.rows.filter({ hasText: target.facilityId }).getByRole('button', { name: 'Clean up this report' }).click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Remove this report');
+  await dialog.getByRole('button', { name: 'Clean up', exact: true }).click();
+
+  // Poll rather than reading the log straight after the click — the DELETE is in flight and
+  // a synchronous read races it.
+  await expect.poll(() => api.callsTo('DELETE', `/api/aggregate/reports/${target.id}`).length).toBe(1);
+  await expect.poll(() => api.callsTo('GET', SUMMARIES).length).toBeGreaterThan(before);
+});
+
+test('a report that is still running cannot be deleted and says so', async ({ page, api }) => {
+  mockReports(api);
+  const target = reportSchedules[0];
+  api.mock(`DELETE /api/aggregate/reports/${target.id}`, {
+    status: 409,
+    json: { detail: 'Report is currently in progress.' },
+  });
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+
+  await reports.rows.filter({ hasText: target.facilityId }).getByRole('button', { name: 'Clean up this report' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Clean up', exact: true }).click();
+
+  // 409 is special-cased into its own title rather than the generic failure message.
+  const alert = page.getByRole('dialog');
+  await expect(alert).toContainText('Report In Progress');
+  await expect(alert).toContainText('Report is currently in progress.');
+});
+
+test('restore is enabled only for deleted reports that had not started or had finished', async ({ page, api }) => {
+  const scheduled = deletedReport('aaaaaaaa-0000-0000-0000-000000000011', 'RestoreScheduled', 'Scheduled');
+  const submitted = deletedReport('aaaaaaaa-0000-0000-0000-000000000012', 'RestoreSubmitted', 'Submitted');
+  const aborted = deletedReport('aaaaaaaa-0000-0000-0000-000000000013', 'RestoreAborted', 'New');
+  const endOfPeriod = deletedReport('aaaaaaaa-0000-0000-0000-000000000014', 'RestoreEndOfPeriod', 'EndOfPeriod');
+  const skipped = deletedReport('aaaaaaaa-0000-0000-0000-000000000015', 'RestoreSkipped', 'CompletedNotSubmitted');
+  mockReports(api, pagedReportSchedules([scheduled, submitted, aborted, endOfPeriod, skipped]));
+
+  const reports = new ReportsDashboardPage(page);
+  await reports.goto();
+  await reports.showDeletedCheckbox.check();
+
+  const scheduledRow = reports.rows.filter({ hasText: 'RestoreScheduled' });
+  const submittedRow = reports.rows.filter({ hasText: 'RestoreSubmitted' });
+  await expect(scheduledRow.getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+  await expect(submittedRow.getByRole('button', { name: 'Restore this report' })).toBeEnabled();
+
+  for (const facility of ['RestoreAborted', 'RestoreEndOfPeriod', 'RestoreSkipped']) {
+    await expect(reports.rows.filter({ hasText: facility }).getByRole('button', { name: RESTORE_BLOCKED })).toBeDisabled();
+  }
+
+  // The button itself is disabled, so the reason is a tooltip on the wrapper around it.
+  // The wrapper is in the tab order so a keyboard user can focus that reason.
+  const blocked = reports.rows.filter({ hasText: 'RestoreAborted' }).getByRole('button', { name: RESTORE_BLOCKED });
+  const blockedWrapper = blocked.locator('xpath=..');
+  await expect(blockedWrapper).toHaveAttribute('tabindex', '0');
+  await expect(blockedWrapper).toHaveAttribute('aria-label', RESTORE_BLOCKED);
+  await blockedWrapper.hover();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await page.locator('body').hover({ position: { x: 1, y: 1 } });
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveCount(0);
+  // Material shows this tooltip on keyboard focus only, so step away and tab back.
+  await blockedWrapper.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(blockedWrapper).toBeFocused();
+  await expect(page.locator('.mat-mdc-tooltip-surface')).toHaveText(RESTORE_BLOCKED);
+  await expect(scheduledRow.getByRole('button', { name: 'Restore this report' }).locator('xpath=..')).not.toHaveAttribute('tabindex');
+
+  await scheduledRow.getByRole('button', { name: 'Restore this report' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Are you sure you want to restore this report');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  expect(api.callsTo('PATCH', `/api/aggregate/reports/${scheduled.id}/restore`)).toHaveLength(0);
+});

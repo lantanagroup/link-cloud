@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -501,17 +503,17 @@
 <p>Marks a change in patient status so other components know when to start their waiting period before requesting data.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nPatientEvent_630CFEC8["Event: Patient Event"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientEvent_630CFEC8
-  nPatientEvent_630CFEC8 -->|consumed by| nQueryDispatchService_3D6D505["Service: QueryDispatchService"]
-  nPatientEvent_630CFEC8 -->|consumed by| nReportService_417D4454["Service: ReportService"]
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientEvent_630CFEC8
-    nQueryDispatchService_3D6D505
-    nReportService_417D4454
+nPatientEvent_5A657A5A["Event: Patient Event"]
+  nCensusService_2C014B95["Service: CensusService"] -->|produces| nPatientEvent_5A657A5A
+  nPatientEvent_5A657A5A -->|consumed by| nQueryDispatchService_2EC3D027["Service: QueryDispatchService"]
+  nPatientEvent_5A657A5A -->|consumed by| nReportService_7E534222["Service: ReportService"]
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPatientEvent_5A657A5A
+    nQueryDispatchService_2EC3D027
+    nReportService_7E534222
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end
 </pre></div>
 <h2 id="event-schema" class="content-heading">Event Schema <a href="#event-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -541,17 +543,17 @@ nPatientEvent_630CFEC8["Event: Patient Event"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nPatientEvent_630CFEC8["Event: Patient Event"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientEvent_630CFEC8
-  nPatientEvent_630CFEC8 -->|consumed by| nQueryDispatchService_3D6D505["Service: QueryDispatchService"]
-  nPatientEvent_630CFEC8 -->|consumed by| nReportService_417D4454["Service: ReportService"]
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientEvent_630CFEC8
-    nQueryDispatchService_3D6D505
-    nReportService_417D4454
+nPatientEvent_5A657A5A["Event: Patient Event"]
+  nCensusService_2C014B95["Service: CensusService"] -->|produces| nPatientEvent_5A657A5A
+  nPatientEvent_5A657A5A -->|consumed by| nQueryDispatchService_2EC3D027["Service: QueryDispatchService"]
+  nPatientEvent_5A657A5A -->|consumed by| nReportService_7E534222["Service: ReportService"]
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPatientEvent_5A657A5A
+    nQueryDispatchService_2EC3D027
+    nReportService_7E534222
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

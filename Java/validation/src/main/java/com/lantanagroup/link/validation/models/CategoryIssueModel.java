@@ -13,4 +13,5 @@ public class CategoryIssueModel {
     private String code;
     private String expression;
     private String patientId;
+    private String profile;
 }

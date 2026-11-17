@@ -21,7 +21,8 @@ public static class GetServiceHealth
 		TenantService tenantService,
 		MeasureEvalService measureEvalService,
 		ValidationService validationService,
-		TerminologyService terminologyService)
+		TerminologyService terminologyService,
+		NhsnAppBffService nhsnAppBffService)
 	{
 		var serviceName = HtmlInputSanitizer.SanitizeAndRemove(service)?.Trim();
 		if (string.IsNullOrWhiteSpace(serviceName))
@@ -71,6 +72,7 @@ public static class GetServiceHealth
 				"measureeval" or "measureevaluation" => await measureEvalService.LinkServiceHealthCheck(cancellationToken),
 				"validation" => await validationService.LinkServiceHealthCheck(cancellationToken),
 				"terminology" => await terminologyService.LinkServiceHealthCheck(cancellationToken),
+				"nhsnappbff" => await nhsnAppBffService.LinkServiceHealthCheck(cancellationToken),
 				_ => null
 			};
 		}

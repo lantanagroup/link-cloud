@@ -99,7 +99,7 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
         }
 
         // The row has to exist before anything else is decided: the manager's own check fires too late,
-        // after the secrets are written. See docs/other-vendor-oauth-configuration.md.
+        // after the secrets are written. See dev-docs/other-vendor-oauth-configuration.md.
         var queryConfiguration = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityId, ct);
 
         if (queryConfiguration is null)
@@ -116,16 +116,16 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
             throw new BadRequestException("ClientSecret is required because no client secret is stored for this facility.");
         }
 
-        var clientIdName = BuildSecretName(facilityId, ClientIdSuffix);
+        var clientIdName = BuildName(facilityId, ClientIdSuffix);
 
         // An operator may have provisioned the existing secret under a name of their own through the
         // older authentication endpoint. Keep writing to that name rather than orphaning it.
         var clientSecretName = replacingSecret
-            ? BuildSecretName(facilityId, ClientSecretSuffix)
+            ? BuildName(facilityId, ClientSecretSuffix)
             : storedSecretName!;
 
         // Secrets before the row, so the row never points at a name that was never written. The window
-        // this leaves on a repeat write is deliberate. See docs/other-vendor-oauth-configuration.md.
+        // this leaves on a repeat write is deliberate. See dev-docs/other-vendor-oauth-configuration.md.
         await WriteSecretAsync(clientIdName, request.ClientId.Trim(), ct);
 
         if (replacingSecret)
@@ -175,7 +175,7 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
     /// Builds a Key Vault-safe, deterministic name for one of the facility's secrets. The hash keeps
     /// facility ids that differ only in characters the slug replaces, such as "a.b" and "a_b", apart.
     /// </summary>
-    private static string BuildSecretName(string facilityId, string suffix)
+    private static string BuildName(string facilityId, string suffix)
     {
         var slug = new string(facilityId
             .ToLowerInvariant()
@@ -198,7 +198,7 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
     {
         if (!await _secretManager.SetSecretAsync(secretName, secretValue, ct))
         {
-            throw new InvalidOperationException($"The secret manager did not store the secret '{secretName}'.");
+            throw new InvalidOperationException($"The secret manager did not store the secret.");
         }
     }
 

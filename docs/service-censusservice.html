@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -502,25 +504,25 @@
 <p>The system routinely gathers census data by leveraging multiple methods compatible with hospital EHRs. This document provides an overview of each acquisition method, the data elements tracked, and future considerations for expanding data persistence.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nCensusService_676D2042["Service: Census Service"]
-  nCensusService_676D2042 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
-  nCensusService_676D2042 -->|produces| nPatientCensusScheduled_3CE52530["Event: PatientCensusScheduled"]
-  nCensusService_676D2042 -->|produces| nPatientEvent_630CFEC8["Event: PatientEvent"]
-  nPatientListsAcquired_2B002DF["Event: PatientListsAcquired"] -->|consumed by| nCensusService_676D2042
-  nCernerPatientsAcquired_4A156AEE["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_676D2042
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nAuditableEventOccurred_415BEB2
+nCensusService_2C014B95["Service: Census Service"]
+  nCensusService_2C014B95 -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
+  nCensusService_2C014B95 -->|produces| nPatientCensusScheduled_49BC5D3C["Event: PatientCensusScheduled"]
+  nCensusService_2C014B95 -->|produces| nPatientEvent_5A657A5A["Event: PatientEvent"]
+  nPatientListsAcquired_36D412D8["Event: PatientListsAcquired"] -->|consumed by| nCensusService_2C014B95
+  nCernerPatientsAcquired_1DA7A840["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_2C014B95
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nAuditableEventOccurred_AF8D6F7
   end
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nCernerPatientsAcquired_4A156AEE
-    nPatientListsAcquired_2B002DF
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_1DA7A840
+    nPatientListsAcquired_36D412D8
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
-    nPatientEvent_630CFEC8
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPatientCensusScheduled_49BC5D3C
+    nPatientEvent_5A657A5A
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end
 </pre></div>
 <h2 id="event-sourcing-workflow" class="content-heading">Event Sourcing Workflow <a href="#event-sourcing-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Sourcing Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -1401,25 +1403,25 @@ Returns a FHIR List resource with the following structure:</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nCensusService_676D2042["Service: Census Service"]
-  nCensusService_676D2042 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
-  nCensusService_676D2042 -->|produces| nPatientCensusScheduled_3CE52530["Event: PatientCensusScheduled"]
-  nCensusService_676D2042 -->|produces| nPatientEvent_630CFEC8["Event: PatientEvent"]
-  nPatientListsAcquired_2B002DF["Event: PatientListsAcquired"] -->|consumed by| nCensusService_676D2042
-  nCernerPatientsAcquired_4A156AEE["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_676D2042
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nAuditableEventOccurred_415BEB2
+nCensusService_2C014B95["Service: Census Service"]
+  nCensusService_2C014B95 -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
+  nCensusService_2C014B95 -->|produces| nPatientCensusScheduled_49BC5D3C["Event: PatientCensusScheduled"]
+  nCensusService_2C014B95 -->|produces| nPatientEvent_5A657A5A["Event: PatientEvent"]
+  nPatientListsAcquired_36D412D8["Event: PatientListsAcquired"] -->|consumed by| nCensusService_2C014B95
+  nCernerPatientsAcquired_1DA7A840["Event: CernerPatientsAcquired"] -->|consumed by| nCensusService_2C014B95
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nAuditableEventOccurred_AF8D6F7
   end
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nCernerPatientsAcquired_4A156AEE
-    nPatientListsAcquired_2B002DF
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_1DA7A840
+    nPatientListsAcquired_36D412D8
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
-    nPatientEvent_630CFEC8
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPatientCensusScheduled_49BC5D3C
+    nPatientEvent_5A657A5A
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

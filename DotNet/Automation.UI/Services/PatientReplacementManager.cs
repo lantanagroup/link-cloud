@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Automation;
+using LantanaGroup.Automation.Diagnostics;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
@@ -77,6 +78,10 @@ public sealed class PatientReplacementManager : IDisposable
                 _automationConfig.FhirServerBase,
                 _automationConfig.FhirServerOAuth,
                 _automationConfig.FhirServerBasicAuth);
+            loader.UseOperationContext(new FhirOperationContext
+            {
+                Logger = _logger
+            });
 
             operation.Update("purging", "Requesting FHIR resource expunge.");
             var purge = await loader.DeleteResourcesWithExpungeAsync(resourcesToDelete, ct);
@@ -108,6 +113,10 @@ public sealed class PatientReplacementManager : IDisposable
         catch (OperationCanceledException)
         {
             operation.Fail($"FHIR patient replacement timed out or was canceled for patient '{operation.PatientId}'.");
+        }
+        catch (OperationFailedException ex)
+        {
+            operation.Fail(ex.Failure.FormattedBlock);
         }
         catch (Exception ex)
         {

@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -547,13 +549,13 @@
 </table>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nSubmissionService_40C7BB9B["Service: Submission Service"]
-  nSubmissionService_40C7BB9B -->|produces| nPayloadSubmitted_40AD77DB["Event: PayloadSubmitted"]
-  nSubmitPayload_7A027AAE["Event: SubmitPayload"] -->|consumed by| nSubmissionService_40C7BB9B
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPayloadSubmitted_40AD77DB
-    nSubmissionService_40C7BB9B
-    nSubmitPayload_7A027AAE
+nSubmissionService_30800FFD["Service: Submission Service"]
+  nSubmissionService_30800FFD -->|produces| nPayloadSubmitted_1D7D15C7["Event: PayloadSubmitted"]
+  nSubmitPayload_6536AAAF["Event: SubmitPayload"] -->|consumed by| nSubmissionService_30800FFD
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPayloadSubmitted_1D7D15C7
+    nSubmissionService_30800FFD
+    nSubmitPayload_6536AAAF
   end
 </pre></div>
 <h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -831,13 +833,13 @@ nSubmissionService_40C7BB9B["Service: Submission Service"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nSubmissionService_40C7BB9B["Service: Submission Service"]
-  nSubmissionService_40C7BB9B -->|produces| nPayloadSubmitted_40AD77DB["Event: PayloadSubmitted"]
-  nSubmitPayload_7A027AAE["Event: SubmitPayload"] -->|consumed by| nSubmissionService_40C7BB9B
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPayloadSubmitted_40AD77DB
-    nSubmissionService_40C7BB9B
-    nSubmitPayload_7A027AAE
+nSubmissionService_30800FFD["Service: Submission Service"]
+  nSubmissionService_30800FFD -->|produces| nPayloadSubmitted_1D7D15C7["Event: PayloadSubmitted"]
+  nSubmitPayload_6536AAAF["Event: SubmitPayload"] -->|consumed by| nSubmissionService_30800FFD
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPayloadSubmitted_1D7D15C7
+    nSubmissionService_30800FFD
+    nSubmitPayload_6536AAAF
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

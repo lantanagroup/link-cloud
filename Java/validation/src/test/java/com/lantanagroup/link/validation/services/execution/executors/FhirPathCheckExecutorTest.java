@@ -1,0 +1,317 @@
+package com.lantanagroup.link.validation.services.execution.executors;
+
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.fhirpath.IFhirPath;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.entities.RubricCheck;
+import com.lantanagroup.link.validation.enums.CheckType;
+import com.lantanagroup.link.validation.enums.PiqiDimension;
+import com.lantanagroup.link.validation.enums.Severity;
+import com.lantanagroup.link.validation.models.ExecutionContext;
+import com.lantanagroup.link.validation.models.RawFinding;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Patient;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class FhirPathCheckExecutorTest {
+
+    private static final FhirContext FHIR_CONTEXT = FhirContext.forR4();
+    private static final IFhirPath FHIR_PATH = FHIR_CONTEXT.newFhirPath();
+
+    private final FhirPathCheckExecutor executor = new FhirPathCheckExecutor(FHIR_PATH, new ObjectMapper());
+
+    private static RubricCheck check(String parametersJson, Severity severityOverride) {
+        return RubricCheck.builder()
+                .checkLocalId("fp-1")
+                .dimension(PiqiDimension.CONFORMANCE)
+                .severityOverride(severityOverride)
+                .parametersJson(parametersJson)
+                .build();
+    }
+
+    private static ExecutionContext context(Patient patient) {
+        return ExecutionContext.builder().resource(patient).build();
+    }
+
+    @Test
+    @DisplayName("supports FHIRPATH")
+    void supportsFhirpath() {
+        assertThat(executor.supports()).isEqualTo(CheckType.FHIRPATH);
+    }
+
+    @Test
+    @DisplayName("a satisfied assertion produces no findings")
+    void satisfiedAssertionPasses() {
+        Patient patient = new Patient();
+        patient.setActive(true);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.active\"}", null), context(patient));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a failed assertion produces one ERROR finding by default, carrying the expression")
+    void failedAssertionProducesError() {
+        Patient patient = new Patient();
+        patient.setActive(false);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.active\"}", null), context(patient));
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("fhirpath-assertion-failed");
+        assertThat(findings.get(0).getSeverity()).isEqualTo(Severity.ERROR);
+        assertThat(findings.get(0).getExpression()).isEqualTo("Patient.active");
+    }
+
+    @Test
+    @DisplayName("a severity override on the check is applied to the finding")
+    void severityOverrideApplied() {
+        Patient patient = new Patient();
+        patient.setActive(false);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.active\"}", Severity.WARNING), context(patient));
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getSeverity()).isEqualTo(Severity.WARNING);
+    }
+
+    @Test
+    @DisplayName("custom code and failureMessage from parameters are used")
+    void customCodeAndMessage() {
+        Patient patient = new Patient();
+        patient.setActive(false);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.active\",\"code\":\"patient-inactive\",\"failureMessage\":\"must be active\"}", null),
+                context(patient));
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("patient-inactive");
+        assertThat(findings.get(0).getMessage()).isEqualTo("must be active");
+    }
+
+    @Test
+    @DisplayName("missing parameters -> no findings")
+    void missingParameters() {
+        assertThat(executor.execute(check(null, null), context(new Patient()))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("missing expression -> no findings")
+    void missingExpression() {
+        assertThat(executor.execute(check("{}", null), context(new Patient()))).isEmpty();
+    }
+
+    // empty-Bundle payload: resource is the Bundle, bundleEntries is empty. Must NOT be treated
+    // like a bare single resource (which would run resource-typed checks against the envelope).
+    private static ExecutionContext emptyBundleContext() {
+        return ExecutionContext.builder()
+                .resource(new Bundle())
+                .bundleEntries(List.of())
+                .build();
+    }
+
+    @Test
+    @DisplayName("empty bundle: a resource-typed check produces NO findings (not phantom findings against the Bundle)")
+    void emptyBundleResourceTypedCheckHasNoFindings() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.name.exists()\"}", null), emptyBundleContext());
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("empty bundle: a Bundle-level expression still evaluates against the Bundle so it can be flagged")
+    void emptyBundleBundleLevelExpressionStillEvaluated() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Bundle.entry.count() >= 1\",\"code\":\"bundle-empty\"}", null),
+                emptyBundleContext());
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("bundle-empty");
+        assertThat(findings.get(0).getLocation()).isEqualTo("Bundle");
+    }
+
+    @Test
+    @DisplayName("parenthesised invariant is scoped to its resource type, not fanned out across all entries")
+    void parenthesisedInvariantIsScopedToResourceType() {
+        // A DiagnosticReport US Core invariant written as a grouped expression. Historically the
+        // leading '(' hid the resource type, so this ran against every entry and reported a phantom
+        // failure on the Patient, Observation, etc. It must now target only the DiagnosticReport.
+        org.hl7.fhir.r4.model.DiagnosticReport dr = new org.hl7.fhir.r4.model.DiagnosticReport();
+        dr.setId("dr1");
+        dr.setStatus(org.hl7.fhir.r4.model.DiagnosticReport.DiagnosticReportStatus.FINAL); // issued absent -> should fail
+        Patient patient = new Patient();
+        patient.setId("p1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(dr);
+        bundle.addEntry().setResource(patient);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(dr, patient))
+                .build();
+
+        String expr = "(DiagnosticReport.status='partial' or DiagnosticReport.status='preliminary' "
+                + "or DiagnosticReport.status='final' or DiagnosticReport.status='amended' "
+                + "or DiagnosticReport.status='corrected' or DiagnosticReport.status='appended') "
+                + "implies DiagnosticReport.issued.exists()";
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"" + expr + "\"}", null), ctx);
+
+        // Exactly one finding, on the DiagnosticReport only — never on the Patient.
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getLocation()).isEqualTo("DiagnosticReport/dr1");
+    }
+
+    @Test
+    @DisplayName("parenthesised invariant that holds on its resource type produces no phantom findings on other types")
+    void parenthesisedInvariantSatisfiedNoPhantomFindings() {
+        org.hl7.fhir.r4.model.DiagnosticReport dr = new org.hl7.fhir.r4.model.DiagnosticReport();
+        dr.setId("dr1");
+        dr.setStatus(org.hl7.fhir.r4.model.DiagnosticReport.DiagnosticReportStatus.FINAL);
+        dr.setIssuedElement(new org.hl7.fhir.r4.model.InstantType("2024-01-01T00:00:00Z")); // issued present -> passes
+        Patient patient = new Patient();
+        patient.setId("p1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(dr);
+        bundle.addEntry().setResource(patient);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(dr, patient))
+                .build();
+
+        String expr = "(DiagnosticReport.status='final') implies DiagnosticReport.issued.exists()";
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"" + expr + "\"}", null), ctx);
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("non-empty bundle: a resource-typed check runs once per matching entry")
+    void nonEmptyBundleTargetsMatchingEntries() {
+        Patient withName = new Patient();
+        withName.setId("with");
+        withName.addName().setFamily("Doe");
+        Patient withoutName = new Patient();
+        withoutName.setId("without");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(withName);
+        bundle.addEntry().setResource(withoutName);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(withName, withoutName))
+                .build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.name.exists()\"}", null), ctx);
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getLocation()).isEqualTo("Patient/without");
+    }
+
+    // ------------------------------------------------------------------
+    // Single non-Bundle resource: an expression whose leading resource type does not match the root
+    // must be skipped, not evaluated against the wrong resource. Previously "Condition.exists()" run
+    // against a lone Patient evaluated to false and invented a spurious finding.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("single resource: an expression for a DIFFERENT resource type is skipped (no phantom finding)")
+    void singleResourceMismatchedTypeExpressionSkipped() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Condition.exists()\"}", null), context(new Patient()));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("single resource: a nested expression for a different resource type is skipped too")
+    void singleResourceMismatchedNestedExpressionSkipped() {
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Condition.id.exists()\"}", null), context(new Patient()));
+
+        assertThat(findings).isEmpty();
+    }
+
+    @Test
+    @DisplayName("single resource: an expression for the SAME resource type still evaluates (and can fail)")
+    void singleResourceMatchingTypeStillEvaluated() {
+        Patient patient = new Patient();
+        patient.setActive(false);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Patient.active\"}", null), context(patient));
+
+        assertThat(findings).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("single resource: an unscoped/relative expression still evaluates against the root")
+    void singleResourceRelativeExpressionStillEvaluated() {
+        Patient patient = new Patient();
+        patient.setActive(false);
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"active\"}", null), context(patient));
+
+        assertThat(findings).hasSize(1);
+    }
+
+    // ------------------------------------------------------------------
+    // The recommended authoring pattern for "a resource of type X must be present": a Bundle-level
+    // expression, so it evaluates against the Bundle and can fail when the type is absent. Bare
+    // "Condition.exists()" against a Bundle would filter to zero Condition entries and vacuously pass.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("bundle-level ofType existence expression FAILS when the required resource type is absent")
+    void bundleLevelExistenceFlagsMissingResource() {
+        Patient patient = new Patient();
+        patient.setId("p1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(patient);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(patient))
+                .build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Bundle.entry.resource.ofType(Condition).exists()\",\"code\":\"condition-missing\"}", null),
+                ctx);
+
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getCode()).isEqualTo("condition-missing");
+        assertThat(findings.get(0).getLocation()).isEqualTo("Bundle");
+    }
+
+    @Test
+    @DisplayName("bundle-level ofType existence expression PASSES when the required resource type is present")
+    void bundleLevelExistencePassesWhenPresent() {
+        Patient patient = new Patient();
+        patient.setId("p1");
+        org.hl7.fhir.r4.model.Condition condition = new org.hl7.fhir.r4.model.Condition();
+        condition.setId("c1");
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(patient);
+        bundle.addEntry().setResource(condition);
+        ExecutionContext ctx = ExecutionContext.builder()
+                .resource(bundle)
+                .bundleEntries(List.of(patient, condition))
+                .build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"expression\":\"Bundle.entry.resource.ofType(Condition).exists()\"}", null), ctx);
+
+        assertThat(findings).isEmpty();
+    }
+}

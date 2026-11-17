@@ -201,7 +201,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NotificationConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck<NotificationDbContext>>("Database")
+        .AddCheck<DatabaseHealthCheck<NotificationDbContext>>(HealthCheckNames.SqlServerDatabase)
         .AddKafka(kafkaHealthOptions);
 
     //Add Hosted Services

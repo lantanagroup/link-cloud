@@ -3,6 +3,7 @@ using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Controllers;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
+using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -536,6 +537,192 @@ public class PatientEventsControllerTests
             db.PatientEvents.RemoveRange(allEvents);
             await db.SaveChangesAsync();
         }
+    }
+
+    #endregion
+
+    #region GetPatientEncounterSnapshot Tests
+
+    // An admit recorded at day 0 and a discharge recorded at day 2, with CreateDate set the way the interceptor sets it in
+    // production: the moment Census stored the event.
+    private static readonly DateTime SnapshotRecordedAdmit = new(2026, 1, 1, 8, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime SnapshotRecordedDischarge = SnapshotRecordedAdmit.AddDays(2);
+
+    private static async Task<(string FacilityId, string CorrelationId, string PatientId, List<PatientEvent> Events)> SeedAdmitThenDischarge(CensusContext db)
+    {
+        var facilityId = "TestFacility" + Guid.NewGuid();
+        var correlationId = Guid.NewGuid().ToString();
+        var patientId = Guid.NewGuid().ToString();
+
+        var admit = new FHIRListAdmitPayload(patientId, SnapshotRecordedAdmit.AddHours(-1)).CreatePatientEvent(facilityId, correlationId);
+        admit.CreateDate = SnapshotRecordedAdmit;
+        var discharge = new FHIRListDischargePayload(patientId, SnapshotRecordedDischarge.AddHours(-1)).CreatePatientEvent(facilityId, correlationId);
+        discharge.CreateDate = SnapshotRecordedDischarge;
+
+        var events = new List<PatientEvent> { admit, discharge };
+        await db.PatientEvents.AddRangeAsync(events);
+        await db.SaveChangesAsync();
+
+        return (facilityId, correlationId, patientId, events);
+    }
+
+    [Fact]
+    public async Task GetPatientEncounterSnapshot_BeforeDischargeRecorded_ReturnsAdmittedEncounter()
+    {
+        var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        var (facilityId, correlationId, patientId, events) = await SeedAdmitThenDischarge(db);
+
+        try
+        {
+            var result = await controller.GetPatientEncounterSnapshot(correlationId, facilityId, SnapshotRecordedAdmit.AddDays(1), default);
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var snapshot = Assert.IsType<PatientEncounterModel>(ok.Value);
+            Assert.Equal(correlationId, snapshot.CorrelationId);
+            Assert.Equal(SnapshotRecordedAdmit.AddHours(-1), snapshot.AdmitDate.ToUniversalTime());
+            Assert.Null(snapshot.DischargeDate);
+            Assert.Contains(snapshot.PatientIdentifiers, i => i.Identifier == patientId);
+
+            // The snapshot is computed, never written to the materialized view.
+            Assert.False(db.PatientEncounters.Any(e => e.CorrelationId == correlationId));
+        }
+        finally
+        {
+            db.PatientEvents.RemoveRange(events);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GetPatientEncounterSnapshot_AfterDischargeRecorded_ReturnsDischargedEncounter()
+    {
+        var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        var (facilityId, correlationId, _, events) = await SeedAdmitThenDischarge(db);
+
+        try
+        {
+            // Inclusive: an event recorded exactly at the threshold is part of the snapshot.
+            var result = await controller.GetPatientEncounterSnapshot(correlationId, facilityId, SnapshotRecordedDischarge, default);
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var snapshot = Assert.IsType<PatientEncounterModel>(ok.Value);
+            Assert.Equal(SnapshotRecordedDischarge.AddHours(-1), snapshot.DischargeDate?.ToUniversalTime());
+        }
+        finally
+        {
+            db.PatientEvents.RemoveRange(events);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GetPatientEncounterSnapshot_LocalThreshold_IsComparedAsUtc()
+    {
+        var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        var (facilityId, correlationId, _, events) = await SeedAdmitThenDischarge(db);
+
+        try
+        {
+            // Model binding hands over a value with an offset as local time; the same instant must give the same answer.
+            var result = await controller.GetPatientEncounterSnapshot(correlationId, facilityId, SnapshotRecordedDischarge.ToLocalTime(), default);
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.NotNull(Assert.IsType<PatientEncounterModel>(ok.Value).DischargeDate);
+        }
+        finally
+        {
+            db.PatientEvents.RemoveRange(events);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GetPatientEncounterSnapshot_BeforeAdmitRecorded_ReturnsNotFound()
+    {
+        var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        var (facilityId, correlationId, _, events) = await SeedAdmitThenDischarge(db);
+
+        try
+        {
+            var result = await controller.GetPatientEncounterSnapshot(correlationId, facilityId, SnapshotRecordedAdmit.AddSeconds(-1), default);
+
+            Assert.IsType<NotFoundObjectResult>(result.Result);
+        }
+        finally
+        {
+            db.PatientEvents.RemoveRange(events);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GetPatientEncounterSnapshot_OtherFacility_ReturnsNotFound()
+    {
+        var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        var (_, correlationId, _, events) = await SeedAdmitThenDischarge(db);
+
+        try
+        {
+            var result = await controller.GetPatientEncounterSnapshot(correlationId, "OtherFacility" + Guid.NewGuid(), null, default);
+
+            Assert.IsType<NotFoundObjectResult>(result.Result);
+        }
+        finally
+        {
+            db.PatientEvents.RemoveRange(events);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GetPatientEncounterSnapshot_Now_MatchesRebuiltEncounter()
+    {
+        var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
+        var (facilityId, correlationId, _, events) = await SeedAdmitThenDischarge(db);
+
+        try
+        {
+            await queries.RebuildPatientEncounterTable(facilityId, correlationId, useTransaction: false);
+            var rebuilt = await queries.GetPatientEncounterByCorrelationIdAsync(correlationId, default);
+
+            var result = await controller.GetPatientEncounterSnapshot(correlationId, facilityId, null, default);
+
+            var snapshot = Assert.IsType<PatientEncounterModel>(Assert.IsType<OkObjectResult>(result.Result).Value);
+            Assert.NotNull(rebuilt);
+            // Payload dates round-trip through JSON with a local Kind, so compare instants.
+            Assert.Equal(rebuilt.AdmitDate.ToUniversalTime(), snapshot.AdmitDate.ToUniversalTime());
+            Assert.Equal(rebuilt.DischargeDate?.ToUniversalTime(), snapshot.DischargeDate?.ToUniversalTime());
+            Assert.Equal(rebuilt.MedicalRecordNumber, snapshot.MedicalRecordNumber);
+            Assert.Equal(
+                rebuilt.PatientIdentifiers.Select(i => (i.Identifier, i.SourceType)).OrderBy(x => x.Identifier),
+                snapshot.PatientIdentifiers.Select(i => (i.Identifier, i.SourceType)).OrderBy(x => x.Identifier));
+        }
+        finally
+        {
+            db.PatientEvents.RemoveRange(events);
+            await db.SaveChangesAsync();
+            // With its events gone, a rebuild removes the encounter it wrote above.
+            await queries.RebuildPatientEncounterTable(facilityId, correlationId, useTransaction: false);
+        }
+    }
+
+    [Theory]
+    [InlineData("", "facility")]
+    [InlineData("correlation", "")]
+    public async Task GetPatientEncounterSnapshot_MissingInput_ReturnsBadRequest(string correlationId, string facilityId)
+    {
+        var controller = _fixture.ServiceProvider.GetRequiredService<PatientEventsController>();
+
+        var result = await controller.GetPatientEncounterSnapshot(correlationId, facilityId, null, default);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     #endregion

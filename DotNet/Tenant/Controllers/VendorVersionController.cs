@@ -1,5 +1,6 @@
 using AutoMapper;
 using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Auditing;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -45,6 +46,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
             _vendorQueries = vendorQueries;
             _logger = logger;
         }
+
+        /// <summary>
+        /// The request's audit context. Null when the controller is constructed directly, outside a
+        /// request.
+        /// </summary>
+        private IAuditContext? Audit => HttpContext?.RequestServices?.GetService<IAuditContext>();
 
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorVersionModel))]
@@ -99,6 +106,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpPost]
+        [Auditable(AuditEventType.Create, "VendorVersion")]
         [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -113,6 +121,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     return BadRequest();
                 }
                 var newVendorVersion = await _vendorManager.CreateVendorVersionAsync(new VendorVersionModel { VendorId = createVendorVersionModel.VendorId, Version = createVendorVersionModel.Version });
+
+                //a vendor version is not facility-scoped; its own id is only known once it exists.
+                if (Audit is { } audit)
+                {
+                    audit.RecordId = newVendorVersion.Id.ToString();
+                }
+
                 return CreatedAtAction(nameof(Get), new { id = newVendorVersion.Id }, newVendorVersion);
             }
             catch (Exception ex)
@@ -122,6 +137,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpPut("{id}")]
+        [Auditable(AuditEventType.Update, "VendorVersion")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorVersionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -155,11 +171,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Auditable(AuditEventType.Delete, "VendorVersion", "Id {id} deleted (Vendor: {Name}, Version: {Version})")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Delete(string id)
+        public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -173,11 +190,21 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     return BadRequest();
                 }
                 
-                if(await _vendorQueries.GetVendorVersion(parsedId) == null)
+                var existingVendorVersion = await _vendorQueries.GetVendorVersion(parsedId, cancellationToken);
+                if (existingVendorVersion == null)
                 {
                     return BadRequest();
                 }
-                await _vendorManager.DeleteVendorVersionAsync(parsedId);
+
+                //the note names the vendor and the version, which the row this check already read
+                //carries and the delete takes away.
+                if (Audit is { } audit)
+                {
+                    audit.Set("Name", existingVendorVersion.VendorName);
+                    audit.Set("Version", existingVendorVersion.Version);
+                }
+
+                await _vendorManager.DeleteVendorVersionAsync(parsedId, cancellationToken);
 
                 return NoContent();
             }

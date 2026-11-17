@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
@@ -131,6 +131,19 @@ public class FacilityTemplateTests
     {
         public System.Threading.Tasks.Task<List<FacilityTemplate>> GetAllAsync(CancellationToken ct = default) =>
             System.Threading.Tasks.Task.FromResult(new List<FacilityTemplate> { template });
+
+        public System.Threading.Tasks.Task<long> CountAsync(CancellationToken ct = default) =>
+            System.Threading.Tasks.Task.FromResult(1L);
+
+        public System.Threading.Tasks.Task<List<FacilityTemplate>> GetPageAsync(
+            int skip,
+            int take,
+            CancellationToken ct = default) =>
+            System.Threading.Tasks.Task.FromResult(
+                new List<FacilityTemplate> { template }
+                    .Skip(skip)
+                    .Take(take)
+                    .ToList());
 
         public System.Threading.Tasks.Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
             System.Threading.Tasks.Task.FromResult(id == template.Id ? template : null);

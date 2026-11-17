@@ -12,16 +12,27 @@ public sealed class NormalizationSuiteApplicationValidator
         _output = output;
     }
 
-    public Task ValidateAllAsync(
+    public async Task ValidateAllAsync(
         IDictionary<string, object> internalAbsResources,
         NormalizationSuiteResolution suiteResolution,
         IReadOnlyList<string>? normalizationSummaryLogs = null,
         IReadOnlyCollection<string>? acquiredResourceTypes = null)
     {
+        using var package = ReportPackage.FromTextEntries(TextEntries(internalAbsResources));
+        await ValidateAllAsync(package, suiteResolution, normalizationSummaryLogs, acquiredResourceTypes);
+    }
+
+    public Task ValidateAllAsync(
+        ReportPackage package,
+        NormalizationSuiteResolution suiteResolution,
+        IReadOnlyList<string>? normalizationSummaryLogs = null,
+        IReadOnlyCollection<string>? acquiredResourceTypes = null)
+    {
+        ArgumentNullException.ThrowIfNull(package);
         var errors = new List<string>();
         var warnings = new List<string>();
 
-        var parsedResources = ParseInternalAbsResources(internalAbsResources, errors);
+        var parsedResources = ParseInternalAbsResources(package, errors);
         var plannedOperations = NormalizationRuntimeSequencePlanner.Plan(suiteResolution);
         var executionEvidence = ParseExecutionEvidence(normalizationSummaryLogs ?? [], warnings);
         var acquiredTypes = acquiredResourceTypes is { Count: > 0 }
@@ -94,13 +105,26 @@ public sealed class NormalizationSuiteApplicationValidator
         throw new InvalidOperationException($"NORMALIZATION SUITE APPLICATION VALIDATION failed with {errors.Count} issue(s).");
     }
 
-    private List<AbsResourceRecord> ParseInternalAbsResources(IDictionary<string, object> internalAbsResources, List<string> errors)
+    private static IEnumerable<KeyValuePair<string, string>> TextEntries(IDictionary<string, object> files)
+    {
+        foreach (var (key, value) in files)
+        {
+            if (value is string text)
+                yield return new KeyValuePair<string, string>(key, text);
+        }
+    }
+
+    private List<AbsResourceRecord> ParseInternalAbsResources(ReportPackage package, List<string> errors)
     {
         var parsed = new List<AbsResourceRecord>();
 
-        foreach (var kvp in internalAbsResources)
+        foreach (var name in package.EntryNames)
         {
-            if (!kvp.Key.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase) || kvp.Value is not string ndjson)
+            if (!name.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var ndjson = package.ReadEntryText(name);
+            if (ndjson == null)
                 continue;
 
             var lineNumber = 0;
@@ -114,21 +138,20 @@ public sealed class NormalizationSuiteApplicationValidator
                 try
                 {
                     using var doc = JsonDocument.Parse(trimmed);
-                    var root = doc.RootElement.Clone();
-                    var resourceType = GetString(root, "resourceType") ?? string.Empty;
-                    var id = GetString(root, "id") ?? string.Empty;
+                    var resourceType = GetString(doc.RootElement, "resourceType") ?? string.Empty;
+                    var id = GetString(doc.RootElement, "id") ?? string.Empty;
 
                     if (string.IsNullOrWhiteSpace(resourceType))
                     {
-                        AddError(errors, $"{kvp.Key}:{lineNumber} has no resourceType.");
+                        AddError(errors, $"{name}:{lineNumber} has no resourceType.");
                         continue;
                     }
 
-                    parsed.Add(new AbsResourceRecord(kvp.Key, lineNumber, resourceType, id, root));
+                    parsed.Add(new AbsResourceRecord(name, lineNumber, resourceType, id));
                 }
                 catch (Exception ex)
                 {
-                    AddError(errors, $"Failed to parse {kvp.Key}:{lineNumber}: {ex.Message}");
+                    AddError(errors, $"Failed to parse {name}:{lineNumber}: {ex.Message}");
                 }
             }
         }
@@ -320,6 +343,6 @@ public sealed class NormalizationSuiteApplicationValidator
             warnings.Add(message);
     }
 
-    private sealed record AbsResourceRecord(string SourceFile, int LineNumber, string ResourceType, string ResourceId, JsonElement Resource);
+    private sealed record AbsResourceRecord(string SourceFile, int LineNumber, string ResourceType, string ResourceId);
     private sealed record ExecutionEvidenceRecord(string ResourceType, string ResourceId, int Sequence, string OperationType, string OperationName, string Outcome);
 }

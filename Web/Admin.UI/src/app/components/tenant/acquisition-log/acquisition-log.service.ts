@@ -19,7 +19,7 @@ export class AcquisitionLogService {
 
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
-  baseUrl = `${this.appConfigService.config?.baseApiUrl}/data/acquisition-logs`;
+  baseUrl = `${this.appConfigService.config?.baseApiUrl}/data-acquisition/acquisition-logs`;
 
   getAcquisitionLogs(
     patientId: string | null,

@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -502,17 +504,17 @@
 <h2 id="nodes" class="content-heading">Nodes <a href="#nodes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Nodes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nNormalizationService_2861AAD1["Service: Normalization Service"]
-  nNormalizationService_2861AAD1 -->|produces| nresources_normalized_47A49D1["Event: resources-normalized"]
-  nresources_acquired_6963A69E["Event: resources-acquired"] -->|consumed by| nNormalizationService_2861AAD1
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nresources_normalized_47A49D1
+nNormalizationService_78B0F5BC["Service: Normalization Service"]
+  nNormalizationService_78B0F5BC -->|produces| nresources_normalized_6C1D52A7["Event: resources-normalized"]
+  nresources_acquired_7C72478A["Event: resources-acquired"] -->|consumed by| nNormalizationService_78B0F5BC
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nresources_normalized_6C1D52A7
   end
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nresources_acquired_6963A69E
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nresources_acquired_7C72478A
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nNormalizationService_2861AAD1
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nNormalizationService_78B0F5BC
   end
 </pre></div>
 <h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -633,9 +635,60 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-1" aria-expanded="false"><strong>dbo.Operation</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-1" aria-expanded="false"><strong>dbo.FacilityLocationLocalCodeMappings</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-normalizationservice-1" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">FacilityLocationId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">LocalCodeSystem</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">LocalCode</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">HSLOCId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-2" aria-expanded="false"><strong>dbo.FacilityLocations</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-normalizationservice-2" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">LocationId</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">PartOfId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">ParentFacilityLocationId</span></td><td>string</td><td>No</td><td>450</td></tr><tr><td><span style="padding-left:0px">LocationName</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">LocationAlias</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-3" aria-expanded="false"><strong>dbo.HSLOC</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-normalizationservice-3" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">HSLOCCode</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">CDCCode</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ShortDescription</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">LongDescription</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Version</span></td><td>string</td><td>Yes</td><td>450</td></tr><tr><td><span style="padding-left:0px">IsActive</span></td><td>boolean</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-4" aria-expanded="false"><strong>dbo.Operation</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-normalizationservice-4" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -650,9 +703,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-2" aria-expanded="false"><strong>dbo.OperationResourceTypes</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-5" aria-expanded="false"><strong>dbo.OperationResourceTypes</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-2" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-5" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -667,9 +720,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-3" aria-expanded="false"><strong>dbo.OperationSequence</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-6" aria-expanded="false"><strong>dbo.OperationSequence</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-3" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-6" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -684,9 +737,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-4" aria-expanded="false"><strong>dbo.ResourceType</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-7" aria-expanded="false"><strong>dbo.ResourceType</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-4" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-7" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -701,9 +754,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-5" aria-expanded="false"><strong>dbo.VendorVersionOperationPreset</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-8" aria-expanded="false"><strong>dbo.VendorVersionOperationPreset</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-5" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-8" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -718,9 +771,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-6" aria-expanded="false"><strong>quartz.QRTZ_BLOB_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-9" aria-expanded="false"><strong>quartz.QRTZ_BLOB_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-6" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-9" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -735,9 +788,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-7" aria-expanded="false"><strong>quartz.QRTZ_CALENDARS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-10" aria-expanded="false"><strong>quartz.QRTZ_CALENDARS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-7" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-10" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -752,9 +805,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-8" aria-expanded="false"><strong>quartz.QRTZ_CRON_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-11" aria-expanded="false"><strong>quartz.QRTZ_CRON_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-8" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-11" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -769,9 +822,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-9" aria-expanded="false"><strong>quartz.QRTZ_FIRED_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-12" aria-expanded="false"><strong>quartz.QRTZ_FIRED_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-9" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-12" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -786,9 +839,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-10" aria-expanded="false"><strong>quartz.QRTZ_JOB_DETAILS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-13" aria-expanded="false"><strong>quartz.QRTZ_JOB_DETAILS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-10" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-13" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -803,9 +856,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-11" aria-expanded="false"><strong>quartz.QRTZ_LOCKS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-14" aria-expanded="false"><strong>quartz.QRTZ_LOCKS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-11" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-14" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -820,9 +873,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-12" aria-expanded="false"><strong>quartz.QRTZ_PAUSED_TRIGGER_GRPS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-15" aria-expanded="false"><strong>quartz.QRTZ_PAUSED_TRIGGER_GRPS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-12" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-15" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -837,9 +890,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-13" aria-expanded="false"><strong>quartz.QRTZ_SCHEDULER_STATE</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-16" aria-expanded="false"><strong>quartz.QRTZ_SCHEDULER_STATE</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-13" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-16" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -854,9 +907,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-14" aria-expanded="false"><strong>quartz.QRTZ_SIMPLE_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-17" aria-expanded="false"><strong>quartz.QRTZ_SIMPLE_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-14" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-17" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -871,9 +924,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-15" aria-expanded="false"><strong>quartz.QRTZ_SIMPROP_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-18" aria-expanded="false"><strong>quartz.QRTZ_SIMPROP_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-15" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-18" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -888,9 +941,9 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-16" aria-expanded="false"><strong>quartz.QRTZ_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-normalizationservice-19" aria-expanded="false"><strong>quartz.QRTZ_TRIGGERS</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
-  <div id="db-schema-card-normalizationservice-16" class="card-body export-collapsible">
+  <div id="db-schema-card-normalizationservice-19" class="card-body export-collapsible">
     <div class="table-responsive">
       <table class="table table-sm table-striped align-middle">
         <thead>
@@ -1378,6 +1431,246 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
   </div>
 </div>
 <div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-post-api-normalization-facility-locations-facilities-facilityid-locations" aria-expanded="false"><strong>POST</strong> <code>/api/normalization/facility-locations/facilities/{facilityId}/locations</code></a></div>
+  <div id="openapi-card-normalizationservice-post-api-normalization-facility-locations-facilities-facilityid-locations" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-api-normalization-facility-locations-facilities-facilityid-locations-locationid" aria-expanded="false"><strong>GET</strong> <code>/api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}</code></a></div>
+  <div id="openapi-card-normalizationservice-get-api-normalization-facility-locations-facilities-facilityid-locations-locationid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr><tr><td>locationId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings" aria-expanded="false"><strong>GET</strong> <code>/api/normalization/hsloc-mappings</code></a></div>
+  <div id="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>unmapped</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-mappingid" aria-expanded="false"><strong>GET</strong> <code>/api/normalization/hsloc-mappings/{mappingId}</code></a></div>
+  <div id="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-mappingid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>mappingId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-put-api-normalization-hsloc-mappings-mappingid" aria-expanded="false"><strong>PUT</strong> <code>/api/normalization/hsloc-mappings/{mappingId}</code></a></div>
+  <div id="openapi-card-normalizationservice-put-api-normalization-hsloc-mappings-mappingid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>mappingId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-delete-api-normalization-hsloc-mappings-mappingid" aria-expanded="false"><strong>DELETE</strong> <code>/api/normalization/hsloc-mappings/{mappingId}</code></a></div>
+  <div id="openapi-card-normalizationservice-delete-api-normalization-hsloc-mappings-mappingid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>mappingId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-facilities-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/normalization/hsloc-mappings/facilities/{facilityId}</code></a></div>
+  <div id="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-facilities-facilityid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>unmapped</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-post-api-normalization-hsloc-mappings-facilities-facilityid" aria-expanded="false"><strong>POST</strong> <code>/api/normalization/hsloc-mappings/facilities/{facilityId}</code></a></div>
+  <div id="openapi-card-normalizationservice-post-api-normalization-hsloc-mappings-facilities-facilityid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-delete-api-normalization-hsloc-mappings-facilities-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/normalization/hsloc-mappings/facilities/{facilityId}</code></a></div>
+  <div id="openapi-card-normalizationservice-delete-api-normalization-hsloc-mappings-facilities-facilityid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-facilities-facilityid-locations-locationid" aria-expanded="false"><strong>GET</strong> <code>/api/normalization/hsloc-mappings/facilities/{facilityId}/locations/{locationId}</code></a></div>
+  <div id="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-facilities-facilityid-locations-locationid" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr><tr><td>locationId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>unmapped</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-facilities-facilityid-local-codes-localcode" aria-expanded="false"><strong>GET</strong> <code>/api/normalization/hsloc-mappings/facilities/{facilityId}/local-codes/{localCode}</code></a></div>
+  <div id="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-facilities-facilityid-local-codes-localcode" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr><tr><td>localCode</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>unmapped</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-search" aria-expanded="false"><strong>GET</strong> <code>/api/normalization/hsloc-mappings/search</code></a></div>
+  <div id="openapi-card-normalizationservice-get-api-normalization-hsloc-mappings-search" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>No</td><td></td></tr><tr><td>facilityId</td><td></td><td>No</td><td></td></tr><tr><td>locationId</td><td></td><td>No</td><td></td></tr><tr><td>localCodeSystem</td><td></td><td>No</td><td></td></tr><tr><td>localCode</td><td></td><td>No</td><td></td></tr><tr><td>hslocId</td><td></td><td>No</td><td></td></tr><tr><td>unmapped</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-normalizationservice-get-health" aria-expanded="false"><strong>GET</strong> <code>/health</code></a></div>
   <div id="openapi-card-normalizationservice-get-health" class="card-body export-collapsible">
     <p class="text-muted">Health check endpoint</p>
@@ -1392,17 +1685,17 @@ Prevents errors in the CQL (measure evaluation) engine caused by inconsistent pr
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nNormalizationService_2861AAD1["Service: Normalization Service"]
-  nNormalizationService_2861AAD1 -->|produces| nresources_normalized_47A49D1["Event: resources-normalized"]
-  nresources_acquired_6963A69E["Event: resources-acquired"] -->|consumed by| nNormalizationService_2861AAD1
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nresources_normalized_47A49D1
+nNormalizationService_78B0F5BC["Service: Normalization Service"]
+  nNormalizationService_78B0F5BC -->|produces| nresources_normalized_6C1D52A7["Event: resources-normalized"]
+  nresources_acquired_7C72478A["Event: resources-acquired"] -->|consumed by| nNormalizationService_78B0F5BC
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nresources_normalized_6C1D52A7
   end
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nresources_acquired_6963A69E
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nresources_acquired_7C72478A
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nNormalizationService_2861AAD1
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nNormalizationService_78B0F5BC
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

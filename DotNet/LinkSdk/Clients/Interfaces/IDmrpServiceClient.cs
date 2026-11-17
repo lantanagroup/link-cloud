@@ -7,6 +7,14 @@ namespace LantanaGroup.Link.Sdk.Clients;
 
 public interface IDmrpServiceClient
 {
+    /// <summary>
+    /// Gets whether DMRP is enabled and whether facility saves write through to the Mock DMRP API.
+    /// </summary>
+    /// <remarks>
+    /// Answers with DMRP off too, reporting both false. A 404 means a Tenant that predates the route.
+    /// </remarks>
+    Task<LinkApiResponse<DmrpStatusModel>> GetDmrpStatusAsync(CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<MeasureMappingModel>> CreateMeasureMappingAsync(MeasureMappingModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<MeasureMappingModel>> GetMeasureMappingAsync(string id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<MeasureMappingModel>> UpdateMeasureMappingAsync(string id, MeasureMappingModel request, CancellationToken cancellationToken = default);

@@ -1,13 +1,13 @@
 package com.lantanagroup.link.measureeval.health;
 
 import com.lantanagroup.link.measureeval.services.AbsResourceService;
+import com.lantanagroup.link.shared.health.TimedHealthIndicator;
 import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -29,18 +29,18 @@ import java.util.concurrent.atomic.AtomicReference;
  * ABS unreachable means resources may be unreadable -- DOWN), while Redis is only a cache in front of
  * it (Redis unreachable degrades reads to ABS speed but loses nothing -- DEGRADED, not DOWN, so the
  * Admin dashboard shows it in amber without the service being restarted over it). Both statuses are
- * always reported as details under the "Resource Cache" component.
+ * always reported as details under the "Resource Cache (Redis/ABS)" component.
  * <p>
  * Spring's auto Redis indicator is disabled (management.health.redis.enabled=false) in favor of this
  * one.
  * <p>
  * The combined probe runs on a separate thread bounded by {@link #checkTimeoutMs}, because both the
  * Lettuce reconnect path and the Azure SDK's retry/backoff can otherwise leave /health hanging when a
- * backend is unreachable. The backstop is kept below the BFF's 5s health-check timeout so the BFF
+ * backend is unreachable. The backstop is kept below the BFF's health-check deadline so the BFF
  * still receives a real verdict rather than timing out to N/A.
  */
-@Component("Resource Cache")
-public class ResourceCacheHealthIndicator implements HealthIndicator {
+@Component("Resource Cache (Redis/ABS)")
+public class ResourceCacheHealthIndicator extends TimedHealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(ResourceCacheHealthIndicator.class);
     private static final String AVAILABLE = "Available";
@@ -84,7 +84,7 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
     }
 
     @Override
-    public Health health() {
+    protected Health check() {
         try {
             CacheStatus status = currentProbe().get(checkTimeoutMs, TimeUnit.MILLISECONDS);
             // ABS is the durable source: unreachable (or missing) ABS is DOWN, whatever Redis says.
@@ -125,7 +125,7 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
     /**
      * Returns the probe already running, or starts one. Never returns null and never throws: a worker
      * that cannot be scheduled is reported through the returned future, so every caller leaves
-     * {@link #health()} by the same path.
+     * {@link #check()} by the same path.
      */
     private CompletableFuture<CacheStatus> currentProbe() {
         while (true) {

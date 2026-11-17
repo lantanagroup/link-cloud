@@ -16,4 +16,35 @@ public interface IValidationServiceClient
     /// Counts results at or above <paramref name="severity"/>. The body is a small summary, not the result list.
     /// </summary>
     Task<LinkApiResponse<string>> GetValidationResultSummaryAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a report's stored validation counts per category, optionally only the categories with the given submit
+    /// flag. Returns 404 when the report has no stored counts.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetReportCategoryCountsAsync(string facilityId,
+                                                              string reportId,
+                                                              bool? submit = null,
+                                                              CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a report's categories with their finding counts, counted live from the saved findings. The validation
+    /// service loads every finding of the report to answer it, so avoid it for very large reports.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetReportCategorySummariesAsync(string facilityId,
+                                                                 string reportId,
+                                                                 CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Gets saved findings for one category as JSON containing records and paging metadata.
+    /// Pages are one-based, size is 1–100, and empty searches return 200 with empty records.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetCategoryIssuesAsync(string facilityId, string reportId,
+        string categoryId, int pageNumber = 1, int pageSize = 25, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Copies a report's saved findings/category CSV directly into the destination, without buffering it.
+    /// Leaves the destination open. Caller cancellation controls the download timeout. Transfer failures
+    /// can leave a partial file; publish the destination only after successful completion.
+    /// </summary>
+    Task<LinkApiResponse> CopyValidationResultsCsvAsync(string facilityId, Guid reportId, Stream destination,
+        CancellationToken cancellationToken = default);
 }

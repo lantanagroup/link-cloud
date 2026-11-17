@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 [ApiController]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
-[Route("api/data/{facilityId}/[controller]")]
+[Route("api/data-acquisition/{facilityId}/[controller]")]
 public class FhirQueriesController : ControllerBase
 {
     private readonly ILogger<FhirQueriesController> _logger;

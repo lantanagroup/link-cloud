@@ -1,0 +1,9 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "snomed-test",
+  "url": "http://snomed.info/sct",
+  "version": "1.0.0",
+  "name": "SNOMEDTest",
+  "status": "active",
+  "content": "fragment"
+}

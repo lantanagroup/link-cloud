@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
+using Hl7.Fhir.Rest;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
@@ -16,6 +17,14 @@ internal class HeaderCapturingHandler : DelegatingHandler
 
 public static class FhirCommandUtils
 {
+    public static BaseFhirClient CreateFhirClient(string baseUrl, HttpClient httpClient)
+    {
+        return new FhirClient(baseUrl, httpClient, new FhirClientSettings
+        {
+            PreferredFormat = ResourceFormat.Json
+        }).WithOstrichModeSerializer();
+    }
+
     public static TimeSpan ParseRetryAfter(HttpResponseHeaders? headers, TimeSpan defaultDelay = default)
     {
         defaultDelay = defaultDelay == default ? TimeSpan.FromSeconds(60) : defaultDelay;

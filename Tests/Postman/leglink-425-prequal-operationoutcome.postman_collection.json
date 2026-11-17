@@ -153,9 +153,9 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{bff}}/api/data/{{facilityId}}/QueryPlan?type=Discharge",
+              "raw": "{{bff}}/api/data-acquisition/{{facilityId}}/QueryPlan?type=Discharge",
               "host": ["{{bff}}"],
-              "path": ["api", "data", "{{facilityId}}", "QueryPlan"],
+              "path": ["api", "data-acquisition", "{{facilityId}}", "QueryPlan"],
               "query": [{ "key": "type", "value": "Discharge" }]
             },
             "description": "Makes the following POST authoritative. Without this, re-running the collection after changing the query plan leaves the original plan in place and your new resource types are never acquired."
@@ -185,9 +185,9 @@
               "raw": "{\n  \"PlanName\": \"{{reportType}}\",\n  \"FacilityId\": \"{{facilityId}}\",\n  \"EHRDescription\": \"Epic\",\n  \"LookBack\": \"P0D\",\n  \"Type\": \"Discharge\",\n  \"InitialQueries\": {\n    \"0\": {\n      \"ResourceType\": \"Encounter\",\n      \"QueryConfigType\": \"Parameter\",\n      \"Parameters\": [\n        { \"ParameterType\": \"Variable\", \"Name\": \"patient\", \"Variable\": 0, \"Format\": null },\n        { \"ParameterType\": \"Variable\", \"Name\": \"date\", \"Variable\": 1, \"Format\": \"ge{0}\" },\n        { \"ParameterType\": \"Variable\", \"Name\": \"date\", \"Variable\": 3, \"Format\": \"le{0}\" }\n      ]\n    },\n    \"1\": {\n      \"QueryConfigType\": \"Reference\",\n      \"ResourceType\": \"Location\",\n      \"OperationType\": 1,\n      \"Paged\": 100\n    }\n  },\n  \"SupplementalQueries\": {\n    \"0\": {\n      \"QueryConfigType\": \"Parameter\",\n      \"ResourceType\": \"Condition\",\n      \"Parameters\": [\n        { \"ParameterType\": \"Variable\", \"Name\": \"patient\", \"Variable\": 0, \"Format\": null },\n        { \"ParameterType\": \"ResourceIds\", \"Name\": \"encounter\", \"Resource\": \"Encounter\", \"Paged\": \"100\" }\n      ]\n    },\n    \"1\": {\n      \"QueryConfigType\": \"Parameter\",\n      \"ResourceType\": \"Observation\",\n      \"Parameters\": [\n        { \"ParameterType\": \"Variable\", \"Name\": \"patient\", \"Variable\": 0, \"Format\": null },\n        { \"ParameterType\": \"Variable\", \"Name\": \"date\", \"Variable\": 1, \"Format\": \"ge{0}\" },\n        { \"ParameterType\": \"Variable\", \"Name\": \"date\", \"Variable\": 3, \"Format\": \"le{0}\" },\n        { \"ParameterType\": \"Literal\", \"Name\": \"category\", \"Literal\": \"imaging,laboratory,social-history,vital-signs\" }\n      ]\n    }\n  }\n}"
             },
             "url": {
-              "raw": "{{bff}}/api/data/{{facilityId}}/QueryPlan",
+              "raw": "{{bff}}/api/data-acquisition/{{facilityId}}/QueryPlan",
               "host": ["{{bff}}"],
-              "path": ["api", "data", "{{facilityId}}", "QueryPlan"]
+              "path": ["api", "data-acquisition", "{{facilityId}}", "QueryPlan"]
             },
             "description": "Type MUST be Discharge: an ad-hoc report maps ReportableEvent.Adhoc -> Frequency.Discharge when selecting the query plan.\n\nParameter Variable enum: 0=PatientId, 1=LookbackStart, 2=PeriodStart, 3=PeriodEnd.\nParameter queries must precede Reference queries within a dictionary."
           },
@@ -216,9 +216,9 @@
               "raw": "{\n  \"FacilityId\": \"{{facilityId}}\",\n  \"FhirServerBaseUrl\": \"{{fhirInternal}}\",\n  \"Authentication\": null,\n  \"MaxConcurrentRequests\": 8,\n  \"MaxRetries\": 3,\n  \"TimeZone\": \"UTC\"\n}"
             },
             "url": {
-              "raw": "{{bff}}/api/data/fhirQueryConfiguration",
+              "raw": "{{bff}}/api/data-acquisition/fhirQueryConfiguration",
               "host": ["{{bff}}"],
-              "path": ["api", "data", "fhirQueryConfiguration"]
+              "path": ["api", "data-acquisition", "fhirQueryConfiguration"]
             },
             "description": "FhirServerBaseUrl uses the DOCKER-INTERNAL name (fhir-server:8080), because DataAcquisition dials it from inside the network. Postman seeds via localhost:6157 instead."
           },

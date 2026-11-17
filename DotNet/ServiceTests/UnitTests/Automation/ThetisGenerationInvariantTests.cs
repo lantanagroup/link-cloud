@@ -116,6 +116,8 @@ public class ThetisGenerationInvariantTests
             encounter.Type?.SelectMany(t => t.Coding) ?? [],
             c => string.Equals(c.Code, "32485007", StringComparison.Ordinal));
         Assert.Single(encounter.Location);
+        Assert.Contains(encounter.Location, l => l.Location?.Reference?.Contains(ids.OutpatientLocation, StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(encounter.Location, l => l.Location?.Reference?.Contains(ids.EdLocation, StringComparison.Ordinal) == true);
         Assert.DoesNotContain(encounter.Location, l => l.Location?.Reference?.Contains(ids.IcuLocation, StringComparison.Ordinal) == true);
         Assert.DoesNotContain(encounter.Location, l => l.Location?.Reference?.Contains(ids.StepDownLocation, StringComparison.Ordinal) == true);
         AssertLocationPeriodsAreForward(encounter);

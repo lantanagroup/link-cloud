@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿using LantanaGroup.Link.Automation.Link.Models;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -16,6 +17,12 @@ public sealed class AutomationRunDocument
     public bool AutomationCreatedFacility { get; set; }
     public string ReportId { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Older rows stored a report-generation counter here. This build does not
+    /// increment it. The property stays so those rows still deserialize.
+    /// </summary>
+    public long SnapshotEpoch { get; set; }
+
     public string RunName { get; set; } = string.Empty;
     public string Scenario { get; set; } = string.Empty;
     public string SelectedMeasure { get; set; } = string.Empty;
@@ -26,6 +33,8 @@ public sealed class AutomationRunDocument
     public string? RunConfigurationJson { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? Error { get; set; }
+    /// <summary>Formatted operation-failure blocks. Capped at record time. Older rows omit the field.</summary>
+    public List<string> FailureDetails { get; set; } = [];
 
     // Store DateTimeOffset values as native BSON ISODate (UTC) so server-side range
     // queries and indexes work. The driver's default representation is a two-element
@@ -50,6 +59,7 @@ public sealed class AutomationRunDocument
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
+    public List<TestRailRunReference> TestRailRuns { get; set; } = [];
 }
 
 /// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>
@@ -103,7 +113,11 @@ public sealed class AutomationRunInputDocument
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-/// <summary>MongoDB document for automation_run_snapshots collection (one per run+domain).</summary>
+/// <summary>
+/// One row in automation_snapshots. A normal snapshot is a single document.
+/// A payload over the chunk size is a header (ChunkIndex -1) plus ordered
+/// chunk documents that share Revision.
+/// </summary>
 public sealed class DomainSnapshotDocument
 {
     [BsonId]
@@ -115,12 +129,29 @@ public sealed class DomainSnapshotDocument
     public string Domain { get; set; } = string.Empty;
 
     /// <summary>
-    /// Serialized domain payload as plain JSON text.
+    /// Serialized domain payload as plain JSON text, or one slice of it.
     /// Using plain JSON avoids Mongo extended-JSON date serialization
     /// surprises during round-trips through System.Text.Json.
     /// </summary>
     public string Data { get; set; } = string.Empty;
 
+    /// <summary>Null for a single document. -1 for a chunk header. 0+ for a slice.</summary>
+    [BsonIgnoreIfNull]
+    public int? ChunkIndex { get; set; }
+
+    [BsonIgnoreIfNull]
+    public int? ChunkCount { get; set; }
+
+    /// <summary>Shared by a header and its slices. Null on a single document.</summary>
+    [BsonIgnoreIfNull]
+    public string? Revision { get; set; }
+
+    /// <summary>
+    /// New writes use BSON ISODate. Older rows may still be the driver array
+    /// form [ticks, offsetMinutes]. The DateTimeOffset serializer reads both.
+    /// BSON dates are millisecond precision.
+    /// </summary>
+    [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset UpdatedAt { get; set; }
 }
 

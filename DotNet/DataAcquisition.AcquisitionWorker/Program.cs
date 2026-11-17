@@ -61,7 +61,7 @@ builder.Services.AddControllers();
 var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
 var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, DataAcquisitionConstants.ServiceName).GetHealthCheckOptions();
 builder.Services.AddHealthChecks()
-        .AddDbContextCheck<DataAcquisitionDbContext>(HealthCheckType.Database.ToString())
+        .AddDbContextCheck<DataAcquisitionDbContext>(HealthCheckNames.SqlServerDatabase)
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
 //Add Hosted Services

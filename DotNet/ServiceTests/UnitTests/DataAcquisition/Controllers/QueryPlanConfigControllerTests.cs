@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.AutoMock;
 using System.Net;
@@ -132,6 +133,33 @@ namespace UnitTests.DataAcquisition.Controllers
 
             var problem = (ObjectResult)result;
             Assert.Equal((int)HttpStatusCode.Accepted, problem.StatusCode!.Value);
+        }
+
+        [Fact]
+        public async Task DeleteQueryPlan_MissingPlan_ReturnsNotFoundWithoutErrorLog()
+        {
+            var mocker = new AutoMocker();
+            mocker.GetMock<IQueryPlanQueries>()
+                .Setup(x => x.ExistsAsync(It.IsAny<string>(), It.IsAny<Frequency>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            var controller = mocker.CreateInstance<QueryPlanConfigController>();
+            var result = await controller.DeleteQueryPlan(
+                "test-facility-id",
+                new DeleteQueryPlanParameters { Type = Frequency.Monthly },
+                CancellationToken.None);
+
+            var problem = Assert.IsAssignableFrom<ObjectResult>(result);
+            Assert.Equal((int)HttpStatusCode.NotFound, problem.StatusCode);
+
+            mocker.GetMock<ILogger<QueryPlanConfigController>>().Verify(
+                logger => logger.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Never);
         }
 
         [Fact]

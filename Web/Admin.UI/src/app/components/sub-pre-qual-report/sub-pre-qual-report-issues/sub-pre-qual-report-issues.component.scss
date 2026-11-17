@@ -7,10 +7,6 @@
   &--tables {
     margin: vt.$vd-container-margin-x;
 
-    > :not(:last-child) {
-      margin-bottom: 80px;
-    }
-
     h4 {
       @include vt.vd-subheading-01();
       margin-bottom: 1rem !important;
@@ -23,4 +19,13 @@
   justify-content: center;
   align-items: center;
   padding: 4rem 0;
+}
+
+.counts-warning {
+  padding: 1rem 1.25rem;
+  border: 1px solid vt.$vd-warning-800;
+  border-left-width: 4px;
+  border-radius: 4px;
+  background-color: #fff8e6;
+  color: #704b12;
 }

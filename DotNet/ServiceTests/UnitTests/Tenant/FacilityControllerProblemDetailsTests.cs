@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business;
+﻿using LantanaGroup.Link.DMRP.Api;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
@@ -122,6 +123,44 @@ public class FacilityControllerProblemDetailsTests
         var problem = AssertProblem(result.Result, StatusCodes.Status400BadRequest, ScheduleRefusal);
         Assert.Equal("Bad Request", problem.Title);
         Assert.Equal(BadRequestType, problem.Type);
+    }
+
+    /// <summary>
+    /// DMRP, or the Mock DMRP API it writes through to, failing is an upstream problem, not the caller's.
+    /// An edit answered 500 for it before the write-through gave the update path a DMRP call to make.
+    /// </summary>
+    [Fact]
+    public async Task Update_when_DMRP_cannot_be_reached_answers_502_with_problem_details()
+    {
+        const string failure = "The Mock DMRP API could not be reached to read the facility's entries.";
+        var mocker = new AutoMocker();
+        mocker.GetMock<IFacilityQueries>()
+            .Setup(q => q.GetAsync(FacilityId, null, It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(Facility());
+        mocker.GetMock<IFacilityOperations>()
+            .Setup(o => o.UpdateAsync(It.IsAny<FacilityModel>(), It.IsAny<FacilityModel>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DmrpApiException(failure));
+
+        var result = await CreateController(mocker).PutFacility(FacilityId, Facility(), CancellationToken.None);
+
+        var problem = AssertProblem(result.Result, StatusCodes.Status502BadGateway, failure);
+        Assert.Equal("DMRP could not be reached", problem.Title);
+    }
+
+    [Fact]
+    public async Task Create_when_DMRP_cannot_be_reached_answers_502_with_problem_details()
+    {
+        const string failure = "The DMRP API operation /msc could not be reached.";
+        var mocker = new AutoMocker();
+        mocker.GetMock<IFacilityOperations>()
+            .Setup(o => o.CreateAsync(It.IsAny<FacilityModel>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DmrpApiException(failure));
+
+        var result = await CreateController(mocker).StoreFacility(Facility(), CancellationToken.None);
+
+        var problem = AssertProblem(result, StatusCodes.Status502BadGateway, failure);
+        Assert.Equal("DMRP could not be reached", problem.Title);
     }
 
     [Fact]

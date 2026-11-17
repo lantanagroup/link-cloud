@@ -139,7 +139,10 @@ public class DataAcquisitionDatabaseValidator
                 AddError(errors, $"No DataAcquisitionLog rows found for expected patient {patientId}.");
         }
 
-        var failedLogs = logs.Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) || string.Equals(l.Status, "MaxRetriesReached", StringComparison.OrdinalIgnoreCase)).ToList();
+        var failedLogs = logs
+            .Where(l => string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase) ||
+                        AcquisitionTerminalFailures.IsTerminalFailure(l.Status))
+            .ToList();
         foreach (var failed in failedLogs.Take(10))
         {
             AddError(errors, $"Failed acquisition log: Id={failed.Id}, Patient={failed.PatientId}, Status={failed.Status}");
@@ -166,8 +169,8 @@ public class DataAcquisitionDatabaseValidator
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
-            var acquiredIds = await _reader.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
-            findings = AcquisitionEmptyResultDetector.Find(manifest, acquiredIds, logs);
+            var acquiredByPatient = await _reader.GetDataAcquisitionResourceCountsByPatientTypeAsync(facilityId, reportId);
+            findings = AcquisitionEmptyResultDetector.Find(manifest, [], logs, acquiredByPatient);
             if (findings.Count == 0)
                 return;
 
@@ -332,7 +335,7 @@ public class DataAcquisitionDatabaseValidator
         if (expectDataAcquisitionData && activeMappings.All(m => !m.IsOrgLocation))
             AddError(errors, "OrganizationLocationMapping rows exist but none are marked IsOrgLocation=true.");
 
-        ValidateLocationHierarchy(activeMappings, errors);
+        ValidateLocationHierarchy(activeMappings, errors, manifest?.AbsentReferencedLocationIds);
         await ValidateEncounterMappingTracking(
             facilityId, reportId, logs, activeMappings, errors,
             expectDataAcquisitionData, expectEncounterResources, manifest);
@@ -362,9 +365,10 @@ public class DataAcquisitionDatabaseValidator
         "Location"
     ];
 
-    private static void ValidateLocationHierarchy(
+    internal static void ValidateLocationHierarchy(
         List<PipelineDataReader.OrganizationLocationMappingInfo> activeMappings,
-        List<string> errors)
+        List<string> errors,
+        IReadOnlySet<string>? absentReferencedLocationIds = null)
     {
         var byLocationId = activeMappings
             .Where(m => !string.IsNullOrWhiteSpace(m.LocationId))
@@ -375,9 +379,19 @@ public class DataAcquisitionDatabaseValidator
             if (string.IsNullOrWhiteSpace(mapping.LocationId) || string.IsNullOrWhiteSpace(mapping.PartOfValue))
                 continue;
 
-            if (!byLocationId.ContainsKey(mapping.PartOfValue))
-                AddError(errors,
-                    $"OrganizationLocationMapping hierarchy gap: Location '{mapping.LocationId}' references parent '{mapping.PartOfValue}', but no mapping row exists for that ancestor.");
+            if (byLocationId.ContainsKey(mapping.PartOfValue))
+                continue;
+
+            // Import already proved this parent is not on the FHIR server. There is
+            // no mapping row to find, and the gap is the dangling partOf itself.
+            if (absentReferencedLocationIds != null
+                && absentReferencedLocationIds.Contains(mapping.PartOfValue))
+            {
+                continue;
+            }
+
+            AddError(errors,
+                $"OrganizationLocationMapping hierarchy gap: Location '{mapping.LocationId}' references parent '{mapping.PartOfValue}', but no mapping row exists for that ancestor.");
         }
 
         foreach (var mapping in activeMappings.Where(m => m.IsOrgLocation && !string.IsNullOrWhiteSpace(m.LocationId)))

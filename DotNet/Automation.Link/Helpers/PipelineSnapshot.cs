@@ -157,10 +157,17 @@ public class PipelineSnapshot
             var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
             foreach (var log in logs.Take(40))
             {
-                var types = string.Join(",", log.FhirQueries.SelectMany(q => q.ResourceTypes).Distinct());
+                var types = string.Join(",",
+                    log.FhirQueries.SelectMany(q => q.ResourceTypes)
+                        .Concat(log.ResourceTypes ?? [])
+                        .Where(t => !string.IsNullOrWhiteSpace(t))
+                        .Distinct(StringComparer.OrdinalIgnoreCase));
+                // Search rows carry resource types, not the acquired id list. The report summary above
+                // is the acquired total. Printing acquired=0 here reported a field the payload does not have.
                 var acquired = log.ResourceAcquiredIds.Count;
+                var acquiredText = acquired > 0 ? $" acquired={acquired}" : string.Empty;
                 output.WriteLine(
-                    $"[Snapshot][DataAcqLog]          log={log.Id} patient={log.PatientId} phase={log.QueryPhase} status={log.Status} types=[{types}] acquired={acquired}");
+                    $"[Snapshot][DataAcqLog]          log={log.Id} patient={log.PatientId} phase={log.QueryPhase} status={log.Status} types=[{types}]{acquiredText}");
             }
 
             if (logs.Count > 40)

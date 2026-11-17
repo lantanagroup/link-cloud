@@ -2,13 +2,11 @@
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -36,7 +34,6 @@ public interface IPatientCensusService
 public class PatientCensusService : IPatientCensusService
 {
     private readonly ILogger<PatientCensusService> _logger;
-    private readonly IAuthenticationRetrievalService _authRetrievalService;
     private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
@@ -47,7 +44,6 @@ public class PatientCensusService : IPatientCensusService
 
     public PatientCensusService(
         ILogger<PatientCensusService> logger,
-        IAuthenticationRetrievalService authRetrievalService,
         IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries,
         IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
         IReadFhirCommand readFhirCommand,
@@ -57,7 +53,6 @@ public class PatientCensusService : IPatientCensusService
         ISftpAcquisitionLogManager sftpAcquisitionLogManager)
     {
         _logger = logger;
-        _authRetrievalService = authRetrievalService;
         _readFhirCommand = readFhirCommand;
         _dataAcquisitionLogManager = dataAcquisitionLogManager;
 
@@ -255,13 +250,10 @@ public class PatientCensusService : IPatientCensusService
                     $"Missing census configuration for facility {query.FacilityId}. Unable to proceed with request.");
             }
 
-            (bool? isQueryParam, object? authHeader) authHeader = (false, null);
-            if (facilityConfig.Authentication != null)
-            {
-                authHeader = await BuildeAuthHeader(query.FacilityId, facilityConfig.Authentication, cancellationToken);
-            }
-
-            var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityConfig.FacilityId);
+            // ReadFhirCommand authenticates with the query configuration's credentials, never the list configuration's.
+            var fhirQueryConfig = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(
+                facilityConfig.FacilityId,
+                cancellationToken);
             if (fhirQueryConfig == null)
             {
                 throw new Exception(
@@ -398,20 +390,6 @@ public class PatientCensusService : IPatientCensusService
         }
 
         return false;
-    }
-
-    private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfigurationModel auth, CancellationToken cancellationToken)
-    {
-        (bool isQueryParam, object authHeader) authHeader = (false, null);
-        IAuth authService = _authRetrievalService.GetAuthenticationService(auth);
-
-        if (authService == null)
-        {
-            return (false, null);
-        }
-
-        authHeader = await authService.SetAuthentication(facilityId, auth, cancellationToken);
-        return authHeader;
     }
 
     private ListType ConvertToListType(Infrastructure.Models.Enums.ListType listType)

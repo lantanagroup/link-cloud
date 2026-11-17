@@ -25,7 +25,7 @@ public class DataAcquisitionServiceClientTests
         var result = await callTask;
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/42/notes", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/42/notes", request.Path);
         Assert.Equal(2, result.Body!.Count);
     }
 
@@ -40,7 +40,7 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/report/r1/statistics", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/report/r1/statistics", request.Path);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/process-bulk", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/process-bulk", request.Path);
         Assert.Contains("11", request.Body);
         Assert.Contains("22", request.Body);
     }
@@ -71,7 +71,7 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/7/process", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/7/process", request.Path);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class DataAcquisitionServiceClientTests
         var result = await callTask;
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/cancel-by-filter", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/cancel-by-filter", request.Path);
         Assert.Contains("minAgeHours=0", request.Query);
         Assert.Contains("facilityId", request.Body);
         Assert.NotNull(result.Body);
@@ -106,7 +106,7 @@ public class DataAcquisitionServiceClientTests
         var result = await callTask;
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/cancel-bulk", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/cancel-bulk", request.Path);
         Assert.Contains("minAgeHours=3", request.Query);
         Assert.Contains("99", request.Body);
         Assert.NotNull(result.Body);
@@ -125,7 +125,7 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/process-by-filter", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/process-by-filter", request.Path);
         Assert.Contains("facilityId", request.Body);
         Assert.Contains("reportId", request.Body);
     }
@@ -141,7 +141,7 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("PATCH", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/facility/f1/restore", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/facility/f1/restore", request.Path);
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("PATCH", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/report/rpt-1/restore", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/report/rpt-1/restore", request.Path);
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("DELETE", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/99", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/99", request.Path);
     }
 
     [Fact]
@@ -183,7 +183,20 @@ public class DataAcquisitionServiceClientTests
         await callTask;
 
         Assert.Equal("DELETE", request.Method);
-        Assert.Equal("/api/data/acquisition-logs/report/rpt-2", request.Path);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/report/rpt-2", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SoftDeleteLogsByFacilityAsync_DeletesExpectedEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.SoftDeleteLogsByFacilityAsync("f1");
+        var request = http.SingleRequest();
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/data-acquisition/acquisition-logs/facility/f1", request.Path);
     }
 
     [Fact]
@@ -197,7 +210,7 @@ public class DataAcquisitionServiceClientTests
         var result = await callTask;
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/data/connectionValidation/$validate", request.Path);
+        Assert.Equal("/api/data-acquisition/connectionValidation/$validate", request.Path);
         Assert.Contains("fhirServerUrl=", request.Query);
         Assert.NotNull(result.Body);
         Assert.True(result.Body.IsConnected);
@@ -216,7 +229,7 @@ public class DataAcquisitionServiceClientTests
         var result = await callTask;
 
         Assert.Equal("POST", request.Method);
-        Assert.Equal("/api/data/sftp-configurations/test-connection", request.Path);
+        Assert.Equal("/api/data-acquisition/sftp-configurations/test-connection", request.Path);
         Assert.Contains("includeFileContent=true", request.Query);
         Assert.Contains("\"hostName\":\"sftp.example.com\"", request.Body);
         Assert.Contains("\"hostUrlPort\":2222", request.Body);
@@ -277,7 +290,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
-        Assert.Equal("/api/data/fhirQueryConfiguration", request.Path);
+        Assert.Equal("/api/data-acquisition/fhirQueryConfiguration", request.Path);
         Assert.Contains("f1", request.Body);
     }
 
@@ -291,7 +304,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/data/connectionValidation/f1/$validate", request.Path);
+        Assert.Equal("/api/data-acquisition/connectionValidation/f1/$validate", request.Path);
         Assert.Contains("patientId=p1", request.Query);
         Assert.Contains("measureId=m1", request.Query);
     }
@@ -306,7 +319,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
-        Assert.Equal("/api/data/fhirQueryList", request.Path);
+        Assert.Equal("/api/data-acquisition/fhirQueryList", request.Path);
     }
 
     [Fact]
@@ -319,7 +332,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
-        Assert.Equal("/api/data/f1/QueryPlan", request.Path);
+        Assert.Equal("/api/data-acquisition/f1/QueryPlan", request.Path);
         Assert.Contains("planName", request.Body);
     }
 
@@ -333,7 +346,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
-        Assert.Equal("/api/data/location-config/facility/f1", request.Path);
+        Assert.Equal("/api/data-acquisition/location-config/facility/f1", request.Path);
     }
 
     [Fact]
@@ -346,7 +359,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
-        Assert.Equal("/api/data/location-mappings/7", request.Path);
+        Assert.Equal("/api/data-acquisition/location-mappings/7", request.Path);
     }
 
     [Theory]
@@ -368,27 +381,27 @@ public class DataAcquisitionServiceClientTests
 
     public static IEnumerable<object[]> SftpEndpointCalls()
     {
-        yield return ["GET", "/api/data/org-1/sftp-configurations", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["GET", "/api/data-acquisition/org-1/sftp-configurations", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.GetOrganizationSftpConfigurationAsync("org-1"))];
-        yield return ["POST", "/api/data/org-1/sftp-configurations", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["POST", "/api/data-acquisition/org-1/sftp-configurations", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.CreateSftpConfigurationAsync("org-1", new { host = "h" }))];
-        yield return ["PUT", "/api/data/org-1/sftp-configurations/cfg-1", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["PUT", "/api/data-acquisition/org-1/sftp-configurations/cfg-1", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.UpdateSftpConfigurationAsync("org-1", "cfg-1", new { host = "h" }))];
-        yield return ["DELETE", "/api/data/org-1/sftp-configurations/cfg-1", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["DELETE", "/api/data-acquisition/org-1/sftp-configurations/cfg-1", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.DeleteSftpConfigurationAsync("org-1", "cfg-1"))];
-        yield return ["PUT", "/api/data/org-1/sftp-configurations/credentials", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["PUT", "/api/data-acquisition/org-1/sftp-configurations/credentials", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.UpdateSftpCredentialsAsync("org-1", new { username = "u", password = "p" }))];
-        yield return ["DELETE", "/api/data/org-1/sftp-configurations/credentials", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["DELETE", "/api/data-acquisition/org-1/sftp-configurations/credentials", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.DeleteSftpCredentialsAsync("org-1"))];
-        yield return ["GET", "/api/data/org-1/sftp-configurations/credentials/status", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["GET", "/api/data-acquisition/org-1/sftp-configurations/credentials/status", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.GetSftpCredentialStatusAsync("org-1"))];
-        yield return ["POST", "/api/data/org-1/sftp-configurations/test-connection", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["POST", "/api/data-acquisition/org-1/sftp-configurations/test-connection", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.TestSavedSftpConnectionAsync("org-1"))];
-        yield return ["GET", "/api/data/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["GET", "/api/data-acquisition/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.SearchSftpLogsAsync(facilityId: "f1"))];
-        yield return ["POST", "/api/data/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["POST", "/api/data-acquisition/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.CreateSftpLogAsync(new { facilityId = "f1" }))];
-        yield return ["GET", "/api/data/sftp-configurations/7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+        yield return ["GET", "/api/data-acquisition/sftp-configurations/7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.GetSftpConfigurationByIdAsync(Guid.Parse("7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10")))];
     }
 
@@ -459,7 +472,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/data/location-mappings/7", request.Path);
+        Assert.Equal("/api/data-acquisition/location-mappings/7", request.Path);
         Assert.NotNull(result.Body);
         Assert.Equal(7, result.Body.LocationMappingId);
         Assert.Equal("ICU", result.Body.LocationName);
@@ -475,7 +488,7 @@ public class DataAcquisitionServiceClientTests
         var request = http.SingleRequest();
 
         Assert.Equal("DELETE", request.Method);
-        Assert.Equal("/api/data/location-mappings/7", request.Path);
+        Assert.Equal("/api/data-acquisition/location-mappings/7", request.Path);
     }
 
     private static DataAcquisitionServiceClient CreateClient(string baseUrl)

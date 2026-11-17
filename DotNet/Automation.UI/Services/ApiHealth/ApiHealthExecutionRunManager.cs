@@ -4,6 +4,8 @@ using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Shared.Application.Models;
+using Automation.UI.Services.TestRail;
 
 namespace Automation.UI.Services.ApiHealth;
 
@@ -12,6 +14,9 @@ public sealed class ApiHealthExecutionRunManager(
     IApiHealthSeedOrchestrator seedOrchestrator,
     IApiHealthSeedContextAccessor seedContext,
     IApiHealthRunStore store,
+    IHttpClientFactory httpClientFactory,
+    IConfiguration configuration,
+    ITestRailPublisher testRailPublisher,
     ILogger<ApiHealthExecutionRunManager> logger)
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
@@ -211,7 +216,6 @@ public sealed class ApiHealthExecutionRunManager(
                 var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
                 await CompleteAsync(run, failed: true, error);
-                AddDone(run);
                 return;
             }
 
@@ -221,6 +225,8 @@ public sealed class ApiHealthExecutionRunManager(
             var abortedBySeedCancellation = false;
             try
             {
+                var serviceInformationByService = new Dictionary<string, ServiceInformation>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var suite in suites)
                 {
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
@@ -230,7 +236,7 @@ public sealed class ApiHealthExecutionRunManager(
                     }
 
                     seedContext.Current = seedSession;
-                    await RunSuiteAsync(run, suite);
+                    await RunSuiteAsync(run, suite, serviceInformationByService);
 
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
                     {
@@ -249,21 +255,18 @@ public sealed class ApiHealthExecutionRunManager(
             {
                 const string cancellationMessage = "ApiHealthScenario seed run was cancelled. Aborting API Health run.";
                 await AddPhaseAsync(run, "Failed", cancellationMessage, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                await CompleteAsync(run, failed: true, cancellationMessage);
-                AddDone(run);
+                await CompleteAsync(run, failed: true, cancellationMessage, cancelled: true);
                 return;
             }
 
             await AddPhaseAsync(run, "Done", "Service run complete");
             await CompleteAsync(run, failed: false, null);
-            AddDone(run);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health service run failed unexpectedly. RunId={RunId}", run.RunId);
             await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
             await CompleteAsync(run, failed: true, SanitizedInternalError);
-            AddDone(run);
         }
     }
 
@@ -284,7 +287,6 @@ public sealed class ApiHealthExecutionRunManager(
                 var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
                 await CompleteAsync(run, failed: true, error);
-                AddDone(run);
                 return;
             }
 
@@ -294,6 +296,8 @@ public sealed class ApiHealthExecutionRunManager(
             var abortedBySeedCancellation = false;
             try
             {
+                var serviceInformationByService = new Dictionary<string, ServiceInformation>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var suite in suites)
                 {
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
@@ -303,7 +307,7 @@ public sealed class ApiHealthExecutionRunManager(
                     }
 
                     seedContext.Current = seedSession;
-                    await RunSuiteAsync(run, suite);
+                    await RunSuiteAsync(run, suite, serviceInformationByService);
 
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
                     {
@@ -322,26 +326,132 @@ public sealed class ApiHealthExecutionRunManager(
             {
                 const string cancellationMessage = "ApiHealthScenario seed run was cancelled. Aborting API Health run.";
                 await AddPhaseAsync(run, "Failed", cancellationMessage, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                await CompleteAsync(run, failed: true, cancellationMessage);
-                AddDone(run);
+                await CompleteAsync(run, failed: true, cancellationMessage, cancelled: true);
                 return;
             }
 
             await AddPhaseAsync(run, "Done", "Run all complete");
             await CompleteAsync(run, failed: false, null);
-            AddDone(run);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health run-all failed unexpectedly. RunId={RunId}", run.RunId);
             await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
             await CompleteAsync(run, failed: true, SanitizedInternalError);
-            AddDone(run);
         }
     }
 
-    private async Task RunSuiteAsync(RunState run, IServiceTestSuite suite)
+    private async Task EnsureHostServiceInformationAsync(
+    string suiteServiceName,
+    IDictionary<string, ServiceInformation> serviceInformationByService)
     {
+        var metadataServiceName = GetMetadataServiceName(suiteServiceName);
+
+        if (string.Equals(
+                metadataServiceName,
+                suiteServiceName,
+                StringComparison.OrdinalIgnoreCase)
+            || serviceInformationByService.ContainsKey(metadataServiceName))
+        {
+            return;
+        }
+
+        var serviceInfo = await FetchHostServiceInformationAsync(
+            metadataServiceName,
+            CancellationToken.None);
+
+        if (serviceInfo != null)
+            serviceInformationByService[metadataServiceName] = serviceInfo;
+    }
+
+    private async Task<ServiceInformation?> FetchHostServiceInformationAsync(
+    string serviceName,
+    CancellationToken ct)
+    {
+        string? baseUrl;
+        string relativePath;
+
+        if (string.Equals(
+            serviceName,
+            ApiEndPointLibrary.ServiceNames.Tenant,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            baseUrl = configuration["ServiceRegistry:TenantService:TenantServiceUrl"];
+            relativePath = "/api/facility/info";
+        }
+        else if (string.Equals(
+            serviceName,
+            ApiEndPointLibrary.ServiceNames.AdminBff,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            baseUrl = configuration["ServiceRegistry:AdminBffServiceUrl"];
+            relativePath = "/api/info";
+        }
+        else
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            logger.LogWarning(
+                "Unable to resolve Service Info for {ServiceName} because its service URL is not configured.",
+                serviceName);
+
+            return null;
+        }
+
+        baseUrl = baseUrl.TrimEnd('/');
+
+        if (baseUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase) 
+            && relativePath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
+        {
+            relativePath = relativePath[4..];
+        }
+
+        try
+        {
+            var client = httpClientFactory.CreateClient("ApiHealthTest");
+
+            using var response = await client.GetAsync(
+                $"{baseUrl}{relativePath}",
+                ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "Unable to resolve Service Info for {ServiceName}. HTTP {StatusCode}.",
+                    serviceName,
+                    (int)response.StatusCode);
+
+                return null;
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
+
+            return DeserializeServiceInformation(
+                responseBody,
+                serviceName);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Unable to resolve Service Info for {ServiceName}.",
+                serviceName);
+
+            return null;
+        }
+    }
+
+    private async Task RunSuiteAsync(RunState run, IServiceTestSuite suite, IDictionary<string, ServiceInformation> serviceInformationByService)
+    {
+        await EnsureHostServiceInformationAsync(suite.ServiceName, serviceInformationByService);
+
         IReadOnlyList<ApiTestRunResult> results;
         try
         {
@@ -369,9 +479,30 @@ public sealed class ApiHealthExecutionRunManager(
             .Select(d => d.Key)
             .ToHashSet();
 
+        var serviceInfo = GetServiceInformation(results, suite.ServiceName);
+
+        if (serviceInfo != null)
+        {
+            serviceInformationByService[suite.ServiceName] = serviceInfo;
+        }
+        else
+        {
+            var metadataServiceName = GetMetadataServiceName(suite.ServiceName);
+
+            serviceInformationByService.TryGetValue(
+                metadataServiceName,
+                out serviceInfo);
+        }
+
+        var commit = GetCommit(serviceInfo);
+
         foreach (var result in results)
         {
             result.RunId = run.RunId;
+            result.Commit = commit;
+            result.Build = NullIfWhiteSpace(serviceInfo?.Build);
+            result.Version = NullIfWhiteSpace(serviceInfo?.Version);
+            result.ProductVersion = NullIfWhiteSpace(serviceInfo?.ProductVersion);
         }
 
         await store.SaveRunResultsAsync(
@@ -385,6 +516,113 @@ public sealed class ApiHealthExecutionRunManager(
             var json = JsonSerializer.Serialize(result, _jsonOptions);
             AddEvent(run, "result", json);
         }
+    }
+
+    private static string GetMetadataServiceName(string suiteServiceName)
+    {
+        if (string.Equals(
+            suiteServiceName,
+            ApiEndPointLibrary.ServiceNames.AdminBffAuth,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiEndPointLibrary.ServiceNames.AdminBff;
+        }
+
+        if (string.Equals(
+            suiteServiceName,
+            ApiEndPointLibrary.ServiceNames.Dmrp,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiEndPointLibrary.ServiceNames.Tenant;
+        }
+
+        return suiteServiceName;
+    }
+
+    private ServiceInformation? GetServiceInformation(
+    IReadOnlyList<ApiTestRunResult> results,
+    string serviceName)
+    {
+        var serviceInfoResult = results.FirstOrDefault(result =>
+            string.Equals(
+                result.EndpointName,
+                ApiEndPointLibrary.ServiceInfoGet200,
+                StringComparison.Ordinal)
+            && result.Passed);
+
+        if (serviceInfoResult == null)
+            return null;
+
+        return DeserializeServiceInformation(
+            serviceInfoResult.ResponseBody,
+            serviceName);
+    }
+
+    private ServiceInformation? DeserializeServiceInformation(
+        string? responseBody,
+        string serviceName)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            logger.LogWarning(
+                "Service Info response for {ServiceName} was empty.",
+                serviceName);
+
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+
+            if (document.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                return document.RootElement.Deserialize<ServiceInformation>(
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+            }
+
+            if (document.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                var first = document.RootElement
+                    .EnumerateArray()
+                    .FirstOrDefault();
+
+                if (first.ValueKind == JsonValueKind.Undefined)
+                    return null;
+
+                return first.Deserialize<ServiceInformation>(
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+            }
+
+            logger.LogWarning(
+                "Service Info response for {ServiceName} was neither an object nor an array.",
+                serviceName);
+
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Service Info response for {ServiceName} could not be parsed.",
+                serviceName);
+
+            return null;
+        }
+    }
+
+    private static string? NullIfWhiteSpace(string? value) =>
+    string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string? GetCommit(ServiceInformation? serviceInfo)
+    {
+        return NullIfWhiteSpace(serviceInfo?.Commit);
     }
 
     private Task AddPhaseAsync(RunState run, string phase, string message, bool isError = false, Guid? seedRunId = null, string? seedRunName = null)
@@ -430,7 +668,7 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
-    private async Task CompleteAsync(RunState run, bool failed, string? error)
+    private async Task CompleteAsync(RunState run, bool failed, string? error, bool cancelled = false)
     {
         run.Completed = true;
         run.Failed = failed;
@@ -451,6 +689,41 @@ public sealed class ApiHealthExecutionRunManager(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to persist completion status for API Health run {RunId}.", run.RunId);
+        }
+
+        // The stream's done event is the run finishing, not TestRail accepting the results.
+        AddDone(run);
+
+        IReadOnlyList<TestRailRunReference> published = [];
+        try
+        {
+            published = await testRailPublisher.PublishApiHealthRunAsync(new ApiHealthTestRailPublishRequest
+            {
+                RunId = run.RunId,
+                Scope = run.Scope,
+                ServiceName = run.ServiceName,
+                Failed = failed,
+                Cancelled = cancelled,
+                Error = error,
+                StartedAt = run.StartedAt,
+                FinishedAt = finishedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "TestRail publish failed for API Health run {RunId}.", run.RunId);
+        }
+
+        if (published.Count > 0)
+        {
+            try
+            {
+                await store.SetExecutionTestRailRunsAsync(run.RunId, published);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to persist the TestRail run link for API Health run {RunId}.", run.RunId);
+            }
         }
 
         PruneCompletedRuns();

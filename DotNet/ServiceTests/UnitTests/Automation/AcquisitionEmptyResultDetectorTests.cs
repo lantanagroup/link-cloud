@@ -46,6 +46,54 @@ public class AcquisitionEmptyResultDetectorTests
     }
 
     [Fact]
+    public void Imported_uuid_ids_do_not_match_the_generated_patient_prefix()
+    {
+        const string patientId = "01a0cfc5-e9f7-762b-a544-debb1c474a5b";
+        var manifest = QualifyingManifest(
+            patientId,
+            simulatedKeys:
+            [
+                "Observation/01a0cfc5-ea49-7ffb-8795-5aa58de0ba50",
+                "Encounter/01a0cfc5-ea33-7f81-8f12-c56aa79b4416"
+            ]);
+
+        var findings = AcquisitionEmptyResultDetector.Find(
+            manifest,
+            [
+                "Observation/01a0cfc5-ea49-7ffb-8795-5aa58de0ba50",
+                "Encounter/01a0cfc5-ea33-7f81-8f12-c56aa79b4416"
+            ],
+            [CompletedLog(patientId)]);
+
+        findings.Select(f => f.ResourceType).Should().BeEquivalentTo("Observation", "Encounter");
+    }
+
+    [Fact]
+    public void Imported_resources_count_by_the_acquisition_log_patient()
+    {
+        const string patientId = "01a0cfc5-e9f7-762b-a544-debb1c474a5b";
+        var manifest = QualifyingManifest(
+            patientId,
+            simulatedKeys:
+            [
+                "Observation/01a0cfc5-ea49-7ffb-8795-5aa58de0ba50",
+                "Encounter/01a0cfc5-ea33-7f81-8f12-c56aa79b4416"
+            ]);
+
+        var findings = AcquisitionEmptyResultDetector.Find(
+            manifest,
+            acquiredResourceIds: [],
+            logs: [CompletedLog(patientId)],
+            acquiredByPatient:
+            [
+                new PipelineDataReader.PatientResourceTypeCount(patientId, "Observation", 129),
+                new PipelineDataReader.PatientResourceTypeCount(patientId, "Encounter", 8)
+            ]);
+
+        findings.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Acquired_observations_do_not_flag_empty_acquisition()
     {
         var manifest = QualifyingManifest(

@@ -34,6 +34,7 @@ public class ResultServiceTest {
     private static final String PATIENT_ID = "patient1";
     private static final String CATEGORY_ID1 = "category1";
     private static final String CATEGORY_ID2 = "category2";
+    private static final String PROFILE = "http://example.org/fhir/StructureDefinition/profile|1.0.0";
 
     @BeforeEach
     void setUp() {
@@ -167,6 +168,7 @@ public class ResultServiceTest {
             assertEquals("NULL", issue.getCode());
             assertEquals("expression", issue.getExpression());
             assertEquals(PATIENT_ID, issue.getPatientId());
+            assertEquals(PROFILE, issue.getProfile());
         }
 
         verify(resultRepository).findAllByFacilityIdAndReportId(FACILITY_ID, REPORT_ID);
@@ -196,6 +198,7 @@ public class ResultServiceTest {
             assertEquals("NULL", issue.getCode());
             assertEquals("expression", issue.getExpression());
             assertEquals(PATIENT_ID, issue.getPatientId());
+            assertEquals(PROFILE, issue.getProfile());
         }
 
         verify(resultRepository).findAllByFacilityIdAndReportId(FACILITY_ID, REPORT_ID);
@@ -209,6 +212,7 @@ public class ResultServiceTest {
         result.setMessage("message");
         result.setLocation("location");
         result.setExpression("expression");
+        result.setProfile(PROFILE);
         result.setPatientId(PATIENT_ID);
         result.setFacilityId(FACILITY_ID);
         result.setReportId(REPORT_ID);

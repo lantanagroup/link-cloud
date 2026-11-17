@@ -43,7 +43,7 @@ steps:
     inputs:
       targetType: 'inline'
       script: |
-        GIT_COMMIT=$(git rev-parse --short HEAD)
+        GIT_COMMIT=$(git rev-parse --short=8 HEAD | tr -d '\r\n')
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
@@ -55,16 +55,11 @@ steps:
       workingDirectory: '$(Build.SourcesDirectory)'
       arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
-  - task: NuGetAuthenticate@1
-    displayName: Authenticate Shared_BOTW_Feed
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      feedsToUse: config
-      nugetConfigPath: nuget.config
   
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -91,35 +86,18 @@ steps:
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
 
-  # buildAndPush ignores `arguments`, so the feed secret never reached docker build
-  # (ADO warning on build 139467). Split build/push so BuildKit --secret applies.
   - task: Docker@2
-    displayName: "Build Automation Docker Image"
+    displayName: "Build & Push Automation Docker Image"
     condition: always()
-    env:
-      DOCKER_BUILDKIT: 1
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     inputs:
       containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
-      command: 'build'
+      command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
         latest
         $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
-      arguments: '--secret id=feed_accesstoken,env=SYSTEM_ACCESSTOKEN'
-
-  - task: Docker@2
-    displayName: "Push Automation Docker Image"
-    condition: always()
-    inputs:
-      containerRegistry: $(containerRegistry) # Variable Group
-      repository: $(registry-repo-name)
-      command: 'push'
-      tags: |
-        latest
-        $(MyTag)
 
   - task: PublishPipelineArtifact@1
     inputs:

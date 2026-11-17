@@ -15,6 +15,7 @@
 | `MeasureEvalServiceClient` | MeasureEval (Java) | `IMeasureEvalServiceClient` |
 | `ValidationServiceClient` | Validation (Java) | `IValidationServiceClient` |
 | `SubmissionServiceClient` | Submission | `ISubmissionServiceClient` |
+| `MockDmrpServiceClient` | Mock DMRP API support surface (`/api/mock-dmrp`) | `IMockDmrpServiceClient` |
 
 ## Design
 
@@ -31,6 +32,14 @@ Use `AddLinkSdk()` from `LantanaGroup.Link.Sdk.DependencyInjection` to register 
 
 ```csharp
 builder.Services.AddLinkSdk();
+```
+
+`MockDmrpServiceClient` is not part of `AddLinkSdk()`. The mock's address is held in different places by
+different callers (Tenant uses `DMRP:Api:BaseUrl`, Automation uses `ServiceRegistry:MockDmrpApiUrl`), so each
+registers it with the mock's root address:
+
+```csharp
+builder.Services.AddMockDmrpServiceClient(sp => /* the mock's root URL */);
 ```
 
 ### Prerequisites in DI
@@ -50,3 +59,22 @@ builder.Services.AddLinkSdk();
 
 - Targets `.NET 8`.
 - All clients are registered as singletons (Flurl clients are thread-safe).
+
+## Validation reporting
+
+- `GetReportCategoryCountsAsync(facilityId, reportId, submit, cancellationToken)` reads stored category counts.
+- `GetCategoryIssuesAsync(facilityId, reportId, categoryId, pageNumber, pageSize, cancellationToken)`
+  returns JSON containing `records` and `metadata`. Paging starts at 1; page size is 1–100.
+  Empty pages preserve the successful 200 response and metadata.
+- `CopyValidationResultsCsvAsync(facilityId, reportId, destination, cancellationToken)` copies the CSV download
+  directly to a writable stream, leaving it open. It uses headers-first HTTP completion and disables
+  the normal request timeout; supply a cancellation token with the desired download deadline.
+  Error status/Problem Details are returned without writing them into the destination. Exceptions
+  or cancellation during transfer may leave partial output, so use a temporary file and rename it
+  only after success. The CSV contains saved findings only, one row per finding/category pair.
+
+```csharp
+await using var file = File.Create("results.csv.partial");
+var response = await validationClient.CopyValidationResultsCsvAsync(facilityId, reportId, file, cancellationToken);
+// Check response.IsSuccessStatusCode before accepting the downloaded file.
+```

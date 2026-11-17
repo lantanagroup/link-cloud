@@ -21,6 +21,8 @@ public class ReportScheduleModel
     public string? PayloadRootUri { get; set; }
     public ScheduleStatus Status { get; set; } = ScheduleStatus.New;
     public bool? IsDeleted { get; set; } = false;
+    public DateTimeOffset? CompletedDate { get; set; }
+    public DateTimeOffset? SoftDeletedDate { get; set; }
 
     public List<string> ReportTypes { get; set; } = new();
 
@@ -43,6 +45,8 @@ public class ReportScheduleModel
             SubmitReportDateTime = reportSchedule.SubmitReportDateTime,
             CreateDate = reportSchedule.CreateDate,
             ModifyDate = reportSchedule.ModifyDate,
+            CompletedDate = reportSchedule.CompletedDate,
+            SoftDeletedDate = reportSchedule.SoftDeletedDate,
         };
     }
 
@@ -64,6 +68,8 @@ public class ReportScheduleModel
             PayloadRootUri = PayloadRootUri,
             ReportTypes = ReportTypes,
             IsDeleted = IsDeleted,
+            CompletedDate = CompletedDate,
+            SoftDeletedDate = SoftDeletedDate,
         };
     }
 }

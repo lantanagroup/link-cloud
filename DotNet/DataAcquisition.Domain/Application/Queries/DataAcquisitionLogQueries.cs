@@ -64,6 +64,15 @@ public interface IDataAcquisitionLogQueries
     Task<DataAcquisitionLogStatistics> GetDataAcquisitionLogStatisticsByReportAsync(string reportId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Counts completed acquired resources for a report, grouped by the log's patient id
+    /// and the resource type prefix of <c>ResourceId</c>. One database query.
+    /// </summary>
+    Task<List<AcquiredResourceCountByPatient>> GetAcquiredResourceCountsByPatientTypeAsync(
+        string reportId,
+        string? facilityId = null,
+        CancellationToken cancellationToken = default);
+
     Task<DataAcquisitionLogStatusStatistics> GetDataAcquisitionLogStatusStatisticsByReportAsync(string reportId,
         string? patientId = null, CancellationToken cancellationToken = default);
 
@@ -100,7 +109,14 @@ public interface IDataAcquisitionLogQueries
     /// </summary>
     Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns true when any note already recorded for the log contains <paramref name="text"/>.
+    /// </summary>
+    Task<bool> HasNoteContainingAsync(long logId, string text, CancellationToken cancellationToken = default);
+
 }
+
+public sealed record AcquiredResourceCountByPatient(string PatientId, string ResourceType, int Count);
 
 public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 {
@@ -540,6 +556,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.ExecutionDate,
                     log.CreateDate,
                     CompletionDate = log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null),
+                    log.CompletionTimeMilliseconds,
                     log.RetryAttempts,
                     log.Status,
                     log.IsDeleted
@@ -632,6 +649,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ExecutionDate = log.ExecutionDate,
                         CreateDate = log.CreateDate,
                         CompletionDate = log.CompletionDate,
+                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
@@ -862,6 +880,44 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         return statistics;
+    }
+
+    public async Task<List<AcquiredResourceCountByPatient>> GetAcquiredResourceCountsByPatientTypeAsync(
+        string reportId,
+        string? facilityId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(reportId, out var reportTrackingIdGuid))
+            throw new ArgumentException("Report ID must be a valid GUID.", nameof(reportId));
+
+        var query = _dbContext.DataAcquisitionLogResourceIds
+            .AsNoTracking()
+            .Where(r =>
+                r.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
+                && !r.DataAcquisitionLog.IsDeleted
+                && r.DataAcquisitionLog.Status == RequestStatus.Completed
+                && r.DataAcquisitionLog.PatientId != null
+                && r.DataAcquisitionLog.PatientId != ""
+                && r.ResourceId != null
+                && r.ResourceId != "");
+
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            query = query.Where(r => r.DataAcquisitionLog.FacilityId == facilityId);
+
+        var rows = await query
+            .GroupBy(r => new
+            {
+                r.DataAcquisitionLog.PatientId,
+                ResourceType = r.ResourceId.IndexOf("/") > 0
+                    ? r.ResourceId.Substring(0, r.ResourceId.IndexOf("/"))
+                    : r.ResourceId
+            })
+            .Select(g => new AcquiredResourceCountByPatient(g.Key.PatientId!, g.Key.ResourceType, g.Count()))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Where(row => !string.IsNullOrWhiteSpace(row.ResourceType))
+            .ToList();
     }
 
     public async Task<DataAcquisitionLogStatusStatistics> GetDataAcquisitionLogStatusStatisticsByReportAsync(
@@ -1165,6 +1221,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         return logs;
+    }
+
+    public async Task<bool> HasNoteContainingAsync(long logId, string text, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.DataAcquisitionLogNotes
+            .AsNoTracking()
+            .AnyAsync(n => n.DataAcquisitionLogId == logId && n.Note.Contains(text), cancellationToken);
     }
 
     public async Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default)

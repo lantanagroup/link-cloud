@@ -34,6 +34,8 @@
         public const string Cache = "cache";
         public const string From = "from";
         public const string To = "to";
+        public const string Route = "http.route";
+        public const string Method = "http.request.method";
 
         //Diagnostic tags Searching
         public const string SearchParameters = "search.parameters";
@@ -42,6 +44,8 @@
         public const string ServiceFilter = "service.filter";
         public const string ActionFilter = "action.filter";
         public const string UserFilter = "user.filter";
+        public const string ResourceFilter = "resource.filter";
+        public const string ResourceIdFilter = "resource-id.filter";
         public const string SortBy = "sort.by";
         public const string SortOrder = "sort.order";
         public const string PageNumber = "page.number";
@@ -64,6 +68,7 @@
         public const string TerminologyLookupDuration = "link_terminology_lookup_duration";
         public const string AutomationPollerHttpCount = "link_automation_poller_http_count";
         public const string AutomationMetricsSnapshotMissing = "link_automation_metrics_snapshot_missing";
+        public const string DataAcquisitionLegacyRouteRequests = "link_data_acq_legacy_route_requests";
 
         public const string ResourceCacheReadDuration = "link_resource_cache_read_duration";
         public const string ResourceCacheWriteDuration = "link_resource_cache_write_duration";

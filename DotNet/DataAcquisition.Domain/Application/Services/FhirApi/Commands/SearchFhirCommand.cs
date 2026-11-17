@@ -86,10 +86,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
         var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
-        var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
-        {
-            PreferredFormat = ResourceFormat.Json
-        });
+        var fhirClient = FhirCommandUtils.CreateFhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler);
 
         Bundle? resultBundle = null;
 
@@ -232,10 +229,7 @@ public class SearchFhirCommand : ISearchFhirCommand
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
             var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
-            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
-            {
-                PreferredFormat = ResourceFormat.Json
-            });
+            var fhirClient = FhirCommandUtils.CreateFhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler);
 
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)

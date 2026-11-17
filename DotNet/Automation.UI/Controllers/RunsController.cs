@@ -2,6 +2,7 @@
 using Automation.UI.Models.Metrics;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
@@ -31,18 +32,43 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         var descending = IsDescending(sortDir);
 
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
+        {
+            return BadRequest(dateError);
+        }
+
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        recentPage.CreatedFrom = createdFrom;
+        recentPage.CreatedTo = createdTo;
         var scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
             .OrderBy(s => s.IsSystemScenario)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var canReuseRecentPage =
+            !createdFrom.HasValue &&
+            !createdTo.HasValue &&
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
@@ -66,6 +92,8 @@ public class RunsController(
             TotalPages = recentPage.TotalPages,
             SortBy = recentPage.SortBy,
             SortDescending = recentPage.SortDescending,
+            CreatedFrom = recentPage.CreatedFrom,
+            CreatedTo = recentPage.CreatedTo,
         };
 
         return View(vm);
@@ -77,7 +105,9 @@ public class RunsController(
         int pageSize = 20,
         string sortBy = "createdAt",
         string sortDir = "desc",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? createdFrom = null,
+        DateOnly? createdTo = null)
     {
         // Returns just the Recent Runs card markup so the dashboard can refresh
         // the table in place (sort / paginate / SignalR update) without a full
@@ -85,7 +115,20 @@ public class RunsController(
         // partial is reused by both this action and the initial server render
         // in Index.cshtml — there's no divergence between the two templates.
         var descending = IsDescending(sortDir);
-        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        if (!TryGetCreatedDateRange(
+            createdFrom,
+            createdTo,
+            out var createdFromUtc,
+            out var createdBeforeUtc,
+            out var dateError))
+        {
+            return BadRequest(dateError);
+        }
+
+        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken, createdFromUtc, createdBeforeUtc);
+        page.CreatedFrom = createdFrom;
+        page.CreatedTo = createdTo;
         return PartialView("_RecentRunsTable", page);
     }
 
@@ -102,7 +145,15 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
-        var activeRuns = await GetActiveRunsAsync(recentPage, pageSize, cancellationToken);
+        var canReuseRecentPage =
+            pageNumber == 1 &&
+            string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase) &&
+            descending;
+
+        var activeRuns = await GetActiveRunsAsync(
+            pageSize,
+            cancellationToken,
+            canReuseRecentPage ? recentPage : null);
 
         return Json(new
         {
@@ -240,6 +291,74 @@ public class RunsController(
     }
 
     [HttpGet]
+    public async Task<IActionResult> NormalizationResults(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        NormalizationEvidenceSnapshot? evidence = null;
+        try
+        {
+            evidence = (await snapshotStore.GetDomainAsync<NormalizationEvidenceSnapshot>(
+                id,
+                NormalizationEvidenceSnapshot.Domain,
+                cancellationToken))?.Data;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Normalization evidence could not be read for run {RunId}.", id);
+            evidence = null;
+        }
+
+        var suiteId = manifest?.AppliedNormalizationSuiteId
+            ?? RunConfigurationReader.Read(run.RunConfigurationJson).SuiteId;
+        var hasRecordedSequences = evidence?.SuiteSequences is { Count: > 0 };
+        NormalizationSuiteDefinition? suite = null;
+        List<NormalizationOperationDefinition>? operations = null;
+        List<NormalizationSequenceDefinition>? sequences = null;
+        var suiteChangedAfterRun = false;
+        if (suiteId.HasValue && !hasRecordedSequences)
+        {
+            suite = await normalizationStore.GetSuiteByIdAsync(suiteId.Value, cancellationToken);
+            if (suite != null)
+            {
+                operations = await normalizationStore.GetAllOperationsAsync(cancellationToken);
+                sequences = await normalizationStore.GetAllSequencesAsync(cancellationToken);
+                suiteChangedAfterRun = NormalizationRunResultsBuilder.SuiteDefinitionChangedAfter(
+                    suite,
+                    operations,
+                    sequences,
+                    run.StartedAt ?? run.CreatedAt);
+            }
+        }
+
+        var mapId = manifest?.AppliedOrganizationResourceMapTemplateId
+            ?? RunConfigurationReader.Read(run.RunConfigurationJson).OrganizationMapId;
+        OrganizationResourceMapTemplate? organizationMap = null;
+        if (mapId.HasValue)
+            organizationMap = await organizationResourceMapTemplateStore.GetByIdAsync(mapId.Value, cancellationToken);
+
+        var finished = run.Status is AutomationRunStatus.Succeeded
+            or AutomationRunStatus.Failed
+            or AutomationRunStatus.Cancelled;
+        var results = NormalizationRunResultsBuilder.Build(new NormalizationRunResultsSource
+        {
+            RunConfigurationJson = run.RunConfigurationJson,
+            RunFinished = finished,
+            Manifest = manifest,
+            Evidence = evidence,
+            Suite = suite,
+            SuiteOperations = operations,
+            SuiteSequences = sequences,
+            SuiteChangedAfterRun = suiteChangedAfterRun,
+            OrganizationMap = organizationMap
+        });
+        return Json(results);
+    }
+
+    [HttpGet]
     public async Task<IActionResult> AbsUploadData(Guid id, CancellationToken cancellationToken)
     {
         var abs = await runManager.GetAbsUploadSnapshotAsync(id, cancellationToken);
@@ -312,7 +431,7 @@ public class RunsController(
         if (package == null)
             return NotFound();
 
-        return File(package.Content, "application/zip", package.FileName);
+        return new DeleteAfterSendFileResult(package.FilePath, "application/zip", package.FileName);
     }
 
     [HttpPost]
@@ -571,9 +690,10 @@ public class RunsController(
                 normalizedSearchTerm,
                 cancellationToken);
 
-            if ((result?.Body?.Records?.Count ?? 0) == 0)
+            if ((result?.Body?.Records?.Count ?? 0) == 0
+                && (result?.Body != null || result?.IsSuccessStatusCode == true))
             {
-                result = await dataAcqClient.SearchAcquisitionLogsAsync(
+                var fallback = await dataAcqClient.SearchAcquisitionLogsAsync(
                     string.Empty,
                     reportId,
                     pageSize,
@@ -582,7 +702,18 @@ public class RunsController(
                     sortOrder,
                     normalizedSearchTerm,
                     cancellationToken);
+                if (AcquisitionLogAvailability.PreferFallback(
+                        result?.Body != null,
+                        fallback?.Body?.Records?.Count ?? 0,
+                        fallback?.Body != null))
+                    result = fallback;
             }
+
+            var read = AcquisitionLogAvailability.Classify(result?.StatusCode, result?.Body != null);
+            if (read.Unavailable)
+                return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 }, unavailable = true });
+            if (read.ErrorStatus is int status)
+                return StatusCode(status);
 
             var records = (result?.Body?.Records ?? [])
                 .Select(r => new
@@ -613,6 +744,10 @@ public class RunsController(
 
             return Json(new { records, metadata });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
@@ -621,7 +756,7 @@ public class RunsController(
                 facilityId,
                 reportId);
 
-            return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 } });
+            return StatusCode(StatusCodes.Status502BadGateway);
         }
     }
 
@@ -641,8 +776,12 @@ public class RunsController(
         try
         {
             var detailed = await dataAcqClient.GetAcquisitionLogByIdAsync(logId, cancellationToken);
-            if (detailed == null)
-                return NotFound();
+            var detailRead = AcquisitionLogAvailability.Classify(
+                detailed?.StatusCode, detailed?.Body != null, notFoundIsMissing: true);
+            if (detailRead.Unavailable)
+                return Json(new { unavailable = true });
+            if (detailRead.ErrorStatus is int detailStatus)
+                return StatusCode(detailStatus);
 
             // Fetch reference resources linked to this log.
             var referenceResourceIds = new List<string>();
@@ -729,31 +868,46 @@ public class RunsController(
                 Notes = detailed.Body?.Notes?.ToList() ?? new List<string>()
             });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load DA log detail for run {RunId}, log {LogId}", id, logId);
-            return NotFound();
+            return StatusCode(StatusCodes.Status502BadGateway);
         }
     }
 
     private static bool IsDescending(string sortDir)
         => !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(
-        AutomationRunIndexViewModel recentPage,
-        int pageSize,
-        CancellationToken cancellationToken)
+    private async Task<List<AutomationRunSummary>> GetActiveRunsAsync(int pageSize, CancellationToken cancellationToken, AutomationRunIndexViewModel? unfilteredFirstPage = null)
     {
         var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
-        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
-        var activeRunsSource = recentPage.PageNumber == 1
-            ? recentPage.Runs
-            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+
+        var activeRunSummaries = await Task.WhenAll(
+            activeRunMetas.Select(meta =>
+                runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
+        // Active Runs must remain independent of the Recent Runs date filter.
+        // Reuse the first page when possible; otherwise fetch an unfiltered page.
+        var unfilteredPage = unfilteredFirstPage
+            ?? await runManager.GetRunsPageAsync(
+                1,
+                pageSize,
+                "createdAt",
+                true,
+                cancellationToken);
+
+        var activeRunsSource = unfilteredPage.Runs;
 
         return activeRunSummaries
-            .Where(r => r is not null && (r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Where(r => r is not null &&
+                (r.Status.IsCancellable() || r.Status.IsInProgress()))
             .Select(r => r!)
-            .Concat(activeRunsSource.Where(r => r.Status.IsCancellable() || r.Status.IsInProgress()))
+            .Concat(activeRunsSource.Where(r =>
+                r.Status.IsCancellable() || r.Status.IsInProgress()))
             .GroupBy(r => r.RunId)
             .Select(g => g.First())
             .OrderByDescending(r => r.CreatedAt)
@@ -764,5 +918,45 @@ public class RunsController(
     {
         var latest = await templateCacheVersionStore.GetLatestAsync(scenarioKey, cancellationToken);
         return latest?.VersionNumber;
+    }
+
+    private static bool TryGetCreatedDateRange(
+        DateOnly? createdFrom,
+        DateOnly? createdTo,
+        out DateTimeOffset? createdFromUtc,
+        out DateTimeOffset? createdBeforeUtc,
+        out string? error)
+    {
+        createdFromUtc = null;
+        createdBeforeUtc = null;
+        error = null;
+
+        if (createdFrom.HasValue &&
+            createdTo.HasValue &&
+            createdFrom.Value > createdTo.Value)
+        {
+            error = "Created From must be on or before Created To.";
+            return false;
+        }
+
+        if (createdTo == DateOnly.MaxValue)
+        {
+            error = "Created To is outside the supported date range.";
+            return false;
+        }
+
+        createdFromUtc = createdFrom.HasValue
+            ? new DateTimeOffset(
+                createdFrom.Value.ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        createdBeforeUtc = createdTo.HasValue
+            ? new DateTimeOffset(
+                createdTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero)
+            : null;
+
+        return true;
     }
 }

@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Data.Repository.Mappings;
+using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -531,5 +532,79 @@ namespace UnitTests.DMRP
             var ex = await Assert.ThrowsAsync<ReportingPlanValidationException>(() => _manager.DeleteForFacilityAsync("  "));
             Assert.Equal("FacilityId is required.", ex.Message);
         }
+
+        /// <summary>
+        /// For the Mock DMRP write-through: the form's selection is the whole of the enrollment, so plans for
+        /// measures it dropped stop reporting even when the DMRP sync would leave them alone.
+        /// </summary>
+        [Fact]
+        public async Task WithdrawUnselectedAsync_WithdrawsOnlyDroppedScheduledMeasuresInThosePeriods()
+        {
+            var keptThisMonth = Plan("HOB", 10, 2026);
+            var droppedThisMonth = Plan("PSM", 10, 2026);
+            var droppedNextMonth = Plan("PSM", 11, 2026);
+            var unmappedThisMonth = Plan("ZZZ", 10, 2026);
+            var droppedOtherMonth = Plan("PSM", 9, 2026);
+            var droppedOutsideThePeriods = Plan("PSM", 11, 2025);
+            var otherFacility = Plan("PSM", 10, 2026, facilityId: "another-facility");
+            GivenStoredPlans(keptThisMonth, droppedThisMonth, droppedNextMonth, unmappedThisMonth, droppedOtherMonth,
+                droppedOutsideThePeriods, otherFacility);
+            GivenMappings(("HOB", "dqm-A"), ("PSM", "dqm-B"), ("ZZZ", null));
+
+            var withdrawn = await _manager.WithdrawUnselectedAsync(FacilityId,
+                [new ReportingPeriod(2026, 10), new ReportingPeriod(2026, 11)],
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "hob" });
+
+            Assert.Equal(2, withdrawn);
+            Assert.False(droppedThisMonth.IsReporting);
+            Assert.False(droppedNextMonth.IsReporting);
+            Assert.True(keptThisMonth.IsReporting);
+            Assert.True(unmappedThisMonth.IsReporting);
+            Assert.True(droppedOtherMonth.IsReporting);
+            Assert.True(droppedOutsideThePeriods.IsReporting);
+            Assert.True(otherFacility.IsReporting);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task WithdrawUnselectedAsync_NothingToWithdraw_SavesNothing()
+        {
+            GivenStoredPlans(Plan("HOB", 10, 2026));
+            GivenMappings(("HOB", "dqm-A"));
+
+            var withdrawn = await _manager.WithdrawUnselectedAsync(FacilityId, [new ReportingPeriod(2026, 10)],
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "HOB" });
+
+            Assert.Equal(0, withdrawn);
+            _mockRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        private static FacilityReportingPlan Plan(string measure,
+                                                  int month,
+                                                  int year,
+                                                  string facilityId = FacilityId) =>
+            new()
+            {
+                FacilityId = facilityId,
+                Measure = measure,
+                ReportingMonth = month,
+                ReportingYear = year,
+                IsReporting = true
+            };
+
+        /// <summary>
+        /// Applies the manager's own query to the rows, the way the database would.
+        /// </summary>
+        private void GivenStoredPlans(params FacilityReportingPlan[] plans) =>
+            _mockRepository
+                .Setup(r => r.FindAsync(It.IsAny<Expression<Func<FacilityReportingPlan, bool>>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken _) =>
+                    plans.Where(predicate.Compile()).ToList());
+
+        private void GivenMappings(params (string Measure, string? Dqm)[] mappings) =>
+            _mockMeasureMappingRepository
+                .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mappings.Select(m => new MeasureMapping { Measure = m.Measure, DQM = m.Dqm }).ToList());
     }
 }

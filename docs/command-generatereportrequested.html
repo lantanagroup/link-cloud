@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -501,15 +503,15 @@
 <p>Contains facility and timing information used to initiate an on‑demand report generation process.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nGenerateReportRequested_150FD8B0["Command: Generate Report Requested"]
-  nTenantService_7F5659F3["Service: TenantService"] -->|sends| nGenerateReportRequested_150FD8B0
-  nGenerateReportRequested_150FD8B0 -->|handled by| nReportService_417D4454["Service: ReportService"]
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nGenerateReportRequested_150FD8B0
-    nReportService_417D4454
+nGenerateReportRequested_5FF13A3F["Command: Generate Report Requested"]
+  nTenantService_29AF3ECE["Service: TenantService"] -->|sends| nGenerateReportRequested_5FF13A3F
+  nGenerateReportRequested_5FF13A3F -->|handled by| nReportService_7E534222["Service: ReportService"]
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nGenerateReportRequested_5FF13A3F
+    nReportService_7E534222
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nTenantService_7F5659F3
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nTenantService_29AF3ECE
   end
 </pre></div>
 
@@ -519,15 +521,15 @@ nGenerateReportRequested_150FD8B0["Command: Generate Report Requested"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nGenerateReportRequested_150FD8B0["Command: Generate Report Requested"]
-  nTenantService_7F5659F3["Service: TenantService"] -->|sends| nGenerateReportRequested_150FD8B0
-  nGenerateReportRequested_150FD8B0 -->|handled by| nReportService_417D4454["Service: ReportService"]
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nGenerateReportRequested_150FD8B0
-    nReportService_417D4454
+nGenerateReportRequested_5FF13A3F["Command: Generate Report Requested"]
+  nTenantService_29AF3ECE["Service: TenantService"] -->|sends| nGenerateReportRequested_5FF13A3F
+  nGenerateReportRequested_5FF13A3F -->|handled by| nReportService_7E534222["Service: ReportService"]
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nGenerateReportRequested_5FF13A3F
+    nReportService_7E534222
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nTenantService_7F5659F3
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nTenantService_29AF3ECE
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

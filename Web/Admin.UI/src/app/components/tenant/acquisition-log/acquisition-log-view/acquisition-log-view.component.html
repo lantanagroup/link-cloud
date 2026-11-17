@@ -353,7 +353,7 @@
               'priority-critical': log.priority === 'Critical',
               'priority-high': log.priority === 'High',
               'row-deleted': log.isDeleted,
-              'row-status-failed': (log.status === 'Failed' || log.status === 'MaxRetriesReached') && log.priority !== 'Critical' && log.priority !== 'High',
+              'row-status-failed': (log.status === 'Failed' || log.status === 'MaxRetriesReached' || log.status === 'AccessDenied') && log.priority !== 'Critical' && log.priority !== 'High',
               'row-cancel-ineligible': !isLogCancelEligible(log)
             }">
               <td class="table-cell" style="position: relative;"
@@ -432,6 +432,7 @@
                     'status-completed': log.status === 'Completed',
                     'status-failed': log.status === 'Failed',
                     'status-maxRetryReached': log.status === 'MaxRetriesReached',
+                    'status-accessDenied': log.status === 'AccessDenied',
                     'status-configurationMissing': log.status === 'ConfigurationMissing',
                     'status-skipped': log.status === 'Skipped',
                     'status-cancelled': log.status === 'Cancelled'

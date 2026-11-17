@@ -22,6 +22,7 @@ public class NormalizationExecutionSummaryParserTests
         steps[0].Outcome.Should().Be("NoAction");
         steps[0].ResourceType.Should().Be("Location");
         steps[0].ResourceId.Should().Be("loc-1");
+        steps[0].PatientId.Should().Be("p1");
     }
 
     [Fact]
@@ -51,6 +52,8 @@ public class NormalizationExecutionSummaryParserTests
         steps.Should().HaveCount(2);
         steps[0].ResourceType.Should().Be("Observation");
         steps[0].ResourceId.Should().Be("Patient-e38197c4-001-Observation-193");
+        steps[0].PatientId.Should().Be("Patient-e38197c4-001");
+        steps[1].PatientId.Should().Be("Patient-e38197c4-001");
         steps[0].Sequence.Should().Be(1);
         steps[0].OperationType.Should().Be("RemoveExtensions");
         steps[0].OperationName.Should().Be("Remove Common Extensions");

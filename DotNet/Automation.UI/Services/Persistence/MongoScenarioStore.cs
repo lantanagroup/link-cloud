@@ -396,6 +396,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             Id = model.Id,
             Name = model.Name,
             Description = model.Description,
+            TestRailCaseId = model.TestRailCaseId,
             IsSystemScenario = model.IsSystemScenario,
             FacilityConfigurationMode = model.FacilityConfigurationMode.ToString(),
             FacilityTemplateId = model.FacilityTemplateId,
@@ -408,7 +409,6 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = model.ResourcesPerPatientMin,
             ResourcesPerPatientMax = model.ResourcesPerPatientMax,
             PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
-            NhsnOrganizationId = model.NhsnOrganizationId,
             EnableDmrp = model.EnableDmrp,
             QueryPlanTemplateId = model.QueryPlanTemplateId,
             NormalizationSuiteId = model.NormalizationSuiteId,
@@ -437,6 +437,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             Id = doc.Id,
             Name = doc.Name,
             Description = doc.Description,
+            TestRailCaseId = doc.TestRailCaseId,
             IsSystemScenario = doc.IsSystemScenario,
             FacilityConfigurationMode = Enum.TryParse<FacilityConfigurationMode>(doc.FacilityConfigurationMode, true, out var facilityMode)
                 ? facilityMode
@@ -458,7 +459,6 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = doc.ResourcesPerPatientMin,
             ResourcesPerPatientMax = doc.ResourcesPerPatientMax,
             PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
-            NhsnOrganizationId = string.IsNullOrWhiteSpace(doc.NhsnOrganizationId) ? string.Empty : doc.NhsnOrganizationId,
             EnableDmrp = doc.EnableDmrp,
             QueryPlanTemplateId = doc.QueryPlanTemplateId,
             NormalizationSuiteId = doc.NormalizationSuiteId,

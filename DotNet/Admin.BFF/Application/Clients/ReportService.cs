@@ -214,10 +214,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             return response;
         }
 
+        /// <summary>
+        /// Gets a report schedule by id. Report hides soft-deleted schedules unless includeDeleted is true.
+        /// </summary>
         public async Task<HttpResponseMessage> GetReportScheduleById(
             ClaimsPrincipal user,
             CancellationToken cancellationToken,
-            string reportScheduleId)
+            string reportScheduleId,
+            bool includeDeleted = false)
         {
             // HTTP GET
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
@@ -230,6 +234,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             }
 
             var relativeUrl = $"api/schedules/{Uri.EscapeDataString(reportScheduleId ?? string.Empty)}";
+            if (includeDeleted)
+            {
+                relativeUrl += "?includeDeleted=true";
+            }
 
             var response = await _client.GetAsync(relativeUrl, cancellationToken);
 

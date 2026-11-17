@@ -180,6 +180,19 @@ public class PipelineSummarySnapshotBuilderTests
     }
 
     [Fact]
+    public async Task Population_summary_uses_counts_without_measure_report_ids()
+    {
+        var snapshot = await BuildAsync(new PipelineSummarySnapshotBuilder.ResolvedDomainData
+        {
+            Schedule = Schedule("InProgress"),
+            PopulationCounts = new PipelineDataReader.PopulationCountSnapshot(2, 3, 40)
+        });
+
+        snapshot.Report.PopulationSummary.Should().Be(
+            "2 report type(s), 3 group population set(s), 40 measure report population reference(s).");
+    }
+
+    [Fact]
     public async Task Validation_rates_use_passed_and_failed_entry_modify_dates()
     {
         var first = new DateTime(2026, 9, 2, 12, 5, 0, DateTimeKind.Utc);

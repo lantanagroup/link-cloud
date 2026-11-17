@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.configs;
 import ca.uhn.fhir.parser.DataFormatException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
+import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.exceptions.FhirParseException;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Properties;
@@ -10,7 +11,9 @@ import com.lantanagroup.link.shared.kafka.RetryTopicRecoverer;
 import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
+import com.lantanagroup.link.validation.records.ShadowCompareEvent;
 import com.lantanagroup.link.validation.records.ValidationComplete;
+import com.lantanagroup.link.validation.services.ShadowValidationConsumer;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -68,7 +71,8 @@ public class KafkaConfig {
         Map<String, Deserializer<?>> deserializers = Map.of(
                 Topics.READY_FOR_VALIDATION, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper),
                 Topics.READY_FOR_VALIDATION_RETRY, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper),
-                Topics.READY_FOR_VALIDATION_ERROR, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper));
+                Topics.READY_FOR_VALIDATION_ERROR, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper),
+                ShadowCompareEvent.TOPIC, new StringDeserializer());
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
     }
@@ -78,7 +82,8 @@ public class KafkaConfig {
         Map<String, Deserializer<?>> deserializers = Map.of(
                 Topics.READY_FOR_VALIDATION, new JsonDeserializer<>(ReadyForValidation.class, objectMapper),
                 Topics.READY_FOR_VALIDATION_RETRY, new JsonDeserializer<>(ReadyForValidation.class, objectMapper),
-                Topics.READY_FOR_VALIDATION_ERROR, new JsonDeserializer<>(ReadyForValidation.class, objectMapper));
+                Topics.READY_FOR_VALIDATION_ERROR, new JsonDeserializer<>(ReadyForValidation.class, objectMapper),
+                ShadowCompareEvent.TOPIC, new JsonDeserializer<>(ShadowCompareEvent.class, objectMapper));
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
     }
@@ -113,6 +118,7 @@ public class KafkaConfig {
                 String.class, new StringSerializer(),
                 ValidationComplete.class, getJsonSerializer(objectMapper, ValidationComplete.class),
                 ReadyForValidation.class, getJsonSerializer(objectMapper, ReadyForValidation.class),
+                ShadowCompareEvent.class, getJsonSerializer(objectMapper, ShadowCompareEvent.class),
                 // A record that fails deserialization reaches the dead-letter publisher as the raw byte[]
                 // that could not be parsed — there is no bound type to serialize. Without this delegate the
                 // publication throws, DefaultErrorHandler cannot recover, and the container redelivers the
@@ -197,6 +203,30 @@ public class KafkaConfig {
             String errorTopic,
             KafkaRetryConfig retryConfig) {
         return RetryTopicRecovererFactory.create(kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE);
+    }
+
+    // Shadow comparison runs on its own container and consumer group, so its pace, lag, and failures
+    // can never affect the primary validation consumer.
+    @Bean
+    public ConcurrentMessageListenerContainer<String, ShadowCompareEvent> shadowCompareEventContainer(
+            ConcurrentKafkaListenerContainerFactory<String, ShadowCompareEvent> factory,
+            ShadowValidationConsumer consumer) {
+        ConcurrentMessageListenerContainer<String, ShadowCompareEvent> container =
+                getAsyncListenerContainer(factory, consumer, ShadowCompareEvent.TOPIC);
+        container.getContainerProperties().setGroupId("validation-shadow");
+        return container;
+    }
+
+    private <K, V> ConcurrentMessageListenerContainer<K, V> getAsyncListenerContainer(
+            ConcurrentKafkaListenerContainerFactory<K, V> factory,
+            AsyncListener<?, ?> listener,
+            String... topics) {
+        ConcurrentMessageListenerContainer<K, V> container = factory.createContainer(topics);
+        ContainerProperties containerProperties = container.getContainerProperties();
+        containerProperties.setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        containerProperties.setAsyncAcks(true);
+        containerProperties.setMessageListener(listener);
+        return container;
     }
 
     @Bean

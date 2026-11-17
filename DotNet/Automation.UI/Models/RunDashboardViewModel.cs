@@ -19,5 +19,7 @@ public class RunDashboardViewModel
     public int TotalPages { get; set; } = 1;
     public string SortBy { get; set; } = "createdAt";
     public bool SortDescending { get; set; } = true;
+    public DateOnly? CreatedFrom { get; set; }
+    public DateOnly? CreatedTo { get; set; }
     public string SortDir => SortDescending ? "desc" : "asc";
 }

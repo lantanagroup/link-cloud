@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -429,5 +430,59 @@ public class LogControllerTests
         var result = await controller.ProcessByFilter(new LogSearchParameters { FacilityId = "Facility1" });
 
         Assert.IsType<AcceptedResult>(result);
+    }
+
+    [Fact]
+    public async Task GetAcquiredResourceCountsByPatient_ReturnsGroupedCounts()
+    {
+        var mocker = new AutoMocker();
+        var reportId = Guid.NewGuid().ToString();
+        mocker.GetMock<IDataAcquisitionLogQueries>()
+            .Setup(q => q.GetAcquiredResourceCountsByPatientTypeAsync(reportId, "facility-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new AcquiredResourceCountByPatient("patient-1", "Observation", 129),
+                new AcquiredResourceCountByPatient("patient-1", "Encounter", 8)
+            ]);
+
+        var controller = CreateController(mocker);
+
+        var result = await controller.GetAcquiredResourceCountsByPatient(reportId, "facility-1");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var rows = Assert.IsType<List<AcquiredResourceCountByPatientApiModel>>(ok.Value);
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(129, rows[0].Count);
+        Assert.Equal("Observation", rows[0].ResourceType);
+    }
+
+    [Fact]
+    public async Task GetAcquiredResourceCountsByPatient_InvalidReportId_ReturnsBadRequest()
+    {
+        var mocker = new AutoMocker();
+        var controller = CreateController(mocker);
+
+        var result = await controller.GetAcquiredResourceCountsByPatient("not-a-guid", null);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetAcquiredResourceCountsByPatient_QueryThrows_ReturnsProblemWithoutExceptionDetail()
+    {
+        var mocker = new AutoMocker();
+        var reportId = Guid.NewGuid().ToString();
+        mocker.GetMock<IDataAcquisitionLogQueries>()
+            .Setup(q => q.GetAcquiredResourceCountsByPatientTypeAsync(reportId, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("secret-schema-detail"));
+
+        var controller = CreateController(mocker);
+
+        var result = await controller.GetAcquiredResourceCountsByPatient(reportId, null);
+
+        var problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, problem.StatusCode);
+        var body = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.DoesNotContain("secret-schema-detail", body.Detail ?? string.Empty);
     }
 }

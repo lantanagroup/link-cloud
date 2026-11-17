@@ -1,27 +1,12 @@
 #!/bin/sh
 #
-# Refuses to push commits that carry the per-environment App Configuration exports.
+# Refuses to push history that touches files moved out of this repository under LEGLINK-912.
+# A clone made before that cleanup must be re-cloned, not pulled; this catches it when it was
+# not. .github/workflows/purged-history-guard.yml checks the repository on a schedule as a
+# backstop.
 #
-# LEGLINK-912 moved those files to the private link-cac repository. A separate, scheduled
-# operation rewrites this repository's history to purge the copies committed before that
-# move. THIS HOOK IS LANDED AHEAD OF THAT OPERATION ON PURPOSE, and does nothing until it
-# runs: the commits it looks for are still reachable from origin today, so they are never
-# part of what a push introduces.
-#
-# It matters afterwards. A clone made before the rewrite still contains the old commits,
-# and `git pull` on such a clone does NOT refuse - this repository's earliest commits are
-# unsigned, so they survive the rewrite and a merge base still exists - and the merge
-# silently brings the purged files back into that clone's history. The working tree looks
-# completely normal. Pushing then restores them to the public repository.
-#
-# Shipping the hook now is what puts it on the machines that will make that mistake: a
-# stale clone carries whatever .githooks it last pulled.
-#
-# This is the last client-side stop before that happens. It is not the only control: a
-# server-side push ruleset blocks the same thing for everyone and cannot be bypassed with
-# --no-verify, and CI fails any pull request whose history carries these paths. This hook
-# exists because it produces a clear message at the moment of the mistake, on the machine
-# that can still fix it cheaply.
+# Git for Windows runs it through its own bundled sh, whichever shell started the push. The
+# recovery steps it prints work unchanged in PowerShell, cmd and Git Bash.
 #
 # Enable for your clone with:
 #     git config core.hooksPath .githooks
@@ -30,10 +15,7 @@
 
 set -e
 
-PURGED_PATHS="Config/app-config.dev.json \
-Config/app-config.qa.json \
-Config/app-config.qa2.json \
-Config/app-config.test.json"
+PURGED_PATHS="Config/ .env"
 
 # 40 zeros: git uses this for "no such ref" on branch creation and deletion.
 ZERO="0000000000000000000000000000000000000000"
@@ -55,15 +37,16 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         range="$remote_sha..$local_sha"
     fi
 
+    # --full-history follows every parent of a merge, not only one that matches at these paths.
     # shellcheck disable=SC2086
-    offenders=$(git rev-list $range -- $PURGED_PATHS 2>/dev/null || true)
+    offenders=$(git rev-list --full-history $range -- $PURGED_PATHS 2>/dev/null || true)
 
     if [ -n "$offenders" ]; then
         blocked=1
         count=$(printf '%s\n' "$offenders" | wc -l | tr -d ' ')
         echo ""
         echo "pre-push: BLOCKED -- $local_ref carries $count commit(s) that reintroduce the"
-        echo "pre-push: App Configuration exports removed from history by LEGLINK-912:"
+        echo "pre-push: files removed from this repository's history by LEGLINK-912:"
         echo ""
         printf '%s\n' "$offenders" | head -5 | while read -r c; do
             echo "    $(git log -1 --format='%h %ad %s' --date=short "$c" 2>/dev/null | cut -c1-72)"
@@ -80,12 +63,15 @@ if [ "$blocked" -eq 1 ]; then
     echo "pre-push: ran 'git pull' instead of re-cloning. Your working tree will look normal;"
     echo "pre-push: the files are in your history, not your files."
     echo ""
-    echo "pre-push: Fix it by re-cloning. To keep unpushed work first:"
-    echo "pre-push:     git format-patch -<n> HEAD -o ~/my-work"
-    echo "pre-push:     git fetch origin && git reset --hard origin/<branch>"
-    echo "pre-push:     git am ~/my-work/*.patch"
-    echo ""
-    echo "pre-push: Then delete every other local branch - they still point at old history."
+    echo "pre-push: Fix it by cloning again. To keep commits that never reached GitHub:"
+    echo "pre-push:   1. Rename this folder to link-cloud-old and clone link-cloud fresh beside it."
+    echo "pre-push:   2. In the new clone, run these, replacing <branch> and <n>, the number of"
+    echo "pre-push:      your commits that never reached GitHub:"
+    echo "pre-push:          git fetch ../link-cloud-old <branch>"
+    echo "pre-push:          git switch -c <branch> origin/dev"
+    echo "pre-push:          git cherry-pick FETCH_HEAD~<n>..FETCH_HEAD"
+    echo "pre-push:   3. Copy .env from link-cloud-old into the new clone."
+    echo "pre-push:   4. Delete link-cloud-old. Never push from it."
     exit 1
 fi
 

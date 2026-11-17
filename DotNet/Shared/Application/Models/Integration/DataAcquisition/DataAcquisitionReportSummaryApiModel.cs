@@ -30,3 +30,14 @@ public class DataAcquisitionReportSummaryApiModel
         public int Count { get; set; }
     }
 }
+
+/// <summary>
+/// Completed acquisition count for one patient and resource type.
+/// Produced by a single group-by on the resource-id table.
+/// </summary>
+public class AcquiredResourceCountByPatientApiModel
+{
+    public string PatientId { get; set; } = string.Empty;
+    public string ResourceType { get; set; } = string.Empty;
+    public int Count { get; set; }
+}

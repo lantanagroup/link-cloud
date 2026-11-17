@@ -41,13 +41,39 @@ public static class LokiEvidenceQuery
         return $"\"ResourceType\":\"{resourceType.Trim()}\"";
     }
 
-    public static TimeSpan LookbackForAttempt(TimeSpan configuredWindow, int attemptIndex)
+    public static TimeSpan LookbackForAttempt(TimeSpan configuredWindow, int attemptIndex, TimeSpan? coverage = null)
     {
+        TimeSpan lookback;
         if (attemptIndex <= 0 || attemptIndex > WidenedWindows.Length)
-            return configuredWindow;
+            lookback = configuredWindow;
+        else
+        {
+            var widened = WidenedWindows[attemptIndex - 1];
+            lookback = configuredWindow > widened ? configuredWindow : widened;
+        }
 
-        var widened = WidenedWindows[attemptIndex - 1];
-        return configuredWindow > widened ? configuredWindow : widened;
+        if (coverage is { } span && span > lookback)
+            return span;
+
+        return lookback;
+    }
+
+    /// <summary>
+    /// Extends an attempt lookback when the run has been going longer than that
+    /// window. Call this immediately before a Loki request so time spent waiting
+    /// or paging does not slide the start of the window past the run start.
+    /// </summary>
+    public static TimeSpan LookbackForRequest(TimeSpan attemptLookback, TimeSpan coverage) =>
+        coverage > attemptLookback ? coverage : attemptLookback;
+
+    /// <summary>
+    /// Time from <paramref name="started"/> to <paramref name="now"/>. A start
+    /// that is still in the future contributes no extra lookback.
+    /// </summary>
+    public static TimeSpan CoverageSince(DateTimeOffset started, DateTimeOffset now)
+    {
+        var coverage = now - started;
+        return coverage < TimeSpan.Zero ? TimeSpan.Zero : coverage;
     }
 
     public static TimeSpan? DelayBeforeAttempt(int attemptIndex)
@@ -105,23 +131,25 @@ public static class LokiEvidenceQuery
         Func<TimeSpan, CancellationToken, Task<List<string>>> queryAsync,
         Func<TimeSpan, CancellationToken, Task> delayAsync,
         IAutomationOutput output,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        TimeSpan? coverage = null,
+        Func<TimeSpan>? coverageNow = null)
     {
         List<string> logs = [];
 
         for (var attempt = 0; attempt < MaxAttempts; attempt++)
         {
             var delay = DelayBeforeAttempt(attempt);
-            var lookback = LookbackForAttempt(configuredWindow, attempt);
-
             if (delay is { } wait)
             {
                 output.WriteLine(
-                    $"[Normalization Suite] Loki evidence incomplete; waiting {wait.TotalSeconds:F0}s then retrying with lookback {lookback.TotalMinutes:F0}m " +
+                    $"[Normalization Suite] Loki evidence incomplete; waiting {wait.TotalSeconds:F0}s then retrying " +
                     $"(attempt {attempt + 1}/{MaxAttempts}).");
                 await delayAsync(wait, cancellationToken);
             }
 
+            var span = coverageNow?.Invoke() ?? coverage;
+            var lookback = LookbackForAttempt(configuredWindow, attempt, span);
             logs = await queryAsync(lookback, cancellationToken);
             output.WriteLine(
                 $"[Normalization Suite] Loki scrape attempt {attempt + 1}/{MaxAttempts}: {logs.Count} summary line(s) " +

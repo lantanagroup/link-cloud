@@ -174,13 +174,102 @@ public sealed class NormalizationSqlServerFixture : IAsyncLifetime
     {
         _container = new MsSqlBuilder(SqlServerImage).Build();
         await _container.StartAsync();
-        ConnectionString = _container.GetConnectionString();
+        var masterConnectionString = _container.GetConnectionString();
+        const string databaseName = "NormalizationTest";
+        await using (var master = new SqlConnection(masterConnectionString))
+        {
+            await master.OpenAsync();
+            await using var create = master.CreateCommand();
+            create.CommandText = $"IF DB_ID(N'{databaseName}') IS NULL CREATE DATABASE [{databaseName}];";
+            await create.ExecuteNonQueryAsync();
+        }
+
+        var builder = new SqlConnectionStringBuilder(masterConnectionString)
+        {
+            InitialCatalog = databaseName
+        };
+        ConnectionString = builder.ConnectionString;
         var options = new DbContextOptionsBuilder<NormalizationDbContext>().UseSqlServer(ConnectionString).Options;
-        await using var context = new NormalizationDbContext(options);
-        await context.Database.MigrateAsync();
+        await using (var context = new NormalizationDbContext(options))
+        {
+            await context.Database.MigrateAsync();
+        }
+
+        // Same isolation as local compose and CI SQL. Master cannot take this setting.
+        SqlConnection.ClearAllPools();
+        await using (var master = new SqlConnection(masterConnectionString))
+        {
+            await master.OpenAsync();
+            await using var alter = master.CreateCommand();
+            alter.CommandText = $"""
+                IF EXISTS (SELECT 1 FROM sys.databases WHERE name = N'{databaseName}' AND is_read_committed_snapshot_on = 0)
+                    ALTER DATABASE [{databaseName}] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
+                """;
+            await alter.ExecuteNonQueryAsync();
+        }
     }
 
     public Session Open() => new(ConnectionString);
+
+    public async Task<string> CreateEmptySnapshotDatabaseAsync(string databaseName)
+    {
+        var master = MasterConnectionString();
+        await using (var connection = new SqlConnection(master))
+        {
+            await connection.OpenAsync();
+            await using var create = connection.CreateCommand();
+            create.CommandText = $"IF DB_ID(N'{databaseName}') IS NULL CREATE DATABASE [{databaseName}];";
+            await create.ExecuteNonQueryAsync();
+        }
+
+        var side = SideConnectionString(databaseName);
+        var options = new DbContextOptionsBuilder<NormalizationDbContext>().UseSqlServer(side).Options;
+        await using (var context = new NormalizationDbContext(options))
+        {
+            await context.Database.MigrateAsync();
+        }
+
+        // A pooled connection to the new database blocks ALTER DATABASE.
+        SqlConnection.ClearAllPools();
+        await using (var connection = new SqlConnection(master))
+        {
+            await connection.OpenAsync();
+            await using var alter = connection.CreateCommand();
+            alter.CommandText = $"""
+                IF EXISTS (SELECT 1 FROM sys.databases WHERE name = N'{databaseName}' AND is_read_committed_snapshot_on = 0)
+                    ALTER DATABASE [{databaseName}] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
+                """;
+            await alter.ExecuteNonQueryAsync();
+        }
+
+        return side;
+    }
+
+    public async Task DropDatabaseAsync(string databaseName)
+    {
+        SqlConnection.ClearAllPools();
+        await using var connection = new SqlConnection(MasterConnectionString());
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            IF DB_ID(N'{databaseName}') IS NOT NULL
+            BEGIN
+                ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                DROP DATABASE [{databaseName}];
+            END
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private string MasterConnectionString()
+    {
+        return new SqlConnectionStringBuilder(ConnectionString) { InitialCatalog = "master" }.ConnectionString;
+    }
+
+    private string SideConnectionString(string databaseName)
+    {
+        return new SqlConnectionStringBuilder(ConnectionString) { InitialCatalog = databaseName }.ConnectionString;
+    }
 
     public async Task DisposeAsync()
     {
@@ -213,10 +302,10 @@ public sealed class NormalizationSqlServerFixture : IAsyncLifetime
                         id => new VendorVersionModel { Id = id, VendorId = Guid.Empty, Version = "test" })));
             var resources = new ResourceQueries(Context);
             Queries = new OperationSequenceQueries(database, Context, _cache, resolver.Object);
-            var operations = new OperationQueries(database, Context, resolver.Object);
+            OperationQueries = new OperationQueries(database, Context, resolver.Object);
             Manager = new OperationManager(
                 database,
-                operations,
+                OperationQueries,
                 Queries,
                 resources,
                 new ResourceManager(database, resources, Queries, NullLogger<ResourceManager>.Instance),
@@ -226,6 +315,7 @@ public sealed class NormalizationSqlServerFixture : IAsyncLifetime
 
         public NormalizationDbContext Context { get; }
         public OperationSequenceQueries Queries { get; }
+        public OperationQueries OperationQueries { get; }
         public OperationManager Manager { get; }
 
         public async Task<Guid> SeedAsync(string facilityId, string name)

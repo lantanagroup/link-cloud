@@ -36,6 +36,9 @@ public static class AbortReport
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
+        // Each response is assigned inside a try that covers only the call, so it is disposed through an alias.
+        using var getResponseScope = getResponse;
+
         if (!getResponse.IsSuccessStatusCode)
         {
             if (getResponse.StatusCode == HttpStatusCode.NotFound)
@@ -77,7 +80,7 @@ public static class AbortReport
 
         try
         {
-            var cancelResponse = await dataAcquisitionService.CancelLogsByFilterAsync(
+            using var cancelResponse = await dataAcquisitionService.CancelLogsByFilterAsync(
                 context.User,
                 new { ReportId = reportScheduleId },
                 minAgeHours: 0,
@@ -105,6 +108,7 @@ public static class AbortReport
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
+        using var reportResponseScope = reportResponse;
         if (!reportResponse.IsSuccessStatusCode)
         {
             try
@@ -123,7 +127,7 @@ public static class AbortReport
 
         try
         {
-            var daResponse = await dataAcquisitionService.SoftDeleteLogsByReportTrackingIdAsync(context.User, reportScheduleId, context.RequestAborted);
+            using var daResponse = await dataAcquisitionService.SoftDeleteLogsByReportTrackingIdAsync(context.User, reportScheduleId, context.RequestAborted);
             if (!daResponse.IsSuccessStatusCode)
             {
                 logger.LogWarning(

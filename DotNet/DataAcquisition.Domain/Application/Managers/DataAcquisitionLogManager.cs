@@ -352,7 +352,25 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (completionTimeMs is not null)
             activity?.SetTag(DiagnosticNames.Duration, completionTimeMs);
 
-        // 1. Append-only notes ? never deletes existing notes (fixes data-loss on retry)
+        // 1. Scalar fields except Status (Status is published last, step 5)
+        var updated = await _dbContext.DataAcquisitionLogs
+            .Where(l => l.Id == logId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.RetryAttempts, l => retryAttempts ?? l.RetryAttempts)
+                .SetProperty(l => l.TraceId, l => traceId ?? l.TraceId)
+                .SetProperty(l => l.ExecutionDate, l => executionDate ?? l.ExecutionDate)
+                .SetProperty(l => l.CompletionDate, l => completionDate ?? l.CompletionDate)
+                .SetProperty(l => l.CompletionTimeMilliseconds, l => completionTimeMs ?? l.CompletionTimeMilliseconds)
+                .SetProperty(l => l.ModifyDate, now),
+            cancellationToken);
+
+        if (updated == 0)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Data acquisition log not found");
+            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
+        }
+
+        // 2. Append-only notes ? never deletes existing notes (fixes data-loss on retry)
         if (newNotes is { Count: > 0 })
         {
             var noteRows = newNotes.Select(n => new DataAcquisitionLogNote
@@ -365,23 +383,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             _dbContext.DataAcquisitionLogNotes.AddRange(noteRows);
         }
 
-        // 2. Persist resource IDs into the child table, ahead of the status write
+        // 3. Persist resource IDs into the child table
         if (resourceAcquiredIds is { Count: > 0 })
         {
-            // The status write is what opens the tail gate, and TryCompleteTailAsync builds the
-            // ResourcesAcquired cache keys from these rows. Written after it, a sibling log completing
-            // in between advertises every resource type but this one, and the loss is silent. The
-            // context retries on failure, which rules out holding both writes in one transaction, so
-            // this order is what closes the window. See docs-dev/resource-cache.md.
-            //
-            // Checked here so a missing log still reports itself as one rather than as a foreign key
-            // violation, now that the status update no longer runs first.
-            if (!await _dbContext.DataAcquisitionLogs.AnyAsync(l => l.Id == logId, cancellationToken))
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, "Data acquisition log not found");
-                throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
-            }
-
             // Delete old rows first (idempotent on re-process)
             await _dbContext.DataAcquisitionLogResourceIds
                 .Where(r => r.DataAcquisitionLogId == logId)
@@ -397,29 +401,24 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             _dbContext.DataAcquisitionLogResourceIds.AddRange(resourceRows);
         }
 
-        // 3. Single SaveChangesAsync for all pending note/resource inserts
+        // 4. Single SaveChangesAsync for all pending note/resource inserts
         if (_dbContext.ChangeTracker.HasChanges())
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        // 4. Atomic scalar update ? single DB round-trip
-        var updated = await _dbContext.DataAcquisitionLogs
-            .Where(l => l.Id == logId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.RetryAttempts, l => retryAttempts ?? l.RetryAttempts)
-                .SetProperty(l => l.TraceId, l => traceId ?? l.TraceId)
-                .SetProperty(l => l.ExecutionDate, l => executionDate ?? l.ExecutionDate)
-                .SetProperty(l => l.CompletionDate, l => completionDate ?? l.CompletionDate)
-                .SetProperty(l => l.CompletionTimeMilliseconds, l => completionTimeMs ?? l.CompletionTimeMilliseconds)
-                .SetProperty(l => l.Status, l => status ?? l.Status)
-                .SetProperty(l => l.ModifyDate, now),
-            cancellationToken);
-
-        if (updated == 0)
+        // 5. Status last. A terminal status is what TryCompleteTailAsync waits for, and the tail builds
+        // ResourcesAcquired.CacheKeys from this log's resource-id rows. Publishing the status before those
+        // rows were saved let a sibling finishing at the same moment claim the tail without this log's
+        // resource type, silently dropping it from the pipeline (run 24d4820a lost 27 Observations).
+        if (status is not null)
         {
-            activity?.SetStatus(ActivityStatusCode.Error, "Data acquisition log not found");
-            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {logId} not found.");
+            await _dbContext.DataAcquisitionLogs
+                .Where(l => l.Id == logId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(l => l.Status, status)
+                    .SetProperty(l => l.ModifyDate, now),
+                    cancellationToken);
         }
 
         // No reload here - hot path under load. Callers that need fresh state

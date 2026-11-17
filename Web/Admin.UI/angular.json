@@ -129,7 +129,10 @@
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "cache": {
+      "environment": "all"
+    }
   },
   "schematics": {
     "@schematics/angular:component": {

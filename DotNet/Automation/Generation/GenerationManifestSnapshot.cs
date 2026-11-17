@@ -69,4 +69,20 @@ public sealed class GenerationManifestSnapshot
     /// </summary>
     public IReadOnlyDictionary<string, string> TemplateCacheKeyByPatient { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Per-patient origin: <c>Generated</c> or <c>Uploaded</c>.
+    /// Null on snapshots written before this field existed.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? PatientOriginByPatient { get; init; }
+
+    public Guid? AppliedNormalizationSuiteId { get; init; }
+    public string? AppliedNormalizationSuiteName { get; init; }
+    public Guid? AppliedOrganizationResourceMapTemplateId { get; init; }
+    public string? AppliedOrganizationResourceMapName { get; init; }
+
+    /// <summary>
+    /// True when generated patients on this manifest were produced with the selected suite.
+    /// </summary>
+    public bool GeneratedWithSelectedSuite { get; init; }
 }

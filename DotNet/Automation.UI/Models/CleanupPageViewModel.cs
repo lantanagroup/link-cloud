@@ -47,3 +47,40 @@ public sealed class CleanupCustomRangeForm
     public bool TeardownFacilities { get; set; }
     public bool PurgeHistory { get; set; }
 }
+
+/// <summary>
+/// Bootstrap 5.1 background classes for Cleanup status text.
+/// This UI ships Bootstrap 5.1, which has no <c>text-bg-*</c> utilities, so a badge
+/// that only names those classes is white text on the row and cannot be read.
+/// </summary>
+public static class CleanupStatusBadge
+{
+    public const string Failed = "bg-danger";
+    public const string Completed = "bg-success";
+    public const string Running = "bg-primary";
+    public const string Idle = "bg-secondary";
+
+    public const string FailedLabel = "Failed";
+    public const string CompletedLabel = "Completed";
+    public const string RunningLabel = "Running";
+    public const string IdleLabel = "Idle";
+
+    public static string ForReport(string? status)
+        => string.Equals(status, "failed", StringComparison.Ordinal) ? Failed : Completed;
+
+    public static string ForActivity(string? status) => status switch
+    {
+        "running" => Running,
+        "completed" => Completed,
+        "failed" => Failed,
+        _ => Idle
+    };
+
+    public static string ActivityLabel(string? status) => status switch
+    {
+        "running" => RunningLabel,
+        "completed" => CompletedLabel,
+        "failed" => FailedLabel,
+        _ => IdleLabel
+    };
+}

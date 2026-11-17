@@ -19,6 +19,7 @@ public sealed class TestScenarioDocument
 
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public int? TestRailCaseId { get; set; }
     public bool IsSystemScenario { get; set; }
 
     public string FacilityConfigurationMode { get; set; } = "Unspecified";
@@ -44,8 +45,6 @@ public sealed class TestScenarioDocument
 
     /// <summary>Serialized cohort configuration as JSON string.</summary>
     public string PatientCohortsJson { get; set; } = "[]";
-
-    public string? NhsnOrganizationId { get; set; }
 
     public bool EnableDmrp { get; set; }
 

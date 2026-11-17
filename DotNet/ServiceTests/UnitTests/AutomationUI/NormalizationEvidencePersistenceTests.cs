@@ -117,6 +117,7 @@ public class NormalizationEvidencePersistenceTests
 
         var empty = NormalizationDiagnosticsWriter.FormatExportAppendix(new NormalizationEvidenceSnapshot());
         empty.Should().Contain("(none collected)");
+        empty.Should().Contain("(no parsable [NormalizationExecutionSummary] steps)");
     }
 
     [Fact]

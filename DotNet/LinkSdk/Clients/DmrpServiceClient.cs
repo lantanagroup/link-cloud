@@ -26,6 +26,10 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
     {
     }
 
+    public Task<LinkApiResponse<DmrpStatusModel>> GetDmrpStatusAsync(CancellationToken cancellationToken = default) =>
+        SendAsync<DmrpStatusModel>(() => Request("/dmrp/dmrp-status")
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<MeasureMappingModel>> CreateMeasureMappingAsync(
         MeasureMappingModel request,
         CancellationToken cancellationToken = default) =>
