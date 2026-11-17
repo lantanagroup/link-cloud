@@ -44,7 +44,7 @@ public class VendorManagerTests : IDisposable
 
         await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
 
-        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class VendorManagerTests : IDisposable
 
         await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorAsync(vendorVersion.VendorId));
 
-        Assert.NotNull(await _dbContext.Vendors.FindAsync(vendorVersion.VendorId));
+        Assert.NotNull(await RetainedVendorAsync(vendorVersion.VendorId));
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class VendorManagerTests : IDisposable
 
         await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
 
-        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public class VendorManagerTests : IDisposable
 
         await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
 
-        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
     }
 
     [Fact]
@@ -138,6 +138,54 @@ public class VendorManagerTests : IDisposable
         Assert.Contains(live.FacilityId, exception.Message);
         Assert.Contains(softDeleted.FacilityId, exception.Message);
         Assert.Contains($"{softDeleted.FacilityId} ({softDeleted.FacilityName}, deleted)", exception.Message);
+    }
+
+    /// <summary>
+    /// Five is the boundary the cap is set at: at five every facility is named and nothing is
+    /// summarised, so the administrator has the whole list to work from.
+    /// </summary>
+    [Fact]
+    public async Task DeleteVendorVersion_WhenFiveFacilitiesUseIt_NamesEveryOneOfThem()
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var facilities = await CreateFacilitiesAsync(vendorVersion.Id, 5);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains("is in use by 5 facility configurations", exception.Message);
+        Assert.All(facilities, facility => Assert.Contains(facility.FacilityId, exception.Message));
+        Assert.DoesNotContain("more", exception.Message);
+    }
+
+    /// <summary>
+    /// The sixth facility is what starts the overflow: this message reaches the client on Problem
+    /// Details `detail`, so the names are capped at five and the rest are summarised - while the
+    /// count stays exact, because it is the number the administrator has to clear.
+    /// </summary>
+    [Theory]
+    [InlineData(6, 1)]
+    [InlineData(7, 2)]
+    [InlineData(23, 18)]
+    public async Task DeleteVendorVersion_WhenMoreThanFiveFacilitiesUseIt_NamesFiveAndCountsTheRest(
+        int facilityCount,
+        int summarised)
+    {
+        var vendorVersion = await CreateVendorVersionAsync();
+        var facilities = await CreateFacilitiesAsync(vendorVersion.Id, facilityCount);
+        ConfigureNoNormalizationReferences(vendorVersion.Id);
+
+        var exception = await Assert.ThrowsAsync<VendorVersionInUseException>(
+            () => _vendorManager.DeleteVendorVersionAsync(vendorVersion.Id));
+
+        Assert.Contains($"is in use by {facilityCount} facility configurations", exception.Message);
+        Assert.Contains($"and {summarised} more", exception.Message);
+
+        //the named five are the first five in FacilityId order, which is the order the refusal reads
+        //them in - not whichever five the database happened to return.
+        Assert.All(facilities.Take(5), facility => Assert.Contains(facility.FacilityId, exception.Message));
+        Assert.All(facilities.Skip(5), facility => Assert.DoesNotContain(facility.FacilityId, exception.Message));
     }
 
     /// <summary>
@@ -197,8 +245,8 @@ public class VendorManagerTests : IDisposable
 
         await Assert.ThrowsAsync<VendorVersionInUseException>(() => _vendorManager.DeleteVendorAsync(vendorVersion.VendorId));
 
-        Assert.NotNull(await _dbContext.Vendors.FindAsync(vendorVersion.VendorId));
-        Assert.NotNull(await _dbContext.VendorVersions.FindAsync(vendorVersion.Id));
+        Assert.NotNull(await RetainedVendorAsync(vendorVersion.VendorId));
+        Assert.NotNull(await RetainedVersionAsync(vendorVersion.Id));
     }
 
     /// <summary>
@@ -306,6 +354,52 @@ public class VendorManagerTests : IDisposable
 
         Assert.Equal("rotated-key", persisted.Authentication?.SigningKeySecretId);
     }
+
+    /// <summary>
+    /// Facilities whose ids sort in the order they were created, so a test can say which five of them
+    /// the refusal had room to name.
+    /// </summary>
+    private async Task<List<Facility>> CreateFacilitiesAsync(Guid vendorVersionId, int count)
+    {
+        var prefix = $"boundary-{Guid.NewGuid():N}";
+        var facilities = Enumerable.Range(1, count)
+            .Select(index => new Facility
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = $"{prefix}-{index:D3}",
+                FacilityName = "Boundary Facility",
+                TimeZone = "America/Chicago",
+                VendorVersionId = vendorVersionId,
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = [],
+                    Weekly = [],
+                    Monthly = []
+                }
+            })
+            .ToList();
+
+        await _dbContext.Facilities.AddRangeAsync(facilities);
+        await _dbContext.SaveChangesAsync();
+
+        return facilities;
+    }
+
+    /// <summary>
+    /// Retention has to be read from the database. The fixture helpers add their rows through this
+    /// same context, so they stay tracked, and the manager deletes with ExecuteDeleteAsync, which
+    /// does not tell the change tracker: FindAsync would hand back the tracked instance without
+    /// querying at all, and the assertion would hold whether or not the row survived.
+    /// </summary>
+    private async Task<VendorVersion?> RetainedVersionAsync(Guid vendorVersionId) =>
+        await _dbContext.VendorVersions
+            .AsNoTracking()
+            .SingleOrDefaultAsync(version => version.Id == vendorVersionId);
+
+    private async Task<Vendor?> RetainedVendorAsync(Guid vendorId) =>
+        await _dbContext.Vendors
+            .AsNoTracking()
+            .SingleOrDefaultAsync(vendor => vendor.Id == vendorId);
 
     private async Task<string> VendorNameAsync(Guid vendorId) =>
         await _dbContext.Vendors
