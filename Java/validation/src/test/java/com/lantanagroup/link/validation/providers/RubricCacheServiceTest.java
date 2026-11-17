@@ -25,6 +25,9 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -173,6 +176,58 @@ class RubricCacheServiceTest {
 
         verify(versionRepository, times(2)).findByRubricIdAndSemver("piqi.core", "1.0.0");
         verify(versionRepository, times(2)).findByRubricIdAndStatus("piqi.core", RubricVersionStatus.PUBLISHED);
+    }
+
+    @Test
+    @DisplayName("inside a transaction, evictVersion waits for the commit, so a read before it cannot re-cache the old row for good")
+    void evictVersionInTransactionWaitsForCommit() {
+        stubDb();
+        cacheService.getVersion("piqi.core", "1.0.0");
+        cacheService.getLatestPublishedSemver("piqi.core");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            cacheService.evictVersion("piqi.core", "1.0.0");
+
+            // not yet committed: both entries are still cached, and a read in between is served from them
+            assertThat(cached(RubricCacheService.VERSION_CACHE, "piqi.core:1.0.0")).isTrue();
+            assertThat(cached(RubricCacheService.LATEST_SEMVER_CACHE, "piqi.core")).isTrue();
+            cacheService.getVersion("piqi.core", "1.0.0");
+            verify(versionRepository, times(1)).findByRubricIdAndSemver("piqi.core", "1.0.0");
+
+            List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+            TransactionSynchronizationUtils.invokeAfterCommit(synchronizations);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        // committed: both are gone, and the next read goes to the database
+        assertThat(cached(RubricCacheService.VERSION_CACHE, "piqi.core:1.0.0")).isFalse();
+        assertThat(cached(RubricCacheService.LATEST_SEMVER_CACHE, "piqi.core")).isFalse();
+        cacheService.getVersion("piqi.core", "1.0.0");
+        verify(versionRepository, times(2)).findByRubricIdAndSemver("piqi.core", "1.0.0");
+    }
+
+    @Test
+    @DisplayName("a transaction that rolls back leaves the cache as it was, since the row did not change")
+    void evictVersionInRolledBackTransactionEvictsNothing() {
+        stubDb();
+        cacheService.getVersion("piqi.core", "1.0.0");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            cacheService.evictVersion("piqi.core", "1.0.0");
+            TransactionSynchronizationUtils.invokeAfterCompletion(
+                    TransactionSynchronizationManager.getSynchronizations(), TransactionSynchronization.STATUS_ROLLED_BACK);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(cached(RubricCacheService.VERSION_CACHE, "piqi.core:1.0.0")).isTrue();
+    }
+
+    private boolean cached(String cacheName, Object key) {
+        return context.getBean(CacheManager.class).getCache(cacheName).get(key) != null;
     }
 
     @Test
