@@ -31,7 +31,7 @@ public class RedisResourceService {
     /**
      * Field-name prefix reserved for cache metadata rather than FHIR resources. Resource fields are
      * always {@code resourceType/resourceId}, so the two can never collide. Shared with the .NET
-     * writers; see docs-dev/resource-cache.md.
+     * writers; see dev-docs/resource-cache.md.
      */
     static final String METADATA_FIELD_PREFIX = "__";
 
@@ -85,7 +85,7 @@ public class RedisResourceService {
             // recreated by a partial append from a whole one -- and they are deliberately in the same
             // hash so one TTL covers them and deleting the entry clears them with it. Skipped quietly:
             // warning here would fire once per correlation read, on the hottest path there is.
-            // See docs-dev/resource-cache.md.
+            // See dev-docs/resource-cache.md.
             if (field.startsWith(METADATA_FIELD_PREFIX)) {
                 if (DURABLE_RESOURCE_COUNT_FIELD.equals(field)) {
                     try {
@@ -138,7 +138,7 @@ public class RedisResourceService {
      * number of resources the durable store holds for it (LEGLINK-1276). It shares the entry's hash
      * so one TTL covers both and deleting the entry clears it. The "__" prefix is reserved for
      * metadata; a resource field is always {@code resourceType/resourceId}, so the two cannot
-     * collide. See docs-dev/resource-cache.md.
+     * collide. See dev-docs/resource-cache.md.
      */
     static final String DURABLE_RESOURCE_COUNT_FIELD = "__durableResourceCount";
 

@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     /// <remarks>
     /// The Redis write is inline; the blob write is queued and completes in the background, which is
     /// why callers must await <see cref="WaitForDurableAsync"/> before advertising a correlation's
-    /// cache keys. See docs-dev/resource-cache.md.
+    /// cache keys. See dev-docs/resource-cache.md.
     /// </remarks>
     public class HybridResourceCache : IResourceCache
     {
@@ -205,7 +205,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             // A failed cache delete stops before durable storage is touched. A cache entry that outlives
             // its blob is served whole, so a redelivery could copy one key and find a later evicted one
-            // empty, which reads as a producer defect. See docs-dev/resource-cache.md.
+            // empty, which reads as a producer defect. See dev-docs/resource-cache.md.
             await _redisCache.DeleteAsync(cacheKeys, cancellationToken);
 
             await _absCache.DeleteAsync(cacheKeys, cancellationToken);

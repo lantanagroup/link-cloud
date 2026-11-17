@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
     /// Keys come in two generations. Acquisition writes one key per resource type as
     /// <c>{correlationId}:{ResourceType}</c>. Normalization accumulates its results into the bare
     /// <c>{correlationId}</c> key and then deletes the acquisition keys, and MeasureEval reads only
-    /// that bare key. See docs-dev/resource-cache.md.
+    /// that bare key. See dev-docs/resource-cache.md.
     /// </remarks>
     public interface IResourceCache
     {
@@ -189,7 +189,7 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// the count this returns against <see cref="GetResourceCountAsync"/> is what tells them apart.
         /// A count nothing has recorded yet is unknown rather than agreement, and a count that cannot be
         /// read is a fault rather than an absence -- both serve the entry, but only one is worth
-        /// counting, so they are distinct statuses rather than one null. See docs-dev/resource-cache.md.
+        /// counting, so they are distinct statuses rather than one null. See dev-docs/resource-cache.md.
         /// </remarks>
         /// <param name="cacheKey">The key to read the recorded count for.</param>
         /// <param name="cancellationToken">Cancels the read.</param>

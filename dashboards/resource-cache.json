@@ -116,7 +116,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "All three readers record `link_resource_cache_read_duration` under the same name and tags, so these panels group by service rather than repeating per service. `DataAcquisitionWorker` and `Normalization` are .NET; `measureeval` is Java and also tags `phase`, which every query here aggregates away. Counts of rare events treat a series that did not exist yet as zero, because `increase()` reads a newly created series' first observations as no change. See `docs-dev/resource-cache.md`, *Instrumentation*."
+        "content": "All three readers record `link_resource_cache_read_duration` under the same name and tags, so these panels group by service rather than repeating per service. `DataAcquisitionWorker` and `Normalization` are .NET; `measureeval` is Java and also tags `phase`, which every query here aggregates away. Counts of rare events treat a series that did not exist yet as zero, because `increase()` reads a newly created series' first observations as no change. See `dev-docs/resource-cache.md`, *Instrumentation*."
       }
     },
     {

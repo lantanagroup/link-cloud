@@ -35,7 +35,7 @@ namespace IntegrationTests.DataAcquisition.Services;
 /// A patient with one org and one non-org encounter is the case the local E2E stack cannot produce: the
 /// generator emits one Encounter per patient, so a generated correlation is all-org or all-non-org, and an
 /// all-non-org correlation strips to nothing and takes the key-delete path rather than the replace. See
-/// docs-dev/resource-cache.md.
+/// dev-docs/resource-cache.md.
 /// </para>
 /// </remarks>
 [Collection("IntegrationTests")]

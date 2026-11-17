@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     /// The payload blob holds a line pair per resource (reference, then JSON) and the ids blob a line per
     /// reference. Each block is appended atomically, so cutting only at record boundaries means a failed
     /// or retried append can duplicate whole records but can never leave a torn line for the next append
-    /// to land on. See docs-dev/resource-cache.md.
+    /// to land on. See dev-docs/resource-cache.md.
     /// </remarks>
     public static class AbsPayloadFormat
     {

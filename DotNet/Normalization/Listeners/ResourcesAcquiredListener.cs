@@ -670,7 +670,7 @@ public class ResourcesAcquiredListener : BackgroundService
     /// acquisition runs, and an append to an evicted entry recreates it holding only this pass's
     /// resources -- non-empty, so it reads as complete and shadows the durable copy that is.
     /// Reading it first repopulates it from durable storage, so the appends that follow extend the
-    /// initial pass rather than replacing it. See docs-dev/resource-cache.md.
+    /// initial pass rather than replacing it. See dev-docs/resource-cache.md.
     /// </remarks>
     private async Task RestoreCorrelationEntryAsync(
         IResourceCache resourceCache,

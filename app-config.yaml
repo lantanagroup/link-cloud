@@ -689,7 +689,7 @@ services:
     # The background blob writer keeps the durable write off the acquisition critical path. Every
     # value ships a working default, so these are operational knobs rather than rows that have to
     # exist in a store. QueueCapacity and MaxConcurrency are the two to tune together under
-    # large-census load; see docs-dev/resource-cache.md.
+    # large-census load; see dev-docs/resource-cache.md.
     - key: "ResourceCache:AbsWriter:QueueCapacity"
       description: "The maximum number of resource cache writes waiting to be persisted to blob storage before callers are made to wait for space. A queued write holds its deserialized resources in memory, so this bounds memory as much as throughput. Defaults to 1000."
       required: false
@@ -752,7 +752,7 @@ services:
     # The background blob writer keeps the durable write off the acquisition critical path. Every
     # value ships a working default, so these are operational knobs rather than rows that have to
     # exist in a store. QueueCapacity and MaxConcurrency are the two to tune together under
-    # large-census load; see docs-dev/resource-cache.md.
+    # large-census load; see dev-docs/resource-cache.md.
     - key: "ResourceCache:AbsWriter:QueueCapacity"
       description: "The maximum number of resource cache writes waiting to be persisted to blob storage before callers are made to wait for space. A queued write holds its deserialized resources in memory, so this bounds memory as much as throughput. Defaults to 1000."
       required: false
@@ -905,7 +905,7 @@ services:
     # The background blob writer keeps the durable write off the acquisition critical path. Every
     # value ships a working default, so these are operational knobs rather than rows that have to
     # exist in a store. QueueCapacity and MaxConcurrency are the two to tune together under
-    # large-census load; see docs-dev/resource-cache.md.
+    # large-census load; see dev-docs/resource-cache.md.
     - key: "ResourceCache:AbsWriter:QueueCapacity"
       description: "The maximum number of resource cache writes waiting to be persisted to blob storage before callers are made to wait for space. A queued write holds its deserialized resources in memory, so this bounds memory as much as throughput. Defaults to 1000."
       required: false

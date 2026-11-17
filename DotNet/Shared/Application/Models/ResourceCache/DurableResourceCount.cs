@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.ResourceCache
     /// </summary>
     /// <remarks>
     /// <see cref="Count"/> is meaningful only when <see cref="Status"/> is
-    /// <see cref="DurableCountStatus.Recorded"/>. See docs-dev/resource-cache.md.
+    /// <see cref="DurableCountStatus.Recorded"/>. See dev-docs/resource-cache.md.
     /// </remarks>
     /// <param name="Status">Whether the count can be used.</param>
     /// <param name="Count">The recorded count, when there is one.</param>

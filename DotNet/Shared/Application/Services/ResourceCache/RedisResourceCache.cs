@@ -107,7 +107,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// (<c>RedisResourceService.METADATA_FIELD_PREFIX</c>). Resource fields are always
         /// <c>resourceType/resourceId</c>, so the two cannot collide. Metadata lives in the entry's own
         /// hash so that one lifetime covers both and deleting the entry clears its metadata with it.
-        /// See docs-dev/resource-cache.md.
+        /// See dev-docs/resource-cache.md.
         /// </remarks>
         private const string MetadataFieldPrefix = "__";
 

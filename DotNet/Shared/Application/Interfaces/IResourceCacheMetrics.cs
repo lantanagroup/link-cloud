@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
     /// <remarks>
     /// <see cref="RecordDrainWait"/> is the one to watch after a change. Every other part of the
     /// durable write overlaps the acquisition paging loop; the barrier is the part that does not, so
-    /// it is the honest measure of what durability costs the pipeline. See docs-dev/resource-cache.md.
+    /// it is the honest measure of what durability costs the pipeline. See dev-docs/resource-cache.md.
     /// </remarks>
     public interface IResourceCacheMetrics
     {

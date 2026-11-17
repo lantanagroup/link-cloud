@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
     /// <remarks>
     /// One instance per process. A queue is never visible to another pod, which is why
     /// <see cref="WaitForDurableAsync"/> can only speak for writes this process enqueued. See
-    /// docs-dev/resource-cache.md.
+    /// dev-docs/resource-cache.md.
     /// </remarks>
     public interface IBackgroundAbsCacheWriter
     {

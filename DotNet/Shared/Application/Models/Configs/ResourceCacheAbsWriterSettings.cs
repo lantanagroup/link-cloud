@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
     /// </summary>
     /// <remarks>
     /// Every value ships with a working default, so none of these need provisioning per environment.
-    /// See docs-dev/resource-cache.md.
+    /// See dev-docs/resource-cache.md.
     /// </remarks>
     public class ResourceCacheAbsWriterSettings
     {
