@@ -50,8 +50,8 @@ to a generated report. The sections after this one explain each part in more dep
 
    | FHIR server | Enter | Patients |
    |---|---|---|
-   | The mock that runs in the AppHost | `http://localhost:16158/fhir` | Ten synthetic patients, `mock-patient-0001` to `mock-patient-0010`, with data in January 2026. http://localhost:16158/api/mock-fhir/patients lists them |
-   | A deployed FHIR server, or your own | Its base URL. The form's default is QA's `https://ehr-test.nhsnlink.org/fhir` | Whichever patients that server holds |
+   | The mock that runs in the AppHost (the form's default) | `http://localhost:16158/fhir` | Ten synthetic patients, `mock-patient-0001` to `mock-patient-0010`, with data in January 2026. http://localhost:16158/api/mock-fhir/patients lists them |
+   | A deployed FHIR server, or your own | Its base URL | Whichever patients that server holds |
 
    The query plans the vendor picks assume that vendor's data (see [Dashboard
    commands](#dashboard-commands)). If the measure list is empty, Seed data has not finished: run it,
@@ -320,10 +320,6 @@ dotnet user-secrets set "Replicas:validation" "3"
   is a resource of its own: `validation`, `validation-2`, `validation-3`. The first keeps the usual port
   and receives every HTTP call and the dashboard commands; the others are on ports Aspire picks. Their
   value is the extra Kafka consumers.
-- **Every log line says which copy wrote it.** .NET lines carry a `ServiceInstance` property
-  (`dataacq-worker-rynurthc`, the name the dashboard shows the replica with), and Java lines end with
-  `[instance=validation-2]`. The AppHost sets `LINK_SERVICE_INSTANCE` on each copy; deployed, where nothing sets
-  it, the services use `HOSTNAME`, which Kubernetes sets to the pod's name.
 
 ### Connecting to SQL Server from SSMS or another tool
 
@@ -398,7 +394,7 @@ or a red one on failure, which stays until dismissed.
   data through migrations, so a new environment has none of it. There are three parts, and each one
   also runs automatically when its service turns healthy:
   - **Roles (Account):** `LinkUser`, with the `IsLinkAdmin` permission.
-  - **Validation:** its artifacts and categories, initialised from the files it ships with, when
+  - **Validation:** its artifacts and categories, initialized from the files it ships with, when
     Validation has none yet. Then the rubric in `SeedData/Validation/` is registered and published if
     it isn't already. The AppHost sets `vaas.bridge.rubric-id` to that rubric's id, so the shadow
     comparison has a published rubric to use.
@@ -421,7 +417,8 @@ or a red one on failure, which stays until dismissed.
   - creates the DMRP measure mapping and the facility in Tenant;
   - configures Census (disabled), QueryDispatch, DataAcquisition (Monthly and Discharge query plans,
     the FHIR query configuration and the patient lists) and Normalization. Normalization is skipped as
-    a whole if the facility already has operations.
+    a whole if the facility already has operations, so a run that stopped part-way through them does
+    not finish them on a rerun: delete the facility's operations first.
 
   The EHR vendor picks the query plans: `query-plan-*-epic.json` or `query-plan-*-cerner.json`, each a
   copy of the ACH Monthly plan production uses for that vendor. Epic fetches Encounter first and
@@ -431,9 +428,10 @@ or a red one on failure, which stays until dismissed.
 
   The steps and payloads come from the QA Postman collections. They're read when the command runs,
   so editing them needs no rebuild. Running it again for the same facility only creates what's
-  missing. The FHIR server can be the AppHost's mock (`http://localhost:16158/fhir`), a deployed
-  server, or your own. The default is QA's `https://ehr-test.nhsnlink.org/fhir`, the only one where
-  the query list's patient lists exist; they matter only to Census, which the facility has disabled.
+  missing. The FHIR server can be the AppHost's mock (`http://localhost:16158/fhir`, the default), a
+  deployed server, or your own. The query list's patient list ids are placeholders, which no server
+  has; they matter only to Census, which the facility has disabled. Replace them with the server's own
+  list ids before enabling it.
   See `FacilitySetup/steps.json` for the format: placeholders, existence checks, captured ids and
   groups.
 - **Create user** (on `account`, Keycloak mode only): a form for first name, last name, email,
@@ -484,11 +482,23 @@ or a red one on failure, which stays until dismissed.
 - **Local secrets.** The .NET services keep secrets in one file per Windows user,
   `%LOCALAPPDATA%\Link\Secrets\link-local-secrets.enc`, which DataAcquisition also uses to hand a
   facility's FHIR credentials to its worker. The AppHost gives every service the same Data Protection
-  key ring (`Link`), so all of them can read it. A service that can't decrypt it won't write over it:
-  it logs "Failed to decrypt secrets file ... It will not be written over" and keeps its own secrets
-  in memory, and saving a facility's credentials fails. That happens when the file was written under
-  another key ring, for example by a service run from your IDE with different settings. **Delete the
-  file**, even with the services running: the next one to save a secret writes a new one.
+  key ring (`Link`), so all of them can read it. A service that can't decrypt it logs "Failed to
+  decrypt secrets file (encryption key may have changed). Starting with empty secrets." and then
+  writes over it with only its own secrets, so the facility credentials the others saved are lost and
+  they can't decrypt the new file either. That happens when the file was written under another key
+  ring, for example by a service run from your IDE with different settings. Run every service with the
+  same key ring, then **delete the file** and save the facility's credentials again.
+- **Generated passwords and the data that remembers them.** The SQL Server `sa` password and
+  Keycloak's admin password and client secret are generated on the first run and kept in the
+  AppHost's user secrets (`Parameters:sql-password`, `Parameters:keycloak-admin-password`,
+  `Parameters:keycloak-client-secret`). The data volumes keep the values they were created with: SQL
+  Server's `sa` password in `link-aspire-sql`, and Keycloak's admin user and the realm's client secret
+  in `link-aspire-keycloak`. If the user secrets are cleared (`dotnet user-secrets clear`, or a new
+  machine profile), the next run generates new values that the volumes don't know: the services fail
+  to log in to SQL Server, signing in fails with `invalid_client`, and **Create user** can't reach
+  Keycloak's admin API. Either put the old values back in user secrets, or remove the volume
+  (`docker volume rm link-aspire-sql`, or `link-aspire-keycloak`), which loses its data, and start
+  again. The SFTP password is set on the container each start, so it is not affected.
 - **Data.** SQL Server, MongoDB, Azurite, Kafka, Keycloak and the SFTP server keep their data in Docker
   volumes (`link-aspire-*`) between runs. Redis and the HAPI FHIR server start empty each time. Submitted
   reports are also written to `%TEMP%\link-aspire\submission`.

@@ -30,7 +30,7 @@ Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, adm
 dotnet run --project DotNet/Link.AspireAppHost --launch-profile http   # dashboard at http://localhost:15190
 ```
 
-Or choose `Link.AspireAppHost` as the startup project in the IDE. It starts the infrastructure in containers and every service with the settings compose would give it, on ports of its own (each service is its compose port plus 10000), so it can run beside the compose stack. Nothing else references it: compose, the Dockerfiles and CI are unaffected, and ignoring it changes nothing. It needs Docker, Maven, a JDK 21 and Node. Set the Terminology data folder and, if `JAVA_HOME` is not a JDK 21, the JDK in its user secrets. See [DotNet/Link.AspireAppHost/README.md](DotNet/Link.AspireAppHost/README.md).
+Or choose `Link.AspireAppHost` as the startup project in the IDE. It starts the infrastructure in containers and every service with the settings compose would give it, on ports of its own (each service is its compose port plus 10000), so it can run beside the compose stack. Nothing else references it: compose, the Dockerfiles and CI are unaffected. It is in `link-cloud.sln`, though, so restoring the solution downloads Aspire's dashboard and orchestration packages (about 85 MB, cached once per machine) even if you never run it; restore and build only the projects you work on to avoid that. It needs Docker, Maven, a JDK 21 and Node. Set the Terminology data folder and, if `JAVA_HOME` is not a JDK 21, the JDK in its user secrets. See [DotNet/Link.AspireAppHost/README.md](DotNet/Link.AspireAppHost/README.md).
 
 ### Thetis packages
 

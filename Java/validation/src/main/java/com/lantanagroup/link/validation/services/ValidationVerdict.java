@@ -26,12 +26,26 @@ public final class ValidationVerdict {
     private ValidationVerdict() {
     }
 
-    /** The legacy engine passes when every category its findings fall in is acceptable; uncategorized findings don't count. */
+    /**
+     * The legacy engine passes when every category its findings fall in is acceptable. This is the rule the legacy
+     * path has always applied, kept as it is: a finding in no category is not counted, so a patient whose only
+     * findings are uncategorized passes, though the categories API treats such findings as unacceptable
+     * ({@link Category#UNCATEGORIZED}). Changing it changes which patients pass, so it is not done here; see
+     * {@link #uncategorizedCount} for saying how many findings it left out.
+     */
     public static boolean legacyValid(List<Result> results) {
         return results.stream()
                 .filter(Objects::nonNull)
                 .flatMap(result -> result.getCategories() == null ? Stream.empty() : result.getCategories().stream())
                 .allMatch(Category::isAcceptable);
+    }
+
+    /** How many findings {@link #legacyValid} leaves out because they are in no category. */
+    public static long uncategorizedCount(List<Result> results) {
+        return results.stream()
+                .filter(Objects::nonNull)
+                .filter(result -> result.getCategories() == null || result.getCategories().isEmpty())
+                .count();
     }
 
     /** The rubric engine passes when its result status is one of {@link #VALID_RUBRIC_STATUSES}. */

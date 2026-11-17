@@ -18,7 +18,10 @@ namespace Link.AspireAppHost.Extensions;
 /// The steps come from the QA Postman collection's facility creation folder. They are read when the command runs,
 /// so editing <c>steps.json</c> or a payload needs no rebuild. Each step calls its service directly, with a Link
 /// system token, so the command works in both launch profiles. It only creates what is missing, so running it again
-/// for the same facility fills in whatever an earlier run did not get to.
+/// for the same facility fills in most of what an earlier run did not get to. The exception is a group of steps
+/// (<c>groups</c> in <c>steps.json</c>), which is skipped whole once its existence check finds anything: the
+/// normalization operations would be duplicated if created twice, so a run that stopped part-way through them leaves
+/// the rest uncreated. Delete the facility's normalization operations and run it again to complete them.
 /// </remarks>
 internal static partial class FacilitySetupExtensions
 {
@@ -144,7 +147,13 @@ internal static partial class FacilitySetupExtensions
     private static string Describe(List<string> created, List<string> alreadyThere) =>
         $"Created {created.Count} item(s), {alreadyThere.Count} already there.";
 
-    /// <summary>The form. Returns the answers, or null when it was cancelled.</summary>
+    /// <summary>
+    /// The FHIR server the form offers when steps.json names none: the AppHost's own mock, so a facility created
+    /// with the defaults acquires locally and not from a shared environment.
+    /// </summary>
+    private static readonly string MockFhirServerUrl = DotNetServiceExtensions.Url(Ports.MockFhirServer) + "/fhir";
+
+    /// <summary>The form. Returns the answers, or null when it was canceled.</summary>
     private static async Task<Dictionary<string, string>?> PromptAsync(
         IInteractionService interaction, Dictionary<string, string> defaults, CancellationToken cancellationToken)
     {
@@ -205,8 +214,8 @@ internal static partial class FacilitySetupExtensions
                     Label = "FHIR server",
                     InputType = InputType.Text,
                     Required = true,
-                    Value = Default("fhirServerBaseUrl"),
-                    Description = "The FHIR server the facility's data is acquired from. The query list's patient lists exist on the QA server."
+                    Value = Default("fhirServerBaseUrl") is { Length: > 0 } configured ? configured : MockFhirServerUrl,
+                    Description = "The FHIR server the facility's data is acquired from. The default is the AppHost's mock, with ten synthetic patients in January 2026."
                 }
             ],
             new InputsDialogInteractionOptions

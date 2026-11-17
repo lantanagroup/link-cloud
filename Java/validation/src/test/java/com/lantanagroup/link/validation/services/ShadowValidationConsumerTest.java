@@ -124,7 +124,7 @@ class ShadowValidationConsumerTest {
         ArgumentCaptor<List<Result>> newResultsCaptor = ArgumentCaptor.forClass(List.class);
         // Legacy's verdict comes from its own (uncategorized, so passing) results; the rubric's from the event, unset here.
         verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
-                eq(REPORT_ID), eq(RUBRIC_ID), eq(true), eq(true), isNull(), eq(List.of(legacyResult)),
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(true), eq(true), isNull(), eq(1L), eq(List.of(legacyResult)),
                 newResultsCaptor.capture());
         assertEquals(1, newResultsCaptor.getValue().size());
     }
@@ -145,7 +145,7 @@ class ShadowValidationConsumerTest {
         verify(validationService, never()).validate(any());
         verify(legacyShadowResultPersister, never()).persist(any(), any(), any(), any(), any(), any(), any(), any());
         verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
-                eq(REPORT_ID), eq(RUBRIC_ID), eq(false), isNull(), isNull(), any(List.class), eq(Collections.emptyList()));
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(false), isNull(), isNull(), eq(1L), any(List.class), eq(Collections.emptyList()));
     }
 
     @Test
@@ -162,7 +162,7 @@ class ShadowValidationConsumerTest {
         consumer.process(record);
 
         verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
-                eq(REPORT_ID), eq(RUBRIC_ID), eq(false), eq(true), eq(false), any(), any());
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(false), eq(true), eq(false), eq(1L), any(), any());
     }
 
     @Test
@@ -180,7 +180,7 @@ class ShadowValidationConsumerTest {
         consumer.process(record);
 
         verify(shadowComparator).compareAndLog(eq(CORRELATION_ID), eq(REQUEST_ID), eq(FACILITY_ID), eq(PATIENT_ID),
-                eq(REPORT_ID), eq(RUBRIC_ID), eq(true), eq(false), eq(true), any(), any());
+                eq(REPORT_ID), eq(RUBRIC_ID), eq(true), eq(false), eq(true), eq(0L), any(), any());
     }
 
     @Test

@@ -139,11 +139,20 @@ describe('rubric lifecycle', () => {
       expect(plan.typeToConfirm).toBeNull();
     });
 
-    it('asks for the rubric id when that rubric is the one the pipeline uses', () => {
+    it('is blocked for the last published version of the rubric the pipeline decides on: the service refuses it', () => {
       const plan = planAction('retire', 'piqi.core', active, { ...rubric, versions: rubric.versions!.slice(0, 2) },
         settings({ pipelineRubricId: 'piqi.core', pipelineEnabled: true }));
 
-      expect(plan.warnings[0]).toContain('pipeline validation has nothing to run');
+      expect(plan.blocked).toContain('only published version');
+      expect(plan.typeToConfirm).toBeNull();
+    });
+
+    it('asks for the rubric id for the last published version of the rubric the pipeline only compares', () => {
+      const plan = planAction('retire', 'piqi.core', active, { ...rubric, versions: rubric.versions!.slice(0, 2) },
+        settings({ pipelineRubricId: 'piqi.core', pipelineShadowEnabled: true }));
+
+      expect(plan.blocked).toBeNull();
+      expect(plan.warnings[0]).toContain('that comparison has nothing to run');
       expect(plan.typeToConfirm).toBe('piqi.core');
     });
 
@@ -155,11 +164,20 @@ describe('rubric lifecycle', () => {
       expect(plan.warnings).toEqual([]);
     });
 
-    it('asks for it when the rubric could not be read and the pipeline uses the rubric: it cannot tell', () => {
+    it('warns, without blocking, when the rubric could not be read and the pipeline decides on it: the service can tell', () => {
       const plan = planAction('retire', 'piqi.core', active, null,
         settings({ pipelineRubricId: 'piqi.core', pipelineEnabled: true }));
 
       expect(plan.consequences[0]).toBe('Validation stops using this version.');
+      expect(plan.blocked).toBeNull();
+      expect(plan.warnings[0]).toContain('retiring it will be refused');
+      expect(plan.typeToConfirm).toBeNull();
+    });
+
+    it('asks for it when the rubric could not be read and the pipeline compares it: it cannot tell', () => {
+      const plan = planAction('retire', 'piqi.core', active, null,
+        settings({ pipelineRubricId: 'piqi.core', pipelineShadowEnabled: true }));
+
       expect(plan.typeToConfirm).toBe('piqi.core');
     });
 

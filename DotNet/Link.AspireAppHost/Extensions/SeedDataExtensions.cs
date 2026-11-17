@@ -16,7 +16,7 @@ namespace Link.AspireAppHost.Extensions;
 /// turns healthy:
 /// <list type="bullet">
 /// <item><b>Roles</b> (Account): the roles a user can be given.</item>
-/// <item><b>Validation</b>: its artifacts and categories, initialised from the files it ships with, and the rubric in
+/// <item><b>Validation</b>: its artifacts and categories, initialized from the files it ships with, and the rubric in
 /// <c>SeedData/Validation</c>, registered and published.</item>
 /// <item><b>Measures</b> (MeasureEval): the measure bundles in <c>DotNet/Automation/measures</c>, with their value sets
 /// expanded by Terminology. Tenant refuses
@@ -245,7 +245,7 @@ internal static class SeedDataExtensions
     }
 
     /// <summary>
-    /// Initialises Validation's artifacts and categories from the files it ships with, each only when Validation has
+    /// Initializes Validation's artifacts and categories from the files it ships with, each only when Validation has
     /// none yet, as Automation does (ValidationApiHelper). Then registers and publishes the rubric in
     /// <paramref name="rubricFile"/> if that version is missing or still a draft. A published version cannot change,
     /// so a rubric that changes needs a new semver.
@@ -262,13 +262,13 @@ internal static class SeedDataExtensions
             if (HasContent(body))
                 continue;
 
-            using var initialise = await http.PostAsync($"{path}/$initialize", content: null, cancellationToken);
-            if (!initialise.IsSuccessStatusCode)
+            using var initialize = await http.PostAsync($"{path}/$initialize", content: null, cancellationToken);
+            if (!initialize.IsSuccessStatusCode)
                 throw new InvalidOperationException(
-                    $"Validation refused to initialise its {name} ({(int)initialise.StatusCode}): {await initialise.Content.ReadAsStringAsync(cancellationToken)}");
+                    $"Validation refused to initialize its {name} ({(int)initialize.StatusCode}): {await initialize.Content.ReadAsStringAsync(cancellationToken)}");
 
-            logger.LogInformation("Initialised Validation's {Part}", name);
-            done.Add($"initialised its {name}");
+            logger.LogInformation("Initialized Validation's {Part}", name);
+            done.Add($"initialized its {name}");
         }
 
         var (rubricId, semver) = ReadRubricIdentity(rubricFile);

@@ -100,7 +100,7 @@ internal static class InfrastructureExtensions
     {
         // SQL Server's password is generated on the first run and kept in this AppHost's user secrets.
         // Clients reach it on the port Docker publishes, not through Aspire's proxy: under load the
-        // proxy has been seen to stop accepting connections and not recover (link-lbw).
+        // proxy has been seen to stop accepting connections and not recover.
         var sql = builder.AddSqlServer("sql", port: Ports.SqlServer)
             .WithEndpoint("tcp", endpoint => endpoint.IsProxied = false)
             .WithDataVolume("link-aspire-sql");
@@ -288,7 +288,7 @@ internal static class InfrastructureExtensions
     /// </summary>
     /// <remarks>
     /// Aspire's Kafka integration runs <c>confluentinc/confluent-local</c>, which bundles parts under a
-    /// source-available license, so the official Apache image is used instead (as in link-lbw). That
+    /// source-available license, so the official Apache image is used instead. That
     /// image drops its own single-node settings as soon as any setting is given, and Aspire gives the
     /// listeners, so the KRaft settings are set here.
     /// <para>

@@ -110,9 +110,7 @@ internal static class JavaServiceExtensions
         {
             var name = copy == 1 ? module : $"{module}-{copy}";
             var resource = builder.AddExecutable(name, javaCommand,
-                    Path.Combine(javaDirectory, module), "-jar", Path.Combine("target", $"{module}-{version}.jar"))
-                // The name logback appends to every Loki line ([instance=validation-2]).
-                .WithEnvironment("LINK_SERVICE_INSTANCE", name);
+                    Path.Combine(javaDirectory, module), "-jar", Path.Combine("target", $"{module}-{version}.jar"));
             // Aspire passes the port it picked for the copy in server.port. The first copy's sits behind the
             // proxy, which holds the fixed port.
             resource = copy == 1

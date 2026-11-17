@@ -436,7 +436,7 @@ public class RubricController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already retired")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already retired, or it is the only published version of the rubric the reporting pipeline validates against (vaas.bridge.rubric-id, with vaas.bridge.enabled)")
     })
     @PostMapping("/{rubricId}/versions/{semver}/$retire")
     public ResponseEntity<ApiResponse<RubricVersionSummaryDto>> retire(

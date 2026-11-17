@@ -5,6 +5,7 @@ import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionException;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
+import com.lantanagroup.link.validation.exceptions.RubricInUseException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
@@ -535,6 +536,14 @@ class RubricControllerTest {
             when(registry.retire(any(), any(), any()))
                     .thenThrow(new RubricLifecycleException("piqi.core", "1.0.0",
                             RubricVersionStatus.RETIRED, "retire"));
+            expectStatus(post(BASE + "/piqi.core/versions/1.0.0/$retire"), 409);
+        }
+
+        @Test
+        @DisplayName("only published version of the pipeline rubric -> 409 (documented)")
+        void retire_pipelineRubricInUse() throws Exception {
+            when(registry.retire(any(), any(), any()))
+                    .thenThrow(new RubricInUseException("piqi.core", "1.0.0"));
             expectStatus(post(BASE + "/piqi.core/versions/1.0.0/$retire"), 409);
         }
     }

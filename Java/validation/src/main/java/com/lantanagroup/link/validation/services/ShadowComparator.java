@@ -39,18 +39,23 @@ public class ShadowComparator {
      *
      * @param legacyValid whether the legacy engine passed the patient; null when unknown
      * @param rubricValid whether the rubric engine passed the patient; null when unknown
+     * @param legacyUncategorized how many legacy findings are in no category. The legacy verdict does not count
+     *                            them (see {@link ValidationVerdict#legacyValid}), so the log says so when there are any
      */
     public void compareAndLog(
             String correlationId, UUID requestId, String facilityId, String patientId, String reportId,
             String rubricId, boolean ranNewEngine, Boolean legacyValid, Boolean rubricValid,
-            List<Result> legacyResults, List<Result> newResults) {
+            long legacyUncategorized, List<Result> legacyResults, List<Result> newResults) {
         ResultDiff diff = ResultDiff.between(legacyResults, newResults);
 
         String agreement = legacyValid == null || rubricValid == null ? "unknown"
                 : legacyValid.equals(rubricValid) ? "agree" : "disagree";
-        log.info("Shadow verdict for report {} patient {}: legacy {}, rubric {} ({}); findings: legacy {}, rubric {}",
+        log.info("Shadow verdict for report {} patient {}: legacy {}, rubric {} ({}); findings: legacy {}, rubric {}{}",
                 LogUtils.sanitize(reportId), LogUtils.sanitize(patientId), verdict(legacyValid), verdict(rubricValid),
-                agreement, legacyResults.size(), newResults.size());
+                agreement, legacyResults.size(), newResults.size(),
+                legacyUncategorized > 0
+                        ? "; " + legacyUncategorized + " legacy findings are uncategorized and not counted in its verdict"
+                        : "");
 
         String addedJson = writeFindingsJson(diff.getAdded(), "added", reportId);
         String missingJson = writeFindingsJson(diff.getMissing(), "missing", reportId);

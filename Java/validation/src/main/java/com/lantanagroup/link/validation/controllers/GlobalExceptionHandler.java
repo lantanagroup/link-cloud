@@ -5,6 +5,7 @@ import com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionExcept
 import com.lantanagroup.link.validation.exceptions.InvalidRubricRequestException;
 import com.lantanagroup.link.validation.exceptions.PayloadParseException;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
+import com.lantanagroup.link.validation.exceptions.RubricInUseException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricPreconditionFailedException;
@@ -74,7 +75,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler({
             RubricVersionConflictException.class,
             RubricLifecycleException.class,
-            RubricDryRunRequiredException.class
+            RubricDryRunRequiredException.class,
+            RubricInUseException.class
     })
     public ResponseEntity<Object> handleConflict(RuntimeException ex) {
         logger.warn("Rubric lifecycle conflict: {}", LogUtils.sanitize(ex.getMessage()));

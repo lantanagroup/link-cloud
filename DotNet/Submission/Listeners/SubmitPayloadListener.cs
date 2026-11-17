@@ -137,8 +137,6 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             
             string? facilityId = key?.FacilityId;
-            using var stage = PipelineStageLog.Start(_logger, "Submission", result, facilityId, value.PatientId,
-                correlationId, [key.ReportScheduleId.ToString()], value.PayloadType.ToString());
             try
             {
                 if (string.IsNullOrEmpty(facilityId))
@@ -164,7 +162,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                         key.ReportScheduleId,
                         value.PayloadType,
                         value.PatientId);
-                    stage.Outcome = PipelineStageOutcome.Completed;
                     return;
                 }
 
@@ -227,27 +224,21 @@ namespace LantanaGroup.Link.Submission.Listeners
                         value.PayloadType,
                         value.PatientId);
                 }
-
-                stage.Outcome = PipelineStageOutcome.Completed;
             }
             catch (TransientException ex)
             {
-                stage.Outcome = PipelineStageOutcome.Retried;
                 _transientExceptionHandler.HandleException(result, ex, facilityId!);
             }
             catch (DeadLetterException ex)
             {
-                stage.Outcome = PipelineStageOutcome.DeadLettered;
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                stage.Outcome = PipelineStageOutcome.Cancelled;
                 throw;
             }
             catch (Exception ex)
             {
-                stage.Outcome = PipelineStageOutcome.DeadLettered;
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             finally

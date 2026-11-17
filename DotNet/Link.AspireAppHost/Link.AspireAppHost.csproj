@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.1" />
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.5" />
 
   <!--
     The optional local orchestrator for link-cloud. It starts the infrastructure in containers and
@@ -15,6 +15,11 @@
     <!-- The app host runs with `dotnet run` or from the IDE. It does not need the Aspire CLI bundle. -->
     <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
     <UserSecretsId>link-cloud-apphost-6f3c2a91-8d4e-4b7a-9c15-2e7d0f8b4a63</UserSecretsId>
+    <!-- As every service does: packages.lock.json records the exact packages restored, transitive ones included.
+         The Aspire SDK adds its dashboard and orchestration packages for the machine's own platform
+         (Aspire.Dashboard.Sdk.win-x64 and so on), so the committed file names one platform's; restoring on
+         another rewrites those entries, which is not a change to commit. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>

@@ -128,7 +128,9 @@ management:
 
 logging:
   level:
-    com.lantanagroup.link: debug
+    # info, not debug: the rubric engine logs a line per check per patient at debug. The local profile turns
+    # debug back on; elsewhere, set logging.level.com.lantanagroup.link (or a narrower package) to debug.
+    com.lantanagroup.link: info
 
 secret-management:
   key-vault-uri: ''

@@ -5,32 +5,32 @@
     {
       "Status": "Admit",
       "TimeFrame": "LessThan24Hours",
-      "FhirId": "Stu3multi-NamitaPatientsadmit1below24"
+      "FhirId": "admit-under-24h"
     },
     {
       "Status": "Admit",
       "TimeFrame": "Between24To48Hours",
-      "FhirId": "Stu3multi-NamitaPatientsadmit124to48"
+      "FhirId": "admit-24h-to-48h"
     },
     {
       "Status": "Admit",
       "TimeFrame": "MoreThan48Hours",
-      "FhirId": "Stu3multi-NamitaPatientsadmit1over48"
+      "FhirId": "admit-over-48h"
     },
     {
       "Status": "Discharge",
       "TimeFrame": "LessThan24Hours",
-      "FhirId": "Stu3multi-NamitaPatientsdischarge1below24"
+      "FhirId": "discharge-under-24h"
     },
     {
       "Status": "Discharge",
       "TimeFrame": "Between24To48Hours",
-      "FhirId": "Stu3multi-NamitaPatientsdischarge124-48"
+      "FhirId": "discharge-24h-to-48h"
     },
     {
       "Status": "Discharge",
       "TimeFrame": "MoreThan48Hours",
-      "FhirId": "Stu3multi-NamitaPatientsdischarge1over48"
+      "FhirId": "discharge-over-48h"
     }
   ]
 }

@@ -23,5 +23,24 @@ class ExpressionTargetsTest {
         assertNull(ExpressionTargets.onlyResourceType("Observation.code.union(Condition.code)"));
         assertNull(ExpressionTargets.onlyResourceType("code"));
         assertNull(ExpressionTargets.onlyResourceType("%resource.code"));
+        assertNull(ExpressionTargets.onlyResourceType("Observation.code.combine(Condition.code)"));
+        assertNull(ExpressionTargets.onlyResourceType("Observation.iif(status = 'final', code, Condition.code)"));
+        assertNull(ExpressionTargets.onlyResourceType("Observation.code.union (Condition.code)"));
+    }
+
+    @Test
+    void anAbstractTypeMatchesEveryResourceDerivedFromItSoNarrowsNothing() {
+        // FHIRPath matches a leading type against the resource's type and its ancestors (checked against HAPI).
+        assertNull(ExpressionTargets.leadingResourceType("Resource.meta.security"));
+        assertNull(ExpressionTargets.leadingResourceType("DomainResource.text.status"));
+        assertNull(ExpressionTargets.leadingResourceType("MetadataResource.status"));
+        assertNull(ExpressionTargets.onlyResourceType("Resource.meta.security"));
+        assertNull(ExpressionTargets.onlyResourceType("(DomainResource.text.status)"));
+    }
+
+    @Test
+    void wordsThatOnlyResembleTheCombiningFunctionsDoNotCount() {
+        assertEquals("Observation", ExpressionTargets.onlyResourceType("Observation.extension.where(url = 'x').valueString"));
+        assertEquals("Observation", ExpressionTargets.onlyResourceType("Observation.code.where(text = 'union(a)')"));
     }
 }

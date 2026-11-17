@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.PipelineRubricConfig;
 import com.lantanagroup.link.validation.configs.RubricDryRunConfig;
 import com.lantanagroup.link.validation.entities.Rubric;
 import com.lantanagroup.link.validation.entities.RubricLifecycleEvent;
@@ -36,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -61,7 +64,7 @@ class RubricRegistryServiceManagementTest {
     private RubricRegistryService service() {
         return new RubricRegistryService(
                 rubricRepository, versionRepository, checkRepository, eventRepository,
-                definitionValidator, new ObjectMapper(), new RubricDryRunConfig(), cacheService);
+                definitionValidator, new ObjectMapper(), new RubricDryRunConfig(), cacheService, new PipelineRubricConfig());
     }
 
     private static RubricVersion version(RubricVersionStatus status) {
@@ -89,6 +92,7 @@ class RubricRegistryServiceManagementTest {
                 .thenReturn(Optional.of(Rubric.builder().rubricId("piqi.core").title("PIQI Core").build()));
         when(rubricRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(versionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(versionRepository.replaceDraftIfUnchanged(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         when(versionRepository.saveAndFlush(any())).thenAnswer(inv -> {
             RubricVersion saved = inv.getArgument(0);
             saved.setRubricVersionId(2L);
@@ -121,7 +125,9 @@ class RubricRegistryServiceManagementTest {
 
             service().registerVersion(payload(), "author", new RubricSavePrecondition("ABC123", false));
 
-            verify(versionRepository).save(any());
+            // the guard uses the stored checksum, so the database compares like with like whatever its collation
+            verify(versionRepository).replaceDraftIfUnchanged(eq(1L), eq(RubricVersionStatus.DRAFT), eq("abc123"),
+                    any(), any(), any(), any(), any(), eq("author"));
         }
 
         @Test
@@ -191,7 +197,57 @@ class RubricRegistryServiceManagementTest {
             service().registerVersion(payload(), "author", null);
             service().registerVersion(payload(), "author");
 
-            verify(versionRepository, org.mockito.Mockito.times(3)).save(any());
+            // guarded on the status only: a draft is still replaced whatever it holds
+            verify(versionRepository, org.mockito.Mockito.times(3)).replaceDraftIfUnchanged(eq(1L),
+                    eq(RubricVersionStatus.DRAFT), isNull(), any(), any(), any(), any(), any(), eq("author"));
+            verify(versionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("another save lands between the check and the write -> 412, and the checks and history are untouched")
+        void lostRaceToAnotherSave() {
+            stubExisting(version(RubricVersionStatus.DRAFT));
+            stubSave();
+            when(versionRepository.replaceDraftIfUnchanged(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(0);
+            RubricVersion savedByOther = version(RubricVersionStatus.DRAFT);
+            savedByOther.setChecksum("other");
+            when(versionRepository.findById(1L)).thenReturn(Optional.of(savedByOther));
+
+            assertThatThrownBy(() -> service().registerVersion(payload(), "author", new RubricSavePrecondition("abc123", false)))
+                    .isInstanceOf(RubricPreconditionFailedException.class)
+                    .hasMessageContaining("has been changed since it was read");
+            verify(checkRepository, never()).softDeleteByRubricVersionId(any());
+            verify(checkRepository, never()).saveAll(any());
+            verifyNoInteractions(eventRepository, cacheService);
+        }
+
+        @Test
+        @DisplayName("the draft is published between the check and the write -> 409, and it stays published")
+        void lostRaceToPublish() {
+            stubExisting(version(RubricVersionStatus.DRAFT));
+            stubSave();
+            when(versionRepository.replaceDraftIfUnchanged(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(0);
+            when(versionRepository.findById(1L)).thenReturn(Optional.of(version(RubricVersionStatus.PUBLISHED)));
+
+            assertThatThrownBy(() -> service().registerVersion(payload(), "author"))
+                    .isInstanceOf(RubricVersionConflictException.class)
+                    .hasMessageContaining("PUBLISHED");
+            verify(versionRepository, never()).save(any());
+            verify(checkRepository, never()).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("the draft is deleted between the check and the write -> 412, not created anew")
+        void lostRaceToDelete() {
+            stubExisting(version(RubricVersionStatus.DRAFT));
+            stubSave();
+            when(versionRepository.replaceDraftIfUnchanged(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(0);
+            when(versionRepository.findById(1L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service().registerVersion(payload(), "author", new RubricSavePrecondition("abc123", false)))
+                    .isInstanceOf(RubricPreconditionFailedException.class)
+                    .hasMessageContaining("no longer exists");
+            verify(versionRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -208,6 +264,7 @@ class RubricRegistryServiceManagementTest {
 
         private void verifyNothingWritten() {
             verify(versionRepository, never()).save(any());
+            verify(versionRepository, never()).replaceDraftIfUnchanged(any(), any(), any(), any(), any(), any(), any(), any(), any());
             verify(versionRepository, never()).saveAndFlush(any());
             verify(rubricRepository, never()).save(any());
             verify(checkRepository, never()).softDeleteByRubricVersionId(any());

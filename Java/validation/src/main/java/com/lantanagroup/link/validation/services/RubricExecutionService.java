@@ -189,6 +189,15 @@ public class RubricExecutionService {
             for (int i = 0; i < findingDtos.size(); i++) {
                 findingDtos.get(i).setId(findingEntities.get(i).getFindingId());
             }
+            // the one INFO line per evaluation; each check's own summary is DEBUG, as there are about a
+            // hundred of them per patient
+            log.info("Rubric {} v{} evaluated for facility {} patient {} report {}: {}, {} check(s), {} finding(s), in {} ms",
+                    LogUtils.sanitize(version.getRubricId()), LogUtils.sanitize(version.getSemver()),
+                    LogUtils.sanitize(subject != null ? subject.getFacilityId() : null),
+                    LogUtils.sanitize(subject != null ? subject.getPatientId() : null),
+                    LogUtils.sanitize(subject != null ? subject.getReportId() : null),
+                    out.resultEntity().getStatus(), enabled.size(), evaluated.size(),
+                    java.time.Duration.between(requestedAt, completedAt).toMillis());
         } else {
             rubricVersionRepository.recordDryRun(
                     version.getRubricVersionId(), out.resultEntity().getStatus(), completedAt);

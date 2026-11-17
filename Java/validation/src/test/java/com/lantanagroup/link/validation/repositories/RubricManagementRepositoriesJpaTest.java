@@ -309,4 +309,34 @@ class RubricManagementRepositoriesJpaTest {
         assertThat(lifecycleEventRepository.findByRubricIdOrderByOccurredAtDesc("piqi.core"))
                 .extracting(RubricLifecycleEvent::getAction).containsExactly(RubricLifecycleAction.DELETED);
     }
+
+    @Test
+    @DisplayName("counting the other published versions leaves out the version named and other statuses and rubrics")
+    void countOtherPublished() {
+        persistRubric("piqi.core", "PIQI Core", "qa");
+        persistRubric("other", "Other", "qa");
+        RubricVersion first = persistVersion("piqi.core", "1.0.0", RubricVersionStatus.PUBLISHED);
+        RubricVersion second = persistVersion("piqi.core", "1.1.0", RubricVersionStatus.PUBLISHED);
+        persistVersion("piqi.core", "1.2.0", RubricVersionStatus.DRAFT);
+        persistVersion("piqi.core", "0.9.0", RubricVersionStatus.RETIRED);
+        persistVersion("other", "1.0.0", RubricVersionStatus.PUBLISHED);
+
+        assertThat(versionRepository.countByRubricIdAndStatusAndRubricVersionIdNot(
+                "piqi.core", RubricVersionStatus.PUBLISHED, first.getRubricVersionId())).isEqualTo(1);
+
+        versionRepository.retireIfNotRetired(second.getRubricVersionId(), RubricVersionStatus.RETIRED,
+                java.time.OffsetDateTime.now(), "qa");
+        assertThat(versionRepository.countByRubricIdAndStatusAndRubricVersionIdNot(
+                "piqi.core", RubricVersionStatus.PUBLISHED, first.getRubricVersionId())).isZero();
+    }
+
+    @Test
+    @DisplayName("locking a rubric returns its row, and nothing for an unknown id")
+    void lockById() {
+        persistRubric("piqi.core", "PIQI Core", "qa");
+        entityManager.clear();
+
+        assertThat(rubricRepository.lockById("piqi.core")).map(Rubric::getRubricId).contains("piqi.core");
+        assertThat(rubricRepository.lockById("missing")).isEmpty();
+    }
 }

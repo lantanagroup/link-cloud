@@ -132,6 +132,12 @@ export function planAction(
       }
       const next = activeAfterRetiring(rubric, version.semver);
       const noneLeft = !!rubric && !next;
+      // The service refuses this one: the pipeline would have no version to validate against.
+      if (use === 'decides' && noneLeft) {
+        plan.blocked = 'The reporting pipeline validates patient data against this rubric, and this is its only '
+          + 'published version. Publish another version before retiring this one.';
+        return plan;
+      }
       if (!rubric) {
         plan.consequences.push('Validation stops using this version.');
       } else if (version.semver !== active) {
@@ -144,11 +150,15 @@ export function planAction(
         plan.consequences.push('No published version will remain, so validation against this rubric has nothing to run.');
       }
       plan.consequences.push('A retired version cannot be published again. To bring it back, create a new version from it.');
-      // With the rubric unread the page cannot tell whether a version would remain; treat it as none would.
-      if (use && (noneLeft || !rubric)) {
+      if (use === 'decides' && !rubric) {
+        // With the rubric unread the page cannot tell whether a version would remain; the service can.
+        plan.warnings.push('The reporting pipeline validates patient data against this rubric. '
+          + 'If this is its only published version, retiring it will be refused.');
+      } else if (use === 'compared' && (noneLeft || !rubric)) {
+        // Nothing stops this one: the comparison stops, but the validator that decides carries on.
         plan.warnings.push(noneLeft
-          ? 'The reporting pipeline uses this rubric. With no published version, pipeline validation has nothing to run.'
-          : 'The reporting pipeline uses this rubric. If no other version is published, pipeline validation has nothing to run.');
+          ? 'The reporting pipeline compares this rubric with the validator that decides. With no published version, that comparison has nothing to run.'
+          : 'The reporting pipeline compares this rubric with the validator that decides. If no other version is published, that comparison has nothing to run.');
         plan.typeToConfirm = rubricId;
       }
       return plan;

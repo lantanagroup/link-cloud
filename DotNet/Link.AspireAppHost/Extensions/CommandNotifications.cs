@@ -3,14 +3,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Link.AspireAppHost.Extensions;
 
 /// <summary>
-/// Tells the person on the dashboard how a long-running command is going, as link-lbw's AppHost does: a notice
+/// Tells the person on the dashboard how a long-running command is going: a notice
 /// at the top while it runs, then one that stays until dismissed, green on success and red on failure.
 /// </summary>
 internal static class CommandNotifications
 {
     /// <summary>
     /// Runs <paramref name="work"/> with a "running" notice, then shows its outcome. The outcome uses the result's
-    /// own message, so what the dashboard shows matches what the command returns. A cancelled result shows nothing.
+    /// own message, so what the dashboard shows matches what the command returns. A canceled result shows nothing.
     /// </summary>
     /// <remarks>
     /// A notification's task only finishes when the person dismisses it, so none is awaited. Cancelling the

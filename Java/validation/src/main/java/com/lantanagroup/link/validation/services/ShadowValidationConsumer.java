@@ -86,6 +86,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
             List<Result> newResults;
             Boolean legacyValid;
             Boolean rubricValid;
+            long legacyUncategorized;
 
             if (event.isRanNewEngine()) {
                 // primary ran the new engine; we run the old one, purely for comparison
@@ -98,6 +99,7 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
                         requestedAt, completedAt);
                 newResults = toResults(event.getAuthoritativeResult());
                 legacyValid = ValidationVerdict.legacyValid(legacyResults);
+                legacyUncategorized = ValidationVerdict.uncategorizedCount(legacyResults);
                 rubricValid = event.getAuthoritativeValid();
             } else {
                 // primary ran the old engine; we run the new one -- persists to rubric_result/rubric_finding
@@ -109,13 +111,18 @@ public class ShadowValidationConsumer extends AsyncListener<String, ShadowCompar
                 newResults = outcome.results();
                 legacyResults = toResults(event.getAuthoritativeResult());
                 legacyValid = event.getAuthoritativeValid();
+                // counted from the event: the results rebuilt from it carry no categories
+                legacyUncategorized = event.getAuthoritativeResult() == null ? 0
+                        : event.getAuthoritativeResult().stream()
+                                .filter(f -> f != null && (f.getCategoryIds() == null || f.getCategoryIds().isEmpty()))
+                                .count();
                 // As the primary consumer decides it: by the rubric status, or unknown when there is none.
                 rubricValid = outcome.status() == null ? null : ValidationVerdict.rubricValid(outcome.status());
             }
 
             shadowComparator.compareAndLog(event.getCorrelationId(), event.getRequestId(), event.getFacilityId(),
                     event.getPatientId(), event.getReportId(), rubricId, event.isRanNewEngine(), legacyValid, rubricValid,
-                    legacyResults, newResults);
+                    legacyUncategorized, legacyResults, newResults);
         } catch (Exception e) {
             _logger.warn("Shadow comparison failed for report {}; skipping",
                     LogUtils.sanitize(event.getReportId()), e);

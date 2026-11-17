@@ -124,6 +124,27 @@ class ValueSetCheckExecutorTest {
     }
 
     @Test
+    @DisplayName("a path starting with Resource reaches every entry, as FHIRPath matches it against every resource")
+    void aPathStartingWithAnAbstractTypeIsEvaluatedOnEveryEntry() {
+        IValidationSupport.CodeValidationResult notMember = mock(IValidationSupport.CodeValidationResult.class);
+        when(notMember.isOk()).thenReturn(false);
+        when(chain.validateCode(any(), any(), eq("http://x/cs"), eq("bad"), any(), eq("http://x/vs"))).thenReturn(notMember);
+
+        Observation observation = new Observation();
+        observation.setId("o1");
+        observation.getMeta().addSecurity(new Coding("http://x/cs", "bad", null));
+        org.hl7.fhir.r4.model.Patient patient = new org.hl7.fhir.r4.model.Patient();
+        patient.setId("p1");
+        patient.getMeta().addSecurity(new Coding("http://x/cs", "bad", null));
+        ExecutionContext context = ExecutionContext.builder().bundleEntries(List.of(observation, patient)).build();
+
+        List<RawFinding> findings = executor.execute(
+                check("{\"path\":\"Resource.meta.security\",\"valueSet\":\"http://x/vs\"}"), context);
+
+        assertThat(findings).extracting(RawFinding::getLocation).containsExactlyInAnyOrder("Observation/o1", "Patient/p1");
+    }
+
+    @Test
     @DisplayName("an unresolvable value set yields a not-evaluated (INCONCLUSIVE) finding, not a membership failure")
     void unresolvableValueSetIsNotEvaluated() {
         IValidationSupport.CodeValidationResult result = mock(IValidationSupport.CodeValidationResult.class);

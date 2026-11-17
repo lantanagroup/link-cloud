@@ -173,7 +173,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
                 }
             }
         }
-        log.info("VALUESET check '{}' done: {} code(s) checked against {}, {} not-a-member, {} not-evaluated, {} skipped -> {} finding(s)",
+        log.debug("VALUESET check '{}' done: {} code(s) checked against {}, {} not-a-member, {} not-evaluated, {} skipped -> {} finding(s)",
                 check.getCheckLocalId(), checked, valueSet, notMember, notEvaluated, skipped, findings.size());
         return findings;
     }
@@ -253,7 +253,7 @@ public class ValueSetCheckExecutor implements CheckExecutor {
             }
 
             if (childFindings.isEmpty()) {
-                log.info("VALUESET (combinator) check '{}': branch '{}' passed", check.getCheckLocalId(), synthetic.getCheckLocalId());
+                log.debug("VALUESET (combinator) check '{}': branch '{}' passed", check.getCheckLocalId(), synthetic.getCheckLocalId());
                 anyPassed = true;
                 if (matchMode == MatchMode.ANY) {
                     break; // short-circuit: one satisfied branch is enough for ANY
@@ -262,12 +262,12 @@ public class ValueSetCheckExecutor implements CheckExecutor {
             }
 
             if (childFindings.stream().allMatch(RawFinding::isNotEvaluated)) {
-                log.info("VALUESET (combinator) check '{}': branch '{}' could not be evaluated", check.getCheckLocalId(), synthetic.getCheckLocalId());
+                log.debug("VALUESET (combinator) check '{}': branch '{}' could not be evaluated", check.getCheckLocalId(), synthetic.getCheckLocalId());
                 anyInconclusive = true;
                 continue;
             }
 
-            log.info("VALUESET (combinator) check '{}': branch '{}' failed", check.getCheckLocalId(), synthetic.getCheckLocalId());
+            log.debug("VALUESET (combinator) check '{}': branch '{}' failed", check.getCheckLocalId(), synthetic.getCheckLocalId());
             reasons.addAll(childFindings);
         }
 

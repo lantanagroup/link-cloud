@@ -43,7 +43,6 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using PatientEvent = LantanaGroup.Link.Census.Domain.Entities.POI.PatientEvent;
-using LantanaGroup.Link.Shared.Application.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -278,8 +277,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
-    // Names this instance on every line (Serilog:Properties:ServiceInstance), to tell scaled-out copies apart.
-    builder.Configuration.AddServiceInstanceLogProperty();
     Log.Logger = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
         .Filter.ByExcluding("RequestPath like '/health%'")

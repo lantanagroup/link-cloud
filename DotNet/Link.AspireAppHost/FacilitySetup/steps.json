@@ -5,8 +5,7 @@
     "facilityName": "Dev Facility",
     "timeZone": "America/Chicago",
     "measure": "NHSNAcuteCareHospitalMonthlyInitialPopulation",
-    "ehr": "epic",
-    "fhirServerBaseUrl": "https://ehr-test.nhsnlink.org/fhir"
+    "ehr": "epic"
   },
   "steps": [
     {
@@ -71,7 +70,7 @@
     },
     {
       "name": "FHIR query list",
-      "$comment": "The patient List resources census reads. The FhirIds are lists on the QA FHIR server (ehr-test.nhsnlink.org); another FHIR server needs its own list ids.",
+      "$comment": "The patient List resources census reads. The FhirIds are placeholders: neither the mock nor a deployed FHIR server has lists by these ids. Census is created disabled, so nothing reads them; before enabling it, replace them with the ids of the lists on the facility's FHIR server.",
       "service": "data-acquisition",
       "method": "POST",
       "path": "/api/data-acquisition/fhirQueryList",

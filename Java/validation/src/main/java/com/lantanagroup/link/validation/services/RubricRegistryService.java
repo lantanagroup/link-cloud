@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.PipelineRubricConfig;
 import com.lantanagroup.link.validation.configs.RubricDryRunConfig;
 import com.lantanagroup.link.validation.entities.Rubric;
 import com.lantanagroup.link.validation.entities.RubricCheck;
@@ -9,6 +10,7 @@ import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.RubricLifecycleAction;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
+import com.lantanagroup.link.validation.exceptions.RubricInUseException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricPreconditionFailedException;
@@ -61,6 +63,7 @@ public class RubricRegistryService {
     private final ObjectMapper objectMapper;
     private final RubricDryRunConfig dryRunConfig;
     private final RubricCacheService rubricCacheService;
+    private final PipelineRubricConfig pipelineRubricConfig;
 
     @Transactional
     public RubricVersion registerVersion(RubricVersionPayloadDto payload, String actor) {
@@ -116,19 +119,33 @@ public class RubricRegistryService {
         RubricVersion version;
         if (existing.isPresent()) {
             version = existing.get();
-            boolean definitionChanged = !checksum.equals(version.getChecksum());
-            version.setChecksum(checksum);
-            version.setDefinitionJson(definitionJson);
-            version.setDimensionsJson(writeJson(payload.getDimensions()));
-            version.setApplicableContextJson(writeJson(payload.getApplicableContext()));
-            version.setScoringPolicyJson(writeJson(payload.getScoringPolicy()));
-            version.setCreatedBy(actor);
-            if (definitionChanged) {
-                // the old dry run was against a different definition, so it no longer counts
+            // guarded update, not a read-modify-save: the checks above read the row without a lock, so they are
+            // repeated in the update's WHERE. With If-Match the checksum read is required too; without it a save
+            // still replaces whatever the draft holds, but never a version that stopped being a draft. The update
+            // also clears the dry run when the definition changes (the old one was against another definition).
+            String expectedChecksum = precondition != null && precondition.expectedChecksum() != null
+                    ? version.getChecksum()
+                    : null;
+            String dimensionsJson = writeJson(payload.getDimensions());
+            String applicableContextJson = writeJson(payload.getApplicableContext());
+            String scoringPolicyJson = writeJson(payload.getScoringPolicy());
+            int updated = rubricVersionRepository.replaceDraftIfUnchanged(version.getRubricVersionId(),
+                    RubricVersionStatus.DRAFT, expectedChecksum, checksum, definitionJson, dimensionsJson,
+                    applicableContextJson, scoringPolicyJson, actor);
+            if (updated == 0) {
+                throw lostDraftRace(payload, version.getRubricVersionId());
+            }
+            // the update cleared the persistence context; patch the entity we return to match the row, as publish does
+            if (!checksum.equals(version.getChecksum())) {
                 version.setDryRunCompletedAt(null);
                 version.setDryRunStatus(null);
             }
-            version = rubricVersionRepository.save(version);
+            version.setChecksum(checksum);
+            version.setDefinitionJson(definitionJson);
+            version.setDimensionsJson(dimensionsJson);
+            version.setApplicableContextJson(applicableContextJson);
+            version.setScoringPolicyJson(scoringPolicyJson);
+            version.setCreatedBy(actor);
             // soft-delete the old checks, the new payload's checks replace them
             rubricCheckRepository.softDeleteByRubricVersionId(version.getRubricVersionId());
         } else {
@@ -196,12 +213,16 @@ public class RubricRegistryService {
         // the status check above can go stale before we write, so flip it with a guarded update
         // instead of setStatus + save. only one concurrent publish gets a row back.
         OffsetDateTime publishedAt = OffsetDateTime.now();
-        int updated = rubricVersionRepository.publishIfStatus(
-                v.getRubricVersionId(), RubricVersionStatus.DRAFT, RubricVersionStatus.PUBLISHED, publishedAt, publishedBy);
+        // the checksum is guarded as well, so a draft replaced after the dry-run check above is not published
+        int updated = rubricVersionRepository.publishIfStatus(v.getRubricVersionId(), RubricVersionStatus.DRAFT,
+                v.getChecksum(), RubricVersionStatus.PUBLISHED, publishedAt, publishedBy);
         if (updated == 0) {
-            // someone else transitioned it first — re-read so the 409 reports the real status
+            // someone else transitioned or replaced it first — re-read so the 409 reports the real status
             RubricVersion current = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
                     .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
+            if (current.getStatus() == RubricVersionStatus.DRAFT) {
+                throw RubricLifecycleException.changedWhilePublishing(rubricId, normalizedSemver);
+            }
             throw new RubricLifecycleException(rubricId, normalizedSemver, current.getStatus(), "publish");
         }
         // the update cleared the persistence context; patch the fields on the entity we return
@@ -219,12 +240,25 @@ public class RubricRegistryService {
     @Transactional
     public RubricVersion retire(String rubricId, String semver, String retiredBy) {
         final String normalizedSemver = Semver.normalize(semver);
+        // while the pipeline decides on this rubric, retires of it run one at a time, so two retires of its
+        // last two published versions can't each count the other as the one left
+        boolean pipelineRubric = pipelineRubricConfig.decidesOn(rubricId);
+        if (pipelineRubric) {
+            rubricRepository.lockById(rubricId);
+        }
         RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, normalizedSemver)
                 .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, normalizedSemver));
         // drafts can be retired directly (abandoned without ever publishing), only
         // re-retiring is blocked so retiredAt/retiredBy and the audit trail stay intact
         if (v.getStatus() == RubricVersionStatus.RETIRED) {
             throw new RubricLifecycleException(rubricId, normalizedSemver, v.getStatus(), "retire");
+        }
+        // the pipeline evaluates the newest published version; with none left every ReadyForValidation
+        // fails, retries and ends on the error topic, and no ValidationComplete is sent
+        if (pipelineRubric && v.getStatus() == RubricVersionStatus.PUBLISHED
+                && rubricVersionRepository.countByRubricIdAndStatusAndRubricVersionIdNot(
+                        rubricId, RubricVersionStatus.PUBLISHED, v.getRubricVersionId()) == 0) {
+            throw new RubricInUseException(rubricId, normalizedSemver);
         }
         // guarded update like publish — if it was retired between our read and here we get 0 rows
         OffsetDateTime retiredAt = OffsetDateTime.now();
@@ -413,6 +447,21 @@ public class RubricRegistryService {
     }
 
     // a precondition is checked after the PUBLISHED/RETIRED refusal, so by here an existing version is a DRAFT
+    /**
+     * Why a guarded draft replacement touched nothing, read back after the fact: the version was published or
+     * retired (409, as the check before the update reports it), deleted, or saved by someone else (412).
+     */
+    private RuntimeException lostDraftRace(RubricVersionPayloadDto payload, Long versionId) {
+        Optional<RubricVersion> current = rubricVersionRepository.findById(versionId);
+        if (current.isEmpty()) {
+            return RubricPreconditionFailedException.missing(payload.getId(), payload.getSemver());
+        }
+        if (current.get().getStatus() != RubricVersionStatus.DRAFT) {
+            return new RubricVersionConflictException(payload.getId(), payload.getSemver(), current.get().getStatus());
+        }
+        return RubricPreconditionFailedException.changed(payload.getId(), payload.getSemver());
+    }
+
     private void checkPrecondition(RubricSavePrecondition precondition, RubricVersionPayloadDto payload,
                                    Optional<RubricVersion> existing) {
         if (precondition == null || precondition.isNone()) {

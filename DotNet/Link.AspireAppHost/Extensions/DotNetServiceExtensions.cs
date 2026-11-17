@@ -32,7 +32,7 @@ internal static class DotNetServiceExtensions
     /// ingress: the proxy spreads requests across them, and each replica listens on its own port. The number
     /// comes from <c>Replicas:&lt;name&gt;</c> (see <see cref="ReplicaExtensions"/>). Only the
     /// services go through it. The infrastructure containers keep Docker's published ports, because under
-    /// load the proxy has been seen to stop accepting connections and not recover (link-lbw, at about 400
+    /// load the proxy has been seen to stop accepting connections and not recover (at about 400
     /// SQL Server connections).
     /// </remarks>
     public static IResourceBuilder<ProjectResource> AddLinkService<TProject>(
@@ -49,12 +49,6 @@ internal static class DotNetServiceExtensions
         var replicas = builder.ReplicaCount(name);
         if (replicas > 1)
             service.WithReplicas(replicas);
-
-        // The name every log line carries (ServiceInstance; see ServiceInstanceLoggingExtensions). With replicas, each
-        // gets the suffix the dashboard shows it with (dataacq-worker-rynurthc): Aspire's process launcher fills in the
-        // per-replica id, as it does for the OpenTelemetry service.instance.id it passes.
-        service.WithEnvironment("LINK_SERVICE_INSTANCE",
-            replicas > 1 ? name + "-{{- index .Annotations \"otel-service-instance-id\" -}}" : name);
 
         return service
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Docker")

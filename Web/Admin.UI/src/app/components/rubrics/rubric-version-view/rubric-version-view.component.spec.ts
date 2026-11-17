@@ -394,9 +394,24 @@ describe('RubricVersionViewComponent', () => {
       expect(component.canConfirm).toBeTrue();
     });
 
-    it('asks for the rubric id when the pipeline uses the rubric and no published version would remain', () => {
+    it('refuses when the pipeline decides on the rubric and no published version would remain', () => {
       rubricService.getSettings.and.returnValue(of(
         { pipelineRubricId: 'piqi.core', pipelineEnabled: true, pipelineShadowEnabled: false } as IRubricSettings));
+      rubricService.getRubric.and.returnValue(of({ ...rubric, versions: rubric.versions!.slice(0, 2) }));
+      fixture.detectChanges();
+
+      component.open('retire');
+      fixture.detectChanges();
+
+      expect(text()).toContain('Publish another version before retiring this one.');
+      expect(component.canConfirm).toBeFalse();
+      component.confirm();
+      expect(rubricService.retire).not.toHaveBeenCalled();
+    });
+
+    it('asks for the rubric id when the pipeline compares the rubric and no published version would remain', () => {
+      rubricService.getSettings.and.returnValue(of(
+        { pipelineRubricId: 'piqi.core', pipelineEnabled: false, pipelineShadowEnabled: true } as IRubricSettings));
       rubricService.getRubric.and.returnValue(of({ ...rubric, versions: rubric.versions!.slice(0, 2) }));
       rubricService.retire.and.returnValue(of(summary('1.1.0')));
       fixture.detectChanges();
@@ -404,7 +419,7 @@ describe('RubricVersionViewComponent', () => {
       component.open('retire');
       fixture.detectChanges();
 
-      expect(text()).toContain('pipeline validation has nothing to run');
+      expect(text()).toContain('that comparison has nothing to run');
       expect(component.canConfirm).toBeFalse();
       component.confirm();
       expect(rubricService.retire).not.toHaveBeenCalled();

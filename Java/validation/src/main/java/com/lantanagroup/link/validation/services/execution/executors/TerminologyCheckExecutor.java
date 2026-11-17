@@ -137,7 +137,7 @@ public class TerminologyCheckExecutor implements CheckExecutor {
                 }
             }
         }
-        log.info("TERMINOLOGY check '{}' done: {} coding(s) validated, {} invalid, {} not-evaluated, {} skipped -> {} finding(s)",
+        log.debug("TERMINOLOGY check '{}' done: {} coding(s) validated, {} invalid, {} not-evaluated, {} skipped -> {} finding(s)",
                 check.getCheckLocalId(), checked, invalid, notEvaluated, skipped, findings.size());
         return findings;
     }
